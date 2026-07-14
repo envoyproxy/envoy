@@ -12,6 +12,18 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    data = ["//test/proto:apikeys_proto_descriptor"],
+    extension_names = ["envoy.filters.http.grpc_field_extraction"],
+    deps = [
+        "//source/extensions/filters/http/grpc_field_extraction:config",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
@@ -45,6 +57,7 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_cc_proto",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -63,6 +76,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/proto:apikeys_proto_cc_proto",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )

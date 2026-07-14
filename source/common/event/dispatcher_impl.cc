@@ -26,6 +26,7 @@
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
@@ -79,13 +80,8 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.fix_dispatcher_approximate_now")) {
-    base_scheduler_.registerOnCheckCallback(
-        std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
-  } else {
-    base_scheduler_.registerOnPrepareCallback(
-        std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
-  }
+  base_scheduler_.registerOnCheckCallback(
+      std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
 DispatcherImpl::~DispatcherImpl() {
@@ -103,7 +99,7 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
 }
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
-                                     const absl::optional<std::string>& prefix) {
+                                     const std::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
   post([this, &scope, effective_prefix] {
@@ -167,11 +163,31 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
 
   auto* factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
       std::string(address->addressType()));
+
   // The target address is usually offered by EDS and the EDS api should reject the unsupported
   // address.
   // TODO(lambdai): Return a closed connection if the factory is not found. Note that the caller
   // expects a non-null connection as of today so we cannot gracefully handle unsupported address
   // type.
+#if defined(__linux__)
+  // For Linux, the source address' network namespace is relevant for client connections, since that
+  // is where the netns would be specified.
+  if (source_address && source_address->networkNamespace().has_value()) {
+    auto f = [&]() -> Network::ClientConnectionPtr {
+      return factory->createClientConnection(
+          *this, address, source_address, std::move(transport_socket), options, transport_options);
+    };
+    auto result = Network::Utility::execInNetworkNamespace(
+        std::move(f), source_address->networkNamespace()->c_str());
+    if (!result.ok()) {
+      ENVOY_LOG(error, "failed to create connection in network namespace {}: {}",
+                source_address->networkNamespace().value(), result.status().ToString());
+      return nullptr;
+    }
+    return *std::move(result);
+  }
+#endif
+
   return factory->createClientConnection(*this, address, source_address,
                                          std::move(transport_socket), options, transport_options);
 }
@@ -370,6 +386,7 @@ void DispatcherImpl::onFatalError(std::ostream& os) const {
   // Dump the state of the tracked objects in the dispatcher if thread safe. This generally
   // results in dumping the active state only for the thread which caused the fatal error.
   if (isThreadSafe()) {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto iter = tracked_object_stack_.rbegin(); iter != tracked_object_stack_.rend(); ++iter) {
       (*iter)->dumpState(os);
     }

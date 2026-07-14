@@ -83,6 +83,16 @@ bool MultiConnectionBaseImpl::initializeReadFilters() {
   return true;
 }
 
+void MultiConnectionBaseImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  if (connect_finished_) {
+    connections_[0]->addAccessLogHandler(handler);
+    return;
+  }
+  // Access log handlers should only be notified of events on the final connection, so defer adding
+  // access log handlers until the final connection has been determined.
+  post_connect_state_.access_log_handlers_.push_back(handler);
+}
+
 void MultiConnectionBaseImpl::addBytesSentCallback(Connection::BytesSentCb cb) {
   if (connect_finished_) {
     connections_[0]->addBytesSentCallback(cb);
@@ -104,6 +114,17 @@ void MultiConnectionBaseImpl::enableHalfClose(bool enabled) {
 
 bool MultiConnectionBaseImpl::isHalfCloseEnabled() const {
   return connections_[0]->isHalfCloseEnabled();
+}
+
+bool MultiConnectionBaseImpl::setSocketOption(Network::SocketOptionName name,
+                                              absl::Span<uint8_t> value) {
+  bool success = true;
+  for (auto& connection : connections_) {
+    if (!connection->setSocketOption(name, value)) {
+      success = false;
+    }
+  }
+  return success;
 }
 
 std::string MultiConnectionBaseImpl::nextProtocol() const {
@@ -177,7 +198,7 @@ ConnectionInfoProviderSharedPtr MultiConnectionBaseImpl::connectionInfoProviderS
   return connections_[0]->connectionInfoProviderSharedPtr();
 }
 
-absl::optional<Connection::UnixDomainSocketPeerCredentials>
+std::optional<Connection::UnixDomainSocketPeerCredentials>
 MultiConnectionBaseImpl::unixSocketPeerCredentials() const {
   return connections_[0]->unixSocketPeerCredentials();
 }
@@ -238,6 +259,15 @@ void MultiConnectionBaseImpl::setBufferLimits(uint32_t limit) {
   }
 }
 
+void MultiConnectionBaseImpl::setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) {
+  if (!connect_finished_) {
+    per_connection_state_.buffer_high_watermark_timeout_ = timeout;
+  }
+  for (auto& connection : connections_) {
+    connection->setBufferHighWatermarkTimeout(timeout);
+  }
+}
+
 uint32_t MultiConnectionBaseImpl::bufferLimit() const { return connections_[0]->bufferLimit(); }
 
 bool MultiConnectionBaseImpl::aboveHighWatermark() const {
@@ -293,12 +323,12 @@ bool MultiConnectionBaseImpl::startSecureTransport() {
   return ret;
 }
 
-absl::optional<std::chrono::milliseconds> MultiConnectionBaseImpl::lastRoundTripTime() const {
+std::optional<std::chrono::milliseconds> MultiConnectionBaseImpl::lastRoundTripTime() const {
   // Note, this might change before connect finishes.
   return connections_[0]->lastRoundTripTime();
 }
 
-absl::optional<uint64_t> MultiConnectionBaseImpl::congestionWindowInBytes() const {
+std::optional<uint64_t> MultiConnectionBaseImpl::congestionWindowInBytes() const {
   // Note, this value changes constantly even within the same connection.
   return connections_[0]->congestionWindowInBytes();
 }
@@ -318,16 +348,30 @@ void MultiConnectionBaseImpl::removeConnectionCallbacks(ConnectionCallbacks& cb)
     connections_[0]->removeConnectionCallbacks(cb);
     return;
   }
-  // Callbacks should only be notified of events on the final connection, so remove
-  // the callback from the list of deferred callbacks.
-  auto i = post_connect_state_.connection_callbacks_.begin();
-  while (i != post_connect_state_.connection_callbacks_.end()) {
-    if (*i == &cb) {
-      post_connect_state_.connection_callbacks_.erase(i);
+  // For performance/safety reasons we just clear the entry and do not resize the vector,
+  // matching ConnectionImplBase::removeConnectionCallbacks. Callers that iterate
+  // connection_callbacks_ skip null entries.
+  for (auto& entry : post_connect_state_.connection_callbacks_) {
+    if (entry == &cb) {
+      entry = nullptr;
       return;
     }
   }
   IS_ENVOY_BUG("Failed to remove connection callbacks");
+}
+
+void MultiConnectionBaseImpl::onDrain() {
+  if (connect_finished_) {
+    connections_[0]->onDrain();
+    return;
+  }
+  // Notify all deferred callbacks directly since no underlying connection has been
+  // chosen yet.
+  for (auto* cb : post_connect_state_.connection_callbacks_) {
+    if (cb != nullptr) {
+      cb->onDrain();
+    }
+  }
 }
 
 void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view details) {
@@ -358,7 +402,7 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view 
   connections_[0]->close(type, details);
 }
 
-DetectedCloseType MultiConnectionBaseImpl::detectedCloseType() const {
+StreamInfo::DetectedCloseType MultiConnectionBaseImpl::detectedCloseType() const {
   return connections_[0]->detectedCloseType();
 };
 
@@ -423,6 +467,10 @@ ClientConnectionPtr MultiConnectionBaseImpl::createNextConnection() {
   }
   if (per_connection_state_.buffer_limits_.has_value()) {
     connection->setBufferLimits(per_connection_state_.buffer_limits_.value());
+  }
+  if (per_connection_state_.buffer_high_watermark_timeout_.has_value()) {
+    connection->setBufferHighWatermarkTimeout(
+        per_connection_state_.buffer_high_watermark_timeout_.value());
   }
   if (per_connection_state_.enable_half_close_.has_value()) {
     connection->enableHalfClose(per_connection_state_.enable_half_close_.value());
@@ -534,6 +582,9 @@ void MultiConnectionBaseImpl::setUpFinalConnection(ConnectionEvent event,
     }
     for (auto& filter : post_connect_state_.read_filters_) {
       connections_[0]->addReadFilter(filter);
+    }
+    for (auto& handler : post_connect_state_.access_log_handlers_) {
+      connections_[0]->addAccessLogHandler(handler);
     }
     if (post_connect_state_.initialize_read_filters_.has_value() &&
         post_connect_state_.initialize_read_filters_.value()) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -8,7 +9,6 @@
 
 #include "source/common/common/utility.h"
 
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -48,6 +48,20 @@ bool labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern);
  *         there is no serial number.
  */
 std::string getSerialNumberFromCertificate(X509& cert);
+
+/**
+ * Computes the SHA-256 digest of a certificate and returns it as a hex-encoded string.
+ * @param cert the certificate
+ * @return std::string the hex-encoded SHA-256 digest of the certificate.
+ */
+std::string getSha256DigestFromCertificate(X509& cert);
+
+/**
+ * Computes the SHA-1 digest of a certificate and returns it as a hex-encoded string.
+ * @param cert the certificate
+ * @return std::string the hex-encoded SHA-1 digest of the certificate.
+ */
+std::string getSha1DigestFromCertificate(X509& cert);
 
 /**
  * Maps a stack of x509 certificates to a vector of strings extracted from the certificates.
@@ -117,12 +131,19 @@ std::vector<std::string> getCertificateExtensionOids(X509& cert);
 absl::string_view getCertificateExtensionValue(X509& cert, absl::string_view extension_name);
 
 /**
+ * Returns the seconds since unix epoch of the expiration time of this certificate.
+ * @param cert the certificate
+ * @return the seconds since unix epoch as a duration, or max duration if cert is null.
+ */
+std::chrono::seconds getExpirationUnixTime(const X509* cert);
+
+/**
  * Returns the days until this certificate is valid.
  * @param cert the certificate
  * @param time_source the time source to use for current time calculation.
  * @return the number of days till this certificate is valid, the value is set when not expired.
  */
-absl::optional<uint32_t> getDaysUntilExpiration(const X509* cert, TimeSource& time_source);
+std::optional<uint32_t> getDaysUntilExpiration(const X509* cert, TimeSource& time_source);
 
 /**
  * Returns the time from when this certificate is valid.
@@ -139,11 +160,11 @@ SystemTime getValidFrom(const X509& cert);
 SystemTime getExpirationTime(const X509& cert);
 
 /**
- * Returns the last crypto error from ERR_get_error(), or `absl::nullopt`
+ * Returns the last crypto error from ERR_get_error(), or `std::nullopt`
  * if the error stack is empty.
  * @return std::string error message
  */
-absl::optional<std::string> getLastCryptoError();
+std::optional<std::string> getLastCryptoError();
 
 /**
  * Returns error string corresponding error code derived from OpenSSL.
@@ -159,6 +180,20 @@ absl::string_view getErrorDescription(int err);
  * @return the error details
  */
 std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
+
+/**
+ * Returns a list of all Subject Alternative Names from the certificate.
+ * @param cert the certificate
+ * @return std::vector returns the list of subject alternate names as strings.
+ */
+std::vector<std::string> getCertificateSansForLogging(X509* cert);
+
+/**
+ * Returns a list of all CRL Distribution Points from the certificate.
+ * @param cert the certificate
+ * @return std::vector returns the list of CRL distribution points as strings.
+ */
+std::vector<std::string> getCertificateCrlDpsForLogging(X509* cert);
 
 } // namespace Utility
 } // namespace Tls

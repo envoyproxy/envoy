@@ -1,6 +1,8 @@
 #pragma once
 #include "envoy/http/codec.h"
 
+#include "source/common/http/response_decoder_impl_base.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -27,7 +29,7 @@ public:
   MOCK_METHOD(void, sendLocalReply,
               (Code code, absl::string_view body,
                const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
 
@@ -43,7 +45,7 @@ public:
   MOCK_METHOD(RequestDecoderHandlePtr, getRequestDecoderHandle, ());
 };
 
-class MockResponseDecoder : public ResponseDecoder {
+class MockResponseDecoder : public ResponseDecoderImplBase {
 public:
   MockResponseDecoder();
   ~MockResponseDecoder() override;
@@ -64,6 +66,7 @@ public:
   MOCK_METHOD(void, decode1xxHeaders_, (ResponseHeaderMapPtr & headers));
   MOCK_METHOD(void, decodeHeaders_, (ResponseHeaderMapPtr & headers, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (ResponseTrailerMapPtr & trailers));
+  MOCK_METHOD(OptRef<WebTransportSession>, downstreamWebTransportSession, (), (override));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 

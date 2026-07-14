@@ -6,6 +6,7 @@
 
 #include "source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/proxy_filter.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/dfp_setter.h"
@@ -14,8 +15,8 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -39,7 +40,7 @@ public:
   };
 
   void setup(std::string upsteam_host = "localhost", std::string cluster_name = "",
-             absl::optional<BufferConfig> buffer_config = absl::nullopt, uint32_t max_hosts = 1024,
+             std::optional<BufferConfig> buffer_config = std::nullopt, uint32_t max_hosts = 1024,
              uint32_t max_pending_requests = 1024) {
     setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
 
@@ -85,6 +86,10 @@ typed_config:
       stat_prefix: foo
       dns_cache_config:
         name: foo
+        typed_dns_resolver_config:
+          name: envoy.network.dns_resolver.getaddrinfo
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
         dns_lookup_family: {}
         max_hosts: {}
         dns_cache_circuit_breaker:
@@ -142,6 +147,10 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
   dns_cache_config:
     name: foo
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
     dns_lookup_family: {}
     max_hosts: {}
     dns_cache_circuit_breaker:
@@ -154,8 +163,8 @@ typed_config:
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({dynamic_cluster_});
     BaseIntegrationTest::initialize();
-    test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Eq(2));
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
   }
 
   CdsHelper cds_helper_;
@@ -175,9 +184,9 @@ TEST_P(DynamicForwardProxyIntegrationTest, BasicFlow) {
   Network::Test::UdpSyncPeer client(version_);
 
   client.write("hello1", *listener_address);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_success", 1);
-  test_server_->waitForCounterEq("dns_cache.foo.host_added", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(1));
+  test_server_->waitForCounter("dns_cache.foo.dns_query_success", Eq(1));
+  test_server_->waitForCounter("dns_cache.foo.host_added", Eq(1));
 
   // There is no buffering in this test, so the first message was dropped. Send another message
   // to verify that it's able to go through after the DNS resolution completed.
@@ -209,9 +218,9 @@ TEST_P(DynamicForwardProxyIntegrationTest, BasicFlowWithBuffering) {
   Network::Test::UdpSyncPeer client(version_);
 
   client.write("hello1", *listener_address);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_success", 1);
-  test_server_->waitForCounterEq("dns_cache.foo.host_added", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(1));
+  test_server_->waitForCounter("dns_cache.foo.dns_query_success", Eq(1));
+  test_server_->waitForCounter("dns_cache.foo.host_added", Eq(1));
 
   // Buffering is enabled so check that the first datagram is sent after the resolution completed.
   Network::UdpRecvData request_datagram;
@@ -227,10 +236,10 @@ TEST_P(DynamicForwardProxyIntegrationTest, BufferOverflowDueToDatagramSize) {
   Network::Test::UdpSyncPeer client(version_);
 
   client.write("hello1", *listener_address);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_success", 1);
-  test_server_->waitForCounterEq("dns_cache.foo.host_added", 1);
-  test_server_->waitForCounterEq("udp.session.dynamic_forward_proxy.foo.buffer_overflow", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(1));
+  test_server_->waitForCounter("dns_cache.foo.dns_query_success", Eq(1));
+  test_server_->waitForCounter("dns_cache.foo.host_added", Eq(1));
+  test_server_->waitForCounter("udp.session.dynamic_forward_proxy.foo.buffer_overflow", Eq(1));
 
   // The first datagram should be dropped because it exceeds the buffer size. Send another message
   // to verify that it's able to go through after the DNS resolution completed.
@@ -249,16 +258,16 @@ TEST_P(DynamicForwardProxyIntegrationTest, EmptyDnsResponseDueToDummyHost) {
   Network::Test::UdpSyncPeer client(version_);
 
   client.write("hello1", *listener_address);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(1));
 
   // The DNS response is empty, so will not be found any valid host and session will be removed.
-  test_server_->waitForCounterEq("cluster.dynamic_cluster.upstream_cx_none_healthy", 1);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounter("cluster.dynamic_cluster.upstream_cx_none_healthy", Eq(1));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 
   // DNS cache hit but still no host found.
   client.write("hello2", *listener_address);
-  test_server_->waitForCounterEq("cluster.dynamic_cluster.upstream_cx_none_healthy", 2);
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounter("cluster.dynamic_cluster.upstream_cx_none_healthy", Eq(2));
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(DynamicForwardProxyIntegrationTest, DynamicClusterWithEmptyHostRemoveTheSession) {
@@ -269,10 +278,10 @@ TEST_P(DynamicForwardProxyIntegrationTest, DynamicClusterWithEmptyHostRemoveTheS
   Network::Test::UdpSyncPeer client(version_);
 
   client.write("hello1", *listener_address);
-  test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 0);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(0));
 
   // The host is empty, the session will be removed.
-  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForGauge("udp.foo.downstream_sess_active", Eq(0));
 }
 
 TEST_P(DynamicForwardProxyIntegrationTest, StaticClusterWithEmptyHostValidFlow) {
@@ -283,7 +292,7 @@ TEST_P(DynamicForwardProxyIntegrationTest, StaticClusterWithEmptyHostValidFlow) 
   Network::Test::UdpSyncPeer client(version_);
 
   client.write("hello1", *listener_address);
-  test_server_->waitForCounterEq("cluster.static_cluster.upstream_cx_tx_bytes_total", 6);
+  test_server_->waitForCounter("cluster.static_cluster.upstream_cx_tx_bytes_total", Eq(6));
 
   // Buffering is enabled so check that the first datagram is sent after the resolution completed.
   Network::UdpRecvData request_datagram;

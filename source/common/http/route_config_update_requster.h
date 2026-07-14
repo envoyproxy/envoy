@@ -25,7 +25,7 @@ public:
 
   void requestRouteConfigUpdate(RouteCache& route_cache,
                                 Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
-                                absl::optional<Router::ConfigConstSharedPtr> route_config,
+                                std::optional<Router::ConfigConstSharedPtr> route_config,
                                 Event::Dispatcher& dispatcher,
                                 RequestHeaderMap& request_headers) override;
   void
@@ -45,9 +45,7 @@ private:
 class RdsRouteConfigUpdateRequesterFactory : public RouteConfigUpdateRequesterFactory {
 public:
   // UntypedFactory
-  virtual std::string name() const override {
-    return "envoy.route_config_update_requester.default";
-  }
+  std::string name() const override { return "envoy.route_config_update_requester.default"; }
 
   std::unique_ptr<RouteConfigUpdateRequester>
   createRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider) override {

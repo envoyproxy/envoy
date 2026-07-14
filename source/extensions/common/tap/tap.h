@@ -153,6 +153,12 @@ public:
   virtual uint32_t maxBufferedTxBytes() const PURE;
 
   /**
+   * Return the minimum transmitted bytes that can be buffered in memory. Streaming taps are still
+   * subject to this limit depending on match status.
+   */
+  virtual uint32_t minStreamedSentBytes() const PURE;
+
+  /**
    * Return a new match status vector that is correctly sized for the number of matchers that are in
    * the configuration.
    */
@@ -174,6 +180,16 @@ public:
    * Return whether the tap session should run in streaming or buffering mode.
    */
   virtual bool streaming() const PURE;
+
+  /**
+   * Per request/connection sampling gate. Called once at filter or transport socket
+   * setup. If false, the tapper is not created and no match state is allocated.
+   * Read-only: the dice roll is performed by the runtime layer's internal RNG
+   * (thread-safe), not by mutating state here.
+   *
+   * @return true if the request/connection should be admitted to matching.
+   */
+  virtual bool shouldRecord() const PURE;
 };
 
 using TapConfigSharedPtr = std::shared_ptr<TapConfig>;

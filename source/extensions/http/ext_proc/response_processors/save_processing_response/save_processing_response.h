@@ -26,7 +26,7 @@ struct SaveProcessingResponseFilterState
     absl::Status processing_status;
     envoy::service::ext_proc::v3::ProcessingResponse processing_response;
   };
-  absl::optional<Response> response;
+  std::optional<Response> response;
 };
 
 class SaveProcessingResponse
@@ -54,6 +54,9 @@ public:
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   void afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse&,
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingStreamingImmediateResponse(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response,
+      absl::Status processing_status, Envoy::StreamInfo::StreamInfo&) override;
 
 private:
   struct SaveOptions {

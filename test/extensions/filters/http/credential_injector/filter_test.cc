@@ -30,14 +30,14 @@ protected:
   NiceMock<Stats::IsolatedStoreImpl> stats_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
 
-  void setup(std::string secret) {
+  void setup(std::string secret, std::string header_value_prefix = "") {
     secret_reader_ = std::make_shared<MockSecretReader>(secret);
 
     // Determine the type of GetParam()
     if (std::dynamic_pointer_cast<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
             GetParam())) {
       extension_ = std::make_shared<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
-          "Authorization", secret_reader_);
+          "Authorization", header_value_prefix, secret_reader_);
       return;
     }
     if (std::dynamic_pointer_cast<
@@ -54,7 +54,7 @@ std::vector<std::shared_ptr<CredentialInjector>> getCredentialInjectorImplementa
   std::vector<std::shared_ptr<CredentialInjector>> implementations;
   implementations.push_back(
       std::make_shared<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
-          "Authorization", nullptr));
+          "Authorization", "", nullptr));
   implementations.push_back(
       std::make_shared<Http::InjectedCredentials::OAuth2::OAuth2ClientCredentialTokenInjector>(
           nullptr));
@@ -128,11 +128,11 @@ TEST_P(CredentialInjectorFilterTest, FailedToInjectCredentialDisAllowWithoutCred
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Envoy::Http::Code code, absl::string_view body,
                            std::function<void(Envoy::Http::ResponseHeaderMap & headers)>,
-                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                            absl::string_view details) {
         EXPECT_EQ(Envoy::Http::Code::Unauthorized, code);
         EXPECT_EQ("Failed to inject credential.", body);
-        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "failed_to_inject_credential");
       }));
   filter->decodeHeaders(request_headers, true);
@@ -151,6 +151,82 @@ TEST_P(CredentialInjectorFilterTest, FailedToInjectCredentialAllowWithoutCredent
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
             filter->decodeHeaders(request_headers, true));
   EXPECT_EQ("", request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+// Test for GenericCredentialInjector with header_value_prefix
+class GenericCredentialInjectorPrefixTest : public testing::Test {
+protected:
+  std::shared_ptr<MockSecretReader> secret_reader_;
+  NiceMock<Stats::IsolatedStoreImpl> stats_;
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
+};
+
+TEST_F(GenericCredentialInjectorPrefixTest, InjectCredentialWithBearerPrefix) {
+  secret_reader_ = std::make_shared<MockSecretReader>("myToken123");
+  auto extension = std::make_shared<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
+      "Authorization", "Bearer ", secret_reader_);
+  auto config =
+      std::make_shared<FilterConfig>(extension, false, false, "stats", *stats_.rootScope());
+  auto filter = std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("Bearer myToken123", request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+TEST_F(GenericCredentialInjectorPrefixTest, InjectCredentialWithBasicPrefix) {
+  secret_reader_ = std::make_shared<MockSecretReader>("dXNlcjpwYXNz");
+  auto extension = std::make_shared<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
+      "Authorization", "Basic ", secret_reader_);
+  auto config =
+      std::make_shared<FilterConfig>(extension, false, false, "stats", *stats_.rootScope());
+  auto filter = std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("Basic dXNlcjpwYXNz", request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+TEST_F(GenericCredentialInjectorPrefixTest, InjectCredentialWithEmptyPrefix) {
+  secret_reader_ = std::make_shared<MockSecretReader>("rawCredential");
+  auto extension = std::make_shared<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
+      "X-Custom-Auth", "", secret_reader_);
+  auto config =
+      std::make_shared<FilterConfig>(extension, false, false, "stats", *stats_.rootScope());
+  auto filter = std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("rawCredential", request_headers.get_("X-Custom-Auth"));
+  filter->onDestroy();
+}
+
+TEST_F(GenericCredentialInjectorPrefixTest, InjectCredentialWithCustomPrefix) {
+  secret_reader_ = std::make_shared<MockSecretReader>("abc123");
+  auto extension = std::make_shared<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
+      "X-API-Key", "ApiKey ", secret_reader_);
+  auto config =
+      std::make_shared<FilterConfig>(extension, false, false, "stats", *stats_.rootScope());
+  auto filter = std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("ApiKey abc123", request_headers.get_("X-API-Key"));
   filter->onDestroy();
 }
 

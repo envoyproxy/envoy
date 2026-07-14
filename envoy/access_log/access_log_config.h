@@ -1,13 +1,17 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/formatter/substitution_formatter.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/protobuf/protobuf.h"
+
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -25,8 +29,9 @@ public:
    * @param context supplies the factory context.
    * @return an instance of extension filter implementation from a config proto.
    */
-  virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                                 Server::Configuration::FactoryContext& context) PURE;
+  virtual absl::StatusOr<FilterPtr>
+  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+               Server::Configuration::GenericFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.access_loggers.extension_filters"; }
 };
@@ -50,7 +55,7 @@ public:
    */
   virtual AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::FactoryContext& context,
+                          Server::Configuration::GenericFactoryContext& context,
                           std::vector<Formatter::CommandParserPtr>&& command_parsers = {}) PURE;
 
   std::string category() const override { return "envoy.access_loggers"; }

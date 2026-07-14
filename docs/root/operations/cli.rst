@@ -138,6 +138,7 @@ following are the command line options that Envoy supports.
    :%v:	The actual message to log ("some user text")
    :%_:	The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
    :%j:	The actual message to log as JSON escaped string (https://tools.ietf.org/html/rfc7159#page-8).
+   :%N:	The Envoy version string: ``{revision}/{version}/{status}/{build_type}/{ssl_version}`` (e.g. "c93f9f6c1e5adddd10a3e3646c7e049c649ae177/1.38.0/Clean/RELEASE/BoringSSL"), matching the output of :option:`--version`.
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")
@@ -187,6 +188,12 @@ following are the command line options that Envoy supports.
   or whether to open an existing one. It should be incremented every time a hot restart takes place.
   The :ref:`hot restart wrapper <operations_hot_restarter>` sets the *RESTART_EPOCH* environment
   variable which should be passed to this option in most cases.
+
+.. option:: --log-stacktrace-single-entry
+
+  *(optional)* Emit the entire stack trace in a single log entry instead of one log call per frame.
+  Frames are still newline-delimited within the message. This is useful for log aggregation systems
+  where each log call produces a separate entry (e.g. JSON logging).
 
 .. option:: --enable-fine-grain-logging
 
@@ -270,6 +277,15 @@ following are the command line options that Envoy supports.
   *(optional)* The file flushing interval in milliseconds. Defaults to 10 seconds.
   This setting is used during file creation to determine the duration between flushes
   of buffers to files. The buffer will flush every time it gets full, or every time
+  the interval has elapsed, whichever comes first. Adjusting this setting is useful
+  when tailing :ref:`access logs <arch_overview_access_logs>` in order to
+  get more (or less) immediate flushing.
+
+.. option:: --file-flush-min-size-kb <integer>
+
+  *(optional)* The minimum size in kilobytes for file flushing. Defaults to 64.
+  This setting is used during file creation to determine the minimum buffer size
+  before flushing to files. The buffer will flush every time it gets full, or every time
   the interval has elapsed, whichever comes first. Adjusting this setting is useful
   when tailing :ref:`access logs <arch_overview_access_logs>` in order to
   get more (or less) immediate flushing.
@@ -378,7 +394,7 @@ following are the command line options that Envoy supports.
 
   * build mode - either ``RELEASE`` or ``DEBUG``,
 
-  * TLS library - either ``BoringSSL`` or ``BoringSSL-FIPS``.
+  * TLS library - ``BoringSSL``, ``BoringSSL-FIPS``, ``AWS-LC-FIPS``, or ``OpenSSL``.
 
 .. option:: --enable-core-dump
 

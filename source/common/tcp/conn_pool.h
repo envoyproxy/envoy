@@ -7,6 +7,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
@@ -88,21 +89,31 @@ public:
 
   ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
                   const Upstream::HostConstSharedPtr& host, uint32_t concurrent_stream_limit,
-                  absl::optional<std::chrono::milliseconds> idle_timeout);
+                  std::optional<std::chrono::milliseconds> idle_timeout);
   ~ActiveTcpClient() override;
 
   // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
-  void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
+  void onAboveWriteBufferHighWatermark() override {
+    if (callbacks_) {
+      callbacks_->onAboveWriteBufferHighWatermark();
+    }
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    if (callbacks_) {
+      callbacks_->onBelowWriteBufferLowWatermark();
+    }
+  }
 
   // Undos the readDisable done in onEvent(Connected)
   void readEnableIfNew();
 
   void initializeReadFilters() override { connection_->initializeReadFilters(); }
-  absl::optional<Http::Protocol> protocol() const override { return {}; }
-  void close() override;
+  std::optional<Http::Protocol> protocol() const override { return {}; }
+  void
+  close(Envoy::Network::ConnectionCloseType type = Envoy::Network::ConnectionCloseType::NoFlush,
+        absl::string_view details = "") override;
   uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
   bool closingWithIncompleteStream() const override { return false; }
   uint64_t id() const override { return connection_->id(); }
@@ -128,7 +139,7 @@ public:
   ConnectionPool::ConnectionStatePtr connection_state_;
   TcpConnectionData* tcp_connection_data_{};
   bool associated_before_{};
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
   Event::TimerPtr idle_timer_;
 };
 
@@ -140,9 +151,10 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                Upstream::ClusterConnectivityState& state,
-               absl::optional<std::chrono::milliseconds> idle_timeout)
+               std::optional<std::chrono::milliseconds> idle_timeout,
+               Server::OverloadManager& overload_manager)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
-                                                transport_socket_options, state),
+                                                transport_socket_options, state, overload_manager),
         idle_timeout_(idle_timeout) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
@@ -162,6 +174,9 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override {
     return Envoy::ConnectionPool::ConnPoolImplBase::host();
   }
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::socketOptions();
+  }
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
                    Envoy::ConnectionPool::AttachContext& context) override;
@@ -173,7 +188,7 @@ public:
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnDestroyed() {}
 
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
 };
 
 } // namespace Tcp

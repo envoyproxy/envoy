@@ -19,7 +19,10 @@ py_test(
     ],
     # Don't run this by default, since we don't want to force local dependency on Wireshark/tshark,
     # will explicitly invoke in CI.
-    tags = ["manual"],
+    tags = [
+        "manual",
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [":tap2pcap"],
 )

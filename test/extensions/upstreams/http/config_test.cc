@@ -8,7 +8,7 @@
 #include "test/extensions/upstreams/http/config.pb.h"
 #include "test/extensions/upstreams/http/config.pb.validate.h"
 #include "test/mocks/http/header_validator.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -21,6 +21,7 @@ namespace Extensions {
 namespace Upstreams {
 namespace Http {
 
+using ::testing::ContainsRegex;
 using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
 using ::testing::StrictMock;
@@ -91,6 +92,18 @@ TEST_F(ConfigTest, AutoHttp3NoCache) {
             "alternate protocols cache must be configured when HTTP/3 is enabled with auto_config");
 }
 
+TEST_F(ConfigTest, MaxHeaderFieldSizeKbExceedsMaxResponseHeadersKb) {
+  options_.mutable_explicit_http_config()
+      ->mutable_http2_protocol_options()
+      ->mutable_max_header_field_size_kb()
+      ->set_value(128);
+  options_.mutable_common_http_protocol_options()->mutable_max_response_headers_kb()->set_value(64);
+  EXPECT_EQ(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .status()
+                .message(),
+            "max_header_field_size_kb must not exceed max_response_headers_kb");
+}
+
 TEST_F(ConfigTest, KvStoreConcurrencyFail) {
   options_.mutable_auto_config();
   options_.mutable_auto_config()->mutable_http3_protocol_options();
@@ -98,11 +111,11 @@ TEST_F(ConfigTest, KvStoreConcurrencyFail) {
       ->mutable_alternate_protocols_cache_options()
       ->mutable_key_value_store_config();
   server_context_.options_.concurrency_ = 2;
-  EXPECT_EQ(
-      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-          .status()
-          .message(),
-      "options has key value store but Envoy has concurrency = 2 : key_value_store_config {\n}\n");
+  EXPECT_THAT(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                  .status()
+                  .message(),
+              ContainsRegex("(?s)options has key value store but Envoy has concurrency = 2 "
+                            ":.*key_value_store_config {\n}\n"));
 }
 
 namespace {
@@ -147,8 +160,8 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), server_context.messageValidationVisitor(),
-        *this);
+        Envoy::Protobuf::DynamicCastMessage<Protobuf::Any>(message),
+        server_context.messageValidationVisitor(), *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(

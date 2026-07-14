@@ -10,6 +10,11 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_network_connectivity_observer_impl.h"
+#include "source/common/quic/scone_state.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "quiche/quic/core/quic_bandwidth.h"
 
 namespace Envoy {
 namespace Quic {
@@ -72,7 +77,11 @@ private:
 
 EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-    std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
+    std::unique_ptr<EnvoyQuicClientConnection> connection,
+    quic::QuicForceBlockablePacketWriter* absl_nullable writer,
+    EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* absl_nullable migration_helper,
+    const quic::QuicConnectionMigrationConfig& migration_config,
+    const quic::QuicServerId& server_id,
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
     QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
@@ -87,12 +96,17 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
               connection->connectionSocket()->connectionInfoProviderSharedPtr(),
               StreamInfo::FilterState::LifeSpan::Connection),
           quic_stat_names, scope),
-      quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
-                                  crypto_config.get()),
+      quic::QuicSpdyClientSession(config, supported_versions, connection.release(),
+                                  /*visitor=*/nullptr, writer, migration_helper, migration_config,
+                                  server_id, crypto_config.get()),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
       rtt_cache_(rtt_cache), transport_socket_options_(transport_socket_options),
       transport_socket_factory_(makeOptRefFromPtr(
-          dynamic_cast<QuicTransportSocketFactoryBase*>(transport_socket_factory.ptr()))) {
+          dynamic_cast<QuicTransportSocketFactoryBase*>(transport_socket_factory.ptr()))),
+      session_handles_migration_(migration_helper != nullptr) {
+  ENVOY_BUG(migration_helper == nullptr || writer != nullptr,
+            "writer must be set if migration helper is set");
+
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   if (transport_socket_options_ != nullptr &&
       !transport_socket_options_->applicationProtocolListOverride().empty()) {
@@ -106,6 +120,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
+
+  streamInfo().filterState()->setData(SconeStateKey, std::make_shared<SconeState>(),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
@@ -115,6 +132,23 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
     registry_->unregisterObserver(*network_connectivity_observer_);
   }
 }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+quic::WebTransportHttp3VersionSet
+EnvoyQuicClientSession::LocallySupportedWebTransportVersions() const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_support_web_transport")) {
+    return {};
+  }
+  return quic::kDefaultSupportedWebTransportVersions;
+}
+void EnvoyQuicClientSession::registerStreamWaitingForSettings(quic::QuicStreamId stream_id) {
+  streams_waiting_for_settings_.insert(stream_id);
+}
+
+void EnvoyQuicClientSession::unregisterStreamWaitingForSettings(quic::QuicStreamId stream_id) {
+  streams_waiting_for_settings_.erase(stream_id);
+}
+#endif
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
 
@@ -193,13 +227,6 @@ quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStr
   return nullptr;
 }
 
-quic::QuicSpdyStream*
-EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  // Envoy doesn't support server push.
-  IS_ENVOY_BUG("unexpectes server push call");
-  return nullptr;
-}
-
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
 
 const quic::QuicConnection* EnvoyQuicClientSession::quicConnection() const {
@@ -233,6 +260,30 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
+bool EnvoyQuicClientSession::OnSettingsFrame(const quic::SettingsFrame& frame) {
+  if (!quic::QuicSpdyClientSession::OnSettingsFrame(frame)) {
+    // The base implementation may close the connection on invalid settings.
+    return false;
+  }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // The peer's SETTINGS (carrying WebTransport/HTTP Datagram negotiation) are now known. Write any
+  // WebTransport CONNECT requests whose encodeHeaders() was deferred because QUICHE only creates
+  // the upstream WebTransport session at header-write time and only if WebTransport is already
+  // negotiated. Move the set aside first so a flush that somehow re-registers (it should not, since
+  // settings_received() is now true) cannot mutate what we iterate.
+  absl::flat_hash_set<quic::QuicStreamId> waiting = std::move(streams_waiting_for_settings_);
+  streams_waiting_for_settings_.clear();
+  for (quic::QuicStreamId stream_id : waiting) {
+    // The stream may have been reset/closed while waiting; GetActiveStream() returns nullptr then,
+    // so a stale ID is harmless.
+    if (auto* stream = GetActiveStream(stream_id); stream != nullptr) {
+      static_cast<EnvoyQuicClientStream*>(stream)->flushPendingHeaders();
+    }
+  }
+#endif
+  return true;
+}
+
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this,
@@ -240,7 +291,7 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
           dispatcher_, /*is_server=*/false, transport_socket_options_, *quic_ssl_info_,
           std::make_unique<CertValidationContext>(
               *this, network_connection_->connectionSocket()->ioHandle())),
-      crypto_config(), this, /*has_application_state = */ version().UsesHttp3());
+      crypto_config(), this);
 }
 
 void EnvoyQuicClientSession::setHttp3Options(
@@ -300,8 +351,11 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
 }
 void EnvoyQuicClientSession::OnServerPreferredAddressAvailable(
     const quic::QuicSocketAddress& server_preferred_address) {
-  static_cast<EnvoyQuicClientConnection*>(connection())
-      ->probeAndMigrateToServerPreferredAddress(server_preferred_address);
+  quic::QuicSpdyClientSession::OnServerPreferredAddressAvailable(server_preferred_address);
+  if (!session_handles_migration_) {
+    static_cast<EnvoyQuicClientConnection*>(connection())
+        ->probeAndMigrateToServerPreferredAddress(server_preferred_address);
+  }
 }
 
 std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
@@ -309,12 +363,49 @@ std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
                                    : configured_alpns_;
 }
 
+void EnvoyQuicClientSession::OnConfigNegotiated() {
+  received_custom_transport_parameters_ = config()->received_custom_transport_parameters();
+  if (config()->HasReceivedIPv6AlternateServerAddress()) {
+    received_ipv6_alternate_server_address_ = config()->ReceivedIPv6AlternateServerAddress();
+  }
+  if (config()->HasReceivedIPv4AlternateServerAddress()) {
+    received_ipv4_alternate_server_address_ = config()->ReceivedIPv4AlternateServerAddress();
+  }
+  quic::QuicSpdyClientSession::OnConfigNegotiated();
+}
+
 void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry) {
   if (network_connectivity_observer_ == nullptr) {
-    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserver>(*this);
+    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserverImpl>(*this);
   }
   registry.registerObserver(*network_connectivity_observer_);
   registry_ = makeOptRef(registry);
+}
+
+void EnvoyQuicClientSession::StartDraining() {
+  ENVOY_CONN_LOG(
+      trace, "Failed to migrate to the default network {}. Drain the connection on network {}.",
+      *this, migration_manager().default_network(), migration_manager().current_network());
+  quic::QuicSpdyClientSession::StartDraining();
+  // Treat draining as receiving a GOAWAY.
+  if (http_connection_callbacks_ != nullptr) {
+    // HTTP/3 GOAWAY doesn't have an error code field.
+    http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
+  }
+}
+
+void EnvoyQuicClientSession::OnSconePacket(quic::QuicBandwidth bandwidth) {
+  auto* state = streamInfo().filterState()->getDataMutable<SconeState>(SconeStateKey);
+  if (state) {
+    state->scone_max_kbps = bandwidth.ToKBitsPerSecond();
+    auto now = dispatcher_.timeSource().systemTime();
+    state->timestamp_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    ENVOY_CONN_LOG(debug, "SCONE update: {} kbps at {} ms", *this, bandwidth.ToKBitsPerSecond(),
+                   state->timestamp_ms.value());
+  } else {
+    IS_ENVOY_BUG("SconeState not found in FilterState");
+  }
 }
 
 } // namespace Quic

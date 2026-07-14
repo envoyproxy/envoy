@@ -13,6 +13,5 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     deps = [
         "//envoy/network:address_interface",
-        "@com_google_absl//absl/types:optional",
     ],
 )

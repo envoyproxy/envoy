@@ -125,6 +125,13 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestContentLength) {
   request_headers.setContentLength("100");
   EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
 
+  request_headers.setContentLength("100,100");
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
+
+  request_headers.setContentLength("100,101");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+
   request_headers.setContentLength("10a2");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
                              UhvResponseCodeDetail::get().InvalidContentLength);
@@ -391,6 +398,13 @@ TEST_F(Http1HeaderValidatorTest, ResponseContentLengthNoTransferEncoding) {
   // The transform method should keep content-length
   EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
   EXPECT_EQ(headers.getContentLengthValue(), "10");
+
+  headers.setContentLength("10,10");
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+
+  headers.setContentLength("10,11");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectRegNameMissingPort) {
@@ -490,6 +504,23 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) 
 
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   // The transform method should drop headers with underscores
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(
+      headers,
+      TestRequestHeaderMapImpl(
+          {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapDropDuplicateUnderscoreHeaders) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x_foo", "bar"}};
+  headers.addCopy("x_foo", "baz");
+  auto uhv = createH1(drop_headers_with_underscores_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   EXPECT_EQ(
       headers,

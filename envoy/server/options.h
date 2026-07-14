@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/admin/v3/server_info.pb.h"
@@ -10,7 +11,6 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/tag.h"
 
-#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -160,6 +160,12 @@ public:
   virtual bool skipDeprecatedLogs() const PURE;
 
   /**
+   * @return bool whether to emit the entire stack trace in a single log entry
+   *         instead of one log call per frame. Useful for log aggregation systems.
+   */
+  virtual bool logStacktraceSingleEntry() const PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() const PURE;
@@ -221,6 +227,11 @@ public:
    * @return std::chrono::milliseconds the duration in msec between log flushes.
    */
   virtual std::chrono::milliseconds fileFlushIntervalMsec() const PURE;
+
+  /**
+   * @return uint64_t the minimum size in kilobytes before the log buffer is flushed.
+   */
+  virtual uint64_t fileFlushMinSizeKB() const PURE;
 
   /**
    * @return const std::string& the server's cluster.

@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 

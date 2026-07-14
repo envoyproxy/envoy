@@ -2,6 +2,7 @@
 
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/http/codec_wrappers.h"
@@ -22,6 +23,7 @@ public:
   // ConnPoolImplBase::ActiveClient
   bool closingWithIncompleteStream() const override;
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
+  RequestEncoder& newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) override;
 
   uint32_t numActiveStreams() const override {
     // Override the parent class using the codec for numActiveStreams.
@@ -35,13 +37,15 @@ public:
     Envoy::Http::ActiveClient::releaseResources();
   }
 
-  struct StreamWrapper : public RequestEncoderWrapper,
-                         public ResponseDecoderWrapper,
+  struct StreamWrapper : public ResponseDecoderWrapper,
+                         public RequestEncoderWrapper,
                          public StreamCallbacks,
                          public Event::DeferredDeletable,
                          protected Logger::Loggable<Logger::Id::pool> {
   public:
     StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent);
+    StreamWrapper(ResponseDecoderHandlePtr response_decoder_handle, ActiveClient& parent);
+
     ~StreamWrapper() override;
 
     // StreamEncoderWrapper
@@ -73,7 +77,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state);
+                 Upstream::ClusterConnectivityState& state,
+                 Server::OverloadManager& overload_manager);
 
 } // namespace Http1
 } // namespace Http

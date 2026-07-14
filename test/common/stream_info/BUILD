@@ -33,6 +33,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -69,7 +70,6 @@ envoy_cc_test(
     deps = [
         "//source/common/stream_info:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

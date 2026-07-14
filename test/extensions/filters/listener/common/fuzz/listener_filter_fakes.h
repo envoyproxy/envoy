@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 
-static constexpr int kFakeSocketFd = 42;
+static constexpr int kFakeSocketFd = 65534;
 
 class FakeConnectionSocket : public Network::MockConnectionSocket {
 public:
@@ -26,7 +26,7 @@ public:
 
   Network::Address::Type addressType() const override;
 
-  absl::optional<Network::Address::IpVersion> ipVersion() const override;
+  std::optional<Network::Address::IpVersion> ipVersion() const override;
 
   void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) override;
 
@@ -50,7 +50,7 @@ public:
 
   Api::SysCallIntResult getSocketOption(int level, int, void* optval, socklen_t*) const override;
 
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() override;
 
 private:
   const Network::IoHandlePtr io_handle_;

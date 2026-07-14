@@ -82,7 +82,7 @@ protected:
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       ext_proc_filter.set_name(ext_proc_filter_name);
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
@@ -91,7 +91,7 @@ protected:
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
@@ -104,7 +104,7 @@ protected:
 
   void processRequestHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -125,7 +125,7 @@ protected:
 
   void processResponseHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -144,9 +144,9 @@ protected:
     }
   }
 
-  void processRequestBodyMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
+  void
+  processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
+                            std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -173,10 +173,10 @@ protected:
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
 
-  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
+  bool isEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void websocketExtProcTest() {
-    if (!IsEnvoyGrpc()) {
+    if (!isEnvoyGrpc()) {
       return;
     }
 
@@ -209,18 +209,16 @@ body_format:
       headers.addCopy(LowerCaseString("connection"), "Upgrade");
     });
 
-    processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+    processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "401"}}, true);
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_ext_proc_on_local_reply")) {
-      processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-    }
-    verifyDownstreamResponse(*response, 401);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
+    verifyDownstreamResponse(*response, 200);
   }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
@@ -234,7 +232,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcMiscInte
 
 // Test sending empty last body chunk with end_of_stream = true.
 TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
-  if (IsEnvoyGrpc()) {
+  if (isEnvoyGrpc()) {
     return;
   }
 
@@ -265,7 +263,7 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
   const uint32_t init_body_size = 1000;
   std::string init_body(init_body_size, 'a');
   codec_client_->sendData(*request_encoder_, init_body, false);
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
 
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(20));
   const uint32_t body_size = 2000;
@@ -293,20 +291,6 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
 }
 
 // Test Ext_Proc filter and WebSocket configuration combination.
-TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.skip_ext_proc_on_local_reply", "true"}});
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.router_filter_resetall_on_local_reply", "false"}});
-  websocketExtProcTest();
-}
-
-// TODO(yanjunxiang-google): Delete this test after both runtime flags are removed.
-TEST_P(ExtProcMiscIntegrationTest, UpstreamRequestEncoderDanglingPointerTest) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.skip_ext_proc_on_local_reply", "false"}});
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.router_filter_resetall_on_local_reply", "true"}});
-  websocketExtProcTest();
-}
+TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) { websocketExtProcTest(); }
 
 } // namespace Envoy

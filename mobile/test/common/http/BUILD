@@ -20,7 +20,6 @@ envoy_cc_test(
         "@envoy//test/mocks/buffer:buffer_mocks",
         "@envoy//test/mocks/event:event_mocks",
         "@envoy//test/mocks/http:api_listener_mocks",
-        "@envoy//test/mocks/local_info:local_info_mocks",
         "@envoy//test/mocks/upstream:upstream_mocks",
     ],
 )

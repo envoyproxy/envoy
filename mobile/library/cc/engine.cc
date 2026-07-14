@@ -1,16 +1,32 @@
 #include "engine.h"
 
+#include <memory>
+
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "library/common/internal_engine.h"
+#include "library/common/network/socket_tag_socket_option_impl.h"
+#include "library/common/system/system_helper.h"
 #include "library/common/types/c_types.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Platform {
 
-Engine::Engine(::Envoy::InternalEngine* engine) : engine_(engine) {}
+absl::StatusOr<std::shared_ptr<Engine>>
+Engine::createFromInternalEngineHandle(int64_t internal_engine_handle) {
+  auto* internal_engine = reinterpret_cast<::Envoy::InternalEngine*>(internal_engine_handle);
+  if (internal_engine == nullptr) {
+    return absl::InvalidArgumentError("Invalid internal engine handle.");
+  }
+  return std::shared_ptr<Engine>(new Engine(internal_engine, /*handle_termination=*/false));
+}
+
+Engine::Engine(::Envoy::InternalEngine* engine, bool handle_termination)
+    : engine_(engine), handle_termination_(handle_termination) {}
 
 Engine::~Engine() {
-  if (!engine_->isTerminated()) {
+  if (handle_termination_ && !engine_->isTerminated()) {
     terminate();
   }
 }
@@ -19,13 +35,22 @@ Engine::~Engine() {
 // because they either require or will require a weak ptr
 // which can't be provided from inside of the constructor
 // because of how std::enable_shared_from_this works
-StreamClientSharedPtr Engine::streamClient() {
-  return std::make_shared<StreamClient>(shared_from_this());
+StreamClientSharedPtr Engine::streamClient(absl::string_view listener_name) {
+  return std::make_shared<StreamClient>(shared_from_this(), listener_name);
 }
 
 std::string Engine::dumpStats() { return engine_->dumpStats(); }
 
+int64_t Engine::getInternalEngineHandle() const { return reinterpret_cast<int64_t>(engine_); }
+
 envoy_status_t Engine::terminate() { return engine_->terminate(); }
+
+void Engine::initializeNetworkChangeMonitor() {
+  network_change_monitor_ = SystemHelper::getInstance().initializeNetworkChangeMonitor(*this);
+  if (network_change_monitor_ != nullptr) {
+    network_change_monitor_->start();
+  }
+}
 
 void Engine::onDefaultNetworkChangeEvent(int network) {
   engine_->onDefaultNetworkChangeEvent(network);
@@ -39,6 +64,10 @@ void Engine::onDefaultNetworkAvailable() { engine_->onDefaultNetworkAvailable();
 
 envoy_status_t Engine::setProxySettings(absl::string_view host, const uint16_t port) {
   return engine_->setProxySettings(host, port);
+}
+
+void Engine::drainConnectionsBySocketTag(uint32_t tag) {
+  engine_->drainConnectionsBySocketTag(tag);
 }
 
 } // namespace Platform

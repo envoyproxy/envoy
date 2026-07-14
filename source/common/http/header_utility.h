@@ -40,11 +40,11 @@ public:
    */
   class GetAllOfHeaderAsStringResult {
   public:
-    // The ultimate result of the concatenation. If absl::nullopt, no header values were found.
+    // The ultimate result of the concatenation. If std::nullopt, no header values were found.
     // If the final string required a string allocation, the memory is held in
     // backingString(). This allows zero allocation in the common case of a single header
     // value.
-    absl::optional<absl::string_view> result() const {
+    std::optional<absl::string_view> result() const {
       // This is safe for move/copy of this class as the backing string will be moved or copied.
       // Otherwise result_ is valid. The assert verifies that both are empty or only 1 is set.
       ASSERT((!result_.has_value() && result_backing_string_.empty()) ||
@@ -55,7 +55,7 @@ public:
     const std::string& backingString() const { return result_backing_string_; }
 
   private:
-    absl::optional<absl::string_view> result_;
+    std::optional<absl::string_view> result_;
     // Valid only if result_ relies on memory allocation that must live beyond the call. See above.
     std::string result_backing_string_;
 
@@ -92,6 +92,10 @@ public:
       return present_ != invert_match_;
     };
 
+    bool matchesHeadersIndividually(const HeaderMap& request_headers) const override {
+      return matchesHeaders(request_headers);
+    };
+
   private:
     const LowerCaseString name_;
     const bool invert_match_;
@@ -124,6 +128,35 @@ public:
       // Execute the specific matcher's code and invert if invert_match_ is set.
       return specificMatchesHeaders(value) != invert_match_;
     };
+
+    // Matches each header value individually.
+    bool matchesHeadersIndividually(const HeaderMap& request_headers) const override {
+      const auto header_values = request_headers.get(name_);
+
+      if (header_values.empty()) {
+        if (!treat_missing_as_empty_) {
+          return false;
+        }
+        // treat_missing_as_empty_ is true, match against empty string
+        return specificMatchesHeaders(EMPTY_STRING) != invert_match_;
+      }
+
+      // Validate each header value individually
+      for (size_t i = 0; i < header_values.size(); ++i) {
+        absl::string_view value = header_values[i]->value().getStringView();
+        bool matches = specificMatchesHeaders(value);
+        if (!invert_match_ && matches) {
+          return true;
+        }
+        if (invert_match_ && matches) {
+          return false;
+        }
+      }
+
+      // For normal match: no value matched, return false
+      // For invert_match: no value matched the pattern, return true
+      return invert_match_;
+    }
 
   protected:
     // A matcher specific implementation to match the given header_value.
@@ -271,6 +304,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers,
       Server::Configuration::CommonFactoryContext& context) {
     std::vector<HeaderUtility::HeaderDataPtr> ret;
+    ret.reserve(header_matchers.size());
     for (const auto& header_matcher : header_matchers) {
       ret.emplace_back(HeaderUtility::createHeaderData(header_matcher, context));
     }
@@ -284,6 +318,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers,
       Server::Configuration::CommonFactoryContext& context) {
     std::vector<Http::HeaderMatcherSharedPtr> ret;
+    ret.reserve(header_matchers.size());
     for (const auto& header_matcher : header_matchers) {
       ret.emplace_back(HeaderUtility::createHeaderData(header_matcher, context));
     }
@@ -299,6 +334,18 @@ public:
    */
   static bool matchHeaders(const HeaderMap& request_headers,
                            const std::vector<HeaderDataPtr>& config_headers);
+
+  /**
+   * See if any of the headers specified in the config are present in a request.
+   * @param request_headers supplies the headers from the request.
+   * @param config_headers supplies the list of configured header conditions on which to match.
+   * @return bool true if any of the headers (and values) in the config_headers are found in the
+   *         request_headers. If no config_headers are specified, returns false.
+   */
+  static bool matchAnyHeader(const HeaderMap& request_headers,
+                             const std::vector<HeaderDataPtr>& config_headers);
+  static bool matchAnyHeader(const HeaderMap& request_headers,
+                             const std::vector<HeaderMatcherSharedPtr>& config_headers);
 
   /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
@@ -379,9 +426,9 @@ public:
   /**
    * Determines if request headers pass Envoy validity checks.
    * @param headers to validate
-   * @return details of the error if an error is present, otherwise absl::nullopt
+   * @return details of the error if an error is present, otherwise std::nullopt
    */
-  static absl::optional<std::reference_wrapper<const absl::string_view>>
+  static std::optional<std::reference_wrapper<const absl::string_view>>
   requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
@@ -406,11 +453,11 @@ public:
 
   /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
-   * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
+   * @return std::optional<uint32_t> containing the port, if removed, else std::nullopt.
    * If port is not passed, port part from host/authority header is removed.
    */
-  static absl::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
-                                                    absl::optional<uint32_t> listener_port);
+  static std::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
+                                                   std::optional<uint32_t> listener_port);
 
   /**
    * @brief Remove the port part from host if it exists.

@@ -129,6 +129,14 @@ func (n *connectionCallback) WorkerID() uint32 {
 	panic("implement me")
 }
 
+func (n *connectionCallback) DrainConnectionUponCompletion() {
+	panic("implement me")
+}
+
+func (n *connectionCallback) DownstreamSslConnection() api.SslConnection {
+	panic("implement me")
+}
+
 type filterState struct {
 	wrapper unsafe.Pointer
 	setFunc func(envoyFilter unsafe.Pointer, key string, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing)

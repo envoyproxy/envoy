@@ -40,6 +40,15 @@ The following TLS statistics are rooted at *listener.<address>.ssl.*:
 
 .. include:: ../../_include/ssl_stats.rst
 
+.. _config_listener_stats_certs:
+
+TLS and CA certificates
+-----------------------
+
+TLS and CA certificate statistics are rooted in the ``listener.<address>.ssl.certificate.<cert_name>.``:
+
+.. include:: ../../_include/cert_stats.rst
+
 .. _config_listener_stats_tcp:
 
 TCP statistics
@@ -131,4 +140,5 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
    total_listeners_warming, Gauge, Number of currently warming listeners.
    total_listeners_active, Gauge, Number of currently active listeners.
    total_listeners_draining, Gauge, Number of currently draining listeners.
+   workers_pinned, Gauge, Number of worker threads assigned a CPU when worker CPU affinity is enabled and 0 otherwise.
    workers_started, Gauge, A boolean (1 if started and 0 otherwise) that indicates whether listeners have been initialized on workers.

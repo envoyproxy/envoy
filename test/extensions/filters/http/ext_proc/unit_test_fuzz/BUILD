@@ -1,8 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -19,10 +22,11 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "ext_proc_unit_test_fuzz",
     srcs = ["ext_proc_unit_test_fuzz.cc"],
     corpus = "ext_proc_corpus",
+    extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
@@ -33,5 +37,6 @@ envoy_cc_fuzz_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )

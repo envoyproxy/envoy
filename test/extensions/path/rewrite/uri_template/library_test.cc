@@ -3,8 +3,7 @@
 #include "source/extensions/path/rewrite/uri_template/config.h"
 #include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
 
-#include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -245,6 +244,22 @@ TEST(RewriteTest, MatchPatternMismatchedVars) {
   EXPECT_FALSE(error.ok());
   EXPECT_EQ(error.message(), "mismatch between variables in path_match_policy "
                              "/bar/{lang}/{country} and path_rewrite_policy /foo/{lang}/{missing}");
+}
+
+TEST(RewriteTest, MixedVariableLiteralRewrite) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.rewrite.uri_template.uri_template_rewriter
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+        path_template_rewrite: "/{version}/{id}"
+)EOF";
+
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
+  // Match pattern has prefix 'v' and suffix '.json' around variables;
+  // the rewrite should use only the captured values, not the surrounding literals.
+  EXPECT_EQ(
+      rewriter->rewritePath("/api/v2/users/456.json", "/api/v{version}/users/{id}.json").value(),
+      "/2/456");
 }
 
 } // namespace Rewrite

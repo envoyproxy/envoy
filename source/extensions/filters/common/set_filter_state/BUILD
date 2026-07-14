@@ -13,10 +13,12 @@ envoy_cc_library(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        "//envoy/common:hashable_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/network:ip_address_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
         "@envoy_api//envoy/extensions/filters/common/set_filter_state/v3:pkg_cc_proto",

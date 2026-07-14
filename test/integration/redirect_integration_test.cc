@@ -30,8 +30,6 @@ public:
   void initialize() override {
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
-    envoy::config::route::v3::RetryPolicy retry_policy;
-
     // If there is a need for another virtual host, it's recommended
     // to add it at the end, so the numbering remains stable.
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
@@ -267,8 +265,7 @@ TEST_P(RedirectIntegrationTest, ConnectionCloseHeaderHonoredInInternalRedirect) 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   // "Connection: close" should be sent back in response.
-  EXPECT_THAT(response->headers(),
-              Envoy::Http::HeaderValueOf(Envoy::Http::Headers::get().Connection, "close"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Envoy::Http::Headers::get().Connection, "close"));
 
   // Envoy should close the connection immediately.
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
@@ -502,6 +499,67 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -"));
 }
 
+// Test for body-less POST/PUT/DELETE/PATCH with 303 internal redirect.
+TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303WithoutBody) {
+  // When a non-GET/HEAD request arrives without a body where end_stream=true on headers,
+  // the decoding buffer is never allocated. The 303 redirect handler must not attempt
+  // to drain a null buffer.
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.set_via("via_value");
+
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(2)->mutable_routes(0);
+        route->mutable_route()
+            ->mutable_internal_redirect_policy()
+            ->mutable_redirect_response_codes()
+            ->Add(303);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  default_request_headers_.setMethod("POST");
+
+  // Body-less POST request having header-only with end_stream=true.
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("", upstream_request_->body().toString());
+
+  // Upstream responds with 303, triggering internal redirect.
+  redirect_response_.setStatus(303);
+  upstream_request_->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("303 internal_redirect test-header-value"));
+
+  // Second request to redirected upstream should be converted to GET with no body.
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("", upstream_request_->body().toString());
+  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  EXPECT_EQ("http://handle.internal.redirect/test/long/url",
+            upstream_request_->headers().getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+  EXPECT_EQ("GET", upstream_request_->headers().getMethodValue());
+  EXPECT_EQ("", upstream_request_->headers().getContentLengthValue());
+
+  // Return the response from the redirect upstream.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -"));
+}
+
 TEST_P(RedirectIntegrationTest, InternalRedirectHttp303PreservesHeadMethod) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
   config_helper_.addConfigModifier(
@@ -566,7 +624,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToBufferOverflow) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(2)->mutable_routes(0);
-        route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
+        route->mutable_request_body_buffer_limit()->set_value(1024);
       });
 
   initialize();
@@ -697,10 +755,14 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     config_helper_.prependFilter(R"EOF(
   name: pause-filter-for-quic
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.PauseFilterForQuicConfig
   )EOF");
   } else {
     config_helper_.prependFilter(R"EOF(
   name: pause-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.PauseFilterConfig
   )EOF");
   }
   initialize();
@@ -784,7 +846,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandledByDirectResponse) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("204", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_internal_redirect_succeeded_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_internal_redirect_succeeded_total",
+                               testing::Eq(1));
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());

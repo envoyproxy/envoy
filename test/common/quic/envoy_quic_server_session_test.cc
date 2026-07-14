@@ -15,25 +15,29 @@
 
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/http/session_idle_list.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/global.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
+#include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/core/quic_versions.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
+#include "quiche/quic/test_tools/quic_stream_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
@@ -48,6 +52,8 @@ namespace Quic {
 class TestEnvoyQuicServerSession : public EnvoyQuicServerSession {
 public:
   using EnvoyQuicServerSession::EnvoyQuicServerSession;
+  using EnvoyQuicServerSession::MaybeAddSessionToIdleList;
+  using EnvoyQuicServerSession::MaybeRemoveSessionFromIdleList;
 
   bool ShouldYield(quic::QuicStreamId /*stream_id*/) override {
     // Never yield to other stream so that it's easier to predict stream write
@@ -56,6 +62,7 @@ public:
   }
 
   using EnvoyQuicServerSession::GetCryptoStream;
+  using EnvoyQuicServerSession::GetSSLConfig;
 };
 
 class ProofSourceDetailsSetter {
@@ -120,20 +127,14 @@ public:
   std::string name() const override { return "quic.test_crypto_server_stream"; }
 
   std::unique_ptr<quic::QuicCryptoServerStreamBase> createEnvoyQuicCryptoServerStream(
-      const quic::QuicCryptoServerConfig* crypto_config,
-      quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
-      quic::QuicCryptoServerStreamBase::Helper* helper,
+      const quic::QuicCryptoServerConfig* crypto_config, quic::QuicCompressedCertsCache*,
+      quic::QuicSession* session, quic::QuicCryptoServerStreamBase::Helper*,
       OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
       Event::Dispatcher& /*dispatcher*/) override {
-    switch (session->connection()->version().handshake_protocol) {
-    case quic::PROTOCOL_QUIC_CRYPTO:
-      return std::make_unique<TestQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
-                                                          session, helper);
-    case quic::PROTOCOL_TLS1_3:
+    if (session->connection()->version().transport_version > quic::QUIC_VERSION_46) {
       return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
-    case quic::PROTOCOL_UNSUPPORTED:
-      ASSERT(false, "Unknown handshake protocol");
     }
+    ASSERT(false, "Unknown QUIC version");
     return nullptr;
   }
 };
@@ -146,10 +147,11 @@ public:
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
         quic_version_({[]() { return quic::CurrentSupportedHttp3Versions()[0]; }()}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
-        quic_connection_(new MockEnvoyQuicServerConnection(
+        quic_connection_(new testing::NiceMock<MockEnvoyQuicServerConnection>(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_,
             connection_id_generator_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
+
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         connection_stats_({QUIC_CONNECTION_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "quic.connection"))}),
@@ -164,7 +166,7 @@ public:
                 dispatcher_->timeSource(),
                 quic_connection_->connectionSocket()->connectionInfoProviderSharedPtr(),
                 StreamInfo::FilterState::LifeSpan::Connection),
-            connection_stats_, debug_visitor_factory_),
+            connection_stats_, debug_visitor_factory_, &session_idle_list_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -179,10 +181,15 @@ public:
     connection_helper_.GetClock()->Now();
 
     ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
-        .WillByDefault(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
-                                 const quic::QuicSocketAddress&, quic::PerPacketOptions*,
-                                 const quic::QuicPacketWriterParams&) {
+        .WillByDefault([](const char*, size_t buf_len, const quic::QuicIpAddress&,
+                          const quic::QuicSocketAddress&, quic::PerPacketOptions*,
+                          const quic::QuicPacketWriterParams&) {
           return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
+        });
+    EXPECT_CALL(*quic_connection_, SendControlFrame(_))
+        .WillRepeatedly(Invoke([](const quic::QuicFrame& frame) {
+          quic::DeleteFrame(&const_cast<quic::QuicFrame&>(frame));
+          return true;
         }));
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
     EXPECT_CALL(write_total_, add(_)).Times(AnyNumber());
@@ -217,7 +224,7 @@ public:
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(
           envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100,
-          envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+          envoy::config::core::v3::HttpProtocolOptions::ALLOW, overload_manager_);
       EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
@@ -237,13 +244,18 @@ public:
 
   quic::QuicStream* createNewStream(Http::MockRequestDecoder& request_decoder,
                                     Http::MockStreamCallbacks& stream_callbacks) {
+    return createNewStreamWithId(/*stream_id=*/4u, request_decoder, stream_callbacks);
+  }
+
+  quic::QuicStream* createNewStreamWithId(quic::QuicStreamId stream_id,
+                                          Http::MockRequestDecoder& request_decoder,
+                                          Http::MockStreamCallbacks& stream_callbacks) {
     EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-        .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
-                                                               bool) -> Http::RequestDecoder& {
+        .WillOnce([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
+                                                        bool) -> Http::RequestDecoder& {
           encoder.getStream().addCallbacks(stream_callbacks);
           return request_decoder;
-        }));
-    quic::QuicStreamId stream_id = 4u;
+        });
     return envoy_quic_session_.GetOrCreateStream(stream_id);
   }
 
@@ -256,6 +268,7 @@ public:
           .WillOnce(Invoke([](const quic::QuicFrame&) { return false; }));
       envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
 protected:
@@ -277,10 +290,11 @@ protected:
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
   EnvoyQuicTestCryptoServerStreamFactory crypto_stream_factory_;
   QuicConnectionStats connection_stats_;
+  testing::NiceMock<Envoy::Http::MockSessionIdleList> session_idle_list_;
   TestEnvoyQuicServerSession envoy_quic_session_;
   quic::QuicCompressedCertsCache compressed_certs_cache_{100};
   std::shared_ptr<Network::MockReadFilter> read_filter_;
-  Network::MockConnectionCallbacks network_connection_callbacks_;
+  testing::NiceMock<Network::MockConnectionCallbacks> network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
   testing::StrictMock<Stats::MockCounter> read_total_;
   testing::StrictMock<Stats::MockGauge> read_current_;
@@ -290,6 +304,7 @@ protected:
   Http::ServerConnectionPtr http_connection_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
@@ -336,6 +351,23 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get, decoded_headers->getMethodValue());
       }));
   stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, ProtocolStreamId) {
+  installReadFilter();
+
+  quic::QuicStreamId stream_id = 0;
+  for (int i = 0; i < 10; ++i) {
+    Http::MockRequestDecoder request_decoder;
+    setupRequestDecoderMock(request_decoder);
+    EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
+        .WillOnce(testing::ReturnRef(request_decoder));
+    EXPECT_CALL(request_decoder, accessLogHandlers());
+    auto stream =
+        reinterpret_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
+    EXPECT_EQ(stream_id, stream->codecStreamId());
+    stream_id += 4;
+  }
 }
 
 TEST_F(EnvoyQuicServerSessionTest, DoesNotCrashWithDestroyedRequestDecoder) {
@@ -906,7 +938,9 @@ TEST_F(EnvoyQuicServerSessionTest, ShutdownNotice) {
   testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
   envoy_quic_session_.set_debug_visitor(&debug_visitor);
   EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
   http_connection_->shutdownNotice();
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
 }
 
 TEST_F(EnvoyQuicServerSessionTest, GoAway) {
@@ -914,18 +948,16 @@ TEST_F(EnvoyQuicServerSessionTest, GoAway) {
   testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
   envoy_quic_session_.set_debug_visitor(&debug_visitor);
   EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
   http_connection_->goAway();
+  EXPECT_EQ(1U, stats_.goaway_sent_.value());
 }
 
 TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
   installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
-  if (!quic_version_[0].UsesTls()) {
-    envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
-  } else {
-    EXPECT_CALL(*quic_connection_, SendControlFrame(_));
-    envoy_quic_session_.OnTlsHandshakeComplete();
-  }
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  envoy_quic_session_.OnTlsHandshakeComplete();
   EXPECT_EQ(nullptr, envoy_quic_session_.socketOptions());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().isOpen());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().close().ok());
@@ -1179,6 +1211,42 @@ TEST_F(EnvoyQuicServerSessionTest, DisableQpack) {
   installReadFilter();
 }
 
+TEST_F(EnvoyQuicServerSessionTest, ConnectionFlowControlForStreamsEnabledByDefault) {
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(request_decoder, accessLogHandlers());
+  setupRequestDecoderMock(request_decoder);
+  auto* stream =
+      dynamic_cast<EnvoyQuicServerStream*>(createNewStream(request_decoder, stream_callbacks));
+
+  EXPECT_TRUE(quic::test::QuicStreamPeer::StreamContributesToConnectionFlowControl(stream));
+
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  stream->resetStream(Http::StreamResetReason::LocalReset);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, DisableConnectionFlowControlForStreams) {
+  installReadFilter();
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_disable_connection_flow_control_for_streams(true);
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(request_decoder, accessLogHandlers());
+  setupRequestDecoderMock(request_decoder);
+  auto* stream =
+      dynamic_cast<EnvoyQuicServerStream*>(createNewStream(request_decoder, stream_callbacks));
+
+  EXPECT_FALSE(quic::test::QuicStreamPeer::StreamContributesToConnectionFlowControl(stream));
+
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  stream->resetStream(Http::StreamResetReason::LocalReset);
+}
+
 TEST_F(EnvoyQuicServerSessionTest, Http3OptionsTest) {
   envoy::config::core::v3::Http3ProtocolOptions http3_options;
   auto* quic_options = http3_options.mutable_quic_protocol_options();
@@ -1188,6 +1256,157 @@ TEST_F(EnvoyQuicServerSessionTest, Http3OptionsTest) {
   envoy_quic_session_.setHttp3Options(http3_options);
 
   EXPECT_FALSE(envoy_quic_session_.allow_extended_connect());
+
+  installReadFilter();
+}
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+// WebTransport is opt-in: even with extended CONNECT enabled, the server advertises no WebTransport
+// versions (and so will not negotiate WebTransport) unless
+// envoy.reloadable_features.quic_support_web_transport is enabled.
+TEST_F(EnvoyQuicServerSessionTest, WebTransportNegotiationGatedByRuntimeFlag) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_allow_extended_connect(true);
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  // Disabled by default, even though extended CONNECT is enabled.
+  EXPECT_FALSE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  EXPECT_TRUE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  // WebTransport still requires extended CONNECT, even with the runtime flag enabled.
+  envoy::config::core::v3::Http3ProtocolOptions no_extended_connect;
+  no_extended_connect.set_allow_extended_connect(false);
+  envoy_quic_session_.setHttp3Options(no_extended_connect);
+  EXPECT_FALSE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  installReadFilter();
+}
+#endif
+
+TEST_F(EnvoyQuicServerSessionTest, SetSocketOption) {
+  installReadFilter();
+
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(envoy_quic_session_.setSocketOption(sockopt_name, sockopt_val));
+}
+
+TEST_F(EnvoyQuicServerSessionTest, SessionBecomesIdleOnlyWhenLastStreamCloses) {
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks1, stream_callbacks2;
+  setupRequestDecoderMock(request_decoder);
+  EXPECT_CALL(request_decoder, accessLogHandlers()).Times(2);
+
+  // session_idle_list_.AddSession() is called in SetUp.
+  // Session starts idle, creating first stream moves it to active.
+  EXPECT_CALL(session_idle_list_, RemoveSession(_));
+  auto* stream1 = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(4u, request_decoder, stream_callbacks1));
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // Creating a second stream shouldn't change idle state because session is
+  // already active.
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(0);
+  auto* stream2 = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(8u, request_decoder, stream_callbacks2));
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // Closing stream1 shouldn't move session to idle as stream2 is active.
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(stream_callbacks1, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream1->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // Closing stream2 should move session to idle.
+  EXPECT_CALL(session_idle_list_, AddSession(_));
+  EXPECT_CALL(stream_callbacks2, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream2->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // session_idle_list_.RemoveSession() will be called in TearDown.
+  EXPECT_CALL(session_idle_list_, RemoveSession(_));
+}
+
+TEST_F(EnvoyQuicServerSessionTest, TerminateIdleSession) {
+  installReadFilter();
+
+  EXPECT_CALL(session_idle_list_, RemoveSession(_));
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_NETWORK_IDLE_TIMEOUT, _, _));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  envoy_quic_session_.TerminateIdleSession();
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  EXPECT_FALSE(quic_connection_->connected());
+}
+
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigDefault) {
+  installReadFilter();
+  quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  ASSERT_TRUE(config.early_data_enabled.has_value());
+  EXPECT_TRUE(*config.early_data_enabled);
+  EXPECT_FALSE(config.disable_ticket_support);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {
+  installReadFilter();
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(0);
+  // Re-adding shouldn't trigger callback because it's already on idle list
+  // after init.
+  envoy_quic_session_.MaybeAddSessionToIdleList();
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  setupRequestDecoderMock(request_decoder);
+  EXPECT_CALL(request_decoder, accessLogHandlers());
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(session_idle_list_, RemoveSession(_));
+  // Creating a stream moves session to active.
+  auto* stream = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(4u, request_decoder, stream_callbacks));
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // Removing from idle list again shouldn't trigger callback.
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(0);
+  envoy_quic_session_.MaybeRemoveSessionFromIdleList();
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream->resetStream(Http::StreamResetReason::LocalReset);
+  // session_idle_list_.RemoveSession() will be called in TearDown.
+  EXPECT_CALL(session_idle_list_, RemoveSession(_));
+}
+
+TEST_F(EnvoyQuicServerSessionTest, MemoryReductionTimeoutTest) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  auto* quic_options = http3_options.mutable_quic_protocol_options();
+  quic_options->mutable_memory_reduction_timeout()->set_seconds(300);
+
+  // Mark handshake complete and set connection idle timeout to a large duration.
+  quic::test::QuicConnectionPeer::GetIdleNetworkDetector(quic_connection_)
+      .SetTimeouts(quic::QuicTime::Delta::Infinite(), quic::QuicTime::Delta::FromSeconds(600));
+
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  // Trigger SetAlarm.
+  quic::test::QuicConnectionPeer::GetIdleNetworkDetector(quic_connection_)
+      .OnPacketReceived(connection_helper_.GetClock()->Now());
+
+  // Check the alarm deadline.
+  quic::QuicAlarmProxy idle_detector_alarm =
+      quic::test::QuicConnectionPeer::GetIdleNetworkDetectorAlarm(quic_connection_);
+
+  EXPECT_TRUE(idle_detector_alarm.IsSet());
+  EXPECT_EQ(connection_helper_.GetClock()->Now() + quic::QuicTime::Delta::FromSeconds(300),
+            idle_detector_alarm.deadline());
 
   installReadFilter();
 }
@@ -1202,8 +1421,8 @@ class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessio
 };
 
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
-  EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), absl::nullopt);
-  EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), absl::nullopt);
+  EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), std::nullopt);
+  EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), std::nullopt);
 }
 
 } // namespace Quic

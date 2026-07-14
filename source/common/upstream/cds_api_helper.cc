@@ -18,15 +18,12 @@ std::pair<uint32_t, std::vector<std::string>>
 CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                              const std::string& system_version_info) {
-  Config::ScopedResume maybe_resume_eds_leds_sds;
-  if (cm_.adsMux()) {
-    // A cluster update pauses sending EDS and LEDS requests.
-    const std::vector<std::string> paused_xds_types{
-        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-        Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-    maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
-  }
+  // A cluster update pauses sending EDS and LEDS requests.
+  const std::vector<std::string> paused_xds_types{
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+      Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
+  Config::ScopedResume resume_eds_leds_sds = xds_manager_.pause(paused_xds_types);
 
   ENVOY_LOG(
       info,
@@ -44,16 +41,21 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
     absl::string_view cluster_name = EMPTY_STRING;
     TRY_ASSERT_MAIN_THREAD {
       const envoy::config::cluster::v3::Cluster& cluster =
-          dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::cluster::v3::Cluster>(
+              resource.get().resource());
       cluster_name = cluster.name();
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
-        exception_msgs.push_back(
-            fmt::format("{}: duplicate cluster {} found", cluster_name, cluster_name));
+        const std::string msg =
+            fmt::format("{}: duplicate cluster {} found", cluster_name, cluster_name);
+        ENVOY_LOG(warn, "cds: cluster '{}' config rejected: {}", cluster_name, msg);
+        exception_msgs.push_back(msg);
         continue;
       }
       auto update_or_error = cm_.addOrUpdateCluster(cluster, resource.get().version());
       if (!update_or_error.status().ok()) {
+        ENVOY_LOG(warn, "cds: cluster '{}' config rejected: {}", cluster_name,
+                  update_or_error.status().message());
         exception_msgs.push_back(
             fmt::format("{}: {}", cluster_name, update_or_error.status().message()));
         continue;
@@ -68,8 +70,10 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
       }
     }
     END_TRY
-    CATCH(const EnvoyException& e,
-          { exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what())); });
+    CATCH(const EnvoyException& e, {
+      ENVOY_LOG(warn, "cds: cluster '{}' config rejected: {}", cluster_name, e.what());
+      exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what()));
+    });
   }
 
   uint32_t removed = 0;

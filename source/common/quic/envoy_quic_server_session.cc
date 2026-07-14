@@ -2,16 +2,28 @@
 
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <type_traits>
+#include <utility>
+
+#include "envoy/event/dispatcher.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/common/scope_tracker.h"
+#include "source/common/http/session_idle_list_interface.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
-#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
+#include "source/common/runtime/runtime_features.h"
 
-#include "absl/types/optional.h"
+#include "quiche/quic/core/quic_config.h"
+#include "quiche/quic/core/quic_error_codes.h"
+#include "quiche/quic/core/quic_stream.h"
+#include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/core/quic_versions.h"
 
 namespace Envoy {
 namespace Quic {
@@ -28,7 +40,7 @@ private:
 
   const ScopeTrackedObject* object_;
   Event::ScopeTracker& tracker_;
-  absl::optional<ScopeTrackerScopeState> state_;
+  std::optional<ScopeTrackerScopeState> state_;
 };
 } // namespace
 
@@ -40,7 +52,8 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
-    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+    Http::SessionIdleListInterface* session_idle_list)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
@@ -49,7 +62,7 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
                                       std::move(stream_info), quic_stat_names, listener_scope),
       quic_connection_(std::move(connection)),
       crypto_server_stream_factory_(crypto_server_stream_factory),
-      connection_stats_(connection_stats) {
+      connection_stats_(connection_stats), session_idle_list_(session_idle_list) {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
@@ -65,8 +78,25 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
+  // Session is destroyed, remove from idle list.
+  MaybeRemoveSessionFromIdleList();
   QuicFilterManagerConnectionImpl::network_connection_ = nullptr;
 }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+quic::WebTransportHttp3VersionSet
+EnvoyQuicServerSession::LocallySupportedWebTransportVersions() const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_support_web_transport")) {
+    return {};
+  }
+  if (!http3_options_.has_value() || !http3_options_->allow_extended_connect()) {
+    // WebTransport requires extended CONNECT, so only advertise it when extended CONNECT is
+    // enabled.
+    return {};
+  }
+  return quic::kDefaultSupportedWebTransportVersions;
+}
+#endif
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -100,23 +130,23 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   if (aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // On a WebTransport-capable session an incoming bidirectional stream may turn out to be a
+  // WebTransport data stream (first frame WEBTRANSPORT_STREAM) rather than an HTTP request. Defer
+  // setting up the request decoder until real request headers arrive
+  // (EnvoyQuicServerStream::OnInitialHeadersComplete); data streams never reach there and so never
+  // become HCM streams, which would otherwise dangle during connection teardown. Non-WebTransport
+  // sessions keep the original eager behavior.
+  if (SupportsWebTransport()) {
+    return stream;
+  }
+#endif
   setUpRequestDecoder(*stream);
   return stream;
 }
 
-quic::QuicSpdyStream*
-EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  IS_ENVOY_BUG("Unexpected disallowed server push call");
-  return nullptr;
-}
-
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
   IS_ENVOY_BUG("Unexpected disallowed server initiated stream");
-  return nullptr;
-}
-
-quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream() {
-  IS_ENVOY_BUG("Unexpected function call");
   return nullptr;
 }
 
@@ -129,6 +159,7 @@ void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
+  MaybeRemoveSessionFromIdleList();
   if (source == quic::ConnectionCloseSource::FROM_SELF) {
     setLocalCloseReason(frame.error_details);
   }
@@ -144,11 +175,13 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
     }
     position_.reset();
   }
+  on_connection_closed_called_ = true;
 }
 
 void EnvoyQuicServerSession::Initialize() {
   quic::QuicServerSessionBase::Initialize();
   initialized_ = true;
+  MaybeAddSessionToIdleList();
   quic_connection_->setEnvoyConnection(*this, *this);
 }
 
@@ -202,6 +235,14 @@ void EnvoyQuicServerSession::setHttp3Options(
       }
     }
   }
+  if (http3_options.has_quic_protocol_options()) {
+    const uint64_t memory_reduction_timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+        http3_options.quic_protocol_options(), memory_reduction_timeout, 0);
+    if (memory_reduction_timeout_ms > 0) {
+      connection()->SetMemoryReductionTimeout(
+          quic::QuicTime::Delta::FromMilliseconds(memory_reduction_timeout_ms));
+    }
+  }
   set_allow_extended_connect(http3_options_->allow_extended_connect());
   if (http3_options_->disable_qpack()) {
     DisableHuffmanEncoding();
@@ -223,6 +264,11 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
                                         position_->filter_chain_.transportSocketFactory())
                                         .earlyDataEnabled()
                                   : true;
+  config.disable_ticket_support = position_.has_value()
+                                      ? !dynamic_cast<const QuicServerTransportSocketFactory&>(
+                                             position_->filter_chain_.transportSocketFactory())
+                                             .resumptionEnabled()
+                                      : false;
   return config;
 }
 
@@ -232,6 +278,21 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
   // If L4 filters causes the connection to be closed early during initialization, now
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();
+
+  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
+                                "sending GOAWAY and close on dispatch");
+    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+    closeConnectionImmediately();
+  } else if (should_send_go_away_on_dispatch_ != nullptr &&
+             should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
+    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
+                                "sending GOAWAY on dispatch");
+    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+    h3_go_away_sent_ = true;
+  }
+
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
   if (connection()->expected_server_preferred_address().IsInitialized() &&
       self_address == connection()->expected_server_preferred_address()) {
@@ -260,6 +321,56 @@ EnvoyQuicServerSession::SelectAlpn(const std::vector<absl::string_view>& alpns) 
     }
   }
   return alpns.end();
+}
+
+void EnvoyQuicServerSession::ActivateStream(std::unique_ptr<quic::QuicStream> stream) {
+  bool streams_was_empty = !HasActiveRequestStreams();
+  QuicServerSessionBase::ActivateStream(std::move(stream));
+  if (streams_was_empty && HasActiveRequestStreams()) {
+    MaybeRemoveSessionFromIdleList();
+  }
+}
+
+void EnvoyQuicServerSession::OnStreamClosed(quic::QuicStreamId id) {
+  bool streams_was_empty = !HasActiveRequestStreams();
+
+  QuicServerSessionBase::OnStreamClosed(id);
+  if (on_connection_closed_called_) {
+    return;
+  }
+
+  if (!streams_was_empty && !HasActiveRequestStreams()) {
+    OnLastActiveStreamClosed();
+  }
+}
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void EnvoyQuicServerSession::TerminateIdleSession() {
+  ENVOY_BUG(!on_connection_closed_called_,
+            "TerminateIdleSession called after session on close called.");
+  connection()->CloseConnection(quic::QUIC_NETWORK_IDLE_TIMEOUT, "Server overload",
+                                quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+}
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void EnvoyQuicServerSession::OnLastActiveStreamClosed() { MaybeAddSessionToIdleList(); }
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void EnvoyQuicServerSession::MaybeAddSessionToIdleList() {
+  if (session_idle_list_ == nullptr || is_in_idle_list_) {
+    return;
+  }
+  is_in_idle_list_ = true;
+  session_idle_list_->AddSession(*this);
+}
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void EnvoyQuicServerSession::MaybeRemoveSessionFromIdleList() {
+  if (session_idle_list_ == nullptr || !is_in_idle_list_) {
+    return;
+  }
+  is_in_idle_list_ = false;
+  session_idle_list_->RemoveSession(*this);
 }
 
 } // namespace Quic

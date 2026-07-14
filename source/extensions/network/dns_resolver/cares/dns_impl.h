@@ -46,12 +46,12 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  static absl::StatusOr<absl::optional<std::string>>
+  static absl::StatusOr<std::optional<std::string>>
   maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
 
   DnsResolverImpl(
       const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
-      Event::Dispatcher& dispatcher, absl::optional<std::string> resolvers_csv,
+      Event::Dispatcher& dispatcher, std::optional<std::string> resolvers_csv,
       Stats::Scope& root_scope);
   ~DnsResolverImpl() override;
 
@@ -185,6 +185,8 @@ private:
   bool isCaresDefaultTheOnlyNameserver();
   // Update timer for c-ares timeouts.
   void updateAresTimer();
+  // Callback for periodic UDP channel refresh.
+  void onUdpChannelRefreshTimer();
   // Return default AresOptions.
   AresOptions defaultAresOptions();
 
@@ -192,6 +194,7 @@ private:
 
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;
+  Event::TimerPtr udp_channel_refresh_timer_;
   ares_channel channel_;
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
@@ -201,10 +204,14 @@ private:
   const uint64_t query_timeout_seconds_;
   const uint32_t query_tries_;
   const bool rotate_nameservers_;
-  const absl::optional<std::string> resolvers_csv_;
+  const uint32_t edns0_max_payload_size_;
+  const std::chrono::milliseconds max_udp_channel_duration_;
+  const bool reinit_channel_on_timeout_;
+  const std::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;
   CaresDnsResolverStats stats_;
+  const uint32_t max_cache_ttl_; // in seconds
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

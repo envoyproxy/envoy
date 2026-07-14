@@ -33,7 +33,6 @@ void forEachSampleStat(int num_clusters, bool include_other_stats,
                                         "lb_subsets_selected",
                                         "lb_zone_cluster_too_small",
                                         "lb_zone_no_capacity_left",
-                                        "lb_zone_number_differs",
                                         "lb_zone_routing_all_directly",
                                         "lb_zone_routing_cross_zone",
                                         "lb_zone_routing_sampled",
@@ -120,6 +119,10 @@ TestScope::TestScope(StatName prefix, TestStore& store)
     : IsolatedScopeImpl(prefix, store), store_(store),
       prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
 
+TestScope::TestScope(StatName prefix, TestStore& store, StatsMatcherSharedPtr matcher)
+    : IsolatedScopeImpl(prefix, store, std::move(matcher)), store_(store),
+      prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
+
 // Override the Stats::Store methods for name-based lookup of stats, to use
 // and update the string-maps in this class. Note that IsolatedStoreImpl
 // does not support deletion of stats, so we only have to track additions
@@ -153,17 +156,25 @@ Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogra
   return *histogram_ref;
 }
 
-std::string TestScope::statNameWithTags(const StatName& stat_name,
-                                        StatNameTagVectorOptConstRef tags) {
-  TagUtility::TagStatNameJoiner joiner(prefix(), stat_name, tags, symbolTable());
+std::string TestScope::statNameWithTags(StatName base_name,
+                                        std::optional<StatNameTagSpan> name_tags,
+                                        StatName tagged_name) {
+  // Use the same joiner construction as IsolatedScopeImpl so the map key here matches the flat
+  // name IsolatedScopeImpl actually creates -- including when the caller supplies a non-empty
+  // tagged_name to override the joiner's tag-interleaving.
+  TagUtility::TagStatNameJoiner joiner(prefix(), {}, prefix(), base_name,
+                                       name_tags.value_or(StatNameTagSpan{}), tagged_name,
+                                       symbolTable());
   return symbolTable().toString(joiner.nameWithTags());
 }
 
-void TestScope::verifyConsistency(StatName ref_stat_name, StatName stat_name,
-                                  StatNameTagVectorOptConstRef tags) {
+void TestScope::verifyConsistency(StatName ref_stat_name, StatName base_name,
+                                  std::optional<StatNameTagSpan> name_tags, StatName tagged_name) {
   // Ensures StatNames with the same string representation are specified
   // consistently using symbolic/dynamic components on every access.
-  TagUtility::TagStatNameJoiner joiner(prefix(), stat_name, tags, symbolTable());
+  TagUtility::TagStatNameJoiner joiner(prefix(), {}, prefix(), base_name,
+                                       name_tags.value_or(StatNameTagSpan{}), tagged_name,
+                                       symbolTable());
   StatName joined_stat_name = joiner.nameWithTags();
   ASSERT(ref_stat_name == joined_stat_name,
          absl::StrCat("Inconsistent dynamic vs symbolic stat name specification: ref_stat_name=",
@@ -171,46 +182,48 @@ void TestScope::verifyConsistency(StatName ref_stat_name, StatName stat_name,
                       " stat_name=", symbolTable().toString(joined_stat_name)));
 }
 
-Counter& TestScope::counterFromStatNameWithTags(const StatName& stat_name,
-                                                StatNameTagVectorOptConstRef tags) {
-  std::string name = statNameWithTags(stat_name, tags);
-  Counter*& counter_ref = store_.counter_map_[name];
+Counter& TestScope::counterFromTaggedName(StatName base_name,
+                                          std::optional<StatNameTagSpan> name_tags,
+                                          StatName tagged_name) {
+  std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
+  Counter*& counter_ref = store_.counter_map_[flat_name];
   if (counter_ref == nullptr) {
-    counter_ref = &IsolatedScopeImpl::counterFromStatNameWithTags(stat_name, tags);
+    counter_ref = &IsolatedScopeImpl::counterFromTaggedName(base_name, name_tags, tagged_name);
   } else {
-    verifyConsistency(counter_ref->statName(), stat_name, tags);
+    verifyConsistency(counter_ref->statName(), base_name, name_tags, tagged_name);
   }
   return *counter_ref;
 }
 
-Gauge& TestScope::gaugeFromStatNameWithTags(const StatName& stat_name,
-                                            StatNameTagVectorOptConstRef tags,
-                                            Gauge::ImportMode import_mode) {
-  std::string name = statNameWithTags(stat_name, tags);
-  Gauge*& gauge_ref = store_.gauge_map_[name];
+Gauge& TestScope::gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                      StatName tagged_name, Gauge::ImportMode import_mode) {
+  std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
+  Gauge*& gauge_ref = store_.gauge_map_[flat_name];
   if (gauge_ref == nullptr) {
-    gauge_ref = &IsolatedScopeImpl::gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+    gauge_ref =
+        &IsolatedScopeImpl::gaugeFromTaggedName(base_name, name_tags, tagged_name, import_mode);
   } else {
-    verifyConsistency(gauge_ref->statName(), stat_name, tags);
+    verifyConsistency(gauge_ref->statName(), base_name, name_tags, tagged_name);
   }
   return *gauge_ref;
 }
 
-Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
-                                                    StatNameTagVectorOptConstRef tags,
-                                                    Histogram::Unit unit) {
-  std::string name = statNameWithTags(stat_name, tags);
-  Histogram*& histogram_ref = store_.histogram_map_[name];
+Histogram& TestScope::histogramFromTaggedName(StatName base_name,
+                                              std::optional<StatNameTagSpan> name_tags,
+                                              StatName tagged_name, Histogram::Unit unit) {
+  std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
+  Histogram*& histogram_ref = store_.histogram_map_[flat_name];
   if (histogram_ref == nullptr) {
-    histogram_ref = &IsolatedScopeImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
+    histogram_ref =
+        &IsolatedScopeImpl::histogramFromTaggedName(base_name, name_tags, tagged_name, unit);
   } else {
-    verifyConsistency(histogram_ref->statName(), stat_name, tags);
+    verifyConsistency(histogram_ref->statName(), base_name, name_tags, tagged_name);
   }
   return *histogram_ref;
 }
 
-ScopeSharedPtr TestStore::makeScope(StatName name) {
-  return std::make_shared<TestScope>(name, *this);
+ScopeSharedPtr TestStore::makeScope(StatName name, StatsMatcherSharedPtr matcher) {
+  return std::make_shared<TestScope>(name, *this, std::move(matcher));
 }
 
 TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
@@ -218,7 +231,7 @@ TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
 TestStore::TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
 
 template <class StatType>
-using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+using StatTypeOptConstRef = std::optional<std::reference_wrapper<const StatType>>;
 
 template <class StatType>
 static StatTypeOptConstRef<StatType>

@@ -7,7 +7,6 @@
 #include "source/common/http/codec_client.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/event/mocks.h"
 
 namespace Envoy {
 /**
@@ -31,6 +30,7 @@ public:
   }
   void raiseGoAway(Http::GoAwayErrorCode error_code) { onGoAway(error_code); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
+  void triggerIdleTimeout() { onIdleTimeout(); }
   using Http::CodecClient::onSettings;
 
   DestroyCb destroy_cb_;
@@ -41,7 +41,7 @@ public:
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   void onPoolReady(Http::RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                   StreamInfo::StreamInfo&, absl::optional<Http::Protocol>) override {
+                   StreamInfo::StreamInfo&, std::optional<Http::Protocol>) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();

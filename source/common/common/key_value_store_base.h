@@ -9,7 +9,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/ttl.h"
 
-#include "quiche/common/quiche_linked_hash_map.h"
+#include "absl/container/linked_hash_map.h"
 
 namespace Envoy {
 inline constexpr absl::string_view KV_STORE_TTL_KEY = "TTL";
@@ -33,21 +33,21 @@ public:
 
   // KeyValueStore
   void addOrUpdate(absl::string_view key, absl::string_view value,
-                   absl::optional<std::chrono::seconds> ttl) override;
+                   std::optional<std::chrono::seconds> ttl) override;
   void remove(absl::string_view key) override;
-  absl::optional<absl::string_view> get(absl::string_view key) override;
+  std::optional<absl::string_view> get(absl::string_view key) override;
   void iterate(ConstIterateCb cb) const override;
 
 protected:
   // Values in a KeyValueStore have an optional TTL.
   struct ValueWithTtl {
-    ValueWithTtl(std::string value, absl::optional<std::chrono::seconds> ttl)
-        : value_(value), ttl_(ttl) {}
+    ValueWithTtl(std::string&& value, std::optional<std::chrono::seconds>&& ttl)
+        : value_(std::move(value)), ttl_(std::move(ttl)) {}
     std::string value_;
-    absl::optional<std::chrono::seconds> ttl_;
+    std::optional<std::chrono::seconds> ttl_;
   };
 
-  using KeyValueMap = quiche::QuicheLinkedHashMap<std::string, ValueWithTtl>;
+  using KeyValueMap = absl::linked_hash_map<std::string, ValueWithTtl>;
 
   const KeyValueMap& store() { return store_; }
 

@@ -28,7 +28,8 @@ TEST(EnvironmentResourceDetectorTest, EnvVariableNotPresent) {
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig config;
 
-  auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
+  auto detector =
+      std::make_unique<EnvironmentResourceDetector>(config, context.serverFactoryContext());
   Resource resource = detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
@@ -44,7 +45,8 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig config;
 
-  auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
+  auto detector =
+      std::make_unique<EnvironmentResourceDetector>(config, context.serverFactoryContext());
   Resource resource = detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
@@ -64,7 +66,8 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig config;
 
-  auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
+  auto detector =
+      std::make_unique<EnvironmentResourceDetector>(config, context.serverFactoryContext());
   Resource resource = detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
@@ -91,7 +94,8 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributesWrongFo
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig config;
 
-  auto detector = std::make_unique<EnvironmentResourceDetector>(config, context);
+  auto detector =
+      std::make_unique<EnvironmentResourceDetector>(config, context.serverFactoryContext());
   Resource resource = detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");

@@ -39,7 +39,7 @@ public:
     //     generate the string_view, and does not work on all platforms yet.
     //
     // The accuracy is checked in buffer_util_test.
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 14000
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 14000 && !defined(__APPLE__)
     // This version is awkward, and doesn't work on all platforms used in Envoy CI
     // as of August 2023, but it is the fastest correct option on modern compilers.
     char buf[100];

@@ -118,8 +118,8 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
                        err);
         return Network::PostIoAction::Close;
       }
-      ProtobufWkt::Struct dynamic_metadata;
-      ProtobufWkt::Value val;
+      Protobuf::Struct dynamic_metadata;
+      Protobuf::Value val;
       val.set_string_value(tsi_info.peer_identity_);
       dynamic_metadata.mutable_fields()->insert({std::string("peer_identity"), val});
       callbacks_->connection().streamInfo().setDynamicMetadata(
@@ -331,7 +331,7 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   }
 }
 
-void TsiSocket::closeSocket(Network::ConnectionEvent) {
+void TsiSocket::closeSocket(Network::ConnectionEvent, bool) {
   ENVOY_CONN_LOG(debug, "TSI: closing socket", callbacks_->connection());
   if (handshaker_) {
     handshaker_.release()->deferredDelete();

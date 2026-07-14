@@ -38,10 +38,20 @@ public:
   /**
    * Get the value from the trace context by the key.
    * @param trace_context the trace context to get the value.
-   * @return absl::optional<absl::string_view> the value of the key. If the key is not found, then
-   * absl::nullopt will be returned.
+   * @return std::optional<absl::string_view> the value of the key. If the key is not found, then
+   * std::nullopt will be returned.
    */
-  absl::optional<absl::string_view> get(const TraceContext& trace_context) const;
+  std::optional<absl::string_view> get(const TraceContext& trace_context) const;
+
+  using GetAllResult = absl::InlinedVector<absl::string_view, 1>;
+
+  /**
+   * Get all values from the trace context by the key. If the underlying trace context is HTTP
+   * header map, then there may be multiple values for the same key and the get() method will
+   * return the first value only. This method will return all values for the key.
+   * @param trace_context the trace context to get the values.
+   */
+  GetAllResult getAll(const TraceContext& trace_context) const;
 
   /*
    * Set the key/value pair in the trace context.
@@ -68,7 +78,7 @@ public:
 
 private:
   const Http::LowerCaseString key_;
-  absl::optional<InlineHandle> handle_;
+  std::optional<InlineHandle> handle_;
 };
 
 } // namespace Tracing

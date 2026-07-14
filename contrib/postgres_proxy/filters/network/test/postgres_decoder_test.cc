@@ -1,6 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <optional>
+
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_test_utils.h"
 
@@ -29,6 +31,7 @@ public:
   MOCK_METHOD(bool, shouldEncryptUpstream, (), (const));
   MOCK_METHOD(void, sendUpstream, (Buffer::Instance&));
   MOCK_METHOD(bool, encryptUpstream, (bool, Buffer::Instance&));
+  MOCK_METHOD(void, verifyDownstreamSSL, (), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -630,6 +633,24 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
   ASSERT_FALSE(decoder_->encrypted());
 }
 
+// Test verifyDownstreamSSL callback.
+TEST_F(PostgresProxyDecoderTest, DownstreamSSL) {
+  // Set decoder to wait for initial message.
+  decoder_->state(DecoderImpl::State::InitState);
+
+  // if message is not requesting SSL,
+  // verifyDownstreamSSL should be called to check
+  // if ssl negotiation is done
+  // and if require client ssl is set
+  EXPECT_CALL(callbacks_, verifyDownstreamSSL);
+
+  // send a init postgres request that is not ssl init request
+  createInitialPostgresRequest(data_);
+
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+}
+
 class PostgresProxyUpstreamSSLTest
     : public PostgresProxyDecoderTestBase,
       public ::testing::TestWithParam<std::tuple<std::string, bool, DecoderImpl::State>> {};
@@ -693,7 +714,7 @@ public:
   MOCK_METHOD(uint64_t, copyOutToSlices,
               (uint64_t size, Buffer::RawSlice* slices, uint64_t num_slice), (const, override));
   MOCK_METHOD(void, drain, (uint64_t), (override));
-  MOCK_METHOD(Buffer::RawSliceVector, getRawSlices, (absl::optional<uint64_t>), (const, override));
+  MOCK_METHOD(Buffer::RawSliceVector, getRawSlices, (std::optional<uint64_t>), (const, override));
   MOCK_METHOD(Buffer::RawSlice, frontSlice, (), (const, override));
   MOCK_METHOD(Buffer::SliceDataPtr, extractMutableFrontSlice, (), (override));
   MOCK_METHOD(uint64_t, length, (), (const, override));
@@ -709,8 +730,8 @@ public:
   MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
   MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
   MOCK_METHOD(std::string, toString, (), (const, override));
-  MOCK_METHOD(void, setWatermarks, (uint32_t, uint32_t), (override));
-  MOCK_METHOD(uint32_t, highWatermark, (), (const, override));
+  MOCK_METHOD(void, setWatermarks, (uint64_t, uint32_t), (override));
+  MOCK_METHOD(uint64_t, highWatermark, (), (const, override));
   MOCK_METHOD(bool, highWatermarkTriggered, (), (const, override));
   MOCK_METHOD(size_t, addFragments, (absl::Span<const absl::string_view>));
 };

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -61,6 +63,10 @@ public:
     return true;
   }
   void stop() override {}
+  std::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  getShrinkHeapConfig() const override {
+    return std::nullopt;
+  }
 
   ThreadLocal::SlotPtr tls_;
   // The admin code runs in non-permissive mode, rejecting connections and

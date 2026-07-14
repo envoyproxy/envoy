@@ -56,6 +56,7 @@ public:
   const std::list<Stats::SinkPtr>& sinks() const override { return sinks_; }
   std::chrono::milliseconds flushInterval() const override { return flush_interval_; }
   bool flushOnAdmin() const override { return flush_on_admin_; }
+  uint32_t evictOnFlush() const override { return evict_on_flush_; }
 
   void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
   bool enableDeferredCreationStats() const override {
@@ -67,6 +68,7 @@ private:
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
   const envoy::config::bootstrap::v3::Bootstrap::DeferredStatOptions deferred_stat_options_;
+  uint32_t evict_on_flush_{0};
 };
 
 /**
@@ -194,7 +196,7 @@ public:
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
-  absl::optional<std::string> flagsPath() const override { return flags_path_; }
+  std::optional<std::string> flagsPath() const override { return flags_path_; }
   const envoy::config::bootstrap::v3::LayeredRuntime& runtime() override {
     return layered_runtime_;
   }
@@ -222,7 +224,7 @@ private:
   };
 
   AdminImpl admin_;
-  absl::optional<std::string> flags_path_;
+  std::optional<std::string> flags_path_;
   envoy::config::bootstrap::v3::LayeredRuntime layered_runtime_;
 };
 

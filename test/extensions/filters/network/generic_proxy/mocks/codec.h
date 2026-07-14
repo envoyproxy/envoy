@@ -19,7 +19,7 @@ public:
             testing::Invoke([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
   }
 
-  MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, absl::optional<StartTime>));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, std::optional<StartTime>));
   MOCK_METHOD(void, onDecodingSuccess, (RequestCommonFramePtr));
   MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance&));
@@ -35,7 +35,7 @@ public:
             testing::Invoke([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
   }
 
-  MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, absl::optional<StartTime>));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, std::optional<StartTime>));
   MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr));
   MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
   MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
@@ -55,6 +55,7 @@ public:
   }
 
   MOCK_METHOD(void, setCodecCallbacks, (ServerCodecCallbacks & callbacks));
+  MOCK_METHOD(void, onConnected, ());
   MOCK_METHOD(void, decode, (Buffer::Instance & buffer, bool end_stream));
   MOCK_METHOD(EncodingResult, encode, (const StreamFrame&, EncodingContext& ctx));
   MOCK_METHOD(ResponseHeaderFramePtr, respond,
@@ -100,7 +101,7 @@ public:
               (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.mock.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.mock"; }

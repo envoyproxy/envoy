@@ -40,7 +40,7 @@ public:
   using StoragePtr = std::unique_ptr<uint8_t[]>;
 
   struct SizedStorage {
-    StoragePtr mem_{};
+    StoragePtr mem_;
     size_t len_{};
   };
 
@@ -657,7 +657,7 @@ public:
   uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
                            uint64_t num_slice) const override;
   void drain(uint64_t size) override;
-  RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
+  RawSliceVector getRawSlices(std::optional<uint64_t> max_slices = std::nullopt) const override;
   RawSlice frontSlice() const override;
   SliceDataPtr extractMutableFrontSlice() override;
   uint64_t length() const override;
@@ -695,8 +695,8 @@ public:
   // Does not implement watermarking.
   // TODO(antoniovicente) Implement watermarks by merging the OwnedImpl and WatermarkBuffer
   // implementations. Also, make high-watermark config a constructor argument.
-  void setWatermarks(uint32_t, uint32_t) override { ASSERT(false, "watermarks not implemented."); }
-  uint32_t highWatermark() const override { return 0; }
+  void setWatermarks(uint64_t, uint32_t) override { ASSERT(false, "watermarks not implemented."); }
+  uint64_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 
   /**

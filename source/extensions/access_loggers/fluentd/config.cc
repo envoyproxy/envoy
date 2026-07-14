@@ -33,7 +33,7 @@ getAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& conte
 
 AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig&>(
@@ -66,8 +66,9 @@ AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
                             std::vector<Formatter::CommandParserPtr>);
 
   Formatter::FormatterPtr json_formatter =
-      Formatter::SubstitutionFormatStringUtils::createJsonFormatter(proto_config.record(), false,
-                                                                    commands);
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
+                                proto_config.record(), false, commands),
+                            Formatter::FormatterPtr);
   FluentdFormatterPtr fluentd_formatter =
       std::make_unique<FluentdFormatterImpl>(std::move(json_formatter));
 

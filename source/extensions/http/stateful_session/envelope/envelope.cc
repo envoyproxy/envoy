@@ -10,34 +10,38 @@ namespace Envelope {
 
 constexpr absl::string_view OriginUpstreamValuePartFlag = "UV:";
 
-void EnvelopeSessionStateFactory::SessionStateImpl::onUpdate(
+bool EnvelopeSessionStateFactory::SessionStateImpl::onUpdate(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
 
   const auto upstream_value_header = headers.get(factory_.name_);
   if (upstream_value_header.size() != 1) {
     ENVOY_LOG(trace, "Header {} not exist or occurs multiple times", factory_.name_);
-    return;
+    return false;
   }
 
+  // For envelope, we always update the header with the new host address, so consider it changed.
+  const bool host_changed =
+      !upstream_address_.has_value() || host_address != upstream_address_.value();
   const std::string new_header =
       absl::StrCat(Envoy::Base64::encode(host_address), ";", OriginUpstreamValuePartFlag,
                    Envoy::Base64::encode(upstream_value_header[0]->value().getStringView()));
   headers.setReferenceKey(factory_.name_, new_header);
+  return host_changed;
 }
 
 EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)
     : name_(config.header().name()) {}
 
-absl::optional<std::string>
+std::optional<std::string>
 EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers) const {
   const auto hdr = headers.get(name_);
   if (hdr.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const absl::InlinedVector<absl::string_view, 2> parts =
       absl::StrSplit(hdr[0]->value().getStringView(), ';', absl::SkipEmpty());
   if (parts.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   std::string upstream_host = Base64::decode(parts[0]);
 
@@ -56,11 +60,11 @@ EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers
   if (decoded.empty()) {
     // Do nothing if the 'UV' part is not valid or if there is no UV part.
     ENVOY_LOG(info, "Header {} contains invalid 'UV' part or there is no 'UV' part", name_);
-    return absl::nullopt;
+    return std::nullopt;
   }
   headers.setReferenceKey(name_, decoded);
 
-  return !upstream_host.empty() ? absl::make_optional(std::move(upstream_host)) : absl::nullopt;
+  return !upstream_host.empty() ? std::make_optional(std::move(upstream_host)) : std::nullopt;
 }
 
 } // namespace Envelope

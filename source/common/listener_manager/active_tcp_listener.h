@@ -68,13 +68,18 @@ public:
 
   // Network::BalancedConnectionHandler
   uint64_t numConnections() const override { return num_listener_connections_; }
+  void preIncNumConnections() override { ++num_listener_connections_; }
+  void postIncNumConnections() override { config_->openConnections().inc(); }
+
+  // ActiveStreamListenerBase
   void incNumConnections() override {
-    ++num_listener_connections_;
-    config_->openConnections().inc();
+    preIncNumConnections();
+    postIncNumConnections();
   }
   void post(Network::ConnectionSocketPtr&& socket) override;
   void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
-                      bool hand_off_restored_destination_connections, bool rebalanced) override;
+                      bool hand_off_restored_destination_connections, bool rebalanced,
+                      const std::optional<std::string>& network_namespace) override;
 
   void newActiveConnection(const Network::FilterChain& filter_chain,
                            Network::ServerConnectionPtr server_conn_ptr,
@@ -89,7 +94,7 @@ public:
   Network::TcpConnectionHandler& tcp_conn_handler_;
   // The number of connections currently active on this listener. This is typically used for
   // connection balancing across per-handler listeners.
-  std::atomic<uint64_t> num_listener_connections_{};
+  std::atomic<uint64_t> num_listener_connections_{0};
 
   Network::ConnectionBalancer& connection_balancer_;
   // This is the address this listener is listening on. It's used to get the correct listener
@@ -98,6 +103,6 @@ public:
   Network::Address::InstanceConstSharedPtr listen_address_;
 };
 
-using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
+using ActiveTcpListenerOptRef = std::optional<std::reference_wrapper<ActiveTcpListener>>;
 } // namespace Server
 } // namespace Envoy

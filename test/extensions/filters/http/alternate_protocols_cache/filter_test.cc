@@ -83,9 +83,8 @@ TEST_F(FilterTest, InvalidAltSvc) {
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
-  absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
-      proto_config.alternate_protocols_cache_options();
-  ON_CALL(*info, alternateProtocolsCacheOptions()).WillByDefault(ReturnRef(options));
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
   EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
       .Times(testing::AnyNumber())
       .WillOnce(Return(alternate_protocols_cache_));
@@ -118,9 +117,8 @@ TEST_F(FilterTest, ValidAltSvc) {
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
-  absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
-      proto_config.alternate_protocols_cache_options();
-  ON_CALL(*info, alternateProtocolsCacheOptions()).WillByDefault(ReturnRef(options));
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
   EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
       .Times(testing::AnyNumber())
       .WillOnce(Return(alternate_protocols_cache_));
@@ -128,9 +126,8 @@ TEST_F(FilterTest, ValidAltSvc) {
   EXPECT_CALL(callbacks_, streamInfo())
       .Times(testing::AtLeast(1))
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
-  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo())
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(Return(info));
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
   EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =
@@ -173,9 +170,8 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
   auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   callbacks_.stream_info_.upstream_cluster_info_ = info;
-  absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> options =
-      proto_config.alternate_protocols_cache_options();
-  ON_CALL(*info, alternateProtocolsCacheOptions()).WillByDefault(ReturnRef(options));
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
   EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
       .Times(testing::AnyNumber())
       .WillOnce(Return(alternate_protocols_cache_));
@@ -183,9 +179,8 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
   EXPECT_CALL(callbacks_, streamInfo())
       .Times(testing::AtLeast(1))
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
-  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo())
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(Return(info));
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
   EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =

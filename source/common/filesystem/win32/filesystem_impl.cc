@@ -1,3 +1,5 @@
+#include "source/common/filesystem/filesystem_impl.h"
+
 #include <fcntl.h>
 
 #include <chrono>
@@ -13,7 +15,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
-#include "source/common/filesystem/filesystem_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
@@ -35,7 +36,7 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   }
 
   auto flags = translateFlag(in);
-  fd_ = CreateFileA(path().c_str(), flags.access_,
+  fd_ = CreateFileA(filepath_and_type_.path_.c_str(), flags.access_,
                     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, flags.creation_, 0,
                     NULL);
   if (fd_ == INVALID_HANDLE) {
@@ -119,7 +120,7 @@ static uint64_t fileSizeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data)
   return static_cast<uint64_t>(file_size.QuadPart);
 }
 
-static absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
+static std::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
   // `FILETIME` is a 64 bit value representing the number of 100-nanosecond
   // intervals since January 1, 1601 (UTC).
   // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
@@ -135,7 +136,7 @@ static absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
   SystemTime ret = windows_file_time_epoch + std::chrono::microseconds{v / 10};
   if (ret <= SystemTime{}) {
     // If the timestamp is before the unix epoch, return nullopt.
-    return absl::nullopt;
+    return std::nullopt;
   }
   return ret;
 }
@@ -152,7 +153,7 @@ static FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data)
 
 static Api::IoCallResult<FileInfo>
 fileInfoFromAttributeData(absl::string_view path, const WIN32_FILE_ATTRIBUTE_DATA& data) {
-  absl::optional<uint64_t> sz;
+  std::optional<uint64_t> sz;
   FileType type = fileTypeFromAttributeData(data);
   if (type == FileType::Regular) {
     sz = fileSizeFromAttributeData(data);
@@ -175,7 +176,7 @@ fileInfoFromAttributeData(absl::string_view path, const WIN32_FILE_ATTRIBUTE_DAT
 Api::IoCallResult<FileInfo> FileImplWin32::info() {
   ASSERT(isOpen());
   WIN32_FILE_ATTRIBUTE_DATA data;
-  BOOL result = GetFileAttributesEx(path().c_str(), GetFileExInfoStandard, &data);
+  BOOL result = GetFileAttributesEx(filepath_and_type_.path_.c_str(), GetFileExInfoStandard, &data);
   if (!result) {
     return resultFailure<FileInfo>({}, ::GetLastError());
   }

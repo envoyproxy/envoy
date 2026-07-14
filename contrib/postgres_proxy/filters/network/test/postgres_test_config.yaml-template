@@ -39,6 +39,8 @@ static_resources:
           {}
           # upstream SSL option:
           {}
+          # require downstream SSL option:
+          {}
       # additional filters
       {}
       - name: tcp

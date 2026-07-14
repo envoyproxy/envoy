@@ -185,6 +185,39 @@ TEST(FactoryTest, QueryParameterMutationsTest) {
   ASSERT_NE(factory, nullptr);
 }
 
+TEST(FactoryTest, FactoryTestWithServerContext) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> mock_server_context;
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.header_mutation");
+  ASSERT_NE(factory, nullptr);
+
+  const std::string config = R"EOF(
+  mutations:
+    request_mutations:
+    - remove: "flag-header"
+    - append:
+        header:
+          key: "flag-header"
+          value: "%REQ(ANOTHER-FLAG-HEADER)%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+  )EOF";
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  // The typed createHttpFilterFactoryFromProto overload is only visible on the concrete factory
+  // type (the base NamedHttpFilterConfigFactory pointer exposes only the Protobuf::Message
+  // overload, which routes through the legacy path).
+  HeaderMutationFactoryConfig header_mutation_factory;
+  auto cb = header_mutation_factory
+                .createHttpFilterFactoryFromProto(proto_config, "test", mock_server_context)
+                .value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
+}
+
 } // namespace
 } // namespace HeaderMutation
 } // namespace HttpFilters

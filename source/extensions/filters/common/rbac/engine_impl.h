@@ -50,9 +50,9 @@ private:
 
 class ActionFactory : public Envoy::Matcher::ActionFactory<ActionContext> {
 public:
-  Envoy::Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, ActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Envoy::Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, ActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "envoy.filters.rbac.action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::rbac::v3::Action>();
@@ -62,6 +62,12 @@ public:
 using ActionValidationVisitor = Envoy::Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData>;
 
 void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log);
+
+struct ExprBuilderWithArena {
+  Protobuf::Arena constant_arena_;
+  Extensions::Filters::Common::Expr::BuilderConstPtr builder_ptr_;
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_instance_;
+};
 
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {
 public:
@@ -78,7 +84,7 @@ public:
                     std::string* effective_policy_id) const override;
 
 private:
-  // Checks whether the request matches any policies
+  // Checks whether the request matches any policies.
   bool checkPolicyMatch(const Network::Connection& connection, const StreamInfo::StreamInfo& info,
                         const Envoy::Http::RequestHeaderMap& headers,
                         std::string* effective_policy_id) const;
@@ -87,9 +93,8 @@ private:
   const EnforcementMode mode_;
 
   std::map<std::string, std::unique_ptr<PolicyMatcher>> policies_;
-
-  Protobuf::Arena constant_arena_;
-  Expr::BuilderPtr builder_;
+  // Arena-based builder for when cel_config is not used.
+  std::unique_ptr<ExprBuilderWithArena> builder_with_arena_;
 };
 
 class RoleBasedAccessControlMatcherEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {

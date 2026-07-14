@@ -17,15 +17,16 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
     std::chrono::seconds initialization_timer,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
         web_identity_config)
-    : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       role_arn_(web_identity_config.role_arn()),
       role_session_name_(web_identity_config.role_session_name()) {
 
-  auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+  auto provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
       web_identity_config.web_identity_token_data_source(), context.mainThreadDispatcher(),
-      context.threadLocal(), context.api(), false, 4096);
+      context.threadLocal(), context.api(), false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 4096);
   if (provider_or_error_.ok()) {
     web_identity_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
@@ -39,13 +40,14 @@ void WebIdentityCredentialsProvider::refresh() {
   absl::string_view web_identity_data;
 
   // If we're unable to read from the configured data source, exit early.
-  if (!web_identity_data_source_provider_.has_value()) {
+  if (!web_identity_data_source_provider_.has_value() ||
+      web_identity_data_source_provider_.value()->data() == nullptr) {
     return;
   }
 
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}",
             aws_cluster_manager_->getUriFromClusterName(cluster_name_).value());
-  web_identity_data = web_identity_data_source_provider_.value()->data();
+  web_identity_data = *web_identity_data_source_provider_.value()->data();
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
@@ -64,10 +66,7 @@ void WebIdentityCredentialsProvider::refresh() {
   // Use the Accept header to ensure that AssumeRoleWithWebIdentityResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
-  // Stop any existing timer.
-  if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
-    cache_duration_timer_->disableTimer();
-  }
+
   // Using Http async client to fetch the AWS credentials.
   if (!metadata_fetcher_) {
     metadata_fetcher_ = create_metadata_fetcher_cb_(context_.clusterManager(), clusterName());
@@ -145,8 +144,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
   // Set receiver state in statistics
   stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
-  const auto expiration =
-      Utility::getIntegerFromJsonOrDefault(credentials.value(), WEB_IDENTITY_EXPIRATION, 0);
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(credentials.value(), EXPIRATION, 0);
 
   if (expiration != 0) {
     expiration_time_ =
@@ -157,7 +155,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
     expiration_time_.reset();
   }
 
-  last_updated_ = api_.timeSource().systemTime();
+  last_updated_ = context_.api().timeSource().systemTime();
   handleFetchDone();
 }
 

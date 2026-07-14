@@ -106,7 +106,7 @@ createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactor
   return nullptr;
 }
 
-std::string responseDetail(const std::string& policy_id);
+std::string responseDetail(absl::string_view policy_id);
 
 } // namespace RBAC
 } // namespace Common

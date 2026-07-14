@@ -58,6 +58,28 @@ const (
 	ValueUpstreamClusterName     = 11
 	ValueVirtualClusterName      = 12
 
+	// SSL values (100+)
+	ValueSslConnectionExists                         = 100
+	ValueSslPeerCertificatePresented                 = 101
+	ValueSslPeerCertificateValidated                 = 102
+	ValueSslCiphersuiteId                            = 103
+	ValueSslValidFromPeerCertificate                 = 104
+	ValueSslExpirationPeerCertificate                = 105
+	ValueSslSha256PeerCertificateDigest              = 106
+	ValueSslSerialNumberPeerCertificate              = 107
+	ValueSslSubjectPeerCertificate                   = 108
+	ValueSslIssuerPeerCertificate                    = 109
+	ValueSslSubjectLocalCertificate                  = 110
+	ValueSslTlsVersion                               = 111
+	ValueSslCiphersuiteString                        = 112
+	ValueSslSessionId                                = 113
+	ValueSslUrlEncodedPemEncodedPeerCertificate      = 114
+	ValueSslUrlEncodedPemEncodedPeerCertificateChain = 115
+	ValueSslUriSanPeerCertificate                    = 116
+	ValueSslUriSanLocalCertificate                   = 117
+	ValueSslDnsSansPeerCertificate                   = 118
+	ValueSslDnsSansLocalCertificate                  = 119
+
 	// NOTE: this is a trade-off value.
 	// When the number of header is less this value, we could use the slice on the stack,
 	// otherwise, we have to allocate a new slice on the heap,
@@ -108,6 +130,8 @@ func capiStatusToErr(status C.CAPIStatus) error {
 		return api.ErrInternalFailure
 	case C.CAPISerializationFailure:
 		return api.ErrSerializationFailure
+	case C.CAPIInvalidIPAddress:
+		return api.ErrInvalidIPAddress
 	}
 
 	return errors.New("unknown status")
@@ -321,6 +345,17 @@ func (c *httpCApiImpl) HttpRemoveTrailer(s unsafe.Pointer, key string) {
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpSetUpstreamOverrideHost(s unsafe.Pointer, host string, strict bool) error {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpSetUpstreamOverrideHost(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(host)), C.int(len(host)), C.bool(strict))
+	handleCApiStatus(res)
+	if res != C.CAPIOK {
+		return capiStatusToErr(res)
+	}
+
+	return nil
+}
+
 func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer, refresh bool) {
 	req := (*httpRequest)(r)
 	res := C.envoyGoFilterHttpClearRouteCache(unsafe.Pointer(req.req), C.bool(refresh))
@@ -475,6 +510,12 @@ func (c *httpCApiImpl) HttpGetStringSecret(r unsafe.Pointer, key string) (string
 		return "", false
 	}
 	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))), true
+}
+
+func (c *httpCApiImpl) HttpSetDrainConnectionUponCompletion(r unsafe.Pointer) {
+	req := (*httpRequest)(r)
+	res := C.envoyGoFilterHttpSetDrainConnectionUponCompletion(unsafe.Pointer(req.req))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {

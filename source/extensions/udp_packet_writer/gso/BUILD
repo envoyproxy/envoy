@@ -21,10 +21,9 @@ envoy_cc_extension(
         "//source/server:__subpackages__",
         "//source/common/listener_manager:__subpackages__",
     ],
-    tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
-        "//envoy/network:udp_packet_writer_handler_interface",
+        "//envoy/network:udp_packet_writer_factory_factory_interface",
         "//envoy/registry",
         "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([

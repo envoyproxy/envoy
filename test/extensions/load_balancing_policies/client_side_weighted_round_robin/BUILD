@@ -17,8 +17,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.load_balancing_policies.client_side_weighted_round_robin"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:client_side_weighted_round_robin_lb_lib",
         "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -33,7 +36,10 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
+        "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -45,10 +51,12 @@ envoy_extension_cc_test(
     extension_names = ["envoy.load_balancing_policies.client_side_weighted_round_robin"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3:pkg_cc_proto",
     ],
 )

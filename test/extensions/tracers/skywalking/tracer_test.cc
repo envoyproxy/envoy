@@ -7,7 +7,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -95,6 +94,9 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     // Test whether the basic functions of Span are normal.
     EXPECT_FALSE(span->spanEntity()->skipAnalysis());
     span->setSampled(false);
+    EXPECT_TRUE(span->spanEntity()->skipAnalysis());
+
+    EXPECT_FALSE(span->useLocalDecision()); // Always false for now.
     EXPECT_TRUE(span->spanEntity()->skipAnalysis());
 
     // The initial operation name is consistent with the 'operation' parameter in the 'startSpan'

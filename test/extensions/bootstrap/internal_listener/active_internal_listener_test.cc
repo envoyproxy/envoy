@@ -172,10 +172,11 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
-  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
+  EXPECT_CALL(listener_config_, perConnectionBufferHighWatermarkTimeout());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_CALL(conn_handler_, decNumConnections());
   connection->close(Network::ConnectionCloseType::NoFlush);
@@ -220,10 +221,11 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
-  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
+  EXPECT_CALL(listener_config_, perConnectionBufferHighWatermarkTimeout());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(conn_handler_, decNumConnections());
@@ -307,6 +309,9 @@ public:
       return hand_off_restored_destination_connections_;
     }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+      return std::chrono::milliseconds::zero();
+    }
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return listener_filters_timeout_;
     }
@@ -410,7 +415,7 @@ TEST_F(ConnectionHandlerTest, DisableInternalListener) {
                   internal_listener->socket_factories_[0].get()),
               localAddress())
       .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_, random_);
+  handler_->addListener(std::nullopt, *internal_listener, runtime_, random_);
   auto internal_listener_cb = handler_->findByAddress(local_address);
   ASSERT_TRUE(internal_listener_cb.has_value());
 
@@ -438,7 +443,7 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
                   internal_listener->socket_factories_[0].get()),
               localAddress())
       .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_, random_);
+  handler_->addListener(std::nullopt, *internal_listener, runtime_, random_);
 
   ASSERT_NE(internal_listener, nullptr);
 

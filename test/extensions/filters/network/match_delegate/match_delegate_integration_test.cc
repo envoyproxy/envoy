@@ -18,21 +18,21 @@ namespace MatchDelegate {
 namespace {
 
 using envoy::extensions::common::matching::v3::ExtensionWithMatcher;
-using Envoy::ProtobufWkt::StringValue;
-using Envoy::ProtobufWkt::UInt32Value;
+using Envoy::Protobuf::StringValue;
+using Envoy::Protobuf::UInt32Value;
 
 // A simple network filter that counts connections and data.
 class CountingFilter : public Network::Filter {
 public:
   // Read filter methods
   Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     data_bytes_ += data.length();
     return Network::FilterStatus::Continue;
   }
 
   Network::FilterStatus onNewConnection() override {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     connection_count_++;
     return Network::FilterStatus::Continue;
   }
@@ -43,7 +43,7 @@ public:
 
   // Write filter methods
   Network::FilterStatus onWrite(Buffer::Instance& data, bool) override {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     write_bytes_ += data.length();
     return Network::FilterStatus::Continue;
   }
@@ -54,23 +54,23 @@ public:
 
   // Thread-safe getters for counter values
   static uint32_t getConnectionCount() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return connection_count_;
   }
 
   static uint64_t getDataBytes() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return data_bytes_;
   }
 
   static uint64_t getWriteBytes() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return write_bytes_;
   }
 
   // Reset all counters
   static void resetCounters() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     connection_count_ = 0;
     data_bytes_ = 0;
     write_bytes_ = 0;
@@ -107,7 +107,6 @@ public:
     if (!value_.empty()) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           "test_key", std::make_shared<Router::StringAccessorImpl>(value_),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     return Network::FilterStatus::Continue;
@@ -153,7 +152,7 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext&) override {
-    const auto& config = dynamic_cast<const StringValue&>(proto_config);
+    const auto& config = Envoy::Protobuf::DynamicCastMessage<StringValue>(proto_config);
     return [value = config.value()](auto& filter_manager) {
       auto filter = std::make_shared<SetFilterStateFilter>(value);
       filter_manager.addReadFilter(filter);
@@ -223,7 +222,7 @@ public:
       auto* typed_config = filter->mutable_typed_config();
       StringValue string_value;
       string_value.set_value(value);
-      typed_config->PackFrom(string_value);
+      std::ignore = typed_config->PackFrom(string_value);
     });
 
     initialize();

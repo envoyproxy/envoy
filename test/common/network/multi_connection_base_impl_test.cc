@@ -1,6 +1,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/network/socket.h"
+
 #include "source/common/network/address_impl.h"
 #include "source/common/network/multi_connection_base_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -202,6 +204,51 @@ TEST_F(MultiConnectionBaseImplTest, ConnectTimeoutThenFirstSuccess) {
   EXPECT_FALSE(impl_->connecting());
 }
 
+TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectFinishedFiresOnDeferredCallbacks) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  StrictMock<MockConnectionCallbacks> cb_a;
+  StrictMock<MockConnectionCallbacks> cb_b;
+  impl_->addConnectionCallbacks(cb_a);
+  impl_->addConnectionCallbacks(cb_b);
+
+  EXPECT_CALL(cb_a, onDrain());
+  EXPECT_CALL(cb_b, onDrain());
+  impl_->onDrain();
+}
+
+TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectFinishedSkipsRemovedCallbacks) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  StrictMock<MockConnectionCallbacks> removed_cb;
+  StrictMock<MockConnectionCallbacks> kept_cb;
+  impl_->addConnectionCallbacks(removed_cb);
+  impl_->addConnectionCallbacks(kept_cb);
+  // Pre-connect removeConnectionCallbacks nulls the slot rather than erasing it; onDrain()
+  // must skip the null entry.
+  impl_->removeConnectionCallbacks(removed_cb);
+
+  EXPECT_CALL(kept_cb, onDrain());
+  // StrictMock catches any call on removed_cb.
+  impl_->onDrain();
+}
+
+TEST_F(MultiConnectionBaseImplTest, DrainAfterConnectFinishedDelegatesToFinalConnection) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  // Finish connect on the only-created connection (index 0).
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
+  connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
+
+  // onDrain() now delegates to the surviving connection.
+  EXPECT_CALL(*createdConnections()[0], onDrain());
+  impl_->onDrain();
+}
+
 TEST_F(MultiConnectionBaseImplTest, DisallowedFunctions) {
   setupMultiConnectionImpl(2);
   startConnect();
@@ -364,6 +411,29 @@ TEST_F(MultiConnectionBaseImplTest, SetDelayedCloseTimeout) {
   // Verify that setDelayedCloseTimeout() calls are delegated to the remaining connection.
   EXPECT_CALL(*createdConnections()[1], setDelayedCloseTimeout(std::chrono::milliseconds(10)));
   impl_->setDelayedCloseTimeout(std::chrono::milliseconds(10));
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetBufferHighWatermarkTimeout) {
+  setupMultiConnectionImpl(3);
+
+  startConnect();
+
+  const std::chrono::milliseconds initial_timeout(5);
+  EXPECT_CALL(*createdConnections()[0], setBufferHighWatermarkTimeout(initial_timeout));
+  impl_->setBufferHighWatermarkTimeout(initial_timeout);
+
+  EXPECT_CALL(*nextConnection(), setBufferHighWatermarkTimeout(initial_timeout));
+  timeOutAndStartNextAttempt();
+
+  const std::chrono::milliseconds updated_timeout(10);
+  EXPECT_CALL(*createdConnections()[0], setBufferHighWatermarkTimeout(updated_timeout));
+  EXPECT_CALL(*createdConnections()[1], setBufferHighWatermarkTimeout(updated_timeout));
+  impl_->setBufferHighWatermarkTimeout(updated_timeout);
+
+  EXPECT_CALL(*nextConnection(), setBufferHighWatermarkTimeout(updated_timeout));
+  expectConnectionCreation(2);
+  EXPECT_CALL(*nextConnection(), connect());
+  failover_timer_->invokeCallback();
 }
 
 TEST_F(MultiConnectionBaseImplTest, CloseDuringAttempt) {
@@ -1109,7 +1179,7 @@ TEST_F(MultiConnectionBaseImplTest, UnixSocketPeerCredentials) {
   connectFirstAttempt();
 
   EXPECT_CALL(*createdConnections()[0], unixSocketPeerCredentials())
-      .WillOnce(Return(absl::optional<Connection::UnixDomainSocketPeerCredentials>()));
+      .WillOnce(Return(std::optional<Connection::UnixDomainSocketPeerCredentials>()));
   EXPECT_FALSE(impl_->unixSocketPeerCredentials().has_value());
 }
 
@@ -1177,9 +1247,43 @@ TEST_F(MultiConnectionBaseImplTest, LastRoundTripTime) {
 
   connectFirstAttempt();
 
-  absl::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
+  std::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
   EXPECT_CALL(*createdConnections()[0], lastRoundTripTime()).WillOnce(Return(rtt));
   EXPECT_EQ(rtt, impl_->lastRoundTripTime());
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetSocketOptionTest) {
+  setupMultiConnectionImpl(2);
+  connectFirstAttempt();
+  EXPECT_CALL(*createdConnections()[0], setSocketOption(_, _)).WillOnce(Return(true));
+
+  Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
+
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_TRUE(impl_->setSocketOption(sockopt_name, sockopt_val));
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetSocketOptionFailedTest) {
+  setupMultiConnectionImpl(2);
+  connectFirstAttempt();
+
+  EXPECT_CALL(*createdConnections()[0], setSocketOption(_, _)).WillOnce(Return(false));
+
+  Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
+
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(impl_->setSocketOption(sockopt_name, sockopt_val));
+}
+
+TEST_F(MultiConnectionBaseImplTest, GetSocketPanics) {
+  setupMultiConnectionImpl(2);
+
+  // getSocket() should panic as it's not implemented for MultiConnectionBaseImpl.
+  EXPECT_DEATH(impl_->getSocket(), "not implemented");
 }
 
 } // namespace Network

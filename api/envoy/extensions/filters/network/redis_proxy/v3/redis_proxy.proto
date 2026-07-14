@@ -2,8 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.redis_proxy.v3;
 
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/extensions/common/aws/v3/credential_provider.proto";
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
 import "google/protobuf/duration.proto";
@@ -59,6 +61,23 @@ message RedisProxy {
       // Read from any node of the cluster. A random node is selected among the primary and
       // replicas, healthy nodes have precedent over unhealthy nodes.
       ANY = 4;
+
+      // Read from replicas in the same availability zone as the Envoy proxy. If no replicas
+      // are available in the same zone, fall back to any replica. If no replicas are available
+      // at all, fall back to the primary.
+      //
+      // Note: Zone discovery currently works with Valkey only. Valkey exposes availability_zone
+      // in its INFO response. Standard Redis does not support this field.
+      //
+      // The client zone is determined from Envoy's :ref:`locality zone <envoy_v3_api_field_config.core.v3.Locality.zone>`.
+      LOCAL_ZONE_AFFINITY = 5;
+
+      // Similar to LOCAL_ZONE_AFFINITY, but also considers the primary node for same-zone routing.
+      // Priority order: replicas in same zone -> primary in same zone -> any replica -> primary.
+      // This is useful when reducing cross-zone traffic is more important than read distribution.
+      //
+      // Note: Zone discovery currently works with Valkey only.
+      LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY = 6;
     }
 
     // Per-operation timeout in milliseconds. The timer starts when the first
@@ -379,13 +398,64 @@ message RedisProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions";
 
+  message Credential {
+    // The address to which this username and password applies.
+    config.core.v3.Address address = 1;
+
+    // Upstream server password as defined by the ``requirepass`` directive
+    // `<https://redis.io/topics/config>`_ in the server's configuration file.
+    config.core.v3.DataSource auth_password = 2 [(udpa.annotations.sensitive) = true];
+
+    // Upstream server username as defined by the ``user`` directive
+    // `<https://redis.io/topics/acl>`_ in the server's configuration file.
+    config.core.v3.DataSource auth_username = 3 [(udpa.annotations.sensitive) = true];
+  }
+
   // Upstream server password as defined by the ``requirepass`` directive
   // `<https://redis.io/topics/config>`_ in the server's configuration file.
+  // If ``aws_iam`` is set, this field is ignored.
   config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
 
   // Upstream server username as defined by the ``user`` directive
   // `<https://redis.io/topics/acl>`_ in the server's configuration file.
+  // If ``aws_iam``` is set, this field will be used as the authenticating user for redis IAM authentication.
+  // See ``Create a new IAM-enabled user`` under `Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_ for more details.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
+
+  // The cluster level configuration for AWS IAM authentication
+  AwsIam aws_iam = 3;
+
+  // If specified, these credentials are used when connecting to upstream endpoints. Which
+  // credential is used is determined by matching the resolved ``address`` field here with each
+  // endpoint's resolved ``address`` field. The first entry for a given ``address`` here takes precedence.
+  // If no entry in ``credentials`` matches, then the ``auth_password`` and ``auth_username`` fields
+  // are used as defaults.
+  repeated Credential credentials = 4;
+}
+
+// [#next-free-field: 6]
+message AwsIam {
+  // An AwsCredentialProvider, allowing the use of a specific credential provider chain or specific provider settings
+  common.aws.v3.AwsCredentialProvider credential_provider = 1;
+
+  // The name of the cache, used when generating the authentication token.
+  string cache_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The optional service name to be used in AWS IAM authentication. If not provided, the service name will be set to ``elasticache``. For Amazon MemoryDB
+  // the service name should be set to ``memorydb``.
+  string service_name = 3;
+
+  // The optional AWS region that your cache is located in. If not provided, the region will be deduced using the region provider chain
+  // as described in :ref:`config_http_filters_aws_request_signing_region`.
+  string region = 4;
+
+  // Number of seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
+  // Expiration of the current authentication token will automatically trigger generation of a new token.
+  // As envoy will automatically continue to generate new tokens as required, there is no substantial benefit to using a long expiration value here.
+  google.protobuf.Duration expiration_time = 5 [(validate.rules).duration = {
+    lte {seconds: 900}
+    gte {}
+  }];
 }
 
 // RedisExternalAuthProvider specifies a gRPC service that can be used to authenticate Redis clients.

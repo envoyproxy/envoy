@@ -13,15 +13,12 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/instance.h"
-#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Upstream {
 namespace {
-
-using testing::_;
 
 using ClusterType = absl::variant<envoy::config::cluster::v3::Cluster::DiscoveryType,
                                   envoy::config::cluster::v3::Cluster::CustomClusterType>;
@@ -59,19 +56,18 @@ envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::string& ya
 class DeferredClusterInitializationTest : public testing::TestWithParam<bool> {
 protected:
   DeferredClusterInitializationTest()
-      : ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()),
-        http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
-        router_context_(factory_.stats_.symbolTable()) {}
+      : ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Replace the adsMux to have mocked GrpcMux object that will allow invoking
     // methods when creating the cluster-manager.
-    ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
+    ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
 
-    cluster_manager_ = TestClusterManagerImpl::createAndInit(
-        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
-        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
+    cluster_manager_ = TestClusterManagerImpl::createTestClusterManager(bootstrap, factory_,
+                                                                        factory_.server_context_);
+    ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
+
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });
@@ -118,14 +114,7 @@ protected:
   NiceMock<TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
-  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
-  AccessLog::MockAccessLogManager log_manager_;
-  NiceMock<Server::MockAdmin> admin_;
-  Http::ContextImpl http_context_;
-  Grpc::ContextImpl grpc_context_;
-  Router::ContextImpl router_context_;
-  NiceMock<Server::MockInstance> server_;
 };
 
 class StaticClusterTest : public DeferredClusterInitializationTest {};
@@ -435,7 +424,7 @@ protected:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(xds_manager_.subscription_factory_.callbacks_
+    EXPECT_TRUE(factory_.server_context_.xds_manager_.subscription_factory_.callbacks_
                     ->onConfigUpdate(decoded_resources.refvec_, {}, "")
                     .ok());
   }
@@ -558,11 +547,9 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
   addEndpoint(cluster_load_assignment, 1000);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
-  auto initiailization_instance =
+  auto initialization_instance =
       cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
-  EXPECT_NE(nullptr, initiailization_instance->load_balancer_factory_);
-  // RING_HASH lb policy requires Envoy re-create the load balancer when the cluster is updated.
-  EXPECT_TRUE(initiailization_instance->load_balancer_factory_->recreateOnHostChange());
+  EXPECT_NE(nullptr, initialization_instance->load_balancer_factory_);
 
   // Update the cluster with a different lb policy. Now it's a different cluster and should
   // not be merged.
@@ -577,7 +564,7 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
 
   auto new_initialization_instance =
       cluster_manager_->clusterInitializationMap().find("cluster_1")->second;
-  EXPECT_NE(initiailization_instance.get(), new_initialization_instance.get());
+  EXPECT_NE(initialization_instance.get(), new_initialization_instance.get());
 
   EXPECT_EQ(1, new_initialization_instance->per_priority_state_.at(1).hosts_added_.size());
   // Ensure the hosts_added_ is empty for priority 0. Because if unexpected merge happens,

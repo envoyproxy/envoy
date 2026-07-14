@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.aggregate.v3;
 
+import "envoy/config/core/v3/config_source.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -24,4 +26,19 @@ message ClusterConfig {
   // Load balancing clusters in aggregate cluster. Clusters are prioritized based on the order they
   // appear in this list.
   repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+}
+
+// Configures an aggregate cluster whose
+// :ref:`ClusterConfig <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`
+// is to be fetched from a separate xDS resource.
+// [#extension: envoy.clusters.aggregate_resource]
+// [#not-implemented-hide:]
+message AggregateClusterResource {
+  // Configuration source specifier for the ClusterConfig resource.
+  // Only the aggregated protocol variants are supported; if configured
+  // otherwise, the cluster resource will be NACKed.
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The name of the ClusterConfig resource to subscribe to.
+  string resource_name = 2 [(validate.rules).string = {min_len: 1}];
 }

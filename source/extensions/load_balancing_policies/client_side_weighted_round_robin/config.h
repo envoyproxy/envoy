@@ -11,7 +11,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClientSideWeightedRoundRobin {
 
 using ClientSideWeightedRoundRobinLbProto = envoy::extensions::load_balancing_policies::
@@ -36,7 +36,8 @@ public:
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
-    const auto& lb_config = dynamic_cast<const ClientSideWeightedRoundRobinLbProto&>(config);
+    const auto& lb_config =
+        Envoy::Protobuf::DynamicCastMessage<ClientSideWeightedRoundRobinLbProto>(config);
     return Upstream::LoadBalancerConfigPtr{new Upstream::ClientSideWeightedRoundRobinLbConfig(
         lb_config, context.mainThreadDispatcher(), context.threadLocal())};
   }
@@ -45,6 +46,6 @@ public:
 DECLARE_FACTORY(Factory);
 
 } // namespace ClientSideWeightedRoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

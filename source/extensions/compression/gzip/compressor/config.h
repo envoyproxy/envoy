@@ -71,7 +71,7 @@ public:
 private:
   Envoy::Compression::Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
       const envoy::extensions::compression::gzip::compressor::v3::Gzip& config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::GenericFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(GzipCompressorLibraryFactory);

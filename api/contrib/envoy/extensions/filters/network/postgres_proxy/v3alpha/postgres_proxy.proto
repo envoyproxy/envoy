@@ -4,6 +4,7 @@ package envoy.extensions.filters.network.postgres_proxy.v3alpha;
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -19,15 +20,26 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_network_filters_postgres_proxy>`.
 // [#extension: envoy.filters.network.postgres_proxy]
 
+// [#next-free-field: 6]
 message PostgresProxy {
-  // Upstream SSL operational modes.
+  // Downstream and Upstream SSL operational modes.
   enum SSLMode {
-    // Do not encrypt upstream connection to the server.
+    // If used in downstream ssl, do not terminate SSL session initiated by a client.
+    // The Postgres proxy filter will pass all encrypted and unencrypted packets to the upstream server.
+    // If used in upstream ssl, do not encrypt upstream connection to the server.
     DISABLE = 0;
 
-    // Establish upstream SSL connection to the server. If the server does not
+    // If used in downstream ssl, the Postgres proxy filter will terminate SSL
+    // session and close downstream connections that refuse to upgrade to SSL.
+    // If used in upstream SSL, establish upstream SSL connection to the server. If the server does not
     // accept the request for SSL connection, the session is terminated.
     REQUIRE = 1;
+
+    // If used in downstream SSL, the Postgres proxy filter will accept downstream
+    // client's encryption settings. If the client wants to use clear-text,
+    // Envoy will not enforce SSL encryption.
+    // If the client wants to use encryption, Envoy will terminate SSL.
+    ALLOW = 2;
   }
 
   // The human readable prefix to use when emitting :ref:`statistics
@@ -48,7 +60,10 @@ message PostgresProxy {
   // If the filter does not manage to terminate the SSL session, it will close the connection from the client.
   // Refer to official documentation for details
   // `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.11>`_.
-  bool terminate_ssl = 3;
+  // This field is deprecated.
+  // Please use :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.downstream_ssl>`.
+  bool terminate_ssl = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Controls whether to establish upstream SSL connection to the server.
   // Envoy will try to establish upstream SSL connection to the server only when
@@ -57,6 +72,12 @@ message PostgresProxy {
   // SSL connection to Envoy and Postgres filter is configured to terminate SSL.
   // In order for upstream encryption to work, the corresponding cluster must be configured to use
   // :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig>`.
-  // Defaults to ``SSL_DISABLE``.
+  // Defaults to ``DISABLE``.
   SSLMode upstream_ssl = 4;
+
+  // Controls whether to close downstream connections that refuse to upgrade to SSL.
+  // If enabled, the filter chain must use
+  // :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig>`.
+  // Defaults to ``DISABLE``.
+  SSLMode downstream_ssl = 5;
 }

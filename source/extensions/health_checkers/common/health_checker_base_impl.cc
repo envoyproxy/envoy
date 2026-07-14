@@ -7,6 +7,7 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/router/router.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -40,9 +41,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       transport_socket_options_(initTransportSocketOptions(config)),
       transport_socket_match_metadata_(initTransportSocketMatchMetadata(config)),
       member_update_cb_{cluster_.prioritySet().addMemberUpdateCb(
-          [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> absl::Status {
+          [this](const HostVector& hosts_added, const HostVector& hosts_removed) {
             onClusterMemberUpdate(hosts_added, hosts_removed);
-            return absl::OkStatus();
           })} {}
 
 std::shared_ptr<const Network::TransportSocketOptionsImpl>
@@ -164,6 +164,11 @@ void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
     if (host->disableActiveHealthCheck()) {
       continue;
     }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.health_check_after_cluster_warming") &&
+        active_sessions_.contains(host)) {
+      continue;
+    }
     active_sessions_[host] = makeSession(host);
     host->setHealthChecker(
         HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
@@ -173,6 +178,12 @@ void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
 
 void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
+  // Skip processing updates while cluster is still warming (e.g., waiting for SDS secrets).
+  // All existing hosts will be added when start() is called.
+  if (!started_ && Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.health_check_after_cluster_warming")) {
+    return;
+  }
   addHosts(hosts_added);
   for (const HostSharedPtr& host : hosts_removed) {
     if (host->disableActiveHealthCheck()) {
@@ -232,6 +243,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
 }
 
 void HealthCheckerImplBase::start() {
+  started_ = true;
   for (auto& host_set : cluster_.prioritySet().hostSetsPerPriority()) {
     addHosts(host_set->hosts());
   }
@@ -355,7 +367,7 @@ bool networkHealthCheckFailureType(envoy::data::core::v3::HealthCheckFailureType
 } // namespace
 
 HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
-    envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
+    envoy::data::core::v3::HealthCheckFailureType type, bool retriable, uint64_t http_status_code) {
   // If we are unhealthy, reset the # of healthy to zero.
   num_healthy_ = 0;
 
@@ -367,7 +379,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {
-        parent_.event_logger_->logEjectUnhealthy(parent_.healthCheckerType(), host_, type);
+        parent_.event_logger_->logEjectUnhealthy(parent_.healthCheckerType(), host_, type,
+                                                 http_status_code);
       }
     } else {
       changed_state = HealthTransition::ChangePending;
@@ -387,7 +400,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   changed_state = clearPendingFlag(changed_state);
 
   if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {
-    parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_);
+    parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_,
+                                        http_status_code);
   }
 
   parent_.stats_.failure_.inc();
@@ -403,8 +417,13 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
-    envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
-  HealthTransition changed_state = setUnhealthy(type, retriable);
+    envoy::data::core::v3::HealthCheckFailureType type, bool retriable, uint64_t http_status_code) {
+  HealthTransition changed_state = setUnhealthy(type, retriable, http_status_code);
+  // Clear the cached HTTP status code on non-HTTP failures so the HDS report does
+  // not ship a stale code from the last successful response.
+  if (type == envoy::data::core::v3::NETWORK || type == envoy::data::core::v3::NETWORK_TIMEOUT) {
+    host_->setLastHealthCheckHttpStatus(0);
+  }
   // It's possible that the previous call caused this session to be deferred deleted.
   if (timeout_timer_ != nullptr) {
     timeout_timer_->disableTimer();

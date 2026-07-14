@@ -38,6 +38,47 @@ following guidelines for all code, APIs, and documentation:
   practices evolve. Additional comments on this topic may be provided by maintainers during code
   review.
 
+# Use of generative AI policy
+
+## Goals
+
+* Keep Envoy code consistent and high-quality.
+* Save reviewers time. Reviewers are often in short supply and time, so try to avoid wasted time.
+
+## What is allowed
+
+* Use of generative AI to assist in writing code or tests, as long as the submitter fully understands
+  the code being submitted.
+* Use of generative AI to assist in reviewing of PRs, as long as the reviewer fully understands review
+  comments produced by the AI review agent. AI review agent is an aid to the reviewer, not to the PR author.
+
+All of the following are required for AI assisted code:
+
+* You understand the change you are submitting.
+* You respond to questions and comments from the reviewer. If you use generative AI to help in your
+  responses, you are required to edit and proof read the AI-generated responses, and ensure it is
+  a reasonable response to the question or issue raised.
+* You are able to revise the AI-generated code if requested by the reviewer. You are responsible for
+  ensuring issues are addressed, even if your AI assistant is unable.
+* You are transparent about your AI usage. It is often helpful to a reviewer to know that an AI tool
+  was used; please include that information in the PR description.
+* All generated code must be released under the same [license](LICENSE) as Envoy. You are responsible
+  for ensuring that the tools you use to generate code do not add any additional licensing restrictions.
+
+All of the following are required for AI assisted PR reviews:
+
+* Remove, or resolve, hallucinated or low value PR comments from AI review agent.
+* Respond to the comments from the PR author in case they require clarification or disagree with AI findings.
+  It is recommended to proactively clarify why you think AI generated comments needs to be addressed.
+
+## What is not allowed
+
+* PRs which the submitter does not understand or take full ownership of.
+* Code comments should be valuable to the codebase. Any comments which only help the AI interact with
+  the code must be removed before the PR is submitted. Comments which explain what straightforward code
+  does are not useful.
+* "Drive-by" invocation of AI review agents on PRs without the intention to follow up on produced review.
+
 # Breaking change policy
 
 Both API and implementation stability are important to Envoy. Since the API is consumed by clients
@@ -90,6 +131,7 @@ versioning guidelines:
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
   it is expected the multi-phase warn-by-default/fail-by-default is sufficient to warn users to move
   away from deprecated features.
+* Given their criticality, changing the default behavior of the ext_authz and ext_proc protocols is strictly forbidden.
 
 # Submitting a PR
 
@@ -110,11 +152,15 @@ versioning guidelines:
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
-  well as [release notes](changelogs/current.yaml). API changes should be documented
-  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
-  to multiple sections of the release notes, it should be noted in the first (most important) section
-  that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
-  `Incompatible Behavior Changes` but not in `Bug Fixes`.
+  well as a release note fragment in [changelogs/current](changelogs/current). Add the fragment to
+  the most appropriate section directory, using the canonical sections and areas listed in
+  [changelogs/changelogs.yaml](changelogs/changelogs.yaml). Fragment filenames should use the form
+  `<area>__<short-description>.rst`, for example
+  `http__added-new-request-stat.rst`. API changes should be documented inline with protos as per
+  the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies to multiple sections
+  of the release notes, it should be noted in the first (most important) section that applies. For
+  instance, a bug fix that introduces incompatible behavior should be noted in
+  `behavior_changes` but not in `bug_fixes`.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
@@ -151,8 +197,9 @@ versioning guidelines:
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
   Closing stale PRs helps us to keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
-  Additionally, the [version history](changelogs/current.yaml) must be updated with
-  relevant RST links for fields and messages as part of the commit.
+  Additionally, add a release note fragment under the `deprecated` section in
+  [changelogs/current](changelogs/current), with relevant RST links for fields and messages as part
+  of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
 * If your PR involves any changes to
@@ -224,12 +271,14 @@ Runtime code is held to the same standard as regular Envoy code, so both the old
 path and the new should have 100% coverage both with the feature defaulting true
 and false.
 
-Please note that if adding a runtime guarded feature, your [release notes](changelogs/current.yaml) should include both the functional change, and how to revert it, for example
+Please note that if adding a runtime guarded feature, your release note fragment in
+[changelogs/current](changelogs/current) should include both the functional change, and how to
+revert it, for example in `changelogs/current/behavior_changes/http__header-validation.rst`:
 
-```yaml
-- area: config
-  change: |
-      type URL is used to lookup extensions regardless of the name field. This may cause problems for empty filter configurations or mis-matched protobuf as the typed configurations. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.no_extension_lookup_by_name`` to false.
+```rst
+HTTP request header validation is now performed before route selection. This behavioral change can
+be temporarily reverted by setting runtime guard
+``envoy.reloadable_features.http_validate_headers_before_route_selection`` to ``false``.
 ```
 
 # PR review policy for maintainers

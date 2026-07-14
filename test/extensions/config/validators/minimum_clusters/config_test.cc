@@ -20,8 +20,8 @@ TEST(MinimumClustersValidatorFactoryTest, CreateValidator) {
 
   envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator config;
   config.set_min_clusters_num(5);
-  ProtobufWkt::Any typed_config;
-  typed_config.PackFrom(config);
+  Protobuf::Any typed_config;
+  std::ignore = typed_config.PackFrom(config);
   auto validator =
       factory->createConfigValidator(typed_config, ProtobufMessage::getStrictValidationVisitor());
   EXPECT_NE(validator, nullptr);
@@ -38,8 +38,8 @@ TEST(MinimumClustersValidatorFactoryTest, CreateEmptyValidator) {
       empty_proto.get());
   EXPECT_EQ(0, config.min_clusters_num());
 
-  ProtobufWkt::Any typed_config;
-  typed_config.PackFrom(config);
+  Protobuf::Any typed_config;
+  std::ignore = typed_config.PackFrom(config);
   auto validator =
       factory->createConfigValidator(typed_config, ProtobufMessage::getStrictValidationVisitor());
   EXPECT_NE(validator, nullptr);

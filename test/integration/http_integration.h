@@ -130,7 +130,10 @@ public:
             ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/downstream_protocol ==
                                           Http::CodecType::HTTP3)) {}
   HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version,
-                      const std::string& config);
+                      const std::string& config)
+      : HttpIntegrationTest(downstream_protocol, version, configToBootstrap(config)) {}
+  HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version,
+                      const envoy::config::bootstrap::v3::Bootstrap& config);
 
   HttpIntegrationTest(Http::CodecType downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
@@ -141,11 +144,16 @@ public:
                                           Http::CodecType::HTTP3)) {}
   HttpIntegrationTest(Http::CodecType downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
-                      Network::Address::IpVersion version, const std::string& config);
+                      Network::Address::IpVersion version, const std::string& config)
+      : HttpIntegrationTest(downstream_protocol, upstream_address_fn, version,
+                            configToBootstrap(config)) {}
+  HttpIntegrationTest(Http::CodecType downstream_protocol,
+                      const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
+                      const envoy::config::bootstrap::v3::Bootstrap& config);
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp1ImplOverrides(Http1ParserImpl http1_implementation);
   void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
@@ -165,9 +173,9 @@ protected:
   // Makes a http connection object without checking its connected state.
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
-          absl::nullopt,
+      std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      std::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          std::nullopt,
       bool wait_till_connected = true);
   // Makes a downstream network connection object based on client codec version.
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
@@ -203,7 +211,7 @@ protected:
 
   struct Result {
     IntegrationStreamDecoderPtr response;
-    absl::optional<uint64_t> upstream_index;
+    std::optional<uint64_t> upstream_index;
   };
 
   Result sendRequestAndWaitForResponse(
@@ -216,14 +224,14 @@ protected:
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
   // In cases where the upstream that will receive the request is not deterministic, a second
   // upstream index may be provided, in which case both upstreams will be checked for requests.
-  absl::optional<uint64_t> waitForNextUpstreamRequest(
+  std::optional<uint64_t> waitForNextUpstreamRequest(
       const std::vector<uint64_t>& upstream_indices,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
   void waitForNextUpstreamRequest(
       uint64_t upstream_index = 0,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
-  absl::optional<uint64_t>
+  std::optional<uint64_t>
   waitForNextUpstreamConnection(const std::vector<uint64_t>& upstream_indices,
                                 std::chrono::milliseconds connection_wait_timeout,
                                 FakeHttpConnectionPtr& fake_upstream_connection);
@@ -244,8 +252,8 @@ protected:
                                     const int request_size,
                                     const Http::TestResponseHeaderMapImpl& response_headers,
                                     const int response_size, const int backend_idx,
-                                    absl::optional<const Http::TestResponseHeaderMapImpl>
-                                        expected_response_headers = absl::nullopt);
+                                    std::optional<const Http::TestResponseHeaderMapImpl>
+                                        expected_response_headers = std::nullopt);
 
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
@@ -349,8 +357,6 @@ protected:
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.
   std::string upstreamProtocolStatsRoot() const;
-  // Prefix listener stat with IP:port, including IP version dependent loopback address.
-  std::string listenerStatPrefix(const std::string& stat_name);
 
   Network::UpstreamTransportSocketFactoryPtr quic_transport_socket_factory_;
   // Must outlive |codec_client_| because it may not close connection till the end of its life
@@ -393,10 +399,12 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP2, version) {}
 
 protected:
+  void startHttp2Session(const Http2Frame& settings);
   void startHttp2Session();
   Http2Frame readFrame();
   void sendFrame(const Http2Frame& frame);
   virtual void beginSession();
+  virtual void beginSession(const Http2Frame& settings);
 
   IntegrationTcpClientPtr tcp_client_;
 };

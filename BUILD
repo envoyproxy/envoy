@@ -1,8 +1,4 @@
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
-
 licenses(["notice"])  # Apache 2
-
-envoy_py_namespace()
 
 exports_files([
     "VERSION.txt",

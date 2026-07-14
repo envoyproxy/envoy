@@ -8,6 +8,7 @@ envoy_mobile_package()
 android_library(
     name = "envoy_c_types_lib",
     srcs = [
+        "EnvoyConnectionType.java",
         "EnvoyEventTracker.java",
         "EnvoyFinalStreamIntel.java",
         "EnvoyHTTPCallbacks.java",
@@ -21,6 +22,7 @@ android_library(
         "EnvoyStatus.java",
         "EnvoyStreamIntel.java",
         "EnvoyStringAccessor.java",
+        "NetworkWithType.java",
     ],
     visibility = ["//visibility:public"],
 )

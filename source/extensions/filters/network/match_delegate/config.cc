@@ -18,10 +18,9 @@ namespace Factory {
 class SkipActionFactory : public Matcher::ActionFactory<NetworkFilterActionContext> {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
-                                                 NetworkFilterActionContext&,
-                                                 ProtobufMessage::ValidationVisitor&) override {
-    return []() { return std::make_unique<SkipAction>(); };
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message&, NetworkFilterActionContext&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return std::make_shared<SkipAction>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
@@ -55,7 +54,7 @@ public:
   }
 
 private:
-  absl::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
+  std::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
 };
 
 REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory<NetworkFilterActionContext>);
@@ -86,6 +85,10 @@ void DelegatingNetworkFilterManager::removeReadFilter(Envoy::Network::ReadFilter
 
 bool DelegatingNetworkFilterManager::initializeReadFilters() { return false; }
 
+void DelegatingNetworkFilterManager::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_.addAccessLogHandler(std::move(handler));
+}
+
 } // namespace Factory
 
 void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
@@ -101,14 +104,14 @@ void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
   }
 
   ASSERT(matching_data_ != nullptr);
-  const auto match_result =
+  const Matcher::ActionMatchResult match_result =
       Matcher::evaluateMatch<Envoy::Network::MatchingData>(*match_tree_, *matching_data_);
 
-  match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
+  match_tree_evaluated_ = match_result.isComplete();
 
-  if (match_tree_evaluated_ && match_result.result_) {
-    const auto result = match_result.result_();
-    if ((result == nullptr) || (SkipAction().typeUrl() == result->typeUrl())) {
+  if (match_tree_evaluated_ && match_result.isMatch()) {
+    const auto& result = match_result.action();
+    if (result == nullptr || SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
       // TODO(botengyao) this would be similar to `base_filter_->onMatchCallback(*result);`
@@ -192,14 +195,14 @@ Envoy::Network::FilterFactoryCb MatchDelegateConfig::createFilterFactory(
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(), validation, factory);
   auto filter_factory_or_error = factory.createFilterFactoryFromProto(*message, context);
-  THROW_IF_NOT_OK(filter_factory_or_error.status());
+  THROW_IF_NOT_OK_REF(filter_factory_or_error.status());
   auto filter_factory = filter_factory_or_error.value();
 
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
   Matcher::MatchTreeFactory<Envoy::Network::MatchingData, NetworkFilterActionContext>
       matcher_factory(action_context, context.serverFactoryContext(), validation_visitor);
-  absl::optional<Matcher::MatchTreeFactoryCb<Envoy::Network::MatchingData>> factory_cb =
+  std::optional<Matcher::MatchTreeFactoryCb<Envoy::Network::MatchingData>> factory_cb =
       std::nullopt;
 
   if (proto_config.has_xds_matcher()) {

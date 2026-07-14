@@ -28,6 +28,7 @@ struct EnvoyLogger {
 };
 
 inline constexpr absl::string_view ENVOY_EVENT_TRACKER_API_NAME = "event_tracker_api";
+inline constexpr absl::string_view DEFAULT_API_LISTENER_NAME = "base_api_listener";
 
 /** The callbacks for Envoy Event Tracker. */
 struct EnvoyEventTracker {
@@ -40,7 +41,7 @@ struct EnvoyEventTracker {
 struct EnvoyError {
   envoy_error_code_t error_code_;
   std::string message_;
-  absl::optional<int> attempt_count_ = absl::nullopt;
+  std::optional<int> attempt_count_ = std::nullopt;
 };
 
 /** The callbacks for the stream. */
@@ -134,24 +135,6 @@ struct EnvoyStreamCallbacks {
    */
   absl::AnyInvocable<void(envoy_stream_intel)> on_send_window_available_ = [](envoy_stream_intel) {
   };
-};
-
-/** Networks classified by the physical link. */
-enum class NetworkType : int {
-  // Includes VPN or cases where network characteristics are unknown.
-  Generic = 1, // 001
-  // Includes WiFi and other local area wireless networks.
-  WLAN = 2, // 010
-  // Includes all mobile phone networks.
-  WWAN = 4, // 100
-  // Includes 2G networks.
-  WWAN_2G = 8, // 1000
-  // Includes 3G networks.
-  WWAN_3G = 16, // 10000
-  // Includes 4G networks.
-  WWAN_4G = 32, // 100000
-  // Includes 5G networks.
-  WWAN_5G = 64, // 1000000
 };
 
 } // namespace Envoy

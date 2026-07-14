@@ -35,15 +35,21 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "codec_runtime_overrides",
+    hdrs = ["codec_runtime_overrides.h"],
+    deps = ["@abseil-cpp//absl/strings"],
 )
 
 envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [
+        ":codec_runtime_overrides",
         ":header_map_interface",
         ":metadata_interface",
         ":protocol_interface",
@@ -59,6 +65,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "client_codec_factory_interface",
+    hdrs = ["client_codec_factory.h"],
+    deps = [
+        ":codec_interface",
+        "//envoy/common:random_generator_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stream_reset_handler_interface",
     hdrs = ["stream_reset_handler.h"],
 )
@@ -66,7 +84,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codes_interface",
     hdrs = ["codes.h"],
-    deps = ["//envoy/stats:stats_interface"],
+    deps = ["//envoy/stats:scope_interface"],
 )
 
 envoy_cc_library(
@@ -96,7 +114,6 @@ envoy_cc_library(
         ":header_map_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/grpc:status",
-        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -119,7 +136,6 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//envoy/upstream:load_balancer_interface",
         "//source/common/common:scope_tracked_object_stack",
-        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -129,7 +145,7 @@ envoy_cc_library(
     deps = [
         ":header_map_interface",
         "//envoy/network:address_interface",
-        "//envoy/stream_info:filter_state_interface",
+        "//envoy/stream_info:stream_info_interface",
     ],
 )
 
@@ -142,7 +158,7 @@ envoy_cc_library(
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
-        "@com_google_absl//absl/container:inlined_vector",
+        "@abseil-cpp//absl/container:inlined_vector",
     ],
 )
 
@@ -163,13 +179,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "query_params_interface",
     hdrs = ["query_params.h"],
-    deps = ["@com_google_absl//absl/container:btree"],
+    deps = ["@abseil-cpp//absl/container:btree"],
 )
 
 envoy_cc_library(
     name = "metadata_interface",
     hdrs = ["metadata_interface.h"],
-    deps = ["@com_google_absl//absl/container:node_hash_map"],
+    deps = ["@abseil-cpp//absl/container:node_hash_map"],
 )
 
 envoy_cc_library(
@@ -217,7 +233,7 @@ envoy_cc_library(
     name = "header_evaluator",
     hdrs = ["header_evaluator.h"],
     deps = [
-        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/formatter:http_formatter_context_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
     ],

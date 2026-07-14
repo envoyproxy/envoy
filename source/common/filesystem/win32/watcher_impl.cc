@@ -1,8 +1,9 @@
+#include "source/common/filesystem/watcher_impl.h"
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_impl.h"
-#include "source/common/filesystem/watcher_impl.h"
 
 namespace Envoy {
 namespace Filesystem {

@@ -5,13 +5,19 @@
 namespace Envoy {
 namespace Network {
 
-absl::optional<uint64_t> AddressObject::hash() const {
-  return HashUtil::xxHash64(address_->asStringView());
+std::optional<uint64_t> AddressObject::hash() const {
+  if (!getAddress()) {
+    return std::nullopt;
+  }
+  return HashUtil::xxHash64(getAddress()->asStringView());
 }
 
 StreamInfo::FilterState::Object::FieldType
 AddressObject::getField(absl::string_view field_name) const {
-  const auto* ip = address_->ip();
+  if (!getAddress()) {
+    return {};
+  }
+  const auto* ip = getAddress()->ip();
   if (!ip) {
     return {};
   }

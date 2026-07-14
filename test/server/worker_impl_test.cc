@@ -10,6 +10,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -72,17 +73,16 @@ TEST_F(WorkerImplTest, BasicFlow) {
   NiceMock<Network::MockListenerConfig> listener;
   ON_CALL(listener, listenerTag()).WillByDefault(Return(1UL));
   EXPECT_CALL(*handler_, addListener(_, _, _, _))
-      .WillOnce(
-          Invoke([current_thread_id](absl::optional<uint64_t>, Network::ListenerConfig& config,
-                                     Runtime::Loader&, Random::RandomGenerator&) -> void {
-            EXPECT_EQ(config.listenerTag(), 1UL);
-            EXPECT_NE(current_thread_id, std::this_thread::get_id());
-          }));
+      .WillOnce(Invoke([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
+                                           Runtime::Loader&, Random::RandomGenerator&) -> void {
+        EXPECT_EQ(config.listenerTag(), 1UL);
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+      }));
   worker_.addListener(
-      absl::nullopt, listener, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
+      std::nullopt, listener, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
 
   NiceMock<Stats::MockStore> store;
-  worker_.start(guard_dog_, emptyCallback);
+  worker_.start(guard_dog_, emptyCallback, std::nullopt);
   worker_.initializeStats(*store.rootScope());
   ci.waitReady();
 
@@ -90,14 +90,13 @@ TEST_F(WorkerImplTest, BasicFlow) {
   NiceMock<Network::MockListenerConfig> listener2;
   ON_CALL(listener2, listenerTag()).WillByDefault(Return(2UL));
   EXPECT_CALL(*handler_, addListener(_, _, _, _))
-      .WillOnce(
-          Invoke([current_thread_id](absl::optional<uint64_t>, Network::ListenerConfig& config,
-                                     Runtime::Loader&, Random::RandomGenerator&) -> void {
-            EXPECT_EQ(config.listenerTag(), 2UL);
-            EXPECT_NE(current_thread_id, std::this_thread::get_id());
-          }));
+      .WillOnce(Invoke([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
+                                           Runtime::Loader&, Random::RandomGenerator&) -> void {
+        EXPECT_EQ(config.listenerTag(), 2UL);
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+      }));
   worker_.addListener(
-      absl::nullopt, listener2, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
+      std::nullopt, listener2, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
   ci.waitReady();
 
   EXPECT_CALL(*handler_, stopListeners(2, _))
@@ -129,14 +128,13 @@ TEST_F(WorkerImplTest, BasicFlow) {
   NiceMock<Network::MockListenerConfig> listener3;
   ON_CALL(listener3, listenerTag()).WillByDefault(Return(3UL));
   EXPECT_CALL(*handler_, addListener(_, _, _, _))
-      .WillOnce(
-          Invoke([current_thread_id](absl::optional<uint64_t>, Network::ListenerConfig& config,
-                                     Runtime::Loader&, Random::RandomGenerator&) -> void {
-            EXPECT_EQ(config.listenerTag(), 3UL);
-            EXPECT_NE(current_thread_id, std::this_thread::get_id());
-          }));
+      .WillOnce(Invoke([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
+                                           Runtime::Loader&, Random::RandomGenerator&) -> void {
+        EXPECT_EQ(config.listenerTag(), 3UL);
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+      }));
   worker_.addListener(
-      absl::nullopt, listener3, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
+      std::nullopt, listener3, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
   ci.waitReady();
 
   EXPECT_CALL(*handler_, removeListeners(3))
@@ -150,13 +148,100 @@ TEST_F(WorkerImplTest, BasicFlow) {
   worker_.stop();
 }
 
+TEST_F(WorkerImplTest, DrainPostsToWorkerThread) {
+  InSequence s;
+  std::thread::id current_thread_id = std::this_thread::get_id();
+  ConditionalInitializer ci;
+
+  NiceMock<Network::MockListenerConfig> listener;
+  ON_CALL(listener, listenerTag()).WillByDefault(Return(7UL));
+  EXPECT_CALL(*handler_, addListener(_, _, _, _));
+  worker_.addListener(std::nullopt, listener, [&ci]() { ci.setReady(); }, runtime_, random_);
+  worker_.start(guard_dog_, emptyCallback, std::nullopt);
+  ci.waitReady();
+
+  // onListenerDrain posts to the worker dispatcher and invokes handler->onListenerDrain on
+  // the worker thread.
+  EXPECT_CALL(*handler_, onListenerDrain(7UL))
+      .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        ci.setReady();
+      }));
+  worker_.onListenerDrain(listener);
+  ci.waitReady();
+
+  // onFilterChainDrain likewise posts and forwards on the worker thread.
+  const std::list<const Network::FilterChain*> filter_chains;
+  EXPECT_CALL(*handler_, onFilterChainDrain(7UL, _))
+      .WillOnce(
+          Invoke([current_thread_id, &ci](uint64_t, const std::list<const Network::FilterChain*>&) {
+            EXPECT_NE(current_thread_id, std::this_thread::get_id());
+            ci.setReady();
+          }));
+  worker_.onFilterChainDrain(7UL, filter_chains);
+  ci.waitReady();
+
+  worker_.stop();
+}
+
 TEST_F(WorkerImplTest, WorkerInvokesProvidedCallback) {
   absl::Notification callback_ran;
   auto cb = [&callback_ran]() { callback_ran.Notify(); };
-  worker_.start(guard_dog_, cb);
+  worker_.start(guard_dog_, cb, std::nullopt);
 
   callback_ran.WaitForNotification();
   worker_.stop();
+}
+
+class WorkerOverloadTest : public testing::Test, public Event::TestUsingSimulatedTime {
+public:
+  WorkerOverloadTest()
+      : api_(Api::createApiForTest(simTime())),
+        dispatcher_(api_->allocateDispatcher("worker_test")),
+        stat_names_(api_->rootScope().symbolTable()) {}
+
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  DefaultListenerHooks hooks_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  WorkerStatNames stat_names_;
+  NiceMock<MockOverloadManager> overload_manager_;
+};
+
+TEST_F(WorkerOverloadTest, CloseIdleHttpConnections) {
+  OverloadActionCb captured_cb;
+  EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
+      .WillRepeatedly(Invoke([&](const std::string& name, Event::Dispatcher&, OverloadActionCb cb) {
+        if (name == OverloadActionNames::get().CloseIdleHttpConnections) {
+          captured_cb = cb;
+        }
+        return true;
+      }));
+
+  auto* handler = new NiceMock<Network::MockConnectionHandler>();
+  auto* dispatcher_ptr = dispatcher_.get();
+  WorkerImpl worker(tls_, hooks_, std::move(dispatcher_), Network::ConnectionHandlerPtr{handler},
+                    overload_manager_, *api_, stat_names_);
+
+  ASSERT_TRUE(captured_cb != nullptr);
+
+  auto trigger_and_advance = [&](OverloadActionState state, std::chrono::milliseconds duration =
+                                                                std::chrono::milliseconds(100)) {
+    captured_cb(state);
+    simTime().advanceTimeAndRun(duration, *dispatcher_ptr, Event::Dispatcher::RunType::NonBlock);
+  };
+
+  // 1. Transition to scaling (active)
+  EXPECT_CALL(*handler, closeIdleHttpConnections(false));
+  trigger_and_advance(OverloadActionState(UnitFloat(0.5)));
+
+  // 2. Transition to saturated
+  EXPECT_CALL(*handler, closeIdleHttpConnections(true));
+  trigger_and_advance(OverloadActionState::saturated());
+
+  // 3. Transition back to inactive
+  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
+  trigger_and_advance(OverloadActionState::inactive());
 }
 
 } // namespace

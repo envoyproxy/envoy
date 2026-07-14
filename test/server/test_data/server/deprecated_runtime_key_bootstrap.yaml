@@ -1,0 +1,34 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+  locality:
+    zone: bootstrap_zone
+    sub_zone: bootstrap_sub_zone
+
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      overload.global_downstream_max_connections: "100"
+
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 0
+
+static_resources:
+  clusters:
+  - name: service_google
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_google
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0

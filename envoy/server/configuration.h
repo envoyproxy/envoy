@@ -4,14 +4,13 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -89,6 +88,11 @@ public:
    * @return true if deferred creation of stats is enabled.
    */
   virtual bool enableDeferredCreationStats() const PURE;
+
+  /**
+   * @return uint32_t a multiple of the flush interval to perform stats eviction, or 0 if disabled.
+   */
+  virtual uint32_t evictOnFlush() const PURE;
 };
 
 /**
@@ -173,9 +177,9 @@ public:
   virtual Admin& admin() PURE;
 
   /**
-   * @return absl::optional<std::string> the path to look for flag files.
+   * @return std::optional<std::string> the path to look for flag files.
    */
-  virtual absl::optional<std::string> flagsPath() const PURE;
+  virtual std::optional<std::string> flagsPath() const PURE;
 
   /**
    * @return const envoy::config::bootstrap::v2::LayeredRuntime& runtime

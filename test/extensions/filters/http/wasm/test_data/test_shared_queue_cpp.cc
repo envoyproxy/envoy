@@ -30,7 +30,6 @@ public:
 
 private:
   SharedQueueRootContext* root() { return static_cast<SharedQueueRootContext*>(Context::root()); }
-
 };
 
 static RegisterContextFactory register_SharedQueueContext(CONTEXT_FACTORY(SharedQueueContext),

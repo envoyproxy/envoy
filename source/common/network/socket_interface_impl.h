@@ -42,13 +42,13 @@ public:
   };
 
   static IoHandlePtr
-  makePlatformSpecificSocket(int socket_fd, bool socket_v6only, absl::optional<int> domain,
+  makePlatformSpecificSocket(int socket_fd, bool socket_v6only, std::optional<int> domain,
                              const SocketCreationOptions& options,
                              Io::IoUringWorkerFactory* io_uring_worker_factory = nullptr);
 
 protected:
   virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, Socket::Type socket_type,
-                                 absl::optional<int> domain,
+                                 std::optional<int> domain,
                                  const SocketCreationOptions& options) const;
 
 private:

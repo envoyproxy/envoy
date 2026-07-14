@@ -17,7 +17,7 @@ public:
     EXPECT_EQ(typed_dns_resolver_config.typed_config().type_url(),
               "type.googleapis.com/"
               "envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
-    typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+    std::ignore = typed_dns_resolver_config.typed_config().UnpackTo(&cares);
   }
 
   // Verify the c-ares object is default.
@@ -126,7 +126,7 @@ TEST_F(DnsFactoryTest, LegacyDnsResolverDataDnsCacheConfigNonDefault) {
 
 // Test checkDnsResolutionConfigExist() function with Bootstrap type,
 // and dns_resolution_config exists.
-TEST_F(DnsFactoryTest, CheckDnsResolutionConfigExistWithBoostrap) {
+TEST_F(DnsFactoryTest, CheckDnsResolutionConfigExistWithBootstrap) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
@@ -151,7 +151,7 @@ TEST_F(DnsFactoryTest, CheckDnsResolutionConfigExistWithBoostrap) {
 
 // Test checkTypedDnsResolverConfigExist() function with Bootstrap type,
 // and typed_dns_resolver_config exists.
-TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBoostrap) {
+TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBootstrap) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
@@ -162,7 +162,7 @@ TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBoostrap) {
   Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 8080),
                                              resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   bootstrap_config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
   EXPECT_TRUE(bootstrap_config.has_typed_dns_resolver_config());
@@ -180,7 +180,7 @@ TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBoostrap) {
 // Test checkTypedDnsResolverConfigExist() function with Bootstrap type.
 // A garbage typed_dns_resolver_config type foo exists with dns_resolution_config.
 // In this case, the typed_dns_resolver_config is copied over.
-TEST_F(DnsFactoryTest, CheckBothTypedAndDnsResolutionConfigExistWithBoostrapWrongType) {
+TEST_F(DnsFactoryTest, CheckBothTypedAndDnsResolutionConfigExistWithBootstrapWrongType) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
 

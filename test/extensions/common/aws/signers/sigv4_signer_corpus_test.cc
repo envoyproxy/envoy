@@ -22,8 +22,8 @@ namespace Aws {
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
   for (auto const& entry : std::filesystem::directory_iterator(
-           TestEnvironment::runfilesDirectory() +
-           "/external/com_github_awslabs_aws_c_auth/tests/aws-signing-test-suite/v4/")) {
+           TestEnvironment::runfilesDirectory("aws-c-auth-testdata") +
+           "/tests/aws-signing-test-suite/v4/")) {
     directories.push_back(entry.path().string());
   }
   return directories;
@@ -35,9 +35,10 @@ public:
     chain_ = std::make_shared<CredentialsProviderChain>();
     credentials_provider_ = std::make_shared<NiceMock<MockCredentialsProvider>>();
     chain_->add(credentials_provider_);
-    signer_ = std::make_shared<SigV4SignerImpl>(
-        "service", "region", chain_, context_,
-        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+    signer_ =
+        std::make_shared<SigV4SignerImpl>("service", "region", chain_, context_,
+                                          Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+                                          Extensions::Common::Aws::AwsSigningHeaderMatcherVector{});
   };
 
   void addMethod(const std::string& method) { message_.headers().setMethod(method); }
@@ -222,7 +223,7 @@ public:
   void createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
                          const absl::string_view authorization_credential,
                          const absl::string_view long_date,
-                         const absl::optional<std::string> session_token,
+                         const std::optional<std::string> session_token,
                          const std::map<std::string, std::string>& signed_headers,
                          const uint16_t expiration_time) {
     return signer_->createQueryParams(query_params, authorization_credential, long_date,
@@ -230,7 +231,7 @@ public:
   };
 
   void addRequiredHeaders(Http::RequestHeaderMap& headers, const std::string long_date,
-                          const absl::optional<std::string> session_token,
+                          const std::optional<std::string> session_token,
                           const absl::string_view override_region) {
     signer_->addRequiredHeaders(headers, long_date, session_token, override_region);
   }
@@ -258,16 +259,17 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusHeaderSigning) {
   setDate();
   addBodySigningIfRequired();
 
-  SigV4SignerImpl headersigner_(service_, region_, chain_, context_,
-                                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false,
-                                expiration_);
+  SigV4SignerImpl headersigner_(
+      service_, region_, chain_, context_, Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, false, expiration_);
 
   auto signer_friend = SigV4SignerImplFriend(&headersigner_);
 
   signer_friend.addRequiredHeaders(message_.headers(), long_date_,
-                                   absl::optional<std::string>(token_), region_);
+                                   std::optional<std::string>(token_), region_);
 
-  const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_.headers(), {});
+  const auto calculated_canonical_headers =
+      Utility::canonicalizeHeaders(message_.headers(), {}, {});
 
   if (content_hash_.empty()) {
     content_hash_ = SignatureConstants::HashedEmptyString;
@@ -312,11 +314,12 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
   setDate();
   addBodySigningIfRequired();
 
-  const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_.headers(), {});
+  const auto calculated_canonical_headers =
+      Utility::canonicalizeHeaders(message_.headers(), {}, {});
 
-  SigV4SignerImpl querysigner_(service_, region_, chain_, context_,
-                               Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
-                               expiration_);
+  SigV4SignerImpl querysigner_(
+      service_, region_, chain_, context_, Extensions::Common::Aws::AwsSigningHeaderMatcherVector{},
+      Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true, expiration_);
 
   auto signer_friend = SigV4SignerImplFriend(&querysigner_);
 
@@ -328,7 +331,7 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
 
   signer_friend.createQueryParams(
       query_params, signer_friend.createAuthorizationCredential(akid_, calculated_credential_scope),
-      long_date_, token_.empty() ? absl::optional<std::string>(absl::nullopt) : token_,
+      long_date_, token_.empty() ? std::optional<std::string>(std::nullopt) : token_,
       calculated_canonical_headers, expiration_);
 
   message_.headers().setPath(query_params.replaceQueryString(message_.headers().Path()->value()));

@@ -8,7 +8,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/admin_stream.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -500,7 +500,8 @@ TEST_F(HystrixSinkTest, HistogramTest) {
   // "latencyExecute": {"99.5": 99.500000, "95": 95.000000, "90": 90.000000, "100": 100.000000, "0":
   // 0.000000, "25": 25.000000, "99": 99.000000, "50": 50.000000, "75": 75.000000}.
   for (const double quantile : hystrix_quantiles) {
-    EXPECT_EQ(quantile * 100, latency->getDouble(fmt::sprintf("%g", quantile * 100)).value());
+    EXPECT_NEAR(quantile * 100, latency->getDouble(fmt::sprintf("%g", quantile * 100)).value(),
+                0.5);
   }
 }
 

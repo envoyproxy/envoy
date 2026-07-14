@@ -11,7 +11,6 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/test_runtime.h"
 
@@ -36,6 +35,7 @@ using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
 using testing::AnyNumber;
+using testing::AtMost;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -57,13 +57,14 @@ protected:
   static constexpr auto kMessageTimeoutNanos =
       std::chrono::duration_cast<std::chrono::nanoseconds>(kMessageTimeout).count();
 
-  void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
+  void initialize(std::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
+    EXPECT_CALL(decoder_callbacks_, route())
+        .WillRepeatedly(Return(makeOptRefFromPtr<const Router::Route>(route_.get())));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
     ExternalProcessor proto_config;
@@ -71,11 +72,14 @@ protected:
     if (cb) {
       (*cb)(proto_config);
     }
-    config_ = std::make_shared<FilterConfig>(
-        proto_config, kMessageTimeout, kMaxMessageTimeoutMs, *stats_store_.rootScope(), "", false,
-        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-        factory_context_);
+    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
+    auto builder = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+        std::move(builder_ptr));
+    absl::Status creation_status = absl::OkStatus();
+    config_ = std::make_shared<FilterConfig>(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
+                                             *stats_store_.rootScope(), "", false, builder,
+                                             factory_context_, creation_status);
+    ASSERT_TRUE(creation_status.ok());
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -92,7 +96,8 @@ protected:
     auto stream = std::make_unique<NiceMock<MockStream>>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
     EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
-    EXPECT_CALL(*stream, close());
+    EXPECT_CALL(*stream, close()).Times(AtMost(1));
+    EXPECT_CALL(*stream, halfCloseAndDeleteOnRemoteClose()).Times(AtMost(1));
     return stream;
   }
 
@@ -205,8 +210,6 @@ protected:
   MockStream stream_delegate_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  FilterConfigSharedPtr config_;
-  std::unique_ptr<Filter> filter_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Router::RouteConstSharedPtr route_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -218,6 +221,8 @@ protected:
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  FilterConfigSharedPtr config_;
+  std::unique_ptr<Filter> filter_;
 };
 
 // A base class for tests that will check that gRPC streams fail while being created
@@ -237,7 +242,7 @@ class FastFailOrderingTest : public OrderingTest {
 
 // A call with a totally crazy response
 TEST_F(OrderingTest, TotallyInvalidResponse) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -254,7 +259,7 @@ TEST_F(OrderingTest, TotallyInvalidResponse) {
 
 // A normal call with the default configuration
 TEST_F(OrderingTest, DefaultOrderingGet) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -534,7 +539,7 @@ TEST_F(OrderingTest, ProcessingModeRequestTrailers) {
 
 // An immediate response on the request path
 TEST_F(OrderingTest, ImmediateResponseOnRequest) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   // MockTimer constructor sets up expectations in the Dispatcher class to wire it up
   MockTimer* request_timer = new MockTimer(&dispatcher_);
@@ -550,7 +555,7 @@ TEST_F(OrderingTest, ImmediateResponseOnRequest) {
 
 // An immediate response on the response path
 TEST_F(OrderingTest, ImmediateResponseOnResponse) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   MockTimer* request_timer = new MockTimer(&dispatcher_);
   EXPECT_CALL(*request_timer, enabled()).Times(AnyNumber());
@@ -581,7 +586,7 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -598,7 +603,7 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -616,6 +621,7 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestBodyReply) {
   initialize([](ExternalProcessor& cfg) {
+    cfg.set_failure_mode_allow(true);
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_body_mode(ProcessingMode::BUFFERED);
     pm->set_response_body_mode(ProcessingMode::BUFFERED);
@@ -645,7 +651,7 @@ TEST_F(OrderingTest, IncorrectRequestBodyReply) {
 // Receive a request headers reply in response to the response
 // headers message -- should continue without error.
 TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -664,7 +670,7 @@ TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
 // Receive an extra message -- we should ignore it
 // and not send anything else to the server
 TEST_F(OrderingTest, ExtraReply) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -683,7 +689,7 @@ TEST_F(OrderingTest, ExtraReply) {
 // Receive an extra message after the immediate response -- it should
 // be ignored.
 TEST_F(OrderingTest, ExtraAfterImmediateResponse) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -753,7 +759,7 @@ TEST_F(OrderingTest, GrpcErrorOutOfLine) {
 
 // gRPC close after a proper message means rest of stream is ignored
 TEST_F(OrderingTest, GrpcCloseAfter) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -870,7 +876,7 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
 
 // gRPC failure while opening stream
 TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestHeaders) {
-  initialize(absl::nullopt);
+  initialize(std::nullopt);
   HttpTestUtility::addDefaultHeaders(request_headers_);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
@@ -909,7 +915,7 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBodyBufferedPartial) {
     pm->set_request_header_mode(ProcessingMode::SKIP);
     pm->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
   });
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillRepeatedly(Return(BufferSize));
   sendRequestHeadersPost(false);
   Buffer::OwnedImpl req_body("Hello!");
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
@@ -928,8 +934,7 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnTransitionAboveQueueLimitWhenSendingStre
   // Set the limit low so we transition over the queue limit and start sending
   // the stream chunk.
   Buffer::OwnedImpl req_body("Hello!");
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
-      .WillRepeatedly(Return(req_body.length() / 2));
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillRepeatedly(Return(req_body.length() / 2));
   EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
 
@@ -979,7 +984,7 @@ TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartRequestBodyBufferedPartial) 
     pm->set_request_header_mode(ProcessingMode::SKIP);
     pm->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
   });
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillRepeatedly(Return(BufferSize));
   sendRequestHeadersPost(false);
   Buffer::OwnedImpl req_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_body, true));

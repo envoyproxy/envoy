@@ -2,6 +2,7 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -23,20 +24,21 @@ public:
    * Function that maps a HostDescription to it's effective priority level in a cluster.
    * For most cluster types, the mapping is simply `return host.priority()`, but some
    * cluster types require more complex mapping.
-   * @return either the effective priority, or absl::nullopt if the mapping cannot be determined,
+   * @return either the effective priority, or std::nullopt if the mapping cannot be determined,
    *         which can happen if the host has been removed from the configurations since it was
    *         used.
    */
   using PriorityMappingFunc =
-      std::function<absl::optional<uint32_t>(const Upstream::HostDescription&)>;
+      std::function<std::optional<uint32_t>(const Upstream::HostDescription&)>;
 
-  static absl::optional<uint32_t> defaultPriorityMapping(const Upstream::HostDescription& host) {
+  static std::optional<uint32_t> defaultPriorityMapping(const Upstream::HostDescription& host) {
     return host.priority();
   }
 
   /**
    * Determines what PriorityLoad to use.
    *
+   * @param stream_info request stream information.
    * @param priority_set current priority set of cluster.
    * @param original_priority_load the unmodified HealthAndDegradedLoad.
    * @param priority_mapping_func a callback to get the priority of a host that has
@@ -47,7 +49,7 @@ public:
    * original_degraded_priority if no changes should be made.
    */
   virtual const HealthyAndDegradedLoad&
-  determinePriorityLoad(const PrioritySet& priority_set,
+  determinePriorityLoad(StreamInfo::StreamInfo* stream_info, const PrioritySet& priority_set,
                         const HealthyAndDegradedLoad& original_priority_load,
                         const PriorityMappingFunc& priority_mapping_func) PURE;
 
@@ -111,7 +113,7 @@ public:
   struct UpdateOptionsReturn {
     // New upstream socket options to apply to the next request attempt. If changed, will affect
     // connection pool selection similar to that which was done for the initial request.
-    absl::optional<Network::Socket::OptionsSharedPtr> new_upstream_socket_options_;
+    std::optional<Network::Socket::OptionsSharedPtr> new_upstream_socket_options_;
   };
 
   virtual ~RetryOptionsPredicate() = default;

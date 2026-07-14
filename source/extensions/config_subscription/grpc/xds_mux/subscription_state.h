@@ -35,8 +35,8 @@ public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   BaseSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
                         Event::Dispatcher& dispatcher,
-                        XdsConfigTrackerOptRef xds_config_tracker = absl::nullopt,
-                        XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+                        XdsConfigTrackerOptRef xds_config_tracker = std::nullopt,
+                        XdsResourcesDelegateOptRef xds_resources_delegate = std::nullopt,
                         const std::string& target_xds_authority = "")
       : ttl_([this](const std::vector<std::string>& expired) { ttlExpiryCallback(expired); },
              dispatcher, dispatcher.timeSource()),
@@ -71,13 +71,13 @@ public:
     ENVOY_LOG(debug, "Handling response for {}", typeUrl());
     TRY_ASSERT_MAIN_THREAD { handleGoodResponse(response); }
     END_TRY
-    catch (const EnvoyException& e) {
+    CATCH(const EnvoyException& e, {
       if (xds_config_tracker_.has_value()) {
         xds_config_tracker_->onConfigRejected(response,
                                               Config::Utility::truncateGrpcStatusMessage(e.what()));
       }
       handleBadResponse(e, ack);
-    }
+    });
     previously_fetched_data_ = true;
     return ack;
   }
@@ -130,7 +130,7 @@ protected:
   UntypedConfigUpdateCallbacks& callbacks_;
   Event::Dispatcher& dispatcher_;
   bool dynamic_context_changed_{};
-  std::string control_plane_identifier_{};
+  std::string control_plane_identifier_;
   XdsConfigTrackerOptRef xds_config_tracker_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   const std::string target_xds_authority_;
@@ -144,8 +144,8 @@ public:
   virtual std::unique_ptr<T>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
                         OpaqueResourceDecoderSharedPtr resource_decoder,
-                        XdsConfigTrackerOptRef xds_config_tracker = absl::nullopt,
-                        XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+                        XdsConfigTrackerOptRef xds_config_tracker = std::nullopt,
+                        XdsResourcesDelegateOptRef xds_resources_delegate = std::nullopt,
                         const std::string& target_xds_authority = "") PURE;
 };
 

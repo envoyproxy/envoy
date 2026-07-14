@@ -1,0 +1,478 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+
+#include "test/extensions/dynamic_modules/util.h"
+#include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Clusters {
+namespace DynamicModules {
+
+namespace {
+
+// ObjectFactory used by the cluster filter-state read test: the dynamic-module HTTP filter
+// writes through this factory via envoy_dynamic_module_callback_http_set_filter_state_typed,
+// and the dynamic-module cluster reads it back during host selection via
+// envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed.
+class ClusterTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.cluster_typed_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ClusterTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+// ObjectFactory used by the cluster filter-state write test: the dynamic-module cluster writes
+// through this factory via envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed
+// during host selection, and the access log reads it back on the same request.
+class ClusterWrittenTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.cluster_written_typed_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ClusterWrittenTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+} // namespace
+
+class DynamicModuleClusterIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithDecCluster(const std::string& cluster_name,
+                                const std::string& cluster_config = "") {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Replace the default cluster_0 with a DEC cluster that uses the Rust module.
+    config_helper_.addConfigModifier([this, cluster_name, cluster_config](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      // Use asString() which correctly formats IPv4 (127.0.0.1:port) and
+      // IPv6 ([::1]:port) for parseInternetAddressAndPortNoThrow.
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      // Configure the cluster as a DEC cluster.
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
+      dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
+      dec_config.set_cluster_name(cluster_name);
+
+      // Pass the upstream address via the cluster config so the Rust module knows
+      // where to add hosts.
+      const std::string config_value = cluster_config.empty() ? upstream_address : cluster_config;
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(config_value);
+      std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore = cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that a cluster with synchronous host selection correctly routes requests
+// to the upstream added during on_init.
+TEST_P(DynamicModuleClusterIntegrationTest, SyncHostSelection) {
+  initializeWithDecCluster("sync_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verifies that multiple requests through a synchronous cluster all succeed,
+// exercising the round-robin host selection path.
+TEST_P(DynamicModuleClusterIntegrationTest, SyncHostSelectionMultipleRequests) {
+  initializeWithDecCluster("sync_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+}
+
+// Verifies that a cluster with asynchronous host selection correctly routes requests.
+TEST_P(DynamicModuleClusterIntegrationTest, AsyncHostSelection) {
+  initializeWithDecCluster("async_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verifies that a cluster can use the scheduler to add hosts after initialization.
+TEST_P(DynamicModuleClusterIntegrationTest, SchedulerHostUpdate) {
+  initializeWithDecCluster("scheduler_host_update");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test the main→worker push pipeline end-to-end. The Rust fixture publishes an
+// Arc<Snapshot{multiplier=5}> from main and posts run_on_all_workers(event_id=7); each worker
+// reads the snapshot back and increments a counter by event_id * multiplier. With concurrency=4
+// the final counter must be exactly 4 * 7 * 5 = 140 — which proves the fan-out fired once per
+// worker, the event_id passed through, the typed payload survived FFI, and main was excluded.
+TEST_P(DynamicModuleClusterIntegrationTest, RunOnAllWorkersFiresOnEachWorker) {
+  concurrency_ = 4;
+  initializeWithDecCluster("run_on_all_workers");
+
+  test_server_->waitForCounter("dynamicmodulescustom.worker_events_applied_total",
+                               testing::Eq(140));
+
+  // Cluster should remain functional for normal traffic after the fan-out.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Exercises the worker local priority set path across multiple workers end to end. Each worker
+// load balancer learns the added host through get_member_update_host, confirms its worker local set
+// agrees, and routes a request to the upstream through that host pointer.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerLocalPrioritySetRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("worker_local_rebuild");
+
+  // Each worker increments the counter once its worker local set converges, so wait for all of
+  // them before routing.
+  test_server_->waitForCounter("dynamicmodulescustom.membership_hosts_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the packed member-update address getter end to end. Each worker load balancer reads the
+// added host's address both as a string and as packed integers and confirms they agree before
+// incrementing the counter, so this runs the real packing under both IPv4 and IPv6 params.
+TEST_P(DynamicModuleClusterIntegrationTest, MemberUpdatePackedAddress) {
+  concurrency_ = 2;
+  initializeWithDecCluster("member_update_packed_address");
+
+  // Each worker increments the counter once its packed address matches the formatted address.
+  test_server_->waitForCounter("dynamicmodulescustom.packed_address_verified_total",
+                               testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verifies that the cluster lifecycle callbacks fire correctly during cluster
+// initialization.
+TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "cluster lifecycle: on_init called"},
+                                  {"info", "cluster lifecycle: on_server_initialized called"}}),
+      initializeWithDecCluster("lifecycle_callbacks"));
+
+  // Send a request to verify the cluster is functional after lifecycle callbacks.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the per-worker timer ABI end to end. The first request arms a 50ms repeating worker timer
+// from choose_host (which exercises enable/enabled/disable and increments timer_armed_total). The
+// timer then fires repeatedly on the worker dispatcher and re-arms itself, so timer_fired_total
+// keeps climbing without further requests — proving the timer is created on the worker dispatcher,
+// fires on the worker thread, and re-arms.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
+  initializeWithDecCluster("worker_timer");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // The first request runs choose_host, which captures the worker dispatcher and arms the timer.
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // The timer is armed exactly once, with enabled()/disable() observed as expected.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_armed_total", testing::Eq(1));
+
+  // The timer fires on the worker dispatcher and re-arms, so the counter keeps climbing.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_total", testing::Ge(3));
+}
+
+// =============================================================================
+// Filter-state read ABI: an upstream HTTP filter writes filter state on the
+// request path; the dynamic-module cluster reads it back during host selection.
+// =============================================================================
+class DynamicModuleClusterFilterStateIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterFilterStateIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithProducerAndReader() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Prepend the dynamic-module HTTP filter so it writes filter state on every
+    // request before the router runs.
+    constexpr absl::string_view producer_filter_config = R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: cluster_filter_state_test
+  filter_name: filter_state_producer
+  filter_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: ""
+)EOF";
+    config_helper_.prependFilter(std::string(producer_filter_config));
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
+    // reads the filter state we just wrote.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig reader_config;
+      reader_config.mutable_dynamic_module_config()->set_name("cluster_filter_state_test");
+      reader_config.set_cluster_name("filter_state_reader");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = reader_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(reader_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterFilterStateIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that filter state written by an upstream HTTP filter on the request
+// path is observable in the dynamic-module cluster's choose_host callback via
+// both the bytes and the typed filter-state ABI accessors. The cluster returns
+// its only host only when both values match the producer's payload, so a 200
+// response proves the round trip.
+TEST_P(DynamicModuleClusterFilterStateIntegrationTest, ReadsFilterStateProducedByHttpFilter) {
+  initializeWithProducerAndReader();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// =============================================================================
+// Filter-state write ABI: the dynamic-module cluster writes filter state during
+// host selection; the access log reads it back on the same request.
+// =============================================================================
+class DynamicModuleClusterFilterStateWriteIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterFilterStateWriteIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithWriter() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Log both the bytes and the typed filter state the cluster writes during host selection.
+    useAccessLog("%FILTER_STATE(test.cluster_filter_state.written_bytes_key:PLAIN)% "
+                 "%FILTER_STATE(envoy.test.cluster_written_typed_object:PLAIN)%");
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer writes filter
+    // state during host selection.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig writer_config;
+      writer_config.mutable_dynamic_module_config()->set_name("cluster_filter_state_test");
+      writer_config.set_cluster_name("filter_state_writer");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = writer_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(writer_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterFilterStateWriteIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that filter state written by the dynamic-module cluster during host selection (via both
+// the bytes and the typed filter-state ABI setters) is observable at access-log flush on the same
+// request.
+TEST_P(DynamicModuleClusterFilterStateWriteIntegrationTest, WritesFilterStateReadableByAccessLog) {
+  initializeWithWriter();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, testing::HasSubstr("written_bytes_value"));
+  EXPECT_THAT(log, testing::HasSubstr("written_typed_value"));
+}
+
+// =============================================================================
+// Dynamic-metadata set ABI: the dynamic-module cluster annotates the request
+// during host selection; the values are read back from the access log.
+// =============================================================================
+class DynamicModuleClusterDynamicMetadataIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterDynamicMetadataIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithMetadataWriter() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Log the two dynamic-metadata values the cluster writes during host selection.
+    useAccessLog("%DYNAMIC_METADATA(dynamic_modules.test:number_key)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:string_key)%");
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
+    // sets dynamic metadata on the request during host selection.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig writer_config;
+      writer_config.mutable_dynamic_module_config()->set_name("cluster_dynamic_metadata_test");
+      writer_config.set_cluster_name("dynamic_metadata_writer");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = writer_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(writer_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterDynamicMetadataIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that dynamic metadata set by the dynamic-module cluster during host
+// selection is attached to the request's stream info and observable in the
+// access log via %DYNAMIC_METADATA(namespace:key)%.
+TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDuringHostSelection) {
+  initializeWithMetadataWriter();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_EQ("1234 test_value", log);
+}
+
+} // namespace DynamicModules
+} // namespace Clusters
+} // namespace Extensions
+} // namespace Envoy

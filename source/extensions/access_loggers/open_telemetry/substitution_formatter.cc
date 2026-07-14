@@ -84,16 +84,15 @@ OpenTelemetryFormatter::FormatBuilder::toFormatStringValue(const std::string& st
 
 ::opentelemetry::proto::common::v1::AnyValue OpenTelemetryFormatter::providersCallback(
     const std::vector<Formatter::FormatterProviderPtr>& providers,
-    const Formatter::HttpFormatterContext& context, const StreamInfo::StreamInfo& info) const {
+    const Formatter::Context& context, const StreamInfo::StreamInfo& info) const {
   ASSERT(!providers.empty());
   ::opentelemetry::proto::common::v1::AnyValue output;
   std::vector<std::string> bits(providers.size());
 
-  std::transform(
-      providers.begin(), providers.end(), bits.begin(),
-      [&](const Formatter::FormatterProviderPtr& provider) {
-        return provider->formatWithContext(context, info).value_or(DefaultUnspecifiedValueString);
-      });
+  std::transform(providers.begin(), providers.end(), bits.begin(),
+                 [&](const Formatter::FormatterProviderPtr& provider) {
+                   return provider->format(context, info).value_or(DefaultUnspecifiedValueString);
+                 });
 
   output.set_string_value(absl::StrJoin(bits, ""));
   return output;
@@ -127,7 +126,7 @@ OpenTelemetryFormatter::openTelemetryFormatListCallback(
 }
 
 ::opentelemetry::proto::common::v1::KeyValueList
-OpenTelemetryFormatter::format(const Formatter::HttpFormatterContext& context,
+OpenTelemetryFormatter::format(const Formatter::Context& context,
                                const StreamInfo::StreamInfo& info) const {
   OpenTelemetryFormatMapVisitor visitor{
       [&](const std::vector<Formatter::FormatterProviderPtr>& providers) {

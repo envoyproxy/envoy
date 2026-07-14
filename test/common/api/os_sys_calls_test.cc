@@ -80,8 +80,20 @@ TEST(OsSyscallsTest, SupportsMptcp) {
   Api::OsSysCallsSingleton::get().supportsMptcp();
 }
 
+TEST(OsSyscallsTest, SupportsReusePortBpfCpuSteering) {
+  // Some environments support this and some do not. Just call the function to make sure nothing
+  // dire (like a crash) happens, without validating the return value.
+  Api::OsSysCallsSingleton::get().supportsReusePortBpfCpuSteering();
+}
+
 TEST(OsSyscallsTest, IoCtlInvalidFd) {
   EXPECT_NE(0, Api::OsSysCallsSingleton::get().ioctl(0, 0, nullptr, 0, nullptr, 0, nullptr).errno_);
+}
+
+TEST(OsSyscallsTest, Setrlimit) {
+  // Not all environments support it, but it is safe to read limits.
+  struct rlimit rlim;
+  Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
 }
 
 } // namespace Envoy

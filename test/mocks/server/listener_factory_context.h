@@ -5,12 +5,13 @@
 
 #include "source/common/tls/context_manager_impl.h"
 
-#include "admin.h"
-#include "drain_manager.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/drain_manager.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/overload_manager.h"
+#include "test/mocks/server/server_lifecycle_notifier.h"
+
 #include "gmock/gmock.h"
-#include "instance.h"
-#include "overload_manager.h"
-#include "server_lifecycle_notifier.h"
 
 namespace Envoy {
 namespace Server {
@@ -25,8 +26,11 @@ public:
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, prefixedScope, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
+  MOCK_METHOD(bool, isQuic, (), (const));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
 

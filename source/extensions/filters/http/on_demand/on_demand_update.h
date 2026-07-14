@@ -42,11 +42,13 @@ public:
   // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
+      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+      absl::Status& creation_status);
   // Constructs config from extension's per-route proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
+      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+      absl::Status& creation_status);
 
   DecodeHeadersBehavior& decodeHeadersBehavior() const { return *behavior_; }
 
@@ -97,6 +99,7 @@ private:
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
   bool decode_headers_active_{false};
+  bool downstream_end_stream_{false};
 };
 
 } // namespace OnDemand

@@ -11,9 +11,9 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/win32_socket_handle_impl.h"
 
-#if defined(__linux__) && !defined(__ANDROID_API__)
-#include "source/common/io/io_uring_worker_factory_impl.h"
+#if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
 #include "source/common/io/io_uring_impl.h"
+#include "source/common/io/io_uring_worker_factory_impl.h"
 #include "source/common/network/io_uring_socket_handle_impl.h"
 #endif
 
@@ -23,7 +23,7 @@ namespace Network {
 namespace {
 [[maybe_unused]] bool hasIoUringWorkerFactory(Io::IoUringWorkerFactory* io_uring_worker_factory) {
   return io_uring_worker_factory != nullptr && io_uring_worker_factory->currentThreadRegistered() &&
-         io_uring_worker_factory->getIoUringWorker() != absl::nullopt;
+         io_uring_worker_factory->getIoUringWorker() != std::nullopt;
 }
 } // namespace
 
@@ -34,13 +34,13 @@ void DefaultSocketInterfaceExtension::onWorkerThreadInitialized() {
 }
 
 IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
-    int socket_fd, bool socket_v6only, absl::optional<int> domain,
+    int socket_fd, bool socket_v6only, std::optional<int> domain,
     const SocketCreationOptions& options,
     [[maybe_unused]] Io::IoUringWorkerFactory* io_uring_worker_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
-#if defined(__linux__) && !defined(__ANDROID_API__)
+#if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
   // Only create IoUringSocketHandleImpl when the IoUringWorkerFactory has been created and it has
   // been registered in the TLS, initialized. There are cases that test may create threads before
   // IoUringWorkerFactory has been added to the TLS and got initialized.
@@ -54,7 +54,7 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
-                                            Socket::Type socket_type, absl::optional<int> domain,
+                                            Socket::Type socket_type, std::optional<int> domain,
                                             const SocketCreationOptions& options) const {
   if (socket_type == Socket::Type::Datagram) {
     return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, options, nullptr);
@@ -167,19 +167,26 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
 Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
     [[maybe_unused]] const Protobuf::Message& config,
     [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
-#if defined(__linux__) && !defined(__ANDROID_API__)
+#if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::network::socket_interface::v3::DefaultSocketInterface&>(
       config, context.messageValidationVisitor());
   if (message.has_io_uring_options() && Io::isIoUringSupported()) {
     const auto& options = message.io_uring_options();
+    const uint32_t write_high_watermark =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_high_watermark_bytes, 131072);
+    uint32_t write_low_watermark =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_low_watermark_bytes, 16384);
+    if (write_low_watermark >= write_high_watermark) {
+      write_low_watermark = write_high_watermark / 2;
+    }
     std::shared_ptr<Io::IoUringWorkerFactoryImpl> io_uring_worker_factory =
         std::make_shared<Io::IoUringWorkerFactoryImpl>(
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, io_uring_size, 1000),
-            options.enable_submission_queue_polling(),
+            options.enable_submission_queue_polling(), options.enable_multishot_receive(),
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, read_buffer_size, 8192),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000),
-            context.threadLocal());
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000), write_high_watermark,
+            write_low_watermark, context.threadLocal());
     io_uring_worker_factory_ = io_uring_worker_factory;
 
     return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_worker_factory);

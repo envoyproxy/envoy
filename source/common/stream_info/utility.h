@@ -51,7 +51,7 @@ class ResponseFlagUtils {
 public:
   static const std::string toString(const StreamInfo& stream_info);
   static const std::string toShortString(const StreamInfo& stream_info);
-  static absl::optional<ResponseFlag> toResponseFlag(absl::string_view response_flag);
+  static std::optional<ResponseFlag> toResponseFlag(absl::string_view response_flag);
 
   struct FlagStrings {
     absl::string_view short_string_;
@@ -216,17 +216,18 @@ class TimingUtility {
 public:
   TimingUtility(const StreamInfo& info) : stream_info_(info) {}
 
-  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent();
-  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent();
-  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived();
-  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived();
-  absl::optional<std::chrono::nanoseconds> upstreamHandshakeComplete();
-  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent();
-  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
-  absl::optional<std::chrono::nanoseconds> lastDownstreamHeaderRxByteReceived();
-  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
-  absl::optional<std::chrono::nanoseconds> downstreamHandshakeComplete();
-  absl::optional<std::chrono::nanoseconds> lastDownstreamAckReceived();
+  std::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent();
+  std::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent();
+  std::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived();
+  std::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived();
+  std::optional<std::chrono::nanoseconds> firstUpstreamRxBodyByteReceived();
+  std::optional<std::chrono::nanoseconds> upstreamHandshakeComplete();
+  std::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent();
+  std::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
+  std::optional<std::chrono::nanoseconds> lastDownstreamHeaderRxByteReceived();
+  std::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
+  std::optional<std::chrono::nanoseconds> downstreamHandshakeComplete();
+  std::optional<std::chrono::nanoseconds> lastDownstreamAckReceived();
 
 private:
   const StreamInfo& stream_info_;
@@ -239,10 +240,14 @@ class Utility {
 public:
   /**
    * @param address supplies the downstream address.
-   * @return a properly formatted address for logs, header expansion, etc.
+   * @param mask_prefix_len optional CIDR prefix length to mask the address. If not provided,
+   * returns the unmasked IP address (without port).
+   * @return the IP address without port, or masked IP address in CIDR notation if mask_prefix_len
+   * is specified (e.g., "10.1.0.0/16"), or empty string if masking fails.
    */
-  static const std::string&
-  formatDownstreamAddressNoPort(const Network::Address::Instance& address);
+  static const std::string
+  formatDownstreamAddressNoPort(const Network::Address::Instance& address,
+                                std::optional<int> mask_prefix_len = std::nullopt);
 
   /**
    * @param address supplies the downstream address.
@@ -255,8 +260,16 @@ public:
    * @param address supplies the downstream address.
    * @return a port, extracted from the provided downstream address for logs, header expansion, etc.
    */
-  static absl::optional<uint32_t>
+  static std::optional<uint32_t>
   extractDownstreamAddressJustPort(const Network::Address::Instance& address);
+
+  /**
+   * @param address supplies the downstream address.
+   * @return the endpoint id of an EnvoyInternalAddress, extracted from the provided downstream
+   * address for logs, header expansion, etc.
+   */
+  static const std::string
+  formatDownstreamAddressJustEndpointId(const Network::Address::Instance& address);
 };
 
 // Static utils for creating, consuming, and producing strings from the
@@ -292,7 +305,7 @@ public:
 
   // Reads |stream_info.responseFlag| and returns an applicable ProxyStatusError, or nullopt
   // if no ProxyStatusError is applicable.
-  static const absl::optional<ProxyStatusError> fromStreamInfo(const StreamInfo& stream_info);
+  static const std::optional<ProxyStatusError> fromStreamInfo(const StreamInfo& stream_info);
 
   // Returns the recommended HTTP status code for a ProxyStatusError, or nullopt
   // if no HTTP status code is applicable.
@@ -303,7 +316,7 @@ public:
   // > Each Proxy Error Type has a Recommended HTTP Status Code. When
   // > generating a HTTP response containing "error", its HTTP status code
   // > SHOULD be set to the Recommended HTTP Status Code.
-  static const absl::optional<Http::Code>
+  static const std::optional<Http::Code>
   recommendedHttpStatusCode(const ProxyStatusError proxy_status);
 
   constexpr static absl::string_view DNS_TIMEOUT = "dns_timeout";

@@ -10,7 +10,7 @@ namespace Common {
 namespace Wasm {
 
 Stats::ScopeSharedPtr CreateStatsHandler::lockAndCreateStats(const Stats::ScopeSharedPtr& scope) {
-  absl::MutexLock l(&mutex_);
+  absl::MutexLock l(mutex_);
   Stats::ScopeSharedPtr lock;
   if (!(lock = scope_.lock())) {
     resetStats();
@@ -23,7 +23,7 @@ Stats::ScopeSharedPtr CreateStatsHandler::lockAndCreateStats(const Stats::ScopeS
 }
 
 void CreateStatsHandler::resetStatsForTesting() {
-  absl::MutexLock l(&mutex_);
+  absl::MutexLock l(mutex_);
   resetStats();
 }
 
@@ -66,14 +66,21 @@ CreateStatsHandler& getCreateStatsHandler() { MUTABLE_CONSTRUCT_ON_FIRST_USE(Cre
 
 std::atomic<int64_t> active_wasms;
 
+Stats::Gauge& lookupWasmVmCountGauge(Stats::Scope& server_scope) {
+  Stats::StatNameManagedStorage stat_name("wasm.wasm_vm_count", server_scope.symbolTable());
+  return server_scope.gaugeFromStatName(stat_name.statName(), Stats::Gauge::ImportMode::Accumulate);
+}
+
 void LifecycleStatsHandler::onEvent(WasmEvent event) {
   switch (event) {
   case WasmEvent::VmShutDown:
     lifecycle_stats_.active_.set(--active_wasms);
+    vm_count_gauge_.dec();
     break;
   case WasmEvent::VmCreated:
     lifecycle_stats_.active_.set(++active_wasms);
     lifecycle_stats_.created_.inc();
+    vm_count_gauge_.inc();
     break;
   default:
     break;

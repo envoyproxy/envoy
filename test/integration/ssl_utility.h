@@ -72,7 +72,7 @@ struct ClientSslTransportOptions {
 
   bool alpn_{};
   bool client_ecdsa_cert_{false};
-  std::vector<std::string> cipher_suites_{};
+  std::vector<std::string> cipher_suites_;
   std::string san_;
   std::vector<std::string> sigalgs_;
   std::vector<std::string> curves_;
@@ -81,6 +81,7 @@ struct ClientSslTransportOptions {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
   bool use_expired_spiffe_cert_{false};
   bool client_with_intermediate_cert_{false};
+  bool no_cert_{false};
   // It is owned by the caller that invokes `setCustomCertValidatorConfig()`.
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
 };

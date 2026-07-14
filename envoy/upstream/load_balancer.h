@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/http/codes.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
@@ -29,14 +31,14 @@ namespace Upstream {
 using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 /*
- * A handle to allow cancelation of asynchronous host selection.
+ * A handle to allow cancellation of asynchronous host selection.
  * If chooseHost returns a HostSelectionResponse with an AsyncHostSelectionHandle
- * handle, and the endpoint does not wish to receive onAsyncHostSelction call,
+ * handle, and the endpoint does not wish to receive onAsyncHostSelection call,
  * it must call cancel() on the provided handle.
  *
  * Please note that the AsyncHostSelectionHandle may be deleted after the
- * cancel() call. It is up to the implemention of the asynchronous load balancer
- * to ensure the cancelation state persists until the load balancer checks it.
+ * cancel() call. It is up to the implementation of the asynchronous load balancer
+ * to ensure the cancellation state persists until the load balancer checks it.
  */
 class AsyncHostSelectionHandle {
 public:
@@ -52,7 +54,7 @@ public:
  * load balancing, returns an AsyncHostSelectionHandle handle.
  *
  * If it returns a AsyncHostSelectionHandle handle, the load balancer guarantees an
- * eventual call to LoadBalancerContext::onAsyncHostSelction unless
+ * eventual call to LoadBalancerContext::onAsyncHostSelection unless
  * AsyncHostSelectionHandle::cancel is called.
  */
 struct HostSelectionResponse {
@@ -62,9 +64,12 @@ struct HostSelectionResponse {
   HostSelectionResponse(HostConstSharedPtr host, std::string details)
       : host(host), details(details) {}
   HostConstSharedPtr host;
-  // Optional details if host selection fails.
+  // Optional details if host selection fails (empty string implies no details).
   std::string details;
   std::unique_ptr<AsyncHostSelectionHandle> cancelable;
+  // Optional HTTP status code to use when host selection fails because the strict override
+  // destination is missing from available endpoints. If not set, defaults to 503.
+  std::optional<Http::Code> failure_status;
 };
 
 /**
@@ -79,9 +84,9 @@ public:
    * Compute and return an optional hash key to use during load balancing. This
    * method may modify internal state so it should only be called once per
    * routing attempt.
-   * @return absl::optional<uint64_t> the optional hash key to use.
+   * @return std::optional<uint64_t> the optional hash key to use.
    */
-  virtual absl::optional<uint64_t> computeHashKey() PURE;
+  virtual std::optional<uint64_t> computeHashKey() PURE;
 
   /**
    * @return Router::MetadataMatchCriteria* metadata for use in selecting a subset of hosts
@@ -146,26 +151,41 @@ public:
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
   /**
-   * Upstream override host. The first element is the target host address and the second element is
-   * a boolean indicating whether the host should be selected strictly or not.
-   * If the host should be selected strictly and no valid host is found, the load balancer should
-   * return  nullptr.
-   * If the host should not be selected strictly, the load balancer will select another host is the
-   * target host is not valid.
+   * Upstream override host structure.
    */
-  using OverrideHost = std::pair<absl::string_view, bool>;
+  struct OverrideHost {
+    // The target host address to select.
+    std::string host;
+    // Whether the host should be selected strictly or not.
+    // If strict and no valid host is found, the load balancer should return nullptr.
+    // If not strict, the load balancer will select another host if the target host is not valid.
+    bool strict{false};
+    // The HTTP status code to return when strict mode is enabled and the target host
+    // is not found in the set of available endpoints. Does not apply when the host
+    // exists but is unhealthy. Defaults to 503 (ServiceUnavailable).
+    Http::Code status_on_strict_destination_not_found{Http::Code::ServiceUnavailable};
+  };
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and
    * the host can be selected directly, the load balancer can bypass the load balancing algorithm
    * and return the corresponding host directly.
    */
-  virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
+  virtual OptRef<const OverrideHost> overrideHostToSelect() const PURE;
 
   /* Called by the load balancer when asynchronous host selection completes
    * @param host supplies the upstream host selected
    * @param details gives optional details about the resolution success/failure.
    */
   virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string&& details) PURE;
+
+  /**
+   * Called by the load balancer to set the headers modifier that will be used to modify the
+   * response headers before sending them downstream.
+   * NOTE: this should be called only once per request, no matter how many times the retrying
+   * happens.
+   * @param modifier supplies the function that will modify the response headers.
+   */
+  virtual void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) PURE;
 };
 
 /**
@@ -234,7 +254,7 @@ public:
    * @return selected pool and connection to be used, or nullopt if no selection is made,
    *         for example if no matching connection is found.
    */
-  virtual absl::optional<SelectedPoolAndConnection>
+  virtual std::optional<SelectedPoolAndConnection>
   selectExistingConnection(LoadBalancerContext* context, const Host& host,
                            std::vector<uint8_t>& hash_key) PURE;
 };
@@ -264,9 +284,17 @@ public:
   virtual LoadBalancerPtr create(LoadBalancerParams params) PURE;
 
   /**
-   * @return bool whether the load balancer should be recreated when the host set changes.
+   * @return bool whether the cluster manager should recreate this worker-local load balancer
+   *         every time the host set changes.
+   *
+   * DEPRECATED: this hook exists only to keep not-yet-migrated load balancers working while the
+   * cluster manager's recreate-on-host-change loop is phased out. New load balancers MUST return
+   * false and refresh any host-derived state by subscribing to the priority set via
+   * PrioritySet::addMemberUpdateCb. The hook has no default so out-of-tree implementations are
+   * forced to make an explicit choice during the migration; it will be removed once all known
+   * implementations have moved off the legacy contract.
    */
-  virtual bool recreateOnHostChange() const { return true; }
+  virtual bool recreateOnHostChangeDeprecated() const PURE;
 };
 
 using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;
@@ -324,6 +352,14 @@ using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
 class LoadBalancerConfig {
 public:
   virtual ~LoadBalancerConfig() = default;
+
+  /**
+   * Optional method to allow a load balancer to validate endpoints before they're applied. If an
+   * error is returned from this method, the endpoints are rejected. If this method does not return
+   * an error, the load balancer must be able to use these endpoints in an update from the priority
+   * set.
+   */
+  virtual absl::Status validateEndpoints(const PriorityState&) const { return absl::OkStatus(); }
 };
 using LoadBalancerConfigPtr = std::unique_ptr<LoadBalancerConfig>;
 

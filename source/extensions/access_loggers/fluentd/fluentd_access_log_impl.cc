@@ -18,8 +18,8 @@ FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& c
     : FluentdBase(
           cluster, std::move(client), dispatcher, config.tag(),
           config.has_retry_options() && config.retry_options().has_max_connect_attempts()
-              ? absl::optional<uint32_t>(config.retry_options().max_connect_attempts().value())
-              : absl::nullopt,
+              ? std::optional<uint32_t>(config.retry_options().max_connect_attempts().value())
+              : std::nullopt,
           parent_scope, config.stat_prefix(), std::move(backoff_strategy),
           PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, DefaultMaxBufferSize)) {}
@@ -66,7 +66,7 @@ FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatt
   });
 }
 
-void FluentdAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
+void FluentdAccessLog::emitLog(const Formatter::Context& context,
                                const StreamInfo::StreamInfo& stream_info) {
   auto msgpack = formatter_->format(context, stream_info);
   uint64_t time = std::chrono::duration_cast<std::chrono::seconds>(

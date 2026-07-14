@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/tracing/custom_tag.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
@@ -53,6 +54,7 @@ public:
 
 private:
   const Tracing::TraceContextHandler name_;
+  const Http::LowerCaseString header_name_;
   const std::string default_value_;
 };
 
@@ -67,12 +69,27 @@ public:
   const envoy::config::core::v3::Metadata* metadata(const CustomTagContext& ctx) const;
 
 protected:
-  absl::optional<std::string>
+  std::optional<std::string>
   metadataToString(const envoy::config::core::v3::Metadata* metadata) const;
 
   const envoy::type::metadata::v3::MetadataKind::KindCase kind_;
   const Envoy::Config::MetadataKey metadata_key_;
   const std::string default_value_;
+};
+
+class FormatterCustomTag : public CustomTag {
+public:
+  FormatterCustomTag(absl::string_view tag, absl::string_view value,
+                     const Formatter::CommandParserPtrVector& command_parsers = {});
+
+  absl::string_view tag() const override { return tag_; }
+  void applySpan(Span& span, const CustomTagContext& ctx) const override;
+  void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                const CustomTagContext& ctx) const override;
+
+private:
+  const std::string tag_;
+  Formatter::FormatterPtr formatter_;
 };
 
 class CustomTagUtility {
@@ -81,7 +98,9 @@ public:
    * Create a custom tag according to the configuration.
    * @param tag a tracing custom tag configuration.
    */
-  static CustomTagConstSharedPtr createCustomTag(const envoy::type::tracing::v3::CustomTag& tag);
+  static CustomTagConstSharedPtr
+  createCustomTag(const envoy::type::tracing::v3::CustomTag& tag,
+                  const Formatter::CommandParserPtrVector& command_parsers = {});
 };
 
 } // namespace Tracing

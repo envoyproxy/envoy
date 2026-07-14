@@ -1,4 +1,5 @@
 #include <chrono>
+#include <optional>
 
 #include "envoy/http/header_map.h"
 
@@ -10,15 +11,15 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/enum_test_utils.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "datadog/dict_writer.h"
 #include "datadog/error.h"
 #include "datadog/expected.h"
-#include "datadog/json.hpp"
 #include "datadog/optional.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -423,7 +424,7 @@ TEST_F(DatadogAgentHttpClientTest, OnErrorOther) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   msg->body().add("{}");
 
-  const auto bogus_value = static_cast<Http::AsyncClient::FailureReason>(-1);
+  const auto bogus_value = uncheckedEnumCastForTest<Http::AsyncClient::FailureReason>(-1);
   callbacks_->onFailure(request_, bogus_value);
 }
 
@@ -676,6 +677,16 @@ TEST_F(DatadogAgentHttpClientTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     EXPECT_EQ(1U, stats_.reports_dropped_.value());
     EXPECT_EQ(1U, stats_.reports_failed_.value());
   }
+}
+
+TEST_F(DatadogAgentHttpClientTest, ConfigJson) {
+  // Verify that the config() method returns valid JSON
+  const std::string config = client_.config();
+  // Parse the config string to verify it's valid JSON
+  EXPECT_NO_THROW({
+    const auto json = nlohmann::json::parse(config);
+    EXPECT_TRUE(json.is_object());
+  });
 }
 
 } // namespace

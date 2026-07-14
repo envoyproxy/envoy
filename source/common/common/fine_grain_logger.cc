@@ -1,11 +1,13 @@
 #include "source/common/common/fine_grain_logger.h"
 
 #include <atomic>
+#include <cstddef>
 #include <memory>
 #include <tuple>
 
 #include "source/common/common/logger.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 
 using spdlog::level::level_enum;
@@ -18,9 +20,9 @@ namespace Envoy {
 class FineGrainLogBasicLockable : public Thread::BasicLockable {
 public:
   // BasicLockable
-  void lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() override { mutex_.Lock(); }
-  bool tryLock() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) override { return mutex_.TryLock(); }
-  void unlock() ABSL_UNLOCK_FUNCTION() override { mutex_.Unlock(); }
+  void lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() override { mutex_.lock(); }
+  bool tryLock() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) override { return mutex_.try_lock(); }
+  void unlock() ABSL_UNLOCK_FUNCTION() override { mutex_.unlock(); }
 
 private:
   absl::Mutex mutex_;
@@ -28,7 +30,7 @@ private:
 
 SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntry(absl::string_view key)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  absl::ReaderMutexLock l(fine_grain_log_lock_);
   auto it = fine_grain_log_map_->find(key);
   if (it != fine_grain_log_map_->end()) {
     return it->second;
@@ -36,15 +38,50 @@ SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntry(absl::string_view k
   return nullptr;
 }
 
+SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntryForFlush(absl::string_view file,
+                                                                     absl::string_view name)
+    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  if (name.empty()) {
+    return getFineGrainLogEntry(file);
+  }
+  return getFineGrainLogEntry(absl::StrCat(file, ":", name));
+}
 spdlog::level::level_enum FineGrainLogContext::getVerbosityDefaultLevel() const {
-  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  absl::ReaderMutexLock l(fine_grain_log_lock_);
   return verbosity_default_level_;
 }
 
-void FineGrainLogContext::initFineGrainLogger(const std::string& key,
-                                              std::atomic<spdlog::logger*>& logger)
+bool FineGrainLogContext::checkFineGrainLogger(spdlog::logger* logger, absl::string_view file,
+                                               absl::string_view name) {
+  absl::string_view logger_name = logger->name();
+  // Fast path for static strings: the pointer address might match if they are string literals.
+  // spdlog logger name is usually a std::string, so logger_name.data() is not the same as
+  // file.data().
+
+  if (name.empty()) {
+    return logger_name == file;
+  }
+
+  // Common case: logger_name was created as absl::StrCat(file, ":", name)
+  if (logger_name.size() != file.size() + 1 + name.size()) {
+    return false;
+  }
+
+  const char* d = logger_name.data();
+  return d[file.size()] == ':' && absl::StartsWith(logger_name, file) &&
+         absl::EndsWith(logger_name, name);
+}
+
+spdlog::logger* FineGrainLogContext::initFineGrainLogger(absl::string_view file,
+                                                         absl::string_view name,
+                                                         std::atomic<spdlog::logger*>& logger)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-  absl::WriterMutexLock l(&fine_grain_log_lock_);
+  std::string key(file);
+  if (!name.empty()) {
+    absl::StrAppend(&key, ":", name);
+  }
+
+  absl::WriterMutexLock l(fine_grain_log_lock_);
   auto it = fine_grain_log_map_->find(key);
   spdlog::logger* target;
   if (it == fine_grain_log_map_->end()) {
@@ -53,11 +90,12 @@ void FineGrainLogContext::initFineGrainLogger(const std::string& key,
     target = it->second.get();
   }
   logger.store(target, std::memory_order_release);
+  return target;
 }
 
 bool FineGrainLogContext::setFineGrainLogger(absl::string_view key, level_enum log_level)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  absl::ReaderMutexLock l(fine_grain_log_lock_);
   auto it = fine_grain_log_map_->find(key);
   if (it != fine_grain_log_map_->end()) {
     it->second->set_level(log_level);
@@ -70,11 +108,11 @@ void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level
                                                             const std::string& format)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   {
-    absl::WriterMutexLock wl(&fine_grain_log_lock_);
+    absl::WriterMutexLock wl(fine_grain_log_lock_);
     verbosity_default_level_ = level;
   }
 
-  absl::ReaderMutexLock rl(&fine_grain_log_lock_);
+  absl::ReaderMutexLock rl(fine_grain_log_lock_);
   for (const auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
     Logger::Utility::setLogFormatForLogger(*logger, format);
@@ -82,19 +120,23 @@ void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level
 }
 
 std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-  absl::ReaderMutexLock l(&fine_grain_log_lock_);
-  std::string info =
-      absl::StrJoin(*fine_grain_log_map_, "\n", [](std::string* out, const auto& log_pair) {
-        auto level_str_view = spdlog::level::to_string_view(log_pair.second->level());
-        absl::StrAppend(out, "  ", log_pair.first, ": ",
-                        absl::string_view(level_str_view.data(), level_str_view.size()));
-      });
-  return info;
+  absl::ReaderMutexLock l(fine_grain_log_lock_);
+  std::vector<std::string> lines;
+  for (const auto& log_pair : *fine_grain_log_map_) {
+    const auto [file, logger_name] = parseKey(log_pair.first);
+    if (!logger_name.empty()) {
+      continue;
+    }
+    auto level_str_view = spdlog::level::to_string_view(log_pair.second->level());
+    lines.push_back(absl::StrCat("  ", file, ": ",
+                                 absl::string_view(level_str_view.data(), level_str_view.size())));
+  }
+  return absl::StrJoin(lines, "\n");
 }
 
 void FineGrainLogContext::setAllFineGrainLoggers(spdlog::level::level_enum level)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  absl::ReaderMutexLock l(fine_grain_log_lock_);
   verbosity_update_info_.clear();
   for (const auto& it : *fine_grain_log_map_) {
     it.second->set_level(level);
@@ -104,7 +146,7 @@ void FineGrainLogContext::setAllFineGrainLoggers(spdlog::level::level_enum level
 FineGrainLogLevelMap FineGrainLogContext::getAllFineGrainLogLevelsForTest()
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   FineGrainLogLevelMap log_levels;
-  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  absl::ReaderMutexLock l(fine_grain_log_lock_);
   for (const auto& it : *fine_grain_log_map_) {
     log_levels[it.first] = it.second->level();
   }
@@ -170,25 +212,25 @@ spdlog::logger* FineGrainLogContext::createLogger(const std::string& key)
 
 void FineGrainLogContext::updateVerbosityDefaultLevel(level_enum level) {
   {
-    absl::WriterMutexLock wl(&fine_grain_log_lock_);
+    absl::WriterMutexLock wl(fine_grain_log_lock_);
     verbosity_default_level_ = level;
   }
 
   setAllFineGrainLoggers(level);
 }
 
-void FineGrainLogContext::updateVerbositySetting(
-    const std::vector<std::pair<absl::string_view, int>>& updates) {
-  absl::WriterMutexLock ul(&fine_grain_log_lock_);
+void FineGrainLogContext::updateVerbositySetting(const std::vector<VerbosityUpdate>& updates) {
+  absl::WriterMutexLock ul(fine_grain_log_lock_);
   verbosity_update_info_.clear();
-  for (const auto& [glob, level] : updates) {
-    if (level < kLogLevelMin || level > kLogLevelMax) {
-      printf(
-          "The log level: %d for glob: %s is out of scope, and it should be in [0, 6]. Skipping.",
-          level, std::string(glob).c_str());
+  for (const auto& update : updates) {
+    if (update.level < kLogLevelMin || update.level > kLogLevelMax) {
+      printf("The log level: %d for pattern: %s is out of scope, and it should be in [0, 6]. "
+             "Skipping.",
+             update.level, std::string(update.pattern).c_str());
       continue;
     }
-    appendVerbosityLogUpdate(glob, static_cast<level_enum>(level));
+    appendVerbosityLogUpdate(update.pattern, static_cast<level_enum>(update.level),
+                             update.match_group_only);
   }
 
   for (const auto& [key, logger] : *fine_grain_log_map_) {
@@ -197,33 +239,36 @@ void FineGrainLogContext::updateVerbositySetting(
 }
 
 void FineGrainLogContext::appendVerbosityLogUpdate(absl::string_view update_pattern,
-                                                   level_enum log_level) {
+                                                   level_enum log_level, bool match_group_only) {
   for (const auto& info : verbosity_update_info_) {
-    if (safeFileNameMatch(info.update_pattern, update_pattern)) {
+    if (info.match_group_only == match_group_only &&
+        safeFileNameMatch(info.update_pattern, update_pattern)) {
       // This is a memory optimization to avoid storing patterns that will never
       // match due to exit early semantics.
       return;
     }
   }
   bool update_is_path = update_pattern.find('/') != update_pattern.npos;
-  verbosity_update_info_.emplace_back(std::string(update_pattern), update_is_path, log_level);
+  verbosity_update_info_.emplace_back(std::string(update_pattern), update_is_path, match_group_only,
+                                      log_level);
 }
-
-level_enum FineGrainLogContext::getLogLevel(absl::string_view file) const {
+level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
   if (verbosity_update_info_.empty()) {
     return verbosity_default_level_;
   }
 
+  const auto [file, logger_name] = parseKey(key);
+
   // Get basename for file.
-  absl::string_view basename = file;
+  absl::string_view file_basename = file;
   {
-    const size_t sep = basename.rfind('/');
-    if (sep != basename.npos) {
-      basename.remove_prefix(sep + 1);
+    const size_t sep = file_basename.rfind('/');
+    if (sep != file_basename.npos) {
+      file_basename.remove_prefix(sep + 1);
     }
   }
 
-  absl::string_view stem_basename = basename;
+  absl::string_view stem_basename = file_basename;
   {
     const size_t sep = stem_basename.find('.');
     if (sep != stem_basename.npos) {
@@ -231,17 +276,48 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view file) const {
     }
   }
   for (const auto& info : verbosity_update_info_) {
+    if (info.match_group_only) {
+      if (!logger_name.empty() && info.update_pattern == logger_name) {
+        return info.log_level;
+      }
+      continue;
+    }
+
     if (info.update_is_path) {
       // If there are any slashes in the pattern, try to match the full path name.
       if (safeFileNameMatch(info.update_pattern, file)) {
         return info.log_level;
       }
-    } else if (safeFileNameMatch(info.update_pattern, stem_basename)) {
-      return info.log_level;
+    } else {
+      if (safeFileNameMatch(info.update_pattern, stem_basename)) {
+        return info.log_level;
+      }
+      if (!logger_name.empty() && info.update_pattern == logger_name) {
+        return info.log_level;
+      }
     }
   }
 
   return verbosity_default_level_;
+}
+
+std::pair<absl::string_view, absl::string_view>
+FineGrainLogContext::parseKey(absl::string_view key) {
+  absl::string_view file = key;
+  absl::string_view name;
+  size_t colon = key.rfind(':');
+#ifdef _WIN32
+  // On Windows, a colon at index 1 is likely a drive letter (e.g., C:\path).
+  if (colon == 1 && key.size() > 1 &&
+      ((key[0] >= 'a' && key[0] <= 'z') || (key[0] >= 'A' && key[0] <= 'Z'))) {
+    colon = absl::string_view::npos;
+  }
+#endif
+  if (colon != absl::string_view::npos) {
+    name = key.substr(colon + 1);
+    file = key.substr(0, colon);
+  }
+  return {file, name};
 }
 
 FineGrainLogContext& getFineGrainLogContext() {

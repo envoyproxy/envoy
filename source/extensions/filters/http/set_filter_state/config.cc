@@ -29,6 +29,9 @@ Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& 
   for (auto policy : policies) {
     policy.get().updateFilterState({&headers}, decoder_callbacks_->streamInfo());
   }
+  if (config_->clearRouteCache() && decoder_callbacks_->downstreamCallbacks()) {
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -37,7 +40,8 @@ Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
     const std::string&, Server::Configuration::FactoryContext& context) {
 
   const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain, context);
+      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain, context,
+      proto_config.clear_route_cache());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});
@@ -53,21 +57,21 @@ SetFilterStateConfig::createRouteSpecificFilterConfigTyped(
 
   return std::make_shared<const Filters::Common::SetFilterState::Config>(
       proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-      generic_context);
+      generic_context, proto_config.clear_route_cache());
 }
 
-Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> SetFilterStateConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {
 
   // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
   // of server context should not be used here directly. But this is bug of
-  // 'createFilterFactoryFromProtoWithServerContext' and will be fixed in the future.
+  // 'createHttpFilterFactoryFromProto' and will be fixed in the future.
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
 
   const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
       proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-      generic_context);
+      generic_context, proto_config.clear_route_cache());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});

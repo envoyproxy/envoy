@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <concepts>
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
@@ -191,6 +192,7 @@ private:
   HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
   HEADER_FUNC(EnvoyIsTimeoutRetry)                                                                 \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOriginalHost)                                                                   \
   HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutAltResponse)                                              \
@@ -466,6 +468,16 @@ public:
    */
   virtual uint32_t maxHeadersCount() const PURE;
 
+  // aliases to make iterate() and iterateReverse() callbacks easier to read
+  enum class Iterate { Continue, Break };
+
+  /**
+   * Callback when calling iterate() over a const header map.
+   * @param header supplies the header entry.
+   * @return Iterate::Continue to continue iteration, or Iterate::Break to stop;
+   */
+  using ConstIterateCb = std::function<Iterate(const HeaderEntry&)>;
+
   /**
    * This is a wrapper for the return result from get(). It avoids a copy when translating from
    * non-const HeaderEntry to const HeaderEntry and only provides const access to the result.
@@ -480,6 +492,13 @@ public:
     bool empty() const { return result_.empty(); }
     size_t size() const { return result_.size(); }
     const HeaderEntry* operator[](size_t i) const { return result_[i]; }
+    void iterate(ConstIterateCb cb) const {
+      for (const auto& val : result_) {
+        if (cb(*val) == Iterate::Break) {
+          break;
+        }
+      }
+    }
 
   private:
     NonConstGetResult result_;
@@ -491,16 +510,6 @@ public:
    * @return all header entries matching the key.
    */
   virtual GetResult get(const LowerCaseString& key) const PURE;
-
-  // aliases to make iterate() and iterateReverse() callbacks easier to read
-  enum class Iterate { Continue, Break };
-
-  /**
-   * Callback when calling iterate() over a const header map.
-   * @param header supplies the header entry.
-   * @return Iterate::Continue to continue iteration, or Iterate::Break to stop;
-   */
-  using ConstIterateCb = std::function<Iterate(const HeaderEntry&)>;
 
   /**
    * Iterate over a constant header map.
@@ -638,14 +647,14 @@ public:
    * Fetch the handle for a registered inline header. May only be called after finalized().
    */
   template <Type type>
-  static absl::optional<Handle<type>> getInlineHeader(const LowerCaseString& header_name) {
+  static std::optional<Handle<type>> getInlineHeader(const LowerCaseString& header_name) {
     ASSERT(mutableFinalized<type>());
     auto& map = mutableRegistrationMap<type>();
     auto entry = map.find(header_name);
     if (entry != map.end()) {
       return Handle<type>(entry);
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   /**
@@ -682,7 +691,7 @@ public:
   RegisterCustomInlineHeader(const LowerCaseString& header)
       : handle_(CustomInlineHeaderRegistry::registerInlineHeader<type>(header)) {}
 
-  typename CustomInlineHeaderRegistry::Handle<type> handle() { return handle_; }
+  typename CustomInlineHeaderRegistry::Handle<type> handle() const { return handle_; }
 
 private:
   const typename CustomInlineHeaderRegistry::Handle<type> handle_;
@@ -808,6 +817,11 @@ public:
    * Check whether header matcher matches any headers in a given HeaderMap.
    */
   virtual bool matchesHeaders(const HeaderMap& headers) const PURE;
+
+  /**
+   * Matches headers validating each value individually.
+   */
+  virtual bool matchesHeadersIndividually(const HeaderMap& headers) const PURE;
 };
 
 using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
@@ -826,3 +840,34 @@ struct formatter<
     std::enable_if_t<std::is_base_of<::Envoy::Http::HeaderMap, HeaderMapType>::value, char>>
     : ostream_formatter {};
 } // namespace fmt
+
+namespace std {
+// Allow std::format to use operator << defined in HeaderMap and LowerCaseString
+template <> struct formatter<::Envoy::Http::LowerCaseString, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <class FmtContext>
+  FmtContext::iterator format(const ::Envoy::Http::LowerCaseString& s, FmtContext& ctx) const {
+    std::ostringstream out;
+    out << s;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+template <std::derived_from<::Envoy::Http::HeaderMap> HeaderMapType>
+struct formatter<HeaderMapType, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <class FmtContext>
+  FmtContext::iterator format(const HeaderMapType& header_map, FmtContext& ctx) const {
+    std::ostringstream out;
+    out << header_map;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+} // namespace std

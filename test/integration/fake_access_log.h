@@ -8,15 +8,13 @@
 
 namespace Envoy {
 
-using LogSignature =
-    std::function<void(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&)>;
+using LogSignature = std::function<void(const Formatter::Context&, const StreamInfo::StreamInfo&)>;
 
 class FakeAccessLog : public AccessLog::Instance {
 public:
   FakeAccessLog(LogSignature cb) : log_cb_(cb) {}
 
-  void log(const Formatter::HttpFormatterContext& context,
-           const StreamInfo::StreamInfo& info) override {
+  void log(const Formatter::Context& context, const StreamInfo::StreamInfo& info) override {
     if (log_cb_) {
       log_cb_(context, info);
     }
@@ -30,7 +28,7 @@ class FakeAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
-                          Server::Configuration::FactoryContext&,
+                          Server::Configuration::GenericFactoryContext&,
                           std::vector<Formatter::CommandParserPtr>&& = {}) override {
     std::lock_guard<std::mutex> guard(log_callback_lock_);
     auto access_log_instance = std::make_shared<FakeAccessLog>(log_cb_);

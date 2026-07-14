@@ -13,6 +13,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/router/upstream_to_downstream_impl_base.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
@@ -37,6 +38,7 @@ public:
   void onAboveWriteBufferHighWatermark() override;
 
   // UpstreamCallbacks
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr&) override {}
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
@@ -51,7 +53,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // This bridge connects the upstream stream to the filter manager.
-  class CodecBridge : public UpstreamToDownstream {
+  class CodecBridge : public UpstreamToDownstreamImplBase {
   public:
     CodecBridge(UpstreamCodecFilter& filter) : filter_(filter) {}
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;
@@ -77,17 +79,24 @@ public:
     const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
       return filter_.callbacks_->upstreamCallbacks()->upstreamStreamOptions();
     }
+    // Reaches the downstream stream's WebTransport session (via the upstream filter callbacks,
+    // which delegate to the router's downstream StreamDecoderFilterCallbacks) so the upstream codec
+    // can bridge it to the upstream session.
+    OptRef<Http::WebTransportSession> downstreamWebTransportSession() override {
+      return filter_.callbacks_->upstreamCallbacks()->downstreamWebTransportSession();
+    }
 
   private:
     void maybeEndDecode(bool end_stream);
     bool seen_1xx_headers_{};
+    bool first_body_rx_recorded_{};
     UpstreamCodecFilter& filter_;
   };
   Http::StreamDecoderFilterCallbacks* callbacks_;
   CodecBridge bridge_;
   OptRef<Http::RequestHeaderMap> latched_headers_;
   absl::Status deferred_reset_status_;
-  absl::optional<bool> latched_end_stream_;
+  std::optional<bool> latched_end_stream_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   bool calling_encode_headers_ = false;
 

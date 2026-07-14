@@ -10,6 +10,8 @@ message TestNetworkFilterConfig {
 message TestDrainerNetworkFilterConfig {
   bool is_terminal_filter = 1;
   uint32 bytes_to_drain = 2 [(validate.rules).uint32 = {gte: 2}];
+  string direct_response = 3;
+  bool drain_all_data = 4;
 }
 
 message TestDrainerUpstreamNetworkFilterConfig {

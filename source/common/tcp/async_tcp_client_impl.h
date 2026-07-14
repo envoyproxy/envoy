@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <optional>
 #include <string>
 
 #include "envoy/common/optref.h"
@@ -16,7 +17,6 @@
 #include "source/common/network/filter_impl.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -32,7 +32,7 @@ public:
 
   void close(Network::ConnectionCloseType type) override { closeImpl(type); }
 
-  Network::DetectedCloseType detectedCloseType() const override { return detected_close_; }
+  StreamInfo::DetectedCloseType detectedCloseType() const override { return detected_close_; }
 
   /**
    * @return true means a host is successfully picked from a Cluster.
@@ -63,7 +63,7 @@ public:
     if (connection_) {
       return connection_->streamInfo();
     } else {
-      return absl::nullopt;
+      return std::nullopt;
     }
   }
 
@@ -110,7 +110,7 @@ private:
   Stats::TimespanPtr conn_length_ms_;
   Event::TimerPtr connect_timer_;
   AsyncTcpClientCallbacks* callbacks_{};
-  Network::DetectedCloseType detected_close_{Network::DetectedCloseType::Normal};
+  StreamInfo::DetectedCloseType detected_close_{StreamInfo::DetectedCloseType::Normal};
   bool closing_{false};
   bool connected_{false};
   bool enable_half_close_{false};

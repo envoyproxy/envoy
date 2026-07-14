@@ -9,8 +9,7 @@
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -94,7 +93,7 @@ void checkMatcherEngine(
 
 void onMetadata(NiceMock<StreamInfo::MockStreamInfo>& info) {
   ON_CALL(info, setDynamicMetadata("envoy.common", _))
-      .WillByDefault(Invoke([&info](const std::string&, const ProtobufWkt::Struct& obj) {
+      .WillByDefault(Invoke([&info](const std::string&, const Protobuf::Struct& obj) {
         (*info.metadata_.mutable_filter_metadata())["envoy.common"] = obj;
       }));
 }
@@ -443,7 +442,7 @@ TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::config::core::v3::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("other", label));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   checkEngine(engine, true, LogResult::Undecided, info, Envoy::Network::MockConnection(), headers);
@@ -500,16 +499,16 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, AllowedAllowlist) {
   auto matcher_matcher = matcher.mutable_matcher_list()->mutable_matchers()->Add();
   auto matcher_action = matcher_matcher->mutable_on_match()->mutable_action();
   matcher_action->set_name("action");
-  matcher_action->mutable_typed_config()->PackFrom(allow_action);
+  std::ignore = matcher_action->mutable_typed_config()->PackFrom(allow_action);
   auto matcher_predicate = matcher_matcher->mutable_predicate()->mutable_single_predicate();
   auto matcher_input = matcher_predicate->mutable_input();
   matcher_input->set_name("envoy.matching.inputs.destination_port");
-  matcher_input->mutable_typed_config()->PackFrom(input);
+  std::ignore = matcher_input->mutable_typed_config()->PackFrom(input);
   matcher_predicate->mutable_value_match()->set_exact("123");
 
   auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_on_no_match_action->set_name("action");
-  matcher_on_no_match_action->mutable_typed_config()->PackFrom(deny_action);
+  std::ignore = matcher_on_no_match_action->mutable_typed_config()->PackFrom(deny_action);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
@@ -549,16 +548,16 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, DeniedDenylist) {
   auto matcher_matcher = matcher.mutable_matcher_list()->mutable_matchers()->Add();
   auto matcher_action = matcher_matcher->mutable_on_match()->mutable_action();
   matcher_action->set_name("action");
-  matcher_action->mutable_typed_config()->PackFrom(deny_action);
+  std::ignore = matcher_action->mutable_typed_config()->PackFrom(deny_action);
   auto matcher_predicate = matcher_matcher->mutable_predicate()->mutable_single_predicate();
   auto matcher_input = matcher_predicate->mutable_input();
   matcher_input->set_name("envoy.matching.inputs.destination_port");
-  matcher_input->mutable_typed_config()->PackFrom(input);
+  std::ignore = matcher_input->mutable_typed_config()->PackFrom(input);
   matcher_predicate->mutable_value_match()->set_exact("123");
 
   auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_on_no_match_action->set_name("action");
-  matcher_on_no_match_action->mutable_typed_config()->PackFrom(allow_action);
+  std::ignore = matcher_on_no_match_action->mutable_typed_config()->PackFrom(allow_action);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;
@@ -634,16 +633,16 @@ TEST(RoleBasedAccessControlMatcherEngineImpl, LogIfMatched) {
   auto matcher_matcher = matcher.mutable_matcher_list()->mutable_matchers()->Add();
   auto matcher_action = matcher_matcher->mutable_on_match()->mutable_action();
   matcher_action->set_name("action");
-  matcher_action->mutable_typed_config()->PackFrom(log_action);
+  std::ignore = matcher_action->mutable_typed_config()->PackFrom(log_action);
   auto matcher_predicate = matcher_matcher->mutable_predicate()->mutable_single_predicate();
   auto matcher_input = matcher_predicate->mutable_input();
   matcher_input->set_name("envoy.matching.inputs.destination_port");
-  matcher_input->mutable_typed_config()->PackFrom(input);
+  std::ignore = matcher_input->mutable_typed_config()->PackFrom(input);
   matcher_predicate->mutable_value_match()->set_exact("123");
 
   auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_on_no_match_action->set_name("action");
-  matcher_on_no_match_action->mutable_typed_config()->PackFrom(allow_action);
+  std::ignore = matcher_on_no_match_action->mutable_typed_config()->PackFrom(allow_action);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   HttpFilters::RBACFilter::ActionValidationVisitor validation_visitor;

@@ -94,7 +94,7 @@ private:
 
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
-  Common::CallbackManager<> update_callback_manager_;
+  Common::CallbackManager<absl::Status> update_callback_manager_;
 
   // Access to addUpdateCallback
   friend class ScopedRdsConfigSubscription;
@@ -122,7 +122,7 @@ public:
 
   // Router::RouteConfigProvider
   Rds::ConfigConstSharedPtr config() const override { return base_.config(); }
-  const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
+  const std::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
 
   absl::Status onConfigUpdate() override;

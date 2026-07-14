@@ -28,6 +28,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -197,6 +198,12 @@ public:
                     }
                   }));
         }
+        // After the first successful write the upstream socket's ephemeral local address becomes
+        // available and is captured for access logging. Allow the lookup in any flow.
+        EXPECT_CALL(*socket_->io_handle_, localAddress())
+            .Times(testing::AnyNumber())
+            .WillRepeatedly(
+                Return(Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:12345")));
       }
     }
 
@@ -404,7 +411,7 @@ use_original_src_ip: true
       session_file_access_log.set_path("unused");
       session_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
           session_access_log_format);
-      session_access_log->mutable_typed_config()->PackFrom(session_file_access_log);
+      std::ignore = session_access_log->mutable_typed_config()->PackFrom(session_file_access_log);
     }
 
     if (!proxy_access_log_format.empty()) {
@@ -415,7 +422,7 @@ use_original_src_ip: true
       proxy_file_access_log.set_path("unused");
       proxy_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
           proxy_access_log_format);
-      proxy_access_log->mutable_typed_config()->PackFrom(proxy_file_access_log);
+      std::ignore = proxy_access_log->mutable_typed_config()->PackFrom(proxy_file_access_log);
     }
     return config;
   }
@@ -585,6 +592,38 @@ upstream_socket_config:
 
   EXPECT_TRUE(std::regex_match(output_[0], std::regex(session_access_log_regex)));
   EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex)));
+}
+
+// The non-tunneling UDP proxy session records the upstream remote and local addresses so they are
+// available to access loggers, matching TCP proxy behavior.
+TEST_F(UdpProxyFilterTest, UpstreamAddressAccessLog) {
+  InSequence s;
+
+  const std::string session_access_log_format =
+      "%UPSTREAM_REMOTE_ADDRESS% %UPSTREAM_LOCAL_ADDRESS%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF",
+                        session_access_log_format, ""),
+        true, false);
+
+  expectSessionCreate(upstream_address_);
+  // The local ephemeral address is only bound after the first successful send to the upstream;
+  // expectWriteToUpstream stubs it to 127.0.0.1:12345.
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  filter_.reset();
+  ASSERT_EQ(output_.size(), 1);
+  EXPECT_EQ(output_[0], "20.0.0.1:443 127.0.0.1:12345");
 }
 
 // Route with source IP.
@@ -1100,6 +1139,102 @@ matcher:
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+// Make sure data.addresses_ is properly updated from active_session->addresses() when creating
+// a new session in per-packet load balancing mode.
+TEST_F(UdpProxyFilterTest, DataAddressesUpdatedFromActiveSessionPerPacketLoadBalancing) {
+  InSequence s;
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF"));
+
+  // Test that data.addresses_ is set when creating a new session
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+
+  Network::UdpRecvData data;
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
+  data.addresses_.local_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.2:80");
+  auto original_addresses = data.addresses_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>("hello");
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  filter_->onData(data);
+
+  EXPECT_EQ(original_addresses, data.addresses_);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+// Make sure data.addresses_ is properly updated from active_session->addresses() when creating
+// a new session and when recreating an unhealthy session in sticky session mode.
+TEST_F(UdpProxyFilterTest, DataAddressesUpdatedFromActiveSessionStickySession) {
+  InSequence s;
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF"));
+
+  // Test that data.addresses_ is set when creating a new session
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+
+  Network::UdpRecvData data;
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
+  data.addresses_.local_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.2:80");
+  auto original_addresses = data.addresses_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>("hello");
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  filter_->onData(data);
+
+  EXPECT_EQ(original_addresses, data.addresses_);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  // Test that data.addresses_ is updated when recreating a session due to unhealthy host
+  EXPECT_CALL(
+      *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_,
+      coarseHealth())
+      .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
+  auto new_host_address = Network::Utility::parseInternetAddressAndPortNoThrow("20.0.0.2:443");
+  auto new_host = createHost(new_host_address);
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
+              chooseHost(_))
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{new_host})));
+  expectSessionCreate(new_host_address);
+  test_sessions_[1].expectWriteToUpstream("world", 0, nullptr, true);
+
+  Network::UdpRecvData data2;
+  data2.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
+  data2.addresses_.local_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.2:80");
+  auto original_addresses2 = data2.addresses_;
+  data2.buffer_ = std::make_unique<Buffer::OwnedImpl>("world");
+  data2.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  filter_->onData(data2);
+
+  // Verify that data.addresses_ is still properly set after session recreation
+  EXPECT_EQ(original_addresses2, data.addresses_);
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 }
@@ -1851,7 +1986,7 @@ tunneling_config:
 
   auto session = filter_->createTunnelingSession();
   EXPECT_NO_THROW(session->onAboveWriteBufferHighWatermark());
-  session->onSessionComplete();
+  filter_.reset();
 }
 
 TEST_F(UdpProxyFilterTest, TunnelingSessionUpstreamClosedDuringFlush) {
@@ -2122,9 +2257,9 @@ public:
 
   Http::TestRequestHeaderMapImpl
   expectedHeaders(bool is_ssl = false, bool use_post = false,
-                  absl::optional<std::string> opt_authority = absl::nullopt,
-                  absl::optional<std::string> opt_path = absl::nullopt,
-                  absl::optional<HeaderToAdd> header_to_add = absl::nullopt) {
+                  std::optional<std::string> opt_authority = std::nullopt,
+                  std::optional<std::string> opt_path = std::nullopt,
+                  std::optional<HeaderToAdd> header_to_add = std::nullopt) {
     // In case connect-udp is used, Envoy expect the H2 headers to be normalized with H1,
     // so expect that the request headers here match H1 headers, even though
     // eventually H2 headers will be sent. When the headers are normalized to H1, the method
@@ -2170,24 +2305,22 @@ public:
     EXPECT_CALL(request_encoder_.stream_, removeCallbacks(_));
   }
 
-  void filterStateOverride(absl::optional<uint32_t> proxy_port = absl::nullopt,
-                           absl::optional<uint32_t> target_port = absl::nullopt) {
+  void filterStateOverride(std::optional<uint32_t> proxy_port = std::nullopt,
+                           std::optional<uint32_t> target_port = std::nullopt) {
     if (proxy_port) {
       stream_info_.filterState()->setData(
           "udp.connect.proxy_port",
-          std::make_shared<StreamInfo::UInt32AccessorImpl>(proxy_port.value()),
-          Envoy::StreamInfo::FilterState::StateType::Mutable);
+          std::make_shared<StreamInfo::UInt32AccessorImpl>(proxy_port.value()));
     }
 
     if (target_port) {
       stream_info_.filterState()->setData(
           "udp.connect.target_port",
-          std::make_shared<StreamInfo::UInt32AccessorImpl>(target_port.value()),
-          Envoy::StreamInfo::FilterState::StateType::Mutable);
+          std::make_shared<StreamInfo::UInt32AccessorImpl>(target_port.value()));
     }
   }
 
-  void setup(absl::optional<HeaderToAdd> header_to_add = absl::nullopt) {
+  void setup(std::optional<HeaderToAdd> header_to_add = std::nullopt) {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add;
     if (header_to_add) {
       envoy::config::core::v3::HeaderValueOption* header = headers_to_add.Add();
@@ -2366,7 +2499,7 @@ TEST_F(HttpUpstreamImplTest, DecodeTrailersAfterSuccessHeaders) {
 
 TEST_F(HttpUpstreamImplTest, EncodeHeaders) {
   HeaderToAdd header{"test_key", "test_val"};
-  absl::optional<uint32_t> port;
+  std::optional<uint32_t> port;
   bool is_ssl = false;
 
   setup(header);
@@ -2385,7 +2518,7 @@ TEST_F(HttpUpstreamImplTest, EncodeHeaders) {
 
 TEST_F(HttpUpstreamImplTest, EncodeHeadersWithPost) {
   std::string post_path = "/post/path";
-  absl::optional<uint32_t> port = 100;
+  std::optional<uint32_t> port = 100;
   bool is_ssl = true;
 
   setup();
@@ -2397,7 +2530,7 @@ TEST_F(HttpUpstreamImplTest, EncodeHeadersWithPost) {
 
   auto expected_headers =
       expectedHeaders(is_ssl, /*use_post=*/true, /*opt_authority=*/"proxy.host:100",
-                      /*opt_path=*/post_path, /*header_to_add=*/absl::nullopt);
+                      /*opt_path=*/post_path, /*header_to_add=*/std::nullopt);
 
   setAndExpectRequestEncoder(expected_headers, is_ssl);
 }
@@ -2471,7 +2604,7 @@ TEST_F(TunnelingConnectionPoolImplTest, ValidPool) {
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, InvalidPool) {
-  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   setup();
   EXPECT_FALSE(pool_->valid());
 }
@@ -2492,6 +2625,8 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolFailure) {
   pool_->onPoolFailure(Http::ConnectionPool::PoolFailureReason::Timeout, "reason", upstream_host_);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamTransportFailureReason(), "reason");
+  ASSERT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted().size(), 1);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted()[0], upstream_host_);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
@@ -2502,14 +2637,16 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
   std::string upstream_host_name = "upstream_host_test";
   EXPECT_CALL(*upstream_host_, hostname()).WillOnce(ReturnRef(upstream_host_name));
   EXPECT_CALL(stream_callbacks_, resetIdleTimer());
-  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, std::nullopt);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
+  ASSERT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted().size(), 1);
+  EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHostsAttempted()[0], upstream_host_);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
   setup();
   createNewStream();
-  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, std::nullopt);
 
   EXPECT_CALL(stream_callbacks_,
               onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "", _));
@@ -2520,7 +2657,7 @@ TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
   setup();
   createNewStream();
-  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, std::nullopt);
 
   EXPECT_CALL(stream_callbacks_, onStreamReady(_, _, _, _, _));
   pool_->onStreamSuccess(request_encoder_);
@@ -2531,7 +2668,7 @@ TEST_F(TunnelingConnectionPoolImplTest, OnDownstreamEvent) {
   createNewStream();
 
   EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
-  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, std::nullopt);
 
   EXPECT_CALL(request_encoder_.stream_, removeCallbacks(_));
   EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
@@ -2545,7 +2682,7 @@ TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_FALSE(valid_pool == nullptr);
 
-  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   auto invalid_pool =
       factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_TRUE(invalid_pool == nullptr);
@@ -2644,8 +2781,7 @@ TEST(TunnelingConfigImplTest, HeadersToAdd) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"));
 
   TunnelingConfig proto_config;
   auto* header_to_add = proto_config.add_headers_to_add();
@@ -2664,8 +2800,7 @@ TEST(TunnelingConfigImplTest, ProxyHostFromFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"));
 
   TunnelingConfig proto_config;
   proto_config.set_proxy_host("%FILTER_STATE(test-proxy-host:PLAIN)%");
@@ -2679,8 +2814,7 @@ TEST(TunnelingConfigImplTest, TargetHostFromFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   stream_info.filterState()->setData(
-      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"),
-      Envoy::StreamInfo::FilterState::StateType::Mutable);
+      "test-proxy-host", std::make_shared<Envoy::Router::StringAccessorImpl>("test.host.com"));
 
   TunnelingConfig proto_config;
   proto_config.set_target_host("%FILTER_STATE(test-proxy-host:PLAIN)%");

@@ -23,7 +23,7 @@ public:
   /**
    * Constructs a Json Object from a Protobuf struct.
    */
-  static ObjectSharedPtr loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct);
+  static ObjectSharedPtr loadFromProtobufStruct(const Protobuf::Struct& protobuf_struct);
 
   /**
    * Serializes a string in JSON format, throwing an exception if not valid UTF-8.
@@ -39,6 +39,9 @@ public:
    * See: https://github.com/msgpack/msgpack/blob/master/spec.md
    */
   static std::vector<uint8_t> jsonToMsgpack(const std::string& json);
+
+  // Serialization helper function for list of items.
+  template <typename T> static std::string serialize(const T& items);
 };
 
 } // namespace Nlohmann

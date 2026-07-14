@@ -63,7 +63,7 @@ public:
   // Local replies will not be seen by upstream HTTP filters.
   void sendLocalReply(Http::Code code, absl::string_view body,
                       const std::function<void(Http::ResponseHeaderMap& headers)>& modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override {
     state().decoder_filter_chain_aborted_ = true;
     state().encoder_filter_chain_aborted_ = true;
@@ -74,6 +74,25 @@ public:
                                                           details);
   }
   void executeLocalReplyIfPrepared() override {}
+  // Returns true if the decoder filter chain should stop (local reply sent or downstream reset).
+  bool isAborted() {
+    return state().decoder_filter_chain_aborted_ || state().saw_downstream_reset_;
+  }
+  // Notifies all upstream callbacks that a host has been selected, returning true if the request
+  // was aborted by one of them.
+  bool notifyHostSelected() {
+    // host is guaranteed non-null: createConnPool() returns nullptr when the host is null,
+    // and the caller checks for that before creating the UpstreamRequest.
+    Upstream::HostDescriptionConstSharedPtr host = upstream_request_.conn_pool_->host();
+    ASSERT(host != nullptr);
+    for (auto* callback : upstream_request_.upstream_callbacks_) {
+      callback->onHostSelected(host);
+      if (isAborted()) {
+        return true;
+      }
+    }
+    return false;
+  }
   UpstreamRequest& upstream_request_;
 };
 
@@ -82,18 +101,18 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  bool can_send_early_data, bool can_use_http3,
                                  bool enable_half_close)
     : parent_(parent), conn_pool_(std::move(conn_pool)),
-      stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
+      stream_info_(parent_.callbacks()->dispatcher().timeSource(),
+                   parent_.callbacks()->connection().has_value()
+                       ? parent_.callbacks()->connection()->connectionInfoProviderSharedPtr()
+                       : nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
-      retried_(false), awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
-      create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      paused_for_websocket_(false), reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
-      cleaned_up_(false), had_upstream_(false),
-      stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
-      enable_half_close_(enable_half_close) {
-  if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+      stream_options_({can_send_early_data, can_use_http3}), enable_half_close_(enable_half_close) {
+  // Get tracing config once and reuse it.
+  auto tracing_config = parent_.callbacks()->tracingConfig();
+
+  if (tracing_config.has_value()) {
     if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
           tracing_config.value().get(),
@@ -108,33 +127,42 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
-  Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
-  Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
-                                            &upstream_host->cluster(),     // cluster_
-                                            Tracing::ServiceType::Unknown, // service_type_
-                                            false                          // async_client_span_
-  );
 
-  if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_context);
-  } else {
-    // No independent child span for current upstream request then inject the parent span's tracing
-    // context into the request headers.
-    // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
+  // Only inject trace context if propagation is not disabled.
+  // When noContextPropagation is true, spans are still reported but trace context
+  // headers (e.g., traceparent, X-B3-*) are not injected into upstream requests.
+  const bool no_context_propagation =
+      tracing_config.has_value() && tracing_config->noContextPropagation();
+
+  if (!no_context_propagation) {
+    Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
+    Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
+                                              &upstream_host->cluster(),     // cluster_
+                                              Tracing::ServiceType::Unknown, // service_type_
+                                              false                          // async_client_span_
+    );
+
+    if (span_ != nullptr) {
+      span_->injectContext(trace_context, upstream_context);
+    } else {
+      // No independent child span for current upstream request then inject the parent span's
+      // tracing context into the request headers.
+      // The injectContext() of the parent span may be called repeatedly when the request is
+      // retried.
+      parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
+    }
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.route_ = parent_.callbacks()->routeSharedPtr();
   stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      parent_.callbacks()->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value()) {
-    stream_info_.setUpstreamClusterInfo(*cluster_info);
+  if (const auto cluster_info = parent_.callbacks()->streamInfo().upstreamClusterInfo()) {
+    stream_info_.setUpstreamClusterInfo(
+        parent_.callbacks()->streamInfo().upstreamClusterInfoSharedPtr());
   }
 
   // Set up the upstream HTTP filter manager.
@@ -142,7 +170,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
       *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), UpstreamRequest::connection(),
       parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
-      parent_.callbacks()->decoderBufferLimit(), *this);
+      parent_.callbacks()->bufferLimit(), *this);
   // Attempt to create custom cluster-specified filter chain
   bool created = filter_manager_->createFilterChain(*parent_.cluster()).created();
 
@@ -240,11 +268,11 @@ void UpstreamRequest::cleanUp() {
 }
 
 void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::HttpFormatterContext log_context{parent_.downstreamHeaders(),
-                                                    upstream_headers_.get(),
-                                                    upstream_trailers_.get(),
-                                                    {},
-                                                    access_log_type};
+  const Formatter::Context log_context{parent_.downstreamHeaders(),
+                                       upstream_headers_.get(),
+                                       upstream_trailers_.get(),
+                                       {},
+                                       access_log_type};
 
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(log_context, stream_info_);
@@ -355,6 +383,10 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
 
 const Route& UpstreamRequest::route() const { return *parent_.callbacks()->route(); }
 
+OptRef<Http::WebTransportSession> UpstreamRequest::downstreamWebTransportSession() {
+  return parent_.callbacks()->webTransportSession();
+}
+
 OptRef<const Network::Connection> UpstreamRequest::connection() const {
   return parent_.callbacks()->connection();
 }
@@ -393,12 +425,29 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     // method which is expecting 2xx response.
   } else if (Http::Utility::isWebSocketUpgradeRequest(*headers)) {
     paused_for_websocket_ = true;
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response")) {
+      // For websocket upgrades, we need to set up timeouts immediately
+      // because the upstream request will be paused waiting for the upgrade response.
+      if (!per_try_timeout_) {
+        setupPerTryTimeout();
+      }
+      parent_.setupRouteTimeoutForWebsocketUpgrade();
+    }
   }
 
-  // Kick off creation of the upstream connection immediately upon receiving headers.
-  // In future it may be possible for upstream HTTP filters to delay this, or influence connection
-  // creation but for now optimize for minimal latency and fetch the connection
-  // as soon as possible.
+  // Kick off creation of the upstream connection immediately upon receiving headers. In future it
+  // may be possible for upstream HTTP filters to delay this, or influence connection creation, but
+  // for now optimize for minimal latency and fetch the connection as soon as possible. As a first
+  // step in that direction, upstream HTTP filters can inspect the selected host and abort the
+  // request before the connection is initiated.
+  auto* upstream_fm = static_cast<UpstreamFilterManager*>(filter_manager_.get());
+  if (upstream_fm->notifyHostSelected()) {
+    ENVOY_LOG(debug, "upstream request aborted during onHostSelected");
+    return;
+  }
+
   conn_pool_->newStream(this);
 
   if (parent_.config().upstream_log_flush_interval_.has_value()) {
@@ -454,15 +503,18 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                     absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  if (span_ != nullptr) {
-    // Add tags about reset.
-    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+  if (reason != Http::StreamResetReason::RemoteResetNoError) {
+    if (span_ != nullptr) {
+      // Add tags about reset.
+      span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+    }
+
+    stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   }
   clearRequestEncoder();
   awaiting_headers_ = false;
 
-  stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   parent_.onUpstreamReset(reason, transport_failure_reason, *this);
 }
 
@@ -583,7 +635,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                                   Upstream::HostDescriptionConstSharedPtr host,
                                   const Network::ConnectionInfoProvider& address_provider,
                                   StreamInfo::StreamInfo& info,
-                                  absl::optional<Http::Protocol> protocol) {
+                                  std::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -631,7 +683,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   onUpstreamHostSelected(host, true);
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
-    upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    uint64_t connection_id = info.downstreamAddressProvider().connectionID().value();
+    upstream_info.setUpstreamConnectionId(connection_id);
   }
 
   if (info.downstreamAddressProvider().interfaceName().has_value()) {
@@ -646,7 +699,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     upstream_info.setUpstreamProtocol(protocol.value());
   }
 
-  if (parent_.downstreamEndStream()) {
+  if (parent_.downstreamEndStream() && !per_try_timeout_) {
     setupPerTryTimeout();
   } else {
     create_per_try_timeout_on_request_complete_ = true;
@@ -657,12 +710,18 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // the encoder.
   parent_.callbacks()->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
 
-  absl::optional<std::chrono::milliseconds> max_stream_duration;
+  std::optional<std::chrono::milliseconds> max_stream_duration;
   if (parent_.dynamicMaxStreamDuration().has_value()) {
     max_stream_duration = parent_.dynamicMaxStreamDuration().value();
-  } else if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
-    max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-        upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
+  } else if (upstream_host_->cluster()
+                 .httpProtocolOptions()
+                 .commonHttpProtocolOptions()
+                 .has_max_stream_duration()) {
+    max_stream_duration = std::chrono::milliseconds(
+        DurationUtil::durationToMilliseconds(upstream_host_->cluster()
+                                                 .httpProtocolOptions()
+                                                 .commonHttpProtocolOptions()
+                                                 .max_stream_duration()));
   }
   if (max_stream_duration.has_value() && max_stream_duration->count()) {
     max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
@@ -673,7 +732,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   const auto* route_entry = route().routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
-                                   route_entry->appendXfh());
+                                   route_entry->appendXfh(),
+                                   !parent_.config().suppress_envoy_headers_);
   }
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
@@ -786,6 +846,11 @@ OptRef<const Tracing::Config> UpstreamRequestFilterManagerCallbacks::tracingConf
   return upstream_request_.parent_.callbacks()->tracingConfig();
 }
 
+OptRef<Http::WebTransportSession>
+UpstreamRequestFilterManagerCallbacks::downstreamWebTransportSession() {
+  return upstream_request_.parent_.callbacks()->webTransportSession();
+}
+
 Tracing::Span& UpstreamRequestFilterManagerCallbacks::activeSpan() {
   return upstream_request_.parent_.callbacks()->activeSpan();
 }
@@ -796,12 +861,7 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   // which should force reset the stream, and a codec driven reset, which should
   // tell the router the stream reset, and let the router make the decision to
   // send a local reply, or retry the stream.
-  bool is_codec_error;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")) {
-    is_codec_error = absl::StrContains(transport_failure_reason, "codec_error");
-  } else {
-    is_codec_error = transport_failure_reason == "codec_error";
-  }
+  bool is_codec_error = absl::StrContains(transport_failure_reason, "codec_error");
   if (reset_reason == Http::StreamResetReason::LocalReset && !is_codec_error) {
     upstream_request_.parent_.callbacks()->resetStream();
     return;
@@ -809,13 +869,39 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   return upstream_request_.onResetStream(reset_reason, transport_failure_reason);
 }
 
-Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> UpstreamRequestFilterManagerCallbacks::clusterInfo() {
   return upstream_request_.parent_.callbacks()->clusterInfo();
+}
+
+Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfoSharedPtr() {
+  return upstream_request_.parent_.callbacks()->clusterInfoSharedPtr();
 }
 
 Http::Http1StreamEncoderOptionsOptRef
 UpstreamRequestFilterManagerCallbacks::http1StreamEncoderOptions() {
   return upstream_request_.parent_.callbacks()->http1StreamEncoderOptions();
+}
+
+void UpstreamRequestFilterManagerCallbacks::disableRouteTimeoutForWebsocketUpgrade() {
+  upstream_request_.parent_.disableRouteTimeoutForWebsocketUpgrade();
+}
+
+void UpstreamRequestFilterManagerCallbacks::disablePerTryTimeoutForWebsocketUpgrade() {
+  // Disable the per-try timeout and idle timeout timers once websocket upgrade succeeds.
+  // This mirrors the behavior for route timeout disabling in upgrades.
+  upstream_request_.disablePerTryTimeoutForWebsocketUpgrade();
+}
+
+void UpstreamRequest::disablePerTryTimeoutForWebsocketUpgrade() {
+  // Disable and clear per-try timers so they do not fire after websocket upgrade.
+  if (per_try_timeout_ != nullptr) {
+    per_try_timeout_->disableTimer();
+    per_try_timeout_.reset();
+  }
+  if (per_try_idle_timeout_ != nullptr) {
+    per_try_idle_timeout_->disableTimer();
+    per_try_idle_timeout_.reset();
+  }
 }
 
 } // namespace Router

@@ -57,8 +57,7 @@ void TraceContextHandler::setRef(TraceContext& trace_context, absl::string_view 
   }
 }
 
-absl::optional<absl::string_view>
-TraceContextHandler::get(const TraceContext& trace_context) const {
+std::optional<absl::string_view> TraceContextHandler::get(const TraceContext& trace_context) const {
   auto header_map = trace_context.requestHeaders();
   if (!header_map.has_value()) {
     return trace_context.get(key_);
@@ -67,15 +66,45 @@ TraceContextHandler::get(const TraceContext& trace_context) const {
   if (handle_.has_value()) {
     auto* entry = header_map->getInline(handle_.value());
     if (entry == nullptr) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return entry->value().getStringView();
   } else {
     auto results = header_map->get(key_);
     if (results.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return results[0]->value().getStringView();
+  }
+}
+
+TraceContextHandler::GetAllResult
+TraceContextHandler::getAll(const TraceContext& trace_context) const {
+  auto header_map = trace_context.requestHeaders();
+  if (!header_map.has_value()) {
+    if (const auto value = trace_context.get(key_); value.has_value()) {
+      return {value.value()};
+    }
+    return {};
+  }
+
+  if (handle_.has_value()) {
+    auto* entry = header_map->getInline(handle_.value());
+    if (entry == nullptr) {
+      return {};
+    }
+    return {entry->value().getStringView()};
+  } else {
+    auto results = header_map->get(key_);
+    if (results.empty()) {
+      return {};
+    }
+    GetAllResult all_values;
+    all_values.reserve(results.size());
+    for (size_t i = 0; i < results.size(); ++i) {
+      all_values.push_back(results[i]->value().getStringView());
+    }
+    return all_values;
   }
 }
 

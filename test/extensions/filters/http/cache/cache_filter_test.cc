@@ -63,7 +63,7 @@ protected:
           mock_upstreams_headers_sent_.emplace_back();
           ON_CALL(*ret, sendHeaders)
               .WillByDefault([this, i](Http::RequestHeaderMap& headers, bool end_stream) {
-                EXPECT_EQ(mock_upstreams_headers_sent_[i], absl::nullopt)
+                EXPECT_EQ(mock_upstreams_headers_sent_[i], std::nullopt)
                     << "headers should only be sent once";
                 EXPECT_TRUE(end_stream) << "post requests should be bypassing the filter";
                 mock_upstreams_headers_sent_[i] = Http::TestRequestHeaderMapImpl();
@@ -187,14 +187,14 @@ protected:
 
   void populateCommonCacheEntry(size_t upstream_index, CacheFilterSharedPtr filter,
                                 absl::string_view body = "",
-                                OptRef<Http::ResponseTrailerMap> trailers = absl::nullopt) {
+                                OptRef<Http::ResponseTrailerMap> trailers = std::nullopt) {
     testDecodeRequestMiss(upstream_index, filter);
 
     receiveUpstreamHeaders(upstream_index, response_headers_,
-                           body.empty() && trailers == absl::nullopt);
+                           body.empty() && trailers == std::nullopt);
 
     if (!body.empty()) {
-      receiveUpstreamBody(upstream_index, body, trailers == absl::nullopt);
+      receiveUpstreamBody(upstream_index, body, trailers == std::nullopt);
     }
     if (trailers) {
       receiveUpstreamTrailers(upstream_index, *trailers);
@@ -223,11 +223,10 @@ protected:
 
   void testDecodeRequestHitNoBody(CacheFilterSharedPtr filter) {
     // The filter should encode cached headers.
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       true));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               true));
 
     // The filter should not encode any data as the response has no body.
     EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
@@ -250,11 +249,10 @@ protected:
 
   void testDecodeRequestHitWithBody(CacheFilterSharedPtr filter, std::string body) {
     // The filter should encode cached headers.
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       false));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               false));
 
     // The filter should encode cached data.
     EXPECT_CALL(
@@ -296,7 +294,7 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   std::vector<std::unique_ptr<Http::MockAsyncClientStream>> mock_upstreams_;
   std::vector<std::reference_wrapper<Http::AsyncClient::StreamCallbacks>> mock_upstreams_callbacks_;
-  std::vector<absl::optional<Http::TestRequestHeaderMapImpl>> mock_upstreams_headers_sent_;
+  std::vector<std::optional<Http::TestRequestHeaderMapImpl>> mock_upstreams_headers_sent_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
   const Seconds delay_ = Seconds(10);
@@ -483,7 +481,7 @@ TEST_F(CacheFilterTest, WatermarkEventsAreSentIfCacheBlocksStreamAndLimitExceede
   const std::string body1 = "abcde";
   const std::string body2 = "fghij";
   // Set the buffer limit to 2 bytes to ensure we send watermark events.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(2));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   MockInsertContext* mock_insert_context = mock_http_cache->mockInsertContext();
@@ -549,7 +547,7 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
   const std::string body1 = "abcde";
   const std::string body2 = "fghij";
   // Set the buffer limit to 2 bytes to ensure we send watermark events.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(2));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   MockInsertContext* mock_insert_context = mock_http_cache->mockInsertContext();
@@ -622,7 +620,7 @@ TEST_F(CacheFilterTest, CacheEntryStreamedWithTrailersAndNoContentLengthCanDeliv
       std::move(cb)(
           LookupResult{CacheEntryStatus::Ok,
                        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
-                       absl::nullopt, absl::nullopt},
+                       std::nullopt, std::nullopt},
           /* end_stream = */ false);
     });
   });
@@ -675,7 +673,7 @@ TEST_F(CacheFilterTest, OnDestroyBeforeOnHeadersAbortsAction) {
     dispatcher_->post([cb = std::move(cb),
                        response_headers = std::move(response_headers)]() mutable {
       std::move(cb)(
-          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt}, false);
+          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, std::nullopt}, false);
     });
   });
   auto filter = makeFilter(mock_http_cache, false);
@@ -697,7 +695,7 @@ TEST_F(CacheFilterTest, OnDestroyBeforeOnBodyAbortsAction) {
     dispatcher_->post([cb = std::move(cb),
                        response_headers = std::move(response_headers)]() mutable {
       std::move(cb)(
-          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt}, false);
+          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, std::nullopt}, false);
     });
   });
   LookupBodyCallback body_callback;
@@ -726,7 +724,7 @@ TEST_F(CacheFilterTest, OnDestroyBeforeOnTrailersAbortsAction) {
     dispatcher_->post([cb = std::move(cb),
                        response_headers = std::move(response_headers)]() mutable {
       std::move(cb)(
-          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt}, false);
+          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, std::nullopt}, false);
     });
   });
   EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
@@ -753,7 +751,7 @@ TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
   request_headers_.setHost("CacheHitWithBody");
   // Set the buffer limit to 5 bytes, and we will have the file be of size
   // 8 bytes.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(5));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(5));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
@@ -762,7 +760,7 @@ TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
     dispatcher_->post([cb = std::move(cb),
                        response_headers = std::move(response_headers)]() mutable {
       std::move(cb)(
-          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt}, false);
+          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, std::nullopt}, false);
     });
   });
   EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
@@ -1101,7 +1099,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     receiveUpstreamBody(1, new_body, true);
 
     // The response headers should have the new status.
-    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "204"));
+    EXPECT_THAT(response_headers_, ContainsHeader(Http::Headers::get().Status, "204"));
 
     // The filter should not encode any data.
     EXPECT_CALL(encoder_callbacks_, addEncodedData).Times(0);
@@ -1136,11 +1134,10 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       false));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               false));
 
     EXPECT_CALL(
         decoder_callbacks_,
@@ -1177,11 +1174,10 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       false));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               false));
 
     EXPECT_CALL(
         decoder_callbacks_,
@@ -1220,11 +1216,10 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(
-        decoder_callbacks_,
-        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
-                       true));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              ContainsHeader(Http::CustomHeaders::get().Age, age)),
+                               true));
 
     // 416 response should not have a body, so we don't expect a call to encodeData
     EXPECT_CALL(decoder_callbacks_,
@@ -1347,7 +1342,7 @@ TEST_F(CacheFilterDeathTest, BadRangeRequestLookup) {
       std::move(cb)(
           LookupResult{CacheEntryStatus::Ok,
                        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
-                       absl::nullopt,
+                       std::nullopt,
                        RangeDetails{/*satisfiable_ = */ false, {AdjustedByteRange{0, 5}}}},
           false);
     });
@@ -1381,7 +1376,7 @@ TEST_F(CacheFilterTest, RangeRequestSatisfiedBeforeLengthKnown) {
       std::move(cb)(
           LookupResult{CacheEntryStatus::Ok,
                        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
-                       absl::nullopt,
+                       std::nullopt,
                        RangeDetails{/*satisfiable_ = */ true, {AdjustedByteRange{0, 5}}}},
           false);
     });
@@ -1456,17 +1451,17 @@ TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDestroyedIsBu
 }
 
 TEST(LookupStatusTest, ResolveLookupStatusReturnsCorrectStatuses) {
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Initial),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::Initial),
             LookupStatus::RequestIncomplete);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::NotServingFromCache),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::NotServingFromCache),
             LookupStatus::RequestNotCacheable);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::ValidatingCachedResponse),
             LookupStatus::Unknown);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::ValidatingCachedResponse),
             LookupStatus::Unknown);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ServingFromCache),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::ServingFromCache),
             LookupStatus::Unknown);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Destroyed),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::Destroyed),
             LookupStatus::Unknown);
   EXPECT_EQ(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
                                              FilterState::ValidatingCachedResponse),
@@ -1599,7 +1594,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
 
 TEST_F(CacheFilterTest, NoRouteShouldLocalReply) {
   request_headers_.setHost("NoRoute");
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>{}));
   {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is

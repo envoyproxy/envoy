@@ -229,12 +229,12 @@ void ZooKeeperFilter::setDynamicMetadata(
     const std::vector<std::pair<const std::string, const std::string>>& data) {
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
-  ProtobufWkt::Struct metadata(
+  Protobuf::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy]);
   auto& fields = *metadata.mutable_fields();
 
   for (const auto& pair : data) {
-    auto val = ProtobufWkt::Value();
+    auto val = Protobuf::Value();
     val.set_string_value(pair.second);
     fields.insert({pair.first, val});
   }
@@ -253,7 +253,7 @@ void ZooKeeperFilter::onConnect(const bool readonly) {
   }
 }
 
-void ZooKeeperFilter::onDecodeError(const absl::optional<OpCodes> opcode) {
+void ZooKeeperFilter::onDecodeError(const std::optional<OpCodes> opcode) {
   config_->stats_.decoder_error_.inc();
 
   if (config_->enable_per_opcode_decoder_error_metrics_ && opcode.has_value() &&
@@ -268,7 +268,7 @@ void ZooKeeperFilter::onDecodeError(const absl::optional<OpCodes> opcode) {
   setDynamicMetadata("opname", "error");
 }
 
-void ZooKeeperFilter::onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
+void ZooKeeperFilter::onRequestBytes(const std::optional<OpCodes> opcode, const uint64_t bytes) {
   config_->stats_.request_bytes_.add(bytes);
 
   if (config_->enable_per_opcode_request_bytes_metrics_ && opcode.has_value()) {
@@ -283,7 +283,7 @@ void ZooKeeperFilter::onRequestBytes(const absl::optional<OpCodes> opcode, const
   setDynamicMetadata("bytes", std::to_string(bytes));
 }
 
-void ZooKeeperFilter::onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) {
+void ZooKeeperFilter::onResponseBytes(const std::optional<OpCodes> opcode, const uint64_t bytes) {
   config_->stats_.response_bytes_.add(bytes);
 
   if (config_->enable_per_opcode_response_bytes_metrics_ && opcode.has_value()) {

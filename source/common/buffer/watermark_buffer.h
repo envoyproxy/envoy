@@ -9,6 +9,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -21,11 +23,12 @@ namespace Buffer {
 // It is only called on the first time the buffer overflows.
 class WatermarkBuffer : public OwnedImpl {
 public:
-  WatermarkBuffer(std::function<void()> below_low_watermark,
-                  std::function<void()> above_high_watermark,
-                  std::function<void()> above_overflow_watermark)
-      : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
-        above_overflow_watermark_(above_overflow_watermark) {}
+  WatermarkBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                  absl::AnyInvocable<void()> above_high_watermark,
+                  absl::AnyInvocable<void()> above_overflow_watermark)
+      : below_low_watermark_(std::move(below_low_watermark)),
+        above_high_watermark_(std::move(above_high_watermark)),
+        above_overflow_watermark_(std::move(above_overflow_watermark)) {}
 
   // Override all functions from Instance which can result in changing the size
   // of the underlying buffer.
@@ -45,8 +48,8 @@ public:
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
 
-  void setWatermarks(uint32_t high_watermark, uint32_t overflow_watermark = 0) override;
-  uint32_t highWatermark() const override { return high_watermark_; }
+  void setWatermarks(uint64_t high_watermark, uint32_t overflow_watermark = 0) override;
+  uint64_t highWatermark() const override { return high_watermark_; }
   // Returns true if the high watermark callbacks have been called more recently
   // than the low watermark callbacks.
   bool highWatermarkTriggered() const override { return above_high_watermark_called_; }
@@ -55,19 +58,21 @@ protected:
   virtual void checkHighAndOverflowWatermarks();
   virtual void checkLowWatermark();
 
+  uint64_t overflowWatermarkForTestOnly() const { return overflow_watermark_; }
+
 private:
   void commit(uint64_t length, absl::Span<RawSlice> slices,
               ReservationSlicesOwnerPtr slices_owner) override;
 
-  std::function<void()> below_low_watermark_;
-  std::function<void()> above_high_watermark_;
-  std::function<void()> above_overflow_watermark_;
+  absl::AnyInvocable<void()> below_low_watermark_;
+  absl::AnyInvocable<void()> above_high_watermark_;
+  absl::AnyInvocable<void()> above_overflow_watermark_;
 
   // Used for enforcing buffer limits (off by default). If these are set to non-zero by a call to
   // setWatermarks() the watermark callbacks will be called as described above.
-  uint32_t high_watermark_{0};
-  uint32_t low_watermark_{0};
-  uint32_t overflow_watermark_{0};
+  uint64_t high_watermark_{0};
+  uint64_t low_watermark_{0};
+  uint64_t overflow_watermark_{0};
   // Tracks the latest state of watermark callbacks.
   // True between the time above_high_watermark_ has been called until below_low_watermark_ has
   // been called.
@@ -137,12 +142,12 @@ private:
   // This can differ with current_bucket_idx_ if buffer_memory_allocated_ was
   // just modified.
   // Returned class index, if present, is in the range [0, NUM_MEMORY_CLASSES_).
-  absl::optional<uint32_t> balanceToClassIndex();
+  std::optional<uint32_t> balanceToClassIndex();
   void updateAccountClass();
 
   uint64_t buffer_memory_allocated_ = 0;
   // Current bucket index where the account is being tracked in.
-  absl::optional<uint32_t> current_bucket_idx_{};
+  std::optional<uint32_t> current_bucket_idx_;
 
   WatermarkBufferFactory* factory_ = nullptr;
 
@@ -192,11 +197,12 @@ public:
 
   // Buffer::WatermarkFactory
   ~WatermarkBufferFactory() override;
-  InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                           std::function<void()> above_high_watermark,
-                           std::function<void()> above_overflow_watermark) override {
-    return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
-                                             above_overflow_watermark);
+  InstancePtr createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                           absl::AnyInvocable<void()> above_high_watermark,
+                           absl::AnyInvocable<void()> above_overflow_watermark) override {
+    return std::make_unique<WatermarkBuffer>(std::move(below_low_watermark),
+                                             std::move(above_high_watermark),
+                                             std::move(above_overflow_watermark));
   }
 
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
@@ -205,14 +211,13 @@ public:
   // Called by BufferMemoryAccountImpls created by the factory on account class
   // updated.
   void updateAccountClass(const BufferMemoryAccountSharedPtr& account,
-                          absl::optional<uint32_t> current_class,
-                          absl::optional<uint32_t> new_class);
+                          std::optional<uint32_t> current_class, std::optional<uint32_t> new_class);
 
   uint32_t bitshift() const { return bitshift_; }
 
   // Unregister a buffer memory account.
   virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account,
-                                 absl::optional<uint32_t> current_class);
+                                 std::optional<uint32_t> current_class);
 
 protected:
   // Enable subclasses to inspect the mapping.

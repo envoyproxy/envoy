@@ -1,22 +1,20 @@
 #include "source/common/common/hex.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
+#include "source/common/ssl/ssl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -50,7 +48,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Browser Client Hello
     {"Browser-2",
@@ -66,7 +64,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Browser Client Hello
     {"Browser-3",
@@ -82,7 +80,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Chrome with `Cloudflare` QUIC
     {"Chrome-Cloudflare-QUIC",
@@ -98,7 +96,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // HTTP2 with cookies
     {"HTTP2-with-cookies",
@@ -114,7 +112,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // TLS SNI - Facebook
     {"TLS-SNI-Facebook",
@@ -129,7 +127,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000000000000000000000000000000000000000000000000000000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Apple connection
     {"Apple-Connection",
@@ -144,7 +142,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Microsoft connection
     {"Microsoft-Connection",
@@ -159,7 +157,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Edge browser connection to Slack
     {"Edge-Slack-Connection",
@@ -175,7 +173,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "eea50f122ddfd506694bb949d38dca486e39a0ef9331a6782bb8392a5bc7395189340732a15909e9c309fc4c7c0bd"
      "4102a78c99979e1eb8dcde030c469c38c3f79cee81c9da56db0ab4a3fe19d54da17bf67fc7efce7bb939a292e7c10"
      "82ac2880021201e639a41e760bacf644eeb7b751c0109159373ffdc666c640b661e2be906aa6c",
-     "t13d1516h2_8daaf6152771_9b887d9acb53"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_9b887d9acb53", "t13d1515h2_8daaf6152771_0ece2fe8a3fb")},
 
     // SSH
     {"SSH2-Example-1",
@@ -228,7 +226,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // IPv6
     {"IPv6",
@@ -254,7 +252,8 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516baad_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516baad_8daaf6152771_e5627efa2ab1",
+                "t13d1515baad_8daaf6152771_de4a06bb82e3")},
 };
 
 class TlsInspectorJA4Test
@@ -264,8 +263,8 @@ public:
       : cfg_(std::make_shared<Config>(
             *store_.rootScope(),
             envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
-        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false,
-                                                                            absl::nullopt, {})) {}
+        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt,
+                                                                            {})) {}
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);

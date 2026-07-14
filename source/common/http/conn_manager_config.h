@@ -7,6 +7,7 @@
 #include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/stats/scope.h"
@@ -18,6 +19,9 @@
 #include "source/common/network/utility.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tracing/tracer_config_impl.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Http {
@@ -126,7 +130,7 @@ struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfigImpl;
+using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfig;
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**
@@ -164,6 +168,8 @@ enum class ForwardClientCertType {
  */
 enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
 
+enum class ClientCertFormat { Text, Json };
+
 /**
  * Type that indicates how port should be stripped from Host header.
  */
@@ -190,13 +196,7 @@ public:
  */
 class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
 public:
-  bool isInternalAddress(const Network::Address::Instance& address) const override {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.explicit_internal_address_config")) {
-      return false;
-    }
-    return Network::Utility::isInternalAddress(address);
-  }
+  bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
 };
 
 /**
@@ -220,9 +220,9 @@ public:
   virtual const AccessLog::InstanceSharedPtrVector& accessLogs() PURE;
 
   /**
-   * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
+   * @return const std::optional<std::chrono::milliseconds>& the interval to flush the access logs.
    */
-  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
+  virtual const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
 
   // If set to true, access log will be flushed when a new HTTP request is received, after request
   // headers have been evaluated, and before attempting to establish a connection with the upstream.
@@ -253,7 +253,10 @@ public:
 
   /**
    * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
-   *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
+   *         notice" to the time it will issue a full GOAWAY and not accept any new streams. If
+   *         ``drain_timeout_jitter`` is configured, each call returns the base timeout extended
+   *         by a random amount up to ``drainTimeout * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method.
    */
   virtual std::chrono::milliseconds drainTimeout() const PURE;
 
@@ -282,7 +285,7 @@ public:
   /**
    * @return optional idle timeout for incoming connection manager connections.
    */
-  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+  virtual std::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return if the connection manager does routing base on router config, e.g. a Server::Admin impl
@@ -291,9 +294,14 @@ public:
   virtual bool isRoutable() const PURE;
 
   /**
-   * @return optional maximum connection duration timeout for manager connections.
+   * @return optional maximum connection duration timeout for manager connections. If
+   *         ``max_connection_duration_jitter`` is configured, each call returns the
+   *         base duration extended by a random amount up to
+   *         ``max_connection_duration * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method;
+   *         callers should arm their timer with whatever value this returns.
    */
-  virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
   /**
    * @return whether maxConnectionDuration allows HTTP1 clients to choose when to close connection
@@ -318,6 +326,12 @@ public:
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
 
   /**
+   * @return per-stream flush timeout for incoming connection manager connections. Zero indicates a
+   *         disabled idle timeout.
+   */
+  virtual std::optional<std::chrono::milliseconds> streamFlushTimeout() const PURE;
+
+  /**
    * @return request timeout for incoming connection manager connections. Zero indicates
    *         a disabled request timeout.
    */
@@ -338,7 +352,7 @@ public:
   /**
    * @return maximum duration time to keep alive stream
    */
-  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
 
   /**
    * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
@@ -372,9 +386,9 @@ public:
   serverHeaderTransformation() const PURE;
 
   /**
-   * @return const absl::optional<std::string> the scheme name to write into requests.
+   * @return const std::optional<std::string> the scheme name to write into requests.
    */
-  virtual const absl::optional<std::string>& schemeToSet() const PURE;
+  virtual const std::optional<std::string>& schemeToSet() const PURE;
 
   /**
    * @return bool whether the scheme should be overwritten to match the upstream transport protocol.
@@ -416,7 +430,7 @@ public:
   virtual bool skipXffAppend() const PURE;
 
   /**
-   * @return const absl::optional<std::string>& value of via header to add to requests and response
+   * @return const std::optional<std::string>& value of via header to add to requests and response
    *                                            headers if set.
    */
   virtual const std::string& via() const PURE;
@@ -427,10 +441,22 @@ public:
   virtual ForwardClientCertType forwardClientCert() const PURE;
 
   /**
+   * @return ClientCertFormat the format to use for the XFCC header value (text or JSON).
+   */
+  virtual ClientCertFormat clientCertFormat() const PURE;
+
+  /**
    * @return vector of ClientCertDetailsType the configuration of the current client cert's details
    * to be forwarded.
    */
   virtual const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const PURE;
+
+  /**
+   * @return the matcher for selecting forward client cert config per-request. Returns nullptr
+   * if no matcher is configured, in which case the static forwardClientCert() and
+   * setCurrentClientCertDetails() should be used.
+   */
+  virtual const Matcher::MatchTreePtr<HttpMatchingData>& forwardClientCertMatcher() const PURE;
 
   /**
    * @return local address.
@@ -443,7 +469,7 @@ public:
    *         be enabled. User agent will only overwritten if it doesn't already exist. If enabled,
    *         the same user agent will be written to the x-envoy-downstream-service-cluster header.
    */
-  virtual const absl::optional<std::string>& userAgent() PURE;
+  virtual const std::optional<std::string>& userAgent() PURE;
 
   /**
    *  @return TracerSharedPtr Tracer to use.
@@ -560,6 +586,18 @@ public:
    *         Connection Lifetime.
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
+
+  /**
+   * @return a set of destination ports that should be treated as HTTPS when the
+   *         local address was restored from PROXY protocol.
+   */
+  virtual const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const PURE;
+
+  /**
+   * @return a set of destination ports that should be treated as HTTP when the
+   *         local address was restored from PROXY protocol.
+   */
+  virtual const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const PURE;
 };
 
 using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;

@@ -11,7 +11,6 @@
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/test_runtime.h"
@@ -206,23 +205,22 @@ public:
     context_.thread_local_.setDispatcher(dispatcher_.get());
   }
 
-  void initialize(absl::optional<Bootstrap::GrpcAsyncClientManagerConfig> config = absl::nullopt) {
+  void initialize(std::optional<Bootstrap::GrpcAsyncClientManagerConfig> config = std::nullopt) {
     ON_CALL(context_, clusterManager()).WillByDefault(testing::ReturnRef(cm_));
     ON_CALL(context_, mainThreadDispatcher()).WillByDefault(testing::ReturnRef(*dispatcher_));
     ON_CALL(context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
     ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
     if (config.has_value()) {
-      async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
-          cm_, context_.threadLocal(), context_, stat_names_, config.value());
+      async_client_manager_ =
+          std::make_unique<AsyncClientManagerImpl>(config.value(), context_, stat_names_);
     } else {
       async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
-          cm_, context_.threadLocal(), context_, stat_names_,
-          Bootstrap::GrpcAsyncClientManagerConfig());
+          Bootstrap::GrpcAsyncClientManagerConfig(), context_, stat_names_);
     }
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  Upstream::MockClusterManager cm_;
+  NiceMock<Upstream::MockClusterManager>& cm_{context_.cluster_manager_};
   Stats::MockStore store_;
   Stats::MockScope& scope_{store_.mockScope()};
   Event::SimulatedTimeSystem time_system_;
@@ -355,7 +353,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](const std::string&) {
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](absl::string_view) {
     return absl::InvalidArgumentError("failure");
   }));
   EXPECT_EQ(

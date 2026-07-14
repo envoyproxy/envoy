@@ -15,7 +15,6 @@ namespace EnvoyDefault {
 
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 class BaseHeaderValidatorTest : public HeaderValidatorUtils, public testing::Test {
@@ -111,7 +110,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderName(header_string);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c)) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c)) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -148,7 +147,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderValue(header_string);
-    if (testCharInTable(kGenericHeaderValueCharTable, c)) {
+    if (kGenericHeaderValueCharTable.hasChar(c)) {
       EXPECT_ACCEPT(result);
     } else {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidValueCharacters);
@@ -159,11 +158,22 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
 TEST_F(BaseHeaderValidatorTest, ValidateContentLength) {
   HeaderString valid{"100"};
   HeaderString invalid{"10a2"};
+  HeaderString valid_multiple{"100,100"};
+  HeaderString invalid_multiple{"100,101"};
+  HeaderString invalid_multiple_empty_first{",100"};
+  HeaderString invalid_multiple_empty_last{"100,"};
   HeaderString invalid_overflow{"18446744073709551618"}; // UINT64_MAX + 1
   auto uhv = createBase(empty_config);
 
   EXPECT_ACCEPT(uhv->validateContentLengthHeader(valid));
+  EXPECT_ACCEPT(uhv->validateContentLengthHeader(valid_multiple));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid_multiple),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid_multiple_empty_first),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid_multiple_empty_last),
                              UhvResponseCodeDetail::get().InvalidContentLength);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid_overflow),
                              UhvResponseCodeDetail::get().InvalidContentLength);

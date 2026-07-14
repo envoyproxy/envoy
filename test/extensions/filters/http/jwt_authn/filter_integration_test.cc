@@ -7,7 +7,6 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
-#include "test/test_common/registry.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
@@ -39,7 +38,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
-  filter.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
@@ -58,7 +57,7 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
 
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
-  filter.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
@@ -196,8 +195,6 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenWithStripFailureResponse) {
   ASSERT_TRUE(response->headers().get(Http::Headers::get().WWWAuthenticate).empty());
   ASSERT_TRUE(response->body().empty());
 
-  // BalsaParser codec produces ContentLength header but HTTPParser does not
-  // when body is empty. The other headers are server, status and date.
   EXPECT_EQ("envoy", response->headers().getServerValue());
   EXPECT_EQ("401", response->headers().getStatusValue());
   ASSERT_FALSE(response->headers().getDateValue().empty());
@@ -292,7 +289,6 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
       format_string:
         text_format_source:
           inline_string: "%REQ(jwt_selector)%"
-      read_only: true
 )");
   initialize();
 
@@ -412,6 +408,19 @@ public:
     initialize();
   }
 
+  void initializeFilterWithAllowMissingOrFailed() {
+    config_helper_.prependFilter(
+        getAuthFilterConfig(AllowMissingExampleConfig, false, false, false));
+
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      jwks_cluster->set_name("pubkey_cluster");
+    });
+
+    initialize();
+  }
+
   void initializeAsyncFetchFilter(bool fast_listener) {
     config_helper_.prependFilter(getAsyncFetchFilterConfig(ExampleConfig, fast_listener, false));
 
@@ -455,8 +464,8 @@ public:
     }
   }
 
-  FakeHttpConnectionPtr fake_jwks_connection_{};
-  FakeStreamPtr jwks_request_{};
+  FakeHttpConnectionPtr fake_jwks_connection_;
+  FakeStreamPtr jwks_request_;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -572,6 +581,47 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
   cleanup();
 }
 
+// With remote Jwks, this test verifies a request is passed with two good JWTs
+// and allow_missing_or_failed but the jwks fetching fails.
+TEST_P(RemoteJwksIntegrationTest, WithTwoGoodTokensAllowMissing) {
+  initializeFilterWithAllowMissingOrFailed();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+  });
+
+  // Fails the jwks fetching.
+  waitForJwksResponse("500", "");
+
+  // Wait for the second fetching.
+  auto result = fake_jwks_connection_->waitForNewStream(*dispatcher_, jwks_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = jwks_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  jwks_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("");
+  jwks_request_->encodeData(response_data1, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
 TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetch) {
   on_server_init_function_ = [this]() { waitForJwksResponse("200", PublicKey); };
   initializeAsyncFetchFilter(false);
@@ -615,7 +665,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
   // the first request will trigger a second jwks fetch, this is not expected, test will fail.
   // To avoid such race condition, before making the first request, wait for the first
   // fetch stats to be updated.
-  test_server_->waitForCounterGe("http.config_test.jwt_authn.jwks_fetch_success", 1);
+  test_server_->waitForCounter("http.config_test.jwt_authn.jwks_fetch_success", testing::Ge(1));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -700,7 +750,7 @@ public:
           auto& per_route_any =
               (*virtual_host->mutable_routes(0)
                     ->mutable_typed_per_filter_config())["envoy.filters.http.jwt_authn"];
-          per_route_any.PackFrom(per_route);
+          std::ignore = per_route_any.PackFrom(per_route);
         });
 
     initialize();

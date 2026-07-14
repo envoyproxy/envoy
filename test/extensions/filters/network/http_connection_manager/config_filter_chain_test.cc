@@ -1,10 +1,12 @@
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -36,6 +38,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
 - name: envoy.filters.http.router
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -50,10 +54,10 @@ TEST_F(FilterChainTest, CreateFilterChain) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
-  EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
-  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-  config.createFilterChain(manager);
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+  config.createFilterChain(callbacks);
 }
 
 TEST_F(FilterChainTest, CreateFilterChainWithDisabledFilter) {
@@ -85,9 +89,9 @@ http_filters:
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
-  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-  config.createFilterChain(manager);
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+  config.createFilterChain(callbacks);
 }
 
 TEST_F(FilterChainTest, CreateFilterChainWithDisabledTerminalFilter) {
@@ -107,6 +111,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
 - name: envoy.filters.http.router
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -156,14 +162,13 @@ http_filters:
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   Http::StreamDecoderFilterSharedPtr missing_config_filter;
-  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_))
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_))
       .Times(2)
       .WillOnce(testing::SaveArg<0>(&missing_config_filter))
       .WillOnce(Return()); // MissingConfigFilter (only once) and router
-  config.createFilterChain(manager);
-
+  config.createFilterChain(callbacks);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
   EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _))
@@ -185,24 +190,23 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
-  const Http::EmptyFilterChainOptions options;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
   // Check the case where WebSockets are configured in the HCM, and no router
   // config is present. We should create an upgrade filter chain for
   // WebSockets.
   {
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager, options));
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks));
   }
 
   // Check the case where WebSockets are configured in the HCM, and no router
   // config is present. We should not create an upgrade filter chain for Foo
   {
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_)).Times(0);
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)).Times(0);
-    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, manager, options));
+    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(0);
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(0);
+    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, callbacks));
   }
 
   // Now override the HCM with a route-specific disabling of WebSocket to
@@ -210,17 +214,17 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", false));
-    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, options));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
   }
 
   // For paranoia's sake make sure route-specific enabling doesn't break
   // anything.
   {
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, options));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
   }
 }
 
@@ -236,24 +240,23 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
-  const Http::EmptyFilterChainOptions options;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
   // Check the case where WebSockets are off in the HCM, and no router config is present.
-  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager, options)); }
+  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks)); }
 
   // Check the case where WebSockets are off in the HCM and in router config.
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", false));
-    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, options));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
   }
 
   // With a route-specific enabling for WebSocket, WebSocket should work.
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, options));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
   }
 
   // With only a route-config we should do what the route config says.
@@ -261,9 +264,9 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("foo", true));
     upgrade_map.emplace(std::make_pair("bar", false));
-    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, manager, options));
-    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, manager, options));
-    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, manager, options));
+    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, callbacks));
   }
 }
 
@@ -272,21 +275,33 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
   auto websocket_config = hcm_config.add_upgrade_configs();
   websocket_config->set_upgrade_type("websocket");
 
-  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n"
-                                                               "\x19"
-                                                               "envoy.filters.http.router"));
+  {
+    auto* filter = websocket_config->add_filters();
+    filter->set_name("envoy.filters.http.router");
+    envoy::extensions::filters::http::router::v3::Router config;
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
+  }
 
   auto foo_config = hcm_config.add_upgrade_configs();
   foo_config->set_upgrade_type("foo");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x1D"
-                                             "encoder-decoder-buffer-filter");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x1D"
-                                             "encoder-decoder-buffer-filter");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x19"
-                                             "envoy.filters.http.router");
+  {
+    auto* filter = foo_config->add_filters();
+    filter->set_name("encoder-decoder-buffer-filter");
+    test::integration::filters::EncoderDecoderBufferFilterConfig config;
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
+  }
+  {
+    auto* filter = foo_config->add_filters();
+    filter->set_name("encoder-decoder-buffer-filter");
+    test::integration::filters::EncoderDecoderBufferFilterConfig config;
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
+  }
+  {
+    auto* filter = foo_config->add_filters();
+    filter->set_name("envoy.filters.http.router");
+    envoy::extensions::filters::http::router::v3::Router config;
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
+  }
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
@@ -294,26 +309,24 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  const Http::EmptyFilterChainOptions options;
-
   {
-    NiceMock<Http::MockFilterChainManager> manager;
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-    config.createFilterChain(manager);
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    config.createFilterChain(callbacks);
   }
 
   {
-    NiceMock<Http::MockFilterChainManager> manager;
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_));
-    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, manager, options));
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
+    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, callbacks));
   }
 
   {
-    NiceMock<Http::MockFilterChainManager> manager;
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_));
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_)).Times(2); // Buffer
-    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, manager, options));
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
+    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Buffer
+    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }
 }
 
@@ -322,18 +335,27 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
   auto websocket_config = hcm_config.add_upgrade_configs();
   websocket_config->set_upgrade_type("websocket");
 
-  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n"
-                                                               "\x19"
-                                                               "envoy.filters.http.router"));
+  {
+    auto* filter = websocket_config->add_filters();
+    filter->set_name("envoy.filters.http.router");
+    envoy::extensions::filters::http::router::v3::Router config;
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
+  }
 
   auto foo_config = hcm_config.add_upgrade_configs();
   foo_config->set_upgrade_type("foo");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x19"
-                                             "envoy.filters.http.router");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x1D"
-                                             "encoder-decoder-buffer-filter");
+  {
+    auto* filter = foo_config->add_filters();
+    filter->set_name("envoy.filters.http.router");
+    envoy::extensions::filters::http::router::v3::Router config;
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
+  }
+  {
+    auto* filter = foo_config->add_filters();
+    filter->set_name("encoder-decoder-buffer-filter");
+    test::integration::filters::EncoderDecoderBufferFilterConfig config;
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
+  }
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,

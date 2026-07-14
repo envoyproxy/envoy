@@ -64,36 +64,6 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
   return {first_available_priority, total_load};
 }
 
-absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
-LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
-
-  if (common_config.has_locality_weighted_lb_config()) {
-    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
-    locality_lb_config.mutable_locality_weighted_lb_config();
-    return locality_lb_config;
-  } else if (common_config.has_zone_aware_lb_config()) {
-    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
-    auto& zone_aware_lb_config = *locality_lb_config.mutable_zone_aware_lb_config();
-
-    const auto& legacy_zone_aware_lb_config = common_config.zone_aware_lb_config();
-    if (legacy_zone_aware_lb_config.has_routing_enabled()) {
-      *zone_aware_lb_config.mutable_routing_enabled() =
-          legacy_zone_aware_lb_config.routing_enabled();
-    }
-    if (legacy_zone_aware_lb_config.has_min_cluster_size()) {
-      *zone_aware_lb_config.mutable_min_cluster_size() =
-          legacy_zone_aware_lb_config.min_cluster_size();
-    }
-    zone_aware_lb_config.set_fail_traffic_on_panic(
-        legacy_zone_aware_lb_config.fail_traffic_on_panic());
-
-    return locality_lb_config;
-  }
-
-  return {};
-}
-
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                                  const DegradedLoad& degraded_per_priority_load) {
@@ -137,15 +107,37 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterLbSta
   // Recalculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
-  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
-        recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
-                                    per_priority_health_, per_priority_degraded_,
-                                    total_healthy_hosts_);
-        recalculatePerPriorityPanic();
-        stashed_random_.clear();
-        return absl::OkStatus();
-      });
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+        [this](uint32_t priority, const HostVector&, const HostVector&) {
+          dirty_priorities_.insert(priority);
+        });
+    member_update_cb_ = priority_set_.addMemberUpdateCb(
+        [this](const HostVector&, const HostVector&) { processDirtyPriorities(); });
+  } else {
+    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+        [this](uint32_t priority, const HostVector&, const HostVector&) {
+          recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
+                                      per_priority_health_, per_priority_degraded_,
+                                      total_healthy_hosts_);
+          recalculatePerPriorityPanic();
+          stashed_random_.clear();
+        });
+  }
+}
+
+void LoadBalancerBase::processDirtyPriorities() {
+  if (dirty_priorities_.empty()) {
+    return;
+  }
+  for (uint32_t priority : dirty_priorities_) {
+    recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_,
+                                per_priority_degraded_, total_healthy_hosts_);
+  }
+  dirty_priorities_.clear();
+  recalculatePerPriorityPanic();
+  stashed_random_.clear();
 }
 
 // The following cases are handled by
@@ -418,14 +410,14 @@ uint64_t LoadBalancerBase::random(bool peeking) {
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-    const absl::optional<LocalityLbConfig> locality_config)
+    const std::optional<LocalityLbConfig> locality_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
       local_priority_set_(local_priority_set),
       min_cluster_size_(locality_config.has_value()
                             ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                   locality_config->zone_aware_lb_config(), min_cluster_size, 6U)
                             : 6U),
-      force_local_zone_min_size_([&]() -> absl::optional<uint32_t> {
+      force_local_zone_min_size_([&]() -> std::optional<uint32_t> {
         // Check runtime value first
         if (auto rt = runtime_.snapshot().getInteger(RuntimeForceLocalZoneMinSize, 0); rt > 0) {
           return static_cast<uint32_t>(rt);
@@ -441,12 +433,15 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
             return 1U;
           }
         }
-        return absl::nullopt;
+        return std::nullopt;
       }()),
       routing_enabled_(locality_config.has_value()
                            ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
                                  locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
                            : 100),
+      locality_basis_(locality_config.has_value()
+                          ? locality_config->zone_aware_lb_config().locality_basis()
+                          : LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM),
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
@@ -454,17 +449,44 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
-  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
-        // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
-        resizePerPriorityState();
-        // If P=0 changes, regenerate locality routing structures. Locality based routing is
-        // disabled at all other levels.
-        if (local_priority_set_ && priority == 0) {
-          regenerateLocalityRoutingStructures();
-        }
-        return absl::OkStatus();
-      });
+  if (locality_weighted_balancing_) {
+    for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
+      rebuildLocalityWrrForPriority(priority);
+    }
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+        [this](uint32_t priority, const HostVector&, const HostVector&) {
+          dirty_priorities_.insert(priority);
+        });
+    member_update_cb_ =
+        priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+          resizePerPriorityState();
+          bool p0_changed = dirty_priorities_.contains(0);
+          if (local_priority_set_ && p0_changed) {
+            regenerateLocalityRoutingStructures();
+          }
+          if (locality_weighted_balancing_) {
+            for (uint32_t priority : dirty_priorities_) {
+              rebuildLocalityWrrForPriority(priority);
+            }
+          }
+          dirty_priorities_.clear();
+        });
+  } else {
+    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+        [this](uint32_t priority, const HostVector&, const HostVector&) {
+          resizePerPriorityState();
+          if (local_priority_set_ && priority == 0) {
+            regenerateLocalityRoutingStructures();
+          }
+          if (locality_weighted_balancing_) {
+            rebuildLocalityWrrForPriority(priority);
+          }
+        });
+  }
   if (local_priority_set_) {
     // Multiple priorities are unsupported for local priority sets.
     // In order to support priorities correctly, one would have to make some assumptions about
@@ -472,14 +494,20 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     // the locality routing structure.
     ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
     local_priority_set_member_update_cb_handle_ = local_priority_set_->addPriorityUpdateCb(
-        [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
+        [this](uint32_t priority, const HostVector&, const HostVector&) {
           ASSERT(priority == 0);
           // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
           // based routing.
           regenerateLocalityRoutingStructures();
-          return absl::OkStatus();
         });
   }
+}
+
+void ZoneAwareLoadBalancerBase::rebuildLocalityWrrForPriority(uint32_t priority) {
+  ASSERT(priority < priority_set_.hostSetsPerPriority().size());
+  auto& host_set = *priority_set_.hostSetsPerPriority()[priority];
+  per_priority_state_[priority]->locality_wrr_ =
+      std::make_unique<LocalityWrr>(host_set, random_.random());
 }
 
 void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
@@ -667,18 +695,57 @@ absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>
 ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     const HostsPerLocality& local_hosts_per_locality,
     const HostsPerLocality& upstream_hosts_per_locality) {
-  uint64_t total_local_hosts = 0;
-  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> local_counts;
+  absl::flat_hash_map<envoy::config::core::v3::Locality, uint64_t, LocalityHash, LocalityEqualTo>
+      local_weights;
+  absl::flat_hash_map<envoy::config::core::v3::Locality, uint64_t, LocalityHash, LocalityEqualTo>
+      upstream_weights;
+  uint64_t total_local_weight = 0;
   for (const auto& locality_hosts : local_hosts_per_locality.get()) {
-    total_local_hosts += locality_hosts.size();
+    uint64_t locality_weight = 0;
+    switch (locality_basis_) {
+    // If locality_basis_ is set to HEALTHY_HOSTS_WEIGHT, it uses the host's weight to calculate the
+    // locality percentage.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_WEIGHT:
+      for (const auto& host : locality_hosts) {
+        locality_weight += host->weight();
+      }
+      break;
+    // By default it uses the number of healthy hosts in the locality.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM:
+      locality_weight = locality_hosts.size();
+      break;
+    default:
+      PANIC_DUE_TO_CORRUPT_ENUM;
+    }
+    total_local_weight += locality_weight;
     // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
     if (!locality_hosts.empty()) {
-      local_counts.insert(std::make_pair(locality_hosts[0]->locality(), locality_hosts.size()));
+      local_weights.emplace(locality_hosts[0]->locality(), locality_weight);
     }
   }
-  uint64_t total_upstream_hosts = 0;
+  uint64_t total_upstream_weight = 0;
   for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
-    total_upstream_hosts += locality_hosts.size();
+    uint64_t locality_weight = 0;
+    switch (locality_basis_) {
+    // If locality_basis_ is set to HEALTHY_HOSTS_WEIGHT, it uses the host's weight to calculate the
+    // locality percentage.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_WEIGHT:
+      for (const auto& host : locality_hosts) {
+        locality_weight += host->weight();
+      }
+      break;
+    // By default it uses the number of healthy hosts in the locality.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM:
+      locality_weight = locality_hosts.size();
+      break;
+    default:
+      PANIC_DUE_TO_CORRUPT_ENUM;
+    }
+    total_upstream_weight += locality_weight;
+    // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
+    if (!locality_hosts.empty()) {
+      upstream_weights.emplace(locality_hosts[0]->locality(), locality_weight);
+    }
   }
 
   absl::FixedArray<LocalityPercentages> percentages(upstream_hosts_per_locality.get().size());
@@ -694,13 +761,17 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     }
     const auto& locality = upstream_hosts[0]->locality();
 
-    const auto& local_count_it = local_counts.find(locality);
-    const uint64_t local_count = local_count_it == local_counts.end() ? 0 : local_count_it->second;
+    const auto local_weight_it = local_weights.find(locality);
+    const uint64_t local_weight =
+        local_weight_it == local_weights.end() ? 0 : local_weight_it->second;
+    const auto upstream_weight_it = upstream_weights.find(locality);
+    const uint64_t upstream_weight =
+        upstream_weight_it == upstream_weights.end() ? 0 : upstream_weight_it->second;
 
     const uint64_t local_percentage =
-        total_local_hosts > 0 ? 10000ULL * local_count / total_local_hosts : 0;
+        total_local_weight > 0 ? 10000ULL * local_weight / total_local_weight : 0;
     const uint64_t upstream_percentage =
-        total_upstream_hosts > 0 ? 10000ULL * upstream_hosts.size() / total_upstream_hosts : 0;
+        total_upstream_weight > 0 ? 10000ULL * upstream_weight / total_upstream_weight : 0;
 
     percentages[i] = LocalityPercentages{local_percentage, upstream_percentage};
   }
@@ -763,7 +834,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   return i;
 }
 
-absl::optional<ZoneAwareLoadBalancerBase::HostsSource>
+std::optional<ZoneAwareLoadBalancerBase::HostsSource>
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_t hash) const {
   auto host_set_and_source = chooseHostSet(context, hash);
 
@@ -778,7 +849,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   if (per_priority_panic_[hosts_source.priority_]) {
     stats_.lb_healthy_panic_.inc();
     if (fail_traffic_on_panic_) {
-      return absl::nullopt;
+      return std::nullopt;
     } else {
       hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
       return hosts_source;
@@ -793,17 +864,17 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   // locality_weighted_lb_config is set explicitly even the hostSourceToUse is called in the
   // load balancing policy extensions.
   if (locality_weighted_balancing_) {
-    absl::optional<uint32_t> locality;
+    std::optional<uint32_t> locality;
     if (host_availability == HostAvailability::Degraded) {
-      locality = host_set.chooseDegradedLocality();
+      locality = chooseDegradedLocality(host_set);
     } else {
-      locality = host_set.chooseHealthyLocality();
+      locality = chooseHealthyLocality(host_set);
     }
 
     if (locality.has_value()) {
       auto source_type = localitySourceType(host_availability);
       if (!source_type) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       hosts_source.source_type_ = source_type.value();
       hosts_source.locality_index_ = locality.value();
@@ -817,7 +888,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
       LocalityRoutingState::NoLocalityRouting) {
     auto source_type = sourceType(host_availability);
     if (!source_type) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     hosts_source.source_type_ = source_type.value();
     return hosts_source;
@@ -827,7 +898,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
     auto source_type = sourceType(host_availability);
     if (!source_type) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     hosts_source.source_type_ = source_type.value();
     return hosts_source;
@@ -838,11 +909,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
     // If the local Envoy instances are in global panic, and we should not fail traffic, do
     // not do locality based routing.
     if (fail_traffic_on_panic_) {
-      return absl::nullopt;
+      return std::nullopt;
     } else {
       auto source_type = sourceType(host_availability);
       if (!source_type) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       hosts_source.source_type_ = source_type.value();
       return hosts_source;
@@ -851,7 +922,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
 
   auto source_type = localitySourceType(host_availability);
   if (!source_type) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   hosts_source.source_type_ = source_type.value();
   hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
@@ -878,8 +949,8 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-    const absl::optional<LocalityLbConfig> locality_config,
-    const absl::optional<SlowStartConfig> slow_start_config, TimeSource& time_source)
+    const std::optional<LocalityLbConfig> locality_config,
+    const std::optional<SlowStartConfig> slow_start_config, TimeSource& time_source)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 healthy_panic_threshold, locality_config),
       seed_(random_.random()),
@@ -889,8 +960,8 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
                              : std::chrono::milliseconds(0)),
       aggression_runtime_(
           slow_start_config.has_value() && slow_start_config.value().has_aggression()
-              ? absl::optional<Runtime::Double>({slow_start_config.value().aggression(), runtime})
-              : absl::nullopt),
+              ? std::optional<Runtime::Double>({slow_start_config.value().aggression(), runtime})
+              : std::nullopt),
       time_source_(time_source), latest_host_added_time_(time_source_.monotonicTime()),
       slow_start_min_weight_percent_(slow_start_config.has_value()
                                          ? PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(
@@ -902,18 +973,33 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // The downside of a full recompute is that time complexity is O(n * log n),
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
-  priority_update_cb_ = priority_set.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) {
-        refresh(priority);
-        return absl::OkStatus();
-      });
-  member_update_cb_ = priority_set.addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector&) -> absl::Status {
-        if (isSlowStartEnabled()) {
-          recalculateHostsInSlowStart(hosts_added);
-        }
-        return absl::OkStatus();
-      });
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+    priority_update_cb_ = priority_set.addPriorityUpdateCb(
+        [this](uint32_t priority, const HostVector&, const HostVector&) {
+          dirty_priorities_.insert(priority);
+        });
+    member_update_cb_ =
+        priority_set.addMemberUpdateCb([this](const HostVector& hosts_added, const HostVector&) {
+          for (uint32_t priority : dirty_priorities_) {
+            refresh(priority);
+          }
+          dirty_priorities_.clear();
+          if (isSlowStartEnabled()) {
+            recalculateHostsInSlowStart(hosts_added);
+          }
+        });
+  } else {
+    priority_update_cb_ = priority_set.addPriorityUpdateCb(
+        [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
+    member_update_cb_ =
+        priority_set.addMemberUpdateCb([this](const HostVector& hosts_added, const HostVector&) {
+          if (isSlowStartEnabled()) {
+            recalculateHostsInSlowStart(hosts_added);
+          }
+        });
+  }
 }
 
 void EdfLoadBalancerBase::initialize() {
@@ -947,6 +1033,10 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
 }
 
 void EdfLoadBalancerBase::refresh(uint32_t priority) {
+  // Ensure that priority is within hostSetsPerPriority.
+  if (priority >= priority_set_.hostSetsPerPriority().size()) {
+    return;
+  }
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
@@ -1026,7 +1116,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
     return nullptr;
   }
 
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
+  const std::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
   if (!hosts_source) {
     return nullptr;
   }
@@ -1053,7 +1143,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
+  const std::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
   if (!hosts_source) {
     return nullptr;
   }
@@ -1097,7 +1187,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
         time_source_.monotonicTime() - host.lastHcPassTime().value());
     if (in_healthy_state_duration < slow_start_window_) {
       double aggression =
-          aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
+          aggression_runtime_ != std::nullopt ? aggression_runtime_.value().value() : 1.0;
       if (aggression <= 0.0 || std::isnan(aggression)) {
         ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
                                      "aggression cannot be less than 0.0");

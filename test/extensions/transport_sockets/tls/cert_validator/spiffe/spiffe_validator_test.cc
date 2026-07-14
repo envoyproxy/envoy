@@ -10,17 +10,23 @@
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/fmt.h"
 #include "source/common/event/real_time_system.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
 #include "test/common/tls/cert_validator/test_common.h"
 #include "test/common/tls/ssl_test_utility.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gtest/gtest.h"
 #include "include/nlohmann/json.hpp"
 #include "openssl/ssl.h"
@@ -31,6 +37,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+using ::Envoy::StatusHelpers::HasStatus;
+using ::testing::HasSubstr;
 using TestCertificateValidationContextConfigPtr =
     std::unique_ptr<TestCertificateValidationContextConfig>;
 using SPIFFEValidatorPtr = std::unique_ptr<SPIFFEValidator>;
@@ -42,19 +50,26 @@ using SSLContextPtr = CSmartPtr<SSL_CTX, SSL_CTX_free>;
 
 class TestSPIFFEValidator : public testing::Test {
 public:
-  TestSPIFFEValidator() : stats_(generateSslStats(*store_.rootScope())) {}
+  TestSPIFFEValidator()
+      : api_(Api::createApiForTest()), stats_(generateSslStats(*store_.rootScope())) {
+    ON_CALL(factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+  }
 
-  void initialize(std::string yaml, TimeSource& time_source) {
+  absl::Status initialize(std::string yaml, TimeSource& time_source) {
     envoy::config::core::v3::TypedExtensionConfig typed_conf;
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
-        typed_conf, allow_expired_certificate_, san_matchers_);
+        typed_conf, allow_expired_certificate_, san_matchers_, /*ca_cert=*/"",
+        /*verify_depth=*/std::nullopt, suppress_client_ca_list_);
 
     // Mocking time source
     ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source));
 
     // Initialize SPIFFEValidator with mocked context and stats
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
+    absl::Status creation_status = absl::OkStatus();
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+                                                   *store_.rootScope(), creation_status);
+    return creation_status;
   }
 
   std::string compactJson(const std::string& json_string) {
@@ -86,13 +101,14 @@ public:
     return ss.str();
   }
 
-  void initialize(std::string yaml, std::string trust_bundle_file = "") {
+  absl::Status initialize(std::string yaml, std::string trust_bundle_file = "") {
     envoy::config::core::v3::TypedExtensionConfig typed_conf;
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
-        typed_conf, allow_expired_certificate_, san_matchers_);
+        typed_conf, allow_expired_certificate_, san_matchers_, /*ca_cert=*/"",
+        /*verify_depth=*/std::nullopt, suppress_client_ca_list_);
 
-    if (trust_bundle_file != "") {
+    if (!trust_bundle_file.empty()) {
       EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
           .WillRepeatedly(testing::Invoke([trust_bundle_file] {
             Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
@@ -105,17 +121,26 @@ public:
           }));
     }
 
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
+    absl::Status creation_status = absl::OkStatus();
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+                                                   *store_.rootScope(), creation_status);
+    return creation_status;
   }
 
-  void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_); }
+  absl::Status initialize() {
+    absl::Status creation_status = absl::OkStatus();
+    validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_);
+    return creation_status;
+  }
 
   // Getter.
   SPIFFEValidator& validator() { return *validator_; }
   SslStats& stats() { return stats_; }
+  Stats::TestUtil::TestStore& store() { return store_; }
 
   // Setter.
   void setAllowExpiredCertificate(bool val) { allow_expired_certificate_ = val; }
+  void setSuppressClientCaList(bool val) { suppress_client_ca_list_ = val; }
   void setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
     san_matchers_.clear();
     for (auto& matcher : san_matchers) {
@@ -141,13 +166,19 @@ public:
     }
   };
 
+  void addSanMatcher(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher matcher) {
+    san_matchers_.push_back(std::move(matcher));
+  }
+
+  Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Envoy::Event::MockDispatcher> dispatcher_;
 
 private:
   bool allow_expired_certificate_{false};
+  bool suppress_client_ca_list_{false};
   TestCertificateValidationContextConfigPtr config_;
-  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_{};
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
   Stats::TestUtil::TestStore store_;
   SslStats stats_;
   Event::TestRealTimeSystem time_system_;
@@ -156,7 +187,7 @@ private:
 
 TEST_F(TestSPIFFEValidator, InvalidCA) {
   // Invalid trust bundle.
-  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+  EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -165,12 +196,14 @@ typed_config:
       trust_bundle:
         inline_string: "invalid"
   )EOF")),
-                            EnvoyException, "Failed to load trusted CA certificate for hello.com");
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Failed to load trusted CA certificate for hello.com")));
 }
 
 // Multiple trust bundles are given for the same trust domain.
 TEST_F(TestSPIFFEValidator, Constructor) {
-  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+  EXPECT_THAT(
+      initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -182,11 +215,11 @@ typed_config:
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"
   )EOF")),
-                            EnvoyException,
-                            "Multiple trust bundles are given for one trust domain for hello.com");
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                HasSubstr("Multiple trust bundles are given for one trust domain for hello.com")));
 
   // Single trust bundle.
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -194,14 +227,14 @@ typed_config:
     - name: hello.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"
-  )EOF"));
+  )EOF")));
 
   EXPECT_EQ(1, validator().getSpiffeData()->trust_bundle_stores_.size());
   EXPECT_NE(validator().getCaFileName().find("test_data/ca_cert_with_crl.pem"), std::string::npos);
   EXPECT_NE(validator().getCaFileName().find("hello.com"), std::string::npos);
 
   // Multiple trust bundles.
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -212,7 +245,7 @@ typed_config:
     - name: k8s-west.example.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/keyusage_crl_sign_cert.pem"
-  )EOF"));
+  )EOF")));
 
   EXPECT_EQ(2, validator().getSpiffeData()->trust_bundle_stores_.size());
 }
@@ -255,40 +288,42 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 }
 
 TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
-  initialize();
+  ASSERT_OK(initialize());
+  Stats::TestUtil::TestStore store;
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-            validator().initializeSslContexts({}, false).value());
+            validator().initializeSslContexts({}, false, *store.rootScope()).value());
 }
 
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
-  initialize();
+  ASSERT_OK(initialize());
 
   // No SAN
   auto cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"));
-  EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
+  EXPECT_FALSE(validator().getTrustBundleStore(cert.get(), ""));
 
   // Non-SPIFFE SAN
   cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir "
                                   "}}/test/common/tls/test_data/non_spiffe_san_cert.pem"));
-  EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
+  EXPECT_FALSE(validator().getTrustBundleStore(cert.get(), ""));
 
   // SPIFFE SAN
   cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
 
   // Trust bundle not provided.
-  EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
+  EXPECT_FALSE(validator().getTrustBundleStore(cert.get(), ""));
 
   // Trust bundle provided.
-  validator().getSpiffeData()->trust_bundle_stores_.emplace("example.com",
-                                                            X509StorePtr(X509_STORE_new()));
-  EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
+  validator().getSpiffeData()->trust_bundle_stores_["example.com"][""] =
+      X509StorePtr(X509_STORE_new());
+  EXPECT_TRUE(validator().getTrustBundleStore(cert.get(), ""));
+  EXPECT_FALSE(validator().getTrustBundleStore(cert.get(), "mydomain.org"));
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainWithEmptyChain) {
-  initialize();
+  ASSERT_OK(initialize());
   TestSslExtendedSocketInfo info;
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
@@ -301,7 +336,7 @@ TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainWithEmptyChain) {
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
-  initialize();
+  ASSERT_OK(initialize());
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints: CA:True
       "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
@@ -318,7 +353,7 @@ TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSingleTrustDomain) {
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -326,7 +361,7 @@ typed_config:
     - name: lyft.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-  )EOF"));
+  )EOF")));
 
   X509StorePtr store = X509_STORE_new();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
@@ -373,7 +408,7 @@ typed_config:
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomain) {
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -384,7 +419,7 @@ typed_config:
     - name: example.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-  )EOF"));
+  )EOF")));
 
   X509StorePtr store = X509_STORE_new();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
@@ -445,9 +480,126 @@ typed_config:
   EXPECT_EQ(2, stats().fail_verify_error_.value());
 }
 
+TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomainWithWorkloadTrustDomain) {
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+      workload_trust_domain: "mydomain.org"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF")));
+
+  X509StorePtr store = X509_STORE_new();
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  TestSslExtendedSocketInfo info;
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks;
+
+  {
+    SCOPED_TRACE("Trust domain has workload_trust_domain but connection does not (client).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx,
+                                     {.callbacks = &callbacks}, false, "")
+                  .status);
+  }
+
+  {
+    SCOPED_TRACE("Trust domain has workload_trust_domain but connection does not (server).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx,
+                                     {.callbacks = &callbacks}, true, "")
+                  .status);
+  }
+
+  callbacks.connection().streamInfo().filterState()->setData(
+      "envoy.tls.cert_validator.spiffe.workload_trust_domain",
+      std::make_shared<Router::StringAccessorImpl>("mydomain.org"),
+      StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    SCOPED_TRACE("Trust domain matches so should be accepted (server).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx,
+                                     {.callbacks = &callbacks}, true, "")
+                  .status);
+  }
+
+  {
+    SCOPED_TRACE("Trust domain does not match because it's missing workload_trust_domain in the "
+                 "definition (server).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx,
+                                     {.callbacks = &callbacks}, true, "")
+                  .status);
+  }
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData("envoy.tls.cert_validator.spiffe.workload_trust_domain",
+                       std::make_shared<Router::StringAccessorImpl>("mydomain.org"),
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto socket_options = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
+
+  {
+    SCOPED_TRACE("Trust domain matches so should be accepted (client).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     socket_options, *ssl_ctx, {}, false, "")
+                  .status);
+  }
+
+  {
+    SCOPED_TRACE("Trust domain does not match because it's missing workload_trust_domain in the "
+                 "definition (client).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     socket_options, *ssl_ctx, {}, false, "")
+                  .status);
+  }
+}
+
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomainAllowExpired) {
   setAllowExpiredCertificate(true);
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -455,7 +607,7 @@ typed_config:
     - name: example.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-  )EOF"));
+  )EOF")));
 
   X509StorePtr store = X509_STORE_new();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
@@ -502,7 +654,7 @@ typed_config:
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("spiffe://lyft.com/");
     setSanMatchers({matcher});
-    initialize(config);
+    ASSERT_OK(initialize(config));
     ValidationResults results = validator().doVerifyCertChain(
         *cert_chain, info.createValidateResultCallback(),
         /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
@@ -513,7 +665,7 @@ typed_config:
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("spiffe://example.com/");
     setSanMatchers({matcher});
-    initialize(config);
+    ASSERT_OK(initialize(config));
     ValidationResults results = validator().doVerifyCertChain(
         *cert_chain, info.createValidateResultCallback(),
         /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
@@ -525,7 +677,7 @@ typed_config:
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainIntermediateCerts) {
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -533,7 +685,7 @@ typed_config:
     - name: example.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-  )EOF"));
+  )EOF")));
 
   TestSslExtendedSocketInfo info;
   // Chain contains workload, intermediate, and ca cert, so it should be accepted.
@@ -572,7 +724,7 @@ TEST_F(TestSPIFFEValidator, TestMatchSubjectAltNameWithURISan) {
   regex_matcher.mutable_safe_regex()->mutable_google_re2();
   regex_matcher.mutable_safe_regex()->set_regex("spiffe:\\/\\/([a-z]+)\\.myorg\\.com\\/.+");
   setSanMatchers({exact_matcher, prefix_matcher, regex_matcher});
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -580,7 +732,7 @@ typed_config:
     - name: lyft.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-  )EOF"));
+  )EOF")));
 
   {
     X509Ptr leaf = X509_new();
@@ -615,7 +767,7 @@ TEST_F(TestSPIFFEValidator, TestMatchSubjectAltNameWithoutURISan) {
   exact_matcher.set_exact("spiffe://example.com/workload");
   prefix_matcher.set_prefix("envoy");
   setSanMatchers({exact_matcher, prefix_matcher});
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -623,7 +775,7 @@ typed_config:
     - name: lyft.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-  )EOF"));
+  )EOF")));
 
   {
     X509Ptr leaf = X509_new();
@@ -643,12 +795,12 @@ typed_config:
 }
 
 TEST_F(TestSPIFFEValidator, TestGetCaCertInformation) {
-  initialize();
+  ASSERT_OK(initialize());
 
   // No cert is set so this should be nullptr.
   EXPECT_FALSE(validator().getCaCertInformation());
 
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -659,20 +811,20 @@ typed_config:
     - name: example.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-  )EOF"));
+  )EOF")));
 
   auto actual = validator().getCaCertInformation();
   EXPECT_TRUE(actual);
 }
 
 TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
-  initialize();
+  ASSERT_OK(initialize());
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(), validator().daysUntilFirstCertExpires().value());
 
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -684,7 +836,7 @@ typed_config:
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"
   )EOF"),
-             time_system);
+                       time_system));
   EXPECT_EQ(20686, validator().daysUntilFirstCertExpires().value());
   time_system.setSystemTime(std::chrono::milliseconds(864000000));
   EXPECT_EQ(20676, validator().daysUntilFirstCertExpires().value());
@@ -696,7 +848,7 @@ TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpiresExpired) {
   const time_t known_date_time = 2000000000;
   time_system.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -705,14 +857,14 @@ typed_config:
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
   )EOF"),
-             time_system);
+                       time_system));
 
-  EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(std::nullopt, validator().daysUntilFirstCertExpires());
 }
 
 TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {
   Event::TestRealTimeSystem time_system;
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -727,21 +879,22 @@ typed_config:
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"),
-             time_system);
+                       time_system));
 
   bool foundTestServer = false;
   bool foundTestCA = false;
   SSLContextPtr ctx = SSL_CTX_new(TLS_method());
   ASSERT_TRUE(validator().addClientValidationContext(ctx.get(), false).ok());
-  for (X509_NAME* name : SSL_CTX_get_client_CA_list(ctx.get())) {
+  for (const X509_NAME* name : SSL_CTX_get_client_CA_list(ctx.get())) {
     const int cn_index = X509_NAME_get_index_by_NID(name, NID_commonName, -1);
     EXPECT_TRUE(cn_index >= 0);
-    X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(name, cn_index);
+    const X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(name, cn_index);
     EXPECT_TRUE(cn_entry);
-    ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+    const ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
     EXPECT_TRUE(cn_asn1);
 
-    auto cn_str = std::string(reinterpret_cast<char const*>(ASN1_STRING_data(cn_asn1)));
+    auto cn_str = std::string(reinterpret_cast<char const*>(ASN1_STRING_get0_data(cn_asn1)),
+                              ASN1_STRING_length(cn_asn1));
     if (cn_str == "Test Server") {
       foundTestServer = true;
     } else if (cn_str == "Test CA") {
@@ -753,9 +906,13 @@ typed_config:
   EXPECT_TRUE(foundTestCA);
 }
 
-TEST_F(TestSPIFFEValidator, TestUpdateDigestForSessionId) {
+// When suppress_client_ca_list is true, the SPIFFE validator must not populate
+// the client CA list on the SSL_CTX so the CA names are not sent in the TLS
+// CertificateRequest message.
+TEST_F(TestSPIFFEValidator, SuppressClientCaListEnabled) {
   Event::TestRealTimeSystem time_system;
-  initialize(TestEnvironment::substitute(R"EOF(
+  setSuppressClientCaList(true);
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
@@ -767,27 +924,128 @@ typed_config:
       trust_bundle:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"),
-             time_system);
+                       time_system));
+
+  SSLContextPtr ctx = SSL_CTX_new(TLS_method());
+  ASSERT_TRUE(validator().addClientValidationContext(ctx.get(), false).ok());
+  // Depending on BoringSSL version, SSL_CTX_new may leave the list as nullptr or
+  // as an empty stack; both satisfy the guarantee that no CA names are advertised.
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ctx.get());
+  if (ca_list != nullptr) {
+    EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
+  }
+}
+
+// When suppress_client_ca_list is false (the default), the SPIFFE validator
+// must continue to populate the client CA list as before.
+TEST_F(TestSPIFFEValidator, SuppressClientCaListDisabled) {
+  Event::TestRealTimeSystem time_system;
+  setSuppressClientCaList(false);
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF"),
+                       time_system));
+
+  SSLContextPtr ctx = SSL_CTX_new(TLS_method());
+  ASSERT_TRUE(validator().addClientValidationContext(ctx.get(), false).ok());
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ctx.get());
+  ASSERT_NE(ca_list, nullptr);
+  EXPECT_GT(sk_X509_NAME_num(ca_list), 0);
+}
+
+TEST_F(TestSPIFFEValidator, TestUpdateDigestForSessionId) {
+  Event::TestRealTimeSystem time_system;
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF"),
+                       time_system));
   uint8_t hash_buffer[EVP_MAX_MD_SIZE];
   bssl::ScopedEVP_MD_CTX md;
   EVP_DigestInit(md.get(), EVP_sha256());
   validator().updateDigestForSessionId(md, hash_buffer, SHA256_DIGEST_LENGTH);
 }
 
+namespace {
+
+// Runs updateDigestForSessionId against the validator and returns the resulting
+// digest bytes. Lets tests compare digests produced under different configs.
+std::vector<uint8_t> computeSpiffeSessionIdDigest(SPIFFEValidator& validator) {
+  bssl::ScopedEVP_MD_CTX md;
+  int rc = EVP_DigestInit_ex(md.get(), EVP_sha256(), nullptr);
+  RELEASE_ASSERT(rc == 1, "EVP_DigestInit_ex failed");
+  uint8_t scratch[EVP_MAX_MD_SIZE];
+  validator.updateDigestForSessionId(md, scratch, SHA256_DIGEST_LENGTH);
+  std::vector<uint8_t> out(EVP_MAX_MD_SIZE);
+  unsigned out_len = 0;
+  rc = EVP_DigestFinal_ex(md.get(), out.data(), &out_len);
+  RELEASE_ASSERT(rc == 1, "EVP_DigestFinal_ex failed");
+  out.resize(out_len);
+  return out;
+}
+
+} // namespace
+
+// Session ID digest must differ when suppress_client_ca_list differs, to prevent
+// session resumption across SPIFFE contexts with different wire behavior.
+TEST_F(TestSPIFFEValidator, SuppressClientCaListSessionIdDiffers) {
+  Event::TestRealTimeSystem time_system;
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF");
+
+  setSuppressClientCaList(true);
+  ASSERT_OK(initialize(yaml, time_system));
+  auto digest_suppressed = computeSpiffeSessionIdDigest(validator());
+
+  setSuppressClientCaList(false);
+  ASSERT_OK(initialize(yaml, time_system));
+  auto digest_not_suppressed = computeSpiffeSessionIdDigest(validator());
+
+  EXPECT_NE(digest_suppressed, digest_not_suppressed)
+      << "Session ID digests must differ when suppress_client_ca_list differs";
+}
+
 TEST_F(TestSPIFFEValidator, InvalidTrustBundleMapConfig) {
   {
-    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+    EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_empty_keys.json"
   )EOF")),
-                              EnvoyException,
-                              "No keys found in SPIFFE bundle for domain 'example.com'");
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("No keys found in SPIFFE bundle for domain 'example.com'")));
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(
+    EXPECT_THAT(
         initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -795,10 +1053,12 @@ typed_config:
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_key.json"
   )EOF")),
-        EnvoyException, "Failed to create x509 object while loading certs in domain 'example.com'");
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            HasSubstr("Failed to create x509 object while loading certs in domain 'example.com'")));
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(
+    EXPECT_THAT(
         initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -806,30 +1066,34 @@ typed_config:
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_missing_use.json"
   )EOF")),
-        EnvoyException, "missing or invalid 'use' field found in cert for domain 'example.com'");
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            HasSubstr("missing or invalid 'use' field found in cert for domain 'example.com'")));
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+    EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_json.json"
   )EOF")),
-                              EnvoyException, "Invalid JSON found in SPIFFE bundle");
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("Invalid JSON found in SPIFFE bundle")));
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+    EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_zero_domains.json"
   )EOF")),
-                              EnvoyException, "No trust domains found in SPIFFE bundle");
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("No trust domains found in SPIFFE bundle")));
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(
+    EXPECT_THAT(
         initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -837,18 +1101,20 @@ typed_config:
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_missing_x5c.json"
   )EOF")),
-        EnvoyException, "missing or empty 'x5c' field found in keys for domain: 'example.com'");
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            HasSubstr("missing or empty 'x5c' field found in keys for domain: 'example.com'")));
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+    EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_x5c.json"
   )EOF")),
-                              EnvoyException,
-                              "Invalid x509 object in certs for domain 'example.com'");
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("Invalid x509 object in certs for domain 'example.com'")));
   }
 }
 
@@ -867,7 +1133,7 @@ typed_config:
   )EOF",
                                 trust_bundle_str);
 
-  initialize(config_str);
+  ASSERT_OK(initialize(config_str));
 
   X509StorePtr store = X509_STORE_new();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
@@ -928,14 +1194,14 @@ typed_config:
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomainBundleMapping) {
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles.json"
   )EOF"),
-             "trust_bundles.json");
+                       "trust_bundles.json"));
 
   X509StorePtr store = X509_STORE_new();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
@@ -996,14 +1262,14 @@ typed_config:
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainIntermediateCertsBundleMapping) {
-  initialize(TestEnvironment::substitute(R"EOF(
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles.json"
   )EOF"),
-             "trust_bundles.json");
+                       "trust_bundles.json"));
 
   TestSslExtendedSocketInfo info;
   // Chain contains workload, intermediate, and ca cert, so it should be accepted.
@@ -1049,7 +1315,7 @@ typed_config:
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("spiffe://lyft.com/");
     setSanMatchers({matcher});
-    initialize(config, "trust_bundles.json");
+    ASSERT_OK(initialize(config, "trust_bundles.json"));
     ValidationResults results = validator().doVerifyCertChain(
         *cert_chain, info.createValidateResultCallback(),
         /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
@@ -1060,7 +1326,7 @@ typed_config:
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("spiffe://example.com/");
     setSanMatchers({matcher});
-    initialize(config, "trust_bundles.json");
+    ASSERT_OK(initialize(config, "trust_bundles.json"));
     ValidationResults results = validator().doVerifyCertChain(
         *cert_chain, info.createValidateResultCallback(),
         /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
@@ -1069,6 +1335,48 @@ typed_config:
     EXPECT_EQ(1, stats().fail_verify_san_.value());
     stats().fail_verify_san_.reset();
   }
+}
+
+TEST_F(TestSPIFFEValidator, SpiffeCaExpirationMetrics) {
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF")));
+
+  std::string expected_metric_name =
+      "ssl.certificate.TEST_CA_CERT_NAME_0.expiration_unix_time_seconds";
+
+  auto gauge_opt = store().findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->get().value(), 1787339642);
+}
+
+// Verify that a URI SAN matcher with an unregistered custom string matcher extension
+// fails during SPIFFE validator construction.
+TEST_F(TestSPIFFEValidator, InvalidCustomMatcherInSanMatcher) {
+  envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
+  san_matcher.set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+  auto* custom = san_matcher.mutable_matcher()->mutable_custom();
+  custom->set_name("unregistered_custom_matcher");
+  custom->mutable_typed_config()->set_type_url("type.googleapis.com/nonexistent.Type");
+  addSanMatcher(san_matcher);
+
+  EXPECT_THROW_WITH_REGEX((void)initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF")),
+                          EnvoyException, "Didn't find a registered implementation");
 }
 
 } // namespace Tls

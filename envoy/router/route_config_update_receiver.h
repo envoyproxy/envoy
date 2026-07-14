@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
@@ -9,8 +10,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -40,7 +39,7 @@ public:
    * @return bool whether RouteConfiguration has been updated.
    */
   virtual bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
-                            const std::set<std::string>& added_resource_ids,
+                            std::set<std::string>&& added_resource_ids,
                             const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                             const std::string& version_info) PURE;
 
@@ -56,7 +55,7 @@ public:
    * @return the union of all resource names and aliases (if any) received with the last VHDS
    * update.
    */
-  virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() PURE;
+  virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() const PURE;
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;

@@ -23,14 +23,14 @@ public:
 
 class PoliteFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
-  PoliteFilter(TestParent& parent, const ProtobufWkt::StringValue& value)
+  PoliteFilter(TestParent& parent, const Protobuf::StringValue& value)
       : parent_(parent), greeting_(value.value()) {}
 
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     ENVOY_CONN_LOG(debug, "polite: onData {} bytes {} end_stream", read_callbacks_->connection(),
                    data.length(), end_stream);
     if (!read_greeted_) {
-      if (greeting_.length() > 0) {
+      if (!greeting_.empty()) {
         Buffer::OwnedImpl greeter(greeting_);
         read_callbacks_->injectReadDataToFilterChain(greeter, false);
       }
@@ -42,7 +42,7 @@ public:
     ENVOY_CONN_LOG(debug, "polite: onWrite {} bytes {} end_stream", write_callbacks_->connection(),
                    data.length(), end_stream);
     if (!write_greeted_) {
-      if (greeting_.length() > 0) {
+      if (!greeting_.empty()) {
         Buffer::OwnedImpl greeter("please ");
         write_callbacks_->injectWriteDataToFilterChain(greeter, false);
       }
@@ -80,14 +80,14 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::UpstreamFactoryContext&) override {
-    auto config = dynamic_cast<const ProtobufWkt::StringValue&>(proto_config);
+    auto config = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));
     };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 
   std::string name() const override { return "envoy.upstream.polite"; }
@@ -101,7 +101,7 @@ class ClusterFilterIntegrationTestBase : public testing::TestWithParam<Network::
 public:
   ClusterFilterIntegrationTestBase() : factory_(*this), registration_(factory_) {}
 
-  void initialize() { on_new_connection_called_after_on_write_.store(absl::optional<bool>{}); }
+  void initialize() { on_new_connection_called_after_on_write_.store(std::optional<bool>{}); }
 
   // TestParent
   void onNewConnectionCalled(bool on_write_called) override {
@@ -124,7 +124,7 @@ public:
 
 private:
   // Atomic so that this may be safely accessed from multiple threads
-  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_{};
+  std::atomic<std::optional<bool>> on_new_connection_called_after_on_write_;
 };
 
 class ClusterFilterTcpIntegrationTest : public ClusterFilterIntegrationTestBase,
@@ -139,9 +139,9 @@ public:
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       auto* filter = cluster_0->add_filters();
       filter->set_name("envoy.upstream.polite");
-      ProtobufWkt::StringValue config;
+      Protobuf::StringValue config;
       config.set_value("surely ");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
     ClusterFilterIntegrationTestBase::initialize();
     BaseIntegrationTest::initialize();
@@ -199,9 +199,9 @@ public:
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       auto* filter = cluster_0->add_filters();
       filter->set_name("envoy.upstream.polite");
-      ProtobufWkt::StringValue config;
+      Protobuf::StringValue config;
       config.set_value("");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
     ClusterFilterIntegrationTestBase::initialize();
     HttpIntegrationTest::initialize();

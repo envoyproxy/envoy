@@ -56,15 +56,15 @@ By *default* response compression is enabled, but it will be *skipped* when:
 
 - A request does **not** contain ``accept-encoding`` header.
 - A request contains an ``accept-encoding`` header, but it does not contain ``gzip`` or ``\*``.
-- A request contains an ``accept-encoding`` header with ``gzip`` or ``\*```` with the weight ``q=0``. Note
+- A request contains an ``accept-encoding`` header with ``gzip`` or ``\*`` with the weight ``q=0``. Note
   that the ``gzip`` will have a higher weight than ``\*``. For example, if ``accept-encoding``
   is ``gzip;q=0,\*;q=1``, the filter will not compress. But if the header is set to
   ``\*;q=0,gzip;q=1``, the filter will compress.
 - A request whose ``accept-encoding`` header includes any encoding type with a higher
   weight than ``gzip``'s given the corresponding compression filter is present in the chain.
 - A response contains a ``content-encoding`` header.
-- A response contains a ``cache-control```` header whose value includes ``no-transform``.
-- A response contains a ``transfer-encoding```` header whose value includes a known
+- A response contains a ``cache-control`` header whose value includes ``no-transform``.
+- A response contains a ``transfer-encoding`` header whose value includes a known
   compression name.
 - A response does **not** contain a ``content-type`` value that matches one of the selected
   mime-types, which default to:
@@ -82,6 +82,8 @@ By *default* response compression is enabled, but it will be *skipped* when:
 - Response size is smaller than 30 bytes (only applicable when ``transfer-encoding``
   is not chunked).
 - A response code is on the list of uncompressible response codes, which is empty by default.
+- A response contains an ``ETag`` header and ``disable_on_etag_header`` is enabled (see
+  :ref:`ETag handling <config_http_filters_compressor_etag>`).
 
 Please note that in case the filter is configured to use a compression library extension
 other than gzip it looks for content encoding in the ``accept-encoding`` header provided by
@@ -93,6 +95,7 @@ When response compression is *applied*:
 - Response headers contain ``transfer-encoding: chunked``, and
   ``content-encoding`` with the compression scheme used (e.g., ``gzip``).
 - The ``vary: accept-encoding`` header is inserted on every response.
+- The ``ETag`` header is handled as described in :ref:`ETag handling <config_http_filters_compressor_etag>`.
 
 Also the ``vary: accept-encoding`` header may be inserted even if compression is **not**
 applied due to incompatible ``accept-encoding`` header in a request. This happens
@@ -107,6 +110,74 @@ When request compression is *applied*:
 - ``content-encoding`` with the compression scheme used (e.g., ``gzip``) is added to
   request headers.
 
+.. _config_http_filters_compressor_etag:
+
+ETag handling
+-------------
+
+When a response has an ``ETag`` header, the filter's behavior depends on
+``response_direction_config``:
+
+- **When both ``disable_on_etag_header`` and ``weaken_etag_on_compress`` are ``true``** —
+  ``weaken_etag_on_compress`` takes precedence. Compression is applied and the strong
+  ``ETag`` is weakened.
+
+- **``disable_on_etag_header: true``** (and ``weaken_etag_on_compress`` is ``false``) —
+  Compression is *skipped* for responses that contain an ``ETag``. The response is sent
+  unchanged (including the original ``ETag``). This avoids changing the entity tag when
+  the body would be modified by compression.
+
+- **``disable_on_etag_header: false``** (default) — Compression is allowed. When compression
+  is applied:
+
+  - **``weaken_etag_on_compress: false``** (default) — Weak ``ETag`` values (RFC 7232: ``W/`` prefix,
+    case-insensitive ``W``) are preserved. Any other value is treated as strong and is *removed*
+    from the response when compressing, since it would no longer match the compressed body.
+
+  - **``weaken_etag_on_compress: true``** — Weak ``ETag`` values are preserved. Strong
+    ``ETag`` values are *weakened* by prepending ``W/`` to the value (e.g. ``"abc123"``
+    becomes ``W/"abc123"``) instead of being removed. This allows caches and conditional
+    requests to keep working while indicating that the representation was modified by
+    compression. This behavior matches common practice in other proxies (e.g. Varnish).
+
+To weaken strong ETags when compressing instead of removing them, set
+``weaken_etag_on_compress`` in ``response_direction_config``:
+
+.. code-block:: yaml
+
+  response_direction_config:
+    weaken_etag_on_compress: true
+
+Compression Status Header
+-------------------------
+
+To aid upstream caches and clients in understanding why a response was or was not compressed, the Compressor filter can add a response header ``x-envoy-compression-status``. This header provides visibility into the filter's decision-making process, which is particularly useful for cache invalidation strategies when compression settings or request/response characteristics change.
+
+To enable this feature, the ``status_header_enabled`` configuration option within ``ResponseDirectionConfig`` must be set to ``true``.
+
+The header value follows the format: ``<encoder-type>;<status>[;<additional-params>]``. Where:
+
+- ``<encoder-type>``: The name of the compressor library configured (e.g., ``gzip``, ``br``).
+- ``<status>``: The result of the compression check.
+- ``<additional-params>``: Optional key-value pairs providing more context.
+
+If multiple Compressor filters are present in the chain, each filter will append its status to the header, separated by commas. For example: ``gzip;ContentTypeNotAllowed,br;Compressed;OriginalLength=1024``
+
+Possible status values:
+
+- ``Compressed``: The response was compressed by this filter.
+   - Additional Parameter: ``OriginalLength=<value>``, where ``<value>`` is the original value of the ``Content-Length`` header before compression.
+- ``ContentLengthTooSmall``: Compression was skipped because the content length is below the configured minimum threshold.
+- ``ContentTypeNotAllowed``: Compression was skipped because the response ``Content-Type`` is not in the allowed list.
+- ``EtagNotAllowed``: Compression was skipped because the response contains an ``ETag``
+  header and ``disable_on_etag_header`` is enabled (see :ref:`ETag handling <config_http_filters_compressor_etag>`).
+- ``StatusCodeNotAllowed``: Compression was skipped because the response status code is in the list of uncompressible status codes.
+
+Behavior Notes:
+
+- When the ``status_header_enabled`` configuration option is enabled, the order of internal checks within the filter is adjusted to ensure the most accurate reason for skipping compression is reported.
+- The conditions are evaluated in a specific order. The first condition that causes compression to be skipped is the one reported in the ``x-envoy-compression-status`` header. Subsequent checks are not performed for that filter instance. For example, if a response has both a disallowed content type and a content length below the threshold, only the reason that is checked first will be reported.
+
 Per-Route Configuration
 -----------------------
 
@@ -119,6 +190,27 @@ For example, to disable response compression for a particular virtual host, but 
     :lineno-start: 14
     :lines: 14-36
     :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
+
+Additionally, the compressor library can be overridden on a per-route basis. This allows
+different routes to use different compression algorithms (e.g., gzip, brotli, zstd) while
+maintaining the same filter configuration. For example, to use brotli compression for a
+specific route while using gzip as the default:
+
+.. code-block:: yaml
+
+  routes:
+  - match:
+      prefix: "/api"
+    route:
+      cluster: service
+    typed_per_filter_config:
+      envoy.filters.http.compressor:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+        overrides:
+          compressor_library:
+            name: brotli
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
 
 Using different compressors for requests and responses
 --------------------------------------------------------
@@ -164,7 +256,8 @@ specific to responses only:
   header_compressor_overshadowed, Counter, Number of requests skipped by this filter instance because they were handled by another filter in the same filter chain.
   header_wildcard, Counter, Number of requests sent with ``\*`` set as the ``accept-encoding``.
   header_not_valid, Counter, Number of requests sent with a not valid ``accept-encoding`` header (aka ``q=0`` or an unsupported encoding type).
-  not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. ``disable_on_etag_header`` must be turned on for this to happen.
+  not_compressed_etag, Counter, Number of responses that were not compressed because they
+  contained an ``ETag`` header and ``disable_on_etag_header`` is enabled.
 
 .. attention::
 

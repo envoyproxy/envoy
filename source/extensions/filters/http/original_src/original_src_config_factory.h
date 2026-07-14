@@ -13,11 +13,12 @@ namespace OriginalSrc {
  * Config registration for the original_src filter.
  */
 class OriginalSrcConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::original_src::v3::OriginalSrc> {
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::http::original_src::v3::OriginalSrc> {
 public:
-  OriginalSrcConfigFactory() : FactoryBase("envoy.filters.http.original_src") {}
+  OriginalSrcConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.original_src") {}
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::original_src::v3::OriginalSrc& proto_config,
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
 };

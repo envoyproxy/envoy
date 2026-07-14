@@ -48,7 +48,7 @@ struct AuthenticateResponse {
   std::string message;
 
   // The expiration time of the authentication.
-  ProtobufWkt::Timestamp expiration;
+  Protobuf::Timestamp expiration;
 };
 
 using AuthenticateResponsePtr = std::unique_ptr<AuthenticateResponse>;
@@ -108,7 +108,7 @@ class GrpcExternalAuthClient : public GrpcExternalAuthClientAsyncCallbacks,
                                public ExternalAuthClient {
 public:
   GrpcExternalAuthClient(const Grpc::RawAsyncClientSharedPtr& async_client,
-                         const absl::optional<std::chrono::milliseconds>& timeout);
+                         const std::optional<std::chrono::milliseconds>& timeout);
   ~GrpcExternalAuthClient() override;
 
   void cancel() override;
@@ -131,7 +131,7 @@ private:
                     envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
-  absl::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
   AuthenticateCallback* callback_{};
   CommandSplitter::SplitCallbacks* pending_request_{};
   const Protobuf::MethodDescriptor& service_method_;

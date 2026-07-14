@@ -1,20 +1,15 @@
-diff --git a/BUILD.bazel b/BUILD.bazel
-index 32b26cbdc..a5e7a554c 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -229,14 +229,88 @@ alias(
-     visibility = ["//visibility:public"],
+@@ -360,13 +360,77 @@
  )
  
-+# Envoy: Patch
-+
  cc_binary(
 -    name = "protoc",
 +    name = "compiled_protoc",
      copts = COPTS,
      linkopts = LINK_OPTS,
      visibility = ["//visibility:public"],
-     deps = ["//src/google/protobuf/compiler:protoc_lib"],
+     deps = ["//src/google/protobuf/compiler:protoc_lib_stage1"],
  )
  
 +# Lifted from `rules_proto`
@@ -37,8 +32,8 @@ index 32b26cbdc..a5e7a554c 100644
 +config_setting(
 +    name = "linux-ppcle_64",
 +    constraint_values = [
-+	"@platforms//os:linux",
-+	"@platforms//cpu:ppc64le",
++        "@platforms//os:linux",
++        "@platforms//cpu:ppc64le",
 +    ],
 +)
 +
@@ -81,157 +76,29 @@ index 32b26cbdc..a5e7a554c 100644
 +    visibility = ["//visibility:public"],
 +)
 +
-+alias(
-+    name = "protobuf_python_genproto",
-+    actual = "//python:well_known_types_py_pb2_genproto",
-+    visibility = ["//visibility:public"],
-+)
-+
-+# /Envoy: Patch
-+
  cc_binary(
-     name = "protoc_static",
+     name = "protoc_stage0",
      copts = COPTS,
-diff --git a/protobuf.bzl b/protobuf.bzl
-index c8d32a604..5bd22e021 100644
---- a/protobuf.bzl
-+++ b/protobuf.bzl
-@@ -99,6 +99,10 @@ def _proto_gen_impl(ctx):
+
+--- a/build_defs/cpp_opts.bzl
++++ b/build_defs/cpp_opts.bzl
+@@ -18,6 +18,7 @@
+     ],
+     "//conditions:default": [
+         "-Wno-sign-compare",
++        "-Wno-deprecated-declarations",
+     ],
+ })
  
-     if ctx.attr.includes:
-         for include in ctx.attr.includes:
-+            if include == ".":
-+                # This is effectively source_dir, which has already been handled,
-+                # and may be generated incorrectly here.
-+                continue
-             import_flags += ["-I" + _GetPath(ctx, include)]
- 
-     import_flags = depset(direct = import_flags)
-diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index 2185c200b..e705cf6d8 100755
---- a/python/google/protobuf/__init__.py
-+++ b/python/google/protobuf/__init__.py
-@@ -8,3 +8,10 @@
- # Copyright 2007 Google Inc. All Rights Reserved.
- 
- __version__ = '5.29.3'
-+
-+
-+if __name__ != '__main__':
-+    try:
-+        __import__('pkg_resources').declare_namespace(__name__)
-+    except ImportError:
-+        __path__ = __import__('pkgutil').extend_path(__path__, __name__)
-diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
-index 5012ee793..edf9adc5f 100644
---- a/src/google/protobuf/compiler/BUILD.bazel
-+++ b/src/google/protobuf/compiler/BUILD.bazel
-@@ -547,7 +547,7 @@ cc_library(
-     srcs = ["retention.cc"],
-     hdrs = ["retention.h"],
-     strip_include_prefix = "/src",
--    visibility = ["//src/google/protobuf:__subpackages__"],
-+    visibility = ["//visibility:public"],
-     deps = [
-         "//src/google/protobuf",
-         "//src/google/protobuf:port",
-diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.bazel
-index 192fec3ab..5d12630eb 100644
+
 --- a/src/google/protobuf/io/BUILD.bazel
 +++ b/src/google/protobuf/io/BUILD.bazel
-@@ -159,7 +159,7 @@ cc_library(
-         "@com_google_absl//absl/log:absl_log",
+@@ -162,7 +162,7 @@
+         "@abseil-cpp//absl/log:absl_log",
      ] + select({
          "//build_defs:config_msvc": [],
 -        "//conditions:default": ["@zlib"],
-+        "//conditions:default": ["@envoy//bazel/foreign_cc:zlib"],
++        "//conditions:default": ["@envoy//bazel:zlib"],
      }),
  )
  
-diff --git a/src/google/protobuf/map.cc b/src/google/protobuf/map.cc
-index 570b61bec..da6ceb99d 100644
---- a/src/google/protobuf/map.cc
-+++ b/src/google/protobuf/map.cc
-@@ -116,7 +116,7 @@ void UntypedMapBase::ClearTable(const ClearInput input) {
-   ABSL_DCHECK_NE(num_buckets_, kGlobalEmptyTableSize);
- 
-   if (alloc_.arena() == nullptr) {
--    const auto loop = [=](auto destroy_node) {
-+    const auto loop = [&, this](auto destroy_node) {
-       const TableEntryPtr* table = table_;
-       for (map_index_t b = index_of_first_non_null_, end = num_buckets_;
-            b < end; ++b) {
-diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
-index 56f995e45..123f936ac 100644
---- a/src/google/protobuf/port_def.inc
-+++ b/src/google/protobuf/port_def.inc
-@@ -835,7 +835,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
- #pragma clang diagnostic ignored "-Wshorten-64-to-32"
- // Turn on -Wdeprecated-enum-enum-conversion. This deprecation comes in C++20
- // via http://wg21.link/p1120r0.
--#pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
-+// #pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
- // This error has been generally flaky, but we need to disable it specifically
- // to fix https://github.com/protocolbuffers/protobuf/issues/12313
- #pragma clang diagnostic ignored "-Wunused-parameter"
-@@ -904,7 +904,8 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
- #pragma warning(disable: 4125)
- #endif
- 
--#if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
-+#if defined(PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII) && \
-+  PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
- #define PROTOBUF_DEBUG true
- #else
- #define PROTOBUF_DEBUG false
-diff --git a/upb/message/internal/accessors.h b/upb/message/internal/accessors.h
-index aae0fdc0a..01a874e4c 100644
---- a/upb/message/internal/accessors.h
-+++ b/upb/message/internal/accessors.h
-@@ -163,7 +163,7 @@ UPB_INLINE void UPB_PRIVATE(_upb_Message_SetPresence)(
-   }
- }
- 
--UPB_INLINE void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
-+UPB_INLINE_IF_NOT_GCC void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
-     const upb_MiniTableField* f, void* to, const void* from) {
-   switch (UPB_PRIVATE(_upb_MiniTableField_GetRep)(f)) {
-     case kUpb_FieldRep_1Byte:
-@@ -183,7 +183,7 @@ UPB_INLINE void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
-   UPB_UNREACHABLE();
- }
- 
--UPB_INLINE bool UPB_PRIVATE(_upb_MiniTableField_DataEquals)(
-+UPB_INLINE_IF_NOT_GCC bool UPB_PRIVATE(_upb_MiniTableField_DataEquals)(
-     const upb_MiniTableField* f, const void* a, const void* b) {
-   switch (UPB_PRIVATE(_upb_MiniTableField_GetRep)(f)) {
-     case kUpb_FieldRep_1Byte:
-diff --git a/upb/port/def.inc b/upb/port/def.inc
-index 4c073b32f..cc63a28b5 100644
---- a/upb/port/def.inc
-+++ b/upb/port/def.inc
-@@ -82,6 +82,12 @@ Error, UINTPTR_MAX is undefined
- #define UPB_INLINE static
- #endif
- 
-+#if defined(__GNUC__) && !defined(__clang__)
-+#define UPB_INLINE_IF_NOT_GCC static
-+#else
-+#define UPB_INLINE_IF_NOT_GCC UPB_INLINE
-+#endif
-+
- #ifdef UPB_BUILD_API
- #define UPB_API UPB_EXPORT
- #define UPB_API_INLINE UPB_EXPORT
-diff --git a/upb/port/undef.inc b/upb/port/undef.inc
-index f94e2764e..5e02a3627 100644
---- a/upb/port/undef.inc
-+++ b/upb/port/undef.inc
-@@ -12,6 +12,7 @@
- #undef UPB_MAPTYPE_STRING
- #undef UPB_EXPORT
- #undef UPB_INLINE
-+#undef UPB_INLINE_IF_NOT_GCC
- #undef UPB_API
- #undef UPBC_API
- #undef UPB_API_INLINE

@@ -45,7 +45,7 @@ StreamInfo::CoreResponseFlag flagFromDownstreamReasonReason(DownstreamStreamRese
 } // namespace
 
 ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
-                           absl::optional<StartTime> start_time)
+                           std::optional<StartTime> start_time)
     : parent_(parent), request_header_frame_(std::move(request)),
       stream_info_(parent_.time_source_,
                    parent_.callbacks_->connection().connectionInfoProviderSharedPtr(),
@@ -89,9 +89,19 @@ Tracing::OperationName ActiveStream::operationName() const {
   return conn_manager_tracing_config_->operationName();
 }
 
-const Tracing::CustomTagMap* ActiveStream::customTags() const {
+void ActiveStream::modifySpan(Tracing::Span& span, bool) const {
   ASSERT(conn_manager_tracing_config_.has_value());
-  return &conn_manager_tracing_config_->getCustomTags();
+
+  const TraceContextBridge trace_context{*request_header_frame_};
+  const FormatterContextExtension context_extension(request_header_frame_.get(),
+                                                    response_header_frame_.get());
+  Formatter::Context context;
+  context.setExtension(context_extension);
+  const Tracing::CustomTagContext ctx{trace_context, stream_info_, context};
+
+  for (const auto& it : conn_manager_tracing_config_->getCustomTags()) {
+    it.second->applySpan(span, ctx);
+  }
 }
 
 bool ActiveStream::verbose() const {
@@ -107,6 +117,11 @@ uint32_t ActiveStream::maxPathTagLength() const {
 bool ActiveStream::spawnUpstreamSpan() const {
   ASSERT(conn_manager_tracing_config_.has_value());
   return conn_manager_tracing_config_->spawnUpstreamSpan();
+}
+
+bool ActiveStream::noContextPropagation() const {
+  ASSERT(conn_manager_tracing_config_.has_value());
+  return conn_manager_tracing_config_->noContextPropagation();
 }
 
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
@@ -567,7 +582,9 @@ void ActiveStream::continueEncoding() {
 }
 
 bool ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
-  factory.createFilterChain(*this);
+  FilterChainFactoryCallbacksHelper callbacks(*this);
+
+  factory.createFilterChain(callbacks);
   // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
   // chain.
   std::reverse(encoder_filters_.begin(), encoder_filters_.end());
@@ -592,7 +609,7 @@ void ActiveStream::deferredDelete() {
   }
 }
 
-void ActiveStream::completeStream(absl::optional<DownstreamStreamResetReason> reason) {
+void ActiveStream::completeStream(std::optional<DownstreamStreamResetReason> reason) {
   if (stream_reset_or_complete_) {
     return;
   }
@@ -621,8 +638,7 @@ void ActiveStream::completeStream(absl::optional<DownstreamStreamResetReason> re
   parent_.stats_helper_.onRequestComplete(stream_info_, local_reply_, error_reply);
 
   if (active_span_) {
-    const TraceContextBridge context{*request_header_frame_};
-    Tracing::TracerUtility::finalizeSpan(*active_span_, context, stream_info_, *this, false);
+    Tracing::TracerUtility::finalizeSpan(*active_span_, stream_info_, *this, false);
   }
 
   for (const auto& access_log : parent_.config_->accessLogs()) {
@@ -657,7 +673,7 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool 
 }
 
 void Filter::onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
-                               absl::optional<StartTime> start_time) {
+                               std::optional<StartTime> start_time) {
   if (request_header_frame == nullptr) {
     ENVOY_LOG(error, "generic proxy: request header frame from codec is null");
     onDecodingFailure();
@@ -726,7 +742,7 @@ void Filter::registerFrameHandler(uint64_t stream_id, ActiveStream* raw_stream) 
 
 void Filter::unregisterFrameHandler(uint64_t stream_id) { frame_handlers_.erase(stream_id); }
 
-void Filter::newDownstreamRequest(StreamRequestPtr request, absl::optional<StartTime> start_time) {
+void Filter::newDownstreamRequest(StreamRequestPtr request, std::optional<StartTime> start_time) {
   auto stream = std::make_unique<ActiveStream>(*this, std::move(request), start_time);
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);

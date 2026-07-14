@@ -18,12 +18,13 @@ public:
   // Create a CertificateValidationContextConfigImpl or return an error status.
   static absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
   create(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
-         bool auto_sni_san_match, Api::Api& api);
+         bool auto_sni_san_match, Api::Api& api, const std::string& ca_cert_name);
 
   absl::Status initialize();
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
+  const std::string& caCertName() const override { return ca_cert_name_; }
   const std::string& certificateRevocationList() const override {
     return certificate_revocation_list_;
   }
@@ -47,7 +48,7 @@ public:
     return trust_chain_verification_;
   }
 
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig>&
   customValidatorConfig() const override {
     return custom_validator_config_;
   }
@@ -56,15 +57,17 @@ public:
 
   bool onlyVerifyLeafCertificateCrl() const override { return only_verify_leaf_cert_crl_; }
 
-  absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
 
   bool autoSniSanMatch() const override { return auto_sni_san_match_; }
+
+  bool suppressClientCaList() const override { return suppress_client_ca_list_; }
 
 protected:
   CertificateValidationContextConfigImpl(
       std::string ca_cert, std::string certificate_revocation_list,
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
-      bool auto_sni_san_match, Api::Api& api);
+      bool auto_sni_san_match, Api::Api& api, const std::string& name);
 
 private:
   static std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
@@ -72,6 +75,7 @@ private:
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config);
   const std::string ca_cert_;
   const std::string ca_cert_path_;
+  const std::string ca_cert_name_;
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
@@ -81,11 +85,12 @@ private:
   const bool allow_expired_certificate_;
   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
       TrustChainVerification trust_chain_verification_;
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
   Api::Api& api_;
   const bool only_verify_leaf_cert_crl_;
-  absl::optional<uint32_t> max_verify_depth_;
+  std::optional<uint32_t> max_verify_depth_;
   const bool auto_sni_san_match_;
+  const bool suppress_client_ca_list_;
 };
 
 } // namespace Ssl

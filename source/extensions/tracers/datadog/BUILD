@@ -38,6 +38,7 @@ envoy_cc_library(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     deps = [
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:message_lib",
@@ -48,7 +49,8 @@ envoy_cc_library(
         "//source/common/upstream:cluster_update_tracker_lib",
         "//source/common/version:version_lib",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
+        "@dd-trace-cpp//:dd_trace_cpp",
+        "@nlohmann_json//:json",
     ],
 )
 

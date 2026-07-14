@@ -10,4 +10,4 @@ Envoy has the following builtin UDP listener filters.
 
   udp_proxy
   dns_filter
-
+  dynamic_modules

@@ -18,18 +18,17 @@ modify different aspects of the server:
   administration interface is only allowed via a secure network. It is also **critical** that hosts
   that access the administration interface are **only** attached to the secure network (i.e., to
   avoid CSRF attacks). This involves setting up an appropriate firewall or optimally only allowing
-  access to the administration listener via localhost. This can be accomplished with a v2
-  configuration like the following:
+  access to the administration listener via localhost. You can additionally restrict which admin
+  paths are reachable using
+  :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>`.
+  This can be accomplished with a configuration like the following:
 
-  .. code-block:: yaml
-
-    admin:
-      profile_path: /tmp/envoy.prof
-      address:
-        socket_address: { address: 127.0.0.1, port_value: 9901 }
-
-  In the future additional security options will be added to the administration interface. This
-  work is tracked in `this <https://github.com/envoyproxy/envoy/issues/2763>`_ issue.
+  .. literalinclude:: /_configs/repo/admin-interface.yaml
+    :language: yaml
+    :start-at: admin:
+    :end-before: static_resources:
+    :emphasize-lines: 7-9
+    :caption: :download:`admin-interface.yaml </_configs/repo/admin-interface.yaml>`
 
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
@@ -145,6 +144,17 @@ modify different aspects of the server:
   Dump the */clusters* output in a JSON-serialized proto. See the
   :ref:`definition <envoy_v3_api_msg_admin.v3.Clusters>` for more information.
 
+.. http:get:: /clusters?filter=regex
+
+  Filters the returned clusters to those with names matching the regular
+  expression ``regex``. Compatible with ``format``. Performs partial
+  matching by default, so ``/clusters?filter=service`` will return all clusters
+  containing the word ``service``.  Full-string matching can be specified
+  with begin- and end-line anchors. (i.e.  ``/clusters?filter=^my-service-cluster$``)
+
+  By default, the regular expression is evaluated using the
+  `Google RE2 <https://github.com/google/re2>`_ engine.
+
 .. _operations_admin_interface_config_dump:
 
 .. http:get:: /config_dump
@@ -177,7 +187,7 @@ modify different aspects of the server:
 .. http:get:: /config_dump?mask={}
 
   Specify a subset of fields that you would like to be returned. The mask is parsed as a
-  ``ProtobufWkt::FieldMask`` and applied to each top level dump such as
+  ``Protobuf::FieldMask`` and applied to each top level dump such as
   :ref:`BootstrapConfigDump <envoy_v3_api_msg_admin.v3.BootstrapConfigDump>` and
   :ref:`ClustersConfigDump <envoy_v3_api_msg_admin.v3.ClustersConfigDump>`.
   This behavior changes if both resource and mask query parameters are specified. See
@@ -225,7 +235,7 @@ modify different aspects of the server:
 
   When both resource and mask query parameters are specified, the mask is applied to every element
   in the desired repeated field so that only a subset of fields are returned. The mask is parsed
-  as a ``ProtobufWkt::FieldMask``.
+  as a ``Protobuf::FieldMask``.
 
   For example, get the names of all active dynamic clusters with
   ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
@@ -248,6 +258,14 @@ modify different aspects of the server:
 .. http:get:: /heap_dump
 
   Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
+.. _operations_admin_interface_peak_heap_dump:
+
+.. http:get:: /peak_heap_dump
+
+  Dump peak heap profile of Envoy process. This captures the heap state at peak memory usage.
+  The output content is parsable binary by the ``pprof`` tool.
   Requires compiling with tcmalloc (default).
 
 .. http:post:: /allocprofiler
@@ -288,7 +306,7 @@ modify different aspects of the server:
 .. http:get:: /init_dump?mask={}
 
   When mask query parameters is specified, the mask value is the desired component to dump unready targets.
-  The mask is parsed as a ``ProtobufWkt::FieldMask``.
+  The mask is parsed as a ``Protobuf::FieldMask``.
 
   For example, get the unready targets of all listeners with
   ``/init_dump?mask=listener``
@@ -332,6 +350,7 @@ modify different aspects of the server:
     source/common/network/udp_listener_impl.cc: trace
 
   - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
+  - ``/logging?group=http:info`` will make the level of all loggers in the ``http`` group be info.
   - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
   - ``/logging?paths=source/common*:warning`` will make the level of ``source/common/event/dispatcher_impl.cc:``, ``source/common/network/tcp_listener_impl.cc`` be warning.
     Other unmatched loggers will be the default trace, e.g., `admin_filter.cc`, even it was updated to info from the previous post update.
@@ -342,6 +361,10 @@ modify different aspects of the server:
 .. http:get:: /memory
 
   Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all ``/stats`` and filtering to get the memory-related statistics.
+
+.. http:get:: /memory/tcmalloc
+
+  Dumps the current `TCMalloc stats <https://github.com/google/tcmalloc/tree/master/docs/stats.md>`_.
 
 .. http:post:: /quitquitquit
 
@@ -756,7 +779,28 @@ modify different aspects of the server:
   .. http:get:: /stats/prometheus
 
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
-  v0.0.4 format. This can be used to integrate with a Prometheus server.
+  format. This can be used to integrate with a Prometheus server.
+
+  The output will either be the protobuf format or the v0.0.4 text format, depending on the value
+  of the ``Accept`` header. A prometheus scrape configuration specifies the desired protocol:
+
+  .. code-block:: yaml
+
+    scrape_configs:
+      - scrape_protocols:
+        - 'PrometheusProto'
+        - 'PrometheusText0.0.4'
+
+  .. http:get:: /stats/prometheus?histogram_buckets=prometheusnative&native_histogram_max_buckets=20
+
+  Outputs histograms as `Prometheus native histograms <https://prometheus.io/docs/specs/native_histograms>`_.
+  This is only available when using the protobuf exposition format.
+
+  This mode ignores :ref:`configured histogram bucket limits
+  <envoy_v3_api_field_config.metrics.v3.StatsConfig.histogram_bucket_settings>`
+  and generates a sparse histogram representation which will use a maximum number of buckets, with
+  accuracy adjusted to that number. The default values is 20 if no value for `native_histogram_max_buckets`
+  is specified.
 
   .. http:get:: /stats?format=prometheus&usedonly
 

@@ -60,11 +60,10 @@ private:
 
   static bool isJsonHeader(uint32_t len) { return (len >> 24u) == 0; }
 
-  static CommandCustomHeaderPtr decodeExtHeader(RequestCode code,
-                                                ProtobufWkt::Struct& header_struct);
+  static CommandCustomHeaderPtr decodeExtHeader(RequestCode code, Protobuf::Struct& header_struct);
 
   static CommandCustomHeaderPtr decodeResponseExtHeader(ResponseCode response_code,
-                                                        ProtobufWkt::Struct& header_struct,
+                                                        Protobuf::Struct& header_struct,
                                                         RequestCode request_code);
 
   static bool isComplete(Buffer::Instance& buffer, int32_t cursor);

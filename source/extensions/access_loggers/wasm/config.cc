@@ -14,16 +14,18 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Wasm {
 
-AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context, std::vector<Formatter::CommandParserPtr>&&) {
+AccessLog::InstanceSharedPtr
+WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_config,
+                                              AccessLog::FilterPtr&& filter,
+                                              Server::Configuration::GenericFactoryContext& context,
+                                              std::vector<Formatter::CommandParserPtr>&&) {
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
       proto_config, context.messageValidationVisitor());
 
   auto plugin_config = std::make_unique<Common::Wasm::PluginConfig>(
       config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, false);
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, false);
   auto access_log = std::make_shared<WasmAccessLog>(std::move(plugin_config), std::move(filter));
 
   context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(

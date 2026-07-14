@@ -77,7 +77,7 @@ public:
           Protobuf::util::TimeUtil::MillisecondsToDuration(250);
 
       tracing.mutable_provider()->set_name("envoy.tracers.opentelemetry");
-      tracing.mutable_provider()->mutable_typed_config()->PackFrom(otel_config);
+      std::ignore = tracing.mutable_provider()->mutable_typed_config()->PackFrom(otel_config);
 
       *hcm.mutable_tracing() = tracing;
     });
@@ -97,7 +97,7 @@ public:
   }
 
   FakeUpstream* grpc_receiver_upstream_{};
-  ProtobufWkt::Struct otel_runtime_config_;
+  Protobuf::Struct otel_runtime_config_;
 
   FakeHttpConnectionPtr connection_;
   std::vector<FakeStreamPtr> streams_;

@@ -16,6 +16,8 @@ namespace Matching {
 namespace InputMatchers {
 namespace RuntimeFraction {
 
+using ::Envoy::Matcher::DataInputGetResult;
+using ::Envoy::Matcher::MatchResult;
 using testing::_;
 
 namespace {
@@ -34,7 +36,7 @@ public:
     matcher_ = std::make_unique<Matcher>(runtime_, runtime_fraction, seed);
   }
 
-  uint64_t matchAndReturnHash(absl::optional<absl::string_view> value, bool result) {
+  uint64_t matchAndReturnHash(std::optional<absl::string_view> value, bool result) {
     uint64_t called_random_value = 0;
     EXPECT_CALL(
         runtime_.snapshot_,
@@ -47,9 +49,9 @@ public:
         });
 
     EXPECT_EQ(matcher_->match(value.has_value()
-                                  ? ::Envoy::Matcher::MatchingDataType(std::string(value.value()))
-                                  : absl::monostate()),
-              result);
+                                  ? DataInputGetResult::CreateString(std::string(value.value()))
+                                  : DataInputGetResult::NoData()),
+              result ? MatchResult::Matched : MatchResult::NoMatch);
     return called_random_value;
   }
 
@@ -58,7 +60,7 @@ public:
         runtime_.snapshot_,
         featureEnabled(key_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), _))
         .Times(0);
-    EXPECT_FALSE(matcher_->match(absl::monostate()));
+    EXPECT_EQ(matcher_->match(DataInputGetResult::NoData()), MatchResult::NoMatch);
   }
 
 private:

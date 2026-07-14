@@ -19,7 +19,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -291,7 +290,7 @@ TEST_F(RateLimitFilterTest, OverLimitWithDynamicMetadata) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
   Filters::Common::RateLimit::DynamicMetadataPtr dynamic_metadata =
-      std::make_unique<ProtobufWkt::Struct>();
+      std::make_unique<Protobuf::Struct>();
   auto* fields = dynamic_metadata->mutable_fields();
   (*fields)["name"] = ValueUtil::stringValue("my-limit");
   (*fields)["x"] = ValueUtil::numberValue(3);
@@ -299,7 +298,7 @@ TEST_F(RateLimitFilterTest, OverLimitWithDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.connection_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(stream_info, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().RateLimit);
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));

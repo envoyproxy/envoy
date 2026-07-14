@@ -71,7 +71,7 @@ DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t len) {
     return DecodeStatus::Failure;
   }
   setBaseClientCap(base_cap);
-  if (base_cap & CLIENT_SSL) {
+  if (len == SSL_CONNECTION_REQUEST_PACKET_SIZE && (base_cap & CLIENT_SSL)) {
     return parseResponseSsl(buffer);
   }
   if (base_cap & CLIENT_PROTOCOL_41) {

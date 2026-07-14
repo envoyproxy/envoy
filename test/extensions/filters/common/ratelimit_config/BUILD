@@ -23,6 +23,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":ratelimit_config_test_proto_cc_proto",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
@@ -30,8 +31,9 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],

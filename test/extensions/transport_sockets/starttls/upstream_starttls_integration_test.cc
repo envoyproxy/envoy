@@ -232,7 +232,8 @@ void StartTlsIntegrationTest::initialize() {
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.starttls");
-    cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(starttls_config);
+    std::ignore =
+        cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(starttls_config);
   });
 
   // Modifications to ConfigHelper::baseConfig.
@@ -271,11 +272,11 @@ void StartTlsIntegrationTest::initialize() {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-      downstream_tls_context, mock_factory_ctx, false);
+      downstream_tls_context, mock_factory_ctx, {}, false);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
       *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-          std::move(cfg), *tls_context_manager_, *client_stats_store->rootScope(), {})};
+          std::move(cfg), *tls_context_manager_, *client_stats_store->rootScope())};
 
   BaseIntegrationTest::initialize();
 }

@@ -54,6 +54,10 @@ TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
+TEST_F(EvironmentCredentialsProviderTest, Coverage) {
+  EXPECT_EQ(provider_.providerName(), "EnvironmentCredentialsProvider");
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

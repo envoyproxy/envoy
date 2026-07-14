@@ -1,13 +1,20 @@
+#include "source/common/api/os_sys_calls_impl.h"
+
+#include <arpa/inet.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <string>
 
+#if defined(__linux__)
+#include <linux/filter.h>
+#endif
+
 #include "envoy/network/socket.h"
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/address_impl.h"
 
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
@@ -178,6 +185,43 @@ bool OsSysCallsImpl::supportsMptcp() const {
 
   ::close(fd);
   return true;
+#endif
+}
+
+bool OsSysCallsImpl::supportsReusePortBpfCpuSteering() const {
+#if !defined(SO_ATTACH_REUSEPORT_CBPF) || !defined(__linux__)
+  return false;
+#else
+  static const bool is_supported = [] {
+    bool result = false;
+    const int fd = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
+    if (fd >= 0) {
+      // Steer to the worker socket selected by the receiving CPU.
+      sock_filter filter[] = {
+          BPF_STMT(BPF_LD | BPF_W | BPF_ABS, static_cast<uint32_t>(SKF_AD_OFF + SKF_AD_CPU)),
+          BPF_STMT(BPF_ALU | BPF_MOD | BPF_K, 1),
+          BPF_STMT(BPF_RET | BPF_A, 0),
+      };
+      sock_fprog prog{};
+      prog.len = sizeof(filter) / sizeof(filter[0]);
+      prog.filter = filter;
+      // Bind and listen on an ephemeral loopback port so the probe attaches the program on the same
+      // socket state the real path uses.
+      int one = 1;
+      sockaddr_in addr{};
+      addr.sin_family = AF_INET;
+      addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+      addr.sin_port = 0;
+      if (::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(one)) == 0 &&
+          ::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0 &&
+          ::listen(fd, 1) == 0) {
+        result = ::setsockopt(fd, SOL_SOCKET, SO_ATTACH_REUSEPORT_CBPF, &prog, sizeof(prog)) == 0;
+      }
+      ::close(fd);
+    }
+    return result;
+  }();
+  return is_supported;
 #endif
 }
 
@@ -418,6 +462,16 @@ SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* servi
 }
 
 void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
+
+SysCallIntResult OsSysCallsImpl::getrlimit(int resource, struct rlimit* rlim) {
+  const int rc = ::getrlimit(resource, rlim);
+  return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rlim) {
+  const int rc = ::setrlimit(resource, rlim);
+  return {rc, errno};
+}
 
 } // namespace Api
 } // namespace Envoy

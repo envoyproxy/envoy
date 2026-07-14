@@ -16,7 +16,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     options.set_log_errors(false);
     re2_filter_ = std::make_shared<re2::RE2>(filter_string_, options);
     if (!re2_filter_->ok()) {
-      response.add("Invalid re2 regex");
+      response.add(absl::StrCat("Invalid re2 regex: ", re2_filter_->error()));
       return Http::Code::BadRequest;
     }
   }
@@ -25,6 +25,16 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   if (!status.ok()) {
     response.add(status.message());
     return Http::Code::BadRequest;
+  }
+
+  auto max_buckets_val = query_.getFirstValue("native_histogram_max_buckets");
+  if (max_buckets_val.has_value() && !max_buckets_val.value().empty()) {
+    uint32_t max_buckets;
+    if (!absl::SimpleAtoi(max_buckets_val.value(), &max_buckets) || max_buckets < 1) {
+      response.add("invalid native_histogram_max_buckets value: must be a positive integer");
+      return Http::Code::BadRequest;
+    }
+    native_histogram_max_buckets_ = max_buckets;
   }
 
   auto parse_type = [](absl::string_view str, StatsType& type) {
@@ -50,7 +60,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     return Http::Code::BadRequest;
   }
 
-  const absl::optional<std::string> hidden_value = query_.getFirstValue("hidden");
+  const std::optional<std::string> hidden_value = query_.getFirstValue("hidden");
   if (hidden_value.has_value() && !hidden_value.value().empty()) {
     if (hidden_value.value() == "include") {
       hidden_ = HiddenFlag::Include;
@@ -64,7 +74,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     }
   }
 
-  const absl::optional<std::string> format_value = Utility::formatParam(query_);
+  const std::optional<std::string> format_value = Utility::formatParam(query_);
   if (format_value.has_value() && !format_value.value().empty()) {
     if (format_value.value() == "prometheus") {
       format_ = StatsFormat::Prometheus;

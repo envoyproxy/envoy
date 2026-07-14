@@ -29,7 +29,8 @@ envoy_cc_library(
     hdrs = ["prefix_map_matcher.h"],
     deps = [
         ":map_matcher_lib",
-        "//source/common/common:trie_lookup_table_lib",
+        "//source/common/common:radix_tree_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -83,5 +84,27 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "address_matcher_lib",
+    srcs = ["address_matcher.cc"],
+    hdrs = ["address_matcher.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//source/common/network:cidr_range_lib",
+        "@abseil-cpp//absl/status:statusor",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "regex_replace_lib",
+    srcs = ["regex_replace.cc"],
+    hdrs = ["regex_replace.h"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

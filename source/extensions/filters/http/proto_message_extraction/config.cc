@@ -31,6 +31,18 @@ Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoT
   };
 }
 
+absl::StatusOr<Envoy::Http::FilterFactoryCb>
+FilterFactoryCreator::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::proto_message_extraction::v3::
+        ProtoMessageExtractionConfig& proto_config,
+    const std::string&, Envoy::Server::Configuration::ServerFactoryContext& context) {
+  auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, std::make_unique<ExtractorFactoryImpl>(), context.api());
+  return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<Filter>(*filter_config));
+  };
+}
+
 REGISTER_FACTORY(FilterFactoryCreator, Envoy::Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace ProtoMessageExtraction

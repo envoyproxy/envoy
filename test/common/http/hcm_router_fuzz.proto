@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package test.common.http;
 
+import "validate/validate.proto";
 import "test/fuzz/common.proto";
 
 enum Clusters {
@@ -24,7 +25,7 @@ message ReconfigureClusterAction {
 
 message RequestHeaderAction {
   Clusters cluster = 1;
-  test.fuzz.Headers headers = 2;
+  test.fuzz.Headers headers = 2 [(validate.rules).message.required = true];
   bool end_stream = 3;
 }
 

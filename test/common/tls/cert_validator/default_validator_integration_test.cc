@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Ssl {
 
@@ -63,7 +64,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidated) {
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeHttpConnection(std::move(conn));
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
@@ -80,9 +81,9 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
                                   .setVerifyDepth(1));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
@@ -100,9 +101,9 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedNoDepthWithTrustRoo
                                   .setTrustRootOnly(true));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
@@ -121,9 +122,9 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedDepthWithTrustRootO
                                   .setVerifyDepth(3));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }
@@ -142,16 +143,15 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOn
                                   .setVerifyDepth(2));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), std::nullopt);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.fail_verify_error"), Ge(1));
   ASSERT_TRUE(codec->waitForDisconnect());
 }
 
 class TestSanListenerFilter : public Network::ListenerFilter {
 public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
-    cb.filterState().setData("test_san_filter_state", nullptr,
-                             StreamInfo::FilterState::StateType::ReadOnly);
+    cb.filterState().setData("test_san_filter_state", nullptr);
     return Network::FilterStatus::Continue;
   }
   size_t maxReadBytes() const override { return 0; }
@@ -172,7 +172,7 @@ public:
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
   std::string name() const override { return "test.tcp_listener.set_dns_filter_state"; }
 };
@@ -182,8 +182,8 @@ REGISTER_FACTORY(TestSanListenerFilterFactory,
 
 class CustomSanStringMatcher : public Matchers::StringMatcher {
 public:
-  bool match(const absl::string_view) const override { return false; }
-  bool match(const absl::string_view, const StringMatcher::Context& context) const override {
+  bool match(absl::string_view) const override { return false; }
+  bool match(absl::string_view, const StringMatcher::Context& context) const override {
     return context.stream_info_ &&
            context.stream_info_->filterState().hasDataWithName("test_san_filter_state");
   }
@@ -200,7 +200,7 @@ public:
   std::string name() const override { return "envoy.string_matcher.test_custom_san_matcher"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 };
 
@@ -234,7 +234,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithCustomMatcher) {
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeHttpConnection(std::move(conn));
   ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
   codec->close();
 }

@@ -1,7 +1,9 @@
 #include "source/extensions/filters/http/file_system_buffer/config.h"
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -10,6 +12,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace FileSystemBuffer {
+
+using StatusHelpers::HasStatus;
 
 using ::testing::HasSubstr;
 
@@ -80,15 +84,17 @@ TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionOnUnsetBufferBehavior) {
                           "invalid BufferBehavior");
 }
 
-TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfiguredInvalidPath) {
+TEST_F(FileSystemBufferFilterConfigTest, FailsWithConfiguredInvalidPath) {
   auto proto_config = configFromYaml(R"(
     storage_buffer_path: "/hat/banana/this/is/not/a/valid/path"
     manager_config:
       thread_pool:
         thread_count: 1
   )");
-  EXPECT_THROW_WITH_REGEX(captureConfigFromProto(proto_config), EnvoyException,
-                          "is not a directory");
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto status_or = factory()->createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or,
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("is not a directory")));
 }
 
 TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfigured0BytesMemoryBufferLimit) {
@@ -300,6 +306,30 @@ INSTANTIATE_TEST_SUITE_P(
                                    "alwaysFullyBuffer, injectContentLength, replaceContentLength"},
                       BehaviorCase{"fully_buffer: {}", "alwaysFullyBuffer"}),
     &behaviorCaseName);
+
+TEST_F(FileSystemBufferFilterConfigTest, ValidConfigWithServerContext) {
+  const std::string yaml_string = R"EOF(
+    request:
+      memory_buffer_bytes_limit: 1234
+      storage_buffer_bytes_limit: 5678
+    response:
+      memory_buffer_bytes_limit: 1235
+      storage_buffer_bytes_limit: 5679
+    manager_config:
+      thread_pool:
+        thread_count: 1
+  )EOF";
+
+  auto proto_config = FileSystemBufferFilterConfigTest::configFromYaml(yaml_string);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  FileSystemBufferFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
 
 } // namespace FileSystemBuffer
 } // namespace HttpFilters

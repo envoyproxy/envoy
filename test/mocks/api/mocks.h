@@ -126,11 +126,14 @@ public:
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(bool, supportsIpTransparent, (Network::Address::IpVersion version), (const));
   MOCK_METHOD(bool, supportsMptcp, (), (const));
+  MOCK_METHOD(bool, supportsReusePortBpfCpuSteering, (), (const));
   MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
   MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));
   MOCK_METHOD(SysCallIntResult, getaddrinfo,
               (const char* node, const char* service, const addrinfo* hints, addrinfo** res));
   MOCK_METHOD(void, freeaddrinfo, (addrinfo * res));
+  MOCK_METHOD(SysCallIntResult, getrlimit, (int resource, struct rlimit* rlim));
+  MOCK_METHOD(SysCallIntResult, setrlimit, (int resource, const struct rlimit* rlim));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;
@@ -142,6 +145,7 @@ class MockLinuxOsSysCalls : public LinuxOsSysCallsImpl {
 public:
   // Api::LinuxOsSysCalls
   MOCK_METHOD(SysCallIntResult, sched_getaffinity, (pid_t pid, size_t cpusetsize, cpu_set_t* mask));
+  MOCK_METHOD(SysCallIntResult, setns, (int fd, int nstype), (const));
 };
 #endif
 

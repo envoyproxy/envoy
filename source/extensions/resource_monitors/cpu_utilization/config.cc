@@ -21,7 +21,9 @@ Server::ResourceMonitorPtr CpuUtilizationMonitorFactory::createResourceMonitorFr
   std::unique_ptr<CpuStatsReader> cpu_stats_reader;
   if (config.mode() ==
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER) {
-    cpu_stats_reader = std::make_unique<LinuxContainerCpuStatsReader>(context.api().timeSource());
+    // Use factory method to create appropriate cgroup reader (v1 or v2)
+    cpu_stats_reader = LinuxContainerCpuStatsReader::create(context.api().fileSystem(),
+                                                            context.api().timeSource());
   } else {
     cpu_stats_reader = std::make_unique<LinuxCpuStatsReader>();
   }

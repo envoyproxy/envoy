@@ -1,22 +1,32 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/filter/config_provider_manager.h"
+#include "envoy/network/address.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
-#include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/network/socket.h"
 #include "envoy/network/socket_interface.h"
 #include "envoy/server/api_listener.h"
 #include "envoy/server/drain_manager.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/guarddog.h"
 
 #include "source/common/protobuf/protobuf.h"
+
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Filter {
@@ -24,6 +34,40 @@ class TcpListenerFilterConfigProviderManagerImpl;
 } // namespace Filter
 
 namespace Server {
+
+/**
+ * ListenerUpdateCallbacks provide a way to expose Listener lifecycle events in the
+ * ListenerManager.
+ */
+class ListenerUpdateCallbacks {
+public:
+  virtual ~ListenerUpdateCallbacks() = default;
+
+  /**
+   * onListenerAddOrUpdate is called when a new listener is added or an existing listener
+   * is updated in the ListenerManager.
+   * @param listener_name the name of the changed listener.
+   * @param listener_config the ListenerConfig that represents the updated listener.
+   */
+  virtual void onListenerAddOrUpdate(absl::string_view listener_name,
+                                     const Network::ListenerConfig& listener_config) PURE;
+  /**
+   * onListenerRemoval is called when a listener is removed; the argument is the listener name.
+   * @param listener_name is the name of the removed listener.
+   */
+  virtual void onListenerRemoval(const std::string& listener_name) PURE;
+};
+
+/**
+ * ListenerUpdateCallbacksHandle is a RAII wrapper for a ListenerUpdateCallbacks. Deleting
+ * the ListenerUpdateCallbacksHandle will remove the callbacks from ListenerManager in O(1).
+ */
+class ListenerUpdateCallbacksHandle {
+public:
+  virtual ~ListenerUpdateCallbacksHandle() = default;
+};
+
+using ListenerUpdateCallbacksHandlePtr = std::unique_ptr<ListenerUpdateCallbacksHandle>;
 
 /**
  * Interface for an LDS API provider.
@@ -268,16 +312,35 @@ public:
    */
   virtual ApiListenerOptRef apiListener() PURE;
 
+  /**
+   * @return the server's API Listener by name if it exists, nullopt if it does
+   * not.
+   */
+  virtual ApiListenerOptRef apiListener(absl::string_view) { return apiListener(); }
+
   /*
    * @return TRUE if the worker has started or FALSE if not.
    */
   virtual bool isWorkerStarted() PURE;
+
+  /**
+   * This method allows to register callbacks for listener lifecycle events in the
+   * ListenerManager.
+   *
+   * @param callbacks are the ListenerUpdateCallbacks to add or remove to the listener manager.
+   * @return ListenerUpdateCallbacksHandlePtr a RAII that needs to be deleted to
+   * unregister the callback.
+   */
+  virtual ListenerUpdateCallbacksHandlePtr
+  addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) PURE;
 };
 
 // overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a
 // combination of flags, such as listeners(ListenerState::WARMING|ListenerState::ACTIVE)
 constexpr ListenerManager::ListenerState operator|(const ListenerManager::ListenerState lhs,
                                                    const ListenerManager::ListenerState rhs) {
+  // Bitmask combinations intentionally produce intermediate values that are not named enumerators.
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   return static_cast<ListenerManager::ListenerState>(static_cast<uint8_t>(lhs) |
                                                      static_cast<uint8_t>(rhs));
 }

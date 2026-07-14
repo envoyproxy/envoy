@@ -24,11 +24,9 @@
 #include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -67,11 +65,12 @@ public:
         /*xds_config_tracker_=*/Config::XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/nullptr};
+        /*eds_resources_cache_=*/nullptr,
+        /*skip_subsequent_node_=*/true};
     if (use_unified_mux_) {
-      grpc_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+      grpc_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context);
     } else {
-      grpc_mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context, true);
+      grpc_mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
     }
     resetCluster(R"EOF(
       name: name
@@ -100,9 +99,8 @@ public:
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     cluster_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
@@ -152,7 +150,7 @@ public:
     response->set_type_url(type_url_);
     response->set_version_info(fmt::format("version-{}", version_++));
     auto* resource = response->mutable_resources()->Add();
-    resource->PackFrom(cluster_load_assignment);
+    std::ignore = resource->PackFrom(cluster_load_assignment);
     state_.ResumeTiming();
     if (use_unified_mux_) {
       dynamic_cast<Config::XdsMux::GrpcMuxSotw&>(*grpc_mux_)
@@ -177,7 +175,6 @@ public:
   bool initialized_{};
   Stats::Scope& scope_{*stats_.rootScope()};
   Config::SubscriptionStats subscription_stats_;
-  Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};

@@ -5,6 +5,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -60,6 +61,65 @@ protected:
   }
   Api::ApiPtr api_;
 };
+
+TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflow) {
+  const int depth = 100000;
+  std::string json;
+  json.reserve(depth * 2 + 10);
+  for (int i = 0; i < depth; ++i) {
+    json.push_back('[');
+  }
+  for (int i = 0; i < depth; ++i) {
+    json.push_back(']');
+  }
+
+  auto status_or_object = Factory::loadFromString(json);
+  EXPECT_FALSE(status_or_object.ok());
+  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(status_or_object.status().message(),
+              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+}
+
+TEST_F(JsonLoaderTest, DeeplyNestedJsonObjectDestructorStackOverflowConfigurable) {
+  const int depth = 100000;
+  std::string json;
+  json.reserve(depth * 12 + 10);
+  for (int i = 0; i < depth; ++i) {
+    json.append("{\"a\":");
+  }
+  json.append("1"); // leaf value
+  for (int i = 0; i < depth; ++i) {
+    json.push_back('}');
+  }
+
+  auto status_or_object = Factory::loadFromString(json);
+  EXPECT_FALSE(status_or_object.ok());
+  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(status_or_object.status().message(),
+              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+}
+
+// Verify that with the default nesting depth limit relaxed, Envoy still does not crash when
+// unwinding deeply nested JSON objects.
+TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflowRuntimeOff) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"limit_json_parser_nesting_depth", false}});
+  const int depth = 100000;
+  std::string json;
+  json.reserve(depth * 2 + 10);
+  for (int i = 0; i < depth; ++i) {
+    json.push_back('[');
+  }
+  for (int i = 0; i < depth; ++i) {
+    json.push_back(']');
+  }
+
+  auto status_or_object = Factory::loadFromString(json);
+  EXPECT_FALSE(status_or_object.ok());
+  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
+  EXPECT_THAT(status_or_object.status().message(),
+              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+}
 
 TEST_F(JsonLoaderTest, Basic) {
   EXPECT_FALSE(Factory::loadFromString("{").status().ok());
@@ -505,15 +565,15 @@ TEST_F(JsonLoaderTest, LoadFromStruct) {
     ],
   })EOF";
 
-  const ProtobufWkt::Struct src = TestUtility::jsonToStruct(json_string);
+  const Protobuf::Struct src = TestUtility::jsonToStruct(json_string);
   ObjectSharedPtr json = Factory::loadFromProtobufStruct(src);
   const auto output_json = json->asJsonString();
   EXPECT_TRUE(TestUtility::jsonStringEqual(output_json, json_string));
 }
 
 TEST_F(JsonLoaderTest, LoadFromStructUnknownValueCase) {
-  ProtobufWkt::Struct src;
-  ProtobufWkt::Value value_not_set;
+  Protobuf::Struct src;
+  Protobuf::Value value_not_set;
   (*src.mutable_fields())["field"] = value_not_set;
   EXPECT_THROW_WITH_MESSAGE(Factory::loadFromProtobufStruct(src), EnvoyException,
                             "Protobuf value case not implemented");
@@ -532,6 +592,26 @@ TEST_F(JsonLoaderTest, InvalidJsonToMsgpack) {
   EXPECT_EQ(0, Factory::jsonToMsgpack("{\"hello\":}").size());
   EXPECT_EQ(0, Factory::jsonToMsgpack("\"hello\":\"world\"}").size());
   EXPECT_EQ(0, Factory::jsonToMsgpack("{\"hello\":\"world\"").size());
+}
+
+TEST_F(JsonLoaderTest, EmptyListAsJsonString) {
+  std::list<std::string> list{};
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, "[]");
+}
+
+TEST_F(JsonLoaderTest, ValidListAsJsonString) {
+  std::list<std::string> list{"item1", "item2", "item3"};
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, R"(["item1","item2","item3"])");
+}
+
+TEST_F(JsonLoaderTest, NestedListAsJsonString) {
+  std::list<std::string> list{"item1", "item2", "item3"};
+  std::list<std::string> nested_list{"nested_item1", "nested_item2"};
+  list.push_back(Factory::listAsJsonString(nested_list));
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, R"(["item1","item2","item3","[\"nested_item1\",\"nested_item2\"]"])");
 }
 
 } // namespace

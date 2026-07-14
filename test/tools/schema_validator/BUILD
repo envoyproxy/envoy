@@ -35,10 +35,10 @@ envoy_cc_test_library(
         "//source/common/version:version_lib",
         "//source/extensions/filters/http/match_delegate:config",
         "//test/test_common:utility_lib",
-        "@com_github_mirror_tclap//:tclap",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@tclap",
     ],
 )

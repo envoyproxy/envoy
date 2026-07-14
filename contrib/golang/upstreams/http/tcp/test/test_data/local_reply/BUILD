@@ -14,8 +14,8 @@ go_library(
     deps = [
         "//contrib/golang/common/go/api",
         "//contrib/golang/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp:http_tcp_bridge",
-        "@com_github_cncf_xds_go//xds/type/v3:type",
         "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_google_protobuf//types/known/structpb",
+        "@xds_go//xds/type/v3:type",
     ],
 )

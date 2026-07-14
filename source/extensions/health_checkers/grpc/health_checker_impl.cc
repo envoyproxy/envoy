@@ -33,7 +33,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 const std::string& getHostname(const HostSharedPtr& host,
-                               const absl::optional<std::string>& config_hostname,
+                               const std::optional<std::string>& config_hostname,
                                const ClusterInfoConstSharedPtr& cluster) {
   if (config_hostname.has_value()) {
     return HealthCheckerFactory::getHostname(host, config_hostname.value(), cluster);
@@ -196,11 +196,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_ = &client_->newStream(*this);
   request_encoder_->getStream().addCallbacks(*this);
 
-  const std::string& authority =
+  absl::string_view authority =
       getHostname(host_, parent_.authority_value_, parent_.cluster_.info());
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
-                                   parent_.service_method_.name(), absl::nullopt);
+                                   parent_.service_method_.name(), std::nullopt);
   headers_message->headers().setReferenceUserAgent(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
 

@@ -1,3 +1,5 @@
+#include <openssl/ssl.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -5,6 +7,7 @@
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_tls_server_handshaker.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/default_tls_certificate_selector.h"
@@ -52,8 +55,10 @@ public:
     const std::string& root_ca_cert =
         cert_chain.substr(cert_chain.rfind("-----BEGIN CERTIFICATE-----"));
     const std::string path_string("some_path");
+    const std::string cert_name("some_cert_name");
     ON_CALL(cert_validation_ctx_config_, caCert()).WillByDefault(ReturnRef(root_ca_cert));
     ON_CALL(cert_validation_ctx_config_, caCertPath()).WillByDefault(ReturnRef(path_string));
+    ON_CALL(cert_validation_ctx_config_, caCertName()).WillByDefault(ReturnRef(cert_name));
     ON_CALL(cert_validation_ctx_config_, trustChainVerification)
         .WillByDefault(Return(envoy::extensions::transport_sockets::tls::v3::
                                   CertificateValidationContext::VERIFY_TRUST_CHAIN));
@@ -72,7 +77,7 @@ public:
         .WillByDefault(ReturnRef(empty_string_list));
     ON_CALL(cert_validation_ctx_config_, verifyCertificateSpkiList())
         .WillByDefault(ReturnRef(empty_string_list));
-    const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
+    const std::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = std::nullopt;
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     auto context = *Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, server_factory_context_);
@@ -97,11 +102,13 @@ public:
     std::string error;
     std::unique_ptr<quic::ProofVerifyDetails> verify_details;
     EXPECT_EQ(quic::QUIC_SUCCESS,
-              verifier_->VerifyCertChain("www.example.org", 54321, chain->certs,
-                                         /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT",
-                                         &verify_context_, &error, &verify_details,
-                                         /*out_alert=*/nullptr,
-                                         /*callback=*/nullptr))
+              verifier_->VerifyCertChain(
+                  "www.example.org", 54321,
+                  std::vector<absl::string_view>(chain->certs.begin(), chain->certs.end()),
+                  /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT", &verify_context_, &error,
+                  &verify_details,
+                  /*out_alert=*/nullptr,
+                  /*callback=*/nullptr))
         << error;
   }
 
@@ -160,9 +167,8 @@ public:
         .WillRepeatedly(SaveArg<0>(&secret_update_callback_));
     EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
     transport_socket_factory_ = *QuicServerTransportSocketFactory::create(
-        true, listener_config_.listenerScope(),
-        std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_,
-        std::vector<std::string>{});
+        /*enable_early_data=*/true, /*enable_resumption=*/true, listener_config_.listenerScope(),
+        std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_);
     transport_socket_factory_->initialize();
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
   }
@@ -192,16 +198,24 @@ public:
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
+    loadCertsIntoFactory(cert, expect_private_key);
+  }
+
+  // Sets up mock config expectations and triggers cert loading into the transport
+  // socket factory. Does NOT set proof-source-level expectations (ioHandle,
+  // findFilterChain, transportSocketFactory) — callers add those as needed.
+  void loadCertsIntoFactory(const std::string& cert, bool with_private_key) {
     auto factory = Extensions::TransportSockets::Tls::TlsCertificateSelectorConfigFactoryImpl::
         getDefaultTlsCertificateSelectorConfigFactory();
     ASSERT_TRUE(factory);
-    ASSERT_EQ("envoy.tls.certificate_selectors.default", factory->name());
-    const ProtobufWkt::Any any;
-    absl::Status creation_status = absl::OkStatus();
-    auto tls_certificate_selector_factory_cb = factory->createTlsCertificateSelectorFactory(
-        any, factory_context_, ProtobufMessage::getNullValidationVisitor(), creation_status, true);
+    const Protobuf::Any any;
+
+    Server::Configuration::MockGenericFactoryContext ctx;
+    ON_CALL(ctx, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
+    auto tls_certificate_selector_factory_cb =
+        factory->createTlsCertificateSelectorFactory(any, ctx, *mock_context_config_, true);
     EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
-        .WillRepeatedly(Return(tls_certificate_selector_factory_cb));
+        .WillRepeatedly(ReturnRef(*tls_certificate_selector_factory_cb.value()));
 
     EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
@@ -209,6 +223,7 @@ public:
     EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
     EXPECT_CALL(tls_cert_config_, pkcs12()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, certificateChainPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(tls_cert_config_, certificateName()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, privateKeyMethod()).WillRepeatedly(Return(nullptr));
     EXPECT_CALL(tls_cert_config_, privateKeyPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, password()).WillRepeatedly(ReturnRef(EMPTY_STRING));
@@ -217,14 +232,14 @@ public:
     EXPECT_CALL(tls_cert_config_, certificateChain())
         .Times(testing::AtLeast(1))
         .WillRepeatedly(ReturnRef(cert));
-    if (expect_private_key) {
+    if (with_private_key) {
       EXPECT_CALL(tls_cert_config_, privateKey())
           .Times(testing::AtLeast(1))
           .WillRepeatedly(ReturnRef(pkey_));
     }
     ASSERT_TRUE(secret_update_callback_ != nullptr);
     absl::Status callback_status = secret_update_callback_();
-    THROW_IF_NOT_OK(callback_status);
+    THROW_IF_NOT_OK_REF(callback_status);
     ASSERT_TRUE(callback_status.ok());
   }
 
@@ -342,6 +357,44 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
   proof_source_.ComputeTlsSignature(
       server_address_, client_address_, hostname_, SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
       std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
+}
+
+TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
+  EXPECT_CALL(listen_socket_, ioHandle()).Times(testing::AnyNumber());
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+        return &filter_chain_;
+      }));
+  EXPECT_CALL(filter_chain_, transportSocketFactory())
+      .WillRepeatedly(ReturnRef(*transport_socket_factory_));
+
+  loadCertsIntoFactory(expected_certs_, true);
+
+  std::string signature;
+  // Use ECDSA algorithm with an RSA key — triggers algorithm mismatch error path.
+  proof_source_.ComputeTlsSignature(
+      server_address_, client_address_, hostname_, SSL_SIGN_ECDSA_SECP256R1_SHA256, "payload",
+      std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
+}
+
+// BoringSSL has no getter for the ticket key callback, so the ticket install
+// can only be observed via behavior; the key log callback has one.
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxInstallsKeylogCallback) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.quic_keylog_support", "true"}});
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  proof_source_.OnNewSslCtx(ssl_ctx.get());
+  EXPECT_EQ(EnvoyTlsServerHandshaker::keylogCallback, SSL_CTX_get_keylog_callback(ssl_ctx.get()));
+}
+
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxDoesNotInstallKeylogCallbackWhenFlagOff) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.quic_keylog_support", "false"}});
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  proof_source_.OnNewSslCtx(ssl_ctx.get());
+  EXPECT_EQ(nullptr, SSL_CTX_get_keylog_callback(ssl_ctx.get()));
 }
 
 } // namespace Quic

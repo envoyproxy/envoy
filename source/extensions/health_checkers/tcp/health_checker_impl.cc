@@ -50,13 +50,12 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
                                            HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       send_bytes_([&config] {
-        Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> send_repeated;
         if (!config.tcp_health_check().send().text().empty()) {
-          send_repeated.Add()->CopyFrom(config.tcp_health_check().send());
+          auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.tcp_health_check().send());
+          THROW_IF_NOT_OK_REF(bytes_or_error.status());
+          return bytes_or_error.value();
         }
-        auto bytes_or_error = PayloadMatcher::loadProtoBytes(send_repeated);
-        THROW_IF_NOT_OK_REF(bytes_or_error.status());
-        return bytes_or_error.value();
+        return PayloadMatcher::MatchSegments{};
       }()),
       proxy_protocol_config_(config.tcp_health_check().has_proxy_protocol_config()
                                  ? std::make_unique<envoy::config::core::v3::ProxyProtocolConfig>(

@@ -1,0 +1,51 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "ufesservice"
+      }
+      name: "route-test"
+    }
+  }
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        path: "/host"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+      }
+      name: "route-test-2"
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "redirect.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/host"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+  headers {
+    key: "x-envoy-internal"
+    value: "false"
+  }
+}

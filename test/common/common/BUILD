@@ -4,13 +4,23 @@ load(
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
-    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_benchmark_binary(
+    name = "fine_grain_logger_benchmark",
+    srcs = ["fine_grain_logger_benchmark.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "@benchmark",
+    ],
+)
 
 envoy_cc_test(
     name = "backoff_strategy_test",
@@ -54,6 +64,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cpu_affinity_test",
+    srcs = ["cpu_affinity_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:cpu_affinity_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     # Same as assert_test above, but with ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE
     name = "assert_enabled_in_release_test",
     srcs = ["assert_test.cc"],
@@ -63,7 +85,7 @@ envoy_cc_test(
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/base",
+        "@abseil-cpp//absl/base",
     ],
 )
 
@@ -96,6 +118,21 @@ envoy_cc_fuzz_test(
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
     deps = ["//source/common/common:base64_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "base64_differential_fuzz_test",
+    srcs = ["base64_differential_fuzz_test.cc"],
+    corpus = "base64_differential_corpus",
+    rbe_pool = "6gig",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
+    deps = [
+        ":base64_legacy_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:base64_lib",
+        "//test/fuzz:utility_lib",
+    ],
 )
 
 envoy_cc_fuzz_test(
@@ -231,7 +268,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:minimal_logger_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -246,6 +283,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/version:version_string_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
     ],
@@ -307,10 +345,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "trie_lookup_table_test",
-    srcs = ["trie_lookup_table_test.cc"],
+    name = "radix_tree_test",
+    srcs = ["radix_tree_test.cc"],
     rbe_pool = "6gig",
-    deps = ["//source/common/common:trie_lookup_table_lib"],
+    deps = ["//source/common/common:radix_tree_lib"],
 )
 
 envoy_cc_test(
@@ -323,7 +361,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -425,8 +463,30 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_googlesource_code_re2//:re2",
+        "@benchmark",
+        "@re2",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "base64_legacy_lib",
+    srcs = ["base64_legacy.cc"],
+    hdrs = ["base64_legacy.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:empty_string",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "base64_speed_test",
+    srcs = ["base64_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":base64_legacy_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:base64_lib",
+        "@benchmark",
     ],
 )
 
@@ -437,8 +497,8 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
     ],
 )
 
@@ -448,19 +508,51 @@ envoy_benchmark_test(
 )
 
 envoy_cc_benchmark_binary(
-    name = "trie_lookup_table_speed_test",
-    srcs = ["trie_lookup_table_speed_test.cc"],
+    name = "radix_tree_speed_test",
+    srcs = ["radix_tree_speed_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/common:trie_lookup_table_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
+        "//source/common/common:radix_tree_lib",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
     ],
 )
 
 envoy_benchmark_test(
-    name = "trie_lookup_table_speed_test_benchmark_test",
-    benchmark_binary = "trie_lookup_table_speed_test",
+    name = "radix_tree_speed_test_benchmark_test",
+    benchmark_binary = "radix_tree_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "prefix_matching_benchmark",
+    srcs = ["prefix_matching_benchmark.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:radix_tree_lib",
+        "//source/common/http:headers_lib",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "prefix_matching_benchmark_test",
+    benchmark_binary = "prefix_matching_benchmark",
+)
+
+envoy_cc_benchmark_binary(
+    name = "shared_pointer_speed_test",
+    srcs = ["shared_pointer_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:assert_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "shared_pointer_benchmark_test",
+    benchmark_binary = "shared_pointer_speed_test",
 )
 
 envoy_cc_test(
@@ -480,7 +572,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:thread_lib",
         "//test/test_common:thread_factory_for_test_lib",
-        "@com_google_absl//absl/hash:hash_testing",
+        "@abseil-cpp//absl/hash:hash_testing",
     ],
 )
 
@@ -507,11 +599,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "version_test",
     srcs = ["version_test.cc"],
-    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
     rbe_pool = "6gig",
     deps = [
         "//source/common/version:version_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -579,6 +670,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:bit_array_lib",
         "//source/common/common:random_generator_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 
@@ -595,13 +687,28 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:inline_map",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
 envoy_benchmark_test(
     name = "inline_map_speed_test_benchmark_test",
     benchmark_binary = "inline_map_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "linked_object_speed_test",
+    srcs = ["linked_object_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:linked_object",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "linked_object_speed_test_benchmark_test",
+    benchmark_binary = "linked_object_speed_test",
 )
 
 envoy_cc_test(
@@ -618,5 +725,15 @@ envoy_cc_test(
         "//source/common/http:filter_manager_lib",
         "//test/mocks:common_lib",
         "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "notification_test",
+    srcs = ["notification_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:notification_lib",
+        "//test/test_common:logging_lib",
     ],
 )

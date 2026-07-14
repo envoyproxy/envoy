@@ -26,10 +26,8 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
 #include "gmock/gmock.h"
@@ -45,7 +43,7 @@ public:
 
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
+    THROW_IF_NOT_OK_REF(loader.status());
     // This will ignore values set in test, but just use flag defaults!
     runtime_ = std::move(loader.value());
   }
@@ -76,10 +74,10 @@ public:
     // Set up runtime.
     auto* runtime = config.add_layers();
     runtime->set_name("test_static_layer_test_runtime");
-    ProtobufWkt::Struct envoy_layer;
-    ProtobufWkt::Struct& runtime_values =
+    Protobuf::Struct envoy_layer;
+    Protobuf::Struct& runtime_values =
         *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
-    ProtobufWkt::Struct& flags =
+    Protobuf::Struct& flags =
         *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
     for (const auto& [key, value] : values) {
       (*flags.mutable_fields())[key].set_bool_value(value);
@@ -88,7 +86,7 @@ public:
 
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
+    THROW_IF_NOT_OK_REF(loader.status());
     // This will ignore values set in test, but just use flag defaults!
     runtime_ = std::move(loader.value());
   }

@@ -90,21 +90,24 @@ public:
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  // http1 doesn't have a codec level stream id.
+  std::optional<uint32_t> codecStreamId() const override { return std::nullopt; }
+
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter);
-  void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
+  void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, std::optional<uint64_t> status,
                          bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
 
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
   ConnectionImpl& connection_;
   uint32_t read_disable_calls_{};
-  bool disable_chunk_encoding_ : 1;
-  bool chunk_encoding_ : 1;
-  bool connect_request_ : 1;
-  bool is_tcp_tunneling_ : 1;
-  bool is_response_to_head_request_ : 1;
-  bool is_response_to_connect_request_ : 1;
+  bool disable_chunk_encoding_ : 1 = false;
+  bool chunk_encoding_ : 1 = true;
+  bool connect_request_ : 1 = false;
+  bool is_tcp_tunneling_ : 1 = false;
+  bool is_response_to_head_request_ : 1 = false;
+  bool is_response_to_connect_request_ : 1 = false;
 
 private:
   /**
@@ -308,14 +311,14 @@ protected:
   const HeaderKeyFormatterConstPtr encode_only_header_key_formatter_;
   HeaderString current_header_field_;
   HeaderString current_header_value_;
-  bool processing_trailers_ : 1;
-  bool handling_upgrade_ : 1;
-  bool reset_stream_called_ : 1;
+  bool processing_trailers_ : 1 = false;
+  bool handling_upgrade_ : 1 = false;
+  bool reset_stream_called_ : 1 = false;
   // Deferred end stream headers indicate that we are not going to raise headers until the full
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
-  bool deferred_end_stream_headers_ : 1;
-  bool dispatching_ : 1;
+  bool deferred_end_stream_headers_ : 1 = false;
+  bool dispatching_ : 1 = false;
   bool dispatching_slice_already_drained_ : 1;
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
   const uint32_t max_headers_kb_;
@@ -345,18 +348,6 @@ private:
    * @return A status representing success.
    */
   Status completeCurrentHeader();
-
-  /**
-   * Check if header name contains underscore character.
-   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
-   * as a security measure due to systems that treat '_' and '-' as interchangeable.
-   * The ServerConnectionImpl may drop header or reject request based on the
-   * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
-   * HttpConnectionManager.
-   */
-  virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
-    return false;
-  }
 
   /**
    * Dispatch a memory span.
@@ -484,11 +475,10 @@ protected:
 
     void dumpState(std::ostream& os, int indent_level) const;
     HeaderString request_url_;
-    RequestDecoder* request_decoder_{};
+    RequestDecoderHandlePtr request_decoder_handle_;
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
-  ActiveRequest* activeRequest() { return active_request_.get(); }
   // ConnectionImpl
   CallbackResult onMessageCompleteBase() override;
   // Add the size of the request_url to the reported header size when processing request headers.
@@ -589,7 +579,7 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       absl::optional<uint16_t> max_response_headers_kb,
+                       std::optional<uint16_t> max_response_headers_kb,
                        const uint32_t max_response_headers_count,
                        bool passing_through_proxy = false);
   // Http::ClientConnection
@@ -598,10 +588,11 @@ public:
 private:
   struct PendingResponse {
     PendingResponse(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter,
-                    ResponseDecoder* decoder)
-        : encoder_(connection, std::move(bytes_meter)), decoder_(decoder) {}
+                    ResponseDecoderHandlePtr&& decoder_handle)
+        : encoder_(connection, std::move(bytes_meter)), decoder_handle_(std::move(decoder_handle)) {
+    }
     RequestEncoderImpl encoder_;
-    ResponseDecoder* decoder_;
+    ResponseDecoderHandlePtr decoder_handle_;
   };
 
   bool cannotHaveBody();
@@ -667,7 +658,7 @@ private:
   // buffer. This buffer is always allocated, never nullptr.
   Buffer::InstancePtr owned_output_buffer_;
 
-  absl::optional<PendingResponse> pending_response_;
+  std::optional<PendingResponse> pending_response_;
   // TODO(mattklein123): The following bool tracks whether a pending response is complete before
   // dispatching callbacks. This is needed so that pending_response_ stays valid during callbacks
   // in order to access the stream, but to avoid invoking callbacks that shouldn't be called once

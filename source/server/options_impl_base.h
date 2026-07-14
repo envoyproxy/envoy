@@ -70,6 +70,9 @@ public:
   void setFileFlushIntervalMsec(std::chrono::milliseconds file_flush_interval_msec) {
     file_flush_interval_msec_ = file_flush_interval_msec;
   }
+  void setFileFlushMinSizeKB(uint64_t file_flush_min_size_kb) {
+    file_flush_min_size_kb_ = file_flush_min_size_kb;
+  }
   void setServiceClusterName(const std::string& service_cluster) {
     service_cluster_ = service_cluster;
   }
@@ -94,6 +97,7 @@ public:
   void setSkipDeprecatedLog(bool skip_deprecated_logs) {
     skip_deprecated_logs_ = skip_deprecated_logs;
   }
+  void setLogStacktraceSingleEntry(bool val) { log_stacktrace_single_entry_ = val; }
 
   void setSocketPath(const std::string& socket_path) { socket_path_ = socket_path; }
 
@@ -117,6 +121,7 @@ public:
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
   bool ignoreUnknownDynamicFields() const override { return ignore_unknown_dynamic_fields_; }
   bool skipDeprecatedLogs() const override { return skip_deprecated_logs_; }
+  bool logStacktraceSingleEntry() const override { return log_stacktrace_single_entry_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -140,6 +145,7 @@ public:
   std::chrono::milliseconds fileFlushIntervalMsec() const override {
     return file_flush_interval_msec_;
   }
+  uint64_t fileFlushMinSizeKB() const override { return file_flush_min_size_kb_; }
   const std::string& serviceClusterName() const override { return service_cluster_; }
   const std::string& serviceNodeName() const override { return service_node_; }
   const std::string& serviceZone() const override { return service_zone_; }
@@ -190,6 +196,7 @@ private:
   bool reject_unknown_dynamic_fields_{false};
   bool ignore_unknown_dynamic_fields_{false};
   bool skip_deprecated_logs_{false};
+  bool log_stacktrace_single_entry_{false};
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_{Network::Address::IpVersion::v4};
   spdlog::level::level_enum log_level_{spdlog::level::info};
@@ -204,6 +211,7 @@ private:
   std::string service_node_;
   std::string service_zone_;
   std::chrono::milliseconds file_flush_interval_msec_{10000};
+  uint64_t file_flush_min_size_kb_{64};
   std::chrono::seconds drain_time_{600};
   std::chrono::seconds parent_shutdown_time_{900};
   Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};

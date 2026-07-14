@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<Matchers::StringMatcherImpl>
+std::optional<Matchers::StringMatcherImpl>
 maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config,
                          Server::Configuration::CommonFactoryContext& context) {
   switch (config.query_parameter_match_specifier_case()) {
@@ -25,13 +25,13 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
     return Matchers::StringMatcherImpl(config.string_match(), context);
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kPresentMatch:
-    return absl::nullopt;
+    return std::nullopt;
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET:
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace
@@ -40,8 +40,8 @@ ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
     const envoy::config::route::v3::QueryParameterMatcher& config,
     Server::Configuration::CommonFactoryContext& context)
     : name_(config.name()),
-      present_match_(config.has_present_match() ? absl::make_optional(config.present_match())
-                                                : absl::nullopt),
+      present_match_(config.has_present_match() ? std::make_optional(config.present_match())
+                                                : std::nullopt),
       matcher_(maybeCreateStringMatcher(config, context)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
@@ -71,6 +71,20 @@ bool ConfigUtility::QueryParameterMatcher::matches(
   return matcher_.value().match(data.value());
 }
 
+ConfigUtility::CookieMatcher::CookieMatcher(const envoy::config::route::v3::CookieMatcher& config,
+                                            Server::Configuration::CommonFactoryContext& context)
+    : name_(config.name()), invert_match_(config.invert_match()),
+      string_match_(config.string_match(), context) {}
+
+bool ConfigUtility::CookieMatcher::matches(
+    const std::optional<absl::string_view>& cookie_value) const {
+  bool matched = false;
+  if (cookie_value.has_value()) {
+    matched = string_match_.match(cookie_value.value());
+  }
+  return matched != invert_match_;
+}
+
 Upstream::ResourcePriority
 ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& priority) {
   switch (priority) {
@@ -88,6 +102,22 @@ bool ConfigUtility::matchQueryParams(
     const std::vector<QueryParameterMatcherPtr>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
     if (!config_query_param->matches(query_params)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool ConfigUtility::matchCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
+                                 const std::vector<CookieMatcherPtr>& matchers) {
+  for (const auto& matcher : matchers) {
+    std::optional<absl::string_view> cookie_value;
+    const auto it = cookies.find(matcher->name());
+    if (it != cookies.end()) {
+      cookie_value = it->second;
+    }
+    if (!matcher->matches(cookie_value)) {
       return false;
     }
   }
@@ -113,7 +143,7 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-absl::optional<Http::Code>
+std::optional<Http::Code>
 ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& route) {
   if (route.has_redirect()) {
     return parseRedirectResponseCode(route.redirect().response_code());
@@ -135,6 +165,20 @@ Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
     return Http::Code::InternalServerError;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
+  dest.headers_to_append_or_add.insert(dest.headers_to_append_or_add.end(),
+                                       src.headers_to_append_or_add.begin(),
+                                       src.headers_to_append_or_add.end());
+  dest.headers_to_overwrite_or_add.insert(dest.headers_to_overwrite_or_add.end(),
+                                          src.headers_to_overwrite_or_add.begin(),
+                                          src.headers_to_overwrite_or_add.end());
+  dest.headers_to_add_if_absent.insert(dest.headers_to_add_if_absent.end(),
+                                       src.headers_to_add_if_absent.begin(),
+                                       src.headers_to_add_if_absent.end());
+  dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
+                                src.headers_to_remove.end());
 }
 
 } // namespace Router

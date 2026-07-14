@@ -31,17 +31,21 @@ public:
   absl::Span<const std::string> uriSanPeerCertificate() const override { return {}; }
   const std::string& serialNumberPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& issuerPeerCertificate() const override { return EMPTY_STRING; }
+  const std::string& sha256PeerCertificateIssuerDigest() const override { return EMPTY_STRING; }
+  const std::string& serialNumberPeerCertificateIssuer() const override { return EMPTY_STRING; }
   const std::string& subjectPeerCertificate() const override { return EMPTY_STRING; }
   Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const std::string& urlEncodedPemEncodedPeerCertificate() const override { return EMPTY_STRING; }
+  const std::string& pemEncodedPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override {
     return EMPTY_STRING;
   }
+  absl::Span<const std::string> pemEncodedPeerCertificateChain() const override { return {}; }
   absl::Span<const std::string> dnsSansPeerCertificate() const override { return {}; }
-  absl::optional<SystemTime> validFromPeerCertificate() const override { return absl::nullopt; }
-  absl::optional<SystemTime> expirationPeerCertificate() const override { return absl::nullopt; }
+  std::optional<SystemTime> validFromPeerCertificate() const override { return std::nullopt; }
+  std::optional<SystemTime> expirationPeerCertificate() const override { return std::nullopt; }
   // QUIC SSL object doesn't cache local certs after the handshake.
   // TODO(danzh) cache these fields during cert chain retrieval.
   const std::string& subjectLocalCertificate() const override { return EMPTY_STRING; }

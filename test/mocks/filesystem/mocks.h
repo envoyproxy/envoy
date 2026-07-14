@@ -25,7 +25,7 @@ public:
   Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
   Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
   bool isOpen() const override { return is_open_; };
-  MOCK_METHOD(std::string, path, (), (const));
+  MOCK_METHOD(absl::string_view, path, (), (const));
   MOCK_METHOD(DestinationType, destinationType, (), (const));
   MOCK_METHOD(Api::IoCallResult<FileInfo>, info, ());
 

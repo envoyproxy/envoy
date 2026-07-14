@@ -1,23 +1,24 @@
 #pragma once
 
-#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <memory>
+#include <string_view>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/network/dns.h"
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
-#include "eval/public/activation.h"
 #include "include/proxy-wasm/wasm.h"
 
 namespace Envoy {
@@ -119,7 +120,8 @@ public:
           PluginHandleSharedPtr plugin_handle); // Stream context.
   ~Context() override;
 
-  Wasm* wasm() const;
+  WasmBase* wasm() const override;
+  Wasm* envoyWasm() const;
   Plugin* plugin() const;
   Context* rootContext() const;
   Upstream::ClusterManager& clusterManager() const;
@@ -148,8 +150,7 @@ public:
                                      const std::shared_ptr<PluginBase>& plugin); // deprecated
 
   // AccessLog::Instance
-  void log(const Formatter::HttpFormatterContext& log_context,
-           const StreamInfo::StreamInfo& info) override;
+  void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override;
 
   uint32_t getLogLevel() override;
 
@@ -272,9 +273,9 @@ public:
   void onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot);
 
   // CEL evaluation
-  absl::optional<google::api::expr::runtime::CelValue>
+  std::optional<google::api::expr::runtime::CelValue>
   findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const;
-  absl::optional<google::api::expr::runtime::CelValue>
+  std::optional<google::api::expr::runtime::CelValue>
   FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
 
   // Foreign function state
@@ -422,8 +423,8 @@ protected:
   // Only available during onHttpCallResponse.
   Envoy::Http::ResponseMessagePtr* http_call_response_{};
 
-  Http::HeaderMapPtr grpc_receive_initial_metadata_{};
-  Http::HeaderMapPtr grpc_receive_trailing_metadata_{};
+  Http::HeaderMapPtr grpc_receive_initial_metadata_;
+  Http::HeaderMapPtr grpc_receive_trailing_metadata_;
 
   // Only available (non-nullptr) during onGrpcReceive.
   ::Envoy::Buffer::InstancePtr grpc_receive_buffer_;
@@ -443,8 +444,7 @@ protected:
   bool buffering_request_body_ = false;
   bool buffering_response_body_ = false;
   bool end_of_stream_ = false;
-  bool local_reply_sent_ = false;
-  ProtobufWkt::Struct temporary_metadata_;
+  bool failure_local_reply_sent_ = false;
 
   // MB: must be a node-type map as we take persistent references to the entries.
   std::map<uint32_t, AsyncClientHandler> http_request_;

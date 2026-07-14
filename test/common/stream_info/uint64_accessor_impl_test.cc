@@ -26,7 +26,7 @@ TEST(UInt64AccessorImplTest, TestProto) {
   auto message = accessor.serializeAsProto();
   EXPECT_NE(nullptr, message);
 
-  auto* uint64_struct = dynamic_cast<ProtobufWkt::UInt64Value*>(message.get());
+  auto* uint64_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::UInt64Value>(message.get());
   EXPECT_NE(nullptr, uint64_struct);
   EXPECT_EQ(init_value, uint64_struct->value());
 }
@@ -34,7 +34,7 @@ TEST(UInt64AccessorImplTest, TestProto) {
 TEST(UInt64AccessorImplTest, TestString) {
   uint64_t init_value = 0xdeadbeefdeadbeef;
   UInt64AccessorImpl accessor(init_value);
-  absl::optional<std::string> value = accessor.serializeAsString();
+  std::optional<std::string> value = accessor.serializeAsString();
   ASSERT_TRUE(value.has_value());
   EXPECT_EQ(value, std::to_string(init_value));
 }

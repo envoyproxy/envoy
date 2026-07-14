@@ -1,9 +1,11 @@
 #include "source/common/network/socket_option_factory.h"
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/address.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/network/addr_family_aware_socket_option_impl.h"
+#include "source/common/network/reuse_port_bpf_cpu_steering_option_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/win32_redirect_records_option_impl.h"
 
@@ -13,7 +15,10 @@ namespace Network {
 std::unique_ptr<Socket::Options>
 SocketOptionFactory::buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepalive_config) {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
-  absl::optional<Network::Socket::Type> tcp_only = {Network::Socket::Type::Stream};
+  if (isTcpKeepaliveConfigDisabled(keepalive_config)) {
+    return options;
+  }
+  std::optional<Network::Socket::Type> tcp_only = {Network::Socket::Type::Stream};
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_KEEPALIVE, 1,
       tcp_only));
@@ -99,7 +104,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
       continue;
     }
 
-    absl::optional<Network::Socket::Type> socket_type = absl::nullopt;
+    std::optional<Network::Socket::Type> socket_type = std::nullopt;
     if (socket_option.has_type() && socket_option.type().has_stream()) {
       if (socket_option.type().has_datagram()) {
         ENVOY_LOG(
@@ -110,12 +115,27 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
     } else if (socket_option.has_type() && socket_option.type().has_datagram()) {
       socket_type = Network::Socket::Type::Datagram;
     }
+    std::optional<Network::Address::IpVersion> socket_ip_version = std::nullopt;
+    switch (socket_option.ip_version()) {
+    case envoy::config::core::v3::SocketOption::SOCKET_IP_VERSION_UNSPECIFIED:
+      break;
+    case envoy::config::core::v3::SocketOption::SOCKET_IP_VERSION_IPV4:
+      socket_ip_version = Network::Address::IpVersion::v4;
+      break;
+    case envoy::config::core::v3::SocketOption::SOCKET_IP_VERSION_IPV6:
+      socket_ip_version = Network::Address::IpVersion::v6;
+      break;
+    default:
+      ENVOY_LOG(warn, "Socket option specified with unknown ip_version: {}",
+                socket_option.DebugString());
+      break;
+    }
     options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
         socket_option.state(),
         Network::SocketOptionName(
             socket_option.level(), socket_option.name(),
             fmt::format("{}/{}", socket_option.level(), socket_option.name())),
-        buf, socket_type));
+        buf, socket_type, socket_ip_version));
   }
   return options;
 }
@@ -151,6 +171,14 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_REUSEPORT, 1));
+  return options;
+}
+
+std::unique_ptr<Socket::Options>
+SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(absl::Span<const uint32_t> worker_cpus) {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<ReusePortBpfCpuSteeringOptionImpl>(
+      std::vector<uint32_t>(worker_cpus.begin(), worker_cpus.end())));
   return options;
 }
 

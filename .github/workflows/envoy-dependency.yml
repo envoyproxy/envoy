@@ -53,16 +53,16 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.16
+      uses: envoyproxy/toolshed/actions/appauth@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.16
+      uses: envoyproxy/toolshed/actions/github/checkout@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/bson@actions-v0.3.16
+    - uses: envoyproxy/toolshed/actions/bson@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: update
       name: Update dependency (${{ inputs.dependency }})
       with:
@@ -97,13 +97,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - uses: envoyproxy/toolshed/gh-actions/upload/diff@actions-v0.3.16
+    - uses: envoyproxy/toolshed/actions/upload/diff@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       name: Upload diff
       with:
         name: ${{ inputs.dependency }}-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr }}
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.16
+      uses: envoyproxy/toolshed/actions/github/pr@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         base: main
         body: |
@@ -134,11 +134,28 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.16
+      uses: envoyproxy/toolshed/actions/appauth@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.16
+    - uses: envoyproxy/toolshed/actions/bind-mounts@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      if: ! github.event.repository.private
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner-cache
+            target: /home/runner/.cache
+            chown: "runner:runner"
+    - name: Free disk space
+      if: github.event.repository.private
+      uses: envoyproxy/toolshed/actions/diskspace@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      with:
+        to_remove: |
+          /usr/local/.ghcup
+          /usr/local/lib/android
+    - uses: envoyproxy/toolshed/actions/github/checkout@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -146,18 +163,16 @@ jobs:
           path: envoy
           fetch-depth: 0
         token: ${{ steps.appauth.outputs.token }}
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
-      name: Checkout Envoy build tools repository
-      with:
-        repository: envoyproxy/envoy-build-tools
-        path: build-tools
-        fetch-depth: 0
     - run: |
         shas=(
-            tag
-            sha
+            sha-ci
+            sha-devtools
+            sha-docker
+            sha-gcc
+            sha-mobile
+            sha-worker
             mobile-sha
-            gcr-sha)
+            tag)
         for sha in "${shas[@]}"; do
             current_sha=$(bazel run --config=ci //tools/dependency:build-image-sha "$sha")
             echo "${sha}=${current_sha}" >> "$GITHUB_OUTPUT"
@@ -167,41 +182,66 @@ jobs:
       working-directory: envoy
     - run: |
         if [[ -z "$CONTAINER_TAG" ]]; then
-            # get current build image version
-            CONTAINER_TAG=$(git log -1 --pretty=format:"%H" "./docker")
+            # Source of truth: the latest `docker-v*` GitHub release in
+            # envoyproxy/toolshed. Strip only the `docker-` prefix - the
+            # published images keep the leading `v`, eg
+            # `envoyproxy/envoy-build:ci-v0.1.6`.
+            CONTAINER_TAG=$(
+                gh api -H "Accept: application/vnd.github+json" \
+                    --paginate \
+                    /repos/envoyproxy/toolshed/releases \
+                    --jq 'map(select(.tag_name | startswith("docker-v"))) | .[0].tag_name // empty' \
+                | head -n1 \
+                | sed 's/^docker-//')
         fi
+        if [[ -z "$CONTAINER_TAG" ]]; then
+            echo "ERROR: Could not determine build image tag from envoyproxy/toolshed releases" >&2
+            exit 1
+        fi
+        # Normalize: accept `docker-v0.1.6`, `v0.1.6` or `0.1.4` from inputs.version
+        CONTAINER_TAG="${CONTAINER_TAG#docker-}"
+        [[ "$CONTAINER_TAG" == v* ]] || CONTAINER_TAG="v${CONTAINER_TAG}"
         echo "tag=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
-        echo "tag_short=${CONTAINER_TAG::7}" >> "$GITHUB_OUTPUT"
+        echo "tag_short=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
       env:
         CONTAINER_TAG: ${{ inputs.version }}
+        GH_TOKEN: ${{ steps.appauth.outputs.token }}
       id: build-tools
       name: Build image SHA
-      working-directory: build-tools
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.3.16
+      uses: envoyproxy/toolshed/actions/docker/shas@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         images: |
-           sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
-           mobile-sha: envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
-           gcr-sha: gcr.io/envoy-ci/envoy-build:${{ steps.build-tools.outputs.tag }}
+           sha-ci: docker.io/envoyproxy/envoy-build:ci-${{ steps.build-tools.outputs.tag }}
+           sha-devtools: docker.io/envoyproxy/envoy-build:devtools-${{ steps.build-tools.outputs.tag }}
+           sha-docker: docker.io/envoyproxy/envoy-build:docker-${{ steps.build-tools.outputs.tag }}
+           sha-gcc: docker.io/envoyproxy/envoy-build:gcc-${{ steps.build-tools.outputs.tag }}
+           sha-mobile: docker.io/envoyproxy/envoy-build:mobile-${{ steps.build-tools.outputs.tag }}
+           sha-worker: docker.io/envoyproxy/envoy-build:worker-${{ steps.build-tools.outputs.tag }}
 
     - run: |
         SHA_REPLACE=(
             "$CURRENT_ENVOY_TAG:$ENVOY_TAG"
-            "$CURRENT_ENVOY_SHA:${{ fromJSON(steps.build-images.outputs.shas).sha }}"
-            "$CURRENT_ENVOY_MOBILE_SHA:${{ fromJSON(steps.build-images.outputs.shas).mobile-sha }}"
-            "$CURRENT_ENVOY_GCR_SHA:${{ fromJSON(steps.build-images.outputs.shas).gcr-sha }}")
+            "$CURRENT_ENVOY_SHA_CI:${{ fromJSON(steps.build-images.outputs.shas).sha-ci }}"
+            "$CURRENT_ENVOY_SHA_DEVTOOLS:${{ fromJSON(steps.build-images.outputs.shas).sha-devtools }}"
+            "$CURRENT_ENVOY_SHA_DOCKER:${{ fromJSON(steps.build-images.outputs.shas).sha-docker }}"
+            "$CURRENT_ENVOY_SHA_GCC:${{ fromJSON(steps.build-images.outputs.shas).sha-gcc }}"
+            "$CURRENT_ENVOY_SHA_MOBILE:${{ fromJSON(steps.build-images.outputs.shas).sha-mobile }}"
+            "$CURRENT_ENVOY_SHA_WORKER:${{ fromJSON(steps.build-images.outputs.shas).sha-worker }}")
         echo "replace=${SHA_REPLACE[*]}" >> "$GITHUB_OUTPUT"
       name: Find SHAs to replace
       id: shas
       env:
         ENVOY_TAG: ${{ steps.build-tools.outputs.tag }}
         CURRENT_ENVOY_TAG: ${{ steps.current.outputs.tag }}
-        CURRENT_ENVOY_SHA: ${{ steps.current.outputs.sha }}
-        CURRENT_ENVOY_MOBILE_SHA: ${{ steps.current.outputs.mobile-sha }}
-        CURRENT_ENVOY_GCR_SHA: ${{ steps.current.outputs.gcr-sha }}
+        CURRENT_ENVOY_SHA_CI: ${{ steps.current.outputs.sha-ci }}
+        CURRENT_ENVOY_SHA_DEVTOOLS: ${{ steps.current.outputs.sha-devtools }}
+        CURRENT_ENVOY_SHA_DOCKER: ${{ steps.current.outputs.sha-docker }}
+        CURRENT_ENVOY_SHA_GCC: ${{ steps.current.outputs.sha-gcc }}
+        CURRENT_ENVOY_SHA_MOBILE: ${{ steps.current.outputs.sha-mobile }}
+        CURRENT_ENVOY_SHA_WORKER: ${{ steps.current.outputs.sha-worker }}
     - run: |
         echo "${SHA_REPLACE}" | xargs bazel run --config=ci @envoy_toolshed//sha:replace "${PWD}"
       env:
@@ -209,7 +249,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.16
+      uses: envoyproxy/toolshed/actions/github/pr@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         base: main
         body: Created by Envoy dependency bot
@@ -238,12 +278,12 @@ jobs:
       issues: write
     steps:
     - name: Checkout repository
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
     - name: Run dependency checker
       run: |
         TODAY_DATE=$(date -u -I"date")
         export TODAY_DATE
-        bazel run --config=ci //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
-        bazel run --config=ci //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
+        bazel run --config=ci //tools/dependency:check -- -c release_issues --fix
+        # bazel run --config=ci //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

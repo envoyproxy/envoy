@@ -13,13 +13,14 @@
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 namespace {
@@ -102,13 +103,13 @@ public:
     acceptXdsConnection();
 
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
     sendClusterDiscoveryResponse({cluster1_}, {cluster1_}, {}, "55");
 
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_1 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
 
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.
@@ -121,7 +122,7 @@ public:
       const std::vector<envoy::config::cluster::v3::Cluster>& added_or_updated,
       const std::vector<std::string>& removed, const std::string& version) {
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, state_of_the_world, added_or_updated, removed, version);
+        Config::TestTypeUrl::get().Cluster, state_of_the_world, added_or_updated, removed, version);
   }
 
   // Regression test to catch the code declaring a gRPC service method for {SotW,delta}
@@ -175,32 +176,32 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   initialize();
 
   if (useDeferredCluster()) {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+    test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(0));
   } else {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 2);
+    test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(2));
   }
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
-  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
 
   if (useDeferredCluster()) {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
+    test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(1));
   } else {
     EXPECT_EQ(
         test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value(), 2);
   }
 
   // Tell Envoy that cluster_1 is gone.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendClusterDiscoveryResponse({}, {}, {ClusterName1}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   if (useDeferredCluster()) {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 0);
+    test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(0));
   } else {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
+    test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(1));
   }
 
   // Now that cluster_1 is gone, the listener (with its routing to cluster_1) should 503.
@@ -215,23 +216,23 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "42", {}, {}, {}));
   sendClusterDiscoveryResponse({cluster1_}, {cluster1_}, {}, "413");
 
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse describing cluster_1 that we sent. Again, 2 includes CDS server.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
   if (useDeferredCluster()) {
     EXPECT_EQ(
         test_server_->gauge("thread_local_cluster_manager.worker_0.clusters_inflated")->value(), 0);
   } else {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 2);
+    test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(2));
   }
 
   // Does *not* call our initialize().
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
   if (useDeferredCluster()) {
-    test_server_->waitForGaugeEq("thread_local_cluster_manager.worker_0.clusters_inflated", 1);
+    test_server_->waitForGauge("thread_local_cluster_manager.worker_0.clusters_inflated", Eq(1));
   }
 
   cleanupUpstreamAndDownstream();
@@ -240,7 +241,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 // Make sure that clusters won't create new connections on teardown.
 TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   initialize();
-  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
   test_server_->waitForCounterExists("cluster.cluster_1.upstream_cx_total");
   Stats::CounterSharedPtr cx_counter = test_server_->counter("cluster.cluster_1.upstream_cx_total");
   // Confirm no upstream connection is attempted so far.
@@ -255,11 +256,11 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
       {":method", "GET"}, {":path", "/cluster1"}, {":scheme", "http"}, {":authority", "host"}});
 
   // Tell Envoy that cluster_1 is gone.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendClusterDiscoveryResponse({}, {}, {ClusterName1}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
   codec_client_->sendReset(encoder_decoder.first);
   cleanupUpstreamAndDownstream();
 
@@ -277,13 +278,11 @@ public:
               enable_deferred_creation_stats);
         });
     CdsIntegrationTest::initialize();
-    test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
   }
 
-  void sendRequestToClusterAndWaitForResponse() {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
-    ASSERT_TRUE(response->complete());
+  void sendRequestToClusterAndWaitForResponse(int upstream_index = UpstreamIndex1) {
+    testRouterHeaderOnlyRequestAndResponse(nullptr, upstream_index, "/cluster1");
     cleanupUpstreamAndDownstream();
   };
 
@@ -294,14 +293,14 @@ public:
         envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
+        Config::TestTypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
   }
 
   void removeClusters(const std::vector<std::string>& removed) {
     uint64_t cluster_removed = test_server_->counter("cluster_manager.cluster_removed")->value();
     sendClusterDiscoveryResponse({}, {}, removed, "42");
-    test_server_->waitForCounterGe("cluster_manager.cluster_removed",
-                                   cluster_removed + removed.size());
+    test_server_->waitForCounter("cluster_manager.cluster_removed",
+                                 Ge(cluster_removed + removed.size()));
   }
 };
 
@@ -324,15 +323,15 @@ TEST_P(DeferredCreationClusterStatsTest,
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 
   updateCluster();
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
 
   // cluster_1 traffic stats not lost.
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   removeClusters({ClusterName1});
   // update_success is 3: initialize(), update cluster1. and remove cluster1.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(3));
   sendClusterDiscoveryResponse({cluster2_}, {cluster2_}, {}, "43");
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(4));
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
   // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
   test_server_->waitForCounterNonexistent("cluster.cluster_1.upstream_cx_total",
@@ -356,15 +355,15 @@ TEST_P(DeferredCreationClusterStatsTest,
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 
   updateCluster();
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
 
   // cluster_1 traffic stats not lost.
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   removeClusters({ClusterName1});
   // update_success is 3: initialize(), update cluster1. and remove cluster1.
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(3));
   sendClusterDiscoveryResponse({cluster2_}, {cluster2_}, {}, "43");
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(4));
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
   // Now the cluster_1 stats are gone.
   test_server_->waitForCounterNonexistent("cluster.cluster_1.upstream_cx_total",
@@ -385,9 +384,9 @@ TEST_P(DeferredCreationClusterStatsTest,
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   removeClusters({ClusterName1});
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
   sendClusterDiscoveryResponse({cluster2_}, {cluster2_}, {}, "43");
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(3));
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
   // No cluster_2 traffic stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.initialized")->value(), 0);
@@ -398,14 +397,15 @@ TEST_P(DeferredCreationClusterStatsTest,
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized"), nullptr);
   // Now add cluster1 back.
   updateCluster();
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(4));
   // Now the cluster_1.ClusterTrafficStats.initialized gauge is 0, since it didn't see previous
   // stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
 
   // cluster_1 traffic stats created, due to the above http request.
-  sendRequestToClusterAndWaitForResponse();
+  // updateCluster() configures cluster_1 to point to fake_upstreams_[UpstreamIndex2] port.
+  sendRequestToClusterAndWaitForResponse(UpstreamIndex2);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 }
@@ -420,9 +420,9 @@ TEST_P(DeferredCreationClusterStatsTest,
   // cluster_1 trafficStats updated.
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   removeClusters({ClusterName1});
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
   sendClusterDiscoveryResponse({cluster2_}, {cluster2_}, {}, "43");
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(3));
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
   // cluster_2 traffic stats created.
   EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total")->value(), 0);
@@ -431,9 +431,10 @@ TEST_P(DeferredCreationClusterStatsTest,
                                           TestUtility::DefaultTimeout);
   // Now add cluster1 back.
   updateCluster();
-  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(4));
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
-  sendRequestToClusterAndWaitForResponse();
+  // updateCluster() configures cluster_1 to point to fake_upstreams_[UpstreamIndex2] port.
+  sendRequestToClusterAndWaitForResponse(UpstreamIndex2);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 }
 
@@ -441,14 +442,14 @@ TEST_P(DeferredCreationClusterStatsTest,
 TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
-  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
 
   // Tell Envoy that cluster_1 is gone.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendClusterDiscoveryResponse({}, {}, {ClusterName1}, "42");
   // Make sure that Envoy's ClusterManager has made use of the DiscoveryResponse that says
   // cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   // Update cluster1_ to use MAGLEV load balancer policy.
   cluster1_ = ConfigHelper::buildStaticCluster(
@@ -459,13 +460,13 @@ TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
   // Cyclically add and remove cluster with ThreadAwareLb.
   for (int i = 42; i < 142; i += 2) {
     EXPECT_TRUE(
-        compareDiscoveryRequest(Config::TypeUrl::get().Cluster, absl::StrCat(i), {}, {}, {}));
+        compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, absl::StrCat(i), {}, {}, {}));
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {cluster1_}, {cluster1_}, {}, absl::StrCat(i + 1));
-    EXPECT_TRUE(
-        compareDiscoveryRequest(Config::TypeUrl::get().Cluster, absl::StrCat(i + 1), {}, {}, {}));
+        Config::TestTypeUrl::get().Cluster, {cluster1_}, {cluster1_}, {}, absl::StrCat(i + 1));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, absl::StrCat(i + 1), {},
+                                        {}, {}));
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {}, {}, {ClusterName1}, absl::StrCat(i + 2));
+        Config::TestTypeUrl::get().Cluster, {}, {}, {ClusterName1}, absl::StrCat(i + 2));
   }
 
   cleanupUpstreamAndDownstream();
@@ -480,11 +481,11 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_2 is here.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
+      Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
   // The '3' includes the fake CDS server.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // A request for cluster_2 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
@@ -492,11 +493,11 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is gone.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "42", {}, {}, {}));
   sendClusterDiscoveryResponse({cluster2_}, {}, {ClusterName1}, "43");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   // Even with cluster_1 gone, a request for cluster_2 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
@@ -504,13 +505,13 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "43", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "43", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
+      Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
 
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse describing cluster_1 that we sent. Again, 3 includes CDS server.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // Does *not* call our initialize().
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
@@ -534,12 +535,12 @@ TEST_P(CdsIntegrationTest, TwoClustersAndRedirects) {
   // Tell Envoy that cluster_2 is here.
   initialize();
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
+      Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
   // The '3' includes the fake CDS server.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
   // Tell Envoy that cluster_1 is gone.
   sendClusterDiscoveryResponse({cluster2_}, {}, {ClusterName1}, "43");
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   default_request_headers_.setPath("/cluster2");
@@ -594,10 +595,10 @@ TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
 
   // Tell Envoy that cluster_2 is here. This update does *not* need to include cluster_1,
   // which Envoy should already know about despite the disconnect.
-  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
-                                                                  {cluster2_}, {}, "42");
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {cluster2_}, {}, "42");
   // The '3' includes the fake CDS server.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // A request for cluster_1 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
@@ -635,6 +636,8 @@ TEST_P(CdsIntegrationTest, CdsClusterDownWithLotsOfIdleConnections) {
             ->mutable_idle_timeout()
             ->set_seconds(600);
       });
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(2001);
+
   initialize();
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeHttpConnectionPtr> upstream_connections;
@@ -676,14 +679,14 @@ TEST_P(CdsIntegrationTest, CdsClusterDownWithLotsOfIdleConnections) {
     EXPECT_EQ("200", responses[i]->headers().getStatusValue());
   }
 
-  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
 
   // Tell Envoy that cluster_1 is gone. Envoy will try to close all idle connections
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendClusterDiscoveryResponse({}, {}, {ClusterName1}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   // If we made it this far then everything is ok.
   for (int i = 0; i < num_requests; ++i) {
@@ -729,7 +732,7 @@ TEST_P(CdsIntegrationTest, DISABLED_CdsClusterDownWithLotsOfConnectingConnection
             ->set_seconds(600);
       });
   initialize();
-  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
   std::vector<IntegrationStreamDecoderPtr> responses;
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   // Stop upstream at UpstreamIndex1 dispatcher, to prevent it from accepting TCP connections.
@@ -747,14 +750,14 @@ TEST_P(CdsIntegrationTest, DISABLED_CdsClusterDownWithLotsOfConnectingConnection
   }
 
   // Wait for Envoy to try to establish all expected connections
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_cx_total", num_requests);
+  test_server_->waitForCounter("cluster.cluster_1.upstream_cx_total", Eq(num_requests));
 
   // Tell Envoy that cluster_1 is gone. Envoy will try to close all pending connections
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
   sendClusterDiscoveryResponse({}, {}, {ClusterName1}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());

@@ -9,7 +9,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Common {
 
 template <class ProtoType, class Impl>
@@ -43,7 +43,7 @@ private:
                     time_source_);
     }
 
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
   public:
     OptRef<const Upstream::LoadBalancerConfig> lb_config_;
@@ -109,6 +109,6 @@ private:
 };
 
 } // namespace Common
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

@@ -16,17 +16,24 @@ namespace Utility {
 // HistogramBucketsMode determines how histogram statistics get reported. Not
 // all modes are supported for all formats, with the "Unset" variant allowing
 // different formats to have different default behavior.
-enum class HistogramBucketsMode { Unset, Summary, Cumulative, Disjoint, Detailed };
+enum class HistogramBucketsMode {
+  Unset,
+  Summary,
+  Cumulative,
+  Disjoint,
+  Detailed,
+  PrometheusNative
+};
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 
 absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params,
                                    HistogramBucketsMode& histogram_buckets_mode);
 
-absl::optional<std::string> formatParam(const Http::Utility::QueryParamsMulti& params);
+std::optional<std::string> formatParam(const Http::Utility::QueryParamsMulti& params);
 
-absl::optional<std::string> nonEmptyQueryParam(const Http::Utility::QueryParamsMulti& params,
-                                               const std::string& key);
+std::optional<std::string> nonEmptyQueryParam(const Http::Utility::QueryParamsMulti& params,
+                                              const std::string& key);
 
 } // namespace Utility
 } // namespace Server

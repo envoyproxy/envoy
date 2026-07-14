@@ -24,6 +24,7 @@ namespace Envoy {
 class FastMockClusterManager : public testing::StrictMock<Upstream::MockClusterManager> {
 public:
   ClusterInfoMaps clusters() const override { return ClusterInfoMaps{}; }
+  void forEachActiveCluster(std::function<void(const Upstream::Cluster&)>) const override {}
 };
 
 class TestSinkPredicates : public Stats::SinkPredicates {
@@ -90,7 +91,7 @@ public:
 private:
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
-  Stats::AllocatorImpl stats_allocator_;
+  Stats::Allocator stats_allocator_;
   Stats::ThreadLocalStoreImpl stats_store_;
   Event::SimulatedTimeSystem time_system_;
   FastMockClusterManager cm_;
@@ -118,7 +119,14 @@ static void bmFlushToSinksWithPredicatesSet(::benchmark::State& state) {
   speed_test.test(state);
 }
 
-BENCHMARK(bmFlushToSinks)->Unit(::benchmark::kMillisecond)->RangeMultiplier(10)->Range(10, 1000000);
+// The 2500000 case exercises 10M metric objects per snapshot (2.5M each of
+// counters, gauges, histograms and text readouts), the regime where ref-count
+// overhead during flush was reported in #43836.
+BENCHMARK(bmFlushToSinks)
+    ->Unit(::benchmark::kMillisecond)
+    ->RangeMultiplier(10)
+    ->Range(10, 1000000)
+    ->Arg(2500000);
 BENCHMARK(bmFlushToSinksWithPredicatesSet)
     ->Unit(::benchmark::kMillisecond)
     ->RangeMultiplier(10)

@@ -1,14 +1,23 @@
 #pragma once
 
-#include "envoy/common/random_generator.h"
-#include "envoy/event/dispatcher.h"
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+
+#include "envoy/common/pure.h"
+#include "envoy/common/resource.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "envoy/singleton/manager.h"
-#include "envoy/thread_local/thread_local.h"
+#include "envoy/network/address.h"
+#include "envoy/network/dns.h"
 #include "envoy/upstream/resource_manager.h"
 
 #include "source/common/http/header_utility.h"
-#include "source/common/runtime/runtime_features.h"
+
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,13 +59,8 @@ public:
   /**
    * Returns the host's currently resolved address. These addresses may change periodically due to
    * async re-resolution.
-   *
-   * If `filtered` is true and the runtime guard
-   * `envoy.reloadable_features.dns_cache_filter_unusable_ip_version` is true, return a filtered
-   * list where the IP addresses of IP families unsupported on the current network are removed.
    */
-  virtual std::vector<Network::Address::InstanceConstSharedPtr>
-  addressList(bool filtered) const PURE;
+  virtual std::vector<Network::Address::InstanceConstSharedPtr> addressList() const PURE;
 
   /**
    * Returns the host that was actually resolved via DNS. If port was originally specified it will
@@ -217,7 +221,7 @@ public:
   struct LoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandlePtr handle_;
-    absl::optional<DnsHostInfoSharedPtr> host_info_;
+    std::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   /**
@@ -263,9 +267,9 @@ public:
    * Retrieve the DNS host info of a given host currently stored in the cache.
    * @param host_name supplies the host name.
    * @return the DNS host info associated with the given host name if the host's address is cached,
-   * otherwise `absl::nullopt`.
+   * otherwise `std::nullopt`.
    */
-  virtual absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) PURE;
+  virtual std::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) PURE;
 
   /**
    * Check if a DNS request is allowed given resource limits.
@@ -285,12 +289,12 @@ public:
    * specific IP version, we can save time not having to try to connect to both IPv4 and IPv6
    * addresses.
    */
-  virtual void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) PURE;
+  virtual void setIpVersionToRemove(std::optional<Network::Address::IpVersion> ip_version) PURE;
 
   /**
    * Gets the `IpVersion` addresses to be removed from the DNS response.
    */
-  virtual absl::optional<Network::Address::IpVersion> getIpVersionToRemove() PURE;
+  virtual std::optional<Network::Address::IpVersion> getIpVersionToRemove() PURE;
 
   /**
    * Stops the DNS cache background tasks by canceling the pending queries and stopping the timeout

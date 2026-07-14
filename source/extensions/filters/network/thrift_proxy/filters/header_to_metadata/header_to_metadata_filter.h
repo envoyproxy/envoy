@@ -8,6 +8,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/matcher/regex_replace.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"
@@ -32,7 +33,7 @@ class HeaderValueSelector {
 public:
   explicit HeaderValueSelector(Http::LowerCaseString header, bool remove)
       : header_(std::move(header)), remove_(std::move(remove)) {}
-  absl::optional<std::string> extract(Http::HeaderMap& map) const;
+  std::optional<std::string> extract(Http::HeaderMap& map) const;
   std::string toString() const { return fmt::format("header '{}'", header_.get()); }
 
 private:
@@ -44,14 +45,12 @@ class Rule {
 public:
   Rule(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
-  const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
-  const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
+  const std::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
   std::shared_ptr<const HeaderValueSelector> selector_;
 
 private:
   const ProtoRule rule_;
-  Regex::CompiledMatcherPtr regex_rewrite_{};
-  std::string regex_rewrite_substitution_{};
+  std::optional<Matcher::RegexReplace> regex_replace_;
 };
 
 using HeaderToMetadataRules = std::vector<Rule>;
@@ -81,7 +80,7 @@ public:
 
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
-  using StructMap = std::map<std::string, ProtobufWkt::Struct>;
+  using StructMap = std::map<std::string, Protobuf::Struct>;
 
   /**
    *  writeHeaderToMetadata encapsulates (1) searching for the header and (2) writing it to the

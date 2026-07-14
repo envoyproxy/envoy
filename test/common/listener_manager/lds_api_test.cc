@@ -8,6 +8,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/listener_manager.h"
@@ -39,15 +40,15 @@ public:
   void setup() {
     envoy::config::core::v3::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
-    lds_ =
-        std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
-                                     *store_.rootScope(), listener_manager_, validation_visitor_);
+    lds_ = std::make_unique<LdsApiImpl>(lds_config, nullptr, xds_manager_, cluster_manager_,
+                                        init_manager_, *store_.rootScope(), listener_manager_,
+                                        validation_visitor_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
   }
 
-  void expectAdd(const std::string& listener_name, absl::optional<std::string> version,
+  void expectAdd(const std::string& listener_name, std::optional<std::string> version,
                  bool updated) {
     if (!version) {
       EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
@@ -91,6 +92,7 @@ public:
     return listener;
   }
 
+  NiceMock<Config::MockXdsManager> xds_manager_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> grpc_mux_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Init::MockManager init_manager_;

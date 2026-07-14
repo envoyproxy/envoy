@@ -34,6 +34,7 @@ public:
   bool supportsUdpGso() const override;
   bool supportsIpTransparent(Network::Address::IpVersion version) const override;
   bool supportsMptcp() const override;
+  bool supportsReusePortBpfCpuSteering() const override;
   SysCallIntResult close(os_fd_t fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
@@ -71,6 +72,8 @@ public:
   SysCallIntResult getaddrinfo(const char* node, const char* service, const addrinfo* hints,
                                addrinfo** res) override;
   void freeaddrinfo(addrinfo* res) override;
+  SysCallIntResult getrlimit(int resource, struct rlimit* rlim) override;
+  SysCallIntResult setrlimit(int resource, const struct rlimit* rlim) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

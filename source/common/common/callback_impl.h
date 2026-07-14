@@ -21,9 +21,9 @@ namespace Common {
  *
  * @see ThreadSafeCallbackManager for dealing with callbacks across multiple threads
  */
-template <typename... CallbackArgs> class CallbackManager {
+template <typename ReturnType, typename... CallbackArgs> class CallbackManager {
 public:
-  using Callback = std::function<absl::Status(CallbackArgs...)>;
+  using Callback = std::function<ReturnType(CallbackArgs...)>;
 
   /**
    * Add a callback.
@@ -46,12 +46,16 @@ public:
    *       to change (specifically, it will crash if the next callback in the list is deleted).
    * @param args supplies the callback arguments.
    */
-  absl::Status runCallbacks(CallbackArgs... args) {
+  ReturnType runCallbacks(CallbackArgs... args) {
     for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
       auto current = *(it++);
-      RETURN_IF_NOT_OK(current->cb_(args...));
+      if constexpr (std::is_same_v<absl::Status, ReturnType>) {
+        RETURN_IF_NOT_OK(current->cb_(args...));
+      } else {
+        current->cb_(args...);
+      }
     }
-    return absl::OkStatus();
+    return defaultReturn();
   }
 
   /**
@@ -62,12 +66,16 @@ public:
    * @param run_with function that is responsible for generating inputs to callbacks. This will be
    * executed once for each callback.
    */
-  absl::Status runCallbacksWith(std::function<std::tuple<CallbackArgs...>(void)> run_with) {
+  ReturnType runCallbacksWith(std::function<std::tuple<CallbackArgs...>(void)> run_with) {
     for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
       auto cb = *(it++);
-      RETURN_IF_NOT_OK(std::apply(cb->cb_, run_with()));
+      if constexpr (std::is_same_v<absl::Status, ReturnType>) {
+        RETURN_IF_NOT_OK(std::apply(cb->cb_, run_with()));
+      } else {
+        std::apply(cb->cb_, run_with());
+      }
     }
-    return absl::OkStatus();
+    return defaultReturn();
   }
 
   size_t size() const noexcept { return callbacks_.size(); }
@@ -99,6 +107,15 @@ private:
    * @param handle supplies the callback handle to remove.
    */
   void remove(typename std::list<CallbackHolder*>::iterator& it) { callbacks_.erase(it); }
+
+  // Templating helper
+  ReturnType defaultReturn() {
+    if constexpr (std::is_same_v<absl::Status, ReturnType>) {
+      return absl::OkStatus();
+    } else {
+      return void();
+    }
+  }
 
   std::list<CallbackHolder*> callbacks_;
   // This is a sentinel shared_ptr used for keeping track of whether the manager is still alive.

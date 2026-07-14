@@ -33,7 +33,8 @@ private:
 
 } // namespace
 
-Span::Span(datadog::tracing::Span&& span) : span_(std::move(span)) {}
+Span::Span(datadog::tracing::Span&& span, bool use_local_decision)
+    : span_(std::move(span)), use_local_decision_(use_local_decision) {}
 
 const datadog::tracing::Optional<datadog::tracing::Span>& Span::impl() const { return span_; }
 
@@ -124,6 +125,13 @@ void Span::setSampled(bool sampled) {
   auto priority = static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
                                            : datadog::tracing::SamplingPriority::USER_DROP);
   span_->trace_segment().override_sampling_priority(priority);
+}
+
+bool Span::exportedSpan() const {
+  // DD does expose sampling_decision()->priority, but the span sampling
+  // (eg, DD_SPAN_SAMPLING_RULES and similar) might be configured to resurrect
+  // the span later.
+  return true;
 }
 
 std::string Span::getBaggage(absl::string_view) {

@@ -23,18 +23,19 @@ public:
   /**
    * Get address of upstream host that the current session stuck on.
    *
-   * @return absl::optional<absl::string_view> optional upstream address. If there is no available
-   * session or no available address, absl::nullopt will be returned.
+   * @return std::optional<absl::string_view> optional upstream address. If there is no available
+   * session or no available address, std::nullopt will be returned.
    */
-  virtual absl::optional<absl::string_view> upstreamAddress() const PURE;
+  virtual std::optional<absl::string_view> upstreamAddress() const PURE;
 
   /**
    * Called when a request is completed to update the session state.
    *
    * @param host_address the upstream host that was finally selected.
    * @param headers the response headers.
+   * @return bool true if the selected host differs from the previously stored session host.
    */
-  virtual void onUpdate(absl::string_view host_address, ResponseHeaderMap& headers) PURE;
+  virtual bool onUpdate(absl::string_view host_address, ResponseHeaderMap& headers) PURE;
 };
 
 using SessionStatePtr = std::unique_ptr<SessionState>;

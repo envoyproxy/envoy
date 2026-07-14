@@ -4,7 +4,7 @@
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/common/engine_types.h"
 #include "library/common/http/header_utility.h"
 
@@ -23,16 +23,17 @@ TEST(SendHeadersTest, Success) {
   auto* headers3 = http_request_headers_match->add_headers();
   headers3->set_name(":path");
   headers3->set_exact_match("/");
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url(
       "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion");
   std::string serialized_assertion;
-  assertion.SerializeToString(&serialized_assertion);
+  std::ignore = assertion.SerializeToString(&serialized_assertion);
   typed_config.set_value(serialized_assertion);
 
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
+      .enableLogger(false)
       .setLogLevel(Logger::Logger::debug)
       .addNativeFilter("envoy.filters.http.assertion", typed_config)
       .setOnEngineRunning([&]() { engine_running.Notify(); });

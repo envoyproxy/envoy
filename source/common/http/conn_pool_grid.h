@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/server/overload/overload_manager.h"
+
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3/conn_pool.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
@@ -76,7 +78,7 @@ public:
                          Upstream::HostDescriptionConstSharedPtr host) override;
       void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
                        StreamInfo::StreamInfo& info,
-                       absl::optional<Http::Protocol> protocol) override;
+                       std::optional<Http::Protocol> protocol) override;
 
       ConnectionPool::Instance& pool() { return pool_; }
 
@@ -101,7 +103,7 @@ public:
     // Called on pool failure or timeout to kick off another connection attempt.
     // Returns the StreamCreationResult if there is a failover pool and a
     // connection has been attempted, an empty optional otherwise.
-    absl::optional<StreamCreationResult> tryAnotherConnection();
+    std::optional<StreamCreationResult> tryAnotherConnection();
 
     // This timer is registered when an initial HTTP/3 attempt is started.
     // The timeout for TCP failover and HTTP/3 happy eyeballs are the same, so
@@ -119,7 +121,7 @@ public:
     void onConnectionAttemptReady(ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
                                   Upstream::HostDescriptionConstSharedPtr host,
                                   StreamInfo::StreamInfo& info,
-                                  absl::optional<Http::Protocol> protocol);
+                                  std::optional<Http::Protocol> protocol);
 
     // Called by onConnectionAttemptFailed and on grid deletion destruction to let wrapper
     // callback subscribers know the connect attempt failed.
@@ -154,6 +156,8 @@ public:
     ConnectivityGrid& grid_;
     // The decoder for the original newStream, needed to create streams on subsequent pools.
     Http::ResponseDecoder& decoder_;
+    Http::ResponseDecoderHandlePtr decoder_handle_;
+
     // The callbacks from the original caller, which must get onPoolFailure or
     // onPoolReady unless there is call to cancel(). Will be nullptr if the caller
     // has been notified while attempts are still pending.
@@ -172,8 +176,9 @@ public:
     bool tcp_attempt_succeeded_{};
     // Latch the passed-in stream options.
     const Instance::StreamOptions stream_options_{};
-    absl::optional<ConnectionPool::PoolFailureReason> prev_pool_failure_reason_;
+    std::optional<ConnectionPool::PoolFailureReason> prev_pool_failure_reason_;
     std::string prev_pool_transport_failure_reason_;
+    bool delete_started_ = false;
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -185,7 +190,8 @@ public:
                    HttpServerPropertiesCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
                    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
-                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry);
+                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
+                   Server::OverloadManager& overload_manager);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -200,6 +206,7 @@ public:
   bool isIdle() const override;
   void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override { return options_; }
   bool maybePreconnect(float preconnect_ratio) override;
   absl::string_view protocolDescription() const override { return "connection grid"; }
 
@@ -288,6 +295,7 @@ private:
 
   Http::PersistentQuicInfo& quic_info_;
   Upstream::ResourcePriority priority_;
+  Server::OverloadManager& overload_manager_;
 
   // True iff this pool is draining. No new streams or connections should be created
   // in this state.

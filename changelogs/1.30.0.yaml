@@ -394,7 +394,7 @@ new_features:
     :ref:`HttpRequest.header_map <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map>` (specifically
     ``header_map.headers.raw_value``) gets populated with the raw values instead of ``headers``,
     which normally contains UTF-8 sanitized header values. Also, since the new field is not a map,
-    headers with the same key are not combined into a single comma-seperated header.
+    headers with the same key are not combined into a single comma-separated header.
 - area: load_shed_point
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if

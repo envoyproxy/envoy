@@ -44,9 +44,11 @@ public:
     return Upstream::Cluster::InitializePhase::Secondary;
   }
 
+  // Getters that return the values from ClusterImplBase.
+  Runtime::Loader& runtime() const { return runtime_; }
+  Random::RandomGenerator& random() const { return random_; }
+
   Upstream::ClusterManager& cluster_manager_;
-  Runtime::Loader& runtime_;
-  Random::RandomGenerator& random_;
   const ClusterSetConstSharedPtr clusters_;
 
 protected:
@@ -77,12 +79,12 @@ public:
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             Upstream::ThreadLocalClusterCommand& get_cluster) override;
-  void onClusterRemoval(const std::string& cluster_name) override;
+  void onClusterRemoval(absl::string_view cluster_name) override;
 
   // Upstream::LoadBalancer
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override;
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                            const Upstream::Host& /*host*/,
                            std::vector<uint8_t>& /*hash_key*/) override;
@@ -107,7 +109,7 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
@@ -117,7 +119,7 @@ private:
       return {};
     }
 
-    absl::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
+    std::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
 
   private:
     const PriorityContext& priority_context_;
@@ -126,8 +128,8 @@ private:
   using LoadBalancerImplPtr = std::unique_ptr<LoadBalancerImpl>;
 
   void addMemberUpdateCallbackForCluster(Upstream::ThreadLocalCluster& thread_local_cluster);
-  PriorityContextPtr linearizePrioritySet(OptRef<const std::string> excluded_cluster);
-  void refresh(OptRef<const std::string> excluded_cluster = OptRef<const std::string>());
+  PriorityContextPtr linearizePrioritySet(std::optional<absl::string_view> excluded_cluster);
+  void refresh(std::optional<absl::string_view> excluded_cluster = std::nullopt);
 
   LoadBalancerImplPtr load_balancer_;
   Upstream::ClusterInfoConstSharedPtr parent_info_;
@@ -148,9 +150,10 @@ public:
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
     return std::make_unique<AggregateClusterLoadBalancer>(
-        cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
+        cluster_.info(), cluster_.cluster_manager_, cluster_.runtime(), cluster_.random(),
         cluster_.clusters_);
   }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
   const Cluster& cluster_;
 };

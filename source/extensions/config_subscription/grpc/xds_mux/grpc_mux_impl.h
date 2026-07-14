@@ -60,8 +60,7 @@ class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
                     public ShutdownableMux,
                     Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, GrpcMuxContext& grpc_mux_context,
-              bool skip_subsequent_node);
+  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, GrpcMuxContext& grpc_mux_context);
 
   ~GrpcMuxImpl() override;
 
@@ -105,15 +104,20 @@ public:
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }
 
-  absl::Status
-  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
-                  BackOffStrategyPtr&& backoff_strategy,
-                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+  absl::Status updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                               Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                               Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
+                               const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+                               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>
+                                   load_stats_reporter_factory = nullptr) override;
 
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
+
+  // TODO(adisuissa): finish implementation.
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 
   GrpcStreamInterface<RQ, RS>& grpcStreamForTest() {
     // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
@@ -179,10 +183,12 @@ private:
   // Helper function to create the grpc_stream_ object.
   // TODO(adisuissa): this should be removed when envoy.restart_features.xds_failover_support
   // is deprecated.
-  std::unique_ptr<GrpcStreamInterface<RQ, RS>> createGrpcStreamObject(
-      Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
-      const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
-      BackOffStrategyPtr&& backoff_strategy, const RateLimitSettings& rate_limit_settings);
+  std::unique_ptr<GrpcStreamInterface<RQ, RS>>
+  createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_client,
+                         Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                         const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+                         BackOffStrategyPtr&& backoff_strategy,
+                         const RateLimitSettings& rate_limit_settings);
 
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
   // whether we *want* to send a (Delta)DiscoveryRequest).
@@ -194,7 +200,7 @@ private:
   // any). First, prioritizes ACKs over non-ACK subscription interest updates. Then, prioritizes
   // non-ACK updates in the order the various types of subscriptions were activated (as tracked by
   // subscription_ordering_).
-  absl::optional<std::string> whoWantsToSendDiscoveryRequest();
+  std::optional<std::string> whoWantsToSendDiscoveryRequest();
 
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);
@@ -256,7 +262,7 @@ class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptio
                                         envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
-  GrpcMuxDelta(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
+  explicit GrpcMuxDelta(GrpcMuxContext& grpc_mux_context);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -272,7 +278,7 @@ class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionSt
                                        envoy::service::discovery::v3::DiscoveryRequest,
                                        envoy::service::discovery::v3::DiscoveryResponse> {
 public:
-  GrpcMuxSotw(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
+  explicit GrpcMuxSotw(GrpcMuxContext& grpc_mux_context);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -300,9 +306,10 @@ public:
                                    SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) override;
 
-  absl::Status updateMuxSource(Grpc::RawAsyncClientPtr&&, Grpc::RawAsyncClientPtr&&, Stats::Scope&,
-                               BackOffStrategyPtr&&,
-                               const envoy::config::core::v3::ApiConfigSource&) override {
+  absl::Status updateMuxSource(
+      Grpc::RawAsyncClientSharedPtr&&, Grpc::RawAsyncClientSharedPtr&&, Stats::Scope&,
+      BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
+      std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> = nullptr) override {
     return absl::UnimplementedError("");
   }
 
@@ -311,6 +318,9 @@ public:
   }
 
   EdsResourcesCacheOptRef edsResourcesCache() override { return {}; }
+
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 };
 
 } // namespace XdsMux

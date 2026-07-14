@@ -1,8 +1,10 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -13,10 +15,9 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/tracer.h"
+#include "envoy/upstream/load_balancer.h"
 
 #include "source/common/protobuf/protobuf.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -277,7 +278,7 @@ public:
    * A structure to hold the options for AsyncStream object.
    */
   struct StreamOptions {
-    StreamOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
+    StreamOptions& setTimeout(const std::optional<std::chrono::milliseconds>& v) {
       timeout = v;
       return *this;
     }
@@ -325,7 +326,7 @@ public:
       account_ = account;
       return *this;
     }
-    StreamOptions& setBufferLimit(uint32_t limit) {
+    StreamOptions& setBufferLimit(uint64_t limit) {
       buffer_limit_ = limit;
       return *this;
     }
@@ -343,9 +344,9 @@ public:
     // The retry policy can be set as either a proto or Router::RetryPolicy but
     // not both. If both formats of the options are set, the more recent call
     // will overwrite the older one.
-    StreamOptions& setRetryPolicy(const Router::RetryPolicy& p) {
-      parsed_retry_policy = &p;
-      retry_policy = absl::nullopt;
+    StreamOptions& setRetryPolicy(Router::RetryPolicyConstSharedPtr p) {
+      parsed_retry_policy = std::move(p);
+      retry_policy = std::nullopt;
       return *this;
     }
     StreamOptions& setFilterConfig(const Router::FilterConfigSharedPtr& config) {
@@ -376,7 +377,7 @@ public:
       child_span_name_ = child_span_name;
       return *this;
     }
-    StreamOptions& setSampled(absl::optional<bool> sampled) {
+    StreamOptions& setSampled(std::optional<bool> sampled) {
       sampled_ = sampled;
       return *this;
     }
@@ -392,6 +393,11 @@ public:
       remote_close_timeout = timeout;
       return *this;
     }
+    StreamOptions&
+    setUpstreamOverrideHost(const Upstream::LoadBalancerContext::OverrideHost& host) {
+      upstream_override_host_ = host;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -403,7 +409,7 @@ public:
 
     // The timeout supplies the stream timeout, measured since when the frame with
     // end_stream flag is sent until when the first frame is received.
-    absl::optional<std::chrono::milliseconds> timeout;
+    std::optional<std::chrono::milliseconds> timeout;
 
     // The buffer_body_for_retry specifies whether the streamed body will be buffered so that
     // it can be retried. In general, this should be set to false for a true stream. However,
@@ -429,10 +435,10 @@ public:
     // Buffer memory account for tracking bytes.
     Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
 
-    absl::optional<uint32_t> buffer_limit_;
+    std::optional<uint64_t> buffer_limit_;
 
-    absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
-    const Router::RetryPolicy* parsed_retry_policy{nullptr};
+    std::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
+    Router::RetryPolicyConstSharedPtr parsed_retry_policy;
 
     Router::FilterConfigSharedPtr filter_config_;
 
@@ -449,11 +455,11 @@ public:
     // Only used if parent_span_ is set.
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
-    absl::optional<bool> sampled_{true};
+    std::optional<bool> sampled_{true};
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
 
-    // The amount of tiem to wait for server to half-close its stream after client
+    // The amount of time to wait for server to half-close its stream after client
     // has half-closed its stream.
     // Defaults to 1 second.
     std::chrono::milliseconds remote_close_timeout{1000};
@@ -461,6 +467,9 @@ public:
     // This callback is invoked when AsyncStream object is deleted.
     // Test only use to validate deferred deletion.
     std::function<void()> on_delete_callback_for_test_only;
+
+    // Optional upstream override host for bypassing load balancer selection
+    Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
   };
 
   /**

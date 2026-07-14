@@ -16,14 +16,15 @@ public:
   // Server::HotRestart
   MOCK_METHOD(void, drainParentListeners, ());
   MOCK_METHOD(int, duplicateParentListenSocket,
-              (const std::string& address, uint32_t worker_index));
+              (const std::string& address, uint32_t worker_index,
+               absl::string_view network_namespace));
   MOCK_METHOD(void, registerUdpForwardingListener,
               (Network::Address::InstanceConstSharedPtr address,
                std::shared_ptr<Network::UdpListenerConfig> listener_config));
   MOCK_METHOD(OptRef<Network::ParentDrainedCallbackRegistrar>, parentDrainedCallbackRegistrar, ());
   MOCK_METHOD(void, whenDrainComplete, (absl::string_view addr, absl::AnyInvocable<void()> action));
   MOCK_METHOD(void, initialize, (Event::Dispatcher & dispatcher, Server::Instance& server));
-  MOCK_METHOD(absl::optional<AdminShutdownResponse>, sendParentAdminShutdownRequest, ());
+  MOCK_METHOD(std::optional<AdminShutdownResponse>, sendParentAdminShutdownRequest, ());
   MOCK_METHOD(void, sendParentTerminateRequest, ());
   MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::StoreRoot & stats_store));
   MOCK_METHOD(void, shutdown, ());
@@ -31,13 +32,14 @@ public:
   MOCK_METHOD(std::string, version, ());
   MOCK_METHOD(Thread::BasicLockable&, logLock, ());
   MOCK_METHOD(Thread::BasicLockable&, accessLogLock, ());
+  MOCK_METHOD(bool, isInitializing, (), (const, override));
   MOCK_METHOD(Stats::Allocator&, statsAllocator, ());
 
 private:
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::AllocatorImpl stats_allocator_;
+  Stats::Allocator stats_allocator_;
 };
 } // namespace Server
 } // namespace Envoy

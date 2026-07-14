@@ -21,6 +21,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/matchers.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -92,7 +93,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("default_universal_header_validator_for_admin");
-  config.mutable_typed_config()->PackFrom(uhv_config);
+  std::ignore = config.mutable_typed_config()->PackFrom(uhv_config);
 
   auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(config);
   ENVOY_BUG(factory != nullptr, "Default UHV is not linked into binary.");
@@ -128,15 +129,17 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           makeHandler("/certs", "print certs on machine",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
           makeHandler("/clusters", "upstream cluster status",
-                      MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false),
+                      MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false,
+                      {{Admin::ParamDescriptor::Type::String, "filter",
+                        "Regular expression (Google re2) for filtering clusters by name"}}),
           makeHandler(
-              "/config_dump", "dump current Envoy configs (experimental)",
+              "/config_dump", "dump current Envoy configs",
               MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,
               {{Admin::ParamDescriptor::Type::String, "resource", "The resource to dump"},
                {Admin::ParamDescriptor::Type::String, "mask",
                 "The mask to apply. When both resource and mask are specified, "
                 "the mask is applied to every element in the desired repeated field so that only a "
-                "subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask"},
+                "subset of fields are returned. The mask is parsed as a Protobuf::FieldMask"},
                {Admin::ParamDescriptor::Type::String, "name_regex",
                 "Dump only the currently loaded configurations whose names match the specified "
                 "regex. Can be used with both resource and mask query parameters."},
@@ -147,7 +150,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false,
                       {{Admin::ParamDescriptor::Type::String, "mask",
                         "The desired component to dump unready targets. The mask is parsed as "
-                        "a ProtobufWkt::FieldMask. For example, get the unready targets of "
+                        "a Protobuf::FieldMask. For example, get the unready targets of "
                         "all listeners with /init_dump?mask=listener`"}}),
           makeHandler("/contention", "dump current Envoy mutex contention stats (if enabled)",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false),
@@ -165,6 +168,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         {"y", "n"}}}),
           makeHandler("/heap_dump", "dump current Envoy heap (if supported)",
                       MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerHeapDump), false,
+                      false),
+          makeHandler("/peak_heap_dump", "dump peak Envoy heap (if supported)",
+                      MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerPeakHeapDump), false,
                       false),
           makeHandler("/allocprofiler", "enable/disable the allocation profiler (if supported)",
                       MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerAllocationProfiler),
@@ -195,11 +201,18 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         "If fine grain logging is enabled, use __FILE__ or a glob experision as "
                         "the logger name. "
                         "For example, source/common*:warning"},
+                       {Admin::ParamDescriptor::Type::String, "group",
+                        "Change given logger group to desired level, set to "
+                        "<logger_group_name>:<desired_level>. "
+                        "logger_group_name must be a logger name."},
                        {Admin::ParamDescriptor::Type::Enum, "level",
                         "desired logging level, this will change all loggers's level",
                         prepend("", LogsHandler::levelStrings())}}),
           makeHandler("/memory", "print current allocation/heap usage",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false),
+          makeHandler("/memory/tcmalloc", "print TCMalloc stats",
+                      MAKE_ADMIN_HANDLER(server_info_handler_.handleMemoryTcmallocStats), false,
+                      false),
           makeHandler("/quitquitquit", "exit the server",
                       MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true),
           makeHandler("/reset_counters", "reset all counters to zero",
@@ -290,7 +303,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
           envoy::config::core::v3::Http2ProtocolOptions())
           .value(),
       maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-      overload_manager);
+      overload_manager, server_.runtime());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
@@ -305,13 +318,18 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
-                                  const Http::FilterChainOptions&) const {
-  Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
-  };
-  manager.applyFilterFactoryCb({}, factory);
+bool AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const {
+  callbacks.setFilterConfigName("");
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
   return true;
+}
+
+void AdminImpl::addAllowlistedPath(Matchers::StringMatcherPtr matcher) {
+  allowlisted_paths_.emplace_back(std::move(matcher));
+}
+
+const Matcher::MatchTreePtr<Http::HttpMatchingData>& AdminImpl::forwardClientCertMatcher() const {
+  return forward_client_cert_matcher_;
 }
 
 namespace {
@@ -391,6 +409,12 @@ Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
+  }
+  if (!allowlisted_paths_.empty() && !acceptTargetPath(path_and_query)) {
+    ENVOY_LOG(info, "Request to admin interface path {} is not allowed", path_and_query);
+    Buffer::OwnedImpl error_response;
+    error_response.add(fmt::format("request to path {} not allowed", path_and_query));
+    return Admin::makeStaticTextRequest(error_response, Http::Code::Forbidden);
   }
 
   for (const UrlHandler& handler : handlers_) {
@@ -531,7 +555,7 @@ void AdminImpl::closeSocket() {
 
 void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
-    handler->addListener(absl::nullopt, *listener_, server_.runtime(),
+    handler->addListener(std::nullopt, *listener_, server_.runtime(),
                          server_.api().randomGenerator());
   }
 }

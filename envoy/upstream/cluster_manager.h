@@ -26,6 +26,7 @@
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/store.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
@@ -45,6 +46,13 @@ class EnvoyQuicNetworkObserverRegistryFactory;
 class EnvoyQuicNetworkObserverRegistry;
 
 } // namespace Quic
+
+namespace Config {
+// TODO(adisuissa): This forward declaration is needed because OD-CDS code is
+// part of the Envoy::Upstream namespace but should be eventually moved to the
+// Envoy::Config namespace (next to the XdsManager).
+class XdsManager;
+} // namespace Config
 
 namespace Upstream {
 
@@ -70,7 +78,7 @@ public:
    * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
    * @param cluster_name is the name of the removed cluster.
    */
-  virtual void onClusterRemoval(const std::string& cluster_name) PURE;
+  virtual void onClusterRemoval(absl::string_view cluster_name) PURE;
 };
 
 /**
@@ -279,7 +287,7 @@ public:
    */
   virtual absl::StatusOr<bool>
   addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                     const std::string& version_info, const bool avoid_cds_removal = false) PURE;
+                     absl::string_view version_info, const bool avoid_cds_removal = false) PURE;
 
   /**
    * Set a callback that will be invoked when all primary clusters have been initialized.
@@ -315,7 +323,7 @@ public:
       if (warming_cluster != warming_clusters_.cend()) {
         return warming_cluster->second;
       }
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     ClusterInfoMap active_clusters_;
@@ -332,6 +340,51 @@ public:
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
   virtual ClusterInfoMaps clusters() const PURE;
+
+  /**
+   * Iterates over all active clusters and invokes the callback for each.
+   * @param cb the callback to invoke for each active cluster.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual void forEachActiveCluster(std::function<void(const Cluster&)> cb) const PURE;
+
+  /**
+   * Receives a cluster name and returns an active cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
+
+  /**
+   * Receives a cluster name and returns an active or warming cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster>
+  getActiveOrWarmingCluster(absl::string_view cluster_name) const PURE;
+
+  /**
+   * Returns true iff the given cluster name is known in the cluster-manager
+   * (either as active or as warming).
+   * @param cluster_name the name of the cluster.
+   * @return bool true if the cluster name is known, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasCluster(absl::string_view cluster_name) const PURE;
+
+  /**
+   * Returns true iff there's an active cluster in the cluster-manager.
+   * @return bool true if there is an active cluster, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasActiveClusters() const PURE;
 
   using ClusterSet = absl::flat_hash_set<std::string>;
 
@@ -366,7 +419,7 @@ public:
    * can be removed by setting `remove_ignored` to true while removeCluster().
    * @return true if the action results in the removal of a cluster.
    */
-  virtual bool removeCluster(const std::string& cluster, const bool remove_ignored = false) PURE;
+  virtual bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) PURE;
 
   /**
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
@@ -381,7 +434,7 @@ public:
   /**
    * @return cluster manager wide bind configuration for new upstream connections.
    */
-  virtual const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
+  virtual const std::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
 
   /**
    * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
@@ -401,10 +454,10 @@ public:
   /**
    * Return the local cluster name, if it was configured.
    *
-   * @return absl::optional<std::string> the local cluster name, or empty if no local cluster was
+   * @return std::optional<std::string> the local cluster name, or empty if no local cluster was
    * configured.
    */
-  virtual const absl::optional<std::string>& localClusterName() const PURE;
+  virtual const std::optional<std::string>& localClusterName() const PURE;
 
   /**
    * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.
@@ -454,6 +507,7 @@ public:
    * to all worker threads and run concurrently.
    */
   using DrainConnectionsHostPredicate = std::function<bool(const Host&)>;
+  using DrainConnectionsPoolPredicate = std::function<bool(ConnectionPool::Instance&)>;
 
   /**
    * Drain all connection pool connections owned by this cluster.
@@ -461,7 +515,7 @@ public:
    * @param predicate supplies the optional drain connections host predicate. If not supplied, all
    *                  hosts are drained.
    */
-  virtual void drainConnections(const std::string& cluster,
+  virtual void drainConnections(absl::string_view cluster,
                                 DrainConnectionsHostPredicate predicate) PURE;
 
   /**
@@ -469,13 +523,22 @@ public:
    * @param predicate supplies the optional drain connections host predicate. If not supplied, all
    *                  hosts are drained.
    */
-  virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
+  virtual void drainConnections(DrainConnectionsHostPredicate predicate,
+                                ConnectionPool::DrainBehavior drain_behavior) PURE;
+
+  /**
+   * Drain all connection pool connections matching the pool predicate owned by
+   * all clusters.
+   * @param predicate supplies the drain connections pool predicate.
+   */
+  virtual void drainOrCloseConnPools(DrainConnectionsPoolPredicate predicate,
+                                     ConnectionPool::DrainBehavior drain_behavior) PURE;
 
   /**
    * Check if the cluster is active and statically configured, and if not, return an error
    * @param cluster, the cluster to check.
    */
-  virtual absl::Status checkActiveStaticCluster(const std::string& cluster) PURE;
+  virtual absl::Status checkActiveStaticCluster(absl::string_view cluster) PURE;
 
   /**
    * Allocates an on-demand CDS API provider from configuration proto or locator.
@@ -485,12 +548,15 @@ public:
    * @param validation_visitor
    * @return OdCdsApiHandlePtr the ODCDS handle.
    */
-
+  // TODO(adisuissa): once the xDS-TP config-sources are fully supported, the
+  // `odcds_config` parameter should become optional, and the comment above
+  // should be updated.
   using OdCdsCreationFunction = std::function<absl::StatusOr<std::shared_ptr<OdCdsApi>>(
       const envoy::config::core::v3::ConfigSource& odcds_config,
-      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
-      MissingClusterNotifier& notifier, Stats::Scope& scope,
-      ProtobufMessage::ValidationVisitor& validation_visitor)>;
+      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+      Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
+      Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+      Server::Configuration::ServerFactoryContext& server_factory_context)>;
 
   virtual absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
@@ -571,7 +637,7 @@ public:
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
-                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                   const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
@@ -589,13 +655,13 @@ public:
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                       ClusterConnectivityState& state,
-                      absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
+                      std::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
 
   /**
    * Allocate a cluster from configuration proto.
    */
   virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
   /**
@@ -603,7 +669,8 @@ public:
    */
   virtual absl::StatusOr<CdsApiPtr>
   createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) PURE;
+            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+            bool support_multi_ads_sources) PURE;
 };
 
 /**

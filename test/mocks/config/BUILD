@@ -16,6 +16,8 @@ envoy_cc_mock(
         "//envoy/config:config_provider_manager_interface",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
@@ -41,8 +43,9 @@ envoy_cc_mock(
     srcs = ["eds_resources_cache.cc"],
     hdrs = ["eds_resources_cache.h"],
     deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/common:pure_lib",
         "//envoy/config:eds_resources_cache_interface",
-        "//source/common/common:logger_lib",
     ],
 )
 

@@ -21,7 +21,8 @@ namespace Http3 {
   COUNTER(metadata_not_supported_error)                                                            \
   COUNTER(quic_version_h3_29)                                                                      \
   COUNTER(quic_version_rfc_v1)                                                                     \
-  COUNTER(tx_flush_timeout)
+  COUNTER(tx_flush_timeout)                                                                        \
+  COUNTER(goaway_sent)
 
 /**
  * Wrapper struct for the HTTP/3 codec stats. @see stats_macros.h

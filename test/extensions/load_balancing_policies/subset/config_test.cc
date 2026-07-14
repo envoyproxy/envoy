@@ -11,7 +11,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Subset {
 namespace {
 
@@ -45,7 +45,7 @@ TEST(SubsetConfigTest, SubsetConfigTest) {
               "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.random.v3.Random
     )EOF";
   TestUtility::loadFromYaml(config_yaml, *config_msg);
-  config.mutable_typed_config()->PackFrom(*config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(*config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.subset", factory.name());
@@ -94,7 +94,7 @@ TEST(SubsetConfigTest, SubsetConfigTestWithUnknownSubsetLoadBalancingPolicy) {
             name: envoy.load_balancing_policies.unknown
     )EOF";
   TestUtility::loadFromYaml(config_yaml, *config_msg);
-  config.mutable_typed_config()->PackFrom(*config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(*config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.subset", factory.name());
@@ -107,6 +107,6 @@ TEST(SubsetConfigTest, SubsetConfigTestWithUnknownSubsetLoadBalancingPolicy) {
 
 } // namespace
 } // namespace Subset
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

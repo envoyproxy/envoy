@@ -9,6 +9,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/matcher/matcher.h"
 
 #include "absl/container/fixed_array.h"
@@ -53,7 +54,10 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
-      streaming_(proto_config.output_config().streaming()) {
+      streaming_(proto_config.output_config().streaming()),
+      runtime_(context.serverFactoryContext().runtime()),
+      tap_enabled_(proto_config.has_tap_enabled() ? std::make_optional(proto_config.tap_enabled())
+                                                  : std::nullopt) {
 
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
@@ -62,6 +66,13 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   // streaming, we should require the length delimited version of binary proto, etc.
   sink_format_ = sinks[0].format();
   sink_type_ = sinks[0].output_sink_type_case();
+
+  if (PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config.output_config(), min_streamed_sent_bytes) !=
+      std::nullopt) {
+    min_streamed_sent_bytes_ =
+        std::max(proto_config.output_config().min_streamed_sent_bytes().value(),
+                 DefaultMinStreamedSentBytes);
+  }
 
   switch (sink_type_) {
   case ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin:
@@ -135,6 +146,15 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   buildMatcher(match, matchers_, context.serverFactoryContext());
 }
 
+bool TapConfigBaseImpl::shouldRecord() const {
+  if (!tap_enabled_.has_value() ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tap_honor_tap_enabled")) {
+    return true;
+  }
+  return runtime_.snapshot().featureEnabled(tap_enabled_->runtime_key(),
+                                            tap_enabled_->default_value());
+}
+
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
   ASSERT(!matchers_.empty());
   return *matchers_[0];
@@ -188,11 +208,26 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
     break;
   }
   case envoy::data::tap::v3::TraceWrapper::TraceCase::kSocketStreamedTraceSegment: {
-    auto& event = *trace.mutable_socket_streamed_trace_segment()->mutable_event();
-    if (event.has_read()) {
-      swapBytesToString(*event.mutable_read()->mutable_data());
-    } else if (event.has_write()) {
-      swapBytesToString(*event.mutable_write()->mutable_data());
+    if (trace.socket_streamed_trace_segment().has_events()) {
+      // Multiple events in each streamed trace.
+      auto* socket_trace_events = trace.mutable_socket_streamed_trace_segment()->mutable_events();
+      for (auto& event : *socket_trace_events->mutable_events()) {
+        if (event.has_read()) {
+          swapBytesToString(*event.mutable_read()->mutable_data());
+        } else if (event.has_write()) {
+          swapBytesToString(*event.mutable_write()->mutable_data());
+        }
+        // else.
+        // The event which has no read or write field.
+      }
+    } else {
+      // Single event in each streamed trace.
+      auto& event = *trace.mutable_socket_streamed_trace_segment()->mutable_event();
+      if (event.has_read()) {
+        swapBytesToString(*event.mutable_read()->mutable_data());
+      } else if (event.has_write()) {
+        swapBytesToString(*event.mutable_write()->mutable_data());
+      }
     }
     break;
   }
@@ -202,6 +237,15 @@ void Utility::bodyBytesToString(envoy::data::tap::v3::TraceWrapper& trace,
 }
 
 void TapConfigBaseImpl::PerTapSinkHandleManagerImpl::submitTrace(TraceWrapperPtr&& trace) {
+  // The configured default_value is stamped on the first emitted segment of each
+  // trace; when runtime_key is active the effective rate may differ, as documented on
+  // configured_sample_rate. The runtime guard suppresses the stamp together with
+  // sampling enforcement so that disabling the guard fully restores prior behavior.
+  if (parent_.tap_enabled_.has_value() && !stamped_ &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tap_honor_tap_enabled")) {
+    *trace->mutable_configured_sample_rate() = parent_.tap_enabled_->default_value();
+    stamped_ = true;
+  }
   Utility::bodyBytesToString(*trace, parent_.sink_format_);
   handle_->submitTrace(std::move(trace), parent_.sink_format_);
 }
@@ -238,7 +282,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
   switch (format) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
-    trace->SerializeToOstream(&output_file_);
+    std::ignore = trace->SerializeToOstream(&output_file_);
     break;
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED: {
     Protobuf::io::OstreamOutputStream stream(&output_file_);

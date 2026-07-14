@@ -23,15 +23,18 @@ INSTANTIATE_TEST_SUITE_P(Protocols, ListenerTypedMetadataIntegrationTest,
 
 TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
   // Add some typed metadata to the listener.
-  ProtobufWkt::StringValue value;
+  Protobuf::StringValue value;
   value.set_value("hello world");
-  ProtobufWkt::Any packed_value;
-  packed_value.PackFrom(value);
+  Protobuf::Any packed_value;
+  std::ignore = packed_value.PackFrom(value);
   config_helper_.addListenerTypedMetadata("test.listener.typed.metadata", packed_value);
 
   // Add the filter that reads the listener typed metadata.
   config_helper_.addFilter(R"EOF({
-    name: listener-typed-metadata-filter
+    name: listener-typed-metadata-filter,
+    typed_config: {
+      "@type": "type.googleapis.com/test.integration.filters.ListenerTypedMetadataFilterConfig"
+    }
   })EOF");
 
   initialize();
@@ -47,21 +50,28 @@ TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
 
 class MockAccessLog : public AccessLog::Instance {
 public:
-  MOCK_METHOD(void, log, (const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&));
+  MOCK_METHOD(void, log, (const Formatter::Context&, const StreamInfo::StreamInfo&));
 };
 
 class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
-                          Server::Configuration::FactoryContext& context,
+                          Server::Configuration::GenericFactoryContext&,
                           std::vector<Formatter::CommandParserPtr>&& = {}) override {
-    // Check that expected listener metadata is present
-    EXPECT_EQ(1, context.listenerInfo().metadata().typed_filter_metadata().size());
-    const auto iter = context.listenerInfo().metadata().typed_filter_metadata().find(
-        "test.listener.typed.metadata");
-    EXPECT_NE(iter, context.listenerInfo().metadata().typed_filter_metadata().end());
-    return std::make_shared<NiceMock<MockAccessLog>>();
+    auto out = std::make_shared<NiceMock<MockAccessLog>>();
+    EXPECT_CALL(*out, log(_, _))
+        .WillRepeatedly(testing::Invoke(
+            [](const Formatter::Context&, const StreamInfo::StreamInfo& info) -> void {
+              // Check that expected listener metadata is present
+              auto listener_info = info.downstreamAddressProvider().listenerInfo();
+              ASSERT_TRUE(listener_info.has_value());
+              EXPECT_EQ(1, listener_info->metadata().typed_filter_metadata().size());
+              const auto iter = listener_info->metadata().typed_filter_metadata().find(
+                  "test.listener.typed.metadata");
+              EXPECT_NE(iter, listener_info->metadata().typed_filter_metadata().end());
+            }));
+    return out;
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -77,17 +87,18 @@ TEST_P(ListenerTypedMetadataIntegrationTest, ListenerMetadataPlumbingToAccessLog
   Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   // Add some typed metadata to the listener.
-  ProtobufWkt::StringValue value;
+  Protobuf::StringValue value;
   value.set_value("hello world");
-  ProtobufWkt::Any packed_value;
-  packed_value.PackFrom(value);
+  Protobuf::Any packed_value;
+  std::ignore = packed_value.PackFrom(value);
   config_helper_.addListenerTypedMetadata("test.listener.typed.metadata", packed_value);
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         test::integration::typed_metadata::TestAccessLog access_log_config;
-        hcm.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore =
+            hcm.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
       });
 
   initialize();

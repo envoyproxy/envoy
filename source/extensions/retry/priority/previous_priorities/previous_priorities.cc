@@ -6,7 +6,7 @@ namespace Retry {
 namespace Priority {
 
 const Upstream::HealthyAndDegradedLoad& PreviousPrioritiesRetryPriority::determinePriorityLoad(
-    const Upstream::PrioritySet& priority_set,
+    StreamInfo::StreamInfo*, const Upstream::PrioritySet& priority_set,
     const Upstream::HealthyAndDegradedLoad& original_priority_load,
     const PriorityMappingFunc& priority_mapping_func) {
   // If we've not seen enough retries to modify the priority load, just
@@ -21,7 +21,7 @@ const Upstream::HealthyAndDegradedLoad& PreviousPrioritiesRetryPriority::determi
     }
 
     for (const auto& host : attempted_hosts_) {
-      absl::optional<uint32_t> mapped_host_priority = priority_mapping_func(*host);
+      std::optional<uint32_t> mapped_host_priority = priority_mapping_func(*host);
       if (mapped_host_priority.has_value()) {
         excluded_priorities_[mapped_host_priority.value()] = true;
       }

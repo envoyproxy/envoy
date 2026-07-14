@@ -34,9 +34,10 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   return context;
 }
 
-absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSslServerContext(
-    Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-    const std::vector<std::string>& server_names, Ssl::ContextAdditionalInitFunc additional_init) {
+absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr>
+ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
+                                           const Envoy::Ssl::ServerContextConfig& config,
+                                           Ssl::ContextAdditionalInitFunc additional_init) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (!config.isReady()) {
     return nullptr;
@@ -49,20 +50,19 @@ absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSsl
     return nullptr;
   }
   absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> context_or_error =
-      factory->createServerContext(scope, config, server_names, factory_context_,
-                                   std::move(additional_init));
+      factory->createServerContext(scope, config, factory_context_, std::move(additional_init));
   RETURN_IF_NOT_OK(context_or_error.status());
   contexts_.insert(*context_or_error);
   return *context_or_error;
 }
 
-absl::optional<uint32_t> ContextManagerImpl::daysUntilFirstCertExpires() const {
-  absl::optional<uint32_t> ret = absl::make_optional(std::numeric_limits<uint32_t>::max());
+std::optional<uint32_t> ContextManagerImpl::daysUntilFirstCertExpires() const {
+  std::optional<uint32_t> ret = std::make_optional(std::numeric_limits<uint32_t>::max());
   for (const auto& context : contexts_) {
     if (context) {
-      const absl::optional<uint32_t> tmp = context->daysUntilFirstCertExpires();
+      const std::optional<uint32_t> tmp = context->daysUntilFirstCertExpires();
       if (!tmp.has_value()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       ret = std::min<uint32_t>(tmp.value(), ret.value());
     }
@@ -70,8 +70,8 @@ absl::optional<uint32_t> ContextManagerImpl::daysUntilFirstCertExpires() const {
   return ret;
 }
 
-absl::optional<uint64_t> ContextManagerImpl::secondsUntilFirstOcspResponseExpires() const {
-  absl::optional<uint64_t> ret;
+std::optional<uint64_t> ContextManagerImpl::secondsUntilFirstOcspResponseExpires() const {
+  std::optional<uint64_t> ret;
   for (const auto& context : contexts_) {
     if (context) {
       auto next_expiration = context->secondsUntilFirstOcspResponseExpires();

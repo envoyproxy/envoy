@@ -1317,7 +1317,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitDisabled) {
 TEST_F(FaultFilterRateLimitTest, DestroyWithResponseRateLimitEnabled) {
   setupRateLimitTest(true);
 
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   // The timer is consumed but not used by this test.
   new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
@@ -1361,7 +1361,7 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
               setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   // Rate limiter related calls.
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   // The timer is consumed but not used by this test.
   new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
 
@@ -1402,7 +1402,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   setupRateLimitTest(fault);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata()).Times(0);
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* token_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
@@ -1420,7 +1420,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data1, false));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
+              injectEncodedDataToFilterChain(BufferString("hello"), false));
   token_timer->invokeCallback();
 
   // Advance time by 1s which should refill all tokens.
@@ -1435,14 +1435,14 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
+              injectEncodedDataToFilterChain(BufferString(std::string(1024, 'a')), false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
+              injectEncodedDataToFilterChain(BufferString(std::string(51, 'a')), false));
   token_timer->invokeCallback();
 
   // Get new data with current data buffered, not end_stream.
@@ -1453,13 +1453,13 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
+              injectEncodedDataToFilterChain(BufferString(std::string(51, 'a')), false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time. No time enable because there is nothing buffered.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false));
+              injectEncodedDataToFilterChain(BufferString(std::string(51, 'b')), false));
   token_timer->invokeCallback();
 
   // Advance time by 1s for a full refill.
@@ -1470,7 +1470,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   Buffer::OwnedImpl data4(std::string(1024, 'c'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
+              injectEncodedDataToFilterChain(BufferString(std::string(1024, 'c')), true));
   token_timer->invokeCallback();
 
   filter_->onDestroy();

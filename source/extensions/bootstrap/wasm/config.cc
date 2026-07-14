@@ -13,13 +13,12 @@ namespace Extensions {
 namespace Bootstrap {
 namespace Wasm {
 
-void WasmServiceExtension::onServerInitialized() { createWasm(context_); }
+void WasmServiceExtension::onServerInitialized(Server::Instance&) { createWasm(context_); }
 
 void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContext& context) {
   plugin_config_ = std::make_unique<Common::Wasm::PluginConfig>(
       config_.config(), context, context.scope(), context.initManager(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr,
-      config_.singleton());
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, config_.singleton());
 }
 
 Server::BootstrapExtensionPtr

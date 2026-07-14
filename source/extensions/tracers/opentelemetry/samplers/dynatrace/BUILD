@@ -31,11 +31,13 @@ envoy_cc_library(
     ],
     hdrs = [
         "dynatrace_sampler.h",
+        "dynatrace_tag.h",
         "sampler_config.h",
         "sampler_config_provider.h",
         "sampling_controller.h",
         "stream_summary.h",
         "tenant_id.h",
+        "trace_capture_reason.h",
     ],
     deps = [
         "//source/common/config:datasource_lib",

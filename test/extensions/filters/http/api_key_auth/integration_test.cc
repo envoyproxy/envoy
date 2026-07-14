@@ -26,12 +26,18 @@ typed_config:
     client: user2
   key_sources:
   - header: "Authorization"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: false
 )EOF";
 
 const std::string ApiKeyAuthScopeConfig =
     R"EOF(
 allowed_clients:
 - user1
+forwarding:
+  header: "x-client-header"
+  hide_credentials: true
 )EOF";
 
 class ApiKeyAuthIntegrationTest : public HttpProtocolIntegrationTest {
@@ -53,7 +59,7 @@ public:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["envoy.filters.http.api_key_auth"].PackFrom(per_route_config);
+          std::ignore = (*config)["envoy.filters.http.api_key_auth"].PackFrom(per_route_config);
         });
     config_helper_.prependFilter(ApiKeyAuthFilterConfig);
     initialize();

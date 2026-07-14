@@ -6,9 +6,7 @@
 #include "source/extensions/bootstrap/wasm/config.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 
@@ -50,7 +48,7 @@ protected:
     EXPECT_CALL(context_, lifecycleNotifier())
         .WillRepeatedly(testing::ReturnRef(lifecycle_notifier_));
     extension_ = factory->createBootstrapExtension(config, context_);
-    extension_->onServerInitialized();
+    extension_->onServerInitialized(server_);
     static_cast<Bootstrap::Wasm::WasmServiceExtension*>(extension_.get())->wasmService();
     EXPECT_CALL(init_watcher_, ready());
     init_manager_.initialize(init_watcher_);
@@ -59,6 +57,7 @@ protected:
   envoy::extensions::wasm::v3::WasmService config_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   testing::NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
+  NiceMock<Server::MockInstance> server_;
   Init::ExpectableWatcherImpl init_watcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
@@ -119,9 +118,9 @@ TEST_P(WasmFactoryTest, UnknownRuntime) {
 }
 
 TEST_P(WasmFactoryTest, StartFailed) {
-  ProtobufWkt::StringValue plugin_configuration;
+  Protobuf::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
-  config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
+  std::ignore = config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
       plugin_configuration);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
@@ -129,9 +128,9 @@ TEST_P(WasmFactoryTest, StartFailed) {
 }
 
 TEST_P(WasmFactoryTest, ConfigureFailed) {
-  ProtobufWkt::StringValue plugin_configuration;
+  Protobuf::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
-  config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration);
+  std::ignore = config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
                             "Unable to create Wasm plugin test");

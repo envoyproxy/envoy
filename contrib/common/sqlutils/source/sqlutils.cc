@@ -6,7 +6,7 @@ namespace Common {
 namespace SQLUtils {
 
 bool SQLUtils::setMetadata(const std::string& query, const DecoderAttributes& attr,
-                           ProtobufWkt::Struct& metadata) {
+                           Protobuf::Struct& metadata) {
   hsql::SQLParserResult result;
 
   hsql::SQLParser::parse(query, &result);

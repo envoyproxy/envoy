@@ -70,8 +70,7 @@ void TraceContextReader::visit(
         visitor) const {
   context_.forEach([&](absl::string_view key, absl::string_view value) {
     visitor(key, value);
-    const bool continue_iterating = true;
-    return continue_iterating;
+    return true;
   });
 }
 

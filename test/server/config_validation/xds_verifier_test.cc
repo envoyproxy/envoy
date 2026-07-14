@@ -11,7 +11,7 @@ envoy::config::listener::v3::Listener buildListener(const std::string& listener_
 }
 
 envoy::config::route::v3::RouteConfiguration buildRoute(const std::string& route_name) {
-  return ConfigHelper::buildRouteConfig(route_name, "cluster_0");
+  return ConfigHelper::buildRouteConfig(route_name, "cluster_0", true);
 }
 
 // Add, warm, drain and remove a listener.

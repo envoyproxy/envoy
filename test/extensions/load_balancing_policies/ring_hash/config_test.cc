@@ -4,7 +4,7 @@
 
 #include "source/extensions/load_balancing_policies/ring_hash/config.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 
@@ -12,7 +12,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RingHash {
 namespace {
 
@@ -26,7 +26,7 @@ TEST(RingHashConfigTest, Validate) {
     envoy::config::core::v3::TypedExtensionConfig config;
     config.set_name("envoy.load_balancing_policies.ring_hash");
     envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config_msg;
-    config.mutable_typed_config()->PackFrom(config_msg);
+    std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
     auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
     EXPECT_EQ("envoy.load_balancing_policies.ring_hash", factory.name());
@@ -53,7 +53,7 @@ TEST(RingHashConfigTest, Validate) {
     config_msg.mutable_minimum_ring_size()->set_value(4);
     config_msg.mutable_maximum_ring_size()->set_value(2);
 
-    config.mutable_typed_config()->PackFrom(config_msg);
+    std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
     auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
     EXPECT_EQ("envoy.load_balancing_policies.ring_hash", factory.name());
@@ -76,8 +76,12 @@ TEST(RingHashConfigTest, Validate) {
     config.set_name("envoy.load_balancing_policies.ring_hash");
     envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config_msg;
     config_msg.mutable_minimum_ring_size()->set_value(0);
+    auto* hash_policy = config_msg.mutable_consistent_hashing_lb_config()->add_hash_policy();
+    *hash_policy->mutable_cookie()->mutable_name() = "test-cookie-name";
+    *hash_policy->mutable_cookie()->mutable_path() = "/test/path";
+    hash_policy->mutable_cookie()->mutable_ttl()->set_seconds(1000);
 
-    config.mutable_typed_config()->PackFrom(config_msg);
+    std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
     std::string err;
     EXPECT_EQ(Validate(config_msg, &err), false);
@@ -88,6 +92,6 @@ TEST(RingHashConfigTest, Validate) {
 
 } // namespace
 } // namespace RingHash
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

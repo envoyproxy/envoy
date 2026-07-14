@@ -103,6 +103,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "", "skip-deprecated-logs",
       "Skips the logging of deprecated field warnings during Protobuf message validation", cmd,
       false);
+  TCLAP::SwitchArg log_stacktrace_single_entry(
+      "", "log-stacktrace-single-entry",
+      "Emit the entire stack trace in a single log entry instead of one "
+      "log call per frame. Useful for log aggregation systems.",
+      cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
@@ -138,6 +143,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<uint32_t> file_flush_interval_msec("", "file-flush-interval-msec",
                                                      "Interval for log flushing in msec", false,
                                                      10000, "uint32_t", cmd);
+  TCLAP::ValueArg<uint32_t> file_flush_min_size_kb("", "file-flush-min-size-kb",
+                                                   "Minimum size in KB for log flushing", false, 64,
+                                                   "uint32_t", cmd);
   TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s",
                                          "Hot restart and LDS removal drain time in seconds", false,
                                          600, "uint32_t", cmd);
@@ -276,20 +284,24 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
   if (allow_unknown_fields.getValue()) {
-    ENVOY_LOG(warn,
-              "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
+    if (!skip_deprecated_logs.getValue()) {
+      ENVOY_LOG(warn,
+                "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
+    }
   }
   allow_unknown_static_fields_ =
       allow_unknown_static_fields.getValue() || allow_unknown_fields.getValue();
   reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields.getValue();
   ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields.getValue();
   skip_deprecated_logs_ = skip_deprecated_logs.getValue();
+  log_stacktrace_single_entry_ = log_stacktrace_single_entry.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   service_cluster_ = service_cluster.getValue();
   service_node_ = service_node.getValue();
   service_zone_ = service_zone.getValue();
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
+  file_flush_min_size_kb_ = file_flush_min_size_kb.getValue();
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   socket_path_ = socket_path.getValue();
@@ -406,6 +418,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
   command_line_options->set_ignore_unknown_dynamic_fields(ignore_unknown_dynamic_fields_);
   command_line_options->set_skip_deprecated_logs(skip_deprecated_logs_);
+  command_line_options->set_log_stacktrace_single_entry(log_stacktrace_single_entry_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
   command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),

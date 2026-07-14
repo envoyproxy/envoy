@@ -10,13 +10,14 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
 #include "library/common/engine_types.h"
 #include "library/common/http/client.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
+#include "library/common/network/network_types.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -29,11 +30,13 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    * @param thread_priority, an optional thread priority, between -20 and 19.
+   * @param high_watermark, an optional per-stream buffer high watermark size; defaults to 2MB.
    */
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority = absl::nullopt,
-                 bool disable_dns_refresh_on_network_change = false);
+                 std::optional<int> thread_priority = std::nullopt,
+                 std::optional<size_t> high_watermark = std::nullopt, bool enable_logger = true,
+                 bool use_worker_thread = false);
 
   /**
    * InternalEngine destructor.
@@ -72,7 +75,7 @@ public:
   // to http client functions of the same name after doing a dispatcher post
   // (thread context switch)
   envoy_status_t startStream(envoy_stream_t stream, EnvoyStreamCallbacks&& stream_callbacks,
-                             bool explicit_flow_control);
+                             bool explicit_flow_control, absl::string_view listener_name = "");
 
   /**
    * Send the headers over an open HTTP stream. This function can be invoked
@@ -131,6 +134,37 @@ public:
   void onDefaultNetworkChanged(int network);
 
   /**
+   * The callback that gets executed when the device pick a different
+   * network as the default.
+   *
+   * @param connection_type the type of the given network, i.e. WIFI, 3G, 4G, etc.
+   * @param net_id an opaque handle to the network picked by the platform. Android Lollipop uses
+   * Network.netId as such handle, and Marshmallow+ uses the returned value of
+   * Network.getNetworkHandle().
+   *
+   */
+  void onDefaultNetworkChangedAndroid(ConnectionType connection_type, int64_t net_id);
+
+  /**
+   * The callback that gets executed when the device gets disconnected from the
+   * given network.
+   *
+   */
+  void onNetworkDisconnectAndroid(int64_t net_id);
+
+  /**
+   * The callback that gets executed when the device gets connected to a new
+   * network.
+   */
+  void onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id);
+
+  /**
+   * The callback that gets executed when the device decides to forget all networks other than the
+   * given list.
+   */
+  void purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids);
+
+  /**
    * The callback that gets executed when the mobile device network monitor receives a network
    * change event.
    *
@@ -159,6 +193,7 @@ public:
    * Dumps Envoy stats into string. Returns an empty string when an error occurred.
    */
   std::string dumpStats();
+  void drainConnectionsBySocketTag(uint32_t tag);
 
   /**
    * Get cluster manager from the Engine.
@@ -170,14 +205,22 @@ public:
    */
   Stats::Store& getStatsStore();
 
+  /**
+   * Set whether to disable DNS refresh on network change events.
+   */
+  void disableDnsRefreshOnNetworkChange(bool disable) {
+    disable_dns_refresh_on_network_change_ = disable;
+  }
+
 private:
   // Needs access to the private constructor.
   GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority, bool disable_dns_refresh_on_network_change,
-                 Thread::PosixThreadFactoryPtr thread_factory);
+                 std::optional<int> thread_priority, std::optional<size_t> high_watermark,
+                 Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger = true,
+                 bool use_worker_thread = false);
 
   envoy_status_t main(std::shared_ptr<OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
@@ -188,12 +231,22 @@ private:
   //  - Sets the preferred network.
   //  - If no IPv6 connectivity, tells the DNS cache to remove IPv6 addresses from host entries.
   //  - Clear HTTP/3 broken status.
-  //  - Force refresh DNS cache.
+  //  - Drain all connections immediately or force refresh DNS cache and drain
+  //  all connections upon completion.
   void handleNetworkChange(int network_type, bool has_ipv6_connectivity);
 
   // Probe for connectivity for the provided `domain` and get a pointer to the local address. If
   // there is no connectivity for the `domain`, a null pointer will be returned.
   static Network::Address::InstanceConstSharedPtr probeAndGetLocalAddr(int domain);
+
+  // Called when it's been determined that the default network has changed.
+  void resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity);
+
+  void removeActiveStream(envoy_stream_t stream);
+
+  Event::ProvisionalDispatcher& requestDispatcher() const {
+    return use_worker_thread_ ? *request_dispatcher_ : *main_dispatcher_;
+  }
 
   Thread::PosixThreadFactoryPtr thread_factory_;
   Event::Dispatcher* event_dispatcher_{};
@@ -202,14 +255,15 @@ private:
   std::unique_ptr<EngineCallbacks> callbacks_;
   std::unique_ptr<EnvoyLogger> logger_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_;
-  absl::optional<int> thread_priority_;
+  std::optional<int> thread_priority_;
+  std::optional<size_t> high_watermark_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
-  Http::ClientPtr http_client_;
-  Network::ConnectivityManagerSharedPtr connectivity_manager_;
-  Event::ProvisionalDispatcherPtr dispatcher_;
+  absl::flat_hash_map<envoy_stream_t, Http::Client*> active_streams_;
+  Network::ConnectivityManagerImplSharedPtr connectivity_manager_;
+  Event::ProvisionalDispatcherPtr main_dispatcher_;
   // Used by the cerr logger to ensure logs don't overwrite each other.
   absl::Mutex log_mutex_;
   Logger::EventTrackingDelegatePtr log_delegate_ptr_{};
@@ -220,9 +274,14 @@ private:
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
   absl::Notification engine_running_;
-  bool disable_dns_refresh_on_network_change_;
+  bool disable_dns_refresh_on_network_change_{false};
   int prev_network_type_{0};
   Network::Address::InstanceConstSharedPtr prev_local_addr_{nullptr};
+  bool enable_logger_{true};
+  bool use_worker_thread_{false};
+  // If use_worker_thread_ is true, request_dispatcher_ will point to the dispatcher_ in the
+  // ApiListenerWorker. Otherwise, it will be null.
+  Event::ProvisionalDispatcherPtr request_dispatcher_;
 };
 
 } // namespace Envoy

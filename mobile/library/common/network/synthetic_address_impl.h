@@ -54,6 +54,10 @@ public:
     return SocketInterfaceSingleton::get();
   }
 
+  std::optional<std::string> networkNamespace() const override { return std::nullopt; }
+
+  InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override { return nullptr; }
+
 private:
   const std::string address_{"synthetic"};
 };

@@ -1,5 +1,7 @@
 #include "source/extensions/http/injected_credentials/generic/generic_impl.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -16,7 +18,8 @@ absl::Status GenericCredentialInjector::inject(Envoy::Http::RequestHeaderMap& he
     return absl::NotFoundError("Failed to get credential from secret");
   }
 
-  headers.setCopy(header_, secret_reader_->credential());
+  const std::string header_value = absl::StrCat(header_value_prefix_, secret_reader_->credential());
+  headers.setCopy(header_, header_value);
   return absl::OkStatus();
 }
 

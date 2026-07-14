@@ -300,18 +300,18 @@ private:
   const std::string name_;
 };
 
-class MockFilterConfigFactory : public MockFactoryBase<ProtobufWkt::Struct> {
+class MockFilterConfigFactory : public MockFactoryBase<Protobuf::Struct> {
 public:
   MockFilterConfigFactory();
   ~MockFilterConfigFactory() override;
 
   DubboFilters::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
+  createFilterFactoryFromProtoTyped(const Protobuf::Struct& proto_config,
                                     const std::string& stat_prefix,
                                     Server::Configuration::FactoryContext& context) override;
 
   std::shared_ptr<MockDecoderFilter> mock_filter_;
-  ProtobufWkt::Struct config_struct_;
+  Protobuf::Struct config_struct_;
   std::string config_stat_prefix_;
 };
 

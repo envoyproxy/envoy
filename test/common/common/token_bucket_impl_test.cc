@@ -193,6 +193,15 @@ TEST_F(AtomicTokenBucketImplTest, Refill) {
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 
+TEST_F(AtomicTokenBucketImplTest, NextTokenAvailable) {
+  AtomicTokenBucketImpl token_bucket{10, time_system_, 5};
+  EXPECT_EQ(9, token_bucket.consume(9, false));
+  EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable());
+  EXPECT_EQ(1, token_bucket.consume(1, false));
+  EXPECT_EQ(0, token_bucket.consume(1, false));
+  EXPECT_EQ(std::chrono::milliseconds(200), token_bucket.nextTokenAvailable());
+}
+
 // Test partial consumption of tokens.
 TEST_F(AtomicTokenBucketImplTest, PartialConsumption) {
   AtomicTokenBucketImpl token_bucket{16, time_system_, 16};

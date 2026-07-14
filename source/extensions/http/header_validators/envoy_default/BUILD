@@ -26,9 +26,10 @@ envoy_cc_library(
         ":path_normalizer",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/container:node_hash_set",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/container:node_hash_set",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
@@ -93,6 +94,7 @@ envoy_cc_library(
     visibility = [
         "//test/common/http:__subpackages__",
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
+        "//test/integration:__subpackages__",
     ],
     deps = [
         ":header_validator_common",
@@ -101,8 +103,8 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/functional:bind_front",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/functional:bind_front",
     ],
 )
 
@@ -117,6 +119,7 @@ envoy_cc_library(
     visibility = [
         "//test/common/http/http2:__subpackages__",
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
+        "//test/integration:__subpackages__",
     ],
     deps = [
         ":header_validator_common",
@@ -126,9 +129,9 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/functional:bind_front",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/functional:bind_front",
     ],
 )
 

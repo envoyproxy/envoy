@@ -47,11 +47,11 @@ public:
   // Router::RouteConfigUpdateReceiver
   bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
   bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
-                    const std::set<std::string>& added_resource_ids,
+                    std::set<std::string>&& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
   uint64_t configHash() const override { return base_.configHash(); }
-  const absl::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
+  const std::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
   }
   bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
@@ -62,11 +62,11 @@ public:
     return base_.parsedConfiguration();
   }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
-  const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
+  const std::set<std::string>& resourceIdsInLastVhdsUpdate() const override {
     return resource_ids_in_last_update_;
   }
   const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() const override {
-    ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(
+    ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(
         &RouteConfigUpdateReceiverImpl::protobufConfiguration()));
     return static_cast<const envoy::config::route::v3::RouteConfiguration&>(
         RouteConfigUpdateReceiverImpl::protobufConfiguration());

@@ -17,7 +17,7 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
     return;
   }
   if (quic_stream_.write_side_closed()) {
-    IS_ENVOY_BUG("encodeData is called on write-closed stream.");
+    IS_ENVOY_BUG(fmt::format("encodeData is called on write-closed stream. {}", quicStreamState()));
     return;
   }
   ASSERT(!local_end_stream_);
@@ -183,6 +183,19 @@ void EnvoyQuicStream::encodeMetadata(const Http::MetadataMapVector& metadata_map
       return;
     }
   }
+}
+
+std::string EnvoyQuicStream::quicStreamState() {
+  return fmt::format(
+      "QUIC stream state: local_end_stream_ {}, rst_received "
+      "{}, rst_sent {}, fin_received {}, fin_sent {}, fin_buffered {}, fin_outstanding {}, "
+      "stream_error {}, connection_error {}, connection connected: {}.",
+      local_end_stream_, quic_stream_.rst_received(), quic_stream_.rst_sent(),
+      quic_stream_.fin_received(), quic_stream_.fin_sent(), quic_stream_.fin_buffered(),
+      quic_stream_.fin_outstanding(),
+      quic::QuicRstStreamErrorCodeToString(quic_stream_.stream_error()),
+      quic::QuicErrorCodeToString(quic_stream_.connection_error()),
+      quic_session_.connection()->connected());
 }
 
 } // namespace Quic

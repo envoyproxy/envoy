@@ -6,13 +6,8 @@ permissions:
 on:
   workflow_call:
     secrets:
-      gcs-cache-key:
-        required: true
-
+      dockerhub-token:
     inputs:
-      gcs-cache-bucket:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -28,14 +23,16 @@ concurrency:
 jobs:
   san:
     secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.target }}
     with:
-      bazel-extra: '--config=remote-envoy-engflow'
+      bazel-cache: true
+      bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
       request: ${{ inputs.request }}
@@ -43,7 +40,6 @@ jobs:
         ERROR
         error:
         Error:
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe }}
       target: ${{ matrix.target }}
       timeout-minutes: 180

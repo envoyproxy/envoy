@@ -59,7 +59,7 @@ UberFilterFuzzer::UberFilterFuzzer()
       .WillByDefault(
           Invoke([this](Http::Code code, absl::string_view body,
                         std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) {
             enabled_ = false;
             decoder_callbacks_.sendLocalReply_(code, body, modify_headers, grpc_status, details);
@@ -142,7 +142,7 @@ void UberFilterFuzzer::reset() {
 
   access_logger_.reset();
   custom_stat_namespaces_ = Stats::CustomStatNamespacesImpl();
-  decoding_buffer_ = nullptr;
+  decoding_buffer_.reset();
   HttpFilterFuzzer::reset();
 }
 

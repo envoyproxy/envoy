@@ -19,7 +19,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/json_to_metadata:json_to_metadata_lib",
         "//test/common/stream_info:test_util",
-        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )
@@ -44,5 +43,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/json_to_metadata:config",
         "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/extensions/filters/http/json_to_metadata/v3:pkg_cc_proto",
     ],
 )

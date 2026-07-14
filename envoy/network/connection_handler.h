@@ -12,7 +12,6 @@
 #include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
-#include "envoy/ssl/context.h"
 
 #include "source/common/common/interval_value.h"
 
@@ -69,7 +68,7 @@ public:
    * @param runtime the runtime for the server.
    * @param random a random number generator.
    */
-  virtual void addListener(absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
+  virtual void addListener(std::optional<uint64_t> overridden_listener, ListenerConfig& config,
                            Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
   /**
@@ -100,6 +99,23 @@ public:
                              const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
+   * Notify the connections in the given filter chains that they are being drained. This is
+   * intended to be invoked at the start of a filter-chain drain sequence (before the drain
+   * timer expires and connections are forcibly closed). It does not close connections.
+   * @param listener_tag supplies the tag passed to addListener().
+   * @param filter_chains supplies the filter chains whose connections should be notified.
+   */
+  virtual void onFilterChainDrain(uint64_t listener_tag,
+                                  const std::list<const FilterChain*>& filter_chains) PURE;
+
+  /**
+   * Notify all connections belonging to the listener with the given tag that they are being
+   * drained. Does not close any connections.
+   * @param listener_tag supplies the tag passed to addListener().
+   */
+  virtual void onListenerDrain(uint64_t listener_tag) PURE;
+
+  /**
    * Stop all listeners. This will not close any connections and is used for draining.
    */
   virtual void stopListeners() PURE;
@@ -126,6 +142,11 @@ public:
    * @return the stat prefix used for per-handler stats.
    */
   virtual const std::string& statPrefix() const PURE;
+
+  /**
+   * Close idle HTTP connections.
+   */
+  virtual void closeIdleHttpConnections(bool is_saturated) PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.
@@ -172,6 +193,28 @@ public:
      */
     virtual void onFilterChainDraining(
         const std::list<const Network::FilterChain*>& draining_filter_chains) PURE;
+
+    /**
+     * Called at the start of the drain sequence for the given filter chains. Implementations
+     * should notify all owned connections that they are being drained (by invoking
+     * Network::Connection::onDrain()) so that callbacks registered on those connections can
+     * react to the drain (e.g. send GOAWAY). Connections are not closed by this call.
+     */
+    virtual void onFilterChainDrainStart(
+        const std::list<const Network::FilterChain*>& draining_filter_chains) PURE;
+
+    /**
+     * Called at the start of the drain sequence for the listener as a whole. Implementations
+     * should notify all owned connections that they are being drained. Connections are not
+     * closed by this call.
+     */
+    virtual void onListenerDrainStart() PURE;
+
+    // New method for handling idle connection closing
+    virtual void onCloseIdleHttpConnections(bool /*is_saturated*/) {
+      // Default implementation does nothing.
+      // Specific listener types (TCP, QUIC) will override this.
+    }
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;
@@ -243,7 +286,7 @@ class UdpConnectionHandler : public virtual ConnectionHandler {
 public:
   /**
    * Get the ``UdpListenerCallbacks`` associated with ``listener_tag`` and ``address``. This will be
-   * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
+   * std::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
    * removed.
    */
   virtual UdpListenerCallbacksOptRef
@@ -320,7 +363,7 @@ public:
 };
 
 using InternalListenerManagerOptRef =
-    absl::optional<std::reference_wrapper<InternalListenerManager>>;
+    std::optional<std::reference_wrapper<InternalListenerManager>>;
 
 // The thread local registry.
 class LocalInternalListenerRegistry {

@@ -16,6 +16,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
@@ -89,7 +90,7 @@ private:
   Event::Dispatcher& dispatcher_;
   absl::variant<double, EnvoyException> response_;
   bool update_async_ = false;
-  absl::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
+  std::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
 };
 
 class FakeProactiveResourceMonitor : public ProactiveResourceMonitor {
@@ -177,9 +178,10 @@ public:
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                      const Server::MockOptions& options, absl::Status& creation_status)
+                      const Server::MockOptions& options, Runtime::Loader& runtime,
+                      absl::Status& creation_status)
       : OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
-                            api, options, creation_status) {
+                            api, options, runtime, creation_status) {
     THROW_IF_NOT_OK_REF(creation_status);
     EXPECT_CALL(*this, createScaledRangeTimerManager)
         .Times(AnyNumber())
@@ -228,14 +230,14 @@ protected:
     absl::Status creation_status = absl::OkStatus();
     return std::make_unique<TestOverloadManager>(dispatcher_, *stats_.rootScope(), thread_local_,
                                                  parseConfig(config), validation_visitor_, *api_,
-                                                 options_, creation_status);
+                                                 options_, runtime_, creation_status);
   }
 
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Duration> factory3_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::StringValue> factory4_;
-  FakeProactiveResourceMonitorFactory<Envoy::ProtobufWkt::BoolValue> factory5_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Struct> factory1_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Timestamp> factory2_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Duration> factory3_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::StringValue> factory4_;
+  FakeProactiveResourceMonitorFactory<Envoy::Protobuf::BoolValue> factory5_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
@@ -249,6 +251,7 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 constexpr char kRegularStateConfig[] = R"YAML(
@@ -299,9 +302,9 @@ constexpr char proactiveResourceConfig[] = R"YAML(
   actions:
     - name: envoy.overload_actions.shrink_heap
       triggers:
-        - name: envoy.resource_monitors.fake_resource1
+        - name: envoy.resource_monitors.global_downstream_max_connections
           threshold:
-            value: 0.9
+            value: 0.5
 )YAML";
 
 TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
@@ -607,6 +610,35 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
             saturation_threshold: 1.0
   )YAML";
 
+constexpr char kReducedTimeoutsConfigWithFlush[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  actions:
+    - name: envoy.overload_actions.reduce_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 2s
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+            min_scale: { value: 10 } # percent
+          - timer: TRANSPORT_SOCKET_CONNECT
+            min_scale: { value: 40 } # percent
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_scale: { value: 20 } # percent
+          - timer: HTTP_DOWNSTREAM_STREAM_FLUSH
+            min_scale: { value: 30 } # percent
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+  )YAML";
+
 // These are the timer types according to the reduced timeouts config above.
 constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
     {TimerType::HttpDownstreamIdleConnectionTimeout,
@@ -615,6 +647,16 @@ constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimu
     {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
     {TimerType::HttpDownstreamMaxConnectionTimeout, Event::ScaledMinimum(UnitFloat(0.2))},
 };
+
+constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimumsWithFlush[]{
+    {TimerType::HttpDownstreamIdleConnectionTimeout,
+     Event::AbsoluteMinimum(std::chrono::seconds(2))},
+    {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
+    {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
+    {TimerType::HttpDownstreamMaxConnectionTimeout, Event::ScaledMinimum(UnitFloat(0.2))},
+    {TimerType::HttpDownstreamStreamFlush, Event::ScaledMinimum(UnitFloat(0.3))},
+};
+
 TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));
 
@@ -631,6 +673,25 @@ TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
 
   EXPECT_EQ(scaled_timer_manager.get(), mock_scaled_timer_manager);
   EXPECT_THAT(timer_minimums, Pointee(UnorderedElementsAreArray(kReducedTimeoutsMinimums)));
+}
+
+TEST_F(OverloadManagerImplTest, CreateScaledTimerManagerWithFlush) {
+  auto manager(createOverloadManager(kReducedTimeoutsConfigWithFlush));
+
+  auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+
+  Event::ScaledTimerTypeMapConstSharedPtr timer_minimums;
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(
+          DoAll(SaveArg<1>(&timer_minimums),
+                Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager}))));
+
+  Event::MockDispatcher mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  EXPECT_EQ(scaled_timer_manager.get(), mock_scaled_timer_manager);
+  EXPECT_THAT(timer_minimums,
+              Pointee(UnorderedElementsAreArray(kReducedTimeoutsMinimumsWithFlush)));
 }
 
 TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
@@ -700,13 +761,69 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
 TEST_F(OverloadManagerImplTest, ActionWithUnexpectedTypedConfig) {
   const std::string config = R"EOF(
     actions:
-      - name: "envoy.overload_actions.shrink_heap"
+      - name: "envoy.overload_actions.stop_accepting_requests"
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Empty
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           ".* unexpected .* typed_config .*");
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithTypedConfig) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ShrinkHeapConfig
+          timer_interval: 5s
+          max_unfreed_memory_bytes: 52428800
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager(createOverloadManager(config));
+  auto config_opt = manager->getShrinkHeapConfig();
+  ASSERT_TRUE(config_opt.has_value());
+  EXPECT_EQ(config_opt->timer_interval().seconds(), 5);
+  EXPECT_EQ(config_opt->max_unfreed_memory_bytes().value(), 52428800);
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithWrongTypedConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unable to unpack as .*ShrinkHeapConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithoutTypedConfig) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager(createOverloadManager(config));
+  auto config_opt = manager->getShrinkHeapConfig();
+  EXPECT_FALSE(config_opt.has_value());
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutAction) {
@@ -872,15 +989,24 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   Stats::Counter& failed_updates =
       stats_.counter("overload.envoy.resource_monitors.global_downstream_max_connections."
                      "failed_updates");
+  Stats::Gauge& pressure =
+      stats_.gauge("overload.envoy.resource_monitors.global_downstream_max_connections.pressure",
+                   Stats::Gauge::ImportMode::NeverImport);
+
   manager->start();
   EXPECT_TRUE(manager->getThreadLocalOverloadState().isResourceMonitorEnabled(
       OverloadProactiveResourceName::GlobalDownstreamMaxConnections));
   bool resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   EXPECT_TRUE(resource_allocated);
+
+  EXPECT_EQ(pressure.value(), 0);
+  timer_cb_();
+  EXPECT_EQ(pressure.value(), 33);
+
   auto monitor = manager->getThreadLocalOverloadState().getProactiveResourceMonitorForTest(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections);
-  EXPECT_NE(absl::nullopt, monitor);
+  EXPECT_NE(std::nullopt, monitor);
   EXPECT_EQ(1, monitor->currentResourceUsage());
   resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 3);
@@ -893,6 +1019,34 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   EXPECT_DEATH(manager->getThreadLocalOverloadState().tryDeallocateResource(
                    Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1),
                ".*Cannot deallocate resource, current resource usage is lower than decrement.*");
+  manager->stop();
+}
+
+// Test that proactive monitors trigger the configured actions when they reach the threshold.
+TEST_F(OverloadManagerImplTest, ProactiveResourceTriggers) {
+  setDispatcherExpectation();
+
+  auto manager(createOverloadManager(proactiveResourceConfig));
+  bool is_active = false;
+  manager->registerForAction("envoy.overload_actions.shrink_heap", dispatcher_,
+                             [&](OverloadActionState state) { is_active = state.isSaturated(); });
+
+  manager->start();
+
+  // Trigger threshold is 50%, max is 3.
+
+  ASSERT_TRUE(factory5_.monitor_->tryAllocateResource(1));
+  timer_cb_();
+  EXPECT_FALSE(is_active);
+
+  ASSERT_TRUE(factory5_.monitor_->tryAllocateResource(1));
+  timer_cb_();
+  EXPECT_TRUE(is_active);
+
+  ASSERT_TRUE(factory5_.monitor_->tryDeallocateResource(1));
+  timer_cb_();
+  EXPECT_FALSE(is_active);
+
   manager->stop();
 }
 

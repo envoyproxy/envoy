@@ -91,13 +91,54 @@ A filter may create a derived/child class of ``DelegatingRoute`` to override spe
 (for example, the route’s timeout value or the route entry’s cluster name) while preserving
 the rest of the properties/behavior of the base route that the ``DelegatingRoute`` wraps around.
 Then, ``setRoute`` can be invoked to manually set the cached route to this ``DelegatingRoute``
-instance. An example of such a derived class can be found in :repo:`ExampleDerivedDelegatingRoute
+instance. An example of such a derived class can be found in :repo:`ExampleDerivedDelegatingRouteEntry
 <test/test_common/delegating_route_utility.h>`.
 
 If no other filters in the chain modify the cached route selection (for example, a common operation
 that filters do is ``clearRouteCache()``, and ``setRoute`` will not survive that), this route
 selection makes its way to the router filter which finalizes the upstream cluster that the request
 will be forwarded to.
+
+In addition to updating the route ``setRoute()`` and ``clearRouteCache()``, downstream HTTP filters could also refresh the
+cluster by invoking ``refreshRouteCluster()`` if the cluster specifier of route supports it. At this point only
+the :ref:`matcher based cluster specifier <config_http_cluster_specifier_matcher>` support the
+``refreshRouteCluster()`` callback.
+
+This callback will not update the cached route but only refresh the target cluster name. This is
+suggested to replace ``clearRouteCache()`` if you only want to determine the target cluster based on
+the latest request attributes that have been updated by the filters and do not want to configure
+multiple similar routes at the route table.
+
+Security Considerations
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. attention::
+
+   **Route cache clearing and route-dependent authorization**: Clearing the route cache can cause
+   Envoy to recompute route matching after earlier HTTP filters have already processed the request.
+   This can be security-sensitive when filters that make route-dependent authorization decisions
+   run before filters that mutate route-matching inputs.
+
+   Route matching may depend on request headers, dynamic metadata, filter state, the request path,
+   or other request attributes. If one of these inputs is modified by a later filter and that filter
+   clears the route cache, subsequent filters and the router may observe a different route than the
+   one seen by earlier filters.
+
+   Filters that may clear the route cache include:
+
+   * :ref:`Lua filter <config_http_filters_lua>` - via ``clearRouteCache()`` method
+   * :ref:`ext_proc filter <config_http_filters_ext_proc>` - when configured with ``CLEAR`` route cache action or when response contains ``clear_route_cache`` directive
+   * :ref:`Golang filter <config_http_filters_golang>` - via ``clearRouteCache()`` API
+   * :ref:`Language filter <config_http_filters_language>` - when ``clear_route_cache`` is enabled
+   * :ref:`JSON to metadata filter <config_http_filters_json_to_metadata>` - when ``clear_route_cache`` is enabled
+   * :ref:`IP tagging filter <config_http_filters_ip_tagging>` - when sanitizing headers
+   * Custom filters that call ``clearRouteCache()`` on the decoder callbacks
+
+   Operators should carefully review HTTP filter ordering when using route-dependent authorization
+   filters such as :ref:`RBAC <config_http_filters_rbac>`, :ref:`ExtAuthZ <config_http_filters_ext_authz>`,
+   or :ref:`JWT <config_http_filters_jwt_authn>`. Avoid enabling route cache clearing for untrusted
+   mutation sources, and consider placing route-dependent authorization filters after filters that
+   mutate route-matching inputs when possible.
 
 .. _arch_overview_http_filters_per_filter_config:
 
@@ -108,14 +149,14 @@ The per filter config map can be used to provide
 :ref:`route <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
 :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
 :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.typed_per_filter_config>`
-specific config for http filters.
+specific config for HTTP filters.
 
 
 The key of the per filter config map should match the :ref:`filter config name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
 
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 
@@ -149,7 +190,7 @@ and setting the :ref:`disabled field <envoy_v3_api_field_config.route.v3.FilterC
 per filter config map in the route configuration. See the
 :ref:`Route specific config <arch_overview_http_filters_per_filter_config>` section for more details.
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 
@@ -173,7 +214,7 @@ In addition, we can set a filter to be disabled by default by setting the :ref:`
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`
 in the HttpFilter configuration and then enable it for specific routes if needed.
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 

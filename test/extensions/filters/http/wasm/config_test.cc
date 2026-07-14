@@ -16,6 +16,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -120,6 +121,29 @@ protected:
     return std::make_unique<FilterConfig>(proto_config, upstream_factory_context_);
   }
 
+  envoy::extensions::filters::http::wasm::v3::Wasm localWasmConfig(const std::string& name) {
+    const std::string yaml =
+        TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    name: ")EOF",
+                                                 name, R"EOF("
+    vm_config:
+      vm_id: ")EOF",
+                                                 name, R"EOF("
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                 std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+    envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    return proto_config;
+  }
+
   NiceMock<Network::MockListenerInfo> listener_info_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
@@ -132,7 +156,7 @@ protected:
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
 
-private:
+protected:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context_;
 };
@@ -142,6 +166,46 @@ INSTANTIATE_TEST_SUITE_P(
     Envoy::Extensions::Common::Wasm::dual_filter_sandbox_runtime_and_cpp_values,
     Envoy::Extensions::Common::Wasm::wasmDualFilterTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterConfigTest);
+
+TEST_P(WasmFilterConfigTest, CreateFilterFactoryFromProtoWithServerContext) {
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  WasmFilterConfig factory;
+  Http::FilterFactoryCb cb;
+  if (std::get<2>(GetParam())) {
+    cb = factory
+             .createHttpFilterFactoryFromProto(proto_config, "stats",
+                                               context_.server_factory_context_)
+             .value();
+  } else {
+    cb = factory
+             .createHttpFilterFactoryFromProto(proto_config, "stats",
+                                               upstream_factory_context_.server_factory_context_)
+             .value();
+  }
+
+  EXPECT_CALL(init_watcher_, ready());
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  cb(filter_callback);
+}
 
 TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
   const std::string json =
@@ -216,6 +280,49 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
   EXPECT_TRUE(context->wasm());
   // Check if the custom stat namespace is registered during the initialization.
   EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
+}
+
+TEST_P(WasmFilterConfigTest, UpstreamWasmUsesServerScopeWhenRuntimeGuardEnabled) {
+  if (std::get<2>(GetParam())) {
+    GTEST_SKIP() << "Only applies to upstream Wasm filters.";
+  }
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.upstream_wasm_filter_uses_root_scope", "true"}});
+  auto cluster_scope =
+      upstream_factory_context_.store_.rootScope()->createScope("cluster.test_cluster.");
+  ON_CALL(upstream_factory_context_, scope()).WillByDefault(ReturnRef(*cluster_scope));
+
+  const auto proto_config = localWasmConfig("upstream_wasm_root_scope");
+  EXPECT_CALL(init_watcher_, ready());
+  auto filter_config = getFilterConfig(proto_config);
+  initializeContextInitManager(init_watcher_);
+
+  ASSERT_TRUE(TestUtility::findCounter(upstream_factory_context_.server_factory_context_.store_,
+                                       "wasm.upstream_wasm_root_scope.vm_reload"));
+}
+
+TEST_P(WasmFilterConfigTest, UpstreamWasmUsesClusterScopeWhenRuntimeGuardDisabled) {
+  if (std::get<2>(GetParam())) {
+    GTEST_SKIP() << "Only applies to upstream Wasm filters.";
+  }
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.upstream_wasm_filter_uses_root_scope", "false"}});
+  auto cluster_scope =
+      upstream_factory_context_.store_.rootScope()->createScope("cluster.test_cluster.");
+  ON_CALL(upstream_factory_context_, scope()).WillByDefault(ReturnRef(*cluster_scope));
+
+  const auto proto_config = localWasmConfig("upstream_wasm_cluster_scope");
+  EXPECT_CALL(init_watcher_, ready());
+  auto filter_config = getFilterConfig(proto_config);
+  initializeContextInitManager(init_watcher_);
+
+  ASSERT_TRUE(
+      TestUtility::findCounter(upstream_factory_context_.store_,
+                               "cluster.test_cluster.wasm.upstream_wasm_cluster_scope.vm_reload"));
 }
 
 TEST_P(WasmFilterConfigTest, DEPRECATED_FEATURE_TEST(YamlLoadFromFileWasmFailOpenOk)) {

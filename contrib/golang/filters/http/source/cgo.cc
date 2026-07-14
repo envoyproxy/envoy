@@ -113,7 +113,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
           for (size_t i = 0; i < header_values.size(); i += 2) {
             const auto& key = header_values[i];
             const auto& value = header_values[i + 1];
-            if (value.length() > 0) {
+            if (!value.empty()) {
               headers.addCopy(Http::LowerCaseString(key), value);
             }
           }
@@ -370,6 +370,12 @@ CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len
       });
 }
 
+CAPIStatus envoyGoFilterHttpSetDrainConnectionUponCompletion(void* r) {
+  return envoyGoFilterHandlerWrapper(r, [](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    return filter->setDrainConnectionUponCompletion();
+  });
+}
+
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name_data,
                                          int name_len, uint32_t* metric_id) {
   return envoyGoConfigHandlerWrapper(
@@ -399,6 +405,17 @@ CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t v
   return envoyGoConfigHandlerWrapper(
       c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
         return filter_config->recordMetric(metric_id, value);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSetUpstreamOverrideHost(void* s, void* host_data, int host_len,
+                                                    bool strict) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s,
+      [host_data, host_len, strict](std::shared_ptr<Filter>& filter,
+                                    ProcessorState& state) -> CAPIStatus {
+        auto host_str = stringViewFromGoPointer(host_data, host_len);
+        return filter->setUpstreamOverrideHost(state, host_str, strict);
       });
 }
 

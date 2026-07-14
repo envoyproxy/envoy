@@ -76,13 +76,12 @@ public:
     stream_info_.filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
         StreamInfo::FilterState::LifeSpan::Connection);
     stream_info_.filter_state_->setData(kConnectionExecutionContextFilterStateName, context_,
-                                        StreamInfo::FilterState::StateType::ReadOnly,
                                         StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   testing::NiceMock<MockScopeTrackedObject> tracked_object_;
-  std::shared_ptr<TestExecutionContext> context_{};
+  std::shared_ptr<TestExecutionContext> context_;
 };
 
 TEST_F(ExecutionContextTest, NullContext) {

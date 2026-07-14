@@ -25,15 +25,15 @@ class CookieBasedSessionStateFactory : public Envoy::Http::SessionStateFactory {
 public:
   class SessionStateImpl : public Envoy::Http::SessionState {
   public:
-    SessionStateImpl(absl::optional<std::string> address,
+    SessionStateImpl(std::optional<std::string> address,
                      const CookieBasedSessionStateFactory& factory, TimeSource& time_source)
         : upstream_address_(std::move(address)), factory_(factory), time_source_(time_source) {}
 
-    absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
-    void onUpdate(absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) override;
+    std::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
+    bool onUpdate(absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) override;
 
   private:
-    absl::optional<std::string> upstream_address_;
+    std::optional<std::string> upstream_address_;
     const CookieBasedSessionStateFactory& factory_;
     TimeSource& time_source_;
   };
@@ -55,10 +55,10 @@ public:
   }
 
 private:
-  absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
+  std::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
     const std::string cookie_value = Envoy::Http::Utility::parseCookieValue(headers, name_);
     if (cookie_value.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     const std::string decoded_value = Envoy::Base64::decode(cookie_value);
     std::string address;
@@ -69,17 +69,17 @@ private:
     if (cookie.ParseFromString(decoded_value)) {
       address = cookie.address();
       if (address.empty()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
 
       if (cookie.expires() != 0) {
         const std::chrono::seconds expiry_time(cookie.expires());
         const auto now = std::chrono::duration_cast<std::chrono::seconds>(
-            (time_source_.monotonicTime()).time_since_epoch());
+            (time_source_.systemTime()).time_since_epoch());
         if (now > expiry_time) {
           // Ignore the address extracted from the cookie. This will cause
           // upstream cluster to select a new host and new cookie will be generated.
-          return absl::nullopt;
+          return std::nullopt;
         }
       }
     } else {
@@ -88,7 +88,7 @@ private:
       address = decoded_value;
     }
 
-    return address.empty() ? absl::nullopt : absl::make_optional(std::move(address));
+    return address.empty() ? std::nullopt : std::make_optional(std::move(address));
   }
 
   std::string makeSetCookie(const std::string& address) const {
@@ -98,7 +98,7 @@ private:
   const std::string name_;
   const std::chrono::seconds ttl_;
   const std::string path_;
-  const Envoy::Http::CookieAttributeRefVector attributes_;
+  std::vector<Envoy::Http::CookieAttribute> attributes_;
   TimeSource& time_source_;
 
   std::function<bool(absl::string_view)> path_matcher_;

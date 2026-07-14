@@ -21,7 +21,10 @@ envoy_extension_cc_test(
         # https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.14.0/api/BUILD#L32
         "-DHAVE_ABSEIL",
     ],
-    extension_names = ["envoy.tracers.opentelemetry"],
+    extension_names = [
+        "envoy.tracers.opentelemetry",
+        "envoy.tracers.opentelemetry.samplers.always_on",
+    ],
     rbe_pool = "6gig",
     deps = [
         "//envoy/common:time_interface",
@@ -33,21 +36,18 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/types:optional",
-        "@io_opentelemetry_cpp//api",
+        "@opentelemetry-cpp//api",
     ],
 )
 
@@ -86,7 +86,7 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/test_common:utility_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 
@@ -96,11 +96,13 @@ envoy_extension_cc_test(
     extension_names = ["envoy.tracers.opentelemetry"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/formatter/file_content:config",
         "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -115,7 +117,6 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
@@ -134,6 +135,22 @@ envoy_extension_cc_test(
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration:http_integration_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "http_trace_exporter_integration_test",
+    srcs = ["http_trace_exporter_integration_test.cc"],
+    extension_names = ["envoy.tracers.opentelemetry"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/tracers/opentelemetry:config",
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//source/extensions/tracers/opentelemetry:trace_exporter",
+        "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

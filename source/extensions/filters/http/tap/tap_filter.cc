@@ -69,7 +69,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Filter::log(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&) {
+void Filter::log(const Formatter::Context&, const StreamInfo::StreamInfo&) {
   if (tapper_ != nullptr && tapper_->onDestroyLog()) {
     config_->stats().rq_tapped_.inc();
   }

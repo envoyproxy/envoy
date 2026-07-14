@@ -3,6 +3,7 @@
 #include <bitset>
 #include <functional>
 #include <list>
+#include <optional>
 #include <regex>
 #include <string>
 #include <vector>
@@ -18,7 +19,7 @@
 #include "source/common/json/json_streamer.h"
 #include "source/common/json/json_utility.h"
 
-#include "absl/types/optional.h"
+#include "absl/status/statusor.h"
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -33,17 +34,15 @@ public:
   PlainStringFormatter(absl::string_view str) { str_.set_string_value(str); }
 
   // FormatterProvider
-  absl::optional<std::string> formatWithContext(const Context&,
-                                                const StreamInfo::StreamInfo&) const override {
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
     return str_.string_value();
   }
-  ProtobufWkt::Value formatValueWithContext(const Context&,
-                                            const StreamInfo::StreamInfo&) const override {
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override {
     return str_;
   }
 
 private:
-  ProtobufWkt::Value str_;
+  Protobuf::Value str_;
 };
 
 /**
@@ -54,18 +53,16 @@ public:
   PlainNumberFormatter(double num) { num_.set_number_value(num); }
 
   // FormatterProvider
-  absl::optional<std::string> formatWithContext(const Context&,
-                                                const StreamInfo::StreamInfo&) const override {
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
     std::string str = absl::StrFormat("%g", num_.number_value());
     return str;
   }
-  ProtobufWkt::Value formatValueWithContext(const Context&,
-                                            const StreamInfo::StreamInfo&) const override {
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override {
     return num_;
   }
 
 private:
-  ProtobufWkt::Value num_;
+  Protobuf::Value num_;
 };
 
 /**
@@ -91,8 +88,8 @@ public:
          const CommandParsers& command_parsers = {});
 
   // Formatter
-  std::string formatWithContext(const Context& context,
-                                const StreamInfo::StreamInfo& stream_info) const override;
+  std::string format(const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
   FormatterImpl(absl::Status& creation_status, absl::string_view format,
@@ -113,18 +110,20 @@ public:
   using CommandParsers = std::vector<CommandParserPtr>;
   using Formatter = FormatterProviderPtr;
   using Formatters = std::vector<Formatter>;
+  using ParsedFormatElement = absl::variant<std::string, Formatters>;
 
-  JsonFormatterImpl(const ProtobufWkt::Struct& struct_format, bool omit_empty_values,
-                    const CommandParsers& commands = {});
+  static absl::StatusOr<std::unique_ptr<JsonFormatterImpl>>
+  create(const Protobuf::Struct& struct_format, bool omit_empty_values,
+         const CommandParsers& commands = {});
+
+  JsonFormatterImpl(bool omit_empty_values, std::vector<ParsedFormatElement>&& parsed_elements);
 
   // Formatter
-  std::string formatWithContext(const Context& context,
-                                const StreamInfo::StreamInfo& info) const override;
+  std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
 
 private:
   const bool omit_empty_values_;
-  using ParsedFormatElement = absl::variant<std::string, Formatters>;
-  std::vector<ParsedFormatElement> parsed_elements_;
+  const std::vector<ParsedFormatElement> parsed_elements_;
 };
 
 } // namespace Formatter

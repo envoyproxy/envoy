@@ -45,6 +45,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // - :ref:`allow_expired_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.allow_expired_certificate>` to allow expired certificates.
 // - :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` to match **URI** SAN of certificates. Unlike the default validator, SPIFFE validator only matches **URI** SAN (which equals to SVID in SPIFFE terminology) and ignore other SAN types.
 //
+// To support multi-tenant use cases, a filter state object ``envoy.tls.cert_validator.spiffe.workload_trust_domain``
+// should be used to define the per-connection workload trust domain. When matching a peer trust domain, both the
+// workload and the peer trust domains are used in selecting the validation certificate. The filter state object
+// should be shared with the upstream to be used in the upstream TLS context SPIFFE validation context.
 message SPIFFECertValidatorConfig {
   message TrustDomain {
     // Name of the trust domain, ``example.com``, ``foo.bar.gov`` for example.
@@ -53,6 +57,11 @@ message SPIFFECertValidatorConfig {
 
     // Specify a data source holding x.509 trust bundle used for validating incoming SVID(s) in this trust domain.
     config.core.v3.DataSource trust_bundle = 2;
+
+    // Optional workload trust domain selection condition. The filter object
+    // ``envoy.tls.cert_validator.spiffe.workload_trust_domain`` must match exactly the value of this field.
+    // If not specified, the filter state object must be absent or be empty to match this trust domain.
+    string workload_trust_domain = 3;
   }
 
   // This field specifies trust domains used for validating incoming X.509-SVID(s).

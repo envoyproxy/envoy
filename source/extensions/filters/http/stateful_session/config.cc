@@ -11,11 +11,24 @@ namespace Extensions {
 namespace HttpFilters {
 namespace StatefulSession {
 
-Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
-    const ProtoConfig& proto_config, const std::string&,
+absl::StatusOr<Http::FilterFactoryCb>
+StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
+    const ProtoConfig& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
+  auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context, stats_prefix,
+                                                             context.scope()));
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new StatefulSession(filter_config)});
+  };
+}
 
-  auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context));
+absl::StatusOr<Http::FilterFactoryCb>
+StatefulSessionFactoryConfig::createHttpFilterFactoryFromProtoTyped(
+    const ProtoConfig& proto_config, const std::string& stats_prefix,
+    Server::Configuration::ServerFactoryContext& context) {
+  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+  auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, generic_context,
+                                                             stats_prefix, context.scope()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new StatefulSession(filter_config)});
   };

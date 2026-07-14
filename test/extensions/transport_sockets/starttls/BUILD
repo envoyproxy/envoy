@@ -67,6 +67,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":starttls_integration_proto_cc_proto",
+        "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/transport_sockets/starttls:config",
         "//test/integration:integration_lib",
         "//test/test_common:registry_lib",

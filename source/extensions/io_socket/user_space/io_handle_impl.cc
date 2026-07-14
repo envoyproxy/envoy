@@ -1,5 +1,7 @@
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
+#include <optional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 
@@ -8,8 +10,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -71,8 +71,8 @@ Api::IoCallUint64Result IoHandleImpl::close() {
     if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
                 static_cast<void*>(peer_handle_));
-      // Notify the peer we won't write more data. shutdown(WRITE).
-      peer_handle_->setWriteEnd();
+      // Notify the peer that it will not receive more data. shutdown(WRITE).
+      peer_handle_->setEof();
       // Notify the peer that we no longer accept data. shutdown(RD).
       peer_handle_->onPeerDestroy();
       peer_handle_ = nullptr;
@@ -122,7 +122,7 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
 }
 
 Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
-                                           absl::optional<uint64_t> max_length_opt) {
+                                           std::optional<uint64_t> max_length_opt) {
   // Below value comes from Buffer::OwnedImpl::default_read_reservation_size_.
   uint64_t max_length = max_length_opt.value_or(MAX_FRAGMENT * FRAGMENT_SIZE);
   if (max_length == 0) {
@@ -162,16 +162,16 @@ Api::IoCallUint64Result IoHandleImpl::writev(const Buffer::RawSlice* slices, uin
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // Error: write after close.
-  if (peer_handle_->isPeerShutDownWrite()) {
+  if (peer_handle_->hasReceivedEof()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // The peer is valid but temporarily does not accept new data. Likely due to flow control.
-  if (!peer_handle_->isWritable()) {
+  if (!peer_handle_->canReceiveData()) {
     return {0, Network::IoSocketError::getIoSocketEagainError()};
   }
 
-  auto* const dest_buffer = peer_handle_->getWriteBuffer();
+  auto* const dest_buffer = peer_handle_->getReceiveBuffer();
   // Write along with iteration. Buffer guarantee the fragment is always append-able.
   uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice && !dest_buffer->highWatermarkTriggered(); i++) {
@@ -198,17 +198,17 @@ Api::IoCallUint64Result IoHandleImpl::write(Buffer::Instance& buffer) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // Error: write after close.
-  if (peer_handle_->isPeerShutDownWrite()) {
+  if (peer_handle_->hasReceivedEof()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // The peer is valid but temporarily does not accept new data. Likely due to flow control.
-  if (!peer_handle_->isWritable()) {
+  if (!peer_handle_->canReceiveData()) {
     return {0, Network::IoSocketError::getIoSocketEagainError()};
   }
   const uint64_t max_bytes_to_write = buffer.length();
   const uint64_t total_bytes_to_write =
-      moveUpTo(*peer_handle_->getWriteBuffer(), buffer,
+      moveUpTo(*peer_handle_->getReceiveBuffer(), buffer,
                // Below value comes from Buffer::OwnedImpl::default_read_reservation_size_.
                MAX_FRAGMENT * FRAGMENT_SIZE);
   peer_handle_->setNewDataAvailable();
@@ -313,7 +313,7 @@ Api::SysCallIntResult IoHandleImpl::ioctl(unsigned long, void*, unsigned long, v
 
 Api::SysCallIntResult IoHandleImpl::setBlocking(bool) { return makeInvalidSyscallResult(); }
 
-absl::optional<int> IoHandleImpl::domain() { return absl::nullopt; }
+std::optional<int> IoHandleImpl::domain() { return std::nullopt; }
 
 absl::StatusOr<Network::Address::InstanceConstSharedPtr> IoHandleImpl::localAddress() {
   return IoHandleImpl::getCommonInternalAddress();
@@ -360,11 +360,11 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
   // Support only shutdown write.
   ASSERT(how == ENVOY_SHUT_WR);
   ASSERT(!closed_);
-  if (!write_shutdown_) {
+  if (!sent_eof_) {
     ASSERT(peer_handle_);
-    // Notify the peer we won't write more data.
-    peer_handle_->setWriteEnd();
-    write_shutdown_ = true;
+    // Notify the peer that it will not receive more data.
+    peer_handle_->setEof();
+    sent_eof_ = true;
   }
   return {0, 0};
 }
@@ -385,13 +385,48 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
   }
   for (const auto& object : filter_state_objects_) {
     // This should not throw as stream info is new and filter objects are uniquely named.
-    filter_state.setData(object.name_, object.data_, object.state_type_,
-                         StreamInfo::FilterState::LifeSpan::Connection, object.stream_sharing_);
+    filter_state.setData(object.name_, object.data_, StreamInfo::FilterState::LifeSpan::Connection,
+                         object.stream_sharing_);
   }
   metadata_ = nullptr;
   filter_state_objects_.clear();
   state_ = State::Done;
 }
+
+std::pair<IoHandleImplPtr, IoHandleImplPtr>
+IoHandleFactory::createIoHandlePair(PassthroughStatePtr state) {
+  PassthroughStateSharedPtr shared_state;
+  if (state != nullptr) {
+    shared_state = std::move(state);
+  } else {
+    shared_state = std::make_shared<PassthroughStateImpl>();
+  }
+  auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(shared_state),
+                                                       new IoHandleImpl(shared_state)};
+  p.first->setPeerHandle(p.second.get());
+  p.second->setPeerHandle(p.first.get());
+  return p;
+}
+
+std::pair<IoHandleImplPtr, IoHandleImplPtr>
+IoHandleFactory::createBufferLimitedIoHandlePair(uint32_t buffer_size, PassthroughStatePtr state) {
+  PassthroughStateSharedPtr shared_state;
+  if (state != nullptr) {
+    shared_state = std::move(state);
+  } else {
+    shared_state = std::make_shared<PassthroughStateImpl>();
+  }
+  auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(shared_state),
+                                                       new IoHandleImpl(shared_state)};
+  // This buffer watermark setting emulates the OS socket buffer parameter
+  // `/proc/sys/net/ipv4/tcp_{r,w}mem`.
+  p.first->setWatermarks(buffer_size);
+  p.second->setWatermarks(buffer_size);
+  p.first->setPeerHandle(p.second.get());
+  p.second->setPeerHandle(p.first.get());
+  return p;
+}
+
 } // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions

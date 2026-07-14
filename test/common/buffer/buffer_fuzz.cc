@@ -138,7 +138,7 @@ public:
   }
 
   Buffer::RawSliceVector
-  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override {
+  getRawSlices(std::optional<uint64_t> max_slices = std::nullopt) const override {
     ASSERT(!max_slices.has_value() || max_slices.value() >= 1);
     return {{const_cast<char*>(start()), size_}};
   }
@@ -216,14 +216,14 @@ public:
     return total_size_to_write;
   }
 
-  void setWatermarks(uint32_t, uint32_t) override {
+  void setWatermarks(uint64_t, uint32_t) override {
     // Not implemented.
     // TODO(antoniovicente) Implement and add fuzz coverage as we merge the Buffer::OwnedImpl and
     // WatermarkBuffer implementations.
     ASSERT(false);
   }
 
-  uint32_t highWatermark() const override { return 0; }
+  uint64_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 
   absl::string_view asStringView() const { return {start(), size_}; }

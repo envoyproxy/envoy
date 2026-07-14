@@ -43,7 +43,8 @@ In addition, the following conventions should be followed:
   messages, or fields, respectively, that are considered work in progress and are not subject to the
   threat model or the breaking change policy. This is similar to the work-in-progress/alpha tagging
   of extensions described below, but allows tagging protos that are used as part of the core API
-  as work in progress without having to break them into their own file.
+  as work in progress without having to break them into their own file. Upon removing the
+  `(xds.annotations.v3.file_status).work_in_progress` annotation, please also update the release notes.
 
 * Always use plural field names for `repeated` fields, such as `filters`.
 
@@ -137,7 +138,7 @@ To add an extension config to the API, the steps below should be followed:
    licenses(["notice"])  # Apache 2
 
    api_proto_package(
-       deps = ["@com_github_cncf_xds//udpa/annotations:pkg"],
+       deps = ["@xds//udpa/annotations:pkg"],
    )
    ```
 1. If this is still WiP and subject to breaking changes, please tag it

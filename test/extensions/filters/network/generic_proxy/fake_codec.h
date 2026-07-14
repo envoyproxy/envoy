@@ -20,12 +20,12 @@ public:
       callback(pair.first, pair.second);
     }
   }
-  absl::optional<absl::string_view> get(absl::string_view key) const override {
+  std::optional<absl::string_view> get(absl::string_view key) const override {
     auto iter = data_.find(key);
     if (iter == data_.end()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
-    return absl::make_optional<absl::string_view>(iter->second);
+    return std::make_optional<absl::string_view>(iter->second);
   }
   void set(absl::string_view key, absl::string_view val) override { data_[key] = std::string(val); }
   void erase(absl::string_view key) override { data_.erase(key); }
@@ -64,6 +64,8 @@ public:
 
   class FakeResponse : public FakeStreamBase<ResponseHeaderFrame> {
   public:
+    FakeResponse() = default;
+    FakeResponse(int code, bool ok) : status_(code, ok) {}
     absl::string_view protocol() const override { return protocol_; }
     StreamStatus status() const override { return status_; }
 
@@ -100,7 +102,7 @@ public:
         data.emplace(pair);
       }
 
-      absl::optional<uint64_t> stream_id;
+      std::optional<uint64_t> stream_id;
       bool end_stream = true;
       bool one_way_stream = false;
 
@@ -163,6 +165,11 @@ public:
     }
 
     void setCodecCallbacks(ServerCodecCallbacks& callback) override { callback_ = &callback; }
+    void onConnected() override {
+      ASSERT(callback_->connection().has_value());
+      ASSERT(callback_->connection()->state() == Network::Connection::State::Open);
+      ASSERT(!callback_->connection()->connecting());
+    }
     void decode(Buffer::Instance& buffer, bool) override {
       ENVOY_LOG(debug, "FakeServerCodec::decode: {}", buffer.toString());
 
@@ -239,7 +246,7 @@ public:
       return response;
     }
 
-    absl::optional<uint32_t> message_size_;
+    std::optional<uint32_t> message_size_;
     Buffer::OwnedImpl buffer_;
     Buffer::OwnedImpl encoding_buffer_;
     ServerCodecCallbacks* callback_{};
@@ -265,7 +272,7 @@ public:
         data.emplace(pair);
       }
 
-      absl::optional<uint64_t> stream_id;
+      std::optional<uint64_t> stream_id;
       bool end_stream = true;
       bool close_connection = false;
 
@@ -400,7 +407,7 @@ public:
       return encoded_size;
     }
 
-    absl::optional<uint32_t> message_size_;
+    std::optional<uint32_t> message_size_;
     Buffer::OwnedImpl buffer_;
     Buffer::OwnedImpl encoding_buffer_;
     ClientCodecCallbacks* callback_{};
@@ -417,7 +424,7 @@ public:
   createCodecFactory(const Protobuf::Message& config,
                      Envoy::Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.fake.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
@@ -432,8 +439,9 @@ class FakeAccessLogExtensionFilter : public AccessLog::Filter {
 class FakeAccessLogExtensionFilterFactory : public AccessLog::ExtensionFilterFactory {
 public:
   // AccessLogFilterFactory
-  AccessLog::FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
-                                    Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<AccessLog::FilterPtr>
+  createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
+               Server::Configuration::GenericFactoryContext&) override {
     return std::make_unique<FakeAccessLogExtensionFilter>();
   }
 
@@ -442,7 +450,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::string name() const override { return "envoy.generic_proxy.access_log.fake"; }
 };

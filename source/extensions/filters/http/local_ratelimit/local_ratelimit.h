@@ -34,7 +34,8 @@ namespace LocalRateLimitFilter {
   COUNTER(enabled)                                                                                 \
   COUNTER(enforced)                                                                                \
   COUNTER(rate_limited)                                                                            \
-  COUNTER(ok)
+  COUNTER(ok)                                                                                      \
+  COUNTER(shadow_mode)
 
 /**
  * Struct definition for all local rate limit stats. @see stats_macros.h
@@ -75,7 +76,7 @@ class FilterConfig : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
-               const bool per_route = false);
+               absl::Status& creation_status, const bool per_route = false);
   ~FilterConfig() override {
     // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
     // timer is created and running.
@@ -86,7 +87,7 @@ public:
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+  Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
@@ -111,7 +112,7 @@ public:
     return vh_rate_limits_;
   }
   bool consumeDefaultTokenBucket() const { return always_consume_default_token_bucket_; }
-  const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
+  const std::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
 
@@ -156,15 +157,15 @@ private:
   std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   Router::HeaderParserPtr response_headers_parser_;
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
   const bool enable_x_rate_limit_headers_;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
-  const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
+  const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
 };
 
@@ -194,16 +195,25 @@ private:
   void populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                            std::vector<RateLimit::Descriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
-  VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
+  VhRateLimitOptions getVirtualHostRateLimitOption(OptRef<const Router::Route> route);
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
-  Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+  Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
+  bool enableXRateLimitHeaders() const {
+    if (x_ratelimit_option_ ==
+        RateLimit::XRateLimitOption::RateLimit_XRateLimitOption_UNSPECIFIED) {
+      return used_config_->enableXRateLimitHeaders();
+    }
+    return x_ratelimit_option_ ==
+           RateLimit::XRateLimitOption::RateLimit_XRateLimitOption_DRAFT_VERSION_03;
+  }
 
   FilterConfigSharedPtr config_;
   // Actual config used for the current request. Is config_ by default, but can be overridden by
   // per-route config.
   const FilterConfig* used_config_{};
   std::shared_ptr<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
+  RateLimit::XRateLimitOption x_ratelimit_option_{};
 
   VhRateLimitOptions vh_rate_limits_;
 };

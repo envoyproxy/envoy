@@ -41,7 +41,7 @@ namespace {
 constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
 
-void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>& arn,
+void setLambdaHeaders(Http::RequestHeaderMap& headers, const std::optional<Arn>& arn,
                       InvocationMode mode, const std::string& host_rewrite) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
@@ -59,7 +59,7 @@ void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>
  * Determines if the target cluster has the AWS Lambda metadata on it.
  */
 bool isTargetClusterLambdaGateway(Upstream::ClusterInfo const& cluster_info) {
-  using ProtobufWkt::Value;
+  using Protobuf::Value;
   const auto& filter_metadata_map = cluster_info.metadata().filter_metadata();
   auto metadata_it = filter_metadata_map.find(filter_metadata_key);
   if (metadata_it == filter_metadata_map.end()) {
@@ -407,15 +407,15 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
   }
 }
 
-absl::optional<Arn> parseArn(absl::string_view arn) {
+std::optional<Arn> parseArn(absl::string_view arn) {
   const std::vector<absl::string_view> parts = absl::StrSplit(arn, ':');
   constexpr auto min_arn_size = 7;
   if (parts.size() < min_arn_size) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   if (parts[0] != "arn") {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   auto partition = parts[1];

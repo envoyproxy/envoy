@@ -77,6 +77,7 @@ private:
 
   Network::DnsResolverSharedPtr dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
+  const std::chrono::milliseconds dns_min_refresh_rate_ms_;
   const std::chrono::milliseconds dns_jitter_ms_;
   BackOffStrategyPtr failure_backoff_strategy_;
   const bool respect_dns_ttl_;
@@ -92,19 +93,6 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
 };
-
-class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
-public:
-  LogicalDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.logical_dns") {}
-
-private:
-  friend class LogicalDnsClusterTest;
-  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
-};
-
-DECLARE_FACTORY(LogicalDnsClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

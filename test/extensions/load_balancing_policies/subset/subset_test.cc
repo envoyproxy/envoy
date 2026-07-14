@@ -2,6 +2,7 @@
 #include <initializer_list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,11 +18,9 @@
 #include "source/extensions/load_balancing_policies/subset/config.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
@@ -30,7 +29,6 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -53,7 +51,7 @@ public:
               fallbackPolicy, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy,
               metadataFallbackPolicy, (), (const));
-  MOCK_METHOD(const ProtobufWkt::Struct&, defaultSubset, (), (const));
+  MOCK_METHOD(const Protobuf::Struct&, defaultSubset, (), (const));
   MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
   MOCK_METHOD(bool, localityWeightAware, (), (const));
   MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
@@ -68,7 +66,7 @@ MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
   ON_CALL(*this, isEnabled()).WillByDefault(Return(true));
   ON_CALL(*this, fallbackPolicy())
       .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
-  ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
+  ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(Protobuf::Struct::default_instance()));
   ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
 }
 
@@ -91,7 +89,7 @@ class TestMetadataMatchCriteria : public Router::MetadataMatchCriteria {
 public:
   TestMetadataMatchCriteria(const std::map<std::string, std::string> matches) {
     for (const auto& it : matches) {
-      ProtobufWkt::Value v;
+      Protobuf::Value v;
       v.set_string_value(it.second);
 
       matches_.emplace_back(
@@ -99,7 +97,7 @@ public:
     }
   }
 
-  TestMetadataMatchCriteria(const std::map<std::string, ProtobufWkt::Value> matches) {
+  TestMetadataMatchCriteria(const std::map<std::string, Protobuf::Value> matches) {
     for (const auto& it : matches) {
       matches_.emplace_back(
           std::make_shared<const TestMetadataMatchCriterion>(it.first, HashedValue(it.second)));
@@ -112,7 +110,7 @@ public:
   }
 
   Router::MetadataMatchCriteriaConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& override) const override {
+  mergeMatchCriteria(const Protobuf::Struct& override) const override {
     auto new_criteria = std::make_unique<TestMetadataMatchCriteria>(*this);
 
     // TODO: this is copied from MetadataMatchCriteriaImpl::extractMetadataMatchCriteria.
@@ -265,7 +263,7 @@ TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
-  auto subset_value = ProtobufWkt::Value();
+  auto subset_value = Protobuf::Value();
   subset_value.set_string_value("the value");
 
   auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
@@ -306,12 +304,12 @@ public:
             new TestMetadataMatchCriteria(std::map<std::string, std::string>(metadata_matches))) {}
 
   TestLoadBalancerContext(
-      std::initializer_list<std::map<std::string, ProtobufWkt::Value>::value_type> metadata_matches)
+      std::initializer_list<std::map<std::string, Protobuf::Value>::value_type> metadata_matches)
       : matches_(new TestMetadataMatchCriteria(
-            std::map<std::string, ProtobufWkt::Value>(metadata_matches))) {}
+            std::map<std::string, Protobuf::Value>(metadata_matches))) {}
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
+  std::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
@@ -333,6 +331,14 @@ public:
   using HostURLMetadataMap = std::map<std::string, HostMetadata>;
 
   void initLbConfigAndLB(LoadBalancerSubsetInfoPtr subset_info = nullptr, bool zone_aware = false) {
+    if (child_lb_config_ == nullptr) {
+      // NOTE: the child lb config should never be null.
+      auto factory =
+          Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
+      auto proto_message = factory->createEmptyConfigProto();
+      child_lb_config_ = factory->loadConfig(server_context_, *proto_message).value();
+    }
+
     lb_config_ = std::make_unique<SubsetLoadBalancerConfig>(
         [&]() -> LoadBalancerSubsetInfoPtr {
           if (subset_info == nullptr) {
@@ -467,7 +473,7 @@ public:
             std::make_shared<HealthyHostVector>(*local_hosts_), local_hosts_per_locality_,
             std::make_shared<DegradedHostVector>(), HostsPerLocalityImpl::empty(),
             std::make_shared<ExcludedHostVector>(), HostsPerLocalityImpl::empty()),
-        {}, {}, {}, 0, absl::nullopt);
+        {}, {}, {}, std::nullopt);
 
     initLbConfigAndLB(nullptr, true);
   }
@@ -479,7 +485,7 @@ public:
           .set_string_value(m_it.second);
     }
 
-    return makeTestHost(info_, url, m, simTime());
+    return makeTestHost(info_, url, m);
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata,
@@ -490,7 +496,7 @@ public:
           .set_string_value(m_it.second);
     }
 
-    return makeTestHost(info_, url, m, locality, simTime());
+    return makeTestHost(info_, url, m, locality);
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostListMetadata& metadata) {
@@ -503,15 +509,15 @@ public:
       }
     }
 
-    return makeTestHost(info_, url, m, simTime());
+    return makeTestHost(info_, url, m);
   }
 
-  ProtobufWkt::Struct makeDefaultSubset(HostMetadata metadata) {
-    ProtobufWkt::Struct default_subset;
+  Protobuf::Struct makeDefaultSubset(HostMetadata metadata) {
+    Protobuf::Struct default_subset;
 
     auto* fields = default_subset.mutable_fields();
     for (const auto& it : metadata) {
-      ProtobufWkt::Value v;
+      Protobuf::Value v;
       v.set_string_value(it.second);
       fields->insert({it.first, v});
     }
@@ -547,7 +553,7 @@ public:
     return makeSelector(selector_keys, fallback_policy, {});
   }
 
-  void modifyHosts(HostVector add, HostVector remove, absl::optional<uint32_t> add_in_locality = {},
+  void modifyHosts(HostVector add, HostVector remove, std::optional<uint32_t> add_in_locality = {},
                    uint32_t priority = 0) {
     MockHostSet& host_set = *priority_set_.getMockHostSet(priority);
     for (const auto& host : remove) {
@@ -616,7 +622,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, {}, remove, 0, absl::nullopt);
+          {}, {}, remove, std::nullopt);
     }
 
     for (const auto& host : add) {
@@ -633,7 +639,7 @@ public:
             updateHostsParams(local_hosts_, local_hosts_per_locality_,
                               std::make_shared<HealthyHostVector>(*local_hosts_),
                               local_hosts_per_locality_),
-            {}, add, {}, 0, absl::nullopt);
+            {}, add, {}, std::nullopt);
       }
     } else if (!add.empty() || !remove.empty()) {
       local_priority_set_.updateHosts(
@@ -641,7 +647,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, add, remove, 0, absl::nullopt);
+          {}, add, remove, std::nullopt);
     }
   }
 
@@ -699,8 +705,8 @@ public:
     return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
   }
 
-  ProtobufWkt::Value valueFromJson(std::string json) {
-    ProtobufWkt::Value v;
+  Protobuf::Value valueFromJson(std::string json) {
+    Protobuf::Value v;
     TestUtility::loadFromJson(json, v);
     return v;
   }
@@ -797,7 +803,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   init({
@@ -816,7 +822,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackPanicMode) {
   EXPECT_CALL(subset_info_, panicModeAny()).WillRepeatedly(Return(true));
 
   // The default subset will be empty.
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "none"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"version", "none"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   init({
@@ -836,7 +842,7 @@ TEST_P(SubsetLoadBalancerTest, FallbackPanicModeWithUpdates) {
   EXPECT_CALL(subset_info_, panicModeAny()).WillRepeatedly(Return(true));
 
   // The default subset will be empty.
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "none"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"version", "none"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   init({{"tcp://127.0.0.1:80", {{"version", "default"}}}});
@@ -854,7 +860,7 @@ TEST_P(SubsetLoadBalancerTest, FallbackDefaultSubsetAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   init({
@@ -877,7 +883,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackEmptyDefaultSubsetConvertsToAnyEndpoint) 
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
   EXPECT_CALL(subset_info_, defaultSubset())
-      .WillRepeatedly(ReturnRef(ProtobufWkt::Struct::default_instance()));
+      .WillRepeatedly(ReturnRef(Protobuf::Struct::default_instance()));
 
   init();
 
@@ -1146,7 +1152,7 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"default", "true"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"default", "true"}});
 
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
   EXPECT_CALL(subset_info_, fallbackPolicy())
@@ -1334,7 +1340,7 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   TestLoadBalancerContext context_13({{"version", "1.3"}});
   TestLoadBalancerContext context_14({{"version", "1.4"}});
   TestLoadBalancerContext context_default({{"default", "true"}});
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"default", "true"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"default", "true"}});
 
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
   EXPECT_CALL(subset_info_, fallbackPolicy())
@@ -1674,7 +1680,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   HostVector hosts;
-  hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80", simTime()));
+  hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
   hosts.emplace_back(makeHost("tcp://127.0.0.1:81", {{"version", "1.0"}}));
 
   host_set_.hosts_ = hosts;
@@ -1812,7 +1818,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}}, local_locality)},
-              {host_set_.hosts_[0]}, absl::optional<uint32_t>(0));
+              {host_set_.hosts_[0]}, std::optional<uint32_t>(0));
 
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}}, local_locality)},
                    {local_hosts_->at(0)}, 0);
@@ -1829,7 +1835,7 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
@@ -1888,7 +1894,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
@@ -1947,7 +1953,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}}, local_locality)},
-              {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
+              {host_set_.hosts_[1]}, std::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}}, local_locality)}, 0);
@@ -2078,7 +2084,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)},
-              {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
+              {host_set_.hosts_[1]}, std::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, local_locality)}, 0);
@@ -2237,7 +2243,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)}, {},
-              absl::optional<uint32_t>(0));
+              std::optional<uint32_t>(0));
 
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, locality_2)}, {}, 2);
 
@@ -2272,10 +2278,10 @@ TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
   init();
 
-  ProtobufWkt::Value str_value;
+  Protobuf::Value str_value;
   str_value.set_string_value("abc");
 
-  ProtobufWkt::Value num_value;
+  Protobuf::Value num_value;
   num_value.set_number_value(100);
 
   EXPECT_EQ("version=\"abc\"", SubsetLoadBalancer::describeMetadata({{"version", str_value}}));
@@ -2710,7 +2716,7 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAnyFallbackPerSelector) {
 
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"bar", "default"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"bar", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   // Add hosts initial hosts.
@@ -2736,7 +2742,7 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"version", "default"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
@@ -2791,7 +2797,7 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorAnyAfterUpdate) {
 TEST_P(SubsetLoadBalancerTest, FallbackForCompoundSelector) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"foo", "bar"}});
+  const Protobuf::Struct default_subset = makeDefaultSubset({{"foo", "bar"}});
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   std::vector<SubsetSelectorPtr> subset_selectors = {
@@ -2946,8 +2952,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackList) {
 
   // if fallback_list is not a list, it should be ignored
   // regular metadata is in effect
-  ProtobufWkt::Value null_value;
-  null_value.set_null_value(ProtobufWkt::NullValue::NULL_VALUE);
+  Protobuf::Value null_value;
+  null_value.set_null_value(Protobuf::NullValue::NULL_VALUE);
   TestLoadBalancerContext context_with_invalid_fallback_list_null(
       {{"version", valueFromJson("\"3.0\"")}, {"fallback_list", null_value}});
 
@@ -3301,7 +3307,7 @@ INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerSingleHostPerSubsetT
 TEST(LoadBalancerContextWrapperTest, LoadBalancingContextWrapperTest) {
   testing::NiceMock<Upstream::MockLoadBalancerContext> mock_context;
 
-  ProtobufWkt::Struct empty_struct;
+  Protobuf::Struct empty_struct;
   Router::MetadataMatchCriteriaImpl match_criteria(empty_struct);
   ON_CALL(mock_context, metadataMatchCriteria()).WillByDefault(testing::Return(&match_criteria));
 
@@ -3329,6 +3335,9 @@ TEST(LoadBalancerContextWrapperTest, LoadBalancingContextWrapperTest) {
 
   EXPECT_CALL(mock_context, overrideHostToSelect());
   wrapper.overrideHostToSelect();
+
+  EXPECT_CALL(mock_context, setHeadersModifier(_));
+  wrapper.setHeadersModifier(nullptr);
 }
 
 } // namespace

@@ -1,0 +1,36 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
+#include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace McpRouter {
+
+/**
+ * Config factory for MCP router filter.
+ */
+class McpRouterFilterConfigFactory
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::http::mcp_router::v3::McpRouter> {
+public:
+  McpRouterFilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.mcp_router") {}
+
+private:
+  bool
+  isTerminalFilterByProtoTyped(const envoy::extensions::filters::http::mcp_router::v3::McpRouter&,
+                               Server::Configuration::ServerFactoryContext&) override {
+    return true;
+  }
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+};
+
+} // namespace McpRouter
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

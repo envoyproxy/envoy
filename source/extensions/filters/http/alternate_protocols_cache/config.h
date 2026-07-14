@@ -15,17 +15,23 @@ namespace AlternateProtocolsCache {
  * Config registration for the alternate protocols cache filter.
  */
 class AlternateProtocolsCacheFilterFactory
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig> {
 public:
   AlternateProtocolsCacheFilterFactory()
-      : FactoryBase(HttpFilterNames::get().AlternateProtocolsCache) {}
+      : ExceptionFreeFactoryBase(HttpFilterNames::get().AlternateProtocolsCache) {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
           proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
+          proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(AlternateProtocolsCacheFilterFactory);

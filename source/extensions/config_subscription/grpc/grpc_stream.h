@@ -29,12 +29,13 @@ public:
   // The entry value corresponding to the grpc stream's configuration entry index.
   enum class ConnectedStateValue {
     // The first entry in the config corresponds to the primary xDS source.
-    FIRST_ENTRY = 1,
+    FirstEntry = 1,
     // The second entry in the config corresponds to the failover xDS source.
-    SECOND_ENTRY
+    SecondEntry
   };
 
-  GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
+  GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks,
+             Grpc::RawAsyncClientSharedPtr&& async_client,
              const Protobuf::MethodDescriptor& service_method, Event::Dispatcher& dispatcher,
              Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
              const RateLimitSettings& rate_limit_settings, ConnectedStateValue connected_state_val)
@@ -164,7 +165,7 @@ public:
     stream_intentionally_closed_ = true;
   }
 
-  absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() const {
+  std::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() const {
     return last_close_status_;
   }
 
@@ -245,7 +246,7 @@ private:
            Grpc::Status::WellKnownGrpcStatus::Unavailable == status;
   }
 
-  void clearCloseStatus() { last_close_status_ = absl::nullopt; }
+  void clearCloseStatus() { last_close_status_ = std::nullopt; }
   bool isCloseStatusSet() { return last_close_status_.has_value(); }
 
   void setCloseStatus(Grpc::Status::GrpcStatus status, const std::string& message) {
@@ -277,7 +278,7 @@ private:
 
   // Records the initial message and timestamp of the most recent remote closes with the same
   // status.
-  absl::optional<Grpc::Status::GrpcStatus> last_close_status_;
+  std::optional<Grpc::Status::GrpcStatus> last_close_status_;
   std::string last_close_message_;
   MonotonicTime last_close_time_;
 

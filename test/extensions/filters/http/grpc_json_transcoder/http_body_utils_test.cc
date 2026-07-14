@@ -26,7 +26,7 @@ public:
 
   void setBodyFieldPath(const std::vector<int>& body_field_path) {
     for (int field_number : body_field_path) {
-      ProtobufWkt::Field field;
+      Protobuf::Field field;
       field.set_number(field_number);
       raw_body_field_path_.emplace_back(std::move(field));
     }
@@ -51,7 +51,7 @@ public:
       Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
 
       Message message;
-      message.ParseFromZeroCopyStream(&stream);
+      std::ignore = message.ParseFromZeroCopyStream(&stream);
 
       google::api::HttpBody http_body = get_http_body(std::move(message));
       EXPECT_EQ(http_body.content_type(), content_type);
@@ -82,8 +82,8 @@ public:
     EXPECT_FALSE(HttpBodyUtils::parseMessageByFieldPath(&stream, body_field_path_, &http_body));
   }
 
-  std::vector<ProtobufWkt::Field> raw_body_field_path_;
-  std::vector<const ProtobufWkt::Field*> body_field_path_;
+  std::vector<Protobuf::Field> raw_body_field_path_;
+  std::vector<const Protobuf::Field*> body_field_path_;
 };
 
 TEST_F(HttpBodyUtilsTest, UnknownQueryParamsAppearInExtension) {
@@ -101,7 +101,7 @@ TEST_F(HttpBodyUtilsTest, UnknownQueryParamsAppearInExtension) {
   Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
 
   google::api::HttpBody http_body;
-  http_body.ParseFromZeroCopyStream(&stream);
+  std::ignore = http_body.ParseFromZeroCopyStream(&stream);
 
   EXPECT_EQ(http_body.content_type(), content_type);
   EXPECT_EQ(http_body.data(), content);
@@ -110,7 +110,7 @@ TEST_F(HttpBodyUtilsTest, UnknownQueryParamsAppearInExtension) {
             "type.googleapis.com/"
             "envoy.extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams");
   UnknownQueryParams unknown_vars_out;
-  http_body.extensions(0).UnpackTo(&unknown_vars_out);
+  std::ignore = http_body.extensions(0).UnpackTo(&unknown_vars_out);
   ASSERT_TRUE(unknown_vars_out.key().contains("foo"));
   EXPECT_THAT(unknown_vars_out.key().at("foo").values(), ElementsAre("bar", "baz"));
 }

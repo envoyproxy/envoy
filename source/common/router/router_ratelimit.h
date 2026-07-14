@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,14 +13,13 @@
 #include "envoy/router/router_ratelimit.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_utility.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -39,6 +39,24 @@ public:
 
 private:
   const Envoy::Config::MetadataKey metadata_key_;
+};
+
+/**
+ * Populate rate limit override from a static configuration value.
+ */
+class StaticRateLimitOverride : public RateLimitOverrideAction {
+public:
+  StaticRateLimitOverride(
+      const envoy::config::route::v3::RateLimit::Override::RateLimitOverride& config)
+      : requests_per_unit_(config.requests_per_unit()), unit_(config.unit()) {}
+
+  // Router::RateLimitOverrideAction
+  bool populateOverride(RateLimit::Descriptor& descriptor,
+                        const envoy::config::core::v3::Metadata* metadata) const override;
+
+private:
+  const uint32_t requests_per_unit_;
+  const envoy::type::v3::RateLimitUnit unit_;
 };
 
 /**
@@ -124,10 +142,8 @@ private:
  */
 class GenericKeyAction : public RateLimit::DescriptorProducer {
 public:
-  GenericKeyAction(const envoy::config::route::v3::RateLimit::Action::GenericKey& action)
-      : descriptor_value_(action.descriptor_value()),
-        descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key()
-                                                         : "generic_key") {}
+  GenericKeyAction(const envoy::config::route::v3::RateLimit::Action::GenericKey& action,
+                   std::unique_ptr<Formatter::FormatterImpl> formatter = nullptr);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -138,6 +154,8 @@ public:
 private:
   const std::string descriptor_value_;
   const std::string descriptor_key_;
+  const std::string default_value_;
+  const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
 };
 
 /**
@@ -189,7 +207,8 @@ class HeaderValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   HeaderValueMatchAction(
       const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
-      Server::Configuration::CommonFactoryContext& context);
+      Server::Configuration::CommonFactoryContext& context,
+      std::unique_ptr<Formatter::FormatterImpl> formatter = nullptr);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -200,8 +219,10 @@ public:
 private:
   const std::string descriptor_value_;
   const std::string descriptor_key_;
+  const std::string default_value_;
   const bool expect_match_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> action_headers_;
+  const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
 };
 
 /**
@@ -211,7 +232,8 @@ class QueryParameterValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   QueryParameterValueMatchAction(
       const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
-      Server::Configuration::CommonFactoryContext& context);
+      Server::Configuration::CommonFactoryContext& context,
+      std::unique_ptr<Formatter::FormatterImpl> formatter = nullptr);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -227,8 +249,33 @@ public:
 private:
   const std::string descriptor_value_;
   const std::string descriptor_key_;
+  const std::string default_value_;
   const bool expect_match_;
   const std::vector<ConfigUtility::QueryParameterMatcherPtr> action_query_parameters_;
+  const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
+};
+
+/**
+ * Action for remote address match rate limiting.
+ */
+class RemoteAddressMatchAction : public RateLimit::DescriptorProducer {
+public:
+  RemoteAddressMatchAction(
+      const envoy::config::route::v3::RateLimit::Action::RemoteAddressMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const std::string descriptor_key_;
+  const std::string default_value_;
+  const std::unique_ptr<Network::Address::IpList> ip_list_;
+  const bool invert_match_;
+  const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
 };
 
 class RateLimitDescriptorValidationVisitor
@@ -281,8 +328,9 @@ private:
   const std::string disable_key_;
   const uint64_t stage_;
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
-  absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
+  std::optional<RateLimitOverrideActionPtr> limit_override_ = std::nullopt;
   const bool apply_on_stream_done_ = false;
+  const RateLimit::XRateLimitOption x_ratelimit_option_{};
 };
 
 /**

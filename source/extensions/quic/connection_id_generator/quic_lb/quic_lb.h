@@ -37,7 +37,7 @@ public:
         const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
         absl::string_view server_id);
 
-    const bool unsafe_unencrypted_testing_mode_;
+    const bool unencrypted_mode_;
     const uint32_t nonce_length_bytes_;
     const quic::LoadBalancerServerId server_id_;
   };
@@ -45,14 +45,14 @@ public:
   QuicLbConnectionIdGenerator(ThreadLocal::TypedSlot<ThreadLocalData>& tls, uint32_t worker_id);
 
   // quic::ConnectionIdGeneratorInterface
-  absl::optional<quic::QuicConnectionId>
+  std::optional<quic::QuicConnectionId>
   GenerateNextConnectionId(const quic::QuicConnectionId& original) override;
-  absl::optional<quic::QuicConnectionId>
+  std::optional<quic::QuicConnectionId>
   MaybeReplaceConnectionId(const quic::QuicConnectionId& original,
                            const quic::ParsedQuicVersion& version) override;
   uint8_t ConnectionIdLength(uint8_t first_byte) const override;
 
-  absl::optional<quic::QuicConnectionId> appendRoutingId(quic::QuicConnectionId& new_connection_id);
+  std::optional<quic::QuicConnectionId> appendRoutingId(quic::QuicConnectionId& new_connection_id);
 
 private:
   ThreadLocal::TypedSlot<ThreadLocalData>& tls_slot_;

@@ -27,6 +27,7 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
+
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #endif
 
@@ -40,6 +41,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -166,7 +168,7 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
 #endif // ENVOY_ENABLE_YAML
 
   envoy::config::core::v3::TransportSocket message;
-  message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  std::ignore = message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
   return config_factory.createTransportSocketFactory(quic_transport_socket_config, context).value();
@@ -226,9 +228,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
           cluster, "",
           *Network::Utility::resolveUrl(
               fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
-          nullptr, nullptr, envoy::config::core::v3::Locality().default_instance(),
-          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-          time_system));
+          nullptr, nullptr, std::make_shared<envoy::config::core::v3::Locality>(),
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0));
 
   if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(type,
@@ -249,7 +250,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                                "spiffe://lyft.com/backend-team");
   auto& quic_transport_socket_factory =
       dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
-  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, 0);
+  std::unique_ptr<Quic::PersistentQuicInfoImpl> persistent_info =
+      Quic::createPersistentQuicInfoForCluster(*dispatcher, *cluster, server_factory_context);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -442,6 +444,59 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   }
 
   return Network::FilterStatus::StopIteration;
+}
+
+addrinfo*
+OsSysCallsWithMockedDns::makeAddrInfo(const Network::Address::InstanceConstSharedPtr& addr) {
+  addrinfo* ai = reinterpret_cast<addrinfo*>(malloc(sizeof(addrinfo)));
+  memset(ai, 0, sizeof(addrinfo));
+  ai->ai_protocol = IPPROTO_TCP;
+  ai->ai_socktype = SOCK_STREAM;
+  if (addr->ip()->ipv4() != nullptr) {
+    ai->ai_family = AF_INET;
+  } else {
+    ai->ai_family = AF_INET6;
+  }
+  sockaddr_storage* storage = reinterpret_cast<sockaddr_storage*>(malloc(sizeof(sockaddr_storage)));
+  ai->ai_addr = reinterpret_cast<sockaddr*>(storage);
+  memcpy(ai->ai_addr, addr->sockAddr(), addr->sockAddrLen());
+  ai->ai_addrlen = addr->sockAddrLen();
+  ai->ai_next = nullptr;
+  return ai;
+}
+
+Api::SysCallIntResult OsSysCallsWithMockedDns::getaddrinfo(const char* node,
+                                                           const char* /*service*/,
+                                                           const addrinfo* /*hints*/,
+                                                           addrinfo** res) {
+  *res = nullptr;
+  if (absl::string_view{"localhost"} == node || absl::string_view{"127.0.0.1"} == node ||
+      absl::string_view{"::1"} == node) {
+    if (ip_version_ == Network::Address::IpVersion::v6) {
+      *res = makeAddrInfo(Network::Utility::getIpv6LoopbackAddress());
+    } else {
+      *res = makeAddrInfo(Network::Utility::getCanonicalIpv4LoopbackAddress());
+    }
+    return {0, 0};
+  }
+  if (nonexisting_addresses_.find(node) != nonexisting_addresses_.end()) {
+    return {EAI_NONAME, 0};
+  }
+  std::cerr << "Mock DNS does not have entry for: " << node << std::endl;
+  return {-1, 128};
+}
+
+void OsSysCallsWithMockedDns::freeaddrinfo(addrinfo* ai) {
+  while (ai != nullptr) {
+    addrinfo* p = ai;
+    ai = ai->ai_next;
+    free(p->ai_addr);
+    free(p);
+  }
+}
+
+void OsSysCallsWithMockedDns::setIpVersion(Network::Address::IpVersion version) {
+  ip_version_ = version;
 }
 
 } // namespace Envoy

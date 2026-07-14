@@ -6,9 +6,7 @@
 #include "source/extensions/health_check/event_sinks/file/file_sink_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/health_checker_factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,8 +24,8 @@ TEST(HealthCheckEventFileSinkFactory, createHealthCheckEventSink) {
 
   envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink config;
   config.set_event_log_path("test_path");
-  Envoy::ProtobufWkt::Any typed_config;
-  typed_config.PackFrom(config);
+  Envoy::Protobuf::Any typed_config;
+  std::ignore = typed_config.PackFrom(config);
 
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
   EXPECT_NE(factory->createHealthCheckEventSink(typed_config, context), nullptr);
@@ -38,8 +36,8 @@ TEST(HealthCheckEventFileSinkFactory, createEmptyHealthCheckEventSink) {
       "envoy.health_check.event_sink.file");
   EXPECT_NE(factory, nullptr);
   auto empty_proto = factory->createEmptyConfigProto();
-  auto config = *dynamic_cast<
-      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink*>(
+  auto config = *Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink>(
       empty_proto.get());
   EXPECT_TRUE(config.event_log_path().empty());
 }
@@ -66,6 +64,7 @@ TEST(HealthCheckEventFileSink, logTest) {
   cluster_name: fake_cluster
   eject_unhealthy_event:
     failure_type: ACTIVE
+    http_status_code: 503
   timestamp: '2009-02-13T23:31:31.234Z'
   )EOF",
                             event);
@@ -76,7 +75,7 @@ TEST(HealthCheckEventFileSink, logTest) {
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
       "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
       "\"ipv4_compat\":false,\"network_namespace_filepath\":\"\"}},\"cluster_name\":\"fake_"
-      "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
+      "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\",\"http_status_code\":503},"
       "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
 
   envoy::data::core::v3::HealthCheckEvent add_event;

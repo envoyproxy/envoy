@@ -9,6 +9,7 @@
 #include "envoy/server/fatal_action_config.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/notification.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -22,7 +23,8 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
-#include "test/mocks/common.h"
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -31,11 +33,13 @@
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -44,6 +48,7 @@
 
 using testing::_;
 using testing::Assign;
+using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -160,6 +165,59 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
   InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
 
+TEST(ServerInstanceUtil, RaiseFileLimits) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 512;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, const struct rlimit* rlim) {
+        EXPECT_EQ(1024, rlim->rlim_cur);
+        EXPECT_EQ(1024, rlim->rlim_max);
+        return Api::SysCallIntResult{0, 0};
+      }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsAlreadyMaxed) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 1024;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsReadError) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _)).WillOnce(Invoke([&](int, struct rlimit*) {
+    return Api::SysCallIntResult{-1, 0};
+  }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsWriteError) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 512;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, const struct rlimit*) { return Api::SysCallIntResult{-1, 0}; }));
+  InstanceUtil::raiseFileLimits();
+}
+
 class RunHelperTest : public testing::Test {
 public:
   RunHelperTest() {
@@ -175,20 +233,21 @@ public:
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-    helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
-                                          init_manager_, overload_manager_, null_overload_manager_,
-                                          [this] { start_workers_.ready(); });
+    helper_ = std::make_unique<RunHelper>(
+        server_, options_, dispatcher_, xds_manager_, cm_, access_log_manager_, init_manager_,
+        overload_manager_, null_overload_manager_, mock_workers_start_cb_.AsStdFunction());
   }
 
   NiceMock<MockInstance> server_;
   testing::NiceMock<MockOptions> options_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Config::MockXdsManager> xds_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
   NiceMock<MockOverloadManager> null_overload_manager_;
   Init::ManagerImpl init_manager_{""};
-  ReadyWatcher start_workers_;
+  testing::MockFunction<void()> mock_workers_start_cb_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
 #ifndef WIN32
@@ -201,14 +260,14 @@ public:
 };
 
 TEST_F(RunHelperTest, Normal) {
-  EXPECT_CALL(start_workers_, ready());
+  EXPECT_CALL(mock_workers_start_cb_, Call);
   cm_init_callback_();
 }
 
 // no signals on Windows
 #ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
-  EXPECT_CALL(start_workers_, ready()).Times(0);
+  EXPECT_CALL(mock_workers_start_cb_, Call).Times(0);
   sigterm_->callback_();
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
@@ -218,7 +277,7 @@ TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
 // no signals on Windows
 #ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
-  EXPECT_CALL(start_workers_, ready()).Times(0);
+  EXPECT_CALL(mock_workers_start_cb_, Call).Times(0);
   Init::ExpectableTargetImpl target;
   init_manager_.add(target);
   EXPECT_CALL(target, initialize());
@@ -374,7 +433,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "envoy.custom_stats_sink"; }
@@ -497,7 +556,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(1), time_system_));
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
@@ -532,13 +591,6 @@ TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
-}
-
-// Validate the the Envoy FIPS compilation flags are consistent with the FIPS
-// mode of the underlying BoringSSL build.
-TEST_P(ServerInstanceImplTest, ValidateFIPSModeConsistency) {
-  bool isFIPS = (FIPS_mode() != 0);
-  EXPECT_EQ(isFIPS, VersionInfo::sslFipsCompliant());
 }
 
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
@@ -798,6 +850,10 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 
+  ENVOY_NOTIFICATION("name", "stuff");
+  ENVOY_NOTIFICATION("name1", "stuff1");
+  ENVOY_NOTIFICATION("name3", "stuff3");
+  EXPECT_EQ(3L, TestUtility::findCounter(stats_store_, "server.envoy_notifications")->value());
 // The ENVOY_BUG stat works in release mode.
 #if defined(NDEBUG)
   // Test exponential back-off on a fixed line ENVOY_BUG.
@@ -909,6 +965,38 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, EvictStats) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_evict_bootstrap.yaml", true);
+  EXPECT_EQ(2, server_->statsConfig().evictOnFlush());
+  EXPECT_EQ(std::chrono::seconds(5), server_->statsConfig().flushInterval());
+
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(1L, counter->value());
+  EXPECT_EQ(0, stats_store_.evictionCount());
+
+  // Eviction applied here: side-effect is that c1 is now marked as unused.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(2L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(3L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  // Second pass of eviction deletes the counter.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(4L, counter->value());
+  EXPECT_EQ(2, stats_store_.evictionCount());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
@@ -937,12 +1025,12 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
     server_->flushStats();
   });
 
-  EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "server.dropped_stat_flushes", Eq(2),
+                                          time_system_));
 
   server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
 
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(1), time_system_));
 
   // Trigger another flush after the first one finished. This should go through an no drops should
   // be recorded.
@@ -950,10 +1038,10 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
 
   server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
 
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(2), time_system_));
 
-  EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "server.dropped_stat_flushes", Eq(2),
+                                          time_system_));
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
@@ -1465,11 +1553,12 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce(
           Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
-            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            const auto* proto =
+                Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
             EXPECT_NE(nullptr, proto);
             EXPECT_EQ(proto->a(), "foo");
             auto mock_extension = std::make_unique<MockBootstrapExtension>();
-            EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([&ctx]() {
+            EXPECT_CALL(*mock_extension, onServerInitialized(_)).WillOnce(Invoke([&ctx]() {
               // call to cluster manager, to make sure it is not nullptr.
               ctx.clusterManager().clusters();
             }));
@@ -1543,7 +1632,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
   // Inject Unsafe Factory
   NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
   EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
   EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
 
@@ -1650,7 +1739,7 @@ public:
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override {}
-  void onClusterRemoval(const std::string&) override {}
+  void onClusterRemoval(absl::string_view) override {}
 
 private:
   Upstream::ClusterUpdateCallbacksHandlePtr cluster_removal_cb_handle_;
@@ -1669,7 +1758,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "envoy.callbacks_stats_sink"; }
@@ -1768,6 +1857,34 @@ TEST_P(ServerInstanceImplTest, TextApplicationLog) {
   }));
 
   ENVOY_LOG_MISC(info, "hello");
+}
+
+// Test that deprecated runtime key warning is logged when skip_deprecated_logs is false
+TEST_P(ServerInstanceImplTest, DeprecatedRuntimeKeyWarningWhenNotSkipped) {
+  // Set skip_deprecated_logs to false (default)
+  ON_CALL(options_, skipDeprecatedLogs()).WillByDefault(Return(false));
+
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "Usage of the deprecated runtime key overload.global_downstream_max_connections, consider "
+      "switching to "
+      "`envoy.resource_monitors.global_downstream_max_connections` instead."
+      "This runtime key will be removed in future.",
+      { initialize("test/server/test_data/server/deprecated_runtime_key_bootstrap.yaml"); });
+}
+
+// Test that deprecated runtime key warning is suppressed when skip_deprecated_logs is true
+TEST_P(ServerInstanceImplTest, DeprecatedRuntimeKeyWarningWhenSkipped) {
+  // Set skip_deprecated_logs to true
+  ON_CALL(options_, skipDeprecatedLogs()).WillByDefault(Return(true));
+
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn",
+      "Usage of the deprecated runtime key overload.global_downstream_max_connections, consider "
+      "switching to "
+      "`envoy.resource_monitors.global_downstream_max_connections` instead."
+      "This runtime key will be removed in future.",
+      { initialize("test/server/test_data/server/deprecated_runtime_key_bootstrap.yaml"); });
 }
 
 } // namespace

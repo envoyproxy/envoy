@@ -19,8 +19,11 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "ares.h"
 
@@ -34,12 +37,22 @@ namespace {
 // to their original values: 5 second timeout and 4 retry attempts.
 // Ref: https://github.com/envoyproxy/envoy/issues/35117
 constexpr uint32_t DEFAULT_QUERY_TIMEOUT_SECONDS = 5;
+constexpr uint32_t DEFAULT_QCACHE_MAX_TTL = 0;
 constexpr uint32_t DEFAULT_QUERY_TRIES = 4;
+
+uint32_t getQcacheMaxTtl(
+    const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config) {
+  if (!config.has_qcache_max_ttl()) {
+    return DEFAULT_QCACHE_MAX_TTL;
+  }
+
+  return config.qcache_max_ttl().value();
+}
 } // namespace
 
 DnsResolverImpl::DnsResolverImpl(
     const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
-    Event::Dispatcher& dispatcher, absl::optional<std::string> resolvers_csv,
+    Event::Dispatcher& dispatcher, std::optional<std::string> resolvers_csv,
     Stats::Scope& root_scope)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
@@ -51,15 +64,33 @@ DnsResolverImpl::DnsResolverImpl(
           config, query_timeout_seconds, DEFAULT_QUERY_TIMEOUT_SECONDS))),
       query_tries_(static_cast<uint32_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, query_tries, DEFAULT_QUERY_TRIES))),
-      rotate_nameservers_(config.rotate_nameservers()), resolvers_csv_(resolvers_csv),
+      rotate_nameservers_(config.rotate_nameservers()),
+      edns0_max_payload_size_(static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, edns0_max_payload_size, 0))), // 0 means use c-ares default EDNS0
+      max_udp_channel_duration_(
+          config.has_max_udp_channel_duration()
+              ? std::chrono::milliseconds(Protobuf::util::TimeUtil::DurationToMilliseconds(
+                    config.max_udp_channel_duration()))
+              : std::chrono::milliseconds::zero()),
+      reinit_channel_on_timeout_(config.reinit_channel_on_timeout()), resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
-      scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
+      scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)),
+      max_cache_ttl_(getQcacheMaxTtl(config)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
+
+  // Initialize the periodic UDP channel refresh timer if configured.
+  if (max_udp_channel_duration_ > std::chrono::milliseconds::zero()) {
+    udp_channel_refresh_timer_ = dispatcher.createTimer([this] { onUdpChannelRefreshTimer(); });
+    udp_channel_refresh_timer_->enableTimer(max_udp_channel_duration_);
+  }
 }
 
 DnsResolverImpl::~DnsResolverImpl() {
   timer_->disableTimer();
+  if (udp_channel_refresh_timer_) {
+    udp_channel_refresh_timer_->disableTimer();
+  }
   ares_destroy(channel_);
 }
 
@@ -67,10 +98,10 @@ CaresDnsResolverStats DnsResolverImpl::generateCaresDnsResolverStats(Stats::Scop
   return {ALL_CARES_DNS_RESOLVER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
-absl::StatusOr<absl::optional<std::string>> DnsResolverImpl::maybeBuildResolversCsv(
+absl::StatusOr<std::optional<std::string>> DnsResolverImpl::maybeBuildResolversCsv(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
   if (resolvers.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   std::vector<std::string> resolver_addrs;
@@ -126,9 +157,17 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.optmask_ |= ARES_OPT_NOROTATE;
   }
 
-  // Disable query cache by default.
+  // Configure EDNS0 payload size if specified
+  if (edns0_max_payload_size_ > 0) {
+    options.optmask_ |= ARES_OPT_EDNSPSZ;
+    options.options_.ednspsz = edns0_max_payload_size_;
+  }
+
   options.optmask_ |= ARES_OPT_QUERY_CACHE;
-  options.options_.qcache_max_ttl = 0;
+  if (max_cache_ttl_) {
+    ENVOY_LOG(debug, "c-ares query cached enabled: max ttl {}", max_cache_ttl_);
+  }
+  options.options_.qcache_max_ttl = max_cache_ttl_;
 
   return options;
 }
@@ -212,7 +251,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // ARES_ECONNREFUSED. If the PendingResolution has not been cancelled that means that the
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
     // can be done with this query and initiate a new one.
-    ENVOY_LOG_EVENT(debug, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
+    ENVOY_LOG_EVENT(trace, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
                     dns_name_);
 
     // Nothing can follow a call to finishResolve due to the deletion of this object upon
@@ -227,7 +266,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
     // broken and hence we reinitialize it here.
     if (status == ARES_ECONNREFUSED || status == ARES_EREFUSED || status == ARES_ESERVFAIL ||
-        status == ARES_ENOTIMP) {
+        status == ARES_ENOTIMP || (status == ARES_ETIMEOUT && parent_.reinit_channel_on_timeout_)) {
       parent_.reinitializeChannel();
     }
   }
@@ -322,7 +361,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 }
 
 void DnsResolverImpl::PendingResolution::finishResolve() {
-  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
+  ENVOY_LOG_EVENT(trace, "cares_dns_resolution_complete",
                   "dns resolution for {} completed with status {:#06x}: \"{}\"", dns_name_,
                   static_cast<int>(pending_response_.status_), pending_response_.details_);
 
@@ -419,7 +458,7 @@ void DnsResolverImpl::reinitializeChannel() {
   int result = ares_reinit(channel_);
   RELEASE_ASSERT(result == ARES_SUCCESS, "c-ares channel re-initialization failed");
   stats_.reinits_.inc();
-  ENVOY_LOG_EVENT(debug, "cares_channel_reinitialized",
+  ENVOY_LOG_EVENT(trace, "cares_channel_reinitialized",
                   "Reinitialized cares channel via ares_reinit");
 
   if (resolvers_csv_.has_value()) {
@@ -437,9 +476,23 @@ void DnsResolverImpl::reinitializeChannel() {
   }
 }
 
+void DnsResolverImpl::onUdpChannelRefreshTimer() {
+  ENVOY_LOG_EVENT(debug, "cares_udp_channel_periodic_refresh",
+                  "Performing periodic UDP channel refresh after {} ms",
+                  max_udp_channel_duration_.count());
+
+  // Reinitialize the channel to refresh UDP sockets.
+  reinitializeChannel();
+
+  // Re-enable the timer for the next periodic refresh.
+  if (udp_channel_refresh_timer_) {
+    udp_channel_refresh_timer_->enableTimer(max_udp_channel_duration_);
+  }
+}
+
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
+  ENVOY_LOG_EVENT(trace, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
 
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getAddrInfo followed by a synchronous IPv4
@@ -451,7 +504,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   if (pending_resolution->completed_) {
     // Resolution does not need asynchronous behavior or network events. For
     // example, localhost lookup.
-    ENVOY_LOG_EVENT(debug, "cares_resolution_completed",
+    ENVOY_LOG_EVENT(trace, "cares_resolution_completed",
                     "dns resolution for {} completed with no async or network events", dns_name);
     return nullptr;
   } else {
@@ -520,14 +573,14 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
     switch (family) {
     case AF_INET:
       if (!available_interfaces_.v4_available_) {
-        ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
+        ENVOY_LOG_EVENT(trace, "cares_resolution_filtered", "filtered v4 lookup");
         onAresGetAddrInfoCallback(ARES_EBADFAMILY, 0, nullptr);
         return;
       }
       break;
     case AF_INET6:
       if (!available_interfaces_.v6_available_) {
-        ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v6 lookup");
+        ENVOY_LOG_EVENT(trace, "cares_resolution_filtered", "filtered v6 lookup");
         onAresGetAddrInfoCallback(ARES_EBADFAMILY, 0, nullptr);
         return;
       }
@@ -559,6 +612,10 @@ DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces
 DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
   if (!Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
     // Maintain no-op behavior if the system cannot provide interface information.
+    return {true, true};
+  }
+
+  if (!parent_.filter_unroutable_families_) {
     return {true, true};
   }
 
@@ -624,6 +681,19 @@ public:
     // Only c-ares DNS factory will call into this function.
     // Directly unpack the typed config to a c-ares object.
     RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares));
+    std::size_t key = 0;
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.shared_cares_dns_resolver")) {
+      key = MessageUtil::hash(cares);
+      const auto it = resolver_map_.find(key);
+      if (it != resolver_map_.end()) {
+        auto resolver = it->second.lock();
+        if (resolver) {
+          ENVOY_LOG(trace, "found existing resolvers: {}", key);
+          return resolver;
+        }
+      }
+    }
+
     if (!cares.resolvers().empty()) {
       const auto& resolver_addrs = cares.resolvers();
       resolvers.reserve(resolver_addrs.size());
@@ -635,25 +705,42 @@ public:
     }
     auto csv_or_error = DnsResolverImpl::maybeBuildResolversCsv(resolvers);
     RETURN_IF_NOT_OK(csv_or_error.status());
-    return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, csv_or_error.value(),
-                                                      api.rootScope());
+
+    auto resolver = std::make_shared<Network::DnsResolverImpl>(
+        cares, dispatcher, csv_or_error.value(), api.rootScope());
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.shared_cares_dns_resolver")) {
+      // clean up any nil resolver in the map so it doesn't keep growing
+      auto original_size = resolver_map_.size();
+      absl::erase_if(
+          resolver_map_,
+          [](const std::pair<const std::size_t, std::weak_ptr<Network::DnsResolver>>& entry) {
+            return entry.second.lock() == nullptr;
+          });
+      if (resolver_map_.size() < original_size) {
+        ENVOY_LOG(trace, "cleaned up {} entries in resolver_map_",
+                  original_size - resolver_map_.size());
+      }
+      resolver_map_[key] = resolver;
+      ENVOY_LOG(trace, "resolver_map_ size after adding: {}", resolver_map_.size());
+    }
+    return resolver;
   }
 
   void initialize() override {
     // Initialize c-ares library in case first time.
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (!ares_library_initialized_) {
       ares_library_initialized_ = true;
-      ENVOY_LOG(debug, "c-ares library initialized.");
+      ENVOY_LOG(trace, "c-ares library initialized.");
       ares_library_init(ARES_LIB_INIT_ALL);
     }
   }
   void terminate() override {
     // Cleanup c-ares library if initialized.
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (ares_library_initialized_) {
       ares_library_initialized_ = false;
-      ENVOY_LOG(debug, "c-ares library cleaned up.");
+      ENVOY_LOG(trace, "c-ares library cleaned up.");
       ares_library_cleanup();
     }
   }
@@ -661,6 +748,7 @@ public:
 private:
   bool ares_library_initialized_ ABSL_GUARDED_BY(mutex_){false};
   absl::Mutex mutex_;
+  mutable absl::flat_hash_map<std::size_t, std::weak_ptr<Network::DnsResolver>> resolver_map_;
 };
 
 // Register the CaresDnsResolverFactory

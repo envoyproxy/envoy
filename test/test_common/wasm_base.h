@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <optional>
 
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -11,7 +12,6 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
 
-#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -65,20 +65,23 @@ public:
     *plugin_config.mutable_root_id() = root_id_;
     *plugin_config.mutable_name() = "plugin_name";
     plugin_config.set_fail_open(fail_open_);
+    if (allow_on_headers_stop_iteration_.has_value()) {
+      plugin_config.mutable_allow_on_headers_stop_iteration()->set_value(
+          *allow_on_headers_stop_iteration_);
+    }
     plugin_config.mutable_configuration()->set_value(plugin_configuration_);
     *plugin_config.mutable_vm_config()->mutable_environment_variables() = envs_;
 
     auto vm_config = plugin_config.mutable_vm_config();
     vm_config->set_vm_id("vm_id");
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
-    ProtobufWkt::StringValue vm_configuration_string;
+    Protobuf::StringValue vm_configuration_string;
     vm_configuration_string.set_value(vm_configuration_);
-    vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+    std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
 
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
-        &listener_metadata_);
+        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_);
     plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
@@ -112,7 +115,6 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
-  envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
   RemoteAsyncDataProviderPtr remote_data_provider_;
 
@@ -122,6 +124,7 @@ public:
     plugin_configuration_ = plugin_configuration;
   }
   void setFailOpen(bool fail_open) { fail_open_ = fail_open; }
+  void setAllowOnHeadersStopIteration(bool allow) { allow_on_headers_stop_iteration_ = allow; }
   void setAllowedCapabilities(proxy_wasm::AllowedCapabilitiesMap allowed_capabilities) {
     allowed_capabilities_ = allowed_capabilities;
   }
@@ -131,9 +134,10 @@ private:
   std::string root_id_ = "";
   std::string vm_configuration_ = "";
   bool fail_open_ = false;
+  std::optional<bool> allow_on_headers_stop_iteration_ = std::nullopt;
   std::string plugin_configuration_ = "";
-  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
-  envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
+  envoy::extensions::wasm::v3::EnvironmentVariables envs_;
 };
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {
@@ -213,7 +217,7 @@ public:
              bool singleton = false) {
     plugin_config_ = std::make_shared<PluginConfig>(
         plugin_config, server_, server_.scope(), server_.initManager(),
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, singleton);
+        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, singleton);
   }
 
   void createStreamContext() {

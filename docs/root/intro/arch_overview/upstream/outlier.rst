@@ -205,12 +205,39 @@ required request volume in an interval is less than the
 :ref:`outlier_detection.failure_percentage_minimum_hosts<envoy_v3_api_field_config.cluster.v3.OutlierDetection.failure_percentage_minimum_hosts>`
 value.
 
-.. _arch_overview_outlier_detection_grpc:
+Degraded Host Detection
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Degraded host detection is enabled by setting
+:ref:`outlier_detection.detect_degraded_hosts<envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded_hosts>`
+to ``true``. When enabled, hosts that return
+the ``x-envoy-degraded`` header are marked as degraded. Unlike ejected hosts, degraded hosts
+remain in the load balancing rotation but are deprioritized, only receiving traffic when there
+are insufficient healthy hosts available. For more information about how degraded endpoints are
+handled during load balancing, see :ref:`degraded endpoints <arch_overview_load_balancing_degraded>`.
+
+When a host is marked as degraded, it remains in that state for a period calculated
+using the same backoff algorithm as ejection, and automatically cleared after this period expires.
+
+.. _arch_overview_outlier_detection_error_mapping:
+
+Error Mapping
+-------------
+
+By default outlier detection understands only HTTP status codes. Responses' status codes 5xx are threated as
+errors and any other codes are treated as success. If there is a need to treat a response in different way,
+mapping is required. Currently the following mappings are available:
 
 gRPC
-----------------------
+^^^^
 
 For gRPC requests, the outlier detection will use the HTTP status mapped from the `grpc-status <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses>`_ response header.
+
+HTTP
+^^^^
+
+If there is a need to redefine whether a response should be treated as error, it can be done by configuring
+:ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>` section in cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`. If a response matches the matcher, it is reported to outlier detection as code 5xx (error). If the response does not match the matcher, it is forwarded to the outlier detection as code 200 (success).
 
 .. _arch_overview_outlier_detection_logging:
 

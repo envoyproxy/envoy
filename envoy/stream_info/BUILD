@@ -24,7 +24,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
-        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -37,7 +36,6 @@ envoy_cc_library(
         "//source/common/common:fmt_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
-        "@com_google_absl//absl/types:optional",
     ],
 )
 

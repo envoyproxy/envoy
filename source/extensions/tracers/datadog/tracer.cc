@@ -38,6 +38,10 @@ std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
   config.agent.http_client = std::make_shared<AgentHTTPClient>(
       cluster_manager, collector_cluster, collector_reference_host, tracer_stats, time_source);
 
+  // Disable telemetry to avoid needing a separate HTTP client for telemetry.
+  // Envoy has its own telemetry system and doesn't need dd-trace-cpp's telemetry.
+  config.telemetry.enabled = false;
+
   datadog::tracing::Expected<datadog::tracing::FinalizedTracerConfig> maybe_config =
       datadog::tracing::finalize_config(config);
   if (datadog::tracing::Error* error = maybe_config.if_error()) {
@@ -107,12 +111,15 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   //
   // If Envoy is telling us to keep the trace, then we leave it up to the
   // tracer's internal sampler (which might decide to drop the trace anyway).
-  if (!span.trace_segment().sampling_decision().has_value() && !tracing_decision.traced) {
+  const bool use_local_decision = !span.trace_segment().sampling_decision().has_value();
+  if (use_local_decision && !tracing_decision.traced) {
+    // TODO(wbpcode): use USER_KEEP to indicate that the trace should be kept if the
+    // Envoy is telling us to keep the trace.
     span.trace_segment().override_sampling_priority(
         int(datadog::tracing::SamplingPriority::USER_DROP));
   }
 
-  return std::make_unique<Span>(std::move(span));
+  return std::make_unique<Span>(std::move(span), use_local_decision);
 }
 
 datadog::tracing::Span Tracer::extractOrCreateSpan(datadog::tracing::Tracer& tracer,

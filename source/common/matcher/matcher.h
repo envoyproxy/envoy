@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <variant>
 
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
@@ -19,7 +20,6 @@
 #include "source/common/matcher/value_input_matcher.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Matcher {
@@ -36,29 +36,11 @@ public:
   }
 };
 
-struct MaybeMatchResult {
-  const ActionFactoryCb result_;
-  const MatchState match_state_;
-};
-
 // TODO(snowp): Make this a class that tracks the progress to speed up subsequent traversals.
 template <class DataType>
-static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
-                                             const DataType& data) {
-  const auto result = match_tree.match(data);
-  if (result.match_state_ == MatchState::UnableToMatch) {
-    return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
-  }
-
-  if (!result.on_match_) {
-    return {nullptr, MatchState::MatchComplete};
-  }
-
-  if (result.on_match_->matcher_) {
-    return evaluateMatch(*result.on_match_->matcher_, data);
-  }
-
-  return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
+static inline ActionMatchResult evaluateMatch(MatchTree<DataType>& match_tree, const DataType& data,
+                                              SkippedMatchCb skipped_match_cb = nullptr) {
+  return match_tree.match(data, skipped_match_cb);
 }
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
@@ -70,13 +52,14 @@ template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatch
  */
 template <class DataType> class AnyMatcher : public MatchTree<DataType> {
 public:
-  explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
+  explicit AnyMatcher(std::optional<OnMatch<DataType>> on_no_match)
       : on_no_match_(std::move(on_no_match)) {}
 
-  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
-    return {MatchState::MatchComplete, on_no_match_};
+  ActionMatchResult match(const DataType& data,
+                          SkippedMatchCb skipped_match_cb = nullptr) override {
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
-  const absl::optional<OnMatch<DataType>> on_no_match_;
+  const std::optional<OnMatch<DataType>> on_no_match_;
 };
 
 /**
@@ -104,10 +87,7 @@ private:
     explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
         : common_protocol_input_(std::move(common_protocol_input)) {}
 
-    DataInputGetResult get(const DataType&) const override {
-      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
-                                common_protocol_input_->get()};
-    }
+    DataInputGetResult get(const DataType&) const override { return common_protocol_input_->get(); }
 
   private:
     const CommonProtocolInputPtr common_protocol_input_;
@@ -153,6 +133,7 @@ public:
                    Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
       : action_factory_context_(context), server_factory_context_(factory_context),
+        on_match_validation_visitor_(validation_visitor),
         match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
@@ -168,12 +149,12 @@ public:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  absl::optional<OnMatchFactoryCb<DataType>>
+  std::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch& on_match) override {
     return createOnMatchBase(on_match);
   }
 
-  absl::optional<OnMatchFactoryCb<DataType>>
+  std::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch& on_match) override {
     return createOnMatchBase(on_match);
   }
@@ -185,7 +166,7 @@ private:
 
     return [on_no_match]() {
       return std::make_unique<AnyMatcher<DataType>>(
-          on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+          on_no_match ? std::make_optional((*on_no_match)()) : std::nullopt);
     };
   }
   template <class MatcherType>
@@ -202,7 +183,7 @@ private:
     auto on_no_match = createOnMatch(config.on_no_match());
     return [matcher_factories, on_no_match]() {
       auto list_matcher = std::make_unique<ListMatcher<DataType>>(
-          on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+          on_no_match ? std::make_optional((*on_no_match)()) : std::nullopt);
 
       for (const auto& matcher : matcher_factories) {
         list_matcher->addMatcher(matcher.first(), matcher.second());
@@ -295,12 +276,12 @@ private:
   }
 
   using MapCreationFunction = std::function<absl::StatusOr<std::unique_ptr<MapMatcher<DataType>>>(
-      DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match)>;
+      DataInputPtr<DataType>&& data_input, std::optional<OnMatch<DataType>> on_no_match)>;
 
   template <template <class> class MapMatcherType, class MapType>
   MatchTreeFactoryCb<DataType>
   createMapMatcher(const MapType& map, DataInputFactoryCb<DataType> data_input,
-                   absl::optional<OnMatchFactoryCb<DataType>>& on_no_match,
+                   std::optional<OnMatchFactoryCb<DataType>>& on_no_match,
                    MapCreationFunction creation_function) {
     std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
     match_children.reserve(map.map().size());
@@ -312,8 +293,8 @@ private:
 
     return [match_children, data_input, on_no_match, creation_function]() {
       auto matcher_or_error = creation_function(
-          data_input(), on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
-      THROW_IF_NOT_OK(matcher_or_error.status());
+          data_input(), on_no_match ? std::make_optional((*on_no_match)()) : std::nullopt);
+      THROW_IF_NOT_OK_REF(matcher_or_error.status());
       auto multimap_matcher = std::move(*matcher_or_error);
       for (const auto& children : match_children) {
         multimap_matcher->addChild(children.first, children.second());
@@ -323,10 +304,16 @@ private:
   }
 
   template <class OnMatchType>
-  absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
+  std::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
+    on_match_validation_visitor_.validateOnMatch(on_match);
+    if (const std::vector<absl::Status>& errors = on_match_validation_visitor_.errors();
+        !errors.empty()) {
+      return []() -> OnMatch<DataType> { return OnMatch<DataType>{}; };
+    }
     if (on_match.has_matcher()) {
-      return [matcher_factory = std::move(create(on_match.matcher()))]() {
-        return OnMatch<DataType>{{}, matcher_factory()};
+      return [matcher_factory = std::move(create(on_match.matcher())),
+              keep_matching = on_match.keep_matching()]() {
+        return OnMatch<DataType>{{}, matcher_factory(), keep_matching};
       };
     } else if (on_match.has_action()) {
       auto& factory = Config::Utility::getAndCheckFactory<ActionFactory<ActionFactoryContext>>(
@@ -335,12 +322,16 @@ private:
           on_match.action().typed_config(), server_factory_context_.messageValidationVisitor(),
           factory);
 
-      auto action_factory = factory.createActionFactoryCb(
-          *message, action_factory_context_, server_factory_context_.messageValidationVisitor());
-      return [action_factory] { return OnMatch<DataType>{action_factory, {}}; };
+      // TODO(taoxuy): try to pass message by moving and let the created action take ownership
+      // of the message if needed, which avoid copy.
+      auto action = factory.createAction(*message, action_factory_context_,
+                                         server_factory_context_.messageValidationVisitor());
+      return [action, keep_matching = on_match.keep_matching()] {
+        return OnMatch<DataType>{action, {}, keep_matching};
+      };
     }
 
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   template <class SinglePredicateType>
@@ -367,6 +358,7 @@ private:
   const std::string stats_prefix_;
   ActionFactoryContext& action_factory_context_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
+  MatchTreeValidationVisitor<DataType>& on_match_validation_visitor_;
   MatchInputFactory<DataType> match_input_factory_;
 };
 } // namespace Matcher

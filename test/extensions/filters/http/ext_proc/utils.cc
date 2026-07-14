@@ -108,6 +108,48 @@ void TestOnProcessingResponse::afterReceivingImmediateResponse(
                                    getHeaderMutations(response.headers()));
   }
 }
+
+void TestOnProcessingResponse::afterProcessingStreamingImmediateResponse(
+    const envoy::service::ext_proc::v3::StreamedImmediateResponse& response, absl::Status,
+    Envoy::StreamInfo::StreamInfo& stream_info) {
+  stream_info.setDynamicMetadata("envoy-test-ext_proc-streaming_immediate_response",
+                                 makeStreamedImmediateResponseMetadata(response));
+}
+
+Envoy::Protobuf::Struct TestOnProcessingResponse::makeStreamedImmediateResponseMetadata(
+    const envoy::service::ext_proc::v3::StreamedImmediateResponse& response) {
+  Envoy::Protobuf::Struct struct_metadata;
+  Envoy::Protobuf::Value value;
+  std::string key;
+  switch (response.response_case()) {
+  case envoy::service::ext_proc::v3::StreamedImmediateResponse::kHeadersResponse:
+    key = "headers_response";
+    for (auto& header : response.headers_response().headers().headers()) {
+      value.mutable_string_value()->assign(header.raw_value());
+      struct_metadata.mutable_fields()->insert(std::make_pair(header.key(), value));
+    }
+    break;
+  case envoy::service::ext_proc::v3::StreamedImmediateResponse::kBodyResponse:
+    key = "body_response";
+    value.mutable_string_value()->assign(response.body_response().body());
+    struct_metadata.mutable_fields()->insert(std::make_pair("body", value));
+    break;
+  case envoy::service::ext_proc::v3::StreamedImmediateResponse::kTrailersResponse:
+    key = "trailers_response";
+    for (auto& header : response.trailers_response().headers()) {
+      value.mutable_string_value()->assign(header.raw_value());
+      struct_metadata.mutable_fields()->insert(std::make_pair(header.key(), value));
+    }
+    break;
+  default:
+    break;
+  }
+  Envoy::Protobuf::Struct return_metadata;
+  *value.mutable_struct_value() = struct_metadata;
+  return_metadata.mutable_fields()->insert(std::make_pair(key, value));
+  return return_metadata;
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

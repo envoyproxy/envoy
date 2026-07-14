@@ -12,7 +12,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/server/hot_restarting_child.h"
 #include "source/server/hot_restarting_parent.h"
 
@@ -102,13 +102,14 @@ public:
 
   // Server::HotRestart
   void drainParentListeners() override;
-  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) override;
+  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
+                                  absl::string_view network_namespace) override;
   void registerUdpForwardingListener(
       Network::Address::InstanceConstSharedPtr address,
       std::shared_ptr<Network::UdpListenerConfig> listener_config) override;
   OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
-  absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
+  std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
   void sendParentTerminateRequest() override;
   ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot& stats_store) override;
   void shutdown() override;
@@ -116,6 +117,7 @@ public:
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
+  bool isInitializing() const override;
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string

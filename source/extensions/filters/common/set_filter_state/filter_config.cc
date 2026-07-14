@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 
+#include "envoy/common/hashable.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/formatter/substitution_format_string.h"
@@ -22,6 +23,25 @@ public:
 
 REGISTER_FACTORY(GenericStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+class HashableString : public Router::StringAccessorImpl, public Hashable {
+public:
+  HashableString(absl::string_view value) : StringAccessorImpl(value) {}
+
+  // Hashable
+  std::optional<uint64_t> hash() const override { return HashUtil::xxHash64(asString()); }
+};
+
+class GenericHashableStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.hashable_string"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<HashableString>(data);
+  }
+};
+
+REGISTER_FACTORY(GenericHashableStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 std::vector<Value>
 Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
               Server::Configuration::GenericFactoryContext& context) const {
@@ -37,7 +57,6 @@ Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_val
     if (value.factory_ == nullptr) {
       throw EnvoyException(fmt::format("'{}' does not have an object factory", value.key_));
     }
-    value.state_type_ = proto_value.read_only() ? StateType::ReadOnly : StateType::Mutable;
     switch (proto_value.shared_with_upstream()) {
     case FilterStateValueProto::ONCE:
       value.stream_sharing_ = StreamSharing::SharedWithUpstreamConnectionOnce;
@@ -58,10 +77,10 @@ Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_val
   return values;
 }
 
-void Config::updateFilterState(const Formatter::HttpFormatterContext& context,
+void Config::updateFilterState(const Formatter::Context& context,
                                StreamInfo::StreamInfo& info) const {
   for (const auto& value : values_) {
-    const std::string bytes_value = value.value_->formatWithContext(context, info);
+    const std::string bytes_value = value.value_->format(context, info);
     if (bytes_value.empty() && value.skip_if_empty_) {
       ENVOY_LOG(debug, "Skip empty value for an object '{}'", value.key_);
       continue;
@@ -72,8 +91,7 @@ void Config::updateFilterState(const Formatter::HttpFormatterContext& context,
       continue;
     }
     ENVOY_LOG(debug, "Created the filter state '{}' from value '{}'", value.key_, bytes_value);
-    info.filterState()->setData(value.key_, std::move(object), value.state_type_, life_span_,
-                                value.stream_sharing_);
+    info.filterState()->setData(value.key_, std::move(object), life_span_, value.stream_sharing_);
   }
 }
 

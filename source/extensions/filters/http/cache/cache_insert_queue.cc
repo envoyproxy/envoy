@@ -71,9 +71,9 @@ CacheInsertQueue::CacheInsertQueue(std::shared_ptr<HttpCache> cache,
                                    Http::StreamEncoderFilterCallbacks& encoder_callbacks,
                                    InsertContextPtr insert_context, InsertQueueCallbacks& callbacks)
     : dispatcher_(encoder_callbacks.dispatcher()), insert_context_(std::move(insert_context)),
-      low_watermark_bytes_(encoder_callbacks.encoderBufferLimit() / 2),
-      high_watermark_bytes_(encoder_callbacks.encoderBufferLimit()), callbacks_(callbacks),
-      cache_(cache) {}
+      low_watermark_bytes_(encoder_callbacks.bufferLimit() / 2),
+      high_watermark_bytes_(encoder_callbacks.bufferLimit()), callbacks_(callbacks), cache_(cache) {
+}
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                      const ResponseMetadata& metadata, bool end_stream) {

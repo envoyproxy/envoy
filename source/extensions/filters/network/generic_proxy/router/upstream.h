@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 #include "envoy/network/connection.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/generic_proxy/interface/codec.h"
 
-#include "quiche/common/quiche_linked_hash_map.h"
+#include "absl/container/linked_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,7 +30,7 @@ public:
 
   virtual void onConnectionClose(Network::ConnectionEvent event) PURE;
   virtual void onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                                 absl::optional<StartTime> start_time = {}) PURE;
+                                 std::optional<StartTime> start_time = {}) PURE;
   virtual void onDecodingSuccess(ResponseCommonFramePtr common_frame) PURE;
   virtual void onDecodingFailure(absl::string_view reason) PURE;
 };
@@ -77,7 +78,9 @@ public:
 };
 
 template <class RequestManager>
-class EncoderDecoder : public ClientCodecCallbacks, public StreamInfo::FilterState::Object {
+class EncoderDecoder : public ClientCodecCallbacks,
+                       public StreamInfo::FilterState::Object,
+                       public Network::ConnectionCallbacks {
 public:
   EncoderDecoder(Network::Connection& connection, Upstream::HostDescriptionConstSharedPtr host,
                  ClientCodecPtr client_codec)
@@ -97,18 +100,12 @@ public:
     request_manager_.removeUpstreamRequest(stream_id);
   }
 
-  // Called when the upstream connection is closed. All pending requests should
-  // be failed.
-  void onConnectionClose(Network::ConnectionEvent event) {
-    request_manager_.onConnectionClose(event);
-  }
-
   size_t requestsSize() const { return request_manager_.size(); }
   bool containsRequest(uint64_t stream_id) const { return request_manager_.contains(stream_id); }
 
   // ClientCodecCallbacks
   void onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                         absl::optional<StartTime> start_time = {}) override {
+                         std::optional<StartTime> start_time = {}) override {
     request_manager_.onDecodingSuccess(std::move(header_frame), std::move(start_time));
   }
   void onDecodingSuccess(ResponseCommonFramePtr common_frame) override {
@@ -129,6 +126,17 @@ public:
   }
   OptRef<const Upstream::ClusterInfo> upstreamCluster() const override { return host_->cluster(); }
 
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      // Notify all pending requests about the connection close.
+      request_manager_.onConnectionClose(event);
+    }
+  }
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
 private:
   Network::Connection& connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
@@ -142,7 +150,7 @@ public:
   void removeUpstreamRequest(uint64_t stream_id);
   void onConnectionClose(Network::ConnectionEvent event);
 
-  void onDecodingSuccess(ResponseHeaderFramePtr header_frame, absl::optional<StartTime> start_time);
+  void onDecodingSuccess(ResponseHeaderFramePtr header_frame, std::optional<StartTime> start_time);
   void onDecodingSuccess(ResponseCommonFramePtr common_frame);
   void onDecodingFailure(absl::string_view reason);
 
@@ -160,7 +168,7 @@ public:
 
   // ClientCodecCallbacks
   void onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                         absl::optional<StartTime> start_time = {});
+                         std::optional<StartTime> start_time = {});
   void onDecodingSuccess(ResponseCommonFramePtr common_frame);
   void onDecodingFailure(absl::string_view reason);
 
@@ -216,6 +224,12 @@ public:
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      onConnectionClose(event);
+    }
+  }
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override {
     if (data.length() == 0) {
       return;
@@ -233,6 +247,9 @@ public:
     ENVOY_LOG(debug, "generic proxy upstream manager: clean up upstream (close: {})",
               close_connection);
 
+    // Clear the encoder/decoder first.
+    encoder_decoder_ = nullptr;
+
     if (tcp_pool_handle_ != nullptr) {
       ENVOY_LOG(debug, "generic proxy upstream manager: cancel pending connection");
       ASSERT(owned_conn_data_ == nullptr);
@@ -245,6 +262,8 @@ public:
 
     if (owned_conn_data_ != nullptr) {
       if (!close_connection) {
+        // Just release the connection back to the pool.
+        owned_conn_data_.reset();
         return;
       }
 
@@ -255,6 +274,15 @@ public:
       auto local_conn_data = std::move(owned_conn_data_);
       owned_conn_data_.reset();
       local_conn_data->connection().close(Network::ConnectionCloseType::FlushWrite);
+
+      // NOTE: Because the local_conn_data will also clear the callbacks when
+      // it is destroyed, the onEvent() callback may not be called if the connection
+      // closing is delayed.
+      // So we need to manually call the onConnectionClose() here.
+      //
+      // The onConnectionClose() implementation MUST ensure it is safe to be called
+      // multiple times.
+      onConnectionClose(Network::ConnectionEvent::LocalClose);
     }
   }
   OptRef<Network::Connection> upstreamConnection() override {
@@ -270,6 +298,7 @@ public:
   virtual void onUpstreamSuccess() PURE;
   virtual void onUpstreamFailure(ConnectionPool::PoolFailureReason reason,
                                  absl::string_view transport_failure_reason) PURE;
+  virtual void onConnectionClose(Network::ConnectionEvent) {}
 
 protected:
   void tryInitialize() {
@@ -285,10 +314,12 @@ protected:
     if (encoder_decoder == nullptr) {
       auto data = std::make_unique<EncoderDecoderType>(connection, tcp_pool_data_.host(),
                                                        codec_factory_.createClientCodec());
+      // The encoder_decoder will has lifetime of the upstream connection. Register it as a
+      // connection callback to handle connection close event.
+      connection.addConnectionCallbacks(*data);
       encoder_decoder = data.get();
       connection.streamInfo().filterState()->setData(RouterFilterEncoderDecoderName,
                                                      std::move(data),
-                                                     StreamInfo::FilterState::StateType::Mutable,
                                                      StreamInfo::FilterState::LifeSpan::Connection);
     }
     return encoder_decoder;
@@ -324,13 +355,11 @@ public:
                        const CodecFactory& codec_factory,
                        Network::Connection& downstream_connection);
 
-  // Tcp::ConnectionPool::UpstreamCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
-
   // UpstreamBase
   void onUpstreamSuccess() override;
   void onUpstreamFailure(ConnectionPool::PoolFailureReason reason,
                          absl::string_view transport_failure_reason) override;
+  void onConnectionClose(Network::ConnectionEvent event) override;
 
   // Upstream
   void appendUpstreamRequest(uint64_t stream_id,
@@ -348,7 +377,7 @@ private:
 
   Network::Connection& downstream_conn_;
   EventWatcher connection_event_watcher_;
-  absl::optional<bool> upstream_conn_ok_;
+  std::optional<bool> upstream_conn_ok_;
 
   // This ensure the requests that are waiting upstream connection will be list in the order in
   // which the requests were received. By this way, the protocols that require the requests and
@@ -358,17 +387,15 @@ private:
   // generic proxy will send requests to server in order. Finally, the upstream server of these
   // protocols will send responses in order. We also assume that the L7 filter chain of these
   // protocols will not change the processing order.
-  using LinkedAbslHashMap = quiche::QuicheLinkedHashMap<uint64_t, UpstreamRequestCallbacks*>;
+  using LinkedAbslHashMap = absl::linked_hash_map<uint64_t, UpstreamRequestCallbacks*>;
   LinkedAbslHashMap pending_requests_;
+  bool saw_connection_close_event_ = false;
 };
 
 using OwnedGenericUpstreamBase = UpstreamBase<UniqueEncoderDecoder>;
 class OwnedGenericUpstream : public OwnedGenericUpstreamBase {
 public:
   using UpstreamBase::UpstreamBase;
-
-  // Tcp::ConnectionPool::UpstreamCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
 
   // UpstreamBase
   void onUpstreamSuccess() override;

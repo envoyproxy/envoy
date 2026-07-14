@@ -15,6 +15,6 @@ envoy_cc_test(
     ],
     deps = [
         "//contrib/common/sqlutils/source:sqlutils_lib",
-        "@com_github_envoyproxy_sqlparser//:sqlparser",
+        "@sql-parser//:sqlparser",
     ],
 )

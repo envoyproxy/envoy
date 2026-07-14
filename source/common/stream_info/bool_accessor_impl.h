@@ -14,12 +14,12 @@ public:
 
   // From FilterState::Object
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::BoolValue>();
+    auto message = std::make_unique<Protobuf::BoolValue>();
     message->set_value(value_);
     return message;
   }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return value_ ? "true" : "false";
   }
 

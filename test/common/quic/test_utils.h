@@ -3,19 +3,22 @@
 #include "envoy/common/optref.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
+#include "source/common/stats/isolated_store_impl.h"
+
+#include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
-#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
-#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
 #include "quiche/quic/core/qpack/qpack_encoder.h"
@@ -48,12 +51,12 @@ public:
       quic::QuicPacketWriter& writer, quic::QuicSocketAddress self_address,
       quic::QuicSocketAddress peer_address, const quic::ParsedQuicVersionVector& supported_versions,
       Network::Socket& listen_socket, quic::ConnectionIdGeneratorInterface& generator)
-      : EnvoyQuicServerConnection(
-            quic::test::TestConnectionId(), self_address, peer_address, helper, alarm_factory,
-            &writer, /*owns_writer=*/false, supported_versions,
-            createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
-                                         "example.com", "h3-29"),
-            generator, nullptr) {}
+      : EnvoyQuicServerConnection(quic::test::TestConnectionId(), self_address, peer_address,
+                                  helper, alarm_factory, &writer, supported_versions,
+                                  createServerConnectionSocket(listen_socket.ioHandle(),
+                                                               self_address, peer_address,
+                                                               "example.com", "h3-29"),
+                                  generator, nullptr) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();
@@ -62,8 +65,8 @@ public:
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
-  MOCK_METHOD(quic::MessageStatus, SendMessage,
-              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
+  MOCK_METHOD(quic::DatagramStatus, SendDatagram,
+              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
@@ -79,10 +82,10 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator, /*prefer_gro=*/true) {}
+                                  generator) {}
 
-  MOCK_METHOD(quic::MessageStatus, SendMessage,
-              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
+  MOCK_METHOD(quic::DatagramStatus, SendDatagram,
+              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
 };
 
 class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {
@@ -145,9 +148,18 @@ public:
 
   using quic::QuicSpdySession::ActivateStream;
 
+  // Lets tests enable WebTransport negotiation. Empty by default so existing tests are unaffected:
+  // WebTransport is not negotiated and a stream's web_transport() stays null.
+  void setLocallySupportedWebTransportVersions(quic::WebTransportHttp3VersionSet versions) {
+    locally_supported_web_transport_versions_ = versions;
+  }
+
 protected:
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
     return quic::HttpDatagramSupport::kRfc;
+  }
+  quic::WebTransportHttp3VersionSet LocallySupportedWebTransportVersions() const override {
+    return locally_supported_web_transport_versions_;
   }
   bool hasDataToWrite() override { return HasDataToWrite(); }
   const quic::QuicConnection* quicConnection() const override {
@@ -157,6 +169,7 @@ protected:
 
 private:
   std::unique_ptr<quic::QuicCryptoStream> crypto_stream_;
+  quic::WebTransportHttp3VersionSet locally_supported_web_transport_versions_;
 };
 
 class TestQuicCryptoClientStream : public quic::QuicCryptoClientStream {
@@ -164,26 +177,26 @@ public:
   TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
                              std::unique_ptr<quic::ProofVerifyContext> verify_context,
                              quic::QuicCryptoClientConfig* crypto_config,
-                             ProofHandler* proof_handler, bool has_application_state)
+                             ProofHandler* proof_handler)
       : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
-                                     proof_handler, has_application_state) {}
+                                     proof_handler, /*has_application_state=*/true) {}
 
   bool encryption_established() const override { return true; }
   quic::HandshakeState GetHandshakeState() const override { return quic::HANDSHAKE_CONFIRMED; }
+  void SetServerApplicationStateForResumption(
+      std::unique_ptr<quic::ApplicationState> /*application_state*/) override {}
 };
 
 class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
-  std::unique_ptr<quic::QuicCryptoClientStreamBase>
-  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
-                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
-                                    quic::QuicCryptoClientConfig* crypto_config,
-                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
-                                    bool has_application_state) override {
+  std::unique_ptr<quic::QuicCryptoClientStreamBase> createEnvoyQuicCryptoClientStream(
+      const quic::QuicServerId& server_id, quic::QuicSession* session,
+      std::unique_ptr<quic::ProofVerifyContext> verify_context,
+      quic::QuicCryptoClientConfig* crypto_config,
+      quic::QuicCryptoClientStream::ProofHandler* proof_handler) override {
     last_verify_context_ = *verify_context;
-    return std::make_unique<TestQuicCryptoClientStream>(server_id, session,
-                                                        std::move(verify_context), crypto_config,
-                                                        proof_handler, has_application_state);
+    return std::make_unique<TestQuicCryptoClientStream>(
+        server_id, session, std::move(verify_context), crypto_config, proof_handler);
   }
 
   OptRef<quic::ProofVerifyContext> lastVerifyContext() const { return last_verify_context_; }
@@ -205,6 +218,8 @@ public:
                              Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                              EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
       : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
+                               /*writer=*/nullptr, /*migration_helper=*/nullptr,
+                               quicConnectionMigrationDisableAllConfig(),
                                quic::QuicServerId("example.com", 443),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
@@ -251,15 +266,19 @@ protected:
   QuicStatNames quic_stat_names_{stats_store_.symbolTable()};
 };
 
-Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
-                                           quic::QuicConfig& quic_config,
-                                           quic::QuicConnectionId connection_id) {
-  std::unique_ptr<quic::QuicReceivedPacket> packet =
-      std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
-  return {packet->data(), packet->length()};
+inline std::vector<Buffer::OwnedImpl>
+generateChloPacketsToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig& quic_config,
+                          quic::QuicConnectionId connection_id) {
+  std::vector<std::unique_ptr<quic::QuicReceivedPacket>> packets =
+      quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id);
+  std::vector<Buffer::OwnedImpl> results;
+  for (auto& packet : packets) {
+    results.emplace_back(packet->data(), packet->length());
+  }
+  return results;
 }
 
-void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
+inline void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
   quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
       config, quic::kDefaultMaxStreamsPerConnection);
   quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
@@ -274,7 +293,7 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header) {
+inline std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
@@ -289,7 +308,7 @@ std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header
   return absl::StrCat(headers_frame_header, payload);
 }
 
-std::string bodyToHttp3StreamPayload(const std::string& body) {
+inline std::string bodyToHttp3StreamPayload(const std::string& body) {
   quiche::SimpleBufferAllocator allocator;
   quiche::QuicheBuffer header =
       quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &allocator);
@@ -301,7 +320,8 @@ class QuicMultiVersionTest : public testing::TestWithParam<
                                  std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> {
 };
 
-std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> generateTestParam() {
+inline std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>
+generateTestParam() {
   std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> param;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (const auto& quic_version : quic::CurrentSupportedHttp3Versions()) {
@@ -311,7 +331,7 @@ std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> gen
   return param;
 }
 
-std::string testParamsToString(
+inline std::string testParamsToString(
     const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>&
         params) {
   return absl::StrCat(TestUtility::ipVersionToString(params.param.first),
@@ -376,18 +396,59 @@ DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory);
 REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory,
                  Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface);
 
+#else
+
+namespace Envoy {
+namespace Quic {
+
+#endif
+
 class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
 public:
-  void onNetworkChanged() {
+  void onNetworkMadeDefault(NetworkHandle network) {
     std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
     for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
       existing_observers.push_back(observer);
     }
     for (auto* observer : existing_observers) {
-      observer->onNetworkChanged();
+      observer->onNetworkMadeDefault(network);
     }
   }
+
+  void onNetworkDisconnected(NetworkHandle network) {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkDisconnected(network);
+    }
+  }
+
+  void onNetworkConnected(NetworkHandle network) {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkConnected(network);
+    }
+  }
+
+  NetworkHandle getDefaultNetwork() override { return -1; }
+
+  NetworkHandle getAlternativeNetwork(NetworkHandle) override { return -1; }
+
   using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
+};
+
+class TestEnvoyQuicNetworkObserverRegistryFactory
+    : public Quic::EnvoyQuicNetworkObserverRegistryFactory {
+public:
+  std::unique_ptr<Quic::EnvoyQuicNetworkObserverRegistry>
+  createQuicNetworkObserverRegistry(Event::Dispatcher&) override {
+    return std::make_unique<TestNetworkObserverRegistry>();
+  }
 };
 
 } // namespace Quic

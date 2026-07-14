@@ -11,6 +11,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -46,7 +47,7 @@ public:
     } else {
       watermark_enabled_ = true;
       buffer_limit_ = std::stoul(std::string(entry_buffer[0]->value().getStringView()));
-      decoder_callbacks_->setDecoderBufferLimit(buffer_limit_);
+      decoder_callbacks_->setBufferLimit(buffer_limit_);
       header_map.remove(Http::LowerCaseString("buffer_limit"));
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }
@@ -112,11 +113,15 @@ private:
 };
 
 constexpr char DecodeHeadersReturnStopAllFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<DecodeHeadersReturnStopAllFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<DecodeHeadersReturnStopAllFilter,
+                             test::integration::filters::DecodeHeadersReturnStopAllFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<DecodeHeadersReturnStopAllFilter>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<DecodeHeadersReturnStopAllFilter,
+                             test::integration::filters::DecodeHeadersReturnStopAllFilterConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 
 } // namespace Envoy

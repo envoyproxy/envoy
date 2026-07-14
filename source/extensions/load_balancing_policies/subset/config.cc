@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Subset {
 
 using SubsetLbProto = envoy::extensions::load_balancing_policies::subset::v3::Subset;
@@ -25,7 +25,7 @@ public:
         subset_config_, cluster_info_, params.priority_set, params.local_priority_set,
         cluster_info_.lbStats(), cluster_info_.statsScope(), runtime_, random_, time_source_);
   }
-  bool recreateOnHostChange() const override { return false; }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
 private:
   const Upstream::SubsetLoadBalancerConfig& subset_config_;
@@ -73,8 +73,8 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 absl::StatusOr<Upstream::LoadBalancerConfigPtr>
 SubsetLbFactory::loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
                             const Protobuf::Message& config) {
-  ASSERT(dynamic_cast<const SubsetLbProto*>(&config) != nullptr);
-  const SubsetLbProto& typed_config = dynamic_cast<const SubsetLbProto&>(config);
+  ASSERT(Envoy::Protobuf::DynamicCastMessage<SubsetLbProto>(&config) != nullptr);
+  const SubsetLbProto& typed_config = Envoy::Protobuf::DynamicCastMessage<SubsetLbProto>(config);
 
   // Load the subset load balancer configuration. This will contains child load balancer
   // config and child load balancer factory.
@@ -106,6 +106,6 @@ SubsetLbFactory::loadLegacy(Server::Configuration::ServerFactoryContext& factory
 REGISTER_FACTORY(SubsetLbFactory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace Subset
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

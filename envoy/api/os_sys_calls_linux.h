@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <memory>
+
 #if !defined(__linux__)
 #error "Linux platform file is part of non-Linux build."
 #endif
@@ -15,6 +18,11 @@ namespace Api {
 class LinuxOsSysCalls {
 public:
   virtual ~LinuxOsSysCalls() = default;
+
+  /**
+   * @see man 2 setns
+   */
+  virtual SysCallIntResult setns(int fd, int nstype) const PURE;
 
   /**
    * @see sched_getaffinity (man 2 sched_getaffinity)

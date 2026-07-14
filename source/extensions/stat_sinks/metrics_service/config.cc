@@ -32,8 +32,8 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
   RETURN_IF_NOT_OK_REF(client_or_error.status());
   std::shared_ptr<GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                       envoy::service::metrics::v3::StreamMetricsResponse>>
-      grpc_metrics_streamer =
-          std::make_shared<GrpcMetricsStreamerImpl>(client_or_error.value(), server.localInfo());
+      grpc_metrics_streamer = std::make_shared<GrpcMetricsStreamerImpl>(
+          client_or_error.value(), server.localInfo(), sink_config.batch_size());
 
   return std::make_unique<MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                                              envoy::service::metrics::v3::StreamMetricsResponse>>(

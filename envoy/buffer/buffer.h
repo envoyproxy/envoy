@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
@@ -16,8 +17,8 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/functional/any_invocable.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace Envoy {
@@ -233,8 +234,7 @@ public:
    * @param max_slices supplies an optional limit on the number of slices to fetch, for performance.
    * @return RawSliceVector with non-empty slices in the buffer.
    */
-  virtual RawSliceVector
-  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
+  virtual RawSliceVector getRawSlices(std::optional<uint64_t> max_slices = std::nullopt) const PURE;
 
   /**
    * Fetch the valid data pointer and valid data length of the first non-zero-length
@@ -506,13 +506,13 @@ public:
    *        If set to non-zero, overflow callbacks will be called if the
    *        buffered data exceeds watermark * overflow_multiplier.
    */
-  virtual void setWatermarks(uint32_t watermark, uint32_t overflow_multiplier = 0) PURE;
+  virtual void setWatermarks(uint64_t watermark, uint32_t overflow_multiplier = 0) PURE;
 
   /**
    * Returns the configured high watermark. A return value of 0 indicates that watermark
    * functionality is disabled.
    */
-  virtual uint32_t highWatermark() const PURE;
+  virtual uint64_t highWatermark() const PURE;
   /**
    * Determine if the buffer watermark trigger condition is currently set. The watermark trigger is
    * set when the buffer size exceeds the configured high watermark and is cleared once the buffer
@@ -552,9 +552,9 @@ public:
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                                   std::function<void()> above_high_watermark,
-                                   std::function<void()> above_overflow_watermark) PURE;
+  virtual InstancePtr createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                                   absl::AnyInvocable<void()> above_high_watermark,
+                                   absl::AnyInvocable<void()> above_overflow_watermark) PURE;
 
   /**
    * Create and returns a buffer memory account.

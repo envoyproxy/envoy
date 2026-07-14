@@ -31,6 +31,17 @@ public:
 
   const std::vector<absl::Status>& errors() const { return errors_; }
 
+  template <class OnMatchType> void validateOnMatch(const OnMatchType& on_match) {
+    if (!support_keep_matching_ && on_match.keep_matching()) {
+      errors_.emplace_back(
+          absl::InvalidArgumentError("keep_matching is not supported in this context"));
+    }
+  }
+
+  void setSupportKeepMatching(bool support_keep_matching) {
+    support_keep_matching_ = support_keep_matching;
+  }
+
 protected:
   // Implementations would subclass this to specify the validation logic for data inputs,
   // returning a helpful error message if validation fails.
@@ -39,6 +50,7 @@ protected:
 
 private:
   std::vector<absl::Status> errors_;
+  bool support_keep_matching_ = false;
 };
 } // namespace Matcher
 } // namespace Envoy

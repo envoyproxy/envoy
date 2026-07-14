@@ -1,4 +1,3 @@
-#include "filter.h"
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
 namespace Envoy {
@@ -68,7 +67,7 @@ Http::FilterHeadersStatus FileSystemBufferFilter::decodeHeaders(Http::RequestHea
   // means we still have the thread potentially using twice the memory that the user configured as
   // the memory limit, once in our own buffer and once in the outgoing buffer. (Plus overflow
   // because the limit isn't hard.)
-  request_callbacks_->setDecoderBufferLimit(request_state_.config_->memoryBufferBytesLimit());
+  request_callbacks_->setBufferLimit(request_state_.config_->memoryBufferBytesLimit());
   request_headers_ = &headers;
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -96,7 +95,7 @@ Http::FilterHeadersStatus FileSystemBufferFilter::encodeHeaders(Http::ResponseHe
   // means we still have the thread potentially using twice the memory that the user configured as
   // the memory limit, once in our own buffer and once in the outgoing buffer. (Plus overflow
   // because the limit isn't hard.)
-  response_callbacks_->setEncoderBufferLimit(response_state_.config_->memoryBufferBytesLimit());
+  response_callbacks_->setBufferLimit(response_state_.config_->memoryBufferBytesLimit());
   response_headers_ = &headers;
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -133,7 +132,7 @@ void FileSystemBufferFilter::filterError(absl::string_view err) {
   aborted_ = true;
   ENVOY_STREAM_LOG(error, "{}", *request_callbacks_, err);
   request_callbacks_->sendLocalReply(Http::Code::InternalServerError, "buffer filter error",
-                                     nullptr, absl::nullopt, "");
+                                     nullptr, std::nullopt, "");
 }
 
 Http::FilterDataStatus FileSystemBufferFilter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -143,7 +142,7 @@ Http::FilterDataStatus FileSystemBufferFilter::decodeData(Buffer::Instance& data
     if (request_state_.injecting_content_length_header_ ||
         request_state_.config_->behavior().alwaysFullyBuffer()) {
       request_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, "buffer limit exceeded",
-                                         nullptr, absl::nullopt, "");
+                                         nullptr, std::nullopt, "");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
@@ -180,6 +179,7 @@ Http::FilterTrailersStatus FileSystemBufferFilter::receiveTrailers(const BufferB
     return Http::FilterTrailersStatus::Continue;
   }
   state.seen_end_stream_ = true;
+  state.seen_trailers_ = true;
   dispatchStateChanged();
   return Http::FilterTrailersStatus::StopIteration;
 }
@@ -195,7 +195,7 @@ Http::FilterDataStatus FileSystemBufferFilter::encodeData(Buffer::Instance& data
     if (response_state_.injecting_content_length_header_ ||
         response_state_.config_->behavior().alwaysFullyBuffer()) {
       response_callbacks_->sendLocalReply(Http::Code::InternalServerError, "buffer limit exceeded",
-                                          nullptr, absl::nullopt, "");
+                                          nullptr, std::nullopt, "");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
@@ -245,7 +245,9 @@ void FileSystemBufferFilter::maybeOutputRequest() {
       request_state_.memory_used_ -= request_state_.buffer_.front()->size();
       auto out = request_state_.buffer_.front()->extract();
       request_state_.buffer_.pop_front();
-      request_callbacks_->injectDecodedDataToFilterChain(*out, false);
+      bool end_stream = (request_state_.buffer_.empty() && request_state_.seen_end_stream_ &&
+                         !request_state_.seen_trailers_);
+      request_callbacks_->injectDecodedDataToFilterChain(*out, end_stream);
     }
   }
   if (request_state_.buffer_.empty() && request_state_.seen_end_stream_) {
@@ -270,7 +272,9 @@ bool FileSystemBufferFilter::maybeOutputResponse() {
       response_state_.memory_used_ -= response_state_.buffer_.front()->size();
       auto out = response_state_.buffer_.front()->extract();
       response_state_.buffer_.pop_front();
-      response_callbacks_->injectEncodedDataToFilterChain(*out, false);
+      bool end_stream = (response_state_.buffer_.empty() && response_state_.seen_end_stream_ &&
+                         !response_state_.seen_trailers_);
+      response_callbacks_->injectEncodedDataToFilterChain(*out, end_stream);
     }
   }
   if (response_state_.buffer_.empty() && response_state_.seen_end_stream_) {

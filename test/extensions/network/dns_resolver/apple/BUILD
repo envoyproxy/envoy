@@ -30,7 +30,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ] + select({
         "//bazel:apple": [

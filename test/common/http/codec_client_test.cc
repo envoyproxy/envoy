@@ -1,11 +1,14 @@
 #include <memory>
 
+#include "envoy/http/client_codec_factory.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/exception.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -18,12 +21,12 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -92,7 +95,7 @@ public:
   std::shared_ptr<Upstream::MockIdleTimeEnabledClusterInfo> cluster_{
       new NiceMock<Upstream::MockIdleTimeEnabledClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
-      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 #ifdef ENVOY_ENABLE_UHV
   NiceMock<MockClientHeaderValidator>* header_validator_{new NiceMock<MockClientHeaderValidator>};
@@ -134,6 +137,183 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+class MockClientCodecFactory : public ClientCodecFactory {
+public:
+  MOCK_METHOD(ClientConnectionPtr, createClientCodec, (const Context& context), (const));
+};
+
+// When a cluster exposes an upstream ClientCodecFactory, CodecClientProd consults it and installs
+// the codec the factory returns (the stock codec is not built). Uses a bare fixture-less test
+// because it constructs a real CodecClientProd rather than the fixture's CodecClientForTest.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsed) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+
+  // The factory returns its own codec; CodecClientProd must install it verbatim. Use a sentinel
+  // protocol (HTTP/2) distinct from the stock HTTP/1 codec to prove the returned codec is used.
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
+        EXPECT_EQ(CodecType::HTTP1, context.type);
+        EXPECT_EQ(cluster.get(), &context.cluster);
+        EXPECT_EQ(nullptr, context.options);
+        auto codec = std::make_unique<NiceMock<MockClientConnection>>();
+        ON_CALL(*codec, protocol()).WillByDefault(Return(Protocol::Http2));
+        return codec;
+      }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+
+  EXPECT_EQ(Protocol::Http2, client.protocol());
+}
+
+// A factory that returns nullptr defers to the stock codec, which CodecClientProd then builds.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryNullptrUsesStockCodec) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke(
+          [](const ClientCodecFactory::Context&) -> ClientConnectionPtr { return nullptr; }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  // The factory declined, so the stock HTTP/1 codec is installed.
+  EXPECT_EQ(Protocol::Http11, client.protocol());
+}
+
+// The factory is consulted for HTTP/2 connections as well; the returned codec is installed.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsedHttp2) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+
+  // Sentinel protocol HTTP/1 (distinct from the stock HTTP/2 codec) proves the returned codec is
+  // installed verbatim rather than the stock one being built.
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
+        EXPECT_EQ(CodecType::HTTP2, context.type);
+        auto codec = std::make_unique<NiceMock<MockClientConnection>>();
+        ON_CALL(*codec, protocol()).WillByDefault(Return(Protocol::Http11));
+        return codec;
+      }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP2, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  EXPECT_EQ(Protocol::Http11, client.protocol());
+}
+
+// A factory that returns nullptr for an HTTP/2 connection defers to the stock HTTP/2 codec.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryNullptrUsesStockCodecHttp2) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke(
+          [](const ClientCodecFactory::Context&) -> ClientConnectionPtr { return nullptr; }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP2, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  EXPECT_EQ(Protocol::Http2, client.protocol());
+}
+
+// For HTTP/3 the factory is consulted and owns full construction. The factory returns its own codec
+// without touching the connection, so the stock QUIC path (which would dynamic_cast the connection
+// to EnvoyQuicClientSession and call Initialize()) is skipped; that this runs against a plain mock
+// connection without crashing is the proof the stock path was not taken.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryIsUsedHttp3) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
+        EXPECT_EQ(CodecType::HTTP3, context.type);
+        auto codec = std::make_unique<NiceMock<MockClientConnection>>();
+        ON_CALL(*codec, protocol()).WillByDefault(Return(Protocol::Http3));
+        return codec;
+      }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP3, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  EXPECT_EQ(Protocol::Http3, client.protocol());
+}
+
+// The transport socket options are forwarded to the factory verbatim.
+TEST(CodecClientProdTest, UpstreamClientCodecFactoryReceivesTransportSocketOptions) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto factory = std::make_shared<NiceMock<MockClientCodecFactory>>();
+  ON_CALL(*cluster, upstreamHttpClientCodecFactory())
+      .WillByDefault(Return(OptRef<const ClientCodecFactory>(*factory)));
+
+  Network::TransportSocketOptionsConstSharedPtr transport_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>();
+  EXPECT_CALL(*factory, createClientCodec(_))
+      .WillOnce(Invoke([&](const ClientCodecFactory::Context& context) -> ClientConnectionPtr {
+        EXPECT_EQ(transport_options.get(), context.options.get());
+        return std::make_unique<NiceMock<MockClientConnection>>();
+      }));
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random,
+                         transport_options, /*should_connect=*/false);
+}
+
+// With no factory configured (the default), CodecClientProd builds the stock codec.
+TEST(CodecClientProdTest, NoUpstreamClientCodecFactoryUsesStockCodec) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  Upstream::HostDescriptionConstSharedPtr host =
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80");
+
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  CodecClientProd client(CodecType::HTTP1, std::move(connection), host, dispatcher, random, nullptr,
+                         /*should_connect=*/false);
+  // No factory consulted; the stock HTTP/1 codec is installed.
+  EXPECT_EQ(Protocol::Http11, client.protocol());
 }
 
 TEST_F(CodecClientTest, BasicResponseWithBody) {
@@ -185,6 +365,8 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
 }
 
 TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
   initialize();
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
@@ -269,10 +451,102 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   EXPECT_EQ(client_->idleTimer(), nullptr);
 }
 
+// Test that idle timeout closes the connection and increments stats when connected (default
+// behavior).
+TEST_F(CodecClientTest, IdleTimeoutWhenConnectedDefault) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
+  initialize();
+
+  // Connect the connection first.
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+
+  // Trigger idle timeout - it should close the connection and increment stats.
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  client_->triggerIdleTimeout();
+
+  // Verify idle timeout stat was incremented.
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+}
+
+// Test that idle timeout closes the connection and increments stats when connected (old behavior).
+TEST_F(CodecClientTest, IdleTimeoutWhenConnectedOldBehavior) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", false}});
+  initialize();
+
+  // Connect the connection first.
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+
+  // Trigger idle timeout - it should close the connection and increment stats.
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  client_->triggerIdleTimeout();
+
+  // Verify idle timeout stat was incremented.
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+}
+
+// Test that idle timer is NOT enabled when connection is not yet established (default behavior).
+TEST_F(CodecClientTest, IdleTimerNotEnabledWhenNotConnectedDefault) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
+
+  connection_ = new NiceMock<Network::MockClientConnection>();
+
+  EXPECT_CALL(*connection_, connecting()).WillOnce(Return(true));
+  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
+  EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection_, connect());
+  EXPECT_CALL(*connection_, addReadFilter(_))
+      .WillOnce(Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
+
+  codec_ = new Http::MockClientConnection();
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+
+  Network::ClientConnectionPtr connection{connection_};
+  Event::MockTimer* idle_timer = new Event::MockTimer();
+  // With the flag enabled (default), idle timer should NOT be enabled when connection is not yet
+  // established.
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(idle_timer));
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                 nullptr, host_, dispatcher_);
+  ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+}
+
+// Test that idle timer IS enabled when connection is not yet established (old behavior with flag
+// disabled).
+TEST_F(CodecClientTest, IdleTimerEnabledWhenNotConnectedOldBehavior) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", false}});
+
+  connection_ = new NiceMock<Network::MockClientConnection>();
+
+  EXPECT_CALL(*connection_, connecting()).WillOnce(Return(true));
+  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
+  EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection_, connect());
+  EXPECT_CALL(*connection_, addReadFilter(_))
+      .WillOnce(Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
+
+  codec_ = new Http::MockClientConnection();
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+
+  Network::ClientConnectionPtr connection{connection_};
+  Event::MockTimer* idle_timer = new Event::MockTimer();
+  // With the flag disabled, idle timer SHOULD be enabled when connection is not yet established
+  // (old behavior). It will be called once in the constructor.
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(idle_timer));
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                 nullptr, host_, dispatcher_);
+  ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+}
+
 TEST_F(CodecClientTest, ProtocolError) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -284,7 +558,7 @@ TEST_F(CodecClientTest, 408Response) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Return(prematureResponseError("", Code::RequestTimeout)));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -295,7 +569,7 @@ TEST_F(CodecClientTest, 408Response) {
 TEST_F(CodecClientTest, PrematureResponse) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(prematureResponseError("", Code::OK)));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -477,7 +751,7 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
       .WillOnce(Return(HeaderValidator::ValidationResult{
           HeaderValidator::ValidationResult::Action::Reject, "some error"}));
   // By default H/2 and H/3 connections are disconnected on protocol errors
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(_, _));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   // Connection closure will cause stream to be reset
   inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,
@@ -572,7 +846,7 @@ protected:
   std::unique_ptr<CodecClientForTest> client_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
-      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
   Network::ConnectionPtr upstream_connection_;
   NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
   Network::ClientConnection* client_connection_{};

@@ -55,7 +55,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 void ConnectionManager::emitLogEntry(const Http::RequestHeaderMap* request_headers,
                                      const Http::ResponseHeaderMap* response_headers,
                                      const StreamInfo::StreamInfo& stream_info) {
-  const Formatter::HttpFormatterContext log_context{request_headers, response_headers};
+  const Formatter::Context log_context{request_headers, response_headers};
 
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(log_context, stream_info);
@@ -111,11 +111,11 @@ void ConnectionManager::dispatch() {
   resetAllRpcs(true);
 }
 
-absl::optional<DirectResponse::ResponseType>
+std::optional<DirectResponse::ResponseType>
 ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                                   bool end_stream) {
   if (read_callbacks_->connection().state() == Network::Connection::State::Closed) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   DirectResponse::ResponseType result = DirectResponse::ResponseType::Exception;
@@ -831,7 +831,7 @@ void ConnectionManager::ActiveRpc::recordResponseAccessLog(
 
 void ConnectionManager::ActiveRpc::recordResponseAccessLog(const std::string& message_type,
                                                            const std::string& reply_type) {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   auto& response_fields_map = *fields_map["response"].mutable_struct_value()->mutable_fields();
 
@@ -869,7 +869,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   }
 
   FilterStatus result = FilterStatus::StopIteration;
-  absl::optional<std::string> error;
+  std::optional<std::string> error;
   TRY_NEEDS_AUDIT { result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata); }
   END_TRY catch (const std::bad_function_call& e) { error = std::string(e.what()); }
 
@@ -880,18 +880,26 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
       metadata->hasFrameSize() ? static_cast<int32_t>(metadata->frameSize()) : -1;
 
   if (error.has_value()) {
-    parent_.stats_.request_internal_error_.inc();
-    std::ostringstream oss;
-    parent_.read_callbacks_->connection().dumpState(oss, 0);
-    ENVOY_STREAM_LOG(error,
-                     "Catch exception: {}. Request seq_id: {}, method: {}, frame size: {}, cluster "
-                     "name: {}, downstream connection state {}, headers:\n{}",
-                     *this, error.value(), metadata_->sequenceId(), method, frame_size,
-                     cluster_name, oss.str(), metadata->requestHeaders());
+    // If downstream connection is closing, we won't be able to proxy and expect this exception.
+    // In this case, just propagate the error and do *not* increase the internal error counter.
+    if (parent_.read_callbacks_->connection().state() == Network::Connection::State::Closing) {
+      ENVOY_CONN_LOG(debug, "thrift: downstream connection closing, not proxying",
+                     parent_.read_callbacks_->connection());
+    } else {
+      parent_.stats_.request_internal_error_.inc();
+      std::ostringstream oss;
+      parent_.read_callbacks_->connection().dumpState(oss, 0);
+      ENVOY_STREAM_LOG(
+          error,
+          "Catch exception: {}. Request seq_id: {}, method: {}, frame size: {}, cluster "
+          "name: {}, downstream connection state {}, headers:\n{}",
+          *this, error.value(), metadata_->sequenceId(), method, frame_size, cluster_name,
+          oss.str(), metadata->requestHeaders());
+    }
     throw EnvoyException(error.value());
   }
 
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["cluster"] = ValueUtil::stringValue(cluster_name);
   fields_map["method"] = ValueUtil::stringValue(method);
@@ -1020,7 +1028,7 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
           parent_.config_->routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
-      cached_route_ = absl::nullopt;
+      cached_route_ = std::nullopt;
     }
   }
 
@@ -1100,7 +1108,7 @@ ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer:
   }
 }
 
-void ConnectionManager::ActiveRpc::clearRouteCache() { cached_route_ = absl::nullopt; }
+void ConnectionManager::ActiveRpc::clearRouteCache() { cached_route_ = std::nullopt; }
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
   ENVOY_CONN_LOG(debug, "resetting downstream connection", parent_.read_callbacks_->connection());

@@ -1,15 +1,19 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
+#include "envoy/network/address.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -221,6 +225,183 @@ external_auth_provider:
   EXPECT_CALL(connection, addReadFilter(_));
   EXPECT_CALL(context.server_factory_context_.cluster_manager_, grpcAsyncClientManager());
   cb(connection);
+}
+
+TEST(RedisProxyFilterProtocolOptionsConfigImplTest, DefaultCredentials) {
+  const std::string yaml = R"EOF(
+auth_username:
+  inline_string: default_username
+auth_password:
+  inline_string: default_password
+credentials:
+  - address:
+      socket_address:
+        address: address1
+        port_value: 1234
+    auth_username:
+      inline_string: address1_username
+    auth_password:
+      inline_string: address1_password
+  )EOF";
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  const auto config = ProtocolOptionsConfigImpl(proto_config);
+  NiceMock<Api::MockApi> api;
+  const std::shared_ptr<NiceMock<Upstream::MockHost>> host =
+      std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Network::Address::InstanceConstSharedPtr instance =
+      *Network::Utility::resolveUrl("tcp://127.0.0.1:1234");
+  const std::string hostname = "address2";
+  ON_CALL(*host, hostname()).WillByDefault(ReturnRef(hostname));
+  ON_CALL(*host, address()).WillByDefault(Return(instance));
+  const auto credentials = config.authCredentials(api, host);
+  EXPECT_EQ("default_username", credentials.username);
+  EXPECT_EQ("default_password", credentials.password);
+}
+
+TEST(RedisProxyFilterProtocolOptionsConfigImplTest, CredentialsWithHostnames) {
+  const std::string yaml = R"EOF(
+auth_username:
+  inline_string: default_username
+auth_password:
+  inline_string: default_password
+credentials:
+  - address:
+      socket_address:
+        address: address1
+        port_value: 1234
+    auth_username:
+      inline_string: address1_username
+    auth_password:
+      inline_string: address1_password
+  - address:
+      socket_address:
+        address: address2
+        port_value: 1234
+    auth_username:
+      inline_string: address2_username
+    auth_password:
+      inline_string: address2_password
+  - address:
+      socket_address:
+        address: address2
+        port_value: 2345
+    auth_username:
+      inline_string: address2_2_username
+    auth_password:
+      inline_string: address2_2_password
+  )EOF";
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  const auto config = ProtocolOptionsConfigImpl(proto_config);
+  NiceMock<Api::MockApi> api;
+
+  const std::shared_ptr<NiceMock<Upstream::MockHost>> host1 =
+      std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Network::Address::InstanceConstSharedPtr instance1 =
+      *Network::Utility::resolveUrl("tcp://127.0.0.1:1234");
+  const std::string hostname1 = "address1";
+  ON_CALL(*host1, hostname()).WillByDefault(ReturnRef(hostname1));
+  ON_CALL(*host1, address()).WillByDefault(Return(instance1));
+  const auto credentials1 = config.authCredentials(api, host1);
+  EXPECT_EQ("address1_username", credentials1.username);
+  EXPECT_EQ("address1_password", credentials1.password);
+
+  const std::shared_ptr<NiceMock<Upstream::MockHost>> host2 =
+      std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Network::Address::InstanceConstSharedPtr instance2 =
+      *Network::Utility::resolveUrl("tcp://127.0.0.2:1234");
+  const std::string hostname2 = "address2";
+  ON_CALL(*host2, hostname()).WillByDefault(ReturnRef(hostname2));
+  ON_CALL(*host2, address()).WillByDefault(Return(instance2));
+  const auto credentials2 = config.authCredentials(api, host2);
+  EXPECT_EQ("address2_username", credentials2.username);
+  EXPECT_EQ("address2_password", credentials2.password);
+
+  const std::shared_ptr<NiceMock<Upstream::MockHost>> host3 =
+      std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Network::Address::InstanceConstSharedPtr instance3 =
+      *Network::Utility::resolveUrl("tcp://127.0.0.2:2345");
+  ON_CALL(*host3, hostname()).WillByDefault(ReturnRef(hostname2));
+  ON_CALL(*host3, address()).WillByDefault(Return(instance3));
+  const auto credentials3 = config.authCredentials(api, host3);
+  EXPECT_EQ("address2_2_username", credentials3.username);
+  EXPECT_EQ("address2_2_password", credentials3.password);
+
+  const std::shared_ptr<NiceMock<Upstream::MockHost>> host9 =
+      std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Network::Address::InstanceConstSharedPtr instance9 =
+      *Network::Utility::resolveUrl("tcp://127.0.0.9:1234");
+  const auto credentials9 = config.authCredentials(api, host9);
+  const std::string hostname9 = "address9";
+  ON_CALL(*host9, hostname()).WillByDefault(ReturnRef(hostname9));
+  ON_CALL(*host9, address()).WillByDefault(Return(instance9));
+
+  // Ensure that the defaults are used if the host is not found.
+  EXPECT_EQ("default_username", credentials9.username);
+  EXPECT_EQ("default_password", credentials9.password);
+}
+
+TEST(RedisProxyFilterProtocolOptionsConfigImplTest, CredentialsWithIpAddresses) {
+  const std::string yaml = R"EOF(
+auth_username:
+  inline_string: default_username
+auth_password:
+  inline_string: default_password
+credentials:
+  - address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    auth_username:
+      inline_string: address1_username
+    auth_password:
+      inline_string: address1_password
+  - address:
+      socket_address:
+        address: ::1
+        port_value: 1234
+    auth_username:
+      inline_string: address2_username
+    auth_password:
+      inline_string: address2_password
+  )EOF";
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  const auto config = ProtocolOptionsConfigImpl(proto_config);
+  NiceMock<Api::MockApi> api;
+
+  const std::shared_ptr<NiceMock<Upstream::MockHost>> host1 =
+      std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Network::Address::InstanceConstSharedPtr instance1 =
+      *Network::Utility::resolveUrl("tcp://127.0.0.1:1234");
+  ON_CALL(*host1, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
+  ON_CALL(*host1, address()).WillByDefault(Return(instance1));
+  const auto credentials1 = config.authCredentials(api, host1);
+  EXPECT_EQ("address1_username", credentials1.username);
+  EXPECT_EQ("address1_password", credentials1.password);
+
+  const std::shared_ptr<NiceMock<Upstream::MockHost>> host2 =
+      std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Network::Address::InstanceConstSharedPtr instance2 =
+      *Network::Utility::resolveUrl("tcp://[::1]:1234");
+  ON_CALL(*host2, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
+  ON_CALL(*host2, address()).WillByDefault(Return(instance2));
+  const auto credentials2 = config.authCredentials(api, host2);
+  EXPECT_EQ("address2_username", credentials2.username);
+  EXPECT_EQ("address2_password", credentials2.password);
+
+  const std::shared_ptr<NiceMock<Upstream::MockHost>> host9 =
+      std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Network::Address::InstanceConstSharedPtr instance9 =
+      *Network::Utility::resolveUrl("tcp://127.0.0.9:1234");
+  ON_CALL(*host9, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
+  ON_CALL(*host9, address()).WillByDefault(Return(instance9));
+
+  // Ensure that the defaults are used if the host is not found.
+  const auto credentials9 = config.authCredentials(api, host9);
+  EXPECT_EQ("default_username", credentials9.username);
+  EXPECT_EQ("default_password", credentials9.password);
 }
 
 } // namespace RedisProxy

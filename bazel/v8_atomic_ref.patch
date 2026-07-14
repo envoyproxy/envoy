@@ -1,0 +1,85 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index eeba8efa..eeba8efb 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -817,6 +817,7 @@ filegroup(
+         "src/base/address-region.h",
+         "src/base/algorithm.h",
+         "src/base/atomic-utils.h",
++        "src/base/atomic_ref_polyfill.h",
+         "src/base/atomicops.h",
+         "src/base/base-export.h",
+         "src/base/bit-field.h",
+diff --git a/src/base/atomic_ref_polyfill.h b/src/base/atomic_ref_polyfill.h
+new file mode 100644
+--- /dev/null
++++ b/src/base/atomic_ref_polyfill.h
+@@ -0,0 +1,68 @@
++// Polyfill for std::atomic_ref (C++20 P0019R8) when libc++ doesn't provide it.
++// LLVM 18's libc++ does not ship std::atomic_ref; V8 14.6 uses it pervasively.
++// TODO(jwendell): Remove this polyfill once the LLVM toolchain is bumped to a
++// version whose libc++ provides std::atomic_ref (LLVM 19+).
++#ifndef V8_BASE_ATOMIC_REF_POLYFILL_H_
++#define V8_BASE_ATOMIC_REF_POLYFILL_H_
++
++#include <atomic>
++#include <type_traits>
++
++#if !defined(__cpp_lib_atomic_ref)
++#define __cpp_lib_atomic_ref 201806L
++namespace std {
++template <typename T>
++struct atomic_ref {
++  static_assert(std::is_trivially_copyable_v<T>);
++  static constexpr std::size_t required_alignment = alignof(T);
++  explicit atomic_ref(T& obj) : ptr_(&obj) {}
++  atomic_ref(const atomic_ref&) = default;
++  T load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<const std::atomic<T>*>(ptr_)->load(order);
++  }
++  void store(T desired, std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    reinterpret_cast<std::atomic<T>*>(ptr_)->store(desired, order);
++  }
++  T exchange(T desired, std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->exchange(desired, order);
++  }
++  bool compare_exchange_strong(T& expected, T desired,
++                               std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->compare_exchange_strong(expected, desired, order);
++  }
++  bool compare_exchange_strong(T& expected, T desired,
++                               std::memory_order success, std::memory_order failure) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->compare_exchange_strong(expected, desired, success, failure);
++  }
++  bool compare_exchange_weak(T& expected, T desired,
++                             std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->compare_exchange_weak(expected, desired, order);
++  }
++  bool compare_exchange_weak(T& expected, T desired,
++                             std::memory_order success, std::memory_order failure) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->compare_exchange_weak(expected, desired, success, failure);
++  }
++  T fetch_add(T arg, std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->fetch_add(arg, order);
++  }
++  T fetch_sub(T arg, std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->fetch_sub(arg, order);
++  }
++  T fetch_and(T arg, std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->fetch_and(arg, order);
++  }
++  T fetch_or(T arg, std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->fetch_or(arg, order);
++  }
++  T fetch_xor(T arg, std::memory_order order = std::memory_order_seq_cst) const noexcept {
++    return reinterpret_cast<std::atomic<T>*>(ptr_)->fetch_xor(arg, order);
++  }
++private:
++  T* ptr_;
++};
++template <typename T>
++atomic_ref(T&) -> atomic_ref<T>;
++}  // namespace std
++#endif  // !defined(__cpp_lib_atomic_ref)
++
++#endif  // V8_BASE_ATOMIC_REF_POLYFILL_H_

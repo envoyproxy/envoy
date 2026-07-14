@@ -29,14 +29,15 @@ public:
 };
 
 // Factory code to create the AsyncRoundRobin LB.
-class AsyncRoundRobinFactory : public Extensions::LoadBalancingPolices::Common::FactoryBase<
+class AsyncRoundRobinFactory : public Extensions::LoadBalancingPolicies::Common::FactoryBase<
                                    test::integration::lb::AsyncRoundRobin, AsyncRoundRobinCreator> {
 public:
   AsyncRoundRobinFactory() : FactoryBase("envoy.load_balancing_policies.async_round_robin") {}
 
   absl::StatusOr<LoadBalancerConfigPtr> loadConfig(Server::Configuration::ServerFactoryContext&,
                                                    const Protobuf::Message& config) override {
-    const auto& typed_config = dynamic_cast<const test::integration::lb::AsyncRoundRobin&>(config);
+    const auto& typed_config =
+        Envoy::Protobuf::DynamicCastMessage<test::integration::lb::AsyncRoundRobin>(config);
     return Upstream::LoadBalancerConfigPtr{new TypedAsyncRoundRobinLbConfig(typed_config)};
   }
 };

@@ -2,6 +2,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -16,13 +17,13 @@ public:
       for (auto const& [k, v] : kvs.fields()) {
         std::string value;
         switch (v.kind_case()) {
-        case ProtobufWkt::Value::kNumberValue:
+        case Protobuf::Value::kNumberValue:
           value = fmt::format("{:g}", v.number_value());
           break;
-        case ProtobufWkt::Value::kStringValue:
+        case Protobuf::Value::kStringValue:
           value = v.string_value();
           break;
-        case ProtobufWkt::Value::kBoolValue:
+        case Protobuf::Value::kBoolValue:
           value = v.bool_value() ? "true" : "false";
           break;
         default:
@@ -38,8 +39,10 @@ public:
 };
 
 constexpr char DecodeDynamicMetadataFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<DecodeDynamicMetadataFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<DecodeDynamicMetadataFilter,
+                             test::integration::filters::DecodeDynamicMetadataFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

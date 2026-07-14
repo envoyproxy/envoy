@@ -1,6 +1,6 @@
 workspace_type: android
 
-bazel_binary: bazelw
+bazel_binary: bazel
 
 directories:
   -bazel-bin

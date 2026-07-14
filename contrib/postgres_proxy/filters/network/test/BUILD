@@ -33,6 +33,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "postgres_encoder_tests",
+    srcs = [
+        "postgres_encoder_test.cc",
+    ],
+    deps = [
+        "//contrib/postgres_proxy/filters/network/source:filter",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "postgres_message_tests",
     srcs = [
         "postgres_message_test.cc",

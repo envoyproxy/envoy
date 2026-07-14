@@ -30,9 +30,11 @@ envoy_cc_library(
         "//envoy/server:admin_interface",
         "//envoy/server:options_interface",
         "//envoy/singleton:manager_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:store_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/thread_local:thread_local_interface",
-        "@com_google_absl//absl/container:node_hash_map",
+        "@abseil-cpp//absl/container:node_hash_map",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -63,6 +65,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admin_endpoint_provider_interface",
+    hdrs = ["admin_endpoint_provider.h"],
+    deps = [
+        "//envoy/common:pure_lib",
+        "//envoy/network:address_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
     deps = [
@@ -73,8 +85,8 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/stats:primitive_stats_macros",
         "//envoy/stats:stats_macros",
-        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 
@@ -86,6 +98,14 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//envoy/upstream:types_interface",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "load_stats_reporter_interface",
+    hdrs = ["load_stats_reporter.h"],
+    deps = [
+        "//envoy/stats:stats_macros",
     ],
 )
 
@@ -103,7 +123,6 @@ envoy_cc_library(
     hdrs = ["outlier_detection.h"],
     deps = [
         "//envoy/common:time_interface",
-        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -113,6 +132,7 @@ envoy_cc_library(
     hdrs = ["retry.h"],
     deps = [
         "//envoy/config:typed_config_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:types_interface",
         "//envoy/upstream:upstream_interface",
     ],
@@ -162,7 +182,6 @@ envoy_cc_library(
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/upstream:types_interface",
-        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -194,5 +213,14 @@ envoy_cc_library(
     name = "scheduler_interface",
     hdrs = ["scheduler.h"],
     deps = [
+    ],
+)
+
+envoy_cc_library(
+    name = "transport_socket_matching_data_interface",
+    hdrs = ["transport_socket_matching_data.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

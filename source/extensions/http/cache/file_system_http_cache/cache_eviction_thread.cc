@@ -30,7 +30,7 @@ CacheEvictionThread::~CacheEvictionThread() {
 
 void CacheEvictionThread::addCache(std::shared_ptr<CacheShared> cache) {
   {
-    absl::MutexLock lock(&cache_mu_);
+    absl::MutexLock lock(cache_mu_);
     bool inserted = caches_.emplace(std::move(cache)).second;
     ASSERT(inserted);
   }
@@ -40,24 +40,24 @@ void CacheEvictionThread::addCache(std::shared_ptr<CacheShared> cache) {
 }
 
 void CacheEvictionThread::removeCache(std::shared_ptr<CacheShared>& cache) {
-  absl::MutexLock lock(&cache_mu_);
+  absl::MutexLock lock(cache_mu_);
   bool removed = caches_.erase(cache);
   ASSERT(removed);
 }
 
 void CacheEvictionThread::signal() {
-  absl::MutexLock lock(&mu_);
+  absl::MutexLock lock(mu_);
   signalled_ = true;
 }
 
 void CacheEvictionThread::terminate() {
-  absl::MutexLock lock(&mu_);
+  absl::MutexLock lock(mu_);
   terminating_ = true;
   signalled_ = true;
 }
 
 bool CacheEvictionThread::waitForSignal() {
-  absl::MutexLock lock(&mu_);
+  absl::MutexLock lock(mu_);
   // Worth noting here that if `signalled_` is already true, the lock is not released
   // until idle_ is false again, so waitForIdle will not return until `signalled_`
   // stays false for the duration of an eviction cycle.
@@ -166,7 +166,7 @@ void CacheEvictionThread::work() {
     {
       // Take a local copy of the set of caches, so we don't hold the lock while
       // work is being performed.
-      absl::MutexLock lock(&cache_mu_);
+      absl::MutexLock lock(cache_mu_);
       caches = caches_;
     }
 
@@ -183,7 +183,7 @@ void CacheEvictionThread::work() {
 }
 
 void CacheEvictionThread::waitForIdle() {
-  absl::MutexLock lock(&mu_);
+  absl::MutexLock lock(mu_);
   auto cond = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) { return idle_ && !signalled_; };
   mu_.Await(absl::Condition(&cond));
 }

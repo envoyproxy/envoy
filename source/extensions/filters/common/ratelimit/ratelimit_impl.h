@@ -45,7 +45,7 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const std::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl() override;
 
   static void createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
@@ -55,9 +55,10 @@ public:
 
   // Filters::Common::RateLimit::Client
   void cancel() override;
+  void detach() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
              const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-             Tracing::Span& parent_span, OptRef<const StreamInfo::StreamInfo> stream_info,
+             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
              uint32_t hits_addend = 0) override;
 
   // Grpc::AsyncRequestCallbacks
@@ -72,17 +73,18 @@ private:
                     envoy::service::ratelimit::v3::RateLimitResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
-  absl::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
 };
 
 /**
  * Builds the rate limit client.
+ * @param timeout the timeout for the gRPC request. If nullopt, no timeout is applied (infinite).
  */
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                          const std::chrono::milliseconds timeout);
+                          const std::optional<std::chrono::milliseconds>& timeout);
 
 } // namespace RateLimit
 } // namespace Common

@@ -14,6 +14,11 @@ public:
   virtual ~TlsCertificateConfig() = default;
 
   /**
+   * @return a string of the certificate name.
+   */
+  virtual const std::string& certificateName() const PURE;
+
+  /**
    * @return a string of certificate chain.
    */
   virtual const std::string& certificateChain() const PURE;

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -8,7 +10,6 @@
 #include "envoy/ssl/parsed_x509_name.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace Envoy {
@@ -94,6 +95,18 @@ public:
   virtual const std::string& issuerPeerCertificate() const PURE;
 
   /**
+   * @return std::string the SHA-256 digest of the verified issuer certificate in the peer
+   *certificate. Returns "" if there is no peer certificate chain or no issuer certificate.
+   **/
+  virtual const std::string& sha256PeerCertificateIssuerDigest() const PURE;
+
+  /**
+   * @return std::string the serial number of the verified issuer certificate in the peer
+   *certificate. Returns "" if there is no peer certificate chain or no issuer certificate.
+   **/
+  virtual const std::string& serialNumberPeerCertificateIssuer() const PURE;
+
+  /**
    * @return std::string the subject field of the peer certificate in RFC 2253 format. Returns "" if
    *         there is no peer certificate, or no subject.
    **/
@@ -101,7 +114,7 @@ public:
 
   /**
    * @return the well-known attribute values parsed from subject field of the peer certificate.
-   *         Returns absl::nullopt if there is no peer certificate.
+   *         Returns std::nullopt if there is no peer certificate.
    **/
   virtual ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const PURE;
 
@@ -118,11 +131,41 @@ public:
   virtual const std::string& urlEncodedPemEncodedPeerCertificate() const PURE;
 
   /**
+   * @return std::string the PEM-encoded representation of the peer certificate. Returns
+   *         "" if there is no peer certificate or encoding fails.
+   **/
+  virtual const std::string& pemEncodedPeerCertificate() const PURE;
+
+  /**
    * @return std::string the URL-encoded PEM-encoded representation of the full peer certificate
    *         chain including the leaf certificate. Returns "" if there is no peer certificate or
    *         encoding fails.
+   *
+   * @note This is the peer-provided certificate chain, not the validated certificate chain. This
+   *       may include certificates that are not part of the validated chain.
    **/
   virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the PEM-encoded representation of each certificate in the
+   *         peer certificate chain, as individual strings. Returns {} if there is no peer
+   *         certificate or encoding fails.
+   *
+   * @note This is the peer-provided certificate chain, not the validated certificate chain. This
+   *       may include certificates that are not part of the validated chain.
+   **/
+  virtual absl::Span<const std::string> pemEncodedPeerCertificateChain() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the PEM-encoded representation of each certificate in the
+   *         validated peer certificate chain (the chain Envoy built and verified during certificate
+   *         validation), as individual strings ordered leaf-first. Returns {} if the peer
+   *         certificate was not validated or the validated chain is unavailable.
+   *
+   * @note Unlike pemEncodedPeerCertificateChain(), this is not the raw chain presented by the peer;
+   *       it reflects the path Envoy actually trusted, so it may differ in order and contents.
+   **/
+  virtual absl::Span<const std::string> pemEncodedValidatedPeerCertificateChain() const PURE;
 
   /**
    * @return bool whether the provided matcher matches a SAN in the peer certificate.
@@ -192,16 +235,16 @@ public:
   virtual absl::Span<const std::string> oidsLocalCertificate() const PURE;
 
   /**
-   * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be
-   *         considered valid from. Returns empty absl::optional if there is no peer certificate.
+   * @return std::optional<SystemTime> the time that the peer certificate was issued and should be
+   *         considered valid from. Returns empty std::optional if there is no peer certificate.
    **/
-  virtual absl::optional<SystemTime> validFromPeerCertificate() const PURE;
+  virtual std::optional<SystemTime> validFromPeerCertificate() const PURE;
 
   /**
-   * @return absl::optional<SystemTime> the time that the peer certificate expires and should not be
-   *         considered valid after. Returns empty absl::optional if there is no peer certificate.
+   * @return std::optional<SystemTime> the time that the peer certificate expires and should not be
+   *         considered valid after. Returns empty std::optional if there is no peer certificate.
    **/
-  virtual absl::optional<SystemTime> expirationPeerCertificate() const PURE;
+  virtual std::optional<SystemTime> expirationPeerCertificate() const PURE;
 
   /**
    * @return std::string the hex-encoded TLS session ID as defined in rfc5246.
@@ -219,6 +262,18 @@ public:
    *         connection. Returns "" if there is no current negotiated ciphersuite.
    **/
   virtual std::string ciphersuiteString() const PURE;
+
+  /**
+   * @return uint16_t the OpenSSL id of the group that was used for the key agreement of the
+   *         established TLS connection. Returns 0 if there is no group.
+   **/
+  virtual uint16_t tlsGroupId() const PURE;
+
+  /**
+   * @return absl::string_view the OpenSSL name of the group that was used for the key agreement of
+   *         the established TLS connection. Returns "" if there is no group.
+   **/
+  virtual absl::string_view tlsGroupString() const PURE;
 
   /**
    * @return std::string the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS

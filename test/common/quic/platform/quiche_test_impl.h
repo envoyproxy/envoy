@@ -38,7 +38,7 @@ template <class T> using QuicTestWithParamImpl = QuicheTestWithParamImpl<T>;
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline std::string QuicheGetCommonSourcePathImpl() {
   std::string test_srcdir(getenv("TEST_SRCDIR"));
-  return absl::StrCat(test_srcdir, "/external/com_github_google_quiche/quiche/common");
+  return absl::StrCat(test_srcdir, "/external/quiche/quiche/common");
 }
 
 class QuicheScopedDisableExitOnDFatalImpl {

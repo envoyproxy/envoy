@@ -19,16 +19,15 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
-#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/load_balancing_policies/override_host/override_host_filter_state.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 
 using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
@@ -58,8 +57,8 @@ class OverrideHostLbConfig : public Upstream::LoadBalancerConfig {
 public:
   struct OverrideSource {
     static OverrideSource make(const OverrideHost::OverrideHostSource& config);
-    absl::optional<Http::LowerCaseString> header_name;
-    absl::optional<Config::MetadataKey> metadata_key;
+    std::optional<Http::LowerCaseString> header_name;
+    std::optional<Config::MetadataKey> metadata_key;
   };
 
   static absl::StatusOr<std::unique_ptr<OverrideHostLbConfig>> make(const OverrideHost& config,
@@ -70,9 +69,11 @@ public:
                                     RandomGenerator& random, TimeSource& time_source) const;
 
   const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
+  const std::optional<Config::MetadataKey>& selectedHostKey() const { return selected_host_key_; }
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
+                       std::optional<Config::MetadataKey>&& selected_host_key,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
@@ -88,6 +89,7 @@ private:
   const FallbackLbConfig fallback_picker_lb_config_;
 
   const std::vector<OverrideSource> override_host_sources_;
+  const std::optional<Config::MetadataKey> selected_host_key_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
@@ -124,10 +126,9 @@ private:
   // Thread-local LB implementation.
   class LoadBalancerImpl : public Upstream::LoadBalancer {
   public:
-    LoadBalancerImpl(const OverrideHostLbConfig& config, LoadBalancerPtr fallback_picker_lb,
-                     const PrioritySet& priority_set)
-        : config_(config), fallback_picker_lb_(std::move(fallback_picker_lb)),
-          priority_set_(priority_set) {}
+    LoadBalancerImpl(const OverrideHostLbConfig& config,
+                     LoadBalancerFactorySharedPtr fallback_picker_lb_factory,
+                     LoadBalancerParams params);
 
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
 
@@ -138,38 +139,47 @@ private:
       return {};
     }
 
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(LoadBalancerContext*, const Host&, std::vector<uint8_t>&) override {
       // This functionality is not supported by dynamic forwarding LB.
       return std::nullopt;
     }
 
   private:
-    HostConstSharedPtr getEndpoint(const std::vector<std::string>& selected_hosts,
-                                   StreamInfo::FilterState& filter_state);
+    HostConstSharedPtr getEndpoint(OverrideHostFilterState& override_host_state);
     HostConstSharedPtr findHost(absl::string_view endpoint);
 
+    HostSelectionResponse chooseHostInternal(LoadBalancerContext* context);
+
+    void addSelectedHostKey(LoadBalancerContext* context, HostSelectionResponse& response);
+
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
-    // header (if configured) or in the request metadata.
-    // nullptr if neither host nor metadata is present.
-    // Error if the metadata is present but cannot be parsed.
+    // header or in the request metadata.
+    // TODO(wbpcode): will absl::InlinedVector be used here be better?
     std::vector<std::string> getSelectedHosts(LoadBalancerContext* context);
 
     // Return a list of endpoints selected by the LbTrafficExtension.
     // nullopt if the metadata is not present.
-    absl::optional<absl::string_view>
+    std::optional<absl::string_view>
     getSelectedHostsFromMetadata(const ::envoy::config::core::v3::Metadata& metadata,
                                  const Config::MetadataKey& metadata_key);
 
     // Return a list of endpoints selected by the LbTrafficExtension, specified.
     // in the header. nullopt if the header is not present.
-    absl::optional<absl::string_view>
+    std::optional<absl::string_view>
     getSelectedHostsFromHeader(const Http::RequestHeaderMap* header_map,
                                const Http::LowerCaseString& header_name);
 
     const OverrideHostLbConfig& config_;
-    const LoadBalancerPtr fallback_picker_lb_;
+    // Held so the fallback LB can be recreated locally on host changes when
+    // its factory still asks for the legacy recreate-on-host-change semantics.
+    const LoadBalancerFactorySharedPtr fallback_picker_lb_factory_;
+    // Mutable: re-assigned from member_update_cb_ when the inner factory opts
+    // into recreate-on-host-change.
+    LoadBalancerPtr fallback_picker_lb_;
     const PrioritySet& priority_set_;
+    const PrioritySet* const local_priority_set_{};
+    Common::CallbackHandlePtr member_update_cb_;
   };
 
   // LoadBalancerFactory implementation shared by worker threads to create
@@ -184,6 +194,8 @@ private:
     // Called by worker threads to create a thread-local load balancer.
     LoadBalancerPtr create(LoadBalancerParams params) override;
 
+    bool recreateOnHostChangeDeprecated() const override { return false; }
+
   private:
     // Hosts in the load balancer. Owned by the cluster manager.
     const OverrideHostLbConfig& config_;
@@ -197,6 +209,6 @@ private:
 };
 
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

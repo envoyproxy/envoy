@@ -11,7 +11,6 @@
 #include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/route.h"
 #include "test/integration/base_integration_test.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -95,7 +94,7 @@ public:
     TestClientCodecCallbacks(IntegrationTest& parent) : parent_(parent) {}
 
     void onDecodingSuccess(ResponseHeaderFramePtr response_frame,
-                           absl::optional<StartTime>) override {
+                           std::optional<StartTime>) override {
       auto& response = responses_[response_frame->frameFlags().streamId()];
       ASSERT(!response.end_stream_);
       response.end_stream_ = response_frame->frameFlags().endStream();
@@ -143,8 +142,7 @@ public:
   struct TestServerCodecCallbacks : public ServerCodecCallbacks {
     TestServerCodecCallbacks(IntegrationTest& parent) : parent_(parent) {}
 
-    void onDecodingSuccess(RequestHeaderFramePtr request_frame,
-                           absl::optional<StartTime>) override {
+    void onDecodingSuccess(RequestHeaderFramePtr request_frame, std::optional<StartTime>) override {
       auto& request = requests_[request_frame->frameFlags().streamId()];
       ASSERT(!request.end_stream_);
       request.end_stream_ = request_frame->frameFlags().endStream();
@@ -200,8 +198,8 @@ public:
 
     test_encoding_context_ = std::make_shared<TestEncodingContext>();
 
-    client_codec_callabcks_ = std::make_shared<TestClientCodecCallbacks>(*this);
-    client_codec_->setCodecCallbacks(*client_codec_callabcks_);
+    client_codec_callbacks_ = std::make_shared<TestClientCodecCallbacks>(*this);
+    client_codec_->setCodecCallbacks(*client_codec_callbacks_);
 
     server_codec_callbacks_ = std::make_shared<TestServerCodecCallbacks>(*this);
     server_codec_->setCodecCallbacks(*server_codec_callbacks_);
@@ -366,14 +364,14 @@ public:
   AssertionResult waitDownstreamResponseForTest(std::chrono::milliseconds timeout,
                                                 uint64_t stream_id) {
     bool timer_fired = false;
-    if (!client_codec_callabcks_->responses_[stream_id].end_stream_) {
+    if (!client_codec_callbacks_->responses_[stream_id].end_stream_) {
       Envoy::Event::TimerPtr timer(
           integration_->dispatcher_->createTimer([this, &timer_fired]() -> void {
             timer_fired = true;
             integration_->dispatcher_->exit();
           }));
       timer->enableTimer(timeout);
-      client_codec_callabcks_->waiting_for_stream_id_ = stream_id;
+      client_codec_callbacks_->waiting_for_stream_id_ = stream_id;
       integration_->dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
       if (timer_fired) {
         return AssertionFailure() << "Timed out waiting for response";
@@ -382,7 +380,7 @@ public:
         timer->disableTimer();
       }
     }
-    if (!client_codec_callabcks_->responses_[stream_id].end_stream_) {
+    if (!client_codec_callbacks_->responses_[stream_id].end_stream_) {
       return AssertionFailure() << "No response or response not complete";
     }
     return AssertionSuccess();
@@ -407,7 +405,7 @@ public:
   ClientCodecPtr client_codec_;
 
   TestEncodingContextSharedPtr test_encoding_context_;
-  TestClientCodecCallbacksSharedPtr client_codec_callabcks_;
+  TestClientCodecCallbacksSharedPtr client_codec_callbacks_;
   TestServerCodecCallbacksSharedPtr server_codec_callbacks_;
 
   // Integration test server.
@@ -452,8 +450,8 @@ TEST_P(IntegrationTest, RequestRouteNotFound) {
   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
                  "unexpected timeout");
 
-  EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
-  EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(),
+  EXPECT_NE(client_codec_callbacks_->responses_[0].response_, nullptr);
+  EXPECT_EQ(client_codec_callbacks_->responses_[0].response_->status().code(),
             static_cast<uint32_t>(absl::StatusCode::kNotFound));
 
   cleanup();
@@ -491,9 +489,9 @@ TEST_P(IntegrationTest, RequestAndResponse) {
   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
                  "unexpected timeout");
 
-  EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
-  EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(), 0);
-  EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->get("zzzz"), "xxxx");
+  EXPECT_NE(client_codec_callbacks_->responses_[0].response_, nullptr);
+  EXPECT_EQ(client_codec_callbacks_->responses_[0].response_->status().code(), 0);
+  EXPECT_EQ(client_codec_callbacks_->responses_[0].response_->get("zzzz"), "xxxx");
 
   cleanup();
 }
@@ -525,8 +523,8 @@ TEST_P(IntegrationTest, RequestTimeout) {
   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 0),
                  "unexpected timeout");
 
-  EXPECT_NE(client_codec_callabcks_->responses_[0].response_, nullptr);
-  EXPECT_EQ(client_codec_callabcks_->responses_[0].response_->status().code(), 4);
+  EXPECT_NE(client_codec_callbacks_->responses_[0].response_, nullptr);
+  EXPECT_EQ(client_codec_callbacks_->responses_[0].response_->status().code(), 4);
 
   cleanup();
 }
@@ -632,10 +630,10 @@ TEST_P(IntegrationTest, MultipleRequests) {
   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
                  "unexpected timeout");
 
-  EXPECT_NE(client_codec_callabcks_->responses_[2].response_, nullptr);
-  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->status().code(), 0);
-  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->get("zzzz"), "xxxx");
-  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->frameFlags().streamId(), 2);
+  EXPECT_NE(client_codec_callbacks_->responses_[2].response_, nullptr);
+  EXPECT_EQ(client_codec_callbacks_->responses_[2].response_->status().code(), 0);
+  EXPECT_EQ(client_codec_callbacks_->responses_[2].response_->get("zzzz"), "xxxx");
+  EXPECT_EQ(client_codec_callbacks_->responses_[2].response_->frameFlags().streamId(), 2);
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
@@ -648,10 +646,10 @@ TEST_P(IntegrationTest, MultipleRequests) {
   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
                  "unexpected timeout");
 
-  EXPECT_NE(client_codec_callabcks_->responses_[1].response_, nullptr);
-  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->status().code(), 0);
-  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->get("zzzz"), "yyyy");
-  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->frameFlags().streamId(), 1);
+  EXPECT_NE(client_codec_callbacks_->responses_[1].response_, nullptr);
+  EXPECT_EQ(client_codec_callbacks_->responses_[1].response_->status().code(), 0);
+  EXPECT_EQ(client_codec_callbacks_->responses_[1].response_->get("zzzz"), "yyyy");
+  EXPECT_EQ(client_codec_callbacks_->responses_[1].response_->frameFlags().streamId(), 1);
 
   cleanup();
 }
@@ -765,10 +763,10 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 2),
                  "unexpected timeout");
 
-  EXPECT_NE(client_codec_callabcks_->responses_[2].response_, nullptr);
-  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->status().code(), 0);
-  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->get("zzzz"), "xxxx");
-  EXPECT_EQ(client_codec_callabcks_->responses_[2].response_->frameFlags().streamId(), 2);
+  EXPECT_NE(client_codec_callbacks_->responses_[2].response_, nullptr);
+  EXPECT_EQ(client_codec_callbacks_->responses_[2].response_->status().code(), 0);
+  EXPECT_EQ(client_codec_callbacks_->responses_[2].response_->get("zzzz"), "xxxx");
+  EXPECT_EQ(client_codec_callbacks_->responses_[2].response_->frameFlags().streamId(), 2);
 
   FakeStreamCodecFactory::FakeResponse response_1;
   response_1.protocol_ = "fake_fake_fake";
@@ -785,12 +783,61 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   RELEASE_ASSERT(waitDownstreamResponseForTest(TestUtility::DefaultTimeout, 1),
                  "unexpected timeout");
 
-  EXPECT_NE(client_codec_callabcks_->responses_[1].response_, nullptr);
-  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->status().code(), 0);
-  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->get("zzzz"), "yyyy");
-  EXPECT_EQ(client_codec_callabcks_->responses_[1].response_->frameFlags().streamId(), 1);
+  EXPECT_NE(client_codec_callbacks_->responses_[1].response_, nullptr);
+  EXPECT_EQ(client_codec_callbacks_->responses_[1].response_->status().code(), 0);
+  EXPECT_EQ(client_codec_callbacks_->responses_[1].response_->get("zzzz"), "yyyy");
+  EXPECT_EQ(client_codec_callbacks_->responses_[1].response_->frameFlags().streamId(), 1);
 
   cleanup();
+}
+
+TEST_P(IntegrationTest, UpstreamEndStreamFrameThenDisconnect) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  initialize(defaultConfig(true), std::make_unique<FakeStreamCodecFactory>());
+
+  EXPECT_TRUE(makeClientConnectionForTest());
+
+  FakeStreamCodecFactory::FakeRequest request;
+  request.host_ = "service_name_0";
+  request.method_ = "hello";
+  request.path_ = "/path_or_anything";
+  request.protocol_ = "fake_fake_fake";
+  request.data_ = {{"version", "v1"}};
+
+  sendRequestForTest(request);
+
+  waitForUpstreamConnectionForTest();
+  const std::function<bool(const std::string&)> data_validator =
+      [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
+  waitForUpstreamRequestForTest(data_validator);
+
+  FakeStreamCodecFactory::FakeResponse response;
+  response.protocol_ = "fake_fake_fake";
+  response.status_ = StreamStatus(0, true);
+  response.data_["zzzz"] = "OK";
+  response.stream_frame_flags_ = FrameFlags(1, 0);
+  sendResponseForTest(response);
+
+  FakeStreamCodecFactory::FakeCommonFrame error;
+  error.data_["zzzz"] = "OK";
+  error.stream_frame_flags_ =
+      FrameFlags(1, FrameFlags::FLAG_END_STREAM | FrameFlags::FLAG_DRAIN_CLOSE);
+  sendResponseForTest(response);
+
+  // Partial cleanup (upstream only)
+  AssertionResult result = upstream_connection_->close();
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  upstream_connection_.reset();
+
+  // Run the event loop after the upstream connection is closed and reset, but before closing the
+  // client connection.
+  integration_->dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+
+  client_connection_->close(Envoy::Network::ConnectionCloseType::NoFlush);
 }
 
 } // namespace

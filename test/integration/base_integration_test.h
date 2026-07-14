@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,7 +26,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
-#include "absl/types/optional.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -100,7 +100,7 @@ public:
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
-  absl::optional<uint64_t> waitForNextRawUpstreamConnection(
+  std::optional<uint64_t> waitForNextRawUpstreamConnection(
       const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
@@ -154,6 +154,15 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
+
+  // Returns all log entries after the nth access log entry, defaulting to log entry 0.
+  // By default will trigger an expect failure if more than one entry is returned.
+  // If client_connection is provided, flush pending acks to enable deferred logging.
+  std::vector<std::string>
+  waitForAccessLogEntries(const std::string& filename,
+                          Network::ClientConnection* client_connection = nullptr,
+                          std::optional<uint32_t> min_entries = std::nullopt);
+
   // Returns all log entries after the nth access log entry, defaulting to log entry 0.
   // By default will trigger an expect failure if more than one entry is returned.
   // If client_connection is provided, flush pending acks to enable deferred logging.
@@ -162,6 +171,9 @@ public:
                                Network::ClientConnection* client_connection = nullptr);
 
   std::string listener_access_log_name_;
+
+  // Prefix listener stat with IP:port, including IP version dependent loopback address.
+  std::string listenerStatPrefix(const std::string& stat_name);
 
   // Last node received on an xDS stream from the server.
   envoy::config::core::v3::Node last_node_;
@@ -187,21 +199,37 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", FakeStream* stream = nullptr,
       OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
-          absl::nullopt);
+          std::nullopt);
 
   template <class T>
-  void
-  sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
-                        const std::vector<T>& added_or_updated,
-                        const std::vector<std::string>& removed, const std::string& version,
-                        const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata = {},
-                        FakeStream* stream = nullptr) {
+  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
+                             const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version,
+                             const absl::flat_hash_map<std::string, Protobuf::Any>& metadata = {},
+                             FakeStream* stream = nullptr) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
         sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version, stream, metadata);
     } else {
       sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, stream, {},
                                  metadata);
+    }
+  }
+
+  template <class T>
+  void
+  sendMapDiscoveryResponse(const std::string& type_url,
+                           const absl::flat_hash_map<std::string, T>& state_of_the_world,
+                           const absl::flat_hash_map<std::string, T>& added_or_updated,
+                           const std::vector<std::string>& removed, const std::string& version,
+                           const absl::flat_hash_map<std::string, Protobuf::Any>& metadata = {},
+                           FakeStream* stream = nullptr) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+        sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
+      sendMapSotwDiscoveryResponse(type_url, state_of_the_world, version, stream, metadata);
+    } else {
+      sendMapDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, stream, {},
+                                    metadata);
     }
   }
 
@@ -223,7 +251,7 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", bool expect_node = true,
       OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
-          absl::nullopt);
+          std::nullopt);
 
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
@@ -237,10 +265,9 @@ public:
     sendSotwDiscoveryResponse(type_url, messages, version, stream, {});
   }
   template <class T>
-  void
-  sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                            const std::string& version, FakeStream* stream,
-                            const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
+  void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                                 const std::string& version, FakeStream* stream,
+                                 const absl::flat_hash_map<std::string, Protobuf::Any>& metadata) {
     if (stream == nullptr) {
       stream = xds_stream_.get();
     }
@@ -250,16 +277,51 @@ public:
     for (const auto& message : messages) {
       if (!metadata.empty()) {
         envoy::service::discovery::v3::Resource resource;
-        resource.mutable_resource()->PackFrom(message);
+        std::ignore = resource.mutable_resource()->PackFrom(message);
         resource.set_name(intResourceName(message));
         resource.set_version(version);
         for (const auto& kvp : metadata) {
           auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
           (*map)[std::string(kvp.first)] = kvp.second;
         }
-        discovery_response.add_resources()->PackFrom(resource);
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
       } else {
-        discovery_response.add_resources()->PackFrom(message);
+        std::ignore = discovery_response.add_resources()->PackFrom(message);
+      }
+    }
+    static int next_nonce_counter = 0;
+    discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+    stream->sendGrpcMessage(discovery_response);
+  }
+
+  template <class T>
+  void sendMapSotwDiscoveryResponse(
+      const std::string& type_url, const absl::flat_hash_map<std::string, T>& messages,
+      const std::string& version, FakeStream* stream = nullptr,
+      const absl::flat_hash_map<std::string, Protobuf::Any>& metadata = {}) {
+    if (stream == nullptr) {
+      stream = xds_stream_.get();
+    }
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
+    discovery_response.set_version_info(version);
+    discovery_response.set_type_url(type_url);
+    for (const auto& [name, message] : messages) {
+      if (!metadata.empty()) {
+        envoy::service::discovery::v3::Resource resource;
+        std::ignore = resource.mutable_resource()->PackFrom(message);
+        resource.set_name(name);
+        resource.set_version(version);
+        for (const auto& kvp : metadata) {
+          auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
+          (*map)[std::string(kvp.first)] = kvp.second;
+        }
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
+      } else {
+        envoy::service::discovery::v3::Resource resource;
+        std::ignore = resource.mutable_resource()->PackFrom(message);
+        resource.set_name(name);
+        resource.set_version(version);
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
       }
     }
     static int next_nonce_counter = 0;
@@ -287,7 +349,7 @@ public:
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
+                             const absl::flat_hash_map<std::string, Protobuf::Any>& metadata) {
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
                                metadata);
   }
@@ -297,9 +359,23 @@ public:
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
                              FakeStream* stream, const std::vector<std::string>& aliases,
-                             const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
+                             const absl::flat_hash_map<std::string, Protobuf::Any>& metadata) {
     auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
                                                     aliases, metadata);
+    if (stream == nullptr) {
+      stream = xds_stream_.get();
+    }
+    stream->sendGrpcMessage(response);
+  }
+
+  template <class T>
+  void sendMapDeltaDiscoveryResponse(
+      const std::string& type_url, const absl::flat_hash_map<std::string, T>& added_or_updated,
+      const std::vector<std::string>& removed, const std::string& version,
+      FakeStream* stream = nullptr, const std::vector<std::string>& aliases = {},
+      const absl::flat_hash_map<std::string, Protobuf::Any>& metadata = {}) {
+    auto response = createMapDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
+                                                       aliases, metadata);
     if (stream == nullptr) {
       stream = xds_stream_.get();
     }
@@ -327,12 +403,36 @@ public:
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases,
-                               const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
+                               const absl::flat_hash_map<std::string, Protobuf::Any>& metadata) {
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
-      resource.mutable_resource()->PackFrom(message);
+      std::ignore = resource.mutable_resource()->PackFrom(message);
       resource.set_name(intResourceName(message));
+      resource.set_version(version);
+      for (const auto& alias : aliases) {
+        resource.add_aliases(alias);
+      }
+      for (const auto& kvp : metadata) {
+        auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
+        (*map)[std::string(kvp.first)] = kvp.second;
+      }
+      resources.emplace_back(resource);
+    }
+    return createExplicitResourcesDeltaDiscoveryResponse(type_url, resources, removed);
+  }
+
+  template <class T>
+  envoy::service::discovery::v3::DeltaDiscoveryResponse createMapDeltaDiscoveryResponse(
+      const std::string& type_url, const absl::flat_hash_map<std::string, T>& added_or_updated,
+      const std::vector<std::string>& removed, const std::string& version,
+      const std::vector<std::string>& aliases,
+      const absl::flat_hash_map<std::string, Protobuf::Any>& metadata) {
+    std::vector<envoy::service::discovery::v3::Resource> resources;
+    for (const auto& [name, message] : added_or_updated) {
+      envoy::service::discovery::v3::Resource resource;
+      std::ignore = resource.mutable_resource()->PackFrom(message);
+      resource.set_name(name);
       resource.set_version(version);
       for (const auto& alias : aliases) {
         resource.add_aliases(alias);
@@ -415,7 +515,7 @@ public:
     FakeUpstreamConfig config = upstream_config_;
     config.upstream_protocol_ = type;
     if (type != Http::CodecType::HTTP3) {
-      config.udp_fake_upstream_ = absl::nullopt;
+      config.udp_fake_upstream_ = std::nullopt;
     }
     return config;
   }
@@ -452,8 +552,9 @@ public:
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
                                              bool use_lds);
+  static envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config);
 
-  void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
+  void setUdpFakeUpstream(std::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;
   }
   bool initialized() const { return initialized_; }
@@ -505,7 +606,7 @@ protected:
   // The config for envoy start-up.
   ConfigHelper config_helper_;
   // The ProcessObject to use when constructing the envoy server.
-  ProcessObjectOptRef process_object_{absl::nullopt};
+  ProcessObjectOptRef process_object_{std::nullopt};
 
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;
@@ -571,7 +672,7 @@ protected:
 
   // If this member is not empty, the test will use a fixed RNG value specified
   // by it.
-  absl::optional<uint64_t> deterministic_value_{};
+  std::optional<uint64_t> deterministic_value_;
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

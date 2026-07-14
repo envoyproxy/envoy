@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cinttypes>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -9,14 +10,13 @@
 #include "envoy/http/codes.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
-#include "absl/types/optional.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Router {
@@ -44,11 +44,30 @@ public:
 
   private:
     const std::string name_;
-    const absl::optional<bool> present_match_;
-    const absl::optional<Matchers::StringMatcherImpl> matcher_;
+    const std::optional<bool> present_match_;
+    const std::optional<Matchers::StringMatcherImpl> matcher_;
   };
 
   using QueryParameterMatcherPtr = std::unique_ptr<const QueryParameterMatcher>;
+
+  // A CookieMatcher specifies match criteria for a specific cookie name parsed
+  // from the Cookie header.
+  class CookieMatcher {
+  public:
+    CookieMatcher(const envoy::config::route::v3::CookieMatcher& config,
+                  Server::Configuration::CommonFactoryContext& context);
+
+    const std::string& name() const { return name_; }
+
+    bool matches(const std::optional<absl::string_view>& cookie_value) const;
+
+  private:
+    const std::string name_;
+    const bool invert_match_;
+    const Matchers::StringMatcherImpl string_match_;
+  };
+
+  using CookieMatcherPtr = std::unique_ptr<const CookieMatcher>;
 
   /**
    * @return the resource priority parsed from proto.
@@ -67,6 +86,15 @@ public:
                                const std::vector<QueryParameterMatcherPtr>& config_query_params);
 
   /**
+   * See if the cookies specified in the config are present/matching in a request.
+   * @param cookies supplies the parsed cookies from the request.
+   * @param matchers supplies the list of configured cookie matchers on which to match.
+   * @return bool true if all cookie matchers succeed.
+   */
+  static bool matchCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
+                           const std::vector<CookieMatcherPtr>& matchers);
+
+  /**
    * Returns the redirect HTTP Status Code enum parsed from proto.
    * @param code supplies the RedirectResponseCode enum.
    * @return Returns the Http::Code version of the RedirectResponseCode.
@@ -77,11 +105,11 @@ public:
   /**
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
    * @param route supplies the Route configuration.
-   * @return absl::optional<Http::Code> the HTTP status from the route's direct_response if
+   * @return std::optional<Http::Code> the HTTP status from the route's direct_response if
    * specified, or the HTTP status code from the route's redirect if specified, or an empty
-   * absl::optional otherwise.
+   * std::optional otherwise.
    */
-  static absl::optional<Http::Code>
+  static std::optional<Http::Code>
   parseDirectResponseCode(const envoy::config::route::v3::Route& route);
 
   /**
@@ -92,6 +120,8 @@ public:
   static Http::Code parseClusterNotFoundResponseCode(
       const envoy::config::route::v3::RouteAction::ClusterNotFoundResponseCode& code);
 };
+
+void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src);
 
 } // namespace Router
 } // namespace Envoy

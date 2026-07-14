@@ -19,7 +19,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace DynamicForwarding {
 
 using ::Envoy::Upstream::Host;
@@ -66,7 +66,7 @@ private:
       return {};
     }
 
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(LoadBalancerContext*, const Host&, std::vector<uint8_t>&) override {
       return std::nullopt;
     }
@@ -86,6 +86,8 @@ private:
     LoadBalancerPtr create(LoadBalancerParams params) override {
       return std::make_unique<LoadBalancerImpl>(params.priority_set);
     }
+
+    bool recreateOnHostChangeDeprecated() const override { return false; }
   };
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
@@ -108,6 +110,6 @@ TestLoadBalancerFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_co
 REGISTER_FACTORY(TestLoadBalancerFactory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace DynamicForwarding
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

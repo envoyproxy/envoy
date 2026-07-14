@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 licenses(["notice"])  # Apache 2
 
 cc_library(
@@ -6,10 +8,10 @@ cc_library(
         "include/**/*.h",
     ]),
     defines = [
-        "SPDLOG_FMT_EXTERNAL",
+        "SPDLOG_USE_STD_FORMAT",
         "SPDLOG_NO_EXCEPTIONS",
     ],
     includes = ["include"],
     visibility = ["//visibility:public"],
-    deps = ["@com_github_fmtlib_fmt//:fmtlib"],
+    deps = ["@fmt"],
 )

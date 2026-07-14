@@ -12,7 +12,7 @@ namespace Matcher {
 template <class DataType> class ExactMapMatcher : public MapMatcher<DataType> {
 public:
   static absl::StatusOr<std::unique_ptr<ExactMapMatcher>>
-  create(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match) {
+  create(DataInputPtr<DataType>&& data_input, std::optional<OnMatch<DataType>> on_no_match) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<ExactMapMatcher<DataType>>(
         new ExactMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status));
@@ -28,17 +28,21 @@ public:
 protected:
   template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;
 
-  ExactMapMatcher(DataInputPtr<DataType>&& data_input,
-                  absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
+  ExactMapMatcher(DataInputPtr<DataType>&& data_input, std::optional<OnMatch<DataType>> on_no_match,
+                  absl::Status& creation_status)
       : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
 
-  absl::optional<OnMatch<DataType>> doMatch(const std::string& data) override {
-    const auto itr = children_.find(data);
+  ActionMatchResult doMatch(const DataType& data, absl::string_view key,
+                            SkippedMatchCb skipped_match_cb) override {
+    const auto itr = children_.find(key);
     if (itr != children_.end()) {
-      return itr->second;
+      ActionMatchResult result =
+          MatchTree<DataType>::handleRecursionAndSkips(itr->second, data, skipped_match_cb);
+      if (!result.isNoMatch()) {
+        return result;
+      }
     }
-
-    return absl::nullopt;
+    return this->doNoMatch(data, skipped_match_cb);
   }
 
 private:

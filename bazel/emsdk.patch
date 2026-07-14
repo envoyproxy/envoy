@@ -1,43 +1,81 @@
-diff --git a/bazel/emscripten_deps.bzl b/bazel/emscripten_deps.bzl
-index 16fd8ee..28fcf17 100644
---- a/bazel/emscripten_deps.bzl
-+++ b/bazel/emscripten_deps.bzl
-@@ -172,38 +172,3 @@ def emscripten_deps(emscripten_version = "latest"):
-             build_file_content = BUILD_FILE_CONTENT_TEMPLATE.format(bin_extension = ".exe"),
-             type = "zip",
-         )
--
--    if "emscripten_npm_linux" not in excludes:
--        npm_install(
--            name = "emscripten_npm_linux",
--            package_json = "@emscripten_bin_linux//:emscripten/package.json",
--            package_lock_json = "@emscripten_bin_linux//:emscripten/package-lock.json",
--        )
--
--    if "emscripten_npm_linux_arm64" not in excludes:
--        npm_install(
--            name = "emscripten_npm_linux_arm64",
--            package_json = "@emscripten_bin_linux_arm64//:emscripten/package.json",
--            package_lock_json = "@emscripten_bin_linux_arm64//:emscripten/package-lock.json",
--        )
--
--    if "emscripten_npm_mac" not in excludes:
--        npm_install(
--            name = "emscripten_npm_mac",
--            package_json = "@emscripten_bin_mac//:emscripten/package.json",
--            package_lock_json = "@emscripten_bin_mac//:emscripten/package-lock.json",
--        )
--
--    if "emscripten_npm_mac_arm64" not in excludes:
--        npm_install(
--            name = "emscripten_npm_mac",
--            package_json = "@emscripten_bin_mac_arm64//:emscripten/package.json",
--            package_lock_json = "@emscripten_bin_mac_arm64//:emscripten/package-lock.json",
--        )
--
--    if "emscripten_npm_win" not in excludes:
--        npm_install(
--            name = "emscripten_npm_win",
--            package_json = "@emscripten_bin_win//:emscripten/package.json",
--            package_lock_json = "@emscripten_bin_win//:emscripten/package-lock.json",
--        )
+diff --git a/bazel/BUILD b/bazel/BUILD
+--- a/bazel/BUILD
++++ b/bazel/BUILD
+@@ -50,7 +50,8 @@ alias(
+         ":macos": "@emscripten_bin_mac//:compiler_files",
+         ":macos_arm64": "@emscripten_bin_mac_arm64//:compiler_files",
+         ":windows": "@emscripten_bin_win//:compiler_files",
+-        "//conditions:default": ":empty",
++        # Default to linux for WASM target platform builds
++        "//conditions:default": "@emscripten_bin_linux//:compiler_files",
+     }),
+ )
+
+@@ -62,7 +63,8 @@ alias(
+         ":macos": "@emscripten_bin_mac//:linker_files",
+         ":macos_arm64": "@emscripten_bin_mac_arm64//:linker_files",
+         ":windows": "@emscripten_bin_win//:linker_files",
+-        "//conditions:default": ":empty",
++        # Default to linux for WASM target platform builds
++        "//conditions:default": "@emscripten_bin_linux//:linker_files",
+     }),
+ )
+
+@@ -74,7 +76,8 @@ alias(
+         ":macos": "@emscripten_bin_mac//:ar_files",
+         ":macos_arm64": "@emscripten_bin_mac_arm64//:ar_files",
+         ":windows": "@emscripten_bin_win//:ar_files",
+-        "//conditions:default": ":empty",
++        # Default to linux for WASM target platform builds
++        "//conditions:default": "@emscripten_bin_linux//:ar_files",
+     }),
+ )
+
+@@ -78,6 +81,19 @@ alias(
+     }),
+ )
+
++alias(
++    name = "dwp_files",
++    actual = select({
++        ":linux": "@emscripten_bin_linux//:dwp_files",
++        ":linux_arm64": "@emscripten_bin_linux_arm64//:dwp_files",
++        ":macos": "@emscripten_bin_mac//:dwp_files",
++        ":macos_arm64": "@emscripten_bin_mac_arm64//:dwp_files",
++        ":windows": "@emscripten_bin_win//:dwp_files",
++        # Default to linux for WASM target platform builds
++        "//conditions:default": "@emscripten_bin_linux//:dwp_files",
++    }),
++)
++
+ platform(
+     name = "platform_wasm",
+     constraint_values = [
+diff --git a/bazel/emscripten_toolchain/BUILD.bazel b/bazel/emscripten_toolchain/BUILD.bazel
+--- a/bazel/emscripten_toolchain/BUILD.bazel
++++ b/bazel/emscripten_toolchain/BUILD.bazel
+@@ -8,6 +8,8 @@ filegroup(
+         "@emscripten_cache//:emscripten_config",
+         "env.sh",
+         "env.bat",
++        # Python interpreter for emscripten scripts
++        "@python3_12//:files",
+         "@nodejs//:node_files",
+     ],
+ )
+diff --git a/bazel/emscripten_toolchain/env.sh b/bazel/emscripten_toolchain/env.sh
+--- a/bazel/emscripten_toolchain/env.sh
++++ b/bazel/emscripten_toolchain/env.sh
+@@ -3,3 +3,12 @@
+ export ROOT_DIR=${EXT_BUILD_ROOT:-$(pwd -P)}
+ export EMSCRIPTEN=$ROOT_DIR/$EM_BIN_PATH/emscripten
+ export EM_CONFIG=$ROOT_DIR/$EM_CONFIG_PATH
++
++# Add Python to PATH for remote execution environments
++# Find Python from rules_python toolchain (supports multiple platform names)
++for python_dir in "$ROOT_DIR"/external/python3_*; do
++    if [ -x "$python_dir/bin/python3" ]; then
++        export PATH="$python_dir/bin:$PATH"
++        break
++    fi
++done

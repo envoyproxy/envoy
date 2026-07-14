@@ -1,5 +1,4 @@
 #include "source/common/common/hex.h"
-#include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
@@ -7,7 +6,6 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -30,8 +28,25 @@ namespace ListenerFilters {
 namespace HttpInspector {
 namespace {
 
+// See https://github.com/envoyproxy/envoy/issues/21245.
+enum class Http1ParserImpl {
+  HttpParser, // http-parser from node.js
+  BalsaParser // Balsa from QUICHE
+};
+
+// Allows pretty printed test names.
+static std::string http1ParserImplToString(Http1ParserImpl impl) {
+  switch (impl) {
+  case Http1ParserImpl::HttpParser:
+    return "HttpParser";
+  case Http1ParserImpl::BalsaParser:
+    return "BalsaParser";
+  }
+  return "UnknownHttp1Impl";
+}
+
 std::string testParamToString(const ::testing::TestParamInfo<Http1ParserImpl>& info) {
-  return TestUtility::http1ParserImplToString(info.param);
+  return http1ParserImplToString(info.param);
 }
 
 class HttpInspectorTest : public testing::TestWithParam<Http1ParserImpl> {
@@ -39,7 +54,7 @@ public:
   HttpInspectorTest()
       : cfg_(std::make_shared<Config>(*store_.rootScope())),
         io_handle_(
-            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt, {})),
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt, {})),
         parser_impl_(GetParam()) {}
 
   void init() {
@@ -428,6 +443,43 @@ TEST_P(HttpInspectorTest, InvalidHttpMethod) {
   }
   const absl::string_view header = "BAD /anything HTTP/1.1";
   testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, JmxRmiBinaryPayload) {
+  const absl::string_view header("\x4a\x52\x4d\x49\x00\x02\x4b", 7);
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, BinaryWithEmbeddedNul) {
+  const absl::string_view header("\x4e\x00\x00\x00\x0a", 5);
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, HighBitBinaryPayload) {
+  const char data[] = {static_cast<char>(0xff), static_cast<char>(0xfe), static_cast<char>(0xfd),
+                       static_cast<char>(0xfc)};
+  const absl::string_view header(data, sizeof(data));
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, ShortRequestLineFollowedByHeaderWithNonTokenChars) {
+  const absl::string_view header = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
+}
+
+TEST_P(HttpInspectorTest, LeadingCrlfStillRejectedByExistingGuard) {
+  const absl::string_view header = "\r\nGET / HTTP/1.1\r\n";
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, FastFailGuardDisabled) {
+  if (parser_impl_ != Http1ParserImpl::BalsaParser) {
+    return;
+  }
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes", "false"}});
+  const absl::string_view header("\x4a\x52\x4d\x49\x00\x02\x4b\n", 8);
+  testHttpInspectMultipleReadsNotFound(header);
 }
 
 TEST_P(HttpInspectorTest, InvalidHttpRequestLine) {

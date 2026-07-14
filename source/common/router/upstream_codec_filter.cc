@@ -15,6 +15,7 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/notification.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/common.h"
@@ -23,6 +24,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -77,7 +79,7 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
                            StringUtil::replaceAllEmptySpace(deferred_reset_status_.message()), "}");
     deferred_reset_status_ = absl::OkStatus();
     callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
-                               absl::nullopt, details);
+                               std::nullopt, details);
     return Http::FilterHeadersStatus::StopIteration;
   }
   upstreamTiming().onFirstUpstreamTxByteSent(callbacks_->dispatcher().timeSource());
@@ -164,9 +166,43 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
         (protocol.has_value() && protocol.value() != Envoy::Http::Protocol::Http11)) {
       // handshake is finished and continue the data processing.
       filter_.callbacks_->upstreamCallbacks()->setPausedForWebsocketUpgrade(false);
+      // Disable the route timeout since the websocket upgrade completed successfully
+      filter_.callbacks_->upstreamCallbacks()->disableRouteTimeoutForWebsocketUpgrade();
+      // Disable per-try timeouts since the websocket upgrade completed successfully
+      filter_.callbacks_->upstreamCallbacks()->disablePerTryTimeoutForWebsocketUpgrade();
       filter_.callbacks_->continueDecoding();
+    } else if (Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain") &&
+               status >= 400) {
+      maybeEndDecode(end_stream);
+      const bool has_upgrade_header = (headers->Upgrade() != nullptr);
+      const bool has_connection_upgrade =
+          (headers->Connection() != nullptr &&
+           Envoy::StringUtil::caseFindToken(headers->getConnectionValue(), ",",
+                                            Http::Headers::get().ConnectionValues.Upgrade));
+      const bool strip_upgrade_header = Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strip_upgrade_header_on_failed_websocket_upgrades");
+      if (has_upgrade_header) {
+        ENVOY_NOTIFICATION("failed_websocket_upgrades_has_upgrade_header",
+                           "Websocket upgrade failed handshake but has upgrade header present");
+        if (strip_upgrade_header) {
+          headers->removeUpgrade();
+        }
+      }
+      if (has_connection_upgrade) {
+        ENVOY_NOTIFICATION("failed_websocket_upgrades_has_connection_upgrade_present",
+                           "WebSocket upgrade failed handshake but has connection header present");
+        if (strip_upgrade_header) {
+          Http::Utility::removeConnectionUpgrade(
+              *headers,
+              Envoy::StringUtil::CaseUnorderedSet{Http::Headers::get().ConnectionValues.Upgrade});
+        }
+      }
+      filter_.callbacks_->encodeHeaders(std::move(headers), end_stream,
+                                        StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+      return;
     } else {
-      // Other status, e.g., 426 or 200, indicate a failed handshake, Envoy as a proxy will proxy
+      // Other status, e.g., 200, indicate a failed handshake, Envoy as a proxy will proxy
       // back the response header to downstream and then close the request, since WebSocket
       // just needs headers for handshake per RFC-6455. Note: HTTP/2 200 will be normalized to
       // 101 before this point in codec and this patch will skip this scenario from the above
@@ -192,6 +228,13 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
 
 // This is response data arriving from the codec. Send it through the filter manager.
 void UpstreamCodecFilter::CodecBridge::decodeData(Buffer::Instance& data, bool end_stream) {
+  // Record the time when the first byte of response body is received.
+  if (!first_body_rx_recorded_) {
+    first_body_rx_recorded_ = true;
+    filter_.upstreamTiming().onFirstUpstreamRxBodyByteReceived(
+        filter_.callbacks_->dispatcher().timeSource());
+  }
+
   maybeEndDecode(end_stream);
   filter_.callbacks_->encodeData(data, end_stream);
 }
@@ -233,14 +276,7 @@ void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason rea
 
   std::string failure_reason(transport_failure_reason);
   if (reason == Http::StreamResetReason::LocalReset) {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.report_stream_reset_error_code")) {
-      ASSERT(transport_failure_reason.empty());
-      // Use this to communicate to the upstream request to not force-terminate.
-      failure_reason = "codec_error";
-    } else {
-      failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
-    }
+    failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
   }
   filter_.callbacks_->resetStream(reason, failure_reason);
 }
@@ -255,14 +291,13 @@ public:
           callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
         }) {}
 
-  bool createFilterChain(
-      Http::FilterChainManager& manager,
-      const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override {
-    manager.applyFilterFactoryCb({"envoy.filters.http.upstream_codec"}, factory_);
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override {
+    callbacks.setFilterConfigName("envoy.filters.http.upstream_codec");
+    factory_(callbacks);
     return true;
   }
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainFactoryCallbacks&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }

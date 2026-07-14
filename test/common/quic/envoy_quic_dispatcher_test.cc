@@ -1,7 +1,14 @@
 #include <openssl/evp.h>
 
 #include <memory>
+#include <optional>
+#include <vector>
 
+#include "envoy/buffer/buffer.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/session_idle_list.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
@@ -29,6 +36,7 @@
 #include "gtest/gtest.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_dispatcher.h"
+#include "quiche/quic/core/quic_packets.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -53,7 +61,8 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         listen_socket_(std::make_unique<Network::NetworkListenSocket<
                            Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>>(
-            Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true)),
+            Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+            /*bind*/ true)),
         connection_helper_(*dispatcher_), proof_source_(new TestProofSource()),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::unique_ptr<TestProofSource>(proof_source_),
@@ -67,7 +76,7 @@ public:
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
-        connection_handler_(*dispatcher_, absl::nullopt),
+        connection_handler_(*dispatcher_, std::nullopt),
         connection_id_generator_(quic::kQuicDefaultConnectionIdLength),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
@@ -75,17 +84,21 @@ public:
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
             listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_,
-            crypto_stream_factory_, connection_id_generator_, std::nullopt),
+            crypto_stream_factory_, connection_id_generator_, std::nullopt,
+            std::make_unique<Http::SessionIdleList>(*dispatcher_)),
         connection_id_(quic::test::TestConnectionId(1)),
         transport_socket_factory_(*QuicServerTransportSocketFactory::create(
-            true, listener_config_.listenerScope(),
-            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_, {})) {
+            /*enable_early_data=*/true, /*enable_resumption=*/true,
+            listener_config_.listenerScope(),
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _, _))
         .WillRepeatedly(Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
     EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
+    EXPECT_CALL(listener_config_, filterChainManager())
+        .WillRepeatedly(ReturnRef(filter_chain_manager_));
   }
 
   void SetUp() override {
@@ -109,20 +122,22 @@ public:
   void processValidChloPacket(const quic::QuicSocketAddress& peer_addr) {
     // Create a Quic Crypto or TLS1.3 CHLO packet.
     EnvoyQuicClock clock(*dispatcher_);
-    Buffer::OwnedImpl payload =
-        generateChloPacketToSend(quic_version_, quic_config_, connection_id_);
-    Buffer::RawSliceVector slice = payload.getRawSlices();
-    ASSERT(slice.size() == 1);
-    auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(
-        static_cast<char*>(slice[0].mem_), slice[0].len_);
-    std::unique_ptr<quic::QuicReceivedPacket> received_packet =
-        std::unique_ptr<quic::QuicReceivedPacket>(
-            quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
+    std::vector<Buffer::OwnedImpl> payloads =
+        generateChloPacketsToSend(quic_version_, quic_config_, connection_id_);
+    for (Buffer::OwnedImpl& payload : payloads) {
+      Buffer::RawSliceVector slice = payload.getRawSlices();
+      ASSERT(slice.size() == 1);
+      auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(
+          static_cast<char*>(slice[0].mem_), slice[0].len_);
+      std::unique_ptr<quic::QuicReceivedPacket> received_packet =
+          std::unique_ptr<quic::QuicReceivedPacket>(
+              quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
 
-    envoy_quic_dispatcher_.ProcessPacket(
-        envoyIpAddressToQuicSocketAddress(
-            listen_socket_->connectionInfoProvider().localAddress()->ip()),
-        peer_addr, *received_packet);
+      envoy_quic_dispatcher_.ProcessPacket(
+          envoyIpAddressToQuicSocketAddress(
+              listen_socket_->connectionInfoProvider().localAddress()->ip()),
+          peer_addr, *received_packet);
+    }
   }
 
   void processValidChloPacketAndCheckStatus(bool should_buffer) {
@@ -234,6 +249,18 @@ public:
     // Shutdown() to close the connection.
     envoy_quic_dispatcher_.Shutdown();
   }
+  Http::SessionIdleList* getIdleList() {
+    return dynamic_cast<Http::SessionIdleList*>(envoy_quic_dispatcher_.idle_session_list());
+  }
+
+  void createSession(uint16_t client_port) {
+    connection_id_ = quic::test::TestConnectionId(client_port);
+    quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                          ? quic::QuicIpAddress::Loopback4()
+                                          : quic::QuicIpAddress::Loopback6(),
+                                      client_port);
+    processValidChloPacket(peer_addr);
+  }
 
 protected:
   Network::Address::IpVersion version_;
@@ -258,6 +285,8 @@ protected:
   quic::QuicConnectionId connection_id_;
   testing::NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
+  testing::NiceMock<Network::MockFilterChainManager> filter_chain_manager_;
+  Filter::NetworkFilterFactoriesList empty_filter_factory_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicDispatcherTests, EnvoyQuicDispatcherTest,
@@ -399,10 +428,12 @@ TEST_P(EnvoyQuicDispatcherTest, ProcessPacketReturnsTrueForDispatchedPacket) {
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
                                     54321);
-  auto chlo_packet = wrapPacket(*encryptPacket(*quic::test::GetFirstFlightOfPackets(
-                                    quic_version_, quic_config_, connection_id_)[0]),
-                                clock);
-  EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *chlo_packet));
+  std::vector<std::unique_ptr<quic::QuicReceivedPacket>> chlo_packets =
+      quic::test::GetFirstFlightOfPackets(quic_version_, quic_config_, connection_id_);
+  for (const auto& packet : chlo_packets) {
+    auto wrapped_packet = wrapPacket(*encryptPacket(*packet), clock);
+    EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *wrapped_packet));
+  }
   auto packet = wrapPacket(*testEncryptedPacket(quic_version_, connection_id_, "hello"), clock);
   EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *packet));
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
@@ -418,10 +449,12 @@ TEST_P(EnvoyQuicDispatcherTest, ProcessPacketReturnsTrueForDispatchedPacketOnExi
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
                                     54321);
-  auto chlo_packet = wrapPacket(*encryptPacket(*quic::test::GetFirstFlightOfPackets(
-                                    quic_version_, quic_config_, connection_id_)[0]),
-                                clock);
-  EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *chlo_packet));
+  std::vector<std::unique_ptr<quic::QuicReceivedPacket>> chlo_packets =
+      quic::test::GetFirstFlightOfPackets(quic_version_, quic_config_, connection_id_);
+  for (const auto& packet : chlo_packets) {
+    auto wrapped_packet = wrapPacket(*encryptPacket(*packet), clock);
+    EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *wrapped_packet));
+  }
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   // Stop accepting new connections after processing the CHLO.
   envoy_quic_dispatcher_.StopAcceptingNewConnections();
@@ -496,6 +529,65 @@ TEST_P(EnvoyQuicDispatcherTest, EnvoyQuicCryptoServerStreamHelper) {
   EXPECT_ENVOY_BUG(helper.CanAcceptClientHello(crypto_message, client_address, peer_address,
                                                self_address, nullptr),
                    "Unexpected call to CanAcceptClientHello");
+}
+
+TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsWhenSaturated) {
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillRepeatedly(Return(&proof_source_->filterChain()));
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
+      .WillRepeatedly(ReturnRef(empty_filter_factory_));
+
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+  createSession(50000);
+  createSession(50001);
+  createSession(50002);
+  EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
+
+  getIdleList()->set_max_sessions_to_terminate_in_one_round(1);
+  getIdleList()->set_max_sessions_to_terminate_in_one_round_when_saturated(2);
+  // Set a large enough gap to verify it's ignored.
+  getIdleList()->set_min_time_before_termination_allowed(absl::Hours(1));
+  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
+  EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
+  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
+  EXPECT_EQ(0u, envoy_quic_dispatcher_.NumSessions());
+}
+
+TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillRepeatedly(Return(&proof_source_->filterChain()));
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
+      .WillRepeatedly(ReturnRef(empty_filter_factory_));
+
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+  createSession(50000);
+  createSession(50001);
+  createSession(50002);
+  EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
+
+  getIdleList()->set_max_sessions_to_terminate_in_one_round(1);
+  getIdleList()->set_max_sessions_to_terminate_in_one_round_when_saturated(2);
+  getIdleList()->set_min_time_before_termination_allowed(absl::Milliseconds(10));
+  // No time has passed, no session should be closed.
+  EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
+
+  // Sessions have not reach the minimal idle time yet.
+  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false);
+  EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
+
+  // Advance time to make sessions idle.
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false);
+  EXPECT_EQ(2u, envoy_quic_dispatcher_.NumSessions());
 }
 
 } // namespace Quic

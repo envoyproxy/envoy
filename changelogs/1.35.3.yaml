@@ -1,0 +1,10 @@
+date: September 8, 2025
+
+bug_fixes:
+- area: http
+  change: |
+    Fixed a bug where the ``response_headers_to_add`` may be processed multiple times for the local responses from
+    the router filter.
+- area: release
+  change: |
+    Fix distroless image to ensure nonroot.

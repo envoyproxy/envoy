@@ -14,7 +14,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace LeastRequest {
 namespace {
 
@@ -26,7 +26,11 @@ public:
     setUpstreamCount(3);
   }
 
-  void initializeConfig(bool legacy_api = false) {
+  void initializeConfig(bool legacy_api = false, bool count_pending = false) {
+    if (count_pending) {
+      config_helper_.addRuntimeOverride(
+          "envoy.reloadable_features.least_request_lb_count_pending_requests", "true");
+    }
     config_helper_.addConfigModifier(
         [legacy_api](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
@@ -116,8 +120,18 @@ TEST_P(LeastRequestIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
   runNormalLoadBalancing();
 }
 
+TEST_P(LeastRequestIntegrationTest, NormalLoadBalancingWithPendingRequestsEnabled) {
+  initializeConfig(false, true);
+  runNormalLoadBalancing();
+}
+
+TEST_P(LeastRequestIntegrationTest, NormalLoadBalancingWithLegacyAPIAndPendingRequestsEnabled) {
+  initializeConfig(true, true);
+  runNormalLoadBalancing();
+}
+
 } // namespace
 } // namespace LeastRequest
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

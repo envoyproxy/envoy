@@ -4,6 +4,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/http/header_mutation/v3/header_mutation.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/filters/repick_cluster_filter.h"
@@ -28,7 +29,7 @@ public:
     }
   }
 
-  void initializeConfig(const std::vector<uint64_t>& weights) {
+  void initializeConfig(const std::vector<uint64_t>& weights, bool test_header_mutation = false) {
     // Set the cluster configuration for `cluster_1`
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -38,11 +39,22 @@ public:
     });
 
     // Add the custom filter.
-    config_helper_.addFilter("name: repick-cluster-filter");
+    config_helper_.addFilter(R"EOF(
+      name: repick-cluster-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.RepickClusterFilterConfig
+    )EOF");
+    if (test_header_mutation) {
+      config_helper_.addFilter(R"EOF(
+        name: envoy.filters.http.header_mutation
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+      )EOF");
+    }
 
     // Modify route with weighted cluster configuration.
     config_helper_.addConfigModifier(
-        [&weights](
+        [&weights, &test_header_mutation](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           auto* weighted_clusters = hcm.mutable_route_config()
@@ -56,6 +68,29 @@ public:
           cluster->set_name("cluster_0");
           cluster->mutable_weight()->set_value(weights[0]);
 
+          if (test_header_mutation) {
+            envoy::config::core::v3::HeaderValueOption* header_value_option =
+                cluster->mutable_request_headers_to_add()->Add();
+            auto* mutable_header = header_value_option->mutable_header();
+            mutable_header->set_key("x-cluster-name-test");
+            mutable_header->set_value("cluster_0");
+
+            envoy::extensions::filters::http::header_mutation::v3::HeaderMutationPerRoute
+                header_mutation;
+            std::string header_mutation_config = R"EOF(
+              mutations:
+                response_mutations:
+                - append:
+                    header:
+                      key: "x-cluster-header-mutation-test"
+                      value: "cluster-0"
+            )EOF";
+            TestUtility::loadFromYaml(header_mutation_config, header_mutation);
+            std::ignore =
+                (*cluster->mutable_typed_per_filter_config())["envoy.filters.http.header_mutation"]
+                    .PackFrom(header_mutation);
+          }
+
           // Add a cluster with `cluster_header` specified.
           cluster = weighted_clusters->add_clusters();
           cluster->set_cluster_header(std::string(Envoy::RepickClusterFilter::ClusterHeaderName));
@@ -67,7 +102,8 @@ public:
 
   const std::vector<uint64_t>& getDefaultWeights() { return default_weights_; }
 
-  void sendRequestAndValidateResponse(const std::vector<uint64_t>& upstream_indices) {
+  void sendRequestAndValidateResponse(const std::vector<uint64_t>& upstream_indices,
+                                      bool check_header_mutation = false) {
     // Create a client aimed at Envoy’s default HTTP port.
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
@@ -86,6 +122,14 @@ public:
     // Verify the proxied request was received upstream, as expected.
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
+    if (check_header_mutation) {
+      EXPECT_EQ(
+          upstream_request_->headers().get(Http::LowerCaseString("x-cluster-name-test")).size(), 1);
+      EXPECT_EQ(result.response->headers()
+                    .get(Http::LowerCaseString("x-cluster-header-mutation-test"))
+                    .size(),
+                1);
+    }
     // Verify the proxied response was received downstream, as expected.
     EXPECT_TRUE(result.response->complete());
     EXPECT_EQ("200", result.response->headers().getStatusValue());
@@ -97,7 +141,7 @@ public:
     // Make sure Envoy saw upstream connection close.
     std::string target_name =
         absl::StrFormat("cluster.cluster_%d.upstream_cx_active", result.upstream_index.value());
-    test_server_->waitForGaugeEq(target_name, 0);
+    test_server_->waitForGauge(target_name, testing::Eq(0));
   }
 
 private:
@@ -116,6 +160,19 @@ TEST_P(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
   // The expected destination cluster upstream is index 0 since the selected
   // value is set to 0 indirectly via `setDeterministicValue()` above to set the weight to 0.
   sendRequestAndValidateResponse({0});
+
+  // Check that the expected upstream cluster has incoming request.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+}
+
+// Test the header mutations in weighted clusters.
+TEST_P(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeaderMutation) {
+  setDeterministicValue();
+  initializeConfig(getDefaultWeights(), true);
+
+  // The expected destination cluster upstream is index 0 since the selected
+  // value is set to 0 indirectly via `setDeterministicValue()` above to set the weight to 0.
+  sendRequestAndValidateResponse({0}, true);
 
   // Check that the expected upstream cluster has incoming request.
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);

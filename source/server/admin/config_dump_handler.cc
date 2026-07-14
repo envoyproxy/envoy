@@ -95,7 +95,7 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
     if (reflection->HasField(message, any_field)) {
       ASSERT(any_field != nullptr);
       // Unpack to a DynamicMessage.
-      ProtobufWkt::Any any_message;
+      Protobuf::Any any_message;
       any_message.MergeFrom(reflection->GetMessage(message, any_field));
       Protobuf::DynamicMessageFactory dmf;
       const absl::string_view inner_type_name =
@@ -114,7 +114,7 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
         return false;
       }
       // Pack it back into the Any resource.
-      any_message.PackFrom(*inner_message);
+      std::ignore = any_message.PackFrom(*inner_message);
       reflection->MutableMessage(&message, any_field)->CopyFrom(any_message);
     }
   }
@@ -153,9 +153,8 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) const {
   Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
-  const absl::optional<std::string> resource =
-      Utility::nonEmptyQueryParam(query_params, "resource");
-  const absl::optional<std::string> mask = Utility::nonEmptyQueryParam(query_params, "mask");
+  const std::optional<std::string> resource = Utility::nonEmptyQueryParam(query_params, "resource");
+  const std::optional<std::string> mask = Utility::nonEmptyQueryParam(query_params, "mask");
   const bool include_eds = shouldIncludeEdsInDump(query_params);
   const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher =
       buildNameMatcher(query_params, server_.regexEngine());
@@ -167,7 +166,7 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
 
   envoy::admin::v3::ConfigDump dump;
 
-  absl::optional<std::pair<Http::Code, std::string>> err;
+  std::optional<std::pair<Http::Code, std::string>> err;
   if (resource.has_value()) {
     err = addResourceToDump(dump, mask, resource.value(), **name_matcher, include_eds);
   } else {
@@ -187,15 +186,14 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
   return Http::Code::OK;
 }
 
-absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourceToDump(
-    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourceToDump(
+    envoy::admin::v3::ConfigDump& dump, const std::optional<std::string>& mask,
     const std::string& resource, const Matchers::StringMatcher& name_matcher,
     bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    auto all_clusters = server_.clusterManager().clusters();
-    if (!all_clusters.active_clusters_.empty()) {
+    if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
         return dumpEndpointConfigs(name_matcher);
       });
@@ -212,7 +210,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
     if (!field_descriptor) {
       continue;
     } else if (!field_descriptor->is_repeated()) {
-      return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+      return std::optional<std::pair<Http::Code, std::string>>{std::make_pair(
           Http::Code::BadRequest,
           fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
                       field_descriptor->name(), field_descriptor->name()))};
@@ -224,32 +222,31 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
         Protobuf::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
         if (!trimResourceMessage(field_mask, msg)) {
-          return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+          return std::optional<std::pair<Http::Code, std::string>>{std::make_pair(
               Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
                                                    " could not be successfully used."))};
         }
       }
       auto* config = dump.add_configs();
-      config->PackFrom(msg);
+      std::ignore = config->PackFrom(msg);
     }
 
     // We found the desired resource so there is no need to continue iterating over
     // the other keys.
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  return absl::optional<std::pair<Http::Code, std::string>>{
+  return std::optional<std::pair<Http::Code, std::string>>{
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
-absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfigToDump(
-    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfigToDump(
+    envoy::admin::v3::ConfigDump& dump, const std::optional<std::string>& mask,
     const Matchers::StringMatcher& name_matcher, bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    auto all_clusters = server_.clusterManager().clusters();
-    if (!all_clusters.active_clusters_.empty()) {
+    if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
         return dumpEndpointConfigs(name_matcher);
       });
@@ -274,24 +271,21 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConf
     }
 
     auto* config = dump.add_configs();
-    config->PackFrom(*message);
+    std::ignore = config->PackFrom(*message);
   }
   if (dump.configs().empty() && mask.has_value()) {
-    return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+    return std::optional<std::pair<Http::Code, std::string>>{std::make_pair(
         Http::Code::BadRequest,
         absl::StrCat("FieldMask ", *mask, " could not be successfully applied to any configs."))};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 ProtobufTypes::MessagePtr
 ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_matcher) const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
-  auto all_clusters = server_.clusterManager().clusters();
-  for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
-    UNREFERENCED_PARAMETER(name);
-    const Upstream::Cluster& cluster = cluster_ref.get();
+  server_.clusterManager().forEachActiveCluster([&](const Upstream::Cluster& cluster) {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
@@ -301,7 +295,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
       cluster_load_assignment.set_cluster_name(cluster_info->name());
     }
     if (!name_matcher.match(cluster_load_assignment.cluster_name())) {
-      continue;
+      return;
     }
     auto& policy = *cluster_load_assignment.mutable_policy();
 
@@ -348,12 +342,12 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     }
     if (cluster_info->addedViaApi()) {
       auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
-      dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
+      std::ignore = dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
     } else {
       auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
-      static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
+      std::ignore = static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
     }
-  }
+  });
   return endpoint_config_dump;
 }
 

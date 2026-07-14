@@ -9,7 +9,7 @@
 #include "test/common/router/route_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 
 namespace Envoy {
 namespace Router {
@@ -154,9 +154,10 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
                                                  ProtobufMessage::getNullValidationVisitor(), true),
                               std::shared_ptr<ConfigImpl>);
     auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
-    auto route = config->route(headers, stream_info, input.random_value());
+    const Formatter::Context formatter_context{&headers};
+    auto route = config->route(headers, stream_info, input.random_value()).route;
     if (route != nullptr && route->routeEntry() != nullptr) {
-      route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);
+      route->routeEntry()->finalizeRequestHeaders(headers, formatter_context, stream_info, true);
     }
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {

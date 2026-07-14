@@ -422,7 +422,8 @@ TEST_P(GrpcWebFilterTest, StatsNoCluster) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", requestContentType()},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  decoder_callbacks_.cluster_info_ = nullptr;
+  EXPECT_CALL(decoder_callbacks_, clusterInfoSharedPtr());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_FALSE(doStatTracking());
@@ -500,6 +501,17 @@ TEST_P(GrpcWebFilterTest, MediaTypeWithParameter) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
+}
+
+TEST_P(GrpcWebFilterTest, RemoveResponseContentLength) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWeb}, {":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-type", "application/grpc"}, {"content-length", "123"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(nullptr, response_headers.ContentLength());
 }
 
 TEST_P(GrpcWebFilterTest, Unary) {

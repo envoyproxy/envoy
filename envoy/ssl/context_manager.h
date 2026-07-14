@@ -40,14 +40,13 @@ public:
    */
   virtual absl::StatusOr<ServerContextSharedPtr>
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
-                         const std::vector<std::string>& server_names,
                          ContextAdditionalInitFunc additional_init) PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire, the value is
    * set when not expired.
    */
-  virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
+  virtual std::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
 
   /**
    * Iterates through the contexts currently attached to a listener.
@@ -62,9 +61,9 @@ public:
 
   /**
    * @return the number of seconds until the next OCSP response being managed will
-   * expire, or `absl::nullopt` if no OCSP responses exist.
+   * expire, or `std::nullopt` if no OCSP responses exist.
    */
-  virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+  virtual std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
 
   /**
    * Remove an existing ssl context.

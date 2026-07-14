@@ -140,9 +140,22 @@ TEST_F(QuicFilterManagerConnectionImplTest, IsHalfCloseEnabled) {
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
-  const absl::optional<uint64_t> id = impl_.connectionInfoProvider().connectionID();
+  const std::optional<uint64_t> id = impl_.connectionInfoProvider().connectionID();
   EXPECT_TRUE(id.has_value());
   EXPECT_NE(id.value_or(0), 0);
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, SetSocketOption) {
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(impl_.setSocketOption(sockopt_name, sockopt_val));
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, GetSocketPanics) {
+  // getSocket() should panic as it's not implemented for QuicFilterManagerConnectionImpl.
+  EXPECT_DEATH(impl_.getSocket(), "not implemented");
 }
 
 } // namespace Quic

@@ -32,9 +32,9 @@ public:
            bool keep_external_id) override;
   void setInResponse(Envoy::Http::ResponseHeaderMap& response_headers,
                      const Envoy::Http::RequestHeaderMap& request_headers) override;
-  absl::optional<absl::string_view>
+  std::optional<absl::string_view>
   get(const Envoy::Http::RequestHeaderMap& request_headers) const override;
-  absl::optional<uint64_t>
+  std::optional<uint64_t>
   getInteger(const Envoy::Http::RequestHeaderMap& request_headers) const override;
   Tracing::Reason getTraceReason(const Envoy::Http::RequestHeaderMap& request_headers) override;
   void setTraceReason(Envoy::Http::RequestHeaderMap& request_headers,

@@ -14,8 +14,11 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
-    "envoy.filters.http.squash":                                "//contrib/squash/filters/http/source:config",
+    "envoy.filters.http.peak_ewma":                             "//contrib/peak_ewma/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
+    "envoy.filters.http.peer_metadata":                         "//contrib/istio/filters/http/peer_metadata/source:config",
+    "envoy.filters.http.istio_stats":                           "//contrib/istio/filters/http/istio_stats/source:istio_stats",
+    "envoy.filters.http.alpn":                                  "//contrib/istio/filters/http/alpn/source:config_lib",
 
     #
     # Network filters
@@ -28,6 +31,14 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
+    "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
+    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
+
+    #
+    # Listener filters
+    #
+
+    "envoy.filters.listener.postgres_inspector":                "//contrib/postgres_inspector/filters/listener/source:config",
 
     #
     # Sip proxy
@@ -35,6 +46,13 @@ CONTRIB_EXTENSIONS = {
 
     "envoy.filters.network.sip_proxy":                          "//contrib/sip_proxy/filters/network/source:config",
     "envoy.filters.sip.router":                                 "//contrib/sip_proxy/filters/network/source/router:config",
+
+    #
+    # Stat sinks
+    #
+
+    "envoy.stat_sinks.kafka":                            "//contrib/kafka/stat_sinks/source:config_lib",
+    "envoy.stat_sinks.wasm_filter":                      "//contrib/stat_sinks/wasm_filter/source:config_lib",
 
     #
     # Tap sinks
@@ -46,6 +64,7 @@ CONTRIB_EXTENSIONS = {
     # Private key providers
     #
 
+    "envoy.tls.key_providers.kae":                              "//contrib/kae/private_key_providers/source:config",
     "envoy.tls.key_providers.cryptomb":                         "//contrib/cryptomb/private_key_providers/source:config",
     "envoy.tls.key_providers.qat":                              "//contrib/qat/private_key_providers/source:config",
 
@@ -65,7 +84,11 @@ CONTRIB_EXTENSIONS = {
     # Connection Balance extensions
     #
 
-    "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
+    # Disabled: upstream Intel mirror (downloadmirror.intel.com) returns HTTP
+    # 202 Accepted instead of 200 OK, breaking @dlb external_http_archive
+    # fetches and aborting //contrib/exe:envoy-static. See
+    # https://github.com/envoyproxy/envoy/issues/45491
+    # "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
 
     #
     # Regex engines
@@ -77,6 +100,11 @@ CONTRIB_EXTENSIONS = {
     # Extensions for generic proxy
     #
     "envoy.generic_proxy.codecs.kafka":                         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
+
+    #
+    # Load balancing policies
+    #
+    "envoy.load_balancing_policies.peak_ewma":      "//contrib/peak_ewma/load_balancing_policies/source:config",
 
     #
     # xDS delegates
@@ -95,4 +123,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
+
+    #
+    # Reverse tunnel reporters
+    #
+
+    "envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service": "//contrib/reverse_tunnel_reporter/source:config",
 }

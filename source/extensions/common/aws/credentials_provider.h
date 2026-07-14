@@ -1,12 +1,12 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/thread.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,14 +16,22 @@ namespace Aws {
 constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
 constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
 constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
+constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
+constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
+constexpr char TOKEN[] = "Token";
+constexpr char SESSION_TOKEN[] = "SessionToken";
+constexpr char EXPIRATION[] = "Expiration";
+constexpr char CREDENTIALS[] = "Credentials";
+constexpr char STS_SERVICE_NAME[] = "sts";
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
+constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{60};
+constexpr std::chrono::seconds MAX_CACHE_JITTER{30};
 
 /**
  * AWS credentials containers
  *
  * If a credential component was not found in the execution environment, it's getter method will
- * return absl::nullopt. Credential components with the empty string value are treated as not found.
+ * return std::nullopt. Credential components with the empty string value are treated as not found.
  */
 class Credentials {
 public:
@@ -43,11 +51,11 @@ public:
     }
   }
 
-  const absl::optional<std::string>& accessKeyId() const { return access_key_id_; }
+  const std::optional<std::string>& accessKeyId() const { return access_key_id_; }
 
-  const absl::optional<std::string>& secretAccessKey() const { return secret_access_key_; }
+  const std::optional<std::string>& secretAccessKey() const { return secret_access_key_; }
 
-  const absl::optional<std::string>& sessionToken() const { return session_token_; }
+  const std::optional<std::string>& sessionToken() const { return session_token_; }
 
   bool hasCredentials() const {
     return access_key_id_.has_value() && secret_access_key_.has_value();
@@ -59,9 +67,9 @@ public:
   }
 
 private:
-  absl::optional<std::string> access_key_id_;
-  absl::optional<std::string> secret_access_key_;
-  absl::optional<std::string> session_token_;
+  std::optional<std::string> access_key_id_;
+  std::optional<std::string> secret_access_key_;
+  std::optional<std::string> session_token_;
 };
 
 using CredentialsPendingCallback = std::function<void()>;
@@ -81,7 +89,7 @@ public:
   X509Credentials(absl::string_view certificate_b64,
                   PublicKeySignatureAlgorithm certificate_signature_algorithm,
                   absl::string_view certificate_serial,
-                  absl::optional<absl::string_view> certificate_chain_b64,
+                  std::optional<absl::string_view> certificate_chain_b64,
                   absl::string_view certificate_private_key_pem,
                   SystemTime certificate_expiration_time)
       : certificate_b64_(certificate_b64),
@@ -96,34 +104,32 @@ public:
 
   X509Credentials() = default;
 
-  const absl::optional<std::string>& certificateDerB64() const { return certificate_b64_; }
+  const std::optional<std::string>& certificateDerB64() const { return certificate_b64_; }
 
-  const absl::optional<std::string>& certificateSerial() const { return certificate_serial_; }
+  const std::optional<std::string>& certificateSerial() const { return certificate_serial_; }
 
-  const absl::optional<SystemTime>& certificateExpiration() const {
-    return certificate_expiration_;
-  }
+  const std::optional<SystemTime>& certificateExpiration() const { return certificate_expiration_; }
 
-  const absl::optional<std::string>& certificateChainDerB64() const {
+  const std::optional<std::string>& certificateChainDerB64() const {
     return certificate_chain_b64_;
   }
 
-  const absl::optional<PublicKeySignatureAlgorithm>& publicKeySignatureAlgorithm() const {
+  const std::optional<PublicKeySignatureAlgorithm>& publicKeySignatureAlgorithm() const {
     return certificate_signature_algorithm_;
   }
 
-  const absl::optional<std::string> certificatePrivateKey() const {
+  const std::optional<std::string> certificatePrivateKey() const {
     return certificate_private_key_pem_;
   }
 
 private:
   // RolesAnywhere certificate based credentials
-  absl::optional<std::string> certificate_b64_ = absl::nullopt;
-  absl::optional<std::string> certificate_chain_b64_ = absl::nullopt;
-  absl::optional<std::string> certificate_private_key_pem_ = absl::nullopt;
-  absl::optional<std::string> certificate_serial_ = absl::nullopt;
-  absl::optional<SystemTime> certificate_expiration_ = absl::nullopt;
-  absl::optional<PublicKeySignatureAlgorithm> certificate_signature_algorithm_ = absl::nullopt;
+  std::optional<std::string> certificate_b64_ = std::nullopt;
+  std::optional<std::string> certificate_chain_b64_ = std::nullopt;
+  std::optional<std::string> certificate_private_key_pem_ = std::nullopt;
+  std::optional<std::string> certificate_serial_ = std::nullopt;
+  std::optional<SystemTime> certificate_expiration_ = std::nullopt;
+  std::optional<PublicKeySignatureAlgorithm> certificate_signature_algorithm_ = std::nullopt;
 };
 
 /*
@@ -157,20 +163,28 @@ public:
   virtual void onCredentialUpdate() PURE;
 };
 
+using CredentialSubscriberCallbacksSharedPtr = std::shared_ptr<CredentialSubscriberCallbacks>;
+
 // Subscription model allowing CredentialsProviderChains to be notified of credential provider
 // updates. A credential provider chain will call credential_provider->subscribeToCredentialUpdates
 // to register itself for updates via onCredentialUpdate callback. When a credential provider has
 // successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
 // it will notify all subscribers that credentials have been retrieved.
+//
+// Subscription is only relevant for metadata credentials providers, as these are the only
+// credential providers that implement async credential retrieval functionality.
+//
 // RAII is used, as credential providers may be instantiated as singletons, as such they may outlive
-// the credential provider chain. Subscription is only relevant for metadata credentials providers,
-// as these are the only credential providers that implement async credential retrieval
-// functionality.
-class CredentialSubscriberCallbacksHandle : public RaiiListElement<CredentialSubscriberCallbacks*> {
+// the credential provider chain.
+//
+// Uses weak_ptr to safely handle subscriber lifetime without dangling pointers.
+class CredentialSubscriberCallbacksHandle
+    : public RaiiListElement<std::weak_ptr<CredentialSubscriberCallbacks>> {
 public:
-  CredentialSubscriberCallbacksHandle(CredentialSubscriberCallbacks& cb,
-                                      std::list<CredentialSubscriberCallbacks*>& parent)
-      : RaiiListElement<CredentialSubscriberCallbacks*>(parent, &cb) {}
+  CredentialSubscriberCallbacksHandle(
+      CredentialSubscriberCallbacksSharedPtr cb,
+      std::list<std::weak_ptr<CredentialSubscriberCallbacks>>& parent)
+      : RaiiListElement<std::weak_ptr<CredentialSubscriberCallbacks>>(parent, cb) {}
 };
 
 using CredentialSubscriberCallbacksHandlePtr = std::unique_ptr<CredentialSubscriberCallbacksHandle>;
@@ -179,7 +193,8 @@ using CredentialSubscriberCallbacksHandlePtr = std::unique_ptr<CredentialSubscri
  * AWS credentials provider chain, able to fallback between multiple credential providers.
  */
 class CredentialsProviderChain : public CredentialSubscriberCallbacks,
-                                 public Logger::Loggable<Logger::Id::aws> {
+                                 public Logger::Loggable<Logger::Id::aws>,
+                                 public std::enable_shared_from_this<CredentialsProviderChain> {
 public:
   ~CredentialsProviderChain() override {
     for (auto& subscriber_handle : subscriber_handles_) {
@@ -190,15 +205,24 @@ public:
   }
 
   void add(const CredentialsProviderSharedPtr& credentials_provider) {
-    providers_.emplace_back(credentials_provider);
+    if (credentials_provider != nullptr) {
+      providers_.emplace_back(credentials_provider);
+    }
   }
 
-  bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
+  // Store a callback if credentials are pending from a credential provider, to be called when
+  // credentials are available
+  virtual bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
 
+  // Loop through all credential providers in a chain and return credentials from the first one that
+  // has credentials available
   Credentials chainGetCredentials();
 
   // Store the RAII handle for a subscription to credential provider notification
   void storeSubscription(CredentialSubscriberCallbacksHandlePtr);
+
+  // Returns the size of the credential provider chain
+  size_t getNumProviders() { return providers_.size(); }
 
 private:
   // Callback to notify on credential updates occurring from a chain member

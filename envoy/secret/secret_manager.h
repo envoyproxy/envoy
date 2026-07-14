@@ -1,10 +1,16 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/init/manager.h"
 #include "envoy/secret/secret_provider.h"
+
+#include "absl/status/status.h"
 
 namespace Envoy {
 
@@ -103,13 +109,17 @@ public:
    * @param config_name a name that uniquely refers to the SDS config source.
    * @param secret_provider_context context that provides components for creating and initializing
    * secret provider.
+   * @param init_manager if supplied, register to the initialization sequence; otherwise, start
+   * immediately
+   * @param warm if true, wait for the update to complete initialization; otherwise, unblock
+   * immediately.
    * @return TlsCertificateConfigProviderSharedPtr the dynamic TLS secret provider.
    */
   virtual TlsCertificateConfigProviderSharedPtr
   findOrCreateTlsCertificateProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                      const std::string& config_name,
                                      Server::Configuration::ServerFactoryContext& server_context,
-                                     Init::Manager& init_manager) PURE;
+                                     OptRef<Init::Manager> init_manager, bool warm) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create
@@ -153,13 +163,15 @@ public:
    * @param config_name a name that uniquely refers to the SDS config source.
    * @param secret_provider_context context that provides components for creating and initializing
    * secret provider.
+   * @param init_manager if supplied, register to the initialization sequence; otherwise, start
+   * immediately
    * @return GenericSecretConfigProviderSharedPtr the dynamic generic secret provider.
    */
   virtual GenericSecretConfigProviderSharedPtr
   findOrCreateGenericSecretProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                     const std::string& config_name,
                                     Server::Configuration::ServerFactoryContext& server_context,
-                                    Init::Manager& init_manager) PURE;
+                                    OptRef<Init::Manager> init_manager) PURE;
 };
 
 using SecretManagerPtr = std::unique_ptr<SecretManager>;

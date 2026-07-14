@@ -87,6 +87,8 @@ LogicalDnsCluster::LogicalDnsCluster(
     : ClusterImplBase(cluster, context, creation_status), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_refresh_rate, 5000))),
+      dns_min_refresh_rate_ms_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_min_refresh_rate, 0))),
       dns_jitter_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_jitter, 0))),
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
@@ -157,18 +159,18 @@ void LogicalDnsCluster::startResolve() {
           if (!logical_host_) {
             logical_host_ = THROW_OR_RETURN_VALUE(
                 LogicalHost::create(info_, hostname_, new_address, address_list,
-                                    localityLbEndpoint(), lbEndpoint(), nullptr, time_source_),
+                                    localityLbEndpoint(), lbEndpoint(), nullptr),
                 std::unique_ptr<LogicalHost>);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
-            PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
+            PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
             priority_state_manager.initializePriorityFor(locality_lb_endpoint);
             priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
 
             const uint32_t priority = locality_lb_endpoint.priority();
             priority_state_manager.updateClusterPrioritySet(
                 priority, std::move(priority_state_manager.priorityState()[priority].first),
-                absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt);
+                std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt);
           }
 
           if (!current_resolved_address_ ||
@@ -180,13 +182,16 @@ void LogicalDnsCluster::startResolve() {
             // Make sure that we have an updated address for admin display, health
             // checking, and creating real host connections.
             logical_host_->setNewAddresses(new_address, address_list, lbEndpoint());
+          } else {
+            info_->configUpdateStats().update_no_rebuild_.inc();
           }
 
           // reset failure backoff strategy because there was a success.
           failure_backoff_strategy_->reset();
 
           if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
-            final_refresh_rate = addrinfo.ttl_;
+            final_refresh_rate =
+                std::max(std::chrono::milliseconds(addrinfo.ttl_), dns_min_refresh_rate_ms_);
           }
           if (dns_jitter_ms_.count() != 0) {
             // Note that `random_.random()` returns a uint64 while
@@ -212,27 +217,6 @@ void LogicalDnsCluster::startResolve() {
         resolve_timer_->enableTimer(final_refresh_rate);
       });
 }
-
-absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-LogicalDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                            ClusterFactoryContext& context) {
-  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
-  THROW_IF_NOT_OK_REF(dns_resolver_or_error.status());
-
-  absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> cluster_or_error;
-  envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
-  createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
-  cluster_or_error = LogicalDnsCluster::create(cluster, proto_config_legacy, context,
-                                               std::move(*dns_resolver_or_error));
-
-  RETURN_IF_NOT_OK(cluster_or_error.status());
-  return std::make_pair(std::shared_ptr<LogicalDnsCluster>(std::move(*cluster_or_error)), nullptr);
-}
-
-/**
- * Static registration for the strict dns cluster factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(LogicalDnsClusterFactory, ClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

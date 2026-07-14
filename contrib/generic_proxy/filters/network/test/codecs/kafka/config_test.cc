@@ -1,8 +1,9 @@
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 #include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/network/connection.h"
 
 #include "contrib/generic_proxy/filters/network/source/codecs/kafka/config.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
@@ -25,7 +26,7 @@ TEST(KafkaCodecTest, SimpleFrameTest) {
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
-                                                 absl::nullopt),
+                                                 std::nullopt),
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     KafkaRequestFrame frame(request);
@@ -64,7 +65,7 @@ TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
-                                                 absl::nullopt),
+                                                 std::nullopt),
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     request_callbacks.onMessage(request);
@@ -117,7 +118,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
-                                                 absl::nullopt),
+                                                 std::nullopt),
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     KafkaRequestFrame frame(request);
@@ -129,8 +130,9 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
 
   {
     // Test decode() method.
+    ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
     EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
-        .WillOnce(testing::Invoke([](RequestHeaderFramePtr request, absl::optional<StartTime>) {
+        .WillOnce(testing::Invoke([](RequestHeaderFramePtr request, std::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaRequestFrame*>(request.get())
                         ->request_->request_header_.correlation_id_,
                     3);
@@ -139,7 +141,25 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
-                                                 absl::nullopt),
+                                                 std::nullopt),
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+
+    Buffer::OwnedImpl buffer;
+    const uint32_t size = htobe32(request->computeSize());
+    buffer.add(&size, sizeof(size)); // Encode data length.
+
+    request->encode(buffer);
+    server_codec.decode(buffer, false);
+  }
+
+  {
+    // Test decode buffer limit.
+    ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(4));
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
+    auto request =
+        std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
+            NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
+                                                 std::nullopt),
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     Buffer::OwnedImpl buffer;
@@ -158,7 +178,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
-                                                 absl::nullopt),
+                                                 std::nullopt),
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
     KafkaRequestFrame request_frame(request);
 
@@ -217,8 +237,9 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
 
   {
     // Test decode() method.
+    ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
     EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
-        .WillOnce(testing::Invoke([](ResponseHeaderFramePtr response, absl::optional<StartTime>) {
+        .WillOnce(testing::Invoke([](ResponseHeaderFramePtr response, std::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaResponseFrame*>(response.get())
                         ->response_->metadata_.correlation_id_,
                     3);
@@ -237,6 +258,24 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
     response->encode(buffer);
 
     client_codec.response_decoder_->expectResponse(3, 0, 0);
+    client_codec.decode(buffer, false);
+  }
+
+  {
+    // Test decode buffer limit.
+    ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(4));
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
+    auto response =
+        std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
+            NetworkFilters::Kafka::ResponseMetadata(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0,
+                                                    3),
+            NetworkFilters::Kafka::FetchResponse({}, {}));
+
+    Buffer::OwnedImpl buffer;
+    const uint32_t size = htobe32(response->computeSize());
+    buffer.add(&size, sizeof(size)); // Encode data length.
+
+    response->encode(buffer);
     client_codec.decode(buffer, false);
   }
 
@@ -265,7 +304,7 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
-                                                 absl::nullopt),
+                                                 std::nullopt),
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     KafkaRequestFrame request_frame(request);

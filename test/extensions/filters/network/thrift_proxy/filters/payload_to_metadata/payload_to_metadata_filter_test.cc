@@ -20,7 +20,7 @@ namespace {
 using ::testing::Return;
 
 MATCHER_P(MapEq, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_NE(obj.fields().find(entry.first), obj.fields().end());
@@ -30,7 +30,7 @@ MATCHER_P(MapEq, rhs, "") {
 }
 
 MATCHER_P(MapEqNum, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_NE(obj.fields().find(entry.first), obj.fields().end());

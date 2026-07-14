@@ -92,7 +92,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(const SubsetLoadBalancerConfig& lb_config
       [this](uint32_t priority, const HostVector&, const HostVector&) {
         refreshSubsets(priority);
         purgeEmptySubsets(subsets_);
-        return absl::OkStatus();
       });
 }
 
@@ -188,7 +187,7 @@ HostSelectionResponse SubsetLoadBalancer::chooseHost(LoadBalancerContext* contex
           Cluster_LbSubsetConfig_LbSubsetMetadataFallbackPolicy_FALLBACK_LIST) {
     return chooseHostIteration(context);
   }
-  const ProtobufWkt::Value* metadata_fallbacks = getMetadataFallbackList(context);
+  const Protobuf::Value* metadata_fallbacks = getMetadataFallbackList(context);
   if (metadata_fallbacks == nullptr) {
     return chooseHostIteration(context);
   }
@@ -231,7 +230,7 @@ SubsetLoadBalancer::removeMetadataFallbackList(LoadBalancerContext* context) {
   return {context, to_preserve};
 }
 
-const ProtobufWkt::Value*
+const Protobuf::Value*
 SubsetLoadBalancer::getMetadataFallbackList(LoadBalancerContext* context) const {
   if (context == nullptr) {
     return nullptr;
@@ -273,7 +272,7 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* 
       return host;
     }
     // otherwise check if there is fallback policy configured for given route metadata
-    absl::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
+    std::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
         tryFindSelectorFallbackParams(actual_used_context);
     if (selector_fallback_params &&
         selector_fallback_params->get().fallback_policy_ !=
@@ -304,16 +303,16 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* 
   return nullptr;
 }
 
-absl::optional<SubsetLoadBalancer::SubsetSelectorFallbackParamsRef>
+std::optional<SubsetLoadBalancer::SubsetSelectorFallbackParamsRef>
 SubsetLoadBalancer::tryFindSelectorFallbackParams(LoadBalancerContext* context) {
   const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
   if (!match_criteria) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const auto match_criteria_vec = match_criteria->metadataMatchCriteria();
   SubsetSelectorMapPtr selectors = selectors_;
   if (selectors == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   for (uint32_t i = 0; i < match_criteria_vec.size(); i++) {
     const Router::MetadataMatchCriterion& match_criterion = *match_criteria_vec[i];
@@ -330,7 +329,7 @@ SubsetLoadBalancer::tryFindSelectorFallbackParams(LoadBalancerContext* context) 
     selectors = subset_it->second;
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
@@ -423,24 +422,23 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
 }
 
 void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVector& all_hosts) {
-  auto update_func = [priority, &all_hosts](LbSubsetPtr& subset, const HostPredicate& predicate,
-                                            uint64_t seed) {
+  auto update_func = [priority, &all_hosts](LbSubsetPtr& subset, const HostPredicate& predicate) {
     for (const auto& host : all_hosts) {
       if (predicate(*host)) {
         subset->pushHost(priority, host);
       }
     }
-    subset->finalize(priority, seed);
+    subset->finalize(priority);
   };
 
   if (subset_any_ != nullptr) {
-    update_func(subset_any_->lb_subset_, [](const Host&) { return true; }, random_.random());
+    update_func(subset_any_->lb_subset_, [](const Host&) { return true; });
   }
 
   if (subset_default_ != nullptr) {
     HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
                                         default_subset_metadata_, std::placeholders::_1);
-    update_func(subset_default_->lb_subset_, predicate, random_.random());
+    update_func(subset_default_->lb_subset_, predicate);
   }
 
   if (fallback_subset_ == nullptr) {
@@ -515,9 +513,9 @@ void SubsetLoadBalancer::processSubsets(uint32_t priority, const HostVector& all
   single_duplicate_stat_->set(collision_count_of_single_host_entries);
 
   // Finalize updates after all the hosts are evaluated.
-  forEachSubset(subsets_, [priority, this](LbSubsetEntryPtr entry) {
+  forEachSubset(subsets_, [priority](LbSubsetEntryPtr entry) {
     if (entry->initialized()) {
-      entry->lb_subset_->finalize(priority, random_.random());
+      entry->lb_subset_->finalize(priority);
     }
   });
 }
@@ -557,7 +555,7 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
       break;
     }
 
-    if (list_as_any_ && it->second.kind_case() == ProtobufWkt::Value::kListValue) {
+    if (list_as_any_ && it->second.kind_case() == Protobuf::Value::kListValue) {
       // If the list of kvs is empty, we initialize one kvs for each value in the list.
       // Otherwise, we branch the list of kvs by generating one new kvs per old kvs per
       // new value.
@@ -611,7 +609,7 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
       first = false;
     }
 
-    const ProtobufWkt::Value& value = it.second;
+    const Protobuf::Value& value = it.second;
     buf << it.first << "=" << MessageUtil::getJsonStringFromMessageOrError(value);
   }
   return buf.str();
@@ -625,7 +623,7 @@ SubsetLoadBalancer::findOrCreateLbSubsetEntry(LbSubsetMap& subsets, const Subset
   ASSERT(idx < kvs.size());
 
   const std::string& name = kvs[idx].first;
-  const ProtobufWkt::Value& pb_value = kvs[idx].second;
+  const Protobuf::Value& pb_value = kvs[idx].second;
   const HashedValue value(pb_value);
 
   LbSubsetEntryPtr entry;
@@ -732,7 +730,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 // hosts that belong in this subset.
 void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_hosts,
                                                 const HostVector& hosts_added,
-                                                const HostVector& hosts_removed, uint64_t seed) {
+                                                const HostVector& hosts_removed) {
   auto cached_predicate = [&matching_hosts](const auto& host) {
     return matching_hosts.count(&host) == 1;
   };
@@ -793,7 +791,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_host
       HostSetImpl::updateHostsParams(
           hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality, degraded_hosts,
           degraded_hosts_per_locality, excluded_hosts, excluded_hosts_per_locality),
-      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed, seed,
+      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed,
       original_host_set_.weightedPriorityHealth(), original_host_set_.overprovisioningFactor());
 }
 
@@ -832,8 +830,8 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
-    uint32_t priority, absl::optional<bool> weighted_priority_health,
-    absl::optional<uint32_t> overprovisioning_factor) {
+    uint32_t priority, std::optional<bool> weighted_priority_health,
+    std::optional<uint32_t> overprovisioning_factor) {
   // Use original hostset's overprovisioning_factor.
   RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size(), "");
 
@@ -850,10 +848,9 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
                                                     const HostHashSet& matching_hosts,
                                                     const HostVector& hosts_added,
-                                                    const HostVector& hosts_removed,
-                                                    uint64_t seed) {
+                                                    const HostVector& hosts_removed) {
   const auto& host_subset = getOrCreateHostSet(priority);
-  updateSubset(priority, matching_hosts, hosts_added, hosts_removed, seed);
+  updateSubset(priority, matching_hosts, hosts_added, hosts_removed);
 
   if (host_subset.hosts().empty() != empty_) {
     empty_ = true;
@@ -865,12 +862,13 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   // Create a new worker local LB if needed.
   // TODO(mattklein123): See the PrioritySubsetImpl constructor for additional comments on how
   // we can do better here.
-  if (thread_aware_lb_ != nullptr && thread_aware_lb_->factory()->recreateOnHostChange()) {
+  if (thread_aware_lb_ != nullptr &&
+      thread_aware_lb_->factory()->recreateOnHostChangeDeprecated()) {
     lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
   }
 }
 
-void SubsetLoadBalancer::PriorityLbSubset::finalize(uint32_t priority, uint64_t seed) {
+void SubsetLoadBalancer::PriorityLbSubset::finalize(uint32_t priority) {
   while (host_sets_.size() <= priority) {
     host_sets_.push_back({HostHashSet(), HostHashSet()});
   }
@@ -891,7 +889,7 @@ void SubsetLoadBalancer::PriorityLbSubset::finalize(uint32_t priority, uint64_t 
     }
   }
 
-  subset_.update(priority, new_hosts, added, removed, seed);
+  subset_.update(priority, new_hosts, added, removed);
 
   old_hosts.swap(new_hosts);
   new_hosts.clear();
@@ -908,7 +906,7 @@ SubsetLoadBalancer::LoadBalancerContextWrapper::LoadBalancerContextWrapper(
 }
 
 SubsetLoadBalancer::LoadBalancerContextWrapper::LoadBalancerContextWrapper(
-    LoadBalancerContext* wrapped, const ProtobufWkt::Struct& metadata_match_criteria_override)
+    LoadBalancerContext* wrapped, const Protobuf::Struct& metadata_match_criteria_override)
     : wrapped_(wrapped) {
   ASSERT(wrapped->metadataMatchCriteria());
   metadata_match_ =

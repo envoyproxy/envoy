@@ -1,4 +1,7 @@
 #include "envoy/admin/v3/clusters.pb.h"
+#include "envoy/upstream/admin_endpoint_provider.h"
+
+#include "source/common/network/address_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
@@ -245,10 +248,88 @@ fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
   EXPECT_EQ(expected_text, response2.toString());
 }
 
+TEST_P(AdminInstanceTest, TestClusterFilter) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
+
+  auto createCluster = [&](const std::string& name) {
+    auto cluster = std::make_unique<NiceMock<Upstream::MockClusterMockPrioritySet>>();
+    ON_CALL(*cluster->info_, name()).WillByDefault(testing::ReturnRefOfCopy(name));
+    ON_CALL(Const(*cluster), outlierDetector()).WillByDefault(Return(nullptr));
+    cluster_maps.active_clusters_.emplace(name, *cluster);
+    return cluster;
+  };
+
+  auto cluster1 = createCluster("test-bar-1");
+  auto cluster2 = createCluster("test-foo-2");
+  auto cluster3 = createCluster("test-baz-3");
+  auto cluster4 = createCluster("test-bar-4");
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/clusters?format=json&filter=^test-bar-1$", header_map, response));
+  std::string output_json = response.toString();
+  envoy::admin::v3::Clusters output_proto;
+  TestUtility::loadFromJson(output_json, output_proto);
+  EXPECT_EQ(1, output_proto.cluster_statuses_size());
+  EXPECT_EQ("test-bar-1", output_proto.cluster_statuses(0).name());
+  response.drain(response.length());
+
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/clusters?format=json&filter=^test", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  std::vector<std::string> cluster_names;
+  for (const auto& cluster_status : output_proto.cluster_statuses()) {
+    cluster_names.push_back(cluster_status.name());
+  }
+  EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("test-bar-1", "test-foo-2", "test-baz-3",
+                                                           "test-bar-4"));
+  response.drain(response.length());
+  cluster_names.clear();
+
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json&filter=bar", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  for (const auto& cluster_status : output_proto.cluster_statuses()) {
+    cluster_names.push_back(cluster_status.name());
+  }
+  EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("test-bar-1", "test-bar-4"));
+  response.drain(response.length());
+  cluster_names.clear();
+
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/clusters?format=json&filter=test-foo-5", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  EXPECT_EQ(0, output_proto.cluster_statuses_size());
+  response.drain(response.length());
+
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json&filter=", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  for (const auto& cluster_status : output_proto.cluster_statuses()) {
+    cluster_names.push_back(cluster_status.name());
+  }
+  EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("test-bar-1", "test-foo-2", "test-baz-3",
+                                                           "test-bar-4"));
+  response.drain(response.length());
+  cluster_names.clear();
+
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/clusters?filter=^(test-bar-1|test-baz-3)$", header_map, response));
+  std::string output_text = response.toString();
+  EXPECT_THAT(output_text, testing::HasSubstr("test-bar-1"));
+  EXPECT_THAT(output_text, testing::HasSubstr("test-baz-3"));
+  EXPECT_THAT(output_text, testing::Not(testing::HasSubstr("test-foo-2")));
+  EXPECT_THAT(output_text, testing::Not(testing::HasSubstr("test-bar-4")));
+}
+
 TEST_P(AdminInstanceTest, TestSetHealthFlag) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Event::MockDispatcher dispatcher;
-  auto host = Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource());
+  auto host = Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000");
   envoy::admin::v3::HostHealthStatus health_status;
 
   // FAILED_ACTIVE_HC
@@ -336,6 +417,121 @@ TEST_P(AdminInstanceTest, TestSetHealthFlag) {
   host->healthFlagClear(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT);
   setHealthFlag(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT, *host, health_status);
   EXPECT_FALSE(health_status.active_hc_timeout());
+}
+
+namespace {
+
+// Minimal AdminEndpointProvider returning a fixed set of endpoints.
+class FakeAdminEndpointProvider : public Upstream::AdminEndpointProvider {
+public:
+  std::vector<AdminEndpoint> adminEndpoints() const override { return endpoints_; }
+  std::vector<AdminEndpoint> endpoints_;
+};
+
+// A cluster that exposes a caller-provided AdminEndpointProvider.
+class MockClusterWithAdminEndpoints : public Upstream::MockClusterMockPrioritySet {
+public:
+  const Upstream::AdminEndpointProvider* adminEndpointProvider() const override {
+    return provider_;
+  }
+  const Upstream::AdminEndpointProvider* provider_{nullptr};
+};
+
+} // namespace
+
+// A cluster's AdminEndpointProvider endpoints are rendered as synthetic host statuses on /clusters,
+// in both JSON and text, without being real load-balanced hosts.
+TEST_P(AdminInstanceTest, ClustersAdminEndpoints) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
+
+  FakeAdminEndpointProvider provider;
+  Upstream::AdminEndpointProvider::AdminEndpoint endpoint;
+  endpoint.address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("none:cluster-a", "node-a");
+  endpoint.hostname = "node-a";
+  endpoint.health = envoy::config::core::v3::HEALTHY;
+  endpoint.gauges.emplace_back("rt_connection_count", 3);
+  provider.endpoints_.push_back(endpoint);
+
+  NiceMock<MockClusterWithAdminEndpoints> cluster;
+  cluster.provider_ = &provider;
+  cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
+
+  // JSON: the synthetic endpoint appears as a host_status with its address, gauge and health.
+  {
+    Buffer::OwnedImpl response;
+    Http::TestResponseHeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
+    envoy::admin::v3::Clusters output;
+    TestUtility::loadFromJson(response.toString(), output);
+    ASSERT_EQ(1, output.cluster_statuses_size());
+    ASSERT_EQ(1, output.cluster_statuses(0).host_statuses_size());
+    const auto& host_status = output.cluster_statuses(0).host_statuses(0);
+    EXPECT_EQ("node-a", host_status.hostname());
+    EXPECT_EQ("none:cluster-a",
+              host_status.address().envoy_internal_address().server_listener_name());
+    EXPECT_EQ("node-a", host_status.address().envoy_internal_address().endpoint_id());
+    EXPECT_EQ(envoy::config::core::v3::HEALTHY, host_status.health_status().eds_health_status());
+    EXPECT_EQ(1, host_status.weight());
+    ASSERT_EQ(1, host_status.stats_size());
+    EXPECT_EQ("rt_connection_count", host_status.stats(0).name());
+    EXPECT_EQ(3, host_status.stats(0).value());
+    EXPECT_EQ(envoy::admin::v3::SimpleMetric::GAUGE, host_status.stats(0).type());
+  }
+
+  // Text: lines for the synthetic endpoint, keyed by its rendered address. Health and weight use
+  // the same vocabulary as regular hosts ("healthy", numeric weight).
+  {
+    Buffer::OwnedImpl response;
+    Http::TestResponseHeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
+    const std::string text = response.toString();
+    EXPECT_THAT(text, testing::HasSubstr("envoy://none:cluster-a/node-a::rt_connection_count::3"));
+    EXPECT_THAT(text, testing::HasSubstr("envoy://none:cluster-a/node-a::hostname::node-a"));
+    EXPECT_THAT(text, testing::HasSubstr("envoy://none:cluster-a/node-a::weight::1"));
+    EXPECT_THAT(text, testing::HasSubstr("envoy://none:cluster-a/node-a::health_flags::healthy"));
+  }
+}
+
+// An AdminEndpoint with a null address is skipped in both JSON and text rendering.
+TEST_P(AdminInstanceTest, ClustersAdminEndpointsNullAddressSkipped) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
+
+  FakeAdminEndpointProvider provider;
+  // Null-address endpoint: must be skipped.
+  provider.endpoints_.emplace_back();
+  // Valid endpoint: must still be rendered.
+  Upstream::AdminEndpointProvider::AdminEndpoint valid;
+  valid.address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("none:cluster-a", "node-a");
+  valid.hostname = "node-a";
+  provider.endpoints_.push_back(valid);
+
+  NiceMock<MockClusterWithAdminEndpoints> cluster;
+  cluster.provider_ = &provider;
+  cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
+
+  {
+    Buffer::OwnedImpl response;
+    Http::TestResponseHeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
+    envoy::admin::v3::Clusters output;
+    TestUtility::loadFromJson(response.toString(), output);
+    ASSERT_EQ(1, output.cluster_statuses_size());
+    // Only the valid endpoint is rendered.
+    ASSERT_EQ(1, output.cluster_statuses(0).host_statuses_size());
+    EXPECT_EQ("node-a", output.cluster_statuses(0).host_statuses(0).hostname());
+  }
+
+  {
+    Buffer::OwnedImpl response;
+    Http::TestResponseHeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
+    EXPECT_THAT(response.toString(),
+                testing::HasSubstr("envoy://none:cluster-a/node-a::hostname::node-a"));
+  }
 }
 
 } // namespace Server

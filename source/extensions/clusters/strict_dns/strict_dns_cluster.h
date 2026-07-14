@@ -73,6 +73,7 @@ private:
   Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
+  const std::chrono::milliseconds dns_min_refresh_rate_ms_;
   const std::chrono::milliseconds dns_jitter_ms_;
   BackOffStrategyPtr failure_backoff_strategy_;
   const bool respect_dns_ttl_;
@@ -80,21 +81,6 @@ private:
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;
 };
-
-/**
- * Factory for StrictDnsClusterImpl
- */
-class StrictDnsClusterFactory : public ClusterFactoryImplBase {
-public:
-  StrictDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
-
-private:
-  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
-};
-
-DECLARE_FACTORY(StrictDnsClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

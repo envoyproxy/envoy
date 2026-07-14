@@ -45,12 +45,12 @@ public:
   static EnvoyBugState& get() { MUTABLE_CONSTRUCT_ON_FIRST_USE(EnvoyBugState); }
 
   void clear() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     counters_.clear();
   }
 
   uint64_t inc(absl::string_view bug_name) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return ++counters_[bug_name];
   }
 

@@ -74,11 +74,11 @@ class FluentdBase : public Tcp::AsyncTcpClientCallbacks,
 public:
   FluentdBase(Upstream::ThreadLocalCluster& cluster, Tcp::AsyncTcpClientPtr client,
               Event::Dispatcher& dispatcher, const std::string& tag,
-              absl::optional<uint32_t> max_connect_attempts, Stats::Scope& parent_scope,
+              std::optional<uint32_t> max_connect_attempts, Stats::Scope& parent_scope,
               const std::string& stat_prefix, BackOffStrategyPtr backoff_strategy,
               uint64_t buffer_flush_interval, uint64_t max_buffer_size);
 
-  virtual ~FluentdBase() = default;
+  ~FluentdBase() override = default;
 
   // Tcp::AsyncTcpClientCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -103,7 +103,7 @@ protected:
   std::string tag_;
   std::string id_;
   uint32_t connect_attempts_{0};
-  absl::optional<uint32_t> max_connect_attempts_;
+  std::optional<uint32_t> max_connect_attempts_;
   const Stats::ScopeSharedPtr stats_scope_;
   Upstream::ThreadLocalCluster& cluster_;
   const BackOffStrategyPtr backoff_strategy_;
@@ -138,7 +138,7 @@ public:
     });
   }
 
-  virtual ~FluentdCacheBase() = default;
+  ~FluentdCacheBase() override = default;
 
   SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
                             Random::RandomGenerator& random,

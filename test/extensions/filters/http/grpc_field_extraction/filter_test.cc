@@ -48,10 +48,11 @@ protected:
         api_->fileSystem()
             .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
             .value();
-    ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
+    absl::Status creation_status = absl::OkStatus();
     filter_config_ = std::make_shared<FilterConfig>(
-        proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_);
+        proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_, creation_status);
+    ASSERT_TRUE(creation_status.ok());
     filter_ = std::make_unique<Filter>(filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
   }
@@ -86,12 +87,12 @@ CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
       parent: "project-id"
     )pb") {
   CreateApiKeyRequest request;
-  Protobuf::TextFormat::ParseFromString(pb, &request);
+  std::ignore = Protobuf::TextFormat::ParseFromString(pb, &request);
   return request;
 }
 
-void checkProtoStruct(ProtobufWkt::Struct got, absl::string_view expected_in_pbtext) {
-  ProtobufWkt::Struct expected;
+void checkProtoStruct(Protobuf::Struct got, absl::string_view expected_in_pbtext) {
+  Protobuf::Struct expected;
   ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(expected_in_pbtext, &expected));
   EXPECT_TRUE(TestUtility::protoEqual(got, expected, true)) << "got:\n"
                                                             << got.DebugString() << "expected:\n"
@@ -111,7 +112,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
   CreateApiKeyRequest request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, expected_metadata);
       }));
@@ -133,7 +134,7 @@ TEST_F(FilterTestExtractOk, EmptyFields) {
   CreateApiKeyRequest request = makeCreateApiKeyRequest("");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -144,6 +145,43 @@ fields {
   }
 })pb");
       }));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+}
+
+TEST_F(FilterTestExtractOk, MissingFieldProducesListValue) {
+  setUp(R"pb(
+    extractions_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_field_extractions: {
+          key: "key.display_name"
+          value: {}
+        }
+      }
+    })pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest(R"pb(
+    parent: "project-id"
+  )pb");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
+        const auto it = new_dynamic_metadata.fields().find("key.display_name");
+        EXPECT_TRUE(it != new_dynamic_metadata.fields().end());
+        const auto& value = it->second;
+        EXPECT_EQ(value.kind_case(), Protobuf::Value::KindCase::kListValue);
+        EXPECT_EQ(value.list_value().values_size(), 0);
+      });
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 
   // No data modification.
@@ -183,7 +221,7 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
   EXPECT_EQ(middle_request_data.length(), 0);
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, expected_metadata);
       }));
@@ -235,7 +273,7 @@ extractions_by_method: {
   EXPECT_EQ(request_data3->length(), 0);
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, expected_metadata);
       }));
@@ -354,7 +392,7 @@ supported_types: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(fields {
   key: "supported_types.double"
@@ -539,7 +577,7 @@ repeated_intermediate: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -689,7 +727,7 @@ repeated_supported_types: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -890,7 +928,7 @@ fields {
 using FilterTestExtractRejected = FilterTestBase;
 TEST_F(FilterTestExtractRejected, BufferLimitedExceeded) {
   setUp();
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -932,7 +970,7 @@ TEST_F(FilterTestExtractRejected, NotEnoughData) {
 
 TEST_F(FilterTestExtractRejected, MisformedGrpcPath) {
   setUp();
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", "/misformatted"}, {"content-type", "application/grpc"}};

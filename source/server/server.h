@@ -44,12 +44,13 @@
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
 #endif
+#include <optional>
+
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/worker_impl.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -72,6 +73,7 @@ struct ServerCompilationSettingsStats {
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
   COUNTER(debug_assertion_failures)                                                                \
   COUNTER(envoy_bug_failures)                                                                      \
+  COUNTER(envoy_notifications)                                                                     \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
   COUNTER(wip_protos)                                                                              \
@@ -146,6 +148,11 @@ public:
                                           const Options& options,
                                           ProtobufMessage::ValidationVisitor& validation_visitor,
                                           Api::Api& api);
+
+  /**
+   * Raises soft file limit to the hard limit.
+   */
+  static void raiseFileLimits();
 };
 
 /**
@@ -155,9 +162,10 @@ public:
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
-            Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-            Init::Manager& init_manager, OverloadManager& overload_manager,
-            OverloadManager& null_overload_manager, std::function<void()> workers_start_cb);
+            Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
+            AccessLog::AccessLogManager& access_log_manager, Init::Manager& init_manager,
+            OverloadManager& overload_manager, OverloadManager& null_overload_manager,
+            std::function<void()> workers_start_cb);
 
 private:
   Init::WatcherImpl init_watcher_;
@@ -252,7 +260,8 @@ public:
   virtual void maybeCreateHeapShrinker() PURE;
   virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
   virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
-  virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
+  virtual std::unique_ptr<Server::GuardDog>
+  maybeCreateGuardDog(absl::string_view name, const Server::Configuration::Watchdog& config) PURE;
   virtual std::unique_ptr<HdsDelegateApi>
   maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
                          Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
@@ -336,20 +345,18 @@ public:
   ServerLifecycleNotifier::HandlePtr
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
-protected:
-  const Configuration::MainImpl& config() { return config_; }
-
 private:
   Network::DnsResolverSharedPtr getOrCreateDnsResolver();
 
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
+  void flushStatsImpl();
   void flushStatsInternal();
   void updateServerStats();
   // This does most of the work of initialization, but can throw or return errors caught
   // by initialize().
   absl::Status initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
                                  ComponentFactory& component_factory);
-  void loadServerFlags(const absl::optional<std::string>& flags_path);
+  void loadServerFlags(const std::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
   void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
@@ -387,6 +394,7 @@ private:
       server_compilation_settings_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
+  Assert::ActionRegistrationPtr envoy_notification_registration_;
   ThreadLocal::Instance& thread_local_;
   Random::RandomGeneratorPtr random_generator_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
@@ -433,9 +441,9 @@ private:
   ListenerHooks& hooks_;
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
-  bool enable_reuse_port_default_{false};
+  bool enable_reuse_port_default_ = true;
   Regex::EnginePtr regex_engine_;
-  bool stats_flush_in_progress_ : 1;
+  bool stats_flush_in_progress_ = false;
   std::unique_ptr<Memory::AllocatorManager> memory_allocator_manager_;
 
   template <class T>
@@ -444,6 +452,8 @@ private:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
         : RaiiListElement<T>(callbacks, callback) {}
   };
+
+  uint32_t stats_eviction_counter_{0};
 
 #ifdef ENVOY_PERFETTO
   std::unique_ptr<perfetto::TracingSession> tracing_session_{};
@@ -460,6 +470,8 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
+  // MetricSnapshotImpl captures a snapshot of metrics by latching the delta usage, and optionally
+  // marking the stats as used.
   explicit MetricSnapshotImpl(Stats::Store& store, Upstream::ClusterManager& cluster_manager,
                               TimeSource& time_source);
 

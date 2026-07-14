@@ -1,8 +1,10 @@
+#include "envoy/common/hashable.h"
+
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 #include "source/server/generic_factory_context.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -93,6 +95,19 @@ TEST_F(ConfigTest, SetValueWithFactory) {
   EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
 }
 
+TEST_F(ConfigTest, SetHashableValueWithFactory) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.hashable_string
+    format_string:
+      text_format_source:
+        inline_string: "XXX"
+  )YAML"});
+  update();
+  const auto* foo = info_.filterState()->getDataReadOnly<Hashable>("my_key");
+  ASSERT_NE(nullptr, foo);
+}
+
 TEST_F(ConfigTest, SetValueConnection) {
   initialize({R"YAML(
     object_key: foo
@@ -116,8 +131,7 @@ TEST_F(ConfigTest, UpdateValue) {
       text_format_source:
         inline_string: "XXX"
   )YAML"});
-  info_.filterState()->setData("foo", std::make_unique<Router::StringAccessorImpl>("OLD"),
-                               StateType::Mutable);
+  info_.filterState()->setData("foo", std::make_unique<Router::StringAccessorImpl>("OLD"));
   update();
   EXPECT_FALSE(info_.filterState()->hasDataAtOrAboveLifeSpan(LifeSpan::Request));
   const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("foo");
@@ -238,7 +252,6 @@ TEST_F(ConfigTest, SetValueUpstreamSharedOnce) {
   const auto objects = info_.filterState()->objectsSharedWithUpstreamConnection();
   EXPECT_EQ(1, objects->size());
   EXPECT_EQ(StreamSharing::None, objects->at(0).stream_sharing_);
-  EXPECT_EQ(StateType::Mutable, objects->at(0).state_type_);
   EXPECT_EQ("foo", objects->at(0).name_);
   EXPECT_EQ(foo, objects->at(0).data_.get());
 }
@@ -260,7 +273,6 @@ TEST_F(ConfigTest, SetValueUpstreamSharedTransitive) {
   const auto objects = info_.filterState()->objectsSharedWithUpstreamConnection();
   EXPECT_EQ(1, objects->size());
   EXPECT_EQ(StreamSharing::SharedWithUpstreamConnection, objects->at(0).stream_sharing_);
-  EXPECT_EQ(StateType::ReadOnly, objects->at(0).state_type_);
   EXPECT_EQ("foo", objects->at(0).name_);
   EXPECT_EQ(foo, objects->at(0).data_.get());
 }

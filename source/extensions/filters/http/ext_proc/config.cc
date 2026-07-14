@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ext_proc/config.h"
 
+#include "source/common/http/http_service_headers.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -87,10 +88,13 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
-  const auto filter_config = std::make_shared<FilterConfig>(
+  absl::Status config_creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
       dual_info.scope, stats_prefix, dual_info.is_upstream,
-      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context);
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context,
+      config_creation_status);
+  RETURN_IF_NOT_OK_REF(config_creation_status);
   if (proto_config.has_grpc_service()) {
     return [filter_config = std::move(filter_config), &context,
             dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
@@ -100,9 +104,14 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
     };
   } else {
+    absl::Status creation_status;
+    auto headers_applicator = std::make_shared<Http::HttpServiceHeadersApplicator>(
+        proto_config.http_service().http_service(), context, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
     return [proto_config = std::move(proto_config), filter_config = std::move(filter_config),
-            &context](Http::FilterChainFactoryCallbacks& callbacks) {
-      auto client = std::make_unique<ExtProcHttpClient>(proto_config, context);
+            &context, headers_applicator = std::move(headers_applicator)](
+               Http::FilterChainFactoryCallbacks& callbacks) {
+      auto client = std::make_unique<ExtProcHttpClient>(proto_config, context, headers_applicator);
       callbacks.addStreamFilter(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
     };
@@ -112,29 +121,32 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfigPerRoute>(proto_config);
+    Server::Configuration::ServerFactoryContext& server_context,
+    ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(
+      proto_config, Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context),
+      server_context);
 }
 
 // This method will only be called when the filter is in downstream.
-Http::FilterFactoryCb
-ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   // Verify configuration before creating FilterConfig
-  absl::Status result = verifyFilterConfig(proto_config);
-  if (!result.ok()) {
-    throw EnvoyException(std::string(result.message()));
-  }
+  RETURN_IF_NOT_OK(verifyFilterConfig(proto_config));
 
   const uint32_t message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
-  const auto filter_config = std::make_shared<FilterConfig>(
+  absl::Status config_creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
       server_context.scope(), stats_prefix, false,
-      Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context);
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context,
+      config_creation_status);
+  RETURN_IF_NOT_OK_REF(config_creation_status);
 
   if (proto_config.has_grpc_service()) {
     return [filter_config = std::move(filter_config),
@@ -145,9 +157,14 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
     };
   } else {
+    auto headers_applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
+        proto_config.http_service().http_service(), server_context);
     return [proto_config = std::move(proto_config), filter_config = std::move(filter_config),
-            &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
-      auto client = std::make_unique<ExtProcHttpClient>(proto_config, server_context);
+            &server_context,
+            headers_applicator = std::shared_ptr<const Http::HttpServiceHeadersApplicator>(
+                std::move(headers_applicator))](Http::FilterChainFactoryCallbacks& callbacks) {
+      auto client =
+          std::make_unique<ExtProcHttpClient>(proto_config, server_context, headers_applicator);
       callbacks.addStreamFilter(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
     };

@@ -32,48 +32,33 @@ void FilterStateImpl::maybeCreateParent(FilterStateSharedPtr ancestor) {
 }
 
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                              FilterState::StateType state_type, FilterState::LifeSpan life_span,
+                              FilterState::LifeSpan life_span,
                               StreamSharingMayImpactPooling stream_sharing) {
   if (life_span > life_span_) {
     if (hasDataWithNameInternally(data_name)) {
-      IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
-                   "conflicting life_span on the same data_name.");
+      IS_ENVOY_BUG(fmt::format("FilterStateAccessViolation: FilterState::setData<T> "
+                               "called twice with "
+                               "conflicting life_span on the same data_name: {}.",
+                               data_name));
       return;
     }
     // Note if ancestor argument of ctor is not nullptr, parent will be created at the time of
     // construction directly and this call will be a no-op.
     // So we only need to consider the case where ancestor is nullptr.
     maybeCreateParent(nullptr);
-    parent_->setData(data_name, data, state_type, life_span, stream_sharing);
+    parent_->setData(data_name, data, life_span, stream_sharing);
     return;
   }
   if (parent_ && parent_->hasDataWithName(data_name)) {
-    IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
-                 "conflicting life_span on the same data_name.");
+    IS_ENVOY_BUG(
+        fmt::format("FilterStateAccessViolation: FilterState::setData<T> called twice with "
+                    "conflicting life_span on the same data_name: {}.",
+                    data_name));
     return;
-  }
-  const auto& it = data_storage_.find(data_name);
-  if (it != data_storage_.end()) {
-    // We have another object with same data_name. Check for mutability
-    // violations namely: readonly data cannot be overwritten, mutable data
-    // cannot be overwritten by readonly data.
-    const FilterStateImpl::FilterObject* current = it->second.get();
-    if (current->state_type_ == FilterState::StateType::ReadOnly) {
-      IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice on same "
-                   "ReadOnly state.");
-      return;
-    }
-
-    if (current->state_type_ != state_type) {
-      IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
-                   "different state types.");
-      return;
-    }
   }
 
   std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
   filter_object->data_ = data;
-  filter_object->state_type_ = state_type;
   filter_object->stream_sharing_ = stream_sharing;
   data_storage_[data_name] = std::move(filter_object);
 }
@@ -113,12 +98,6 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
   }
 
   FilterStateImpl::FilterObject* current = it->second.get();
-  if (current->state_type_ == FilterState::StateType::ReadOnly) {
-    IS_ENVOY_BUG("FilterStateAccessViolation: FilterState accessed immutable data as mutable.");
-    // To reduce the chances of a crash, allow the mutation in this case instead of returning a
-    // nullptr.
-  }
-
   return current->data_;
 }
 
@@ -135,11 +114,10 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
   for (const auto& [name, object] : data_storage_) {
     switch (object->stream_sharing_) {
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
-      objects->push_back({object->data_, object->state_type_, object->stream_sharing_, name});
+      objects->push_back({object->data_, object->stream_sharing_, name});
       break;
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce:
-      objects->push_back(
-          {object->data_, object->state_type_, StreamSharingMayImpactPooling::None, name});
+      objects->push_back({object->data_, StreamSharingMayImpactPooling::None, name});
       break;
     default:
       break;

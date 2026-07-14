@@ -5,6 +5,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/retry/priority/previous_priorities/config.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -53,10 +54,10 @@ public:
 
   void verifyPriorityLoads(const Upstream::HealthyLoad& expected_healthy_priority_load,
                            const Upstream::DegradedLoad& expected_degraded_priority_load,
-                           absl::optional<Upstream::RetryPriority::PriorityMappingFunc>
-                               priority_mapping_func = absl::nullopt) {
+                           std::optional<Upstream::RetryPriority::PriorityMappingFunc>
+                               priority_mapping_func = std::nullopt) {
     const auto& priority_loads = retry_priority_->determinePriorityLoad(
-        priority_set_, original_priority_load_,
+        &stream_info_, priority_set_, original_priority_load_,
         priority_mapping_func.value_or(Upstream::RetryPriority::defaultPriorityMapping));
     // Unwrapping gives a nicer gtest error.
     ASSERT_EQ(priority_loads.healthy_priority_load_.get(), expected_healthy_priority_load.get());
@@ -68,6 +69,7 @@ public:
   NiceMock<Upstream::MockPrioritySet> priority_set_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   Upstream::HealthyAndDegradedLoad original_priority_load_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(RetryPriorityTest, DefaultFrequency) {
@@ -115,7 +117,7 @@ TEST_F(RetryPriorityTest, PriorityMappingCallback) {
   EXPECT_CALL(*host2, priority()).Times(0);
 
   Upstream::RetryPriority::PriorityMappingFunc priority_mapping_func =
-      [&](const Upstream::HostDescription& host) -> absl::optional<uint32_t> {
+      [&](const Upstream::HostDescription& host) -> std::optional<uint32_t> {
     if (&host == host1.get()) {
       return 0;
     }
@@ -135,12 +137,12 @@ TEST_F(RetryPriorityTest, PriorityMappingCallback) {
   // only trying host1.
   retry_priority_->onHostAttempted(host2);
   Upstream::RetryPriority::PriorityMappingFunc priority_mapping_func_no_host2 =
-      [&](const Upstream::HostDescription& host) -> absl::optional<uint32_t> {
+      [&](const Upstream::HostDescription& host) -> std::optional<uint32_t> {
     if (&host == host1.get()) {
       return 0;
     }
     ASSERT(&host == host2.get());
-    return absl::nullopt;
+    return std::nullopt;
   };
   verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load,
                       priority_mapping_func_no_host2);

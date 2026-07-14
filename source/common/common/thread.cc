@@ -21,13 +21,13 @@ namespace {
 // tests more hermetic.
 struct ThreadIds {
   bool inMainThread() const {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return main_threads_to_usage_count_.find(std::this_thread::get_id()) !=
            main_threads_to_usage_count_.end();
   }
 
   bool isMainThreadActive() const {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return !main_threads_to_usage_count_.empty();
   }
 
@@ -36,7 +36,7 @@ struct ThreadIds {
 
   // Call this from the context of MainThread when it exits.
   void releaseMainThread() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     auto it = main_threads_to_usage_count_.find(std::this_thread::get_id());
     if (!skipAsserts()) {
       ASSERT(it != main_threads_to_usage_count_.end());
@@ -52,7 +52,7 @@ struct ThreadIds {
   // Declares current thread as the main one, or verifies that the current
   // thread matches any previous declarations.
   void registerMainThread() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     auto it = main_threads_to_usage_count_.find(std::this_thread::get_id());
     if (it == main_threads_to_usage_count_.end()) {
       it = main_threads_to_usage_count_.insert({std::this_thread::get_id(), 0}).first;
@@ -67,7 +67,7 @@ struct ThreadIds {
 
 private:
   mutable absl::Mutex mutex_;
-  std::atomic<uint32_t> skip_asserts_{};
+  std::atomic<uint32_t> skip_asserts_{0};
   absl::flat_hash_map<std::thread::id, uint32_t>
       main_threads_to_usage_count_ ABSL_GUARDED_BY(mutex_);
 };

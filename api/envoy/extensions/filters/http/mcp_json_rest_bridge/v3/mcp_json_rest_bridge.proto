@@ -1,0 +1,327 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.mcp_json_rest_bridge.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_json_rest_bridge.v3";
+option java_outer_classname = "McpJsonRestBridgeProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/mcp_json_rest_bridge/v3;mcp_json_rest_bridgev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MCP JSON REST Bridge]
+// [#extension: envoy.filters.http.mcp_json_rest_bridge]
+
+// Configuration for the MCP MCP JSON REST Bridge.
+//
+// This extension translates Model Context Protocol (MCP) JSON-RPC requests into standard JSON-REST
+// HTTP requests. This enables existing REST backends to function as MCP servers without native MCP
+// support.
+//
+// Main functionalities:
+//
+// 1. Transcoding: Converts JSON-RPC request payload to HTTP REST request, and maps JSON response
+//    back to JSON-RPC.
+// 2. Session negotiation: Handles MCP connection prerequisites.
+//
+// The core logic transforms "tools/call" request into HTTP request following the ``HttpRule``
+// specification.
+//
+// Example 1: GET request with path and query parameters
+//
+// .. code-block:: text
+//
+//   tools: {
+//     name: "getResource"
+//     http_rule: {
+//       get: "/v1/projects/{project_id}/resources/{resource_id}"
+//       // body is omitted for GET
+//     }
+//   }
+//   If tools/call params are:
+//   { "name": "getResource", "arguments": {"project_id": "foo", "resource_id": "res-789", "view": "FULL"} }
+//   Translation:
+//   - Method: GET
+//   - URL: /v1/projects/foo/resources/res-789?view=FULL
+//     (Arguments not matching path templates become query parameters.)
+//
+// Example 2: POST request with wildcard body
+//
+// .. code-block:: text
+//
+//   tools: {
+//     name: "createResource"
+//     http_rule: {
+//       post: "/v1/projects/{project_id}/resources"
+//       body: "*"
+//     }
+//   }
+//   If tools/call params are:
+//   { "name": "createResource", "arguments": {"project_id": "foo", "resource_id": "res-456", "payload": { "data": "some value" }} }
+//   Translation:
+//   - Method: POST
+//   - URL: /v1/projects/foo/resources
+//   - Body: {"resource_id": "res-456", "payload": { "data": "some value" }}
+//     (Arguments not used in the path form the body, as per body: "*".)
+//
+// Example 3: PUT request with a specific field as body
+//
+// .. code-block:: text
+//
+//   tools: {
+//     name: "updateResource"
+//     http_rule: {
+//       put: "/v1/projects/{project_id}"
+//       body: "payload"
+//     }
+//   }
+//   If tools/call params are:
+//   { "name": "updateResource", "arguments": {"project_id": "foo", "resource_id": "res-456", "payload": { "data": "updated value" }} }
+//   Translation:
+//   - Method: PUT
+//   - URL: /v1/projects/foo?resource_id=res-456
+//   - Body: {"data": "updated value"}
+//     (Only the "payload" field from arguments is used as the body. Other arguments not in the
+//     path, like 'resource_id', become query parameters.)
+// [#next-free-field: 8]
+message McpJsonRestBridge {
+  // Where to store parsed MCP request attributes.
+  enum RequestStorageMode {
+    // Unspecified. Uses default behavior (nothing is stored).
+    MODE_UNSPECIFIED = 0;
+
+    // Store request attributes in dynamic metadata. The metadata namespace
+    // is the filter's config name as specified by the ``name`` field in the
+    // ``http_filters`` list (e.g. ``envoy.filters.http.mcp_json_rest_bridge``
+    // if using the canonical filter name).
+    DYNAMIC_METADATA = 1;
+  }
+
+  // General server information.
+  ServerInfo server_info = 1;
+
+  // Configuration for the MCP tools.
+  ServerToolConfig tool_config = 2;
+
+  // Maximum size of the request body to buffer for transcoding and validation.
+  // If the request body exceeds this size, the request is rejected with ``413 Payload Too Large``.
+  // This limit applies to prevent unbounded buffering.
+  //
+  // It defaults to 64KB (65536 bytes) as the MCP calls (tools, resources, or prompts)
+  // only pass small arguments or identifiers.
+  //
+  // Setting it to 0 would disable the limit. It is not recommended to do so in production.
+  google.protobuf.UInt32Value max_request_body_size = 3;
+
+  // Maximum size of the response body to buffer for transcoding.
+  // If the response body exceeds this size, the response is rejected with an appropriate error.
+  // This limit applies to prevent unbounded buffering.
+  //
+  // It defaults to 1MB (1048576 bytes) to prevent transcoding failures on large payloads like
+  // file reads, while aligning with Envoy's standard default connection buffer limit.
+  //
+  // Setting it to 0 would disable the limit. It is not recommended to do so in production.
+  google.protobuf.UInt32Value max_response_body_size = 4;
+
+  // Where to store parsed MCP request attributes.
+  // Default is not storing anything.
+  // When set to ``DYNAMIC_METADATA``, attributes are stored in dynamic metadata
+  // using the filter's config name (i.e. the ``name`` field of this filter's entry
+  // in the ``http_filters`` list) as the metadata namespace.
+  RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // If set, extract OpenTelemetry (OTel) trace context from MCP requests and propagate it to
+  // request headers. The keys ``traceparent``, ``tracestate``, and ``baggage``
+  // will be extracted from ``_meta``.
+  // Ref: `Request Meta SEP <https://modelcontextprotocol.io/seps/414-request-meta>`_
+  TraceContextExtractionOptions trace_context_extraction = 6;
+
+  // When set to true, the filter will not clear the route cache after transcoding.
+  // This allows the route to be re-selected based on the updated request path or method.
+  bool disable_clear_route_cache = 7;
+}
+
+// Options for trace context extraction.
+message TraceContextExtractionOptions {
+}
+
+// Configuration for the server metadata.
+message ServerInfo {
+  // [#not-implemented-hide:]
+  // [#comment:TODO(guoyilin42): Implement supported_protocol_versions]
+  // Lists the MCP protocol versions supported by this MCP endpoint.
+  //
+  // - If provided: The extension enforces version negotiation according to the MCP specification:
+  //   https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation
+  // - If not provided: The extension accepts any version sent by the client during negotiation and
+  //   skips validation of the mcp-protocol-version header on subsequent requests.
+  //
+  // Example values: ["2025-11-25", "2025-06-18"]
+  repeated string supported_protocol_versions = 1;
+
+  // [#not-implemented-hide:]
+  // [#comment:TODO(guoyilin42): Implement description]
+  // Optional description of the server.
+  string description = 2;
+
+  // The fallback protocol version to use if the client does not provide the ``mcp-protocol-version`` header.
+  //
+  // - If provided: The extension uses this version as the fallback protocol version.
+  // - If not provided: The extension uses the fallback protocol version defined in the latest MCP
+  //   specification. For example, the current latest 2025-11-25 specification designates "2025-03-26"
+  //   as the fallback protocol version.
+  //   See https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
+  google.protobuf.StringValue fallback_protocol_version = 3;
+}
+
+// Configuration for sending locally-generated responses to tools/list requests.
+message ToolsListLocal {
+}
+
+// Configuration for the MCP tool capability of the server.
+// [#next-free-field: 6]
+message ServerToolConfig {
+  // List of MCP tools configurations.
+  repeated ToolConfig tools = 1;
+
+  // [#not-implemented-hide:]
+  // [#comment:TODO(guoyilin42): Implement list_changed]
+  // Whether this server supports notifications for changes to the tool list.
+  bool list_changed = 2;
+
+  // Optional configuration for tools/list requests. If not set: The ``tools/list`` request is
+  // passed through. This allows subsequent extension or the backend itself to handle the tools/list
+  // request if they support it.
+  oneof tool_list_config {
+    // Configuration to transcode the tools/list requests to a standard HTTP request. If provided:
+    // The extension transcodes the request and forwards it down the filter chain. The response
+    // (whether from an upstream backend, a configured ``direct_response``, or another extension)
+    // MUST be a JSON body strictly matching the MCP ``ListToolsResult`` schema. Ref:
+    // https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
+    HttpRule tool_list_http_rule = 3;
+
+    // If provided: The extension sends a local response, according to each tool's
+    // ToolsListSpecificConfig.
+    ToolsListLocal tool_list_local = 4;
+  }
+
+  // [#not-implemented-hide:]
+  // Default server info for tools without specific ones.
+  McpServerInfo default_server_info = 5;
+}
+
+// Configuration for a tool's entry in tools/list responses.
+message ToolsListSpecificConfig {
+  // Optional, human-readable name of the tool for display purposes.
+  string title = 1;
+
+  // Human-readable description of functionality.
+  string description = 2 [(validate.rules).string = {min_len: 1}];
+
+  // A JSON Schema describing expected parameters, as a serialized JSON string, in the JSON Schema
+  // 2020-12 dialect. This should be raw JSON, including the "properties" and "required" keys, but
+  // not "type". Tools with no parameters may omit this to signify a tool with no constraints on the
+  // parameters object, or set to '"additionalProperties": false' to require empty parameters.
+  string input_schema = 3;
+}
+
+message McpServerInfo {
+  // The path to the endpoint hosting this tool.
+  string path = 1;
+
+  // The host hosting this tool.
+  string host = 2;
+}
+
+// [#next-free-field: 6]
+message ToolConfig {
+  // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The HTTP configuration rules that apply to the normal backend.
+  HttpRule http_rule = 2;
+
+  // Config for this tool's entry in a local tools/list response. Used when tool_list_local is set
+  // in the ServerToolConfig.
+  ToolsListSpecificConfig tool_list_config = 3;
+
+  // Enables streaming transcoding for unstructured text responses (``content`` field of a result).
+  //
+  // When enabled, the response body is streamed directly to the client without buffering. Each
+  // chunk is JSON escaped as it arrives and wrapped with a pre-built JSON-RPC prefix and suffix.
+  //
+  // Streaming flow:
+  //
+  // .. code-block:: text
+  //
+  //   input:  [chunk1] → [chunk2] → [chunk3]
+  //   output: [prefix+escaped_chunk1] → [escaped_chunk2] → [escaped_chunk3+suffix]
+  //
+  // Disabled by default.
+  bool text_content_streaming_enabled = 4;
+
+  // [#not-implemented-hide:]
+  // Path and host of the MCP server that hosts this tool.
+  repeated McpServerInfo server_info = 5;
+}
+
+// Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
+// in a tools/call request are mapped to the URL path, query parameters, and HTTP request body.
+//
+// Mapping Rules:
+//
+// 1. Path: Fields defined in the path template (e.g., ``/v1/resources/{id}``) are extracted from
+//    arguments and placed in the URL.
+// 2. Body: Determined by the ``body`` field.
+//    - If "*": All arguments not used in the path become the HTTP JSON body.
+//    - If specify a field: Only that specific argument becomes the HTTP JSON body.
+//    - If empty: No body is sent.
+// 3. Query: Any leaf arguments not mapped to Path or Body are added as URL query parameters.
+// [#next-free-field: 7]
+message HttpRule {
+  // Determines the HTTP method and the URL path template.
+  //
+  // Path templating uses curly braces ``{}`` to mark a section of the URL path as replaceable.
+  // Each template variable MUST correspond to a field in the JSON-RPC "arguments".
+  // Use dot-notation to access fields within nested objects (e.g., "user.id" maps the value of the
+  // "id" field inside "user").
+  //
+  // To support backward compatibility with future methods, these are defined as individual fields
+  // rather than a "oneof". If multiple fields are present, the one with the highest field number
+  // highest priority) is the effective method.
+  //
+  // Maps to HTTP GET.
+  string get = 1;
+
+  // Maps to HTTP PUT.
+  string put = 2;
+
+  // Maps to HTTP POST.
+  string post = 3;
+
+  // Maps to HTTP DELETE.
+  string delete = 4;
+
+  // Maps to HTTP PATCH.
+  string patch = 5;
+
+  // The name of the request field whose value is mapped to the HTTP request body.
+  //
+  // - If "*": All fields not bound by the path template are mapped to the request body.
+  // - If specify a field: This specific field is mapped to the body. Uses dot-notation for nested
+  //   fields (e.g., "user.data" maps the value of the "data" field inside "user").
+  // - If omitted: There is no HTTP request body; fields not in the path become query parameters.
+  string body = 6;
+}
+
+// Per-route override configuration for the MCP JSON REST Bridge filter.
+message McpJsonRestBridgePerRoute {
+  repeated ServerToolConfig tool_config = 1;
+}

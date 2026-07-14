@@ -40,14 +40,14 @@ public:
   static constexpr int32_t MaxBodySize = 16 * 1024 * 1024;
 
 private:
-  SerializerPtr serializer_{};
+  SerializerPtr serializer_;
 };
 
 class DirectResponseUtil {
 public:
   static MessageMetadataSharedPtr heartbeatResponse(MessageMetadata& heartbeat_request);
   static MessageMetadataSharedPtr localResponse(MessageMetadata& request, ResponseStatus status,
-                                                absl::optional<RpcResponseType> type,
+                                                std::optional<RpcResponseType> type,
                                                 absl::string_view content);
 };
 

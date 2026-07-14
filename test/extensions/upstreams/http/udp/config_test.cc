@@ -14,7 +14,6 @@ namespace Http {
 namespace Udp {
 
 using ::testing::NiceMock;
-using ::testing::Return;
 
 class UdpGenericConnPoolFactoryTest : public ::testing::Test {
 public:
@@ -25,7 +24,7 @@ protected:
   Upstream::ResourcePriority priority_ = Upstream::ResourcePriority::Default;
   Upstream::HostConstSharedPtr host_;
   UdpGenericConnPoolFactory factory_;
-  ProtobufTypes::MessagePtr message_{new Envoy::ProtobufWkt::Struct()};
+  ProtobufTypes::MessagePtr message_{new Envoy::Protobuf::Struct()};
 };
 
 TEST_F(UdpGenericConnPoolFactoryTest, CreateValidUdpConnPool) {

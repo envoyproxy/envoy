@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -9,7 +10,6 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,11 +19,11 @@ namespace ConnectGrpcBridge {
 struct Error {
   Grpc::Status::GrpcStatus code;
   std::string message;
-  std::vector<ProtobufWkt::Any> details;
+  std::vector<Protobuf::Any> details;
 };
 
 struct EndStreamResponse {
-  absl::optional<Error> error;
+  std::optional<Error> error;
   absl::flat_hash_map<std::string, std::vector<std::string>> metadata;
 };
 

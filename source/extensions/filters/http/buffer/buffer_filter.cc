@@ -60,7 +60,7 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
-  callbacks_->setDecoderBufferLimit(settings_->maxRequestBytes());
+  callbacks_->setBufferLimit(settings_->maxRequestBytes());
   request_headers_ = &headers;
 
   return Http::FilterHeadersStatus::StopIteration;

@@ -27,7 +27,7 @@ class ActiveQuicListener : public Envoy::Server::ActiveUdpListenerBase,
                            Logger::Loggable<Logger::Id::quic> {
 public:
   // TODO(bencebeky): Tune this value.
-  static const size_t kNumSessionsToCreatePerLoop = 16;
+  static constexpr size_t kNumSessionsToCreatePerLoop = 16;
 
   ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
                      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
@@ -42,7 +42,7 @@ public:
                      QuicConnectionIdGeneratorPtr&& cid_generator,
                      QuicConnectionIdWorkerSelector worker_selector,
                      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-                     bool reject_new_connections = false);
+                     bool reject_new_connections = false, bool enable_session_idle_list = false);
 
   ~ActiveQuicListener() override;
 
@@ -72,6 +72,11 @@ public:
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onFilterChainDrainStart(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onListenerDrainStart() override;
+
+  void onCloseIdleHttpConnections(bool is_saturated) override;
 
 protected:
   Event::Dispatcher& dispatcher() { return dispatcher_; }
@@ -87,7 +92,7 @@ private:
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   const bool kernel_worker_routing_;
-  absl::optional<Runtime::FeatureFlag> enabled_{};
+  std::optional<Runtime::FeatureFlag> enabled_;
   Network::UdpPacketWriter* udp_packet_writer_;
 
   // The number of runs of the event loop in which at least one CHLO was buffered.
@@ -102,6 +107,10 @@ private:
   // During hot restart, an optional handler for packets that weren't for existing connections.
   OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
   Network::IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config_;
+  // Maximum number of QUIC sessions to create per event loop.
+  // This is an equivalent of max_connections_to_accept_per_socket_event for TCP
+  // listeners.
+  uint32_t max_sessions_per_event_loop_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
@@ -143,10 +152,9 @@ protected:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
-  absl::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
+  std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
       crypto_server_stream_factory_;
-  absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
-      proof_source_factory_;
+  std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>> proof_source_factory_;
   EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr connection_debug_visitor_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;

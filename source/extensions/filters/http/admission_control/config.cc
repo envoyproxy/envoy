@@ -22,6 +22,20 @@ AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& config,
     const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(config, stats_prefix, context, dual_info.scope);
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+AdmissionControlFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto_config, stats_prefix, context, context.scope());
+}
+
+absl::StatusOr<Http::FilterFactoryCb> AdmissionControlFilterFactory::createFilterFactory(
+    const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
+    Stats::Scope& scope) {
   if (config.has_sr_threshold() && config.sr_threshold().default_value().value() < 1.0) {
     return absl::InvalidArgumentError("Success rate threshold cannot be less than 1.0%.");
   }
@@ -51,9 +65,9 @@ AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
   }
 
   AdmissionControlFilterConfigSharedPtr filter_config =
-      std::make_shared<AdmissionControlFilterConfig>(
-          config, context.runtime(), context.api().randomGenerator(), dual_info.scope,
-          std::move(tls), std::move(response_evaluator));
+      std::make_shared<AdmissionControlFilterConfig>(config, context.runtime(),
+                                                     context.api().randomGenerator(), scope,
+                                                     std::move(tls), std::move(response_evaluator));
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));

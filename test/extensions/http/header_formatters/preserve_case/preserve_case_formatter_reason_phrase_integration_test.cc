@@ -2,7 +2,6 @@
 
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -11,13 +10,11 @@ namespace {
 
 struct TestParams {
   Network::Address::IpVersion ip_version;
-  Http1ParserImpl parser_impl;
   bool forward_reason_phrase;
 };
 
 std::string testParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
-                     TestUtility::http1ParserImplToString(p.param.parser_impl),
+  return fmt::format("{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
                      p.param.forward_reason_phrase ? "enabled" : "disabled");
 }
 
@@ -25,10 +22,8 @@ std::vector<TestParams> getTestsParams() {
   std::vector<TestParams> ret;
 
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    for (auto parser_impl : {Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser}) {
-      ret.push_back(TestParams{ip_version, parser_impl, true});
-      ret.push_back(TestParams{ip_version, parser_impl, false});
-    }
+    ret.push_back(TestParams{ip_version, true});
+    ret.push_back(TestParams{ip_version, false});
   }
 
   return ret;
@@ -43,11 +38,6 @@ public:
   void SetUp() override {
     setDownstreamProtocol(Http::CodecType::HTTP1);
     setUpstreamProtocol(Http::CodecType::HTTP1);
-    if (GetParam().parser_impl == Http1ParserImpl::BalsaParser) {
-      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
-    } else {
-      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
-    }
   }
 
   void initialize() override {
@@ -64,7 +54,7 @@ public:
             TestUtility::parseYaml<envoy::extensions::http::header_formatters::preserve_case::v3::
                                        PreserveCaseFormatterConfig>(fmt::format(
                 "forward_reason_phrase: {}", GetParam().forward_reason_phrase ? "true" : "false"));
-        typed_extension_config->mutable_typed_config()->PackFrom(config);
+        std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(config);
 
         ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                          protocol_options);

@@ -93,6 +93,10 @@ protected:
     return main_common_->adminRequest(StreamingEndpoint, "GET");
   }
 
+  AdminResponseSharedPtr streamingResponse(std::string endpoint) {
+    return main_common_->adminRequest(endpoint, "GET");
+  }
+
   /**
    * In order to trigger certain early-exit criteria in a test, we can exploit
    * the fact that all the admin responses are delivered on the main thread.
@@ -151,6 +155,23 @@ TEST_F(AdminStreamingTest, RequestGetStatsAndQuit) {
             response_data.num_bytes_);
   EXPECT_EQ(Http::Code::OK, response_data.code_);
   EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
+  EXPECT_TRUE(quitAndWait());
+}
+
+TEST_F(AdminStreamingTest, RequestForNotAllowedPath) {
+  AdminResponseSharedPtr response = streamingResponse("/status");
+  ResponseData response_data = runStreamingRequest(response);
+  EXPECT_EQ(1, response_data.num_chunks_);
+  EXPECT_EQ(35, response_data.num_bytes_);
+  EXPECT_EQ(Http::Code::Forbidden, response_data.code_);
+  EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
+  EXPECT_TRUE(quitAndWait());
+}
+
+TEST_F(AdminStreamingTest, RequestForAllowedPrefixPath) {
+  AdminResponseSharedPtr response = streamingResponse("/healthcheck/live");
+  ResponseData response_data = runStreamingRequest(response);
+  EXPECT_NE(Http::Code::OK, response_data.code_);
   EXPECT_TRUE(quitAndWait());
 }
 

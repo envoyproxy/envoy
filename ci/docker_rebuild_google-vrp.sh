@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Script to rebuild Dockerfile-envoy-google-vrp locally (i.e. not in CI) for development purposes.
+# Script to rebuild Dockerfile-envoy google-vrp target locally (i.e. not in CI) for development purposes.
 # This makes use of the latest envoy:dev base image on Docker Hub as the base and takes an
 # optional local path for an Envoy binary. When a custom local Envoy binary is used, the script
 # switches to using ${BASE_DOCKER_IMAGE} for the build, which should be configured to provide
@@ -22,7 +22,7 @@ set -e
 # Don't use the local envoy:dev, but pull from Docker Hub instead, this avoids having to rebuild
 # this local dep which is fairly stable.
 BASE_DOCKER_IMAGE="envoyproxy/envoy:dev"
-declare -r DOCKER_BUILD_FILE="ci/Dockerfile-envoy"
+declare -r DOCKER_BUILD_FILE="distribution/docker/Dockerfile-envoy"
 
 DOCKER_CONTEXT=.
 DOCKER_BUILD_ARGS=(

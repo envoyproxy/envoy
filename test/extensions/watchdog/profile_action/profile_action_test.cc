@@ -15,7 +15,6 @@
 #include "source/extensions/watchdog/profile_action/profile_action.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -112,11 +111,11 @@ TEST_F(ProfileActionTest, CanDoSingleProfile) {
   // Check that we can do at least a single profile
   dispatcher_->post([&tid_ltt_pairs, &now, this]() -> void {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   waitForOutstandingNotify();
   time_system_->advanceTimeWait(std::chrono::seconds(2));
 
@@ -151,11 +150,11 @@ TEST_F(ProfileActionTest, CanDoMultipleProfiles) {
   // Check that we can do at least a single profile
   dispatcher_->post([&tid_ltt_pairs, &now, this]() -> void {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   waitForOutstandingNotify();
   time_system_->advanceTimeWait(std::chrono::seconds(2));
 
@@ -169,7 +168,7 @@ TEST_F(ProfileActionTest, CanDoMultipleProfiles) {
   // Check we can do multiple profiles
   dispatcher_->post([&tid_ltt_pairs, &now, this]() -> void {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
@@ -210,11 +209,11 @@ TEST_F(ProfileActionTest, CannotTriggerConcurrentProfiles) {
     // This subsequent call should fail since the one prior starts a profile.
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
 
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   waitForOutstandingNotify();
   time_system_->advanceTimeWait(std::chrono::seconds(6));
 
@@ -248,11 +247,11 @@ TEST_F(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
 
   dispatcher_->post([&, this]() -> void {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   waitForOutstandingNotify();
   time_system_->advanceTimeWait(std::chrono::seconds(6));
 
@@ -280,11 +279,11 @@ TEST_F(ProfileActionTest, ShouldNotProfileIfNoTids) {
     std::vector<std::pair<Thread::ThreadId, MonotonicTime>> tid_ltt_pairs;
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs,
                  api_->timeSource().monotonicTime());
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   waitForOutstandingNotify();
   time_system_->advanceTimeWait(std::chrono::seconds(2));
 
@@ -316,11 +315,11 @@ TEST_F(ProfileActionTest, ShouldSaturatedMaxProfiles) {
 
   dispatcher_->post([&, this]() -> void {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   waitForOutstandingNotify();
   time_system_->advanceTimeWait(std::chrono::seconds(2));
 
@@ -335,7 +334,7 @@ TEST_F(ProfileActionTest, ShouldSaturatedMaxProfiles) {
   // Do another run of the watchdog action. It shouldn't have run again.
   dispatcher_->post([&, this]() -> void {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
@@ -375,12 +374,12 @@ TEST_F(ProfileActionTest, ShouldUpdateCountersCorrectly) {
   dispatcher_->post([this, &tid_ltt_pairs]() -> void {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs,
                  api_->timeSource().monotonicTime());
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     waitForOutstandingNotify();
     time_system_->advanceTimeWait(std::chrono::seconds(2));
   }
@@ -396,12 +395,12 @@ TEST_F(ProfileActionTest, ShouldUpdateCountersCorrectly) {
 
   dispatcher_->post([this, &tid_ltt_pairs, &now]() -> void {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     outstanding_notifies_ += 1;
   });
 
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     waitForOutstandingNotify();
     time_system_->advanceTimeWait(std::chrono::seconds(2));
   }

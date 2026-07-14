@@ -1,4 +1,3 @@
-#include "printers.h"
 #include "test/test_common/printers.h"
 
 #include <iostream>

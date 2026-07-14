@@ -35,7 +35,7 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg_cc_proto",
     ],
 )

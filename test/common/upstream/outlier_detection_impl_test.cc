@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,7 +26,6 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -91,7 +91,7 @@ public:
   void addHosts(std::vector<std::string> urls, bool primary = true) {
     HostVector& hosts = primary ? hosts_ : failover_hosts_;
     for (auto& url : urls) {
-      hosts.emplace_back(makeTestHost(cluster_.info_, url, simTime()));
+      hosts.emplace_back(makeTestHost(cluster_.info_, url));
     }
   }
 
@@ -103,7 +103,9 @@ public:
 
   void loadRq(HostSharedPtr host, int num_rq, int http_code) {
     for (int i = 0; i < num_rq; i++) {
-      host->outlierDetector().putHttpResponseCode(http_code);
+      host->outlierDetector().putResult(http_code >= 500 ? Result::ExtOriginRequestFailed
+                                                         : Result::ExtOriginRequestSuccess,
+                                        http_code);
     }
   }
 
@@ -366,6 +368,37 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
                      .value());
 }
 
+TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesButConsecutive5xxZero) {
+  empty_outlier_detection_.mutable_consecutive_5xx()->set_value(0);
+
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+
+  addHosts({"tcp://127.0.0.1:81"});
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({hosts_[1]}, {});
+
+  // Reporting HTTP codes (5xx) but consecutive_5xx is set to 0, so host should not be ejected.
+  loadRq(hosts_[0], 20, 500);
+
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(
+      0UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_consecutive_gateway_failure")
+                     .value());
+}
+
 /*
  Tests scenario when active health check clears the FAILED_OUTLIER_CHECK flag.
 */
@@ -564,7 +597,7 @@ TEST_F(OutlierDetectorImplTest, ConnectSuccessWithOptionalHTTP_OK) {
   // such scenario is used by tcp_proxy.
   for (auto i = 0; i < 100; i++) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginConnectSuccess,
-                                           absl::optional<uint64_t>(enumToInt(Http::Code::OK)));
+                                           std::optional<uint64_t>(enumToInt(Http::Code::OK)));
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginConnectFailed);
   }
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -804,7 +837,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
       runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout,
-                                           absl::optional<uint64_t>(500));
+                                           std::optional<uint64_t>(500));
   }
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -826,7 +859,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
   n = runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout,
-                                           absl::optional<uint64_t>(200));
+                                           std::optional<uint64_t>(200));
   }
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -1698,7 +1731,7 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
-  hosts_[0]->outlierDetector().putHttpResponseCode(500);
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestFailed, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   loadRq(hosts_[1], 5, 500);
@@ -1777,7 +1810,7 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
-  hosts_[0]->outlierDetector().putHttpResponseCode(500);
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestFailed, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   // Expect active helper_ has the value 1. However, helper is private and it cannot be tested.
@@ -1791,6 +1824,54 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
   EXPECT_EQ(2UL, outlier_detection_ejections_active_.value());
   EXPECT_EQ(1UL,
             cluster_.info_->stats_store_.counter("outlier_detection.ejections_overflow").value());
+}
+
+// Regression test for the degraded-host outlier-detection null dereference when a host is removed
+// while a cross-thread degrade post is in flight. setHostDegraded() posts to the main thread;
+// setHostDegradedMainThread() then does host_monitors_[host]->degrade(...). Unlike the eject path
+// (which guards `if (host_monitors_.count(host) == 0) return;`), the degrade path had no such
+// guard, so if a cluster update removes the host (host_monitors_.erase) before the posted callback
+// runs, host_monitors_[host] default-inserts a null monitor and ->degrade() dereferences it. We
+// reproduce the interleaving deterministically (no real threads) by intercepting the post, removing
+// the host, then firing the captured callback.
+// PRE-fix: ->degrade() on a null DetectorHostMonitorImpl -> crash. POST-fix: the removed host is
+// skipped and the test completes cleanly.
+TEST_F(OutlierDetectorImplTest, CrossThreadDegradeRemoveRace) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 30s
+consecutive_5xx: 5
+detect_degraded_hosts: true
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Report a degraded response; capture (do not run) the resulting main-thread post.
+  Event::PostCb post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+
+  // Remove the host before the cross-thread degrade event is delivered (host_monitors_.erase).
+  HostVector old_hosts = std::move(hosts_);
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
+
+  // Fire the deferred degrade callback against the now-removed host.
+  // PRE-fix this dereferences a null monitor and crashes; POST-fix it is a no-op.
+  ASSERT_TRUE(post_cb != nullptr);
+  post_cb();
+
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 }
 
 TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
@@ -2640,7 +2721,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2018-12-18T09:00:00Z"
   time_system.setSystemTime(std::chrono::milliseconds(1545123600000));
-  absl::optional<MonotonicTime> monotonic_time;
+  std::optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
 
   EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{
@@ -2756,6 +2837,378 @@ TEST(OutlierUtility, SRThreshold) {
       DetectorImpl::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(90.0, success_rate_nums.success_rate_average_); // average success rate
   EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   //  ejection threshold
+}
+
+TEST_F(OutlierDetectorImplTest, DegradedHostDetection) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 30s
+consecutive_5xx: 5
+detect_degraded_hosts: true
+  )EOF";
+
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Host should initially not be degraded
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Report a degraded response
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0)); // Jitter = 0
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+
+  // Host should now be marked as degraded
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // But not ejected
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  // Report a successful response - should NOT immediately clear degraded state
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestSuccess, 200);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Timer-based recovery: advance time past base_ejection_time (30s)
+  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  // Host should now be undegraded
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+}
+
+TEST_F(OutlierDetectorImplTest, DegradedHostDetectionDisabled) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 30s
+consecutive_5xx: 5
+detect_degraded_hosts: false
+  )EOF";
+
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+
+  // Host should initially not be degraded
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Report a degraded response with feature disabled
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+
+  // Host should NOT be marked as degraded since feature is disabled
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+}
+
+TEST_F(OutlierDetectorImplTest, DegradedDoesResetConsecutive5xx) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 30s
+consecutive_5xx: 3
+max_ejection_percent: 100
+detect_degraded_hosts: true
+  )EOF";
+
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Send 2 consecutive 5xx errors
+  loadRq(hosts_[0], 2, 500);
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Send a degraded response - should reset consecutive counters
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0)); // Jitter = 0
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Send 2 more 5xx errors - should not eject since counters were reset
+  loadRq(hosts_[0], 2, 500);
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // One more 5xx should trigger ejection (3rd consecutive)
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
+// Test that 5xx errors trigger ejection even with degraded header present.
+// This ensures ejection has priority over degradation.
+TEST_F(OutlierDetectorImplTest, EjectionHasPriorityOverDegradation) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 30s
+consecutive_5xx: 3
+max_ejection_percent: 100
+detect_degraded_hosts: true
+  )EOF";
+
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Send 5xx errors - these should count towards ejection
+  loadRq(hosts_[0], 2, 500);
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Send the 3rd 5xx which should trigger ejection (consecutive_5xx: 3)
+  // Even if the actual HTTP response had a degraded header, router.cc ensures
+  // that 5xx responses trigger ExtOriginRequestFailed, not ExtOriginRequestDegraded
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, 500);
+
+  // Host should be EJECTED (not degraded) because 5xx has priority over degradation
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+}
+
+// Test that backoff decrements after host has been healthy for one interval
+TEST_F(OutlierDetectorImplTest, DegradedBackoffDecrement) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 30s
+max_ejection_time: 300s
+consecutive_5xx: 5
+detect_degraded_hosts: true
+  )EOF";
+
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // First degradation
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Undegrade after base_ejection_time
+  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Degrade again
+  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Undegrade again - should happen at 2x base_ejection_time (60s) due to backoff = 2
+  time_system_.setMonotonicTime(std::chrono::milliseconds(100001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Wait one more interval (10s) while host is healthy - backoff should decrement from 2 to 1
+  time_system_.setMonotonicTime(std::chrono::milliseconds(110002));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  // Degrade again - backoff was 1, will increment to 2, so use 2x base_ejection_time
+  time_system_.setMonotonicTime(std::chrono::milliseconds(120000));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Should undegrade at 2x base_ejection_time (60s) - backoff went from 1->2 on degrade
+  time_system_.setMonotonicTime(std::chrono::milliseconds(180001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+}
+
+// Test multiple degrades with backoff increment and max backoff
+TEST_F(OutlierDetectorImplTest, DegradedBackoffIncrementAndMax) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 10s
+max_ejection_time: 30s
+consecutive_5xx: 5
+detect_degraded_hosts: true
+  )EOF";
+
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // First degradation - backoff = 1, undegrade at 1x base (10s)
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Second degradation - backoff = 2, undegrade at 2x base (20s)
+  time_system_.setMonotonicTime(std::chrono::milliseconds(11000));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(31001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Third degradation - backoff = 3, would be 3x base (30s) which equals max_ejection_time
+  time_system_.setMonotonicTime(std::chrono::milliseconds(32000));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(62001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Fourth degradation - backoff should stay at 3 (max) not increment to 4
+  time_system_.setMonotonicTime(std::chrono::milliseconds(63000));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+
+  // Should still undegrade at max (30s), not 4x base (40s)
+  time_system_.setMonotonicTime(std::chrono::milliseconds(93001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+}
+
+// Test degradation with non-zero jitter
+TEST_F(OutlierDetectorImplTest, DegradedWithJitter) {
+  const std::string yaml = R"EOF(
+interval: 10s
+base_ejection_time: 30s
+max_ejection_time_jitter: 5s
+consecutive_5xx: 5
+detect_degraded_hosts: true
+  )EOF";
+
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Degrade with jitter = 3000ms (random() % 5001)
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(random_, random()).WillOnce(Return(3000));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Should NOT undegrade at base_ejection_time (30s) without jitter
+  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+
+  // Should undegrade at base_ejection_time + jitter (30s + 3s = 33s)
+  time_system_.setMonotonicTime(std::chrono::milliseconds(33001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 }
 
 } // namespace

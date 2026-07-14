@@ -7,7 +7,6 @@
 #include "source/common/tls/cert_validator/san_matcher.h"
 
 #include "absl/strings/str_replace.h"
-#include "openssl/err.h"
 #include "openssl/safestack.h"
 #include "openssl/x509v3.h"
 #include "utility.h"
@@ -16,6 +15,40 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+namespace {
+// There must be an version of this function for each type possible in variant `CachedValue`.
+bool shouldRecalculateCachedEntry(const std::string& str) { return str.empty(); }
+bool shouldRecalculateCachedEntry(const std::vector<std::string>& vec) { return vec.empty(); }
+bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return ptr == nullptr; }
+bool shouldRecalculateCachedEntry(const bssl::UniquePtr<GENERAL_NAMES>& ptr) {
+  return ptr == nullptr;
+}
+
+// Convert a single X509 certificate to a PEM-encoded string.
+std::string certToPem(X509& cert) {
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+  RELEASE_ASSERT(buf != nullptr, "");
+  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), &cert) == 1, "");
+  const uint8_t* output;
+  size_t length;
+  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
+  return std::string(reinterpret_cast<const char*>(output), length);
+}
+
+// Iterate the peer certificate chain, converting each certificate to PEM and calling the provided
+// callback. Does nothing if the chain is not available.
+void forEachPeerCertPem(SSL* ssl, std::function<void(const std::string&)> cb) {
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+  if (cert_chain == nullptr) {
+    return;
+  }
+  for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
+    cb(certToPem(*sk_X509_value(cert_chain, i)));
+  }
+}
+} // namespace
 
 template <typename ValueType>
 const ValueType&
@@ -26,6 +59,16 @@ ConnectionInfoImplBase::getCachedValueOrCreate(CachedValueTag tag,
     const ValueType* val = absl::get_if<ValueType>(&it->second);
     ASSERT(val != nullptr, "Incorrect type in variant");
     if (val != nullptr) {
+
+      // Some values are retrieved too early, for example if properties of a peer certificate are
+      // retrieved before the handshake is complete, an empty value is cached. The value must be
+      // in the cache, so that we can return a valid reference, but in those cases if another caller
+      // later retrieves the same value, we must recalculate the value.
+      if (shouldRecalculateCachedEntry(*val)) {
+        it->second = create(ssl());
+        val = &absl::get<ValueType>(it->second);
+      }
+
       return *val;
     }
   }
@@ -102,12 +145,7 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
         if (!cert) {
           return std::string{};
         }
-
-        std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-        unsigned int n;
-        X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
-        RELEASE_ASSERT(n == computed_hash.size(), "");
-        return Hex::encode(computed_hash);
+        return Utility::getSha256DigestFromCertificate(*cert);
       });
 }
 
@@ -120,11 +158,7 @@ absl::Span<const std::string> ConnectionInfoImplBase::sha256PeerCertificateChain
         }
 
         return Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
-          std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-          unsigned int n;
-          X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
-          RELEASE_ASSERT(n == computed_hash.size(), "");
-          return Hex::encode(computed_hash);
+          return Utility::getSha256DigestFromCertificate(cert);
         });
       });
 }
@@ -136,12 +170,7 @@ const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
         if (!cert) {
           return std::string{};
         }
-
-        std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
-        unsigned int n;
-        X509_digest(cert.get(), EVP_sha1(), computed_hash.data(), &n);
-        RELEASE_ASSERT(n == computed_hash.size(), "");
-        return Hex::encode(computed_hash);
+        return Utility::getSha1DigestFromCertificate(*cert);
       });
 }
 
@@ -154,11 +183,7 @@ absl::Span<const std::string> ConnectionInfoImplBase::sha1PeerCertificateChainDi
         }
 
         return Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
-          std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
-          unsigned int n;
-          X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
-          RELEASE_ASSERT(n == computed_hash.size(), "");
-          return Hex::encode(computed_hash);
+          return Utility::getSha1DigestFromCertificate(cert);
         });
       });
 }
@@ -170,39 +195,51 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate()
         if (!cert) {
           return std::string{};
         }
+        return Envoy::Http::Utility::PercentEncoding::urlEncode(certToPem(*cert));
+      });
+}
 
-        bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-        RELEASE_ASSERT(buf != nullptr, "");
-        RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
-        const uint8_t* output;
-        size_t length;
-        RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
-        absl::string_view pem(reinterpret_cast<const char*>(output), length);
-        return Envoy::Http::Utility::PercentEncoding::urlEncode(pem);
+const std::string& ConnectionInfoImplBase::pemEncodedPeerCertificate() const {
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::PemEncodedPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::string{};
+        }
+        return certToPem(*cert);
       });
 }
 
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateChain() const {
   return getCachedValueOrCreate<std::string>(
       CachedValueTag::UrlEncodedPemEncodedPeerCertificateChain, [](SSL* ssl) {
-        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
-        if (cert_chain == nullptr) {
-          return std::string{};
-        }
-
         std::string result;
-        for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
-          X509* cert = sk_X509_value(cert_chain, i);
-
-          bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-          RELEASE_ASSERT(buf != nullptr, "");
-          RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert) == 1, "");
-          const uint8_t* output;
-          size_t length;
-          RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
-
-          absl::string_view pem(reinterpret_cast<const char*>(output), length);
+        forEachPeerCertPem(ssl, [&result](const std::string& pem) {
           absl::StrAppend(&result, Envoy::Http::Utility::PercentEncoding::urlEncode(pem));
+        });
+        return result;
+      });
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::pemEncodedPeerCertificateChain() const {
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::PemEncodedPeerCertificateChain, [](SSL* ssl) {
+        std::vector<std::string> result;
+        forEachPeerCertPem(ssl, [&result](const std::string& pem) { result.emplace_back(pem); });
+        return result;
+      });
+}
+
+absl::Span<const std::string>
+ConnectionInfoImplBase::pemEncodedValidatedPeerCertificateChain() const {
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::PemEncodedValidatedPeerCertificateChain, [this](SSL*) {
+        std::vector<std::string> result;
+        OptRef<const std::vector<bssl::UniquePtr<X509>>> chain = validatedPeerCertChain();
+        if (chain.has_value()) {
+          for (const auto& cert : *chain) {
+            result.emplace_back(certToPem(*cert));
+          }
         }
         return result;
       });
@@ -330,6 +367,17 @@ std::string ConnectionInfoImplBase::ciphersuiteString() const {
   return SSL_CIPHER_get_name(cipher);
 }
 
+uint16_t ConnectionInfoImplBase::tlsGroupId() const { return SSL_get_group_id(ssl()); }
+
+absl::string_view ConnectionInfoImplBase::tlsGroupString() const {
+  const char* group = SSL_get_group_name(tlsGroupId());
+  if (group == nullptr) {
+    return {};
+  }
+
+  return group;
+}
+
 const std::string& ConnectionInfoImplBase::tlsVersion() const {
   return getCachedValueOrCreate<std::string>(
       CachedValueTag::TlsVersion, [](SSL* ssl) { return std::string(SSL_get_version(ssl)); });
@@ -392,6 +440,28 @@ const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
   });
 }
 
+const std::string& ConnectionInfoImplBase::sha256PeerCertificateIssuerDigest() const {
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::Sha256PeerCertificateIssuerDigest, [this](SSL*) -> std::string {
+        X509* issuer = validatedPeerIssuer();
+        if (!issuer) {
+          return std::string{};
+        }
+        return Utility::getSha256DigestFromCertificate(*issuer);
+      });
+}
+
+const std::string& ConnectionInfoImplBase::serialNumberPeerCertificateIssuer() const {
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::SerialNumberPeerCertificateIssuer, [this](SSL*) -> std::string {
+        X509* issuer = validatedPeerIssuer();
+        if (!issuer) {
+          return std::string{};
+        }
+        return Utility::getSerialNumberFromCertificate(*issuer);
+      });
+}
+
 const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
   return getCachedValueOrCreate<std::string>(CachedValueTag::SubjectPeerCertificate, [](SSL* ssl) {
     bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
@@ -415,7 +485,7 @@ Ssl::ParsedX509NameOptConstRef ConnectionInfoImplBase::parsedSubjectPeerCertific
   if (parsedName) {
     return {*parsedName};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
@@ -428,18 +498,18 @@ const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
   });
 }
 
-absl::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
+std::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return Utility::getValidFrom(*cert);
 }
 
-absl::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() const {
+std::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return Utility::getExpirationTime(*cert);
 }

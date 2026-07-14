@@ -1,7 +1,9 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,8 +28,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/server_stats.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -116,7 +116,7 @@ public:
       return *this;
     }
 
-    ServerSslOptions& setVerifyDepth(absl::optional<uint32_t> depth) {
+    ServerSslOptions& setVerifyDepth(std::optional<uint32_t> depth) {
       max_verify_depth_ = depth;
       return *this;
     }
@@ -164,12 +164,11 @@ public:
     bool keylog_multiple_ips_{false};
     std::string keylog_path_;
     Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
-    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
-        san_matchers_{};
+    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
     std::string tls_cert_selector_yaml_{""};
     bool client_with_intermediate_cert_{false};
     bool trust_root_only_{false};
-    absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
+    std::optional<uint32_t> max_verify_depth_{std::nullopt};
   };
 
   // Sets up config with the provided bootstrap.
@@ -226,8 +225,6 @@ public:
   static std::string smallBufferFilter();
   // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
-  // A string for a squash filter which can be used with prependFilter()
-  static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
   // A cluster that uses the startTls transport socket.
@@ -281,8 +278,17 @@ public:
                                                              const std::string& address,
                                                              const std::string& stat_prefix);
 
-  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
-                                                                       const std::string& cluster);
+  static envoy::config::route::v3::RouteConfiguration
+  buildRouteConfig(const std::string& name, const std::string& cluster,
+                   bool header_mutations = false);
+
+  static envoy::config::route::v3::RouteConfiguration
+  buildRouteConfigWithVhdsOverAds(const std::string& name);
+
+  static envoy::config::route::v3::VirtualHost buildVirtualHost(const std::string& name,
+                                                                const std::string& domain,
+                                                                const std::string& prefix,
+                                                                const std::string& cluster);
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
@@ -362,7 +368,7 @@ public:
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
           configure_tls_context,
-      bool enable_quic_early_data = true);
+      bool enable_quic_early_data = true, bool enable_quic_resumption = true);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
@@ -417,6 +423,14 @@ public:
   // Set limits on pending upstream outbound frames.
   void setUpstreamOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
 
+  // Set limits on HTTP/2 concurrent streams.
+  void setDownstreamHttp2MaxConcurrentStreams(uint32_t max_streams);
+  void setUpstreamHttp2MaxConcurrentStreams(uint32_t max_streams);
+
+  // Set limits on HTTP/2 window sizes.
+  void setDownstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window);
+  void setUpstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window);
+
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v3::Bootstrap& bootstrap() { return bootstrap_; }
 
@@ -426,7 +440,7 @@ public:
   // Configure Envoy to do TLS to upstream.
   void configureUpstreamTls(
       bool use_alpn = false, bool http3 = false,
-      absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
           alternate_protocol_cache_config = {},
       std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
           configure_tls_context = nullptr);
@@ -439,7 +453,7 @@ public:
   void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
   // Add typed_filter_metadata to the first listener.
-  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
+  void addListenerTypedMetadata(absl::string_view key, Protobuf::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
@@ -449,8 +463,8 @@ public:
   // CONNECT requests.
   static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post,
                                bool http3 = false,
-                               absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
-                                   proxy_protocol_version = absl::nullopt);
+                               std::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
+                                   proxy_protocol_version = std::nullopt);
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT-UDP requests.
   static void setConnectUdpConfig(HttpConnectionManager& hcm, bool terminate_connect,
@@ -505,7 +519,7 @@ private:
     RELEASE_ASSERT(!finalized_, "");
     auto* filter_config_any = getFilterFromListener(name)->mutable_typed_config();
 
-    filter_config_any->PackFrom(filter);
+    std::ignore = filter_config_any->PackFrom(filter);
   }
 
   // Load the first FilterType struct from the first listener filters into a parsed proto.
@@ -527,7 +541,7 @@ private:
     RELEASE_ASSERT(!finalized_, "");
     auto* filter_config_any = getListenerFilterFromListener(name)->mutable_typed_config();
 
-    filter_config_any->PackFrom(filter);
+    std::ignore = filter_config_any->PackFrom(filter);
   }
 
   // Finds the filter named 'name' from the first filter chain from the first listener.

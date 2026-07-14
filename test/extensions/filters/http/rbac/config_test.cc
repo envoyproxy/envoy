@@ -7,7 +7,6 @@
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -44,7 +43,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_action->set_name("action");
-  matcher_action->mutable_typed_config()->PackFrom(action);
+  std::ignore = matcher_action->mutable_typed_config()->PackFrom(action);
   envoy::extensions::filters::http::rbac::v3::RBAC config;
   *config.mutable_matcher() = matcher;
 
@@ -58,14 +57,17 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBAC*>(
-                         factory.createEmptyConfigProto().get()));
+  EXPECT_NE(nullptr,
+            Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::rbac::v3::RBAC>(
+                factory.createEmptyConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBACPerRoute*>(
-                         factory.createEmptyRouteConfigProto().get()));
+  EXPECT_NE(
+      nullptr,
+      Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::rbac::v3::RBACPerRoute>(
+          factory.createEmptyRouteConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, InvalidMatcherProto) {
@@ -119,6 +121,22 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
                                            ProtobufMessage::getNullValidationVisitor())
           .value();
   EXPECT_TRUE(route_config.get());
+}
+
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProtoWithServerContext) {
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+  (*config.mutable_rules()->mutable_policies())["foo"] = policy;
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  RoleBasedAccessControlFilterConfigFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
 }
 
 } // namespace

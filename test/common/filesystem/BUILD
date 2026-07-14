@@ -34,10 +34,12 @@ envoy_cc_test(
     srcs = ["watcher_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/common:exception_lib",
         "//source/common/common:assert_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/filesystem:watcher_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
     ],
 )

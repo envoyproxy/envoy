@@ -1,6 +1,7 @@
 #include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager_impl.h"
 
 #include <functional>
+#include <optional>
 
 #include "source/common/common/fmt.h"
 
@@ -72,7 +73,7 @@ void SharedConsumerManagerImpl::removeCallback(const RecordCbSharedPtr& callback
 }
 
 void SharedConsumerManagerImpl::registerConsumerIfAbsent(const std::string& topic) {
-  absl::MutexLock lock(&consumers_mutex_);
+  absl::MutexLock lock(consumers_mutex_);
   const auto it = topic_to_consumer_.find(topic);
   // Return consumer already present or create new one and register it.
   if (topic_to_consumer_.end() == it) {
@@ -84,7 +85,7 @@ void SharedConsumerManagerImpl::registerNewConsumer(const std::string& topic) {
   ENVOY_LOG(debug, "Creating consumer for topic [{}]", topic);
 
   // Compute which upstream cluster corresponds to the topic.
-  const absl::optional<ClusterConfig> cluster_config =
+  const std::optional<ClusterConfig> cluster_config =
       configuration_.computeClusterConfigForTopic(topic);
   if (!cluster_config) {
     throw EnvoyException(
@@ -101,7 +102,7 @@ void SharedConsumerManagerImpl::registerNewConsumer(const std::string& topic) {
 }
 
 size_t SharedConsumerManagerImpl::getConsumerCountForTest() const {
-  absl::MutexLock lock(&consumers_mutex_);
+  absl::MutexLock lock(consumers_mutex_);
   return topic_to_consumer_.size();
 }
 
@@ -145,7 +146,7 @@ void RecordDistributor::receive(InboundRecordSharedPtr record) {
   bool consumed_by_callback = false;
 
   {
-    absl::MutexLock lock(&callbacks_mutex_);
+    absl::MutexLock lock(callbacks_mutex_);
     auto& callbacks = partition_to_callbacks_[kafka_partition];
 
     std::vector<RecordCbSharedPtr> satisfied_callbacks = {};
@@ -183,7 +184,7 @@ void RecordDistributor::receive(InboundRecordSharedPtr record) {
 
   // No-one is interested in our record, so we are going to store it in a local cache.
   if (!consumed_by_callback) {
-    absl::MutexLock lock(&stored_records_mutex_);
+    absl::MutexLock lock(stored_records_mutex_);
     auto& stored_records = stored_records_[kafka_partition];
     // XXX (adam.kotwasinski) Implement some kind of limit.
     stored_records.push_back(record);
@@ -208,7 +209,7 @@ void RecordDistributor::processCallback(const RecordCbSharedPtr& callback) {
   // Usual path: the request was not fulfilled at receive time (there were no stored messages).
   // So we just register the callback.
   TopicToPartitionsMap requested = callback->interest();
-  absl::MutexLock lock(&callbacks_mutex_);
+  absl::MutexLock lock(callbacks_mutex_);
   for (const auto& topic_and_partitions : requested) {
     const std::string topic = topic_and_partitions.first;
     for (const int32_t partition : topic_and_partitions.second) {
@@ -221,7 +222,7 @@ void RecordDistributor::processCallback(const RecordCbSharedPtr& callback) {
 
 bool RecordDistributor::passRecordsToCallback(const RecordCbSharedPtr& callback) {
   TopicToPartitionsMap requested = callback->interest();
-  absl::MutexLock lock(&stored_records_mutex_);
+  absl::MutexLock lock(stored_records_mutex_);
 
   for (const auto& topic_and_partitions : requested) {
     for (const int32_t partition : topic_and_partitions.second) {
@@ -289,7 +290,7 @@ bool RecordDistributor::passPartitionRecordsToCallback(const RecordCbSharedPtr& 
 }
 
 void RecordDistributor::removeCallback(const RecordCbSharedPtr& callback) {
-  absl::MutexLock lock(&callbacks_mutex_);
+  absl::MutexLock lock(callbacks_mutex_);
   doRemoveCallback(callback);
 }
 
@@ -315,19 +316,19 @@ int32_t countForTest(const std::string& topic, const int32_t partition, Partitio
   if (map.end() != it) {
     return it->second.size();
   } else {
-    return -1; // Tests are simpler to type if we do this instead of absl::optional.
+    return -1; // Tests are simpler to type if we do this instead of std::optional.
   }
 }
 
 int32_t RecordDistributor::getCallbackCountForTest(const std::string& topic,
                                                    const int32_t partition) const {
-  absl::MutexLock lock(&callbacks_mutex_);
+  absl::MutexLock lock(callbacks_mutex_);
   return countForTest(topic, partition, partition_to_callbacks_);
 }
 
 int32_t RecordDistributor::getRecordCountForTest(const std::string& topic,
                                                  const int32_t partition) const {
-  absl::MutexLock lock(&stored_records_mutex_);
+  absl::MutexLock lock(stored_records_mutex_);
   return countForTest(topic, partition, stored_records_);
 }
 

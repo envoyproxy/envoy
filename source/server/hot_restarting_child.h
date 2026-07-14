@@ -28,7 +28,7 @@ public:
     // This is called from the thread to which the hot restart Event::Dispatcher
     // dispatches, which is expected to be the same main thread as registerListener
     // is called from.
-    absl::optional<ForwardEntry>
+    std::optional<ForwardEntry>
     getListenerForDestination(const Network::Address::Instance& address);
 
     // Registers a UdpListenerConfig and address into the map, to be matched using
@@ -50,7 +50,8 @@ public:
   void initialize(Event::Dispatcher& dispatcher);
   void shutdown();
 
-  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
+  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
+                                  absl::string_view network_namespace);
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
                                      std::shared_ptr<Network::UdpListenerConfig> listener_config);
   // From Network::ParentDrainedCallbackRegistrar.
@@ -58,7 +59,7 @@ public:
                                      absl::AnyInvocable<void()> action) override;
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
-  absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
+  std::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
   void sendParentTerminateRequest();
   void mergeParentStats(Stats::Store& stats_store,
                         const envoy::HotRestartMessage::Reply::Stats& stats_proto);
@@ -80,7 +81,7 @@ private:
   const bool skip_parent_stats_;
   sockaddr_un parent_address_;
   sockaddr_un parent_address_udp_forwarding_;
-  std::unique_ptr<Stats::StatMerger> stat_merger_{};
+  std::unique_ptr<Stats::StatMerger> stat_merger_;
   Stats::StatName hot_restart_generation_stat_name_;
   // There are multiple listener instances per address that must all be reactivated
   // when the parent is drained, so a multimap is used to contain them.

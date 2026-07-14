@@ -1,13 +1,16 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/network/connection_impl.h"
 
 #include "test/common/tls/integration/ssl_integration_test_base.h"
 #include "test/extensions/common/tap/common.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Ssl {
 
@@ -41,10 +44,12 @@ public:
     transport_socket->set_name("envoy.transport_sockets.tap");
     envoy::config::core::v3::TransportSocket raw_transport_socket;
     raw_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
+    std::ignore = raw_transport_socket.mutable_typed_config()->PackFrom(raw_buffer_config);
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
-    transport_socket->mutable_typed_config()->PackFrom(tap_config);
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
   void setupDownstreamTap(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -59,7 +64,7 @@ public:
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(ssl_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-    transport_socket->mutable_typed_config()->PackFrom(tap_config);
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
   envoy::extensions::transport_sockets::tap::v3::Tap
@@ -77,9 +82,30 @@ public:
     }
     output_config->set_streaming(streaming_tap_);
 
+    // Only for streamed trace
+    if (sending_streamed_msg_on_configured_size_) {
+      output_config->mutable_min_streamed_sent_bytes()->set_value(min_streamed_sent_bytes_);
+    }
     auto* output_sink = output_config->mutable_sinks()->Add();
     output_sink->set_format(format_);
     output_sink->mutable_file_per_tap()->set_path_prefix(path_prefix_);
+    auto* socket_tap_config = tap_config.mutable_socket_tap_config();
+    // Only for streaming trace
+    socket_tap_config->set_set_connection_per_event(set_connection_per_event_);
+
+    if (tap_enabled_numerator_.has_value()) {
+      auto* tap_enabled =
+          tap_config.mutable_common_config()->mutable_static_config()->mutable_tap_enabled();
+      tap_enabled->mutable_default_value()->set_numerator(tap_enabled_numerator_.value());
+      tap_enabled->mutable_default_value()->set_denominator(
+          envoy::type::v3::FractionalPercent::HUNDRED);
+    }
+
+    // stats for both streaming and buffered trace
+    if (pegging_counter_) {
+      socket_tap_config->set_stats_prefix("tranTapPrefix");
+    }
+
     tap_config.mutable_transport_socket()->MergeFrom(inner_transport);
     return tap_config;
   }
@@ -87,10 +113,15 @@ public:
   std::string path_prefix_ = TestEnvironment::temporaryPath("ssl_trace");
   envoy::config::tap::v3::OutputSink::Format format_{
       envoy::config::tap::v3::OutputSink::PROTO_BINARY};
-  absl::optional<uint64_t> max_rx_bytes_;
-  absl::optional<uint64_t> max_tx_bytes_;
+  std::optional<uint64_t> max_rx_bytes_;
+  std::optional<uint64_t> max_tx_bytes_;
   bool upstream_tap_{};
   bool streaming_tap_{};
+  bool set_connection_per_event_{false};
+  bool pegging_counter_{false};
+  bool sending_streamed_msg_on_configured_size_{false};
+  unsigned int min_streamed_sent_bytes_{9};
+  std::optional<uint32_t> tap_enabled_numerator_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslTapIntegrationTest,
@@ -128,7 +159,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
       *codec_client_->connection()->connectionInfoProvider().localAddress(),
       expected_remote_address);
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
   envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
@@ -161,7 +192,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_EQ(256, response->body().size());
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(2));
   TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, *api_);
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.socket_buffered_trace().trace_id());
@@ -208,7 +239,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
 
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
 
   envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
@@ -235,7 +266,7 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
   envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
@@ -266,7 +297,7 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
   testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
   test_server_.reset();
 
   // This must be done after server shutdown so that connection pool connections are closed and
@@ -302,7 +333,7 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
   checkStats();
   codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
   test_server_.reset();
 
   // This must be done after server shutdown so that connection pool connections are closed and
@@ -323,6 +354,131 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   EXPECT_TRUE(traces[1].socket_streamed_trace_segment().event().write().data().truncated());
   EXPECT_EQ(traces[2].socket_streamed_trace_segment().event().read().data().as_bytes(), "HTTP/");
   EXPECT_TRUE(traces[2].socket_streamed_trace_segment().event().read().data().truncated());
+}
+
+TEST_P(SslTapIntegrationTest, RequestWithStreamingDownstreamTapPegCounter) {
+  bool local_upstream_tap = upstream_tap_;
+  upstream_tap_ = false;
+  bool local_streaming_tap_ = streaming_tap_;
+  streaming_tap_ = true;
+  bool local_pegging_counter = pegging_counter_;
+  pegging_counter_ = true;
+
+  format_ = envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+
+  // Disable for this test because it uses connection IDs, which disrupts the accounting below
+  // leading to the wrong path for the `pb_text` being used.
+  skip_tag_extraction_rule_check_ = true;
+
+  // const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
+  testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("transport.tap.tranTapPrefix.streamed_submit", Ge(1));
+  test_server_.reset();
+
+  // Restore the value.
+  upstream_tap_ = local_upstream_tap;
+  streaming_tap_ = local_streaming_tap_;
+  pegging_counter_ = local_pegging_counter;
+}
+
+TEST_P(SslTapIntegrationTest, RequestWithBuffedDownstreamTapPegCounter) {
+  bool local_upstream_tap = upstream_tap_;
+  upstream_tap_ = false;
+  bool local_streaming_tap_ = streaming_tap_;
+  streaming_tap_ = false;
+  bool local_pegging_counter = pegging_counter_;
+  pegging_counter_ = true;
+
+  format_ = envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+
+  // Disable for this test because it uses connection IDs, which disrupts the accounting below
+  // leading to the wrong path for the `pb_text` being used.
+  skip_tag_extraction_rule_check_ = true;
+
+  // const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
+  testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("transport.tap.tranTapPrefix.buffered_submit", Ge(1));
+  test_server_.reset();
+
+  // Restore the value.
+  upstream_tap_ = local_upstream_tap;
+  streaming_tap_ = local_streaming_tap_;
+  pegging_counter_ = local_pegging_counter;
+}
+
+// Verify that tap_enabled = 0/100 creates no per-socket tapper: no trace file is
+// written for the connection and the cx_sampled_out counter increments.
+TEST_P(SslTapIntegrationTest, ZeroPercentSamplingProducesNoTraces) {
+  tap_enabled_numerator_ = 0;
+  pegging_counter_ = true;
+  // The custom stats prefix uses names outside the tag extraction rules.
+  skip_tag_extraction_rule_check_ = true;
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+
+  // The tapped (downstream) connection ID will be +1 since the client also bumps.
+  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 128, default_response_headers_, 256);
+  ASSERT_TRUE(response->complete());
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("transport.tap.tranTapPrefix.cx_sampled_out", Ge(1));
+  EXPECT_EQ(0UL, test_server_->counter("transport.tap.tranTapPrefix.buffered_submit")->value());
+  // No tapper was created, so no trace file can exist for the connection.
+  EXPECT_FALSE(api_->fileSystem().fileExists(fmt::format("{}_{}.pb", path_prefix_, id)));
+}
+
+// Verify that tap_enabled = 100/100 taps the connection and stamps
+// configured_sample_rate on the emitted socket trace.
+TEST_P(SslTapIntegrationTest, FullPercentSamplingStampsConfiguredSampleRate) {
+  tap_enabled_numerator_ = 100;
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+
+  // The tapped (downstream) connection ID will be +1 since the client also bumps.
+  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  codec_client_ = makeHttpConnection(creator());
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 128, default_response_headers_, 256);
+  ASSERT_TRUE(response->complete());
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+
+  envoy::data::tap::v3::TraceWrapper trace;
+  TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
+  EXPECT_EQ(id, trace.socket_buffered_trace().trace_id());
+  EXPECT_TRUE(trace.has_configured_sample_rate());
+  EXPECT_EQ(100u, trace.configured_sample_rate().numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+            trace.configured_sample_rate().denominator());
 }
 
 } // namespace Ssl

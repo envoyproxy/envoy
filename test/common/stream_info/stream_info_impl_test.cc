@@ -17,6 +17,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -31,7 +32,7 @@ REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
 REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
 
 std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
-                                       absl::optional<std::chrono::nanoseconds> timing) {
+                                       std::optional<std::chrono::nanoseconds> timing) {
   EXPECT_TRUE(timing);
   EXPECT_LE(last, timing.value());
   return timing.value();
@@ -42,11 +43,13 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 712 ||
+        sizeof(stream_info) == 752 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 720 ||
+        sizeof(stream_info) == 776 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 688)
+        sizeof(stream_info) == 728 ||
+        // with protobuf v35
+        sizeof(stream_info) == 736 || sizeof(stream_info) == 760)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -85,6 +88,10 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   upstream_timing.onFirstUpstreamRxByteReceived(test_time_.timeSystem());
   dur = checkDuration(dur, timing.firstUpstreamRxByteReceived());
 
+  EXPECT_FALSE(timing.firstUpstreamRxBodyByteReceived());
+  upstream_timing.onFirstUpstreamRxBodyByteReceived(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.firstUpstreamRxBodyByteReceived());
+
   EXPECT_FALSE(timing.lastUpstreamRxByteReceived());
   upstream_timing.onLastUpstreamRxByteReceived(test_time_.timeSystem());
   dur = checkDuration(dur, timing.lastUpstreamRxByteReceived());
@@ -116,6 +123,33 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();
   dur = checkDuration(dur, info.requestComplete());
+}
+
+// downstreamConnectionBegin is empty until set.
+TEST(DownstreamTimingTest, ConnectionBeginSet) {
+  DownstreamTiming timing;
+  EXPECT_FALSE(timing.downstreamConnectionBegin().has_value());
+
+  const MonotonicTime begin(std::chrono::milliseconds(5));
+  timing.setDownstreamConnectionBegin(begin);
+  ASSERT_TRUE(timing.downstreamConnectionBegin().has_value());
+  EXPECT_EQ(begin, timing.downstreamConnectionBegin().value());
+}
+
+// onDownstreamConnectionEnd records only the first close so the duration is not inflated.
+TEST(DownstreamTimingTest, ConnectionEndRecordsFirstClose) {
+  Event::SimulatedTimeSystem time_system;
+  DownstreamTiming timing;
+  EXPECT_FALSE(timing.downstreamConnectionEnd().has_value());
+
+  timing.onDownstreamConnectionEnd(time_system);
+  ASSERT_TRUE(timing.downstreamConnectionEnd().has_value());
+  const MonotonicTime first_close = timing.downstreamConnectionEnd().value();
+
+  // A later close event does not overwrite the recorded connection end time.
+  time_system.advanceTimeWait(std::chrono::milliseconds(5));
+  timing.onDownstreamConnectionEnd(time_system);
+  EXPECT_EQ(first_close, timing.downstreamConnectionEnd().value());
 }
 
 TEST_F(StreamInfoImplTest, BytesTest) {
@@ -321,14 +355,23 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.healthCheck(true);
     EXPECT_TRUE(stream_info.healthCheck());
 
-    EXPECT_EQ(nullptr, stream_info.route());
+    EXPECT_FALSE(stream_info.route().has_value());
+    EXPECT_FALSE(stream_info.virtualHost().has_value());
+
+    std::shared_ptr<NiceMock<Router::MockVirtualHost>> vhost =
+        std::make_shared<NiceMock<Router::MockVirtualHost>>();
+
+    stream_info.vhost_ = vhost;
+
+    // If the route is invalid then the vhost will be used.
+    EXPECT_EQ(vhost.get(), stream_info.virtualHost().ptr());
+
     std::shared_ptr<NiceMock<Router::MockRoute>> route =
         std::make_shared<NiceMock<Router::MockRoute>>();
     stream_info.route_ = route;
-    EXPECT_EQ(route, stream_info.route());
+    EXPECT_EQ(route.get(), stream_info.route().ptr());
 
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
-                                       FilterState::StateType::ReadOnly,
                                        FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
 
@@ -338,11 +381,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
                      ->getDataReadOnly<TestIntAccessor>("test")
                      ->access());
 
-    EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
+    EXPECT_FALSE(stream_info.upstreamClusterInfo().has_value());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
     stream_info.setUpstreamClusterInfo(cluster_info);
-    EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
-    EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
+    ASSERT_TRUE(stream_info.upstreamClusterInfo().has_value());
+    EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo()->name());
 
     const std::string session_id =
         "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
@@ -366,6 +409,14 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setUpstreamInfo(new_info);
     EXPECT_EQ(stream_info.upstreamInfo(), new_info);
   }
+}
+
+TEST_F(StreamInfoImplTest, CodecStreamId) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(std::nullopt, stream_info.codecStreamId());
+  stream_info.setCodecStreamId(12345);
+  EXPECT_EQ(12345, stream_info.codecStreamId());
 }
 
 TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
@@ -411,7 +462,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.addPacketsRetransmitted(1);
 
   // setFrom
-  s1.setVirtualClusterName(absl::optional<std::string>("bar"));
+  s1.setVirtualClusterName(std::optional<std::string>("bar"));
   s1.setResponseCode(200);
   s1.setResponseCodeDetails("OK");
   s1.setConnectionTerminationDetails("baz");
@@ -423,7 +474,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.route_ = std::make_shared<NiceMock<Router::MockRoute>>();
   s1.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
   s1.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
-                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+                            FilterState::LifeSpan::FilterChain);
   Http::TestRequestHeaderMapImpl headers1;
   s1.setRequestHeaders(headers1);
   Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
@@ -474,8 +525,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.requestComplete(), s2.requestComplete());
   EXPECT_EQ(s1.responseFlags(), s2.responseFlags());
   EXPECT_EQ(s1.healthCheck(), s2.healthCheck());
-  EXPECT_NE(s1.route(), nullptr);
-  EXPECT_EQ(s1.route(), s2.route());
+  EXPECT_TRUE(s1.route().has_value());
+  EXPECT_EQ(s1.route().ptr(), s2.route().ptr());
   EXPECT_EQ(
       Config::Metadata::metadataValue(&s1.dynamicMetadata(), "com.test", "test_key").string_value(),
       Config::Metadata::metadataValue(&s2.dynamicMetadata(), "com.test", "test_key")
@@ -484,8 +535,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
             s2.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
   EXPECT_EQ(*s1.getRequestHeaders(), headers1);
   EXPECT_EQ(*s2.getRequestHeaders(), headers2);
-  EXPECT_TRUE(s2.upstreamClusterInfo().has_value());
-  EXPECT_EQ(s1.upstreamClusterInfo(), s2.upstreamClusterInfo());
+  ASSERT_TRUE(s2.upstreamClusterInfo().has_value());
+  EXPECT_EQ(s1.upstreamClusterInfo().ptr(), s2.upstreamClusterInfo().ptr());
   EXPECT_EQ(s1.getStreamIdProvider().value().get().toStringView().value(),
             s2.getStreamIdProvider().value().get().toStringView().value());
   EXPECT_EQ(s1.traceReason(), s2.traceReason());
@@ -506,8 +557,8 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
-  ProtobufWkt::Struct struct_obj2;
-  ProtobufWkt::Value val2;
+  Protobuf::Struct struct_obj2;
+  Protobuf::Value val2;
   val2.set_string_value("another_value");
   (*struct_obj2.mutable_fields())["another_key"] = val2;
   stream_info.setDynamicMetadata("com.test", struct_obj2);

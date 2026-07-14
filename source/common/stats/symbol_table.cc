@@ -1,6 +1,7 @@
 #include "source/common/stats/symbol_table.h"
 
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -14,13 +15,6 @@
 namespace Envoy {
 namespace Stats {
 
-// Masks used for variable-length encoding of arbitrary-sized integers into a
-// uint8-array. The integers are typically small, so we try to store them in as
-// few bytes as possible. The bottom 7 bits hold values, and the top bit is used
-// to determine whether another byte is needed for more data.
-static constexpr uint32_t SpilloverMask = 0x80;
-static constexpr uint32_t Low7Bits = 0x7f;
-
 // When storing Symbol arrays, we disallow Symbol 0, which is the only Symbol
 // that will decode into uint8_t array starting (and ending) with {0}. Thus we
 // can use a leading 0 in the first byte to indicate that what follows is
@@ -31,33 +25,22 @@ static constexpr uint32_t Low7Bits = 0x7f;
 static constexpr Symbol FirstValidSymbol = 1;
 static constexpr uint8_t LiteralStringIndicator = 0;
 
-size_t StatName::dataSize() const {
-  if (size_and_data_ == nullptr) {
-    return 0;
-  }
-  return SymbolTable::Encoding::decodeNumber(size_and_data_).first;
-}
-
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   // TODO(jmarantz): capture this functionality (always prints regardless of
   // loglevel) in an ENVOY_LOG macro variant or similar, perhaps
   // ENVOY_LOG_MISC(stderr, ...);
-  if (size_and_data_ == nullptr) {
-    std::cerr << "Null StatName" << std::endl;
-  } else {
-    const size_t nbytes = dataSize();
-    std::cerr << "dataSize=" << nbytes << ":";
-    for (size_t i = 0; i < nbytes; ++i) {
-      std::cerr << " " << static_cast<uint64_t>(data()[i]);
-    }
-    const SymbolVec encoding = SymbolTable::Encoding::decodeSymbols(*this);
-    std::cerr << ", numSymbols=" << encoding.size() << ":";
-    for (Symbol symbol : encoding) {
-      std::cerr << " " << symbol;
-    }
-    std::cerr << std::endl;
+  const size_t nbytes = dataSize();
+  std::cerr << "dataSize=" << nbytes << ":";
+  for (size_t i = 0; i < nbytes; ++i) {
+    std::cerr << " " << static_cast<uint64_t>(data()[i]);
   }
+  const SymbolVec encoding = SymbolTable::Encoding::decodeSymbols(*this);
+  std::cerr << ", numSymbols=" << encoding.size() << ":";
+  for (Symbol symbol : encoding) {
+    std::cerr << " " << symbol;
+  }
+  std::cerr << std::endl;
 }
 #endif
 
@@ -105,17 +88,6 @@ void SymbolTable::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
   }
 }
 
-std::pair<uint64_t, size_t> SymbolTable::Encoding::decodeNumber(const uint8_t* encoding) {
-  uint64_t number = 0;
-  uint64_t uc = SpilloverMask;
-  const uint8_t* start = encoding;
-  for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
-    uc = static_cast<uint32_t>(*encoding);
-    number |= (uc & Low7Bits) << shift;
-  }
-  return std::make_pair(number, encoding - start);
-}
-
 SymbolVec SymbolTable::Encoding::decodeSymbols(StatName stat_name) {
   SymbolVec symbol_vec;
   symbol_vec.reserve(stat_name.dataSize());
@@ -143,14 +115,9 @@ public:
 
   TokenIter(StatName stat_name) {
     const uint8_t* raw_data = stat_name.dataIncludingSize();
-    if (raw_data == nullptr) {
-      size_ = 0;
-      array_ = nullptr;
-    } else {
-      std::pair<uint64_t, size_t> size_consumed = decodeNumber(raw_data);
-      size_ = size_consumed.first;
-      array_ = raw_data + size_consumed.second;
-    }
+    std::pair<uint64_t, size_t> size_consumed = decodeNumber(raw_data);
+    size_ = size_consumed.first;
+    array_ = raw_data + size_consumed.second;
   }
 
   /**
@@ -278,12 +245,7 @@ void SymbolTable::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) 
 
 void SymbolTable::Encoding::appendToMemBlock(StatName stat_name,
                                              MemBlockBuilder<uint8_t>& mem_block) {
-  const uint8_t* data = stat_name.dataIncludingSize();
-  if (data == nullptr) {
-    mem_block.appendOne(0);
-  } else {
-    mem_block.appendData(absl::MakeSpan(data, stat_name.size()));
-  }
+  mem_block.appendData(absl::MakeSpan(stat_name.dataIncludingSize(), stat_name.size()));
 }
 
 SymbolTable::SymbolTable()
@@ -338,6 +300,37 @@ uint64_t SymbolTable::numSymbols() const {
 
 std::string SymbolTable::toString(const StatName& stat_name) const {
   return absl::StrJoin(decodeStrings(stat_name), ".");
+}
+
+size_t SymbolTable::serializeToBuffer(const StatName& stat_name, char* buffer,
+                                      size_t buffer_size) const {
+  // A null buffer is only valid as a length query when buffer_size is 0.
+  ASSERT(buffer != nullptr || buffer_size == 0);
+  // Tracks the full required length even when it exceeds buffer_size, so the caller can detect
+  // truncation and retry. Tokens are copied only while they still fit.
+  size_t bytes_required = 0;
+  const auto append = [&](absl::string_view token) {
+    if (bytes_required < buffer_size && !token.empty()) {
+      const size_t copy_size = std::min(token.size(), buffer_size - bytes_required);
+      memcpy(buffer + bytes_required, token.data(), copy_size); // NOLINT(safe-memcpy)
+    }
+    bytes_required += token.size();
+  };
+
+  Thread::LockGuard lock(lock_);
+  Encoding::TokenIter iter(stat_name);
+  bool first = true;
+  for (Encoding::TokenIter::TokenType type = iter.next();
+       type != Encoding::TokenIter::TokenType::End; type = iter.next()) {
+    if (!first) {
+      append(".");
+    }
+    first = false;
+    // fromSymbol() requires lock_, which is held for the duration of this call.
+    append(type == Encoding::TokenIter::TokenType::Symbol ? fromSymbol(iter.symbol())
+                                                          : iter.stringView());
+  }
+  return bytes_required;
 }
 
 void SymbolTable::incRefCount(const StatName& stat_name) {
@@ -757,7 +750,7 @@ StatNameSet::StatNameSet(SymbolTable& symbol_table, absl::string_view name)
 void StatNameSet::rememberBuiltin(absl::string_view str) {
   StatName stat_name;
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     stat_name = pool_.add(str);
   }
   builtin_stat_names_[str] = stat_name;

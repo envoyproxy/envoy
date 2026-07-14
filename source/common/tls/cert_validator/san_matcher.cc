@@ -27,7 +27,7 @@ bool StringSanMatcher::typeCompatible(const GENERAL_NAME* general_name) const {
   return true;
 }
 
-bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
+bool StringSanMatcher::match(GENERAL_NAME const* general_name) const {
   if (!typeCompatible(general_name)) {
     return false;
   }
@@ -35,7 +35,7 @@ bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
   return matcher_.match(Utility::generalNameAsString(general_name));
 }
 
-bool StringSanMatcher::match(const GENERAL_NAME* general_name,
+bool StringSanMatcher::match(GENERAL_NAME const* general_name,
                              const StreamInfo::StreamInfo& stream_info) const {
   if (!typeCompatible(general_name)) {
     return false;
@@ -45,14 +45,14 @@ bool StringSanMatcher::match(const GENERAL_NAME* general_name,
   return matcher_.match(Utility::generalNameAsString(general_name), context);
 }
 
-bool DnsExactStringSanMatcher::match(const GENERAL_NAME* general_name) const {
+bool DnsExactStringSanMatcher::match(GENERAL_NAME const* general_name) const {
   if (general_name->type != GEN_DNS) {
     return false;
   }
   return Utility::dnsNameMatch(dns_exact_match_, Utility::generalNameAsString(general_name));
 }
 
-SanMatcherPtr createStringSanMatcher(
+absl::StatusOr<SanMatcherPtr> createStringSanMatcher(
     envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher const& matcher,
     Server::Configuration::CommonFactoryContext& context) {
   // Verify that a new san type has not been added.
@@ -79,7 +79,8 @@ SanMatcherPtr createStringSanMatcher(
     // Invalid/Empty OID returns a nullptr from OBJ_txt2obj
     bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj(matcher.oid().c_str(), 0));
     if (oid == nullptr) {
-      return nullptr;
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to create SAN matcher for OTHER_NAME with OID: ", matcher.oid()));
     }
     return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher.matcher(),
                                                             context, std::move(oid))};
@@ -87,7 +88,8 @@ SanMatcherPtr createStringSanMatcher(
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SAN_TYPE_UNSPECIFIED:
     PANIC("unhandled value");
   }
-  return nullptr;
+  return absl::InternalError(
+      "Unhandled case in createStringSanMatcher; this should be unreachable");
 }
 
 } // namespace Tls

@@ -31,9 +31,7 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/upstreams/http/generic:config",
         "//test/common/upstream:utility_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -63,12 +61,18 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_proxy_test",
+    size = "large",
     srcs = [
         "tcp_proxy_test.cc",
     ],
     rbe_pool = "6gig",
+    # MemorySanitizer's instrumentation overhead makes this large parameterized suite exceed the
+    # default 300s cap, so allow 900s and shard the work to keep each shard well under the limit.
+    shard_count = 5,
     deps = [
         ":tcp_proxy_test_base",
+        "//source/common/router:string_accessor_lib",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
@@ -84,15 +88,20 @@ envoy_cc_test(
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/tcp_proxy",
+        "//test/common/formatter:command_extension_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_filter_interface",
         "//test/mocks/router:upstream_request",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto",
     ],
 )

@@ -14,8 +14,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/http3_status_tracker_impl.h"
 
+#include "absl/container/linked_hash_map.h"
 #include "absl/strings/string_view.h"
-#include "quiche/common/quiche_linked_hash_map.h"
 
 namespace Envoy {
 namespace Http {
@@ -43,7 +43,7 @@ public:
           concurrent_streams(concurrent_streams) {}
 
     // The alternate protocols supported if available.
-    absl::optional<std::vector<AlternateProtocol>> protocols;
+    std::optional<std::vector<AlternateProtocol>> protocols;
     // The last smoothed round trip time, if available else 0.
     std::chrono::microseconds srtt;
     // The last connectivity status of HTTP/3, if available else nullptr.
@@ -55,7 +55,7 @@ public:
   // Converts an Origin to a string which can be parsed by stringToOrigin.
   static std::string originToString(const HttpServerPropertiesCache::Origin& origin);
   // Converts a string from originToString back to structured format.
-  static absl::optional<HttpServerPropertiesCache::Origin> stringToOrigin(const std::string& str);
+  static std::optional<HttpServerPropertiesCache::Origin> stringToOrigin(const std::string& str);
 
   // Convert origin data to a string to cache to the key value
   // store. Note that in order to determine the lifetime of entries, this
@@ -66,13 +66,13 @@ public:
   // The string format is:
   // protocols|rtt
   static std::string originDataToStringForCache(const OriginData& data);
-  // Parse an origin data into structured data, or absl::nullopt
+  // Parse an origin data into structured data, or std::nullopt
   // if it is empty or invalid.
   // If from_cache is true, it is assumed the string was serialized using
   // protocolsToStringForCache and the the ma fields will be parsed as absolute times
   // rather than relative time.
-  static absl::optional<OriginData> originDataFromString(absl::string_view origin_data,
-                                                         TimeSource& time_source, bool from_cache);
+  static std::optional<OriginData> originDataFromString(absl::string_view origin_data,
+                                                        TimeSource& time_source, bool from_cache);
   // Parse an alt-svc string into a vector of structured data.
   // If from_cache is true, it is assumed the string was serialized using
   // protocolsToStringForCache and the the ma fields will be parsed as absolute times
@@ -84,7 +84,7 @@ public:
   // HttpServerPropertiesCache
   void setAlternatives(const Origin& origin, std::vector<AlternateProtocol>& protocols) override;
   void setSrtt(const Origin& origin, std::chrono::microseconds srtt) override;
-  std::chrono::microseconds getSrtt(const Origin& origin) const override;
+  std::chrono::microseconds getSrtt(const Origin& origin, bool use_canonical_suffix) const override;
   void setConcurrentStreams(const Origin& origin, uint32_t concurrent_streams) override;
   uint32_t getConcurrentStreams(const Origin& origin) const override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
@@ -110,7 +110,7 @@ private:
     }
   };
 
-  using ProtocolsMap = quiche::QuicheLinkedHashMap<Origin, OriginData, OriginHash>;
+  using ProtocolsMap = absl::linked_hash_map<Origin, OriginData, OriginHash>;
   // Map from origin to list of alternate protocols.
   ProtocolsMap protocols_;
 
@@ -138,17 +138,17 @@ private:
   ProtocolsMap::iterator addOriginData(const Origin& origin, OriginData&& origin_data);
 
   // Returns the canonical suffix, if any, associated with `hostname`.
-  absl::string_view getCanonicalSuffix(absl::string_view hostname);
+  absl::string_view getCanonicalSuffix(absl::string_view hostname) const;
 
   // Returns the canonical origin from the canonical_h3_broken_map, if any, associated with
   // `hostname`.
-  absl::optional<Origin> getCanonicalOriginForHttp3Brokenness(absl::string_view hostname);
+  std::optional<Origin> getCanonicalOriginForHttp3Brokenness(absl::string_view hostname);
 
   // Updates the canonical origin for http3 brokenness book keeping.
   void maybeSetCanonicalOriginForHttp3Brokenness(const Origin& origin);
 
   // Returns the canonical origin, if any, associated with `hostname`.
-  absl::optional<Origin> getCanonicalOrigin(absl::string_view hostname);
+  std::optional<Origin> getCanonicalOrigin(absl::string_view hostname) const;
 
   // If `origin` matches a canonical suffix then updates canonical_alt_svc_map_ accordingly.
   void maybeSetCanonicalOrigin(const Origin& origin);

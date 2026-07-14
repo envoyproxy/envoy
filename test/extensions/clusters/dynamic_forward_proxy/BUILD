@@ -26,7 +26,6 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//test/common/upstream:utility_lib",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:options_mocks",
@@ -38,6 +37,8 @@ envoy_extension_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/common/dns/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

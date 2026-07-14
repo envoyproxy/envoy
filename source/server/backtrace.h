@@ -58,7 +58,7 @@ public:
    * e.g.
    *   `7d34c0e28000-7d34c1e0d000 /build/foo/bar/source/exe/envoy-static`
    */
-  static const std::string& addrMapping(bool setup = false);
+  static absl::string_view addrMapping(bool setup = false);
 
   /**
    * Directs the output of logTrace() to directly stderr rather than the
@@ -75,6 +75,20 @@ public:
    * @return whether the system directing backtraces directly to stderr.
    */
   static bool logToStderr() { return log_to_stderr_; }
+
+  /**
+   * Directs all stack trace output to be formatted as a single log line
+   * rather than one line per frame. This makes stack traces easier to
+   * consume in log aggregation systems.
+   *
+   * @param single_line Whether to log the entire stack trace on a single line.
+   */
+  static void setSingleLine(bool single_line);
+
+  /**
+   * @return whether stack traces are formatted as a single line.
+   */
+  static bool singleLine() { return single_line_; }
 
   /**
    * Capture a stack trace.
@@ -110,6 +124,24 @@ public:
       return;
     }
 
+    if (single_line_) {
+      std::string buf = fmt::format(
+          "Backtrace (use tools/stack_decode.py to get line numbers):\nEnvoy version: {}",
+          VersionInfo::version());
+      if (!addrMapping().empty()) {
+        fmt::format_to(std::back_inserter(buf), "\nAddress mapping: {}", addrMapping());
+      }
+      visitTrace([&buf](int index, const char* symbol, void* address) {
+        if (symbol != nullptr) {
+          fmt::format_to(std::back_inserter(buf), "\n#{}: {} [{}]", index, symbol, address);
+        } else {
+          fmt::format_to(std::back_inserter(buf), "\n#{}: [{}]", index, address);
+        }
+      });
+      ENVOY_LOG(critical, "{}", buf);
+      return;
+    }
+
     ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
     ENVOY_LOG(critical, "Envoy version: {}", VersionInfo::version());
     if (!addrMapping().empty()) {
@@ -141,6 +173,7 @@ public:
 
 private:
   static bool log_to_stderr_;
+  static bool single_line_;
 
   /**
    * Visit the previously captured stack trace.

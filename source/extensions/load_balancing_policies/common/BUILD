@@ -27,8 +27,76 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
-        "@com_google_absl//absl/synchronization",
+        "//source/common/http:hash_policy_lib",
+        "//source/common/http:headers_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "locality_wrr_lib",
+    srcs = ["locality_wrr.cc"],
+    hdrs = ["locality_wrr.h"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/upstream:scheduler_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "orca_weight_manager_lib",
+    srcs = ["orca_weight_manager.cc"],
+    hdrs = ["orca_weight_manager.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/orca:orca_load_metrics_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "orca_oob_manager_lib",
+    srcs = ["orca_oob_manager.cc"],
+    hdrs = ["orca_oob_manager.h"],
+    deps = [
+        ":orca_weight_manager_lib",
+        "//envoy/common:random_generator_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/grpc:status",
+        "//envoy/http:codec_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:macros",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/grpc:status_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/network:utility_lib",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/status",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
+        "@xds//xds/service/orca/v3:pkg_cc_proto",
     ],
 )
 
@@ -39,6 +107,7 @@ envoy_cc_library(
     # previously considered core code and used by mobile.
     visibility = ["//visibility:public"],
     deps = [
+        ":locality_wrr_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",

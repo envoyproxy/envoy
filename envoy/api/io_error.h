@@ -1,9 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
-#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -44,6 +45,8 @@ public:
     NetworkUnreachable,
     // Invalid arguments passed in.
     InvalidArgument,
+    // No buffer space available.
+    NoBufferSpace,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };

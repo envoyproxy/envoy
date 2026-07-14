@@ -8,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,6 +17,7 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using testing::Invoke;
+using testing::Return;
 using testing::Unused;
 
 namespace Envoy {
@@ -54,6 +56,23 @@ protected:
                                    const Http::AsyncClient::StreamOptions&) {
     stream_callbacks_ = &callbacks;
     return &stream_;
+  }
+
+  // Drives the `getOrCreateRawAsyncClientWithHashKey` failure path: first opens a normal
+  // stream (so we can verify the happy path still works), then arranges for the next
+  // start() call to observe an InvalidArgumentError. Caller asserts the runtime-guard-
+  // dependent fallout (onGrpcError invocation vs. silent nullptr).
+  void startAndExpectClientCreationFailure() {
+    Http::AsyncClient::ParentContext parent_context;
+    parent_context.stream_info = &stream_info_;
+    auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
+    auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+    EXPECT_NE(stream, nullptr);
+
+    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(absl::InvalidArgumentError("creation-error")));
+    stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+    EXPECT_EQ(stream, nullptr);
   }
 
   // ExternalProcessorCallbacks
@@ -330,6 +349,26 @@ TEST_F(ExtProcStreamTest, OnReceiveMessageAfterFilterDestroy) {
 
   EXPECT_CALL(stream_, closeStream());
   stream->close();
+}
+
+TEST_F(ExtProcStreamTest, ClientStartError) {
+  // Legacy behavior: with the runtime guard off, start() returns nullptr without invoking
+  // onGrpcError (matching the pre-fix semantic this test was originally written against).
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_report_client_creation_error", "false"}});
+
+  startAndExpectClientCreationFailure();
+  EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Ok);
+  EXPECT_EQ(grpc_error_message_, "");
+}
+
+TEST_F(ExtProcStreamTest, ClientStartErrorGuardEnabled) {
+  // New behavior under the default runtime guard: start() surfaces the failure via
+  // onGrpcError so the consuming filter can honor failure_mode_allow.
+  startAndExpectClientCreationFailure();
+  EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Internal);
+  EXPECT_THAT(grpc_error_message_, testing::HasSubstr("creation-error"));
 }
 
 } // namespace

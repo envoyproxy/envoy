@@ -42,7 +42,7 @@ public:
    * @param stream_info the stream info.
    */
   virtual void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
-                                    const Formatter::HttpFormatterContext& context,
+                                    const Formatter::Context& context,
                                     const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 using QueryParameterMutationPtr = std::unique_ptr<QueryParameterMutation>;
@@ -52,8 +52,7 @@ public:
   QueryParameterMutationRemove(absl::string_view key) : key_(key) {}
 
   // QueryParameterMutation
-  void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
-                            const Formatter::HttpFormatterContext&,
+  void mutateQueryParameter(Http::Utility::QueryParamsMulti& params, const Formatter::Context&,
                             const StreamInfo::StreamInfo&) const override {
     params.remove(key_);
   }
@@ -70,7 +69,7 @@ public:
 
   // QueryParameterMutation
   void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
-                            const Formatter::HttpFormatterContext& context,
+                            const Formatter::Context& context,
                             const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
@@ -83,19 +82,16 @@ class Mutations {
 public:
   using HeaderMutations = Http::HeaderMutations;
 
-  Mutations(const MutationsProto& config, absl::Status& creation_status);
+  Mutations(const MutationsProto& config, Server::Configuration::ServerFactoryContext& context,
+            absl::Status& creation_status);
 
-  void mutateRequestHeaders(Http::RequestHeaderMap& headers,
-                            const Formatter::HttpFormatterContext& context,
+  void mutateRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
                             const StreamInfo::StreamInfo& stream_info) const;
-  void mutateResponseHeaders(Http::ResponseHeaderMap& headers,
-                             const Formatter::HttpFormatterContext& context,
+  void mutateResponseHeaders(Http::ResponseHeaderMap& headers, const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) const;
-  void mutateResponseTrailers(Http::ResponseTrailerMap& trailers,
-                              const Formatter::HttpFormatterContext& context,
+  void mutateResponseTrailers(Http::ResponseTrailerMap& trailers, const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info) const;
-  void mutateRequestTrailers(Http::RequestTrailerMap& trailers,
-                             const Formatter::HttpFormatterContext& context,
+  void mutateRequestTrailers(Http::RequestTrailerMap& trailers, const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) const;
 
 private:
@@ -109,7 +105,9 @@ private:
 
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
 public:
-  PerRouteHeaderMutation(const PerRouteProtoConfig& config, absl::Status& creation_status);
+  PerRouteHeaderMutation(const PerRouteProtoConfig& config,
+                         Server::Configuration::ServerFactoryContext& context,
+                         absl::Status& creation_status);
 
   const Mutations& mutations() const { return mutations_; }
 
@@ -120,7 +118,9 @@ using PerRouteHeaderMutationSharedPtr = std::shared_ptr<PerRouteHeaderMutation>;
 
 class HeaderMutationConfig {
 public:
-  HeaderMutationConfig(const ProtoConfig& config, absl::Status& creation_status);
+  HeaderMutationConfig(const ProtoConfig& config,
+                       Server::Configuration::ServerFactoryContext& context,
+                       absl::Status& creation_status);
 
   const Mutations& mutations() const { return mutations_; }
 
@@ -151,10 +151,10 @@ public:
 private:
   void maybeInitializeRouteConfigs(Http::StreamFilterCallbacks* callbacks);
 
-  HeaderMutationConfigSharedPtr config_{};
+  HeaderMutationConfigSharedPtr config_;
   // The lifetime of route config pointers is same as the matched route.
   bool route_configs_initialized_{false};
-  absl::InlinedVector<std::reference_wrapper<const PerRouteHeaderMutation>, 4> route_configs_{};
+  absl::InlinedVector<std::reference_wrapper<const PerRouteHeaderMutation>, 4> route_configs_;
 };
 
 } // namespace HeaderMutation

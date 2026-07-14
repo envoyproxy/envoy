@@ -4,6 +4,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -12,17 +14,14 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
     : ClusterImplBase(cluster, context, creation_status) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   priority_state_manager_ = std::make_unique<PriorityStateManager>(
-      *this, context.serverFactoryContext().localInfo(), nullptr, random_);
+      *this, context.serverFactoryContext().localInfo(), nullptr);
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
   weighted_priority_health_ = cluster_load_assignment.policy().weighted_priority_health();
 
-  Event::Dispatcher& dispatcher = context.serverFactoryContext().mainThreadDispatcher();
-
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
-    THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       std::vector<Network::Address::InstanceConstSharedPtr> address_list;
@@ -35,10 +34,13 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
               returnOrThrow(resolveProtoAddress(additional_address.address()));
           address_list.emplace_back(address);
         }
-        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-          // All addresses must by IP addresses.
-          if (!address->ip()) {
-            throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+        if (!Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses")) {
+          for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+            // All addresses must by IP addresses.
+            if (!address->ip()) {
+              throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+            }
           }
         }
       }
@@ -46,9 +48,12 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
           lb_endpoint.endpoint().hostname(),
           THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
                                 const Network::Address::InstanceConstSharedPtr),
-          address_list, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
+          address_list, locality_lb_endpoint, lb_endpoint);
     }
   }
+
+  THROW_IF_NOT_OK(validateEndpoints(cluster_load_assignment.endpoints(),
+                                    priority_state_manager_->priorityState()));
 }
 
 void StaticClusterImpl::startPreInit() {
@@ -56,8 +61,8 @@ void StaticClusterImpl::startPreInit() {
   // then fire update callbacks to start the health checking process.
   const auto& health_checker_flag =
       health_checker_ != nullptr
-          ? absl::optional<Upstream::Host::HealthFlag>(Host::HealthFlag::FAILED_ACTIVE_HC)
-          : absl::nullopt;
+          ? std::optional<Upstream::Host::HealthFlag>(Host::HealthFlag::FAILED_ACTIVE_HC)
+          : std::nullopt;
 
   auto& priority_state = priority_state_manager_->priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
@@ -65,7 +70,7 @@ void StaticClusterImpl::startPreInit() {
       priority_state[i].first = std::make_unique<HostVector>();
     }
     priority_state_manager_->updateClusterPrioritySet(
-        i, std::move(priority_state[i].first), absl::nullopt, absl::nullopt, health_checker_flag,
+        i, std::move(priority_state[i].first), std::nullopt, std::nullopt, health_checker_flag,
         weighted_priority_health_, overprovisioning_factor_);
   }
   priority_state_manager_.reset();

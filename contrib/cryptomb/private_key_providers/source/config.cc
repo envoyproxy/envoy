@@ -11,8 +11,8 @@
 #include "source/common/protobuf/utility.h"
 
 #ifndef IPP_CRYPTO_DISABLED
-#include "contrib/cryptomb/private_key_providers/source/ipp_crypto_impl.h"
 #include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
+#include "contrib/cryptomb/private_key_providers/source/ipp_crypto_impl.h"
 #endif
 
 #include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.h"
@@ -40,6 +40,7 @@ CryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
               *message, private_key_provider_context.messageValidationVisitor());
   Ssl::PrivateKeyMethodProviderSharedPtr provider = nullptr;
 #ifdef IPP_CRYPTO_DISABLED
+  static_cast<void>(conf);
   throw EnvoyException("X86_64 architecture is required for cryptomb provider.");
 #else
   IppCryptoSharedPtr ipp = std::make_shared<IppCryptoImpl>();

@@ -11,6 +11,7 @@
 
 #include "test/config/v2_link_hacks.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
@@ -63,10 +64,12 @@ private:
 };
 
 class SdsGenericSecretTestFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+          test::integration::filters::SdsGenericSecretTestConfig> {
 public:
   SdsGenericSecretTestFilterConfig()
-      : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("sds-generic-secret-test") {}
+      : Extensions::HttpFilters::Common::UniqueEmptyHttpFilterConfig<
+            test::integration::filters::SdsGenericSecretTestConfig>("sds-generic-secret-test") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
@@ -112,7 +115,11 @@ public:
       ConfigHelper::setHttp2(*sds_cluster);
     });
 
-    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
+    config_helper_.prependFilter(R"EOF(
+      name: sds-generic-secret-test
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.SdsGenericSecretTestConfig
+    )EOF");
 
     create_xds_upstream_ = true;
     HttpIntegrationTest::initialize();
@@ -134,8 +141,8 @@ public:
     generic_secret->mutable_secret()->set_inline_string("DUMMY_AES_128_KEY");
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("0");
-    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(secret);
+    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
+    std::ignore = discovery_response.add_resources()->PackFrom(secret);
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
@@ -193,7 +200,11 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()), registration_(factory_) {}
 
   void initialize() override {
-    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
+    config_helper_.prependFilter(R"EOF(
+      name: sds-generic-secret-test
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.SdsGenericSecretTestConfig
+    )EOF");
     HttpIntegrationTest::initialize();
   }
 
@@ -263,7 +274,11 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()), registration_(factory_) {}
 
   void initialize() override {
-    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
+    config_helper_.prependFilter(R"EOF(
+      name: sds-generic-secret-test
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.SdsGenericSecretTestConfig
+    )EOF");
     HttpIntegrationTest::initialize();
   }
 

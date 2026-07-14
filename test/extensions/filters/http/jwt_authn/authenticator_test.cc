@@ -21,8 +21,6 @@ using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
 using Envoy::Extensions::HttpFilters::Common::MockJwksFetcher;
-using ::google::jwt_verify::Jwks;
-using ::google::jwt_verify::Status;
 using ::testing::_;
 using ::testing::Invoke;
 using ::testing::MockFunction;
@@ -35,6 +33,9 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
+using JwtVerify::Jwks;
+using JwtVerify::Status;
+
 class AuthenticatorTest : public testing::Test {
 public:
   void SetUp() override {
@@ -43,8 +44,8 @@ public:
   }
 
   void createAuthenticator(
-      ::google::jwt_verify::CheckAudience* check_audience = nullptr,
-      const absl::optional<std::string>& provider = absl::make_optional<std::string>(ProviderName),
+      JwtVerify::CheckAudience* check_audience = nullptr,
+      const std::optional<std::string>& provider = std::make_optional<std::string>(ProviderName),
       bool allow_failed = false, bool allow_missing = false) {
     filter_config_ = std::make_unique<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
     raw_fetcher_ = new MockJwksFetcher;
@@ -52,7 +53,9 @@ public:
     auth_ = Authenticator::create(
         check_audience, provider, allow_failed, allow_missing, filter_config_->getJwksCache(),
         filter_config_->cm(),
-        [this](Upstream::ClusterManager&, const RemoteJwks&) { return std::move(fetcher_); },
+        [this](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr, const RemoteJwks&) {
+          return std::move(fetcher_);
+        },
         filter_config_->timeSource());
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
@@ -61,11 +64,11 @@ public:
   void expectVerifyStatus(Status expected_status, Http::RequestHeaderMap& headers,
                           bool expect_clear_route = false) {
     std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
-      ASSERT_STREQ(google::jwt_verify::getStatusString(status).c_str(),
-                   google::jwt_verify::getStatusString(expected_status).c_str());
+      ASSERT_STREQ(Envoy::JwtVerify::getStatusString(status).c_str(),
+                   Envoy::JwtVerify::getStatusString(expected_status).c_str());
     };
     auto set_extracted_jwt_data_cb = [this](const std::string& name,
-                                            const ProtobufWkt::Struct& extracted_data) {
+                                            const Protobuf::Struct& extracted_data) {
       this->addExtractedData(name, extracted_data);
     };
     initTokenExtractor();
@@ -86,7 +89,7 @@ public:
 
   // This is like ContextImpl::addExtractedData in
   // source/extensions/filters/http/jwt_authn/verifier.cc.
-  void addExtractedData(const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+  void addExtractedData(const std::string& name, const Protobuf::Struct& extracted_data) {
     *(*out_extracted_data_.mutable_fields())[name].mutable_struct_value() = extracted_data;
   }
 
@@ -97,8 +100,8 @@ public:
   MockJwksFetcher* raw_fetcher_;
   JwksFetcherPtr fetcher_;
   AuthenticatorPtr auth_;
-  ::google::jwt_verify::JwksPtr jwks_;
-  ProtobufWkt::Struct out_extracted_data_;
+  JwtVerify::JwksPtr jwks_;
+  Protobuf::Struct out_extracted_data_;
   NiceMock<Tracing::MockSpan> parent_span_;
 };
 
@@ -318,7 +321,7 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
   // Only one field is set.
   EXPECT_EQ(1, out_extracted_data_.fields().size());
 
-  ProtobufWkt::Value expected_payload;
+  Protobuf::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
@@ -350,7 +353,7 @@ TEST_F(AuthenticatorTest, TestSetPayloadWithSpaces) {
   // Only one field is set.
   EXPECT_EQ(1, out_extracted_data_.fields().size());
 
-  ProtobufWkt::Value expected_payload;
+  Protobuf::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSONWithSpaces, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
@@ -377,7 +380,7 @@ TEST_F(AuthenticatorTest, TestSetHeader) {
   EXPECT_EQ(1, out_extracted_data_.fields().size());
 
   // We should expect empty JWT payload.
-  ProtobufWkt::Value expected_payload;
+  Protobuf::Value expected_payload;
   TestUtility::loadFromJson(ExpectedHeaderJSON, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_header")));
@@ -406,12 +409,12 @@ TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
                                                .at("code")
                                                .number_value());
 
-  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtExpired), out_extracted_data_.fields()
-                                                                         .at("jwt-failure-reason")
-                                                                         .struct_value()
-                                                                         .fields()
-                                                                         .at("message")
-                                                                         .string_value());
+  EXPECT_EQ(Envoy::JwtVerify::getStatusString(Status::JwtExpired), out_extracted_data_.fields()
+                                                                       .at("jwt-failure-reason")
+                                                                       .struct_value()
+                                                                       .fields()
+                                                                       .at("message")
+                                                                       .string_value());
 }
 
 // This test verifies writing InvalidAudience status into metadata
@@ -420,7 +423,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidJwtInvalidAudienceToGetStatus) {
   // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -440,7 +443,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidJwtInvalidAudienceToGetStatus) {
                                                           .at("code")
                                                           .number_value());
 
-  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtAudienceNotAllowed),
+  EXPECT_EQ(Envoy::JwtVerify::getStatusString(Status::JwtAudienceNotAllowed),
             out_extracted_data_.fields()
                 .at("jwt-failure-reason")
                 .struct_value()
@@ -454,7 +457,7 @@ TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
   // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -473,12 +476,12 @@ TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
                                               .at("code")
                                               .number_value());
 
-  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtMissed), out_extracted_data_.fields()
-                                                                        .at("jwt-failure-reason")
-                                                                        .struct_value()
-                                                                        .fields()
-                                                                        .at("message")
-                                                                        .string_value());
+  EXPECT_EQ(Envoy::JwtVerify::getStatusString(Status::JwtMissed), out_extracted_data_.fields()
+                                                                      .at("jwt-failure-reason")
+                                                                      .struct_value()
+                                                                      .fields()
+                                                                      .at("message")
+                                                                      .string_value());
 }
 
 // This test verifies two tokens, one is good another is with invalidAudience
@@ -489,7 +492,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
 
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
@@ -513,7 +516,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
                                                           .at("code")
                                                           .number_value());
 
-  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtAudienceNotAllowed),
+  EXPECT_EQ(Envoy::JwtVerify::getStatusString(Status::JwtAudienceNotAllowed),
             out_extracted_data_.fields()
                 .at("jwt-failure-reason")
                 .struct_value()
@@ -530,7 +533,7 @@ TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
 
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -551,12 +554,12 @@ TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
                                                .at("code")
                                                .number_value());
 
-  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtExpired), out_extracted_data_.fields()
-                                                                         .at("jwt-failure-reason")
-                                                                         .struct_value()
-                                                                         .fields()
-                                                                         .at("message")
-                                                                         .string_value());
+  EXPECT_EQ(Envoy::JwtVerify::getStatusString(Status::JwtExpired), out_extracted_data_.fields()
+                                                                       .at("jwt-failure-reason")
+                                                                       .struct_value()
+                                                                       .fields()
+                                                                       .at("message")
+                                                                       .string_value());
 }
 
 // This test set two providers and send request without jwt
@@ -568,7 +571,7 @@ TEST_F(AuthenticatorTest, TestSetTwoProvidersJwtMissing) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
 
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -604,12 +607,12 @@ TEST_F(AuthenticatorTest, TestSetPayloadAndHeader) {
   EXPECT_EQ(2, out_extracted_data_.fields().size());
 
   // We should expect both JWT payload and header are set.
-  ProtobufWkt::Value expected_payload;
+  Protobuf::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
 
-  ProtobufWkt::Value expected_header;
+  Protobuf::Value expected_header;
   TestUtility::loadFromJson(ExpectedHeaderJSON, expected_header);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_header, out_extracted_data_.fields().at("my_header")));
@@ -669,7 +672,7 @@ TEST_F(AuthenticatorTest, TestWrongIssuerOKWithoutProvider) {
   provider.clear_issuer();
   provider.clear_audiences();
   // use authenticator without a valid provider
-  createAuthenticator(nullptr, absl::nullopt);
+  createAuthenticator(nullptr, std::nullopt);
 
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
@@ -698,7 +701,7 @@ TEST_F(AuthenticatorTest, TestJwtWithoutIssWithValidProvider) {
 // The verification fails with JwtUnknownIssuer.
 // When "allow_missing" or "allow_failed" is used, authenticator doesn't have a valid provider.
 TEST_F(AuthenticatorTest, TestJwtWithoutIssWithoutValidProvider) {
-  createAuthenticator(nullptr, absl::nullopt);
+  createAuthenticator(nullptr, std::nullopt);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
   Http::TestRequestHeaderMapImpl headers{
@@ -733,7 +736,7 @@ TEST_F(AuthenticatorTest, TestJwtWithoutIssWithValidProviderNotIssuer) {
 TEST_F(AuthenticatorTest, TestJwtWithoutIssWithoutValidProviderNotIssuer) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.clear_issuer();
-  createAuthenticator(nullptr, absl::nullopt);
+  createAuthenticator(nullptr, std::nullopt);
 
   jwks_ = Jwks::createFrom(ES256PublicKey, Jwks::JWKS);
   EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
@@ -799,7 +802,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTAllGood) {
 
 // Test multiple tokens; one of them is bad and allow_failed, verification is ok.
 TEST_F(AuthenticatorTest, TestMultipleJWTOneBadAllowFails) {
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*all_missing=*/false);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _));
 
@@ -814,7 +817,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTOneBadAllowFails) {
 
 // Test empty header and allow_missing, verification is ok.
 TEST_F(AuthenticatorTest, TestAllowMissingWithEmptyHeader) {
-  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, std::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/false, /*all_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
@@ -984,7 +987,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
     header->set_value_prefix("Bearer ");
   }
 
-  createAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
+  createAuthenticator(nullptr, std::nullopt, /*allow_failed=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -1030,11 +1033,12 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   header->set_name("other-auth");
   header->set_value_prefix("Bearer ");
 
-  createAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
+  createAuthenticator(nullptr, std::nullopt, /*allow_failed=*/true);
+  EXPECT_CALL(*raw_fetcher_, cancel());
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .Times(2)
       .WillRepeatedly(Invoke([](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-        ::google::jwt_verify::JwksPtr jwks = Jwks::createFrom(PublicKey, Jwks::JWKS);
+        JwtVerify::JwksPtr jwks = Jwks::createFrom(PublicKey, Jwks::JWKS);
         EXPECT_TRUE(jwks->getStatus() == Status::Ok);
         receiver.onJwksSuccess(std::move(jwks));
       }));
@@ -1054,8 +1058,8 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
 
 // Test checks that supplying a CheckAudience to auth will override the one in JwksCache.
 TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
-  auto check_audience = std::make_unique<::google::jwt_verify::CheckAudience>(
-      std::vector<std::string>{"invalid_service"});
+  auto check_audience =
+      std::make_unique<JwtVerify::CheckAudience>(std::vector<std::string>{"invalid_service"});
   createAuthenticator(check_audience.get());
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
@@ -1089,10 +1093,10 @@ public:
     extractor_ = Extractor::create(jwks_cache_.jwks_data_.jwt_provider_);
     // Not to use jwks_fetcher, mocked that JwksObj already has Jwks
     EXPECT_CALL(jwks_cache_.jwks_data_, getJwksObj()).WillRepeatedly(Return(jwks_.get()));
-    EXPECT_CALL(mock_fetcher_, Call(_, _)).Times(0);
+    EXPECT_CALL(mock_fetcher_, Call(_, _, _)).Times(0);
   }
 
-  void createAuthenticator(const absl::optional<std::string>& provider) {
+  void createAuthenticator(const std::optional<std::string>& provider) {
     auth_ = Authenticator::create(nullptr, provider, false, false, jwks_cache_, cm_,
                                   mock_fetcher_.AsStdFunction(), time_system_);
   }
@@ -1102,7 +1106,7 @@ public:
       ASSERT_EQ(status, expected_status);
     };
     auto set_extracted_jwt_data_cb = [this](const std::string& name,
-                                            const ProtobufWkt::Struct& extracted_data) {
+                                            const Protobuf::Struct& extracted_data) {
       out_name_ = name;
       out_extracted_data_ = extracted_data;
     };
@@ -1111,20 +1115,22 @@ public:
                   on_complete_cb, nullptr);
   }
 
-  ::google::jwt_verify::JwksPtr jwks_;
+  JwtVerify::JwksPtr jwks_;
   NiceMock<MockJwksCache> jwks_cache_;
-  MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&, const RemoteJwks&)> mock_fetcher_;
+  MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr,
+                                      const RemoteJwks&)>
+      mock_fetcher_;
   AuthenticatorPtr auth_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::SimulatedTimeSystem time_system_;
   ExtractorConstPtr extractor_;
   NiceMock<Tracing::MockSpan> parent_span_;
   std::string out_name_;
-  ProtobufWkt::Struct out_extracted_data_;
+  Protobuf::Struct out_extracted_data_;
 };
 
 TEST_F(AuthenticatorJwtCacheTest, TestNonProvider) {
-  createAuthenticator(absl::nullopt);
+  createAuthenticator(std::nullopt);
 
   // For invalid provider, jwt_cache is not called.
   EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).Times(0);
@@ -1165,7 +1171,7 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
 
   createAuthenticator("provider");
 
-  ::google::jwt_verify::Jwt cached_jwt;
+  JwtVerify::Jwt cached_jwt;
   cached_jwt.parseFromString(GoodToken);
   // jwt_cache hit: lookup return a cached jwt.
   EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(&cached_jwt));
@@ -1183,9 +1189,25 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
   // Payload is set
   EXPECT_EQ(out_name_, "my_payload");
 
-  ProtobufWkt::Struct expected_payload;
+  Protobuf::Struct expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(TestUtility::protoEqual(out_extracted_data_, expected_payload));
+}
+
+// Test: ExtractOnlyWithoutValidation config can be set and cleared.
+TEST_F(AuthenticatorTest, ExtractOnlyVerificationHeaderConfig) {
+  envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation config;
+
+  // By default, the header name is empty, signaling the filter to use the default.
+  EXPECT_TRUE(config.verification_status_header().empty());
+
+  // A custom header name can be set.
+  config.set_verification_status_header("x-custom-jwt-status");
+  EXPECT_EQ(config.verification_status_header(), "x-custom-jwt-status");
+
+  // Clearing reverts to default behavior.
+  config.clear_verification_status_header();
+  EXPECT_TRUE(config.verification_status_header().empty());
 }
 
 } // namespace

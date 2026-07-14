@@ -40,7 +40,7 @@ public:
                                 unsigned /*hash_length*/) override {
     IS_ENVOY_BUG("Should not be reached");
   }
-  absl::optional<uint32_t> daysUntilFirstCertExpires() const override { return absl::nullopt; }
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override { return std::nullopt; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override { return nullptr; }
   // Return empty string
   std::string getCaFileName() const override { return ""; }
@@ -53,7 +53,8 @@ public:
                     absl::string_view hostname) override;
   // Returns SSL_VERIFY_PEER so that doVerifyCertChain() will be called from the TLS stack.
   absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> /*contexts*/,
-                                            bool /*handshaker_provides_certificates*/) override {
+                                            bool /*handshaker_provides_certificates*/,
+                                            Stats::Scope& /*scope*/) override {
     return SSL_VERIFY_PEER;
   }
 
@@ -106,7 +107,7 @@ private:
   absl::flat_hash_map<Thread::ThreadId, ValidationJob> validation_jobs_;
   std::shared_ptr<size_t> alive_indicator_{new size_t(1)};
   Thread::PosixThreadFactoryPtr thread_factory_;
-  absl::optional<int> thread_priority_;
+  std::optional<int> thread_priority_;
 };
 
 } // namespace Tls

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
@@ -12,7 +13,6 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -43,17 +43,26 @@ public:
   Upstream::ClusterLbStats stats_{stat_names_, stats_scope_};
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
-  envoy::config::cluster::v3::Cluster::RoundRobinLbConfig round_robin_lb_config_;
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
 };
 
 class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
+};
+
+class TestHashPolicy : public Http::HashPolicy {
+public:
+  std::optional<uint64_t> generateHash(OptRef<const Http::RequestHeaderMap>,
+                                       OptRef<const StreamInfo::StreamInfo>,
+                                       AddCookieCallback) const override {
+    return hash_key_;
+  }
+
+  std::optional<uint64_t> hash_key_;
 };
 
 inline void computeHitStats(::benchmark::State& state,

@@ -12,9 +12,12 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/hash_policy.h"
 #include "source/common/http/http1/settings.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/retry_policy_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -82,7 +85,7 @@ bool useHttp3(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&
   return false;
 }
 
-absl::StatusOr<absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>>
+absl::StatusOr<std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>>
 getAlternateProtocolsCacheOptions(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     Server::Configuration::ServerFactoryContext& server_context) {
@@ -101,7 +104,7 @@ getAlternateProtocolsCacheOptions(
 
     return cache_options;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::StatusOr<Envoy::Http::HeaderValidatorFactoryPtr> createHeaderValidatorFactory(
@@ -124,7 +127,7 @@ absl::StatusOr<Envoy::Http::HeaderValidatorFactoryPtr> createHeaderValidatorFact
     uhv_config.mutable_http1_protocol_options()->set_allow_chunked_length(
         getHttpOptions(options).allow_chunked_length());
     legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
-    legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
+    std::ignore = legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
   }
 
   const ::envoy::config::core::v3::TypedExtensionConfig& header_validator_config =
@@ -184,19 +187,73 @@ uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::
   return features;
 }
 
+absl::StatusOr<std::vector<Envoy::Router::ShadowPolicyPtr>>
+ProtocolOptionsConfigImpl::buildShadowPolicies(
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  std::vector<Envoy::Router::ShadowPolicyPtr> policies;
+  policies.reserve(options.request_mirror_policies().size());
+  for (const auto& mirror_policy_config : options.request_mirror_policies()) {
+    auto policy_or_error =
+        Envoy::Router::ShadowPolicyImpl::create(mirror_policy_config, server_context);
+    RETURN_IF_NOT_OK_REF(policy_or_error.status());
+    policies.push_back(std::move(policy_or_error.value()));
+  }
+  return policies;
+}
+
+absl::StatusOr<std::shared_ptr<const Envoy::Router::RetryPolicy>>
+ProtocolOptionsConfigImpl::buildRetryPolicy(
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  if (!options.has_retry_policy()) {
+    return nullptr;
+  }
+  return Envoy::Router::RetryPolicyImpl::create(options.retry_policy(), validation_visitor,
+                                                server_context);
+}
+
+absl::StatusOr<std::unique_ptr<Envoy::Http::HashPolicy>> ProtocolOptionsConfigImpl::buildHashPolicy(
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  if (options.hash_policy().empty()) {
+    return nullptr;
+  }
+  return Envoy::Http::HashPolicyImpl::create(options.hash_policy(), server_context.regexEngine());
+}
+
 absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
 ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     Server::Configuration::ServerFactoryContext& server_context) {
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(getHttp2Options(options));
   RETURN_IF_NOT_OK_REF(options_or_error.status());
+
+  if (options_or_error.value().has_max_header_field_size_kb() &&
+      options.common_http_protocol_options().has_max_response_headers_kb() &&
+      options_or_error.value().max_header_field_size_kb().value() >
+          options.common_http_protocol_options().max_response_headers_kb().value()) {
+    return absl::InvalidArgumentError(
+        "max_header_field_size_kb must not exceed max_response_headers_kb");
+  }
+
   auto cache_options_or_error = getAlternateProtocolsCacheOptions(options, server_context);
   RETURN_IF_NOT_OK_REF(cache_options_or_error.status());
   auto validator_factory_or_error = createHeaderValidatorFactory(options, server_context);
   RETURN_IF_NOT_OK_REF(validator_factory_or_error.status());
+  auto shadow_policies_or_error = buildShadowPolicies(options, server_context);
+  RETURN_IF_NOT_OK_REF(shadow_policies_or_error.status());
+  auto retry_policy_or_error =
+      buildRetryPolicy(options, server_context.messageValidationVisitor(), server_context);
+  RETURN_IF_NOT_OK_REF(retry_policy_or_error.status());
+  auto hash_policy_or_error = buildHashPolicy(options, server_context);
+  RETURN_IF_NOT_OK_REF(hash_policy_or_error.status());
   return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
       options, options_or_error.value(), std::move(validator_factory_or_error.value()),
-      cache_options_or_error.value(), server_context));
+      cache_options_or_error.value(), std::move(shadow_policies_or_error.value()),
+      std::move(retry_policy_or_error.value()), std::move(hash_policy_or_error.value()),
+      server_context));
 }
 
 absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
@@ -204,12 +261,21 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const envoy::config::core::v3::HttpProtocolOptions& common_options,
-    const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
+    const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
     bool use_downstream_protocol, bool use_http2,
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(http2_options);
   RETURN_IF_NOT_OK_REF(options_or_error.status());
+
+  if (options_or_error.value().has_max_header_field_size_kb() &&
+      common_options.has_max_response_headers_kb() &&
+      options_or_error.value().max_header_field_size_kb().value() >
+          common_options.max_response_headers_kb().value()) {
+    return absl::InvalidArgumentError(
+        "max_header_field_size_kb must not exceed max_response_headers_kb");
+  }
+
   return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
       http1_settings, options_or_error.value(), common_options, upstream_options,
       use_downstream_protocol, use_http2, server_context, validation_visitor));
@@ -219,7 +285,10 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     envoy::config::core::v3::Http2ProtocolOptions http2_options,
     Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
-    absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
+    std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
+    std::vector<Envoy::Router::ShadowPolicyPtr>&& shadow_policies,
+    std::shared_ptr<const Envoy::Router::RetryPolicy>&& retry_policy,
+    std::unique_ptr<Envoy::Http::HashPolicy>&& hash_policy,
     Server::Configuration::ServerFactoryContext& server_context)
     : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(
           getHttpOptions(options), server_context, server_context.messageValidationVisitor())),
@@ -227,23 +296,30 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       common_http_protocol_options_(options.common_http_protocol_options()),
       upstream_http_protocol_options_(
           options.has_upstream_http_protocol_options()
-              ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
+              ? std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
                     options.upstream_http_protocol_options())
-              : absl::nullopt),
+              : std::nullopt),
       http_filters_(options.http_filters()),
       alternate_protocol_cache_options_(std::move(cache_options)),
       header_validator_factory_(std::move(header_validator_factory)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
-      use_alpn_(options.has_auto_config()) {
+      use_alpn_(options.has_auto_config()), shadow_policies_(std::move(shadow_policies)),
+      retry_policy_(std::move(retry_policy)), hash_policy_(std::move(hash_policy)) {
   ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
+  // Build outlier detection config.
+
+  if (options.has_outlier_detection()) {
+    buildMatcher(options.outlier_detection().error_matcher(), outlier_detection_http_error_matcher_,
+                 server_context);
+  }
 }
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& validated_http2_options,
     const envoy::config::core::v3::HttpProtocolOptions& common_options,
-    const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
+    const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
     bool use_downstream_protocol, bool use_http2,
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor& validation_visitor)

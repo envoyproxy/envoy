@@ -32,7 +32,7 @@ public:
     decoder_callbacks_->streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::NoFilterConfigFound);
     decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
-                                       absl::nullopt, EMPTY_STRING);
+                                       std::nullopt, EMPTY_STRING);
     return Http::FilterHeadersStatus::StopIteration;
   }
 };
@@ -55,8 +55,7 @@ public:
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
-  static void createFilterChainForFactories(Http::FilterChainManager& manager,
-                                            const FilterChainOptions& options,
+  static void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
                                             const FilterFactoriesList& filter_factories);
 
   static absl::Status checkUpstreamHttpFiltersList(const FiltersList& filters);

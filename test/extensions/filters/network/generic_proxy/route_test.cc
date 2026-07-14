@@ -7,7 +7,7 @@
 #include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/route.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -85,7 +85,7 @@ public:
   std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& d) const override {
+  parse(const Protobuf::Struct& d) const override {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
@@ -93,7 +93,7 @@ public:
   }
 
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Any&) const override {
+  parse(const Protobuf::Any&) const override {
     return nullptr;
   }
 };
@@ -130,7 +130,7 @@ TEST_F(RouteEntryImplTest, RouteTypedMetadata) {
  */
 TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
   ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
 
@@ -175,7 +175,7 @@ TEST_F(RouteEntryImplTest, RouteTimeout) {
  */
 TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
   ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
 
@@ -201,41 +201,6 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
  * unexpected type is used to find the filter factory. But the extension lookup by name is enabled
  * and the mock filter is found.
  */
-TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownTypeButEnableExtensionLookupByName) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
-  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
-  }));
-  Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
-
-  ON_CALL(filter_config_, createRouteSpecificFilterConfig(_, _, _))
-      .WillByDefault(
-          Invoke([this](const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
-                        ProtobufMessage::ValidationVisitor&) {
-            auto route_config = std::make_shared<RouteConfig>();
-            route_config_map_.emplace(filter_config_.name(), route_config);
-            return route_config;
-          }));
-
-  const std::string yaml_config = R"EOF(
-    cluster: cluster_0
-    per_filter_config:
-      envoy.filters.generic.mock_filter:
-        # The mock filter is registered with the type of google.protobuf.Struct.
-        # So the google.protobuf.Value cannot be used to find the mock filter.
-        "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        type_url: type.googleapis.com/google.protobuf.Value
-        value:
-          value: { "key_0": "value_0" }
-  )EOF";
-
-  initialize(yaml_config);
-
-  EXPECT_EQ(route_->perFilterConfig("envoy.filters.generic.mock_filter"),
-            route_config_map_.at("envoy.filters.generic.mock_filter").get());
-}
 
 /**
  * Test the case where there is no route level proto available for the filter.
@@ -264,7 +229,7 @@ TEST_F(RouteEntryImplTest, NullRouteEmptyProto) {
 TEST_F(RouteEntryImplTest, NullRouteSpecificConfig) {
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
   ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
 
   const std::string yaml_config = R"EOF(
@@ -278,16 +243,6 @@ TEST_F(RouteEntryImplTest, NullRouteSpecificConfig) {
 
   EXPECT_EQ(route_->perFilterConfig("envoy.filters.generic.mock_filter"), nullptr);
 };
-
-/**
- * Test the simple route action wrapper.
- */
-TEST(RouteMatchActionTest, SimpleRouteMatchActionTest) {
-  auto entry = std::make_shared<NiceMock<MockRouteEntry>>();
-  RouteMatchAction action(entry);
-
-  EXPECT_EQ(action.route().get(), entry.get());
-}
 
 /**
  * Test the simple data input validator.
@@ -321,13 +276,11 @@ TEST(RouteMatchActionFactoryTest, SimpleRouteMatchActionFactoryTest) {
   TestUtility::loadFromYaml(yaml_config, proto_config);
   RouteActionContext context{server_context};
 
-  auto factory_cb = factory.createActionFactoryCb(proto_config, context,
-                                                  server_context.messageValidationVisitor());
+  auto action =
+      factory.createAction(proto_config, context, server_context.messageValidationVisitor());
 
-  EXPECT_EQ(factory_cb()->getTyped<RouteMatchAction>().route().get(),
-            factory_cb()->getTyped<RouteMatchAction>().route().get());
-
-  EXPECT_EQ(factory_cb()->getTyped<RouteMatchAction>().route()->clusterName(), "cluster_0");
+  EXPECT_NE(action, nullptr);
+  EXPECT_EQ(action->getTyped<RouteEntryImpl>().clusterName(), "cluster_0");
 }
 
 class RouteMatcherImplTest : public testing::Test {

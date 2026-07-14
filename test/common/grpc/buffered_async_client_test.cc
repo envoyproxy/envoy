@@ -10,8 +10,7 @@
 #include "source/common/network/socket_impl.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
 
@@ -34,8 +33,9 @@ public:
   BufferedAsyncClientTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
-    config_.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
 
+    config_.mutable_envoy_grpc()->set_cluster_name("test_cluster");
     cm_.initializeThreadLocalClusters({"test_cluster"});
     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
@@ -45,7 +45,7 @@ public:
     EXPECT_CALL(http_stream_, sendHeaders(_, _));
     EXPECT_CALL(http_stream_, reset());
 
-    raw_client_ = *AsyncClientImpl::create(cm_, config_, dispatcher_->timeSource());
+    raw_client_ = *AsyncClientImpl::create(config_, context_);
     client_ = std::make_unique<AsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>(
         raw_client_);
   }
@@ -56,7 +56,7 @@ public:
             buffer_size, *method_descriptor_, callback_, *client_, *dispatcher_, ttl);
   }
 
-  void bufferNewMessage(absl::optional<uint32_t> expected_message_id) {
+  void bufferNewMessage(std::optional<uint32_t> expected_message_id) {
     helloworld::HelloRequest request;
     request.set_name("Alice");
     EXPECT_EQ(expected_message_id, buffered_client_->bufferMessage(request));
@@ -84,11 +84,13 @@ public:
     EXPECT_EQ(pending_count, expected_pending_count);
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Upstream::MockClusterManager>& cm_{context_.cluster_manager_};
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+
   const Protobuf::MethodDescriptor* method_descriptor_;
   envoy::config::core::v3::GrpcService config_;
-  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockAsyncClient> http_client_;
   Http::MockAsyncClientStream http_stream_;
   std::shared_ptr<AsyncClientImpl> raw_client_;
@@ -151,7 +153,7 @@ TEST_F(BufferedAsyncClientTest, BufferLimitExceeded) {
   EXPECT_CALL(http_stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
 
   prepareBufferedClient(0, std::chrono::milliseconds(1000));
-  bufferNewMessage(absl::nullopt);
+  bufferNewMessage(std::nullopt);
 
   EXPECT_EQ(0, buffered_client_->sendBufferedMessages().size());
   EXPECT_TRUE(buffered_client_->hasActiveStream());

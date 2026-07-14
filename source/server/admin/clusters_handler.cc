@@ -1,12 +1,15 @@
 #include "source/server/admin/clusters_handler.h"
 
 #include "envoy/admin/v3/clusters.pb.h"
+#include "envoy/upstream/admin_endpoint_provider.h"
 
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/server/admin/utils.h"
+
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Server {
@@ -45,12 +48,24 @@ ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(
 Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_headers,
                                             Buffer::Instance& response, AdminStream& admin_stream) {
   const auto format_value = Utility::formatParam(admin_stream.queryParams());
+  const auto filter_value = admin_stream.queryParams().getFirstValue("filter");
+
+  std::optional<const re2::RE2> re2_filter;
+  if (filter_value.has_value() && !filter_value.value().empty()) {
+    re2::RE2::Options options;
+    options.set_log_errors(false);
+    re2_filter.emplace(filter_value.value(), options);
+    if (!re2_filter->ok()) {
+      response.add("Invalid re2 regex");
+      return Http::Code::BadRequest;
+    }
+  }
 
   if (format_value.has_value() && format_value.value() == "json") {
-    writeClustersAsJson(response);
+    writeClustersAsJson(re2_filter, response);
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
-    writeClustersAsText(response);
+    writeClustersAsText(re2_filter, response);
   }
 
   return Http::Code::OK;
@@ -104,11 +119,16 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
       health_status.set_eds_health_status(envoy::config::core::v3::DRAINING);
     }
     break;
+  case Upstream::Host::HealthFlag::DEGRADED_OUTLIER_DETECTION:
+    health_status.set_failed_degraded_outlier_detection(
+        host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+    break;
   }
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
+void ClustersHandler::writeClustersAsJson(const std::optional<const re2::RE2>& filter,
+                                          Buffer::Instance& response) {
   envoy::admin::v3::Clusters clusters;
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
@@ -116,6 +136,9 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
     UNREFERENCED_PARAMETER(name);
     const Upstream::Cluster& cluster = cluster_ref.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
+    if (!shouldIncludeCluster(cluster_info->name(), filter)) {
+      continue;
+    }
 
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
@@ -194,18 +217,44 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
         }
       }
     }
+
+    // Render a cluster's synthetic admin endpoints (not load-balanced hosts) as host statuses.
+    if (const auto* provider = cluster.adminEndpointProvider()) {
+      for (const auto& endpoint : provider->adminEndpoints()) {
+        if (endpoint.address == nullptr) {
+          continue;
+        }
+        envoy::admin::v3::HostStatus& host_status = *cluster_status.add_host_statuses();
+        Network::Utility::addressToProtobufAddress(*endpoint.address,
+                                                   *host_status.mutable_address());
+        host_status.set_hostname(endpoint.hostname);
+        host_status.set_weight(endpoint.weight);
+        for (const auto& [gauge_name, gauge_value] : endpoint.gauges) {
+          auto& metric = *host_status.add_stats();
+          metric.set_name(gauge_name);
+          metric.set_value(gauge_value);
+          metric.set_type(envoy::admin::v3::SimpleMetric::GAUGE);
+        }
+        host_status.mutable_health_status()->set_eds_health_status(endpoint.health);
+      }
+    }
   }
   response.add(MessageUtil::getJsonStringFromMessageOrError(clusters, true)); // pretty-print
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
+void ClustersHandler::writeClustersAsText(const std::optional<const re2::RE2>& filter,
+                                          Buffer::Instance& response) {
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
   for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
     UNREFERENCED_PARAMETER(name);
     const Upstream::Cluster& cluster = cluster_ref.get();
     const std::string& cluster_name = cluster.info()->name();
+    if (!shouldIncludeCluster(cluster_name, filter)) {
+      continue;
+    }
+
     response.add(fmt::format("{}::observability_name::{}\n", cluster_name,
                              cluster.info()->observabilityName()));
     addOutlierInfo(cluster_name, cluster.outlierDetector(), response);
@@ -265,9 +314,34 @@ void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
                 Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
       }
     }
+
+    // Render a cluster's synthetic admin endpoints (not load-balanced hosts) as host statuses.
+    if (const auto* provider = cluster.adminEndpointProvider()) {
+      for (const auto& endpoint : provider->adminEndpoints()) {
+        if (endpoint.address == nullptr) {
+          continue;
+        }
+        const std::string address = endpoint.address->asString();
+        for (const auto& [gauge_name, gauge_value] : endpoint.gauges) {
+          response.add(
+              fmt::format("{}::{}::{}::{}\n", cluster_name, address, gauge_name, gauge_value));
+        }
+        response.add(
+            fmt::format("{}::{}::hostname::{}\n", cluster_name, address, endpoint.hostname));
+        response.add(fmt::format("{}::{}::weight::{}\n", cluster_name, address, endpoint.weight));
+        // Lower-case to match the token a regular host emits.
+        response.add(fmt::format(
+            "{}::{}::health_flags::{}\n", cluster_name, address,
+            absl::AsciiStrToLower(envoy::config::core::v3::HealthStatus_Name(endpoint.health))));
+      }
+    }
   }
 }
 
+bool ClustersHandler::shouldIncludeCluster(const std::string& cluster_name,
+                                           const std::optional<const re2::RE2>& filter) {
+  return !filter.has_value() || re2::RE2::PartialMatch(cluster_name, filter.value());
+}
 void ClustersHandler::addOutlierInfo(const std::string& cluster_name,
                                      const Upstream::Outlier::Detector* outlier_detector,
                                      Buffer::Instance& response) {

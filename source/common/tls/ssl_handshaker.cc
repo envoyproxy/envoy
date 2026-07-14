@@ -20,13 +20,16 @@ void ValidateResultCallbackImpl::onSslHandshakeCancelled() { extended_socket_inf
 
 void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
                                                         Ssl::ClientValidationStatus detailed_status,
-                                                        const std::string& /*error_details*/,
+                                                        const std::string& error_details,
                                                         uint8_t tls_alert) {
   if (!extended_socket_info_.has_value()) {
     return;
   }
   extended_socket_info_->setCertificateValidationStatus(detailed_status);
   extended_socket_info_->setCertificateValidationAlert(tls_alert);
+  if (!error_details.empty()) {
+    extended_socket_info_->setCertificateValidationError(error_details);
+  }
   extended_socket_info_->onCertificateValidationCompleted(succeeded, true);
 }
 
@@ -52,6 +55,10 @@ SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
 void SslExtendedSocketInfoImpl::setCertificateValidationStatus(
     Envoy::Ssl::ClientValidationStatus validated) {
   certificate_validation_status_ = validated;
+}
+
+void SslExtendedSocketInfoImpl::setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) {
+  ssl_handshaker_.setValidatedCertChain(std::move(chain));
 }
 
 Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidationStatus() const {
@@ -150,11 +157,13 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     switch (err) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
+      state_ = Ssl::SocketState::HandshakeWaitingForConnectionData;
       return PostIoAction::KeepOpen;
     case SSL_ERROR_PENDING_CERTIFICATE:
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
-      state_ = Ssl::SocketState::HandshakeInProgress;
+    case SSL_ERROR_WANT_X509_LOOKUP:
+      state_ = Ssl::SocketState::HandshakeBlockedOnAsyncOperation;
       return PostIoAction::KeepOpen;
     default:
       handshake_callbacks_->onFailure();

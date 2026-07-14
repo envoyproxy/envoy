@@ -26,21 +26,14 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/custom_static_cluster.h"
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/registry.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -62,18 +55,20 @@ namespace Upstream {
 // the expectations when needed.
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
-  TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
-
+  TestClusterManagerFactory()
+      : api_(Api::createApiForTest(server_context_.store_, server_context_.api_.random_)) {
     ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(*this, clusterFromProto_(_, _, _, _))
+    ON_CALL(server_context_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
+
+    ON_CALL(*this, clusterFromProto_(_, _, _))
         .WillByDefault(Invoke(
-            [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+            [&](const envoy::config::cluster::v3::Cluster& cluster,
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  cluster, server_context_, cm,
+                  cluster, server_context_,
                   [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-                  ssl_context_manager_, outlier_event_logger, added_via_api);
+                  outlier_event_logger, added_via_api);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               if (!result.ok()) {
                 throw EnvoyException(std::string(result.status().message()));
@@ -82,19 +77,19 @@ public:
             }));
   }
 
-  ~TestClusterManagerFactory() override { dispatcher_.to_delete_.clear(); }
+  ~TestClusterManagerFactory() override { server_context_.dispatcher_.to_delete_.clear(); }
 
   Http::ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, std::vector<Http::Protocol>&,
-      const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+      const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
           alternate_protocol_options,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
       ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& /*quic_info*/,
       OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) override {
-    return Http::ConnectionPool::InstancePtr{allocateConnPool_(host, alternate_protocol_options,
-                                                               options, transport_socket_options,
-                                                               state, network_observer_registry)};
+    return Http::ConnectionPool::InstancePtr{
+        allocateConnPool_(host, alternate_protocol_options, options, transport_socket_options,
+                          state, network_observer_registry, server_context_.overloadManager())};
   }
 
   Tcp::ConnectionPool::InstancePtr
@@ -102,21 +97,24 @@ public:
                       const Network::ConnectionSocket::OptionsSharedPtr&,
                       Network::TransportSocketOptionsConstSharedPtr,
                       Upstream::ClusterConnectivityState&,
-                      absl::optional<std::chrono::milliseconds>) override {
+                      std::optional<std::chrono::milliseconds>) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
-    auto result = clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
+    auto result = clusterFromProto_(cluster, outlier_event_logger, added_via_api);
+    if (result.first == nullptr) {
+      return absl::InvalidArgumentError("Failed to create cluster from proto");
+    }
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource&,
-                                      const xds::core::v3::ResourceLocator*,
-                                      ClusterManager&) override {
+                                      const xds::core::v3::ResourceLocator*, ClusterManager&,
+                                      bool) override {
     return CdsApiPtr{createCds_()};
   }
 
@@ -129,52 +127,42 @@ public:
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(Http::ConnectionPool::Instance*, allocateConnPool_,
               (HostConstSharedPtr host,
-               const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+               const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                    alternate_protocol_options,
                Network::ConnectionSocket::OptionsSharedPtr,
                Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&,
-               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry));
+               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
+               Server::OverloadManager& overload_manager));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
-              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+              (const envoy::config::cluster::v3::Cluster& cluster,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
   MOCK_METHOD(CdsApi*, createCds_, ());
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
   NiceMock<ThreadLocal::MockInstance>& tls_ = server_context_.thread_local_;
+  NiceMock<Event::MockDispatcher>& dispatcher_ = server_context_.dispatcher_;
+  testing::NiceMock<Random::MockRandomGenerator>& random_ = server_context_.api_.random_;
+
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
-  NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
-  NiceMock<Event::MockDispatcher>& dispatcher_ = server_context_.dispatcher_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{server_context_};
-  NiceMock<LocalInfo::MockLocalInfo>& local_info_ = server_context_.local_info_;
-  NiceMock<Server::MockAdmin>& admin_ = server_context_.admin_;
-  NiceMock<AccessLog::MockAccessLogManager>& log_manager_ = server_context_.access_log_manager_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
-  Server::MockOptions& options_ = server_context_.options_;
 };
 
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
-  static std::unique_ptr<TestClusterManagerImpl> createAndInit(
-      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-      Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-      Server::Admin& admin, Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-      Router::Context& router_context, Server::Instance& server, Config::XdsManager& xds_manager) {
+  static std::unique_ptr<TestClusterManagerImpl>
+  createTestClusterManager(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                           ClusterManagerFactory& factory,
+                           Server::Configuration::ServerFactoryContext& context) {
     absl::Status creation_status = absl::OkStatus();
-    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
-        bootstrap, factory, context, stats, tls, runtime, local_info, log_manager,
-        main_thread_dispatcher, admin, api, http_context, grpc_context, router_context, server,
-        xds_manager, creation_status)};
-    THROW_IF_NOT_OK(creation_status);
-    THROW_IF_NOT_OK(cluster_manager->initialize(bootstrap));
+    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{
+        new TestClusterManagerImpl(bootstrap, factory, context, creation_status)};
+    THROW_IF_NOT_OK_REF(creation_status);
     return cluster_manager;
   }
 
@@ -191,7 +179,10 @@ public:
   }
 
   OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
-    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
+    // For tests, generate a unique key based on the pointer address.
+    uint64_t config_source_key = reinterpret_cast<uint64_t>(odcds.get());
+    odcds_subscriptions_.emplace(config_source_key, std::move(odcds));
+    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, config_source_key);
   }
 
   void notifyExpiredDiscovery(absl::string_view name) {
@@ -207,17 +198,9 @@ protected:
 
   TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                          ClusterManagerFactory& factory,
-                         Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager,
-                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-                         Router::Context& router_context, Server::Instance& server,
-                         Config::XdsManager& xds_manager, absl::Status& creation_status)
-      : ClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
-                           log_manager, main_thread_dispatcher, admin, api, http_context,
-                           grpc_context, router_context, server, xds_manager, creation_status) {}
+                         Server::Configuration::ServerFactoryContext& context,
+                         absl::Status& creation_status)
+      : ClusterManagerImpl(bootstrap, factory, context, creation_status) {}
 };
 
 } // namespace Upstream

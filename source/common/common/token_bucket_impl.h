@@ -115,13 +115,19 @@ public:
    */
   double remainingTokens() const;
 
+  /**
+   * Get the time to next token available. This is a snapshot and may change after the call.
+   * @return the time to next token available.
+   */
+  std::chrono::milliseconds nextTokenAvailable() const;
+
 private:
   double timeNowInSeconds() const;
 
   const double max_tokens_;
   const double fill_rate_;
 
-  std::atomic<double> time_in_seconds_{};
+  std::atomic<double> time_in_seconds_;
   TimeSource& time_source_;
 };
 

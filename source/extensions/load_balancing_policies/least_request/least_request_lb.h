@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 namespace Envoy {
@@ -26,34 +27,6 @@ class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
-      TimeSource& time_source)
-      : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                           100, 50),
-            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
-            least_request_config.has_value()
-                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(
-                      least_request_config.ref())
-                : absl::nullopt,
-            time_source),
-        choice_count_(
-            least_request_config.has_value()
-                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), choice_count, 2)
-                : 2),
-        active_request_bias_runtime_(
-            least_request_config.has_value() && least_request_config->has_active_request_bias()
-                ? absl::optional<Runtime::Double>(
-                      {least_request_config->active_request_bias(), runtime})
-                : absl::nullopt) {
-    initialize();
-  }
-
-  LeastRequestLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
       const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest&
           least_request_config,
@@ -65,16 +38,16 @@ public:
         choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, choice_count, 2)),
         active_request_bias_runtime_(
             least_request_config.has_active_request_bias()
-                ? absl::optional<Runtime::Double>(
+                ? std::optional<Runtime::Double>(
                       {least_request_config.active_request_bias(), runtime})
-                : absl::nullopt),
+                : std::nullopt),
         selection_method_(least_request_config.selection_method()) {
     initialize();
   }
 
 protected:
   void refresh(uint32_t priority) override {
-    active_request_bias_ = active_request_bias_runtime_ != absl::nullopt
+    active_request_bias_ = active_request_bias_runtime_ != std::nullopt
                                ? active_request_bias_runtime_.value().value()
                                : 1.0;
 
@@ -84,6 +57,9 @@ protected:
                      active_request_bias_runtime_->runtimeKey());
       active_request_bias_ = 1.0;
     }
+
+    count_pending_requests_ = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.least_request_lb_count_pending_requests");
 
     EdfLoadBalancerBase::refresh(priority);
   }
@@ -97,6 +73,7 @@ private:
                                         const HostsSource& source) override;
   HostSharedPtr unweightedHostPickFullScan(const HostVector& hosts_to_use);
   HostSharedPtr unweightedHostPickNChoices(const HostVector& hosts_to_use);
+  uint64_t effectiveActiveRequests(const Host& host) const;
 
   const uint32_t choice_count_;
 
@@ -105,7 +82,12 @@ private:
   // whenever a `HostSet` is updated.
   double active_request_bias_{};
 
-  const absl::optional<Runtime::Double> active_request_bias_runtime_;
+  // Whether to include pending requests in the per-host load value. Cached for performance and
+  // consistency reasons and refreshed in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
+  // whenever a `HostSet` is updated.
+  bool count_pending_requests_{};
+
+  const std::optional<Runtime::Double> active_request_bias_runtime_;
   const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
       selection_method_{};
 };

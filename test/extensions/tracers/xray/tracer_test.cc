@@ -60,7 +60,7 @@ public:
         expected_(std::make_unique<TraceProperties>(
             "Service 1", "AWS::Service::Proxy", "test_value", "egress hostname", "POST",
             "/first/second", "Mozilla/5.0 (Macintosh; Intel Mac OS X)", "egress")) {}
-  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
+  absl::flat_hash_map<std::string, Protobuf::Value> aws_metadata_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Tracing::MockConfig> config_;
   std::unique_ptr<MockDaemonBroker> broker_;
@@ -119,8 +119,8 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, expected_->operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               server_.timeSource().systemTime(), std::nullopt /*headers*/,
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -170,7 +170,7 @@ TEST_F(XRayTracerTest, SerializeSpanTestXForwardedForSet) {
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, expected_->operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/,
+                               server_.timeSource().systemTime(), std::nullopt /*headers*/,
                                expected_client_ip /*client_ip from x-forwarded-for header*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
@@ -208,8 +208,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestServerError) {
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, expected_->operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               server_.timeSource().systemTime(), std::nullopt /*headers*/,
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -244,8 +244,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientError) {
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, expected_->operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               server_.timeSource().systemTime(), std::nullopt /*headers*/,
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -279,8 +279,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientErrorWithThrottle) {
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, expected_->operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               server_.timeSource().systemTime(), std::nullopt /*headers*/,
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -308,8 +308,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithEmptyValue) {
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, expected_->operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               server_.timeSource().systemTime(), std::nullopt /*headers*/,
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -342,8 +342,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, expected_->operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               server_.timeSource().systemTime(), std::nullopt /*headers*/,
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -356,14 +356,14 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
 TEST_F(XRayTracerTest, NonSampledSpansNotSerialized) {
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
+  auto span = tracer.createNonSampledSpan(std::nullopt /*headers*/);
   span->finishSpan();
 }
 
 TEST_F(XRayTracerTest, BaggageNotImplemented) {
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
+  auto span = tracer.createNonSampledSpan(std::nullopt /*headers*/);
   span->setBaggage("baggage_key", "baggage_value");
   span->finishSpan();
 
@@ -374,7 +374,7 @@ TEST_F(XRayTracerTest, BaggageNotImplemented) {
 TEST_F(XRayTracerTest, LogNotImplemented) {
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
+  auto span = tracer.createNonSampledSpan(std::nullopt /*headers*/);
   span->log(SystemTime{std::chrono::duration<int, std::milli>(100)}, "dummy log value");
   span->finishSpan();
   // Nothing to assert here as log is a dummy function
@@ -383,7 +383,7 @@ TEST_F(XRayTracerTest, LogNotImplemented) {
 TEST_F(XRayTracerTest, GetTraceId) {
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
+  auto span = tracer.createNonSampledSpan(std::nullopt /*headers*/);
   span->finishSpan();
 
   // Trace ID is always generated
@@ -402,8 +402,8 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
   // Span id taken from random generator
   EXPECT_CALL(server_.api_.random_, random()).WillOnce(Return(999));
   auto parent_span = tracer.startSpan(config_, expected_->operation_name,
-                                      server_.timeSource().systemTime(), absl::nullopt /*headers*/,
-                                      absl::nullopt /*client_ip from x-forwarded-for header*/);
+                                      server_.timeSource().systemTime(), std::nullopt /*headers*/,
+                                      std::nullopt /*client_ip from x-forwarded-for header*/);
 
   const XRay::Span* xray_parent_span = static_cast<XRay::Span*>(parent_span.get());
   auto on_send = [&](const std::string& json) {
@@ -443,7 +443,7 @@ TEST_F(XRayTracerTest, UseExistingHeaderInformation) {
                 server_.timeSource(),
                 server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(), xray_header,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
 
   const XRay::Span* xray_span = static_cast<XRay::Span*>(span.get());
   EXPECT_STREQ(xray_header.trace_id_.c_str(), xray_span->traceId().c_str());
@@ -468,7 +468,7 @@ TEST_F(XRayTracerTest, DontStartSpanOnNonSampledSpans) {
   Tracing::SpanPtr span;
   EXPECT_ENVOY_BUG(span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(),
                                            xray_header,
-                                           absl::nullopt /*client_ip from x-forwarded-for header*/),
+                                           std::nullopt /*client_ip from x-forwarded-for header*/),
                    "unexpected code path hit");
 }
 
@@ -487,7 +487,7 @@ TEST_F(XRayTracerTest, UnknownSpanStillSampled) {
                 server_.timeSource(),
                 server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(), xray_header,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
 
   const XRay::Span* xray_span = static_cast<XRay::Span*>(span.get());
   EXPECT_STREQ(xray_header.trace_id_.c_str(), xray_span->traceId().c_str());
@@ -508,8 +508,8 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
                 server_.timeSource(),
                 server_.api().randomGenerator()};
   auto span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(),
-                               absl::nullopt /*headers*/,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               std::nullopt /*headers*/,
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
   Tracing::TestTraceContextImpl request_headers{};
   span->injectContext(request_headers, Tracing::UpstreamContext());
   auto header = request_headers.get(xRayTraceHeader().key());
@@ -527,7 +527,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
                 std::move(broker_),
                 server_.timeSource(),
                 server_.api().randomGenerator()};
-  auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
+  auto span = tracer.createNonSampledSpan(std::nullopt /*headers*/);
   Tracing::TestTraceContextImpl request_headers{};
   span->injectContext(request_headers, Tracing::UpstreamContext());
   auto header = request_headers.get(xRayTraceHeader().key());
@@ -546,7 +546,7 @@ TEST_F(XRayTracerTest, TraceIDFormatTest) {
                 server_.timeSource(),
                 server_.api().randomGenerator()};
   // startSpan and createNonSampledSpan use the same logic to create a trace ID
-  auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
+  auto span = tracer.createNonSampledSpan(std::nullopt /*headers*/);
   XRay::Span* xray_span = span.get();
   std::vector<std::string> parts = absl::StrSplit(xray_span->traceId(), absl::ByChar('-'));
   EXPECT_EQ(3, parts.size());
@@ -584,7 +584,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, XRayDaemonTest,
 TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
   NiceMock<Tracing::MockConfig> config_;
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
-  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata;
+  absl::flat_hash_map<std::string, Protobuf::Value> aws_metadata;
   NiceMock<Server::MockInstance> server;
   Network::Test::UdpSyncPeer xray_fake_daemon(GetParam());
   const std::string daemon_endpoint = xray_fake_daemon.localAddress()->asString();
@@ -592,8 +592,8 @@ TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
                 aws_metadata,        std::make_unique<DaemonBrokerImpl>(daemon_endpoint),
                 server.timeSource(), server.api().randomGenerator()};
   auto span = tracer.startSpan(config_, "ingress" /*operation name*/,
-                               server.timeSource().systemTime(), absl::nullopt /*headers*/,
-                               absl::nullopt /*client_ip from x-forwarded-for header*/);
+                               server.timeSource().systemTime(), std::nullopt /*headers*/,
+                               std::nullopt /*client_ip from x-forwarded-for header*/);
 
   span->setTag(Tracing::Tags::get().HttpStatusCode, "202");
   span->finishSpan();

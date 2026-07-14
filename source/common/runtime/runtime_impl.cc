@@ -30,8 +30,8 @@
 #include "re2/re2.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "quiche_platform_impl/quiche_flags_impl.h"
 #include "quiche/common/platform/api/quiche_flags.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 #endif
 
 namespace Envoy {
@@ -45,7 +45,21 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
   stats.deprecated_feature_seen_since_process_start_.inc();
 }
 
-void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
+void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
+                            absl::node_hash_map<std::string, bool>& runtime_feature_defaults) {
+  for (const auto& it : flag_map) {
+    if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
+      runtime_feature_defaults.try_emplace(it.first, Runtime::runtimeFeatureEnabled(it.first));
+    }
+  }
+
+  for (const auto& it : runtime_feature_defaults) {
+    const auto flag = flag_map.find(it.first);
+    if (flag == flag_map.end() || !flag->second.bool_value_.has_value()) {
+      maybeSetRuntimeGuard(it.first, it.second);
+    }
+  }
+
   for (const auto& it : flag_map) {
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
@@ -136,7 +150,7 @@ Snapshot::ConstStringOptRef SnapshotImpl::get(absl::string_view key) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return entry->second.raw_string_value_;
   }
@@ -181,6 +195,7 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
               "WARNING runtime key '{}': numerator ({}) > denominator ({}), condition always "
               "evaluates to true",
               key, percent.numerator(), denominator_value);
+    return true;
   }
 
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
@@ -233,7 +248,7 @@ SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& sta
   stats.num_keys_.set(values_.size());
 }
 
-void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& value) {
+void parseFractionValue(SnapshotImpl::Entry& entry, const Protobuf::Struct& value) {
   envoy::type::v3::FractionalPercent percent;
   static_assert(envoy::type::v3::FractionalPercent::MILLION ==
                 envoy::type::v3::FractionalPercent::DenominatorType_MAX);
@@ -285,11 +300,11 @@ bool parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
 }
 
 void SnapshotImpl::addEntry(Snapshot::EntryMap& values, const std::string& key,
-                            const ProtobufWkt::Value& value, absl::string_view raw_string) {
+                            const Protobuf::Value& value, absl::string_view raw_string) {
   values.emplace(key, SnapshotImpl::createEntry(value, raw_string));
 }
 
-SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
+SnapshotImpl::Entry SnapshotImpl::createEntry(const Protobuf::Value& value,
                                               absl::string_view raw_string) {
   Entry entry;
   entry.raw_string_value_ = value.string_value();
@@ -297,26 +312,26 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
     entry.raw_string_value_ = raw_string;
   }
   switch (value.kind_case()) {
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     setNumberValue(entry, value.number_value());
     if (entry.raw_string_value_.empty()) {
       entry.raw_string_value_ = absl::StrCat(value.number_value());
     }
     break;
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
       // Convert boolean to "true"/"false"
       entry.raw_string_value_ = value.bool_value() ? "true" : "false";
     }
     break;
-  case ProtobufWkt::Value::kStructValue:
+  case Protobuf::Value::kStructValue:
     if (entry.raw_string_value_.empty()) {
       entry.raw_string_value_ = value.struct_value().DebugString();
     }
     parseFractionValue(entry, value.struct_value());
     break;
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     parseEntryDoubleValue(entry);
     break;
   default:
@@ -421,7 +436,7 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
   return absl::OkStatus();
 }
 
-ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
+ProtoLayer::ProtoLayer(absl::string_view name, const Protobuf::Struct& proto,
                        absl::Status& creation_status)
     : OverrideLayerImpl{name} {
   creation_status = absl::OkStatus();
@@ -433,27 +448,27 @@ ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
   }
 }
 
-absl::Status ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix) {
+absl::Status ProtoLayer::walkProtoValue(const Protobuf::Value& v, const std::string& prefix) {
   switch (v.kind_case()) {
-  case ProtobufWkt::Value::KIND_NOT_SET:
-  case ProtobufWkt::Value::kListValue:
-  case ProtobufWkt::Value::kNullValue:
+  case Protobuf::Value::KIND_NOT_SET:
+  case Protobuf::Value::kListValue:
+  case Protobuf::Value::kNullValue:
     return absl::InvalidArgumentError(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
-  case ProtobufWkt::Value::kNumberValue:
-  case ProtobufWkt::Value::kBoolValue:
-    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
+  case Protobuf::Value::kNumberValue:
+  case Protobuf::Value::kBoolValue:
+    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix) && !isLegacyRuntimeFeature(prefix)) {
       IS_ENVOY_BUG(absl::StrCat(
           "Using a removed guard ", prefix,
           ". In future version of Envoy this will be treated as invalid configuration"));
     }
     SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
-  case ProtobufWkt::Value::kStructValue: {
-    const ProtobufWkt::Struct& s = v.struct_value();
+  case Protobuf::Value::kStructValue: {
+    const Protobuf::Struct& s = v.struct_value();
     if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
         s.fields().find("denominator") != s.fields().end()) {
       SnapshotImpl::addEntry(values_, prefix, v, "");
@@ -541,6 +556,8 @@ absl::Status LoaderImpl::initialize(Upstream::ClusterManager& cm) {
   return absl::OkStatus();
 }
 
+absl::Status LoaderImpl::onWorkerThreadsRegistered() { return loadNewSnapshot(); }
+
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   on_rtds_initialized_ = on_done;
   init_manager_.initialize(init_watcher_);
@@ -554,17 +571,16 @@ void LoaderImpl::onRtdsReady() {
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(validation_visitor,
-                                                                            "name"),
-      parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
+    : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
-      init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
+      init_target_("RTDS " + resource_name_, [this]() { start(); }),
+      resource_type_helper_(validation_visitor, "name") {}
 
 absl::Status RtdsSubscription::createSubscription() {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   auto subscription_or_error = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this, resource_decoder_,
-      {});
+      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this,
+      resource_type_helper_.resourceDecoder(), {});
   RETURN_IF_NOT_OK(subscription_or_error.status());
   subscription_ = std::move(*subscription_or_error);
   return absl::OkStatus();
@@ -577,8 +593,8 @@ RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& 
   if (!valid.ok()) {
     return valid;
   }
-  const auto& runtime =
-      dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
+  const auto& runtime = Envoy::Protobuf::DynamicCastMessage<envoy::service::runtime::v3::Runtime>(
+      resources[0].get().resource());
   if (runtime.name() != resource_name_) {
     return absl::InvalidArgumentError(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
@@ -652,10 +668,10 @@ absl::Status LoaderImpl::loadNewSnapshot() {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
 
-  refreshReloadableFlags(ptr->values());
+  refreshReloadableFlags(ptr->values(), runtime_feature_defaults_);
 
   {
-    absl::MutexLock lock(&snapshot_mutex_);
+    absl::MutexLock lock(snapshot_mutex_);
     thread_safe_snapshot_ = ptr;
   }
   return absl::OkStatus();
@@ -673,7 +689,7 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   }
 
   {
-    absl::ReaderMutexLock lock(&snapshot_mutex_);
+    absl::ReaderMutexLock lock(snapshot_mutex_);
     return thread_safe_snapshot_;
   }
 }

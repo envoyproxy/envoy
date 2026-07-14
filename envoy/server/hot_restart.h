@@ -1,13 +1,22 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
+#include <memory>
+#include <optional>
 #include <string>
 
+#include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/allocator.h"
+#include "envoy/network/address.h"
+#include "envoy/network/listener.h"
+#include "envoy/network/socket.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Server {
@@ -45,9 +54,11 @@ public:
    * @param address supplies the address of the socket to duplicate, e.g. tcp://127.0.0.1:5000.
    * @param worker_index supplies the socket/worker index to fetch. When using reuse_port sockets
    *        each socket is fetched individually to ensure no connection loss.
+   * @param network_namespace supplies the network namespace of the socket, if any.
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */
-  virtual int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) PURE;
+  virtual int duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
+                                          absl::string_view network_namespace) PURE;
 
   /**
    * Registers a UdpListenerConfig as a possible receiver of udp packets forwarded from the
@@ -85,7 +96,7 @@ public:
    * to start up in the new process.
    * @return response if the parent is alive.
    */
-  virtual absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
+  virtual std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
 
   /**
    * Tell our parent process to gracefully terminate itself.
@@ -128,6 +139,11 @@ public:
    * @return Thread::BasicLockable& a lock for access logs.
    */
   virtual Thread::BasicLockable& accessLogLock() PURE;
+
+  /**
+   * @return bool whether the server is currently in the initializing state during hot restart.
+   */
+  virtual bool isInitializing() const PURE;
 };
 
 /**

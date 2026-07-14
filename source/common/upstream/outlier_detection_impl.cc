@@ -60,6 +60,17 @@ void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {
   last_unejection_time_ = (unejection_time);
 }
 
+void DetectorHostMonitorImpl::degrade(MonotonicTime degraded_time) {
+  ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+  host_.lock()->healthFlagSet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION);
+  num_degradations_++;
+  last_degraded_time_ = degraded_time;
+}
+
+void DetectorHostMonitorImpl::undegrade(MonotonicTime undegraded_time) {
+  last_undegraded_time_ = undegraded_time;
+}
+
 void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
   external_origin_sr_monitor_.updateCurrentSuccessRateBucket();
   local_origin_sr_monitor_.updateCurrentSuccessRateBucket();
@@ -94,7 +105,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
+std::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   Http::Code http_code = Http::Code::InternalServerError;
 
   switch (result) {
@@ -111,13 +122,16 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
   case Result::ExtOriginRequestFailed:
     http_code = Http::Code::InternalServerError;
     break;
+  case Result::ExtOriginRequestDegraded:
+    http_code = Http::Code::OK;
+    break;
     // LOCAL_ORIGIN_CONNECT_SUCCESS  is used is 2-layer protocols, like HTTP.
     // First connection is established and then higher level protocol runs.
     // If error happens in higher layer protocol, it will be mapped to
     // HTTP code indicating error. In order not to intervene with result of
     // higher layer protocol, this code is not mapped to HTTP code.
   case Result::LocalOriginConnectSuccess:
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return {http_code};
@@ -129,11 +143,19 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
 // - if the *code* is not defined, mapping uses resultToHttpCode method to do mapping.
 // - if *code* is defined, it is taken as HTTP code and reported as such to outlier detector.
 void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
-                                                            absl::optional<uint64_t> code) {
+                                                            std::optional<uint64_t> code) {
+  // Mark host as degraded if needed, then process normally
+  if (result == Result::ExtOriginRequestDegraded) {
+    std::shared_ptr<DetectorImpl> detector = detector_.lock();
+    if (detector) {
+      detector->setHostDegraded(host_.lock());
+    }
+  }
+
   if (code) {
     putHttpResponseCode(code.value());
   } else {
-    absl::optional<Http::Code> http_code = resultToHttpCode(result);
+    std::optional<Http::Code> http_code = resultToHttpCode(result);
     if (http_code) {
       putHttpResponseCode(enumToInt(http_code.value()));
     }
@@ -144,7 +166,7 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
 // are treated separately. Local origin errors have separate counters and
 // separate success rate monitor.
 void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
-                                                              absl::optional<uint64_t>) {
+                                                              std::optional<uint64_t> code) {
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
@@ -156,17 +178,25 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   case Result::LocalOriginConnectFailed:
     return localOriginFailure();
   // EXT_ORIGIN_REQUEST_FAILED is used when connection to server was successful, but transaction on
-  // server level failed. Since it it similar to HTTP 5xx, map it to 5xx handler.
+  // server level failed. Since it it similar to HTTP 5xx, map it to 5xx if HTTP code is not
+  // provided.
   case Result::ExtOriginRequestFailed:
     // map it to http code and call http handler.
-    return putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
-  // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with non-http server was
+    putHttpResponseCode(code.value_or(enumToInt(Http::Code::ServiceUnavailable)));
+    break;
+  // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with upstream server was
   // completed successfully. This means that connection and server level transactions were
-  // successful. Map it to http code 200 OK and indicate that there was no errors on connection
-  // level.
+  // successful. Map it to http code 200 OK if HTTP code is not provided.
   case Result::ExtOriginRequestSuccess:
-    putHttpResponseCode(enumToInt(Http::Code::OK));
-    localOriginNoFailure();
+    putHttpResponseCode(code.value_or(enumToInt(Http::Code::OK)));
+    break;
+  case Result::ExtOriginRequestDegraded:
+    // Mark host as degraded, then process as successful response
+    std::shared_ptr<DetectorImpl> detector = detector_.lock();
+    if (detector) {
+      detector->setHostDegraded(host_.lock());
+    }
+    putHttpResponseCode(code.value_or(enumToInt(Http::Code::OK)));
     break;
   }
 }
@@ -175,7 +205,7 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
 // It calls putResultWithLocalExternalSplit or put putResultNoLocalExternalSplit via
 // std::function. The setting happens in constructor based on split_external_local_origin_errors
 // config parameter.
-void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> code) {
+void DetectorHostMonitorImpl::putResult(Result result, std::optional<uint64_t> code) {
   put_result_func_(this, result, code);
 }
 
@@ -261,7 +291,8 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       max_ejection_time_jitter_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
           config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
       successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, successful_active_health_check_uneject_host, true)) {}
+          config, successful_active_health_check_uneject_host, true)),
+      detect_degraded_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, detect_degraded_hosts, false)) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
@@ -324,7 +355,7 @@ void DetectorImpl::initialize(Cluster& cluster) {
         });
   }
   member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> absl::Status {
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) {
         for (const HostSharedPtr& host : hosts_added) {
           addHostMonitor(host);
         }
@@ -338,7 +369,6 @@ void DetectorImpl::initialize(Cluster& cluster) {
 
           host_monitors_.erase(host);
         }
-        return absl::OkStatus();
       });
 
   armIntervalTimer();
@@ -371,6 +401,31 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time) + jitter) <=
       (now - monitor->lastEjectionTime().value())) {
     unejectHost(host);
+  }
+}
+
+void DetectorImpl::checkHostForUndegrade(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
+                                         MonotonicTime now) {
+  if (!config_.detectDegraded() ||
+      !host->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
+    return;
+  }
+
+  const std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
+      runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
+  const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
+      runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
+  const std::chrono::milliseconds jitter = monitor->getJitter();
+  ASSERT(monitor->numDegradations() > 0);
+  if ((std::min(base_eject_time * monitor->degradeTimeBackoff(), max_eject_time) + jitter) <=
+      (now - monitor->lastDegradedTime().value())) {
+    host->healthFlagClear(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION);
+    monitor->undegrade(time_source_.monotonicTime());
+    runCallbacks(host);
+
+    if (event_logger_) {
+      event_logger_->logUneject(host);
+    }
   }
 }
 
@@ -414,6 +469,9 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
                                               config_.enforcingFailurePercentageLocalOrigin());
+  case envoy::data::cluster::v3::DEGRADED:
+    // Degradation uses its own code path, not the ejection helpers
+    IS_ENVOY_BUG("enforceEjection() should not be called for DEGRADED type");
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -444,6 +502,10 @@ void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::Outlier
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_enforced_local_origin_failure_percentage_.inc();
     break;
+  case envoy::data::cluster::v3::DEGRADED:
+    // Degradation uses its own code path, not the ejection helpers
+    IS_ENVOY_BUG("updateEnforcedEjectionStats() should not be called for DEGRADED type");
+    return;
   }
 }
 
@@ -470,6 +532,9 @@ void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::Outlier
     break;
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_detected_local_origin_failure_percentage_.inc();
+    break;
+  case envoy::data::cluster::v3::DEGRADED:
+    stats_.ejections_detected_degradation_.inc();
     break;
   }
 }
@@ -572,6 +637,69 @@ void DetectorImpl::onConsecutiveLocalOriginFailure(HostSharedPtr host) {
                                    envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE);
 }
 
+void DetectorImpl::notifyMainThreadHostDegraded(HostSharedPtr host) {
+  // This event will come from all threads, so we synchronize with a post to the main thread.
+  // Similar to consecutive error handling, we use weak pointers to handle the case where
+  // the cluster/detector is destroyed before the callback runs.
+  std::weak_ptr<DetectorImpl> weak_this = shared_from_this();
+  dispatcher_.post([weak_this, host]() -> void {
+    std::shared_ptr<DetectorImpl> shared_this = weak_this.lock();
+    if (shared_this) {
+      shared_this->setHostDegradedMainThread(host);
+    }
+  });
+}
+
+void DetectorImpl::setHostDegraded(HostSharedPtr host) {
+  // Only mark as degraded if the feature is enabled
+  if (!config_.detectDegraded()) {
+    return;
+  }
+  notifyMainThreadHostDegraded(host);
+}
+
+void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
+  // The host may have been removed from host_monitors_ between the worker thread
+  // posting this degrade event and the main thread running it; if so, ignore it
+  // (mirrors the guard in the eject path) so host_monitors_[host] does not
+  // default-insert a null monitor that is then dereferenced.
+  if (host_monitors_.count(host) == 0) {
+    return;
+  }
+  if (!host->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
+    updateDetectedEjectionStats(envoy::data::cluster::v3::DEGRADED);
+
+    // Use the degrade() method which tracks timing
+    host_monitors_[host]->degrade(time_source_.monotonicTime());
+
+    const std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
+        runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
+    const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
+        runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
+
+    // Generate random jitter to prevent connection storms when hosts undegrade
+    const uint64_t max_eject_time_jitter = runtime_.snapshot().getInteger(
+        MaxEjectionTimeJitterMsRuntime, config_.maxEjectionTimeJitterMs());
+    const std::chrono::milliseconds jitter =
+        std::chrono::milliseconds(random_generator_() % (max_eject_time_jitter + 1));
+    host_monitors_[host]->setJitter(jitter);
+
+    if ((host_monitors_[host]->degradeTimeBackoff() * base_eject_time) <
+        (max_eject_time + base_eject_time)) {
+      host_monitors_[host]->degradeTimeBackoff()++;
+    }
+
+    // Log degradation event
+    // Use DEGRADED type to distinguish from actual ejections
+    // The enforced=true since degradation is always enforced (host is deprioritized)
+    if (event_logger_) {
+      event_logger_->logEject(host, *this, envoy::data::cluster::v3::DEGRADED, true);
+    }
+
+    runCallbacks(host);
+  }
+}
+
 void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
                                             envoy::data::cluster::v3::OutlierEjectionType type) {
   // Ejections come in cross thread. There is a chance that the host has already been removed from
@@ -598,6 +726,8 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
     FALLTHRU;
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+    FALLTHRU;
+  case envoy::data::cluster::v3::DEGRADED:
     IS_ENVOY_BUG("unexpected non-consecutive error");
     return;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
@@ -674,7 +804,7 @@ void DetectorImpl::processSuccessRateEjections(
   for (const auto& host : host_monitors_) {
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      absl::optional<std::pair<double, uint64_t>> host_success_rate_and_volume =
+      std::optional<std::pair<double, uint64_t>> host_success_rate_and_volume =
           host.second->getSRMonitor(monitor_type)
               .successRateAccumulator()
               .getSuccessRateAndVolume();
@@ -749,6 +879,7 @@ void DetectorImpl::onIntervalTimer() {
 
   for (auto host : host_monitors_) {
     checkHostForUneject(host.first, host.second, now);
+    checkHostForUndegrade(host.first, host.second, now);
 
     // Need to update the writer bucket to keep the data valid.
     host.second->updateCurrentSuccessRateBucket();
@@ -777,6 +908,23 @@ void DetectorImpl::onIntervalTimer() {
     }
   }
 
+  // Decrement degrade backoff for all hosts which have not been degraded.
+  // Uses the same algorithm as ejection backoff.
+  for (auto host : host_monitors_) {
+    if (!host.first->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
+      auto& monitor = host.second;
+      // Node is healthy and was not degraded since the last check.
+      if (monitor->lastUndegradedTime().has_value() &&
+          ((now - monitor->lastUndegradedTime().value()) >=
+           std::chrono::milliseconds(
+               runtime_.snapshot().getInteger(IntervalMsRuntime, config_.intervalMs())))) {
+        if (monitor->degradeTimeBackoff() != 0) {
+          monitor->degradeTimeBackoff()--;
+        }
+      }
+    }
+  }
+
   armIntervalTimer();
 }
 
@@ -791,7 +939,7 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
   envoy::data::cluster::v3::OutlierDetectionEvent event;
   event.set_type(type);
 
-  absl::optional<MonotonicTime> time = host->outlierDetector().lastUnejectionTime();
+  std::optional<MonotonicTime> time = host->outlierDetector().lastUnejectionTime();
   setCommonEventParams(event, host, time);
 
   event.set_action(envoy::data::cluster::v3::EJECT);
@@ -835,7 +983,7 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
 void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
   envoy::data::cluster::v3::OutlierDetectionEvent event;
 
-  absl::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
+  std::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
   setCommonEventParams(event, host, time);
 
   event.set_action(envoy::data::cluster::v3::UNEJECT);
@@ -852,7 +1000,7 @@ void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
 
 void EventLoggerImpl::setCommonEventParams(envoy::data::cluster::v3::OutlierDetectionEvent& event,
                                            const HostDescriptionConstSharedPtr& host,
-                                           absl::optional<MonotonicTime> time) {
+                                           std::optional<MonotonicTime> time) {
   MonotonicTime monotonic_now = time_source_.monotonicTime();
   if (time) {
     std::chrono::seconds secsFromLastAction =
@@ -875,9 +1023,9 @@ SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
   return current_success_rate_bucket_.get();
 }
 
-absl::optional<std::pair<double, uint64_t>> SuccessRateAccumulator::getSuccessRateAndVolume() {
+std::optional<std::pair<double, uint64_t>> SuccessRateAccumulator::getSuccessRateAndVolume() {
   if (!backup_success_rate_bucket_->total_request_counter_) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   double success_rate = backup_success_rate_bucket_->success_request_counter_ * 100.0 /

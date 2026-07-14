@@ -50,14 +50,6 @@ MockServerConnection::~MockServerConnection() = default;
 MockClientConnection::MockClientConnection() = default;
 MockClientConnection::~MockClientConnection() = default;
 
-MockFilterChainManager::MockFilterChainManager() {
-  ON_CALL(*this, applyFilterFactoryCb(_, _))
-      .WillByDefault(
-          Invoke([this](FilterContext, FilterFactoryCb& factory) { factory(callbacks_); }));
-}
-
-MockFilterChainManager::~MockFilterChainManager() = default;
-
 MockFilterChainFactory::MockFilterChainFactory() = default;
 MockFilterChainFactory::~MockFilterChainFactory() = default;
 
@@ -66,8 +58,20 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
   callbacks.route_.reset(new NiceMock<Router::MockRoute>());
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, streamInfo()).WillByDefault(ReturnRef(callbacks.stream_info_));
-  ON_CALL(callbacks, route()).WillByDefault(Return(callbacks.route_));
-  ON_CALL(callbacks, clusterInfo()).WillByDefault(Return(callbacks.cluster_info_));
+  ON_CALL(callbacks, route()).WillByDefault(Invoke([&callbacks]() -> OptRef<const Router::Route> {
+    return makeOptRefFromPtr<const Router::Route>(callbacks.route_.get());
+  }));
+  ON_CALL(callbacks, routeSharedPtr())
+      .WillByDefault(
+          Invoke([&callbacks]() -> Router::RouteConstSharedPtr { return callbacks.route_; }));
+  ON_CALL(callbacks, clusterInfo())
+      .WillByDefault(Invoke([&callbacks]() -> OptRef<const Upstream::ClusterInfo> {
+        return makeOptRefFromPtr<const Upstream::ClusterInfo>(callbacks.cluster_info_.get());
+      }));
+  ON_CALL(callbacks, clusterInfoSharedPtr())
+      .WillByDefault(Invoke([&callbacks]() -> Upstream::ClusterInfoConstSharedPtr {
+        return callbacks.cluster_info_;
+      }));
   ON_CALL(callbacks, downstreamCallbacks())
       .WillByDefault(
           Return(OptRef<DownstreamStreamFilterCallbacks>{callbacks.downstream_callbacks_}));
@@ -95,19 +99,19 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, sendLocalReply(_, _, _, _, _))
       .WillByDefault(Invoke([this](Code code, absl::string_view body,
                                    std::function<void(ResponseHeaderMap & headers)> modify_headers,
-                                   const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                   const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                                    absl::string_view details) {
         sendLocalReply_(code, body, modify_headers, grpc_status, details);
       }));
   ON_CALL(*this, routeConfig())
-      .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
+      .WillByDefault(Return(std::optional<Router::ConfigConstSharedPtr>()));
   ON_CALL(*this, upstreamOverrideHost())
-      .WillByDefault(Return(absl::optional<Upstream::LoadBalancerContext::OverrideHost>()));
+      .WillByDefault(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {
         auto route = this->route();
-        if (route == nullptr) {
+        if (!route) {
           return nullptr;
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
@@ -115,7 +119,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, perFilterConfigs())
       .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
         auto route = this->route();
-        if (route == nullptr) {
+        if (!route) {
           return {};
         }
         return route->perFilterConfigs("envoy.filter");
@@ -127,7 +131,7 @@ MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
 void MockStreamDecoderFilterCallbacks::sendLocalReply_(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   Utility::sendLocalReply(
       stream_destroyed_,
       Utility::EncodeFunctions{
@@ -155,7 +159,7 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {
         auto route = this->route();
-        if (route == nullptr) {
+        if (!route) {
           return nullptr;
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
@@ -163,7 +167,7 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   ON_CALL(*this, perFilterConfigs())
       .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
         auto route = this->route();
-        if (route == nullptr) {
+        if (!route) {
           return {};
         }
         return route->perFilterConfigs("envoy.filter");

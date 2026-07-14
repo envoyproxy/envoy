@@ -2,7 +2,6 @@
 
 #include "test/mocks/http/stateful_session.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -95,6 +94,23 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
                   .createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
                                                    context.messageValidationVisitor())
                   .ok());
+}
+
+TEST(StatefulSessionFactoryConfigTest, SimpleConfigTestWithServerContext) {
+  testing::NiceMock<Http::MockSessionStateFactoryConfig> config_factory;
+  Registry::InjectFactory<Http::SessionStateFactoryConfig> registration(config_factory);
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(std::string(ConfigYaml), proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  StatefulSessionFactoryConfig factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
 }
 
 } // namespace

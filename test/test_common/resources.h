@@ -26,7 +26,7 @@ public:
   const std::string Runtime{"type.googleapis.com/envoy.service.runtime.v3.Runtime"};
 };
 
-using TypeUrl = ConstSingleton<TypeUrlValues>;
+using TestTypeUrl = ConstSingleton<TypeUrlValues>;
 
 } // namespace Config
 } // namespace Envoy

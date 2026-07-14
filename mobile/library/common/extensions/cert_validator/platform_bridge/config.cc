@@ -9,7 +9,7 @@ namespace Tls {
 
 absl::StatusOr<CertValidatorPtr> PlatformBridgeCertValidatorFactory::createCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Server::Configuration::CommonFactoryContext& /*context*/) {
+    Server::Configuration::CommonFactoryContext& /*context*/, Stats::Scope& /*scope*/) {
   return PlatformBridgeCertValidator::create(config, stats);
 }
 

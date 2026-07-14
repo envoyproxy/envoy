@@ -7,7 +7,6 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -114,7 +113,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy()).WillOnce(Return(nullptr));
-    EXPECT_CALL(decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillOnce(Return(nullptr));
+    EXPECT_CALL(*decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillOnce(Return(nullptr));
 
     ON_CALL(decoder_callbacks_, perFilterConfigs())
         .WillByDefault(Invoke([]() -> Router::RouteSpecificFilterConfigs { return {}; }));
@@ -130,7 +129,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
 
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy())
         .WillOnce(Return(cors_policy_.get()));
-    EXPECT_CALL(decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillOnce(Return(nullptr));
+    EXPECT_CALL(*decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillOnce(Return(nullptr));
 
     ON_CALL(decoder_callbacks_, perFilterConfigs())
         .WillByDefault(Invoke([]() -> Router::RouteSpecificFilterConfigs { return {}; }));
@@ -146,7 +145,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy()).WillOnce(Return(nullptr));
-    EXPECT_CALL(decoder_callbacks_.route_->virtual_host_, corsPolicy())
+    EXPECT_CALL(*decoder_callbacks_.route_->virtual_host_, corsPolicy())
         .WillOnce(Return(cors_policy_.get()));
 
     ON_CALL(decoder_callbacks_, perFilterConfigs())
@@ -668,7 +667,7 @@ TEST_F(CorsFilterTest, RedirectRoute) {
 }
 
 TEST_F(CorsFilterTest, EmptyRoute) {
-  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>{}));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -708,7 +707,7 @@ TEST_F(CorsFilterTest, NoCorsEntry) {
       .WillByDefault(Invoke([]() -> Router::RouteSpecificFilterConfigs { return {}; }));
   // No cors policy in route entry or virtual host.
   ON_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy()).WillByDefault(Return(nullptr));
-  ON_CALL(decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillByDefault(Return(nullptr));
+  ON_CALL(*decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillByDefault(Return(nullptr));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(false, isCorsRequest());

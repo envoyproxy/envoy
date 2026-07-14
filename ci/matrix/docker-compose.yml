@@ -1,0 +1,115 @@
+x-common: &common-base
+  build:
+    context: ../..
+    dockerfile: ci/matrix/Dockerfile
+  volumes:
+  - ../..:/workspace
+  environment: &common-env
+    ENVOY_UID: "${UID:?UID not set, **try** `export UID`}"
+    ENVOY_GID: ${GID}
+
+x-gcc-setup: &gcc-setup |
+  #!/usr/bin/env bash
+  set -eo pipefail
+  apt-get update --error-on=any
+  apt-get -qq install -y gnupg2 gpg-agent
+  add-apt-repository -y ppa:ubuntu-toolchain-r/test
+  apt-get update --error-on=any
+  apt-get -qq install -y --no-install-recommends gcc-13 g++-13 libstdc++-13-dev libc6-dev build-essential
+  update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+  update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+
+x-llvm-setup: &llvm-setup |
+  #!/usr/bin/env bash
+  set -eo pipefail
+  apt-get -qq update --error-on=any
+  apt-get -qq install -y gnupg2 gpg-agent
+  add-apt-repository -y ppa:ubuntu-toolchain-r/test
+  apt-get update --error-on=any
+  apt-get -qq install -y libtinfo5 wget xz-utils libgcc-s1 libgcc-13-dev
+
+services:
+  gcc:
+    <<: *common-base
+    build:
+      context: ../..
+      dockerfile: ci/matrix/Dockerfile
+      args:
+        MATRIX_SETUP: *gcc-setup
+    environment:
+      <<: *common-env
+      EXPECTED_NO_ARGS: fail
+      EXPECTED_GCC: gcc-libstdc++
+      EXPECTED_CLANG: fail
+      EXPECTED_GCC_ENV: fail
+      EXPECTED_CLANG_ENV: fail
+    command:
+    - bash
+    - -c
+    - |
+      ! which clang || (echo "ERROR: clang found when it shouldn't be" && exit 1)
+      /usr/local/bin/test.sh
+
+  llvm:
+    <<: *common-base
+    build:
+      context: ../..
+      dockerfile: ci/matrix/Dockerfile
+      args:
+        MATRIX_SETUP: *llvm-setup
+    environment:
+      <<: *common-env
+      EXPECTED_NO_ARGS: clang-libc++
+      EXPECTED_GCC: fail
+      EXPECTED_CLANG: clang-libc++
+      EXPECTED_GCC_ENV: clang-libc++
+      EXPECTED_CLANG_ENV: clang-libc++
+    command:
+    - bash
+    - -c
+    - |
+      ! which gcc || (echo "ERROR: gcc found when it shouldn't be" && exit 1)
+      /usr/local/bin/test.sh
+
+  all:
+    <<: *common-base
+    build:
+      context: ../..
+      dockerfile: ci/matrix/Dockerfile
+      args:
+        MATRIX_SETUP: *llvm-setup
+        MATRIX_SETUP_EXTRA: *gcc-setup
+    environment:
+      <<: *common-env
+      EXPECTED_NO_ARGS: clang-libc++
+      EXPECTED_GCC: gcc-libstdc++
+      EXPECTED_CLANG: clang-libc++
+      EXPECTED_GCC_ENV: clang-libc++
+      EXPECTED_CLANG_ENV: clang-libc++
+    command:
+    - bash
+    - -c
+    - |
+      gcc --version
+      /usr/local/bin/test.sh
+
+  # this fails due to llvm's dep on shared libtinfo, it
+  # tries to pick the clang toolchain otherwise
+  none:
+    <<: *common-base
+    build:
+      context: ../..
+      dockerfile: ci/matrix/Dockerfile
+    environment:
+      <<: *common-env
+      EXPECTED_NO_ARGS: fail
+      EXPECTED_GCC: fail
+      EXPECTED_CLANG: fail
+      EXPECTED_GCC_ENV: fail
+      EXPECTED_CLANG_ENV: fail
+    command:
+    - bash
+    - -c
+    - |
+      ! which gcc || (echo "ERROR: gcc found when it shouldn't be" && exit 1)
+      /usr/local/bin/test.sh

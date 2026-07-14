@@ -217,6 +217,12 @@ public:
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
 
   /**
+   * @return std::chrono::milliseconds specifying how long a connection is allowed to remain above
+   * the buffer high watermark before it is closed. A zero duration disables the timeout.
+   */
+  virtual std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const PURE;
+
+  /**
    * @return std::chrono::milliseconds the time to wait for all listener filters to complete
    *         operation. If the timeout is reached, the accepted socket is closed without a
    *         connection being created unless continueOnListenerFiltersTimeout() returns true.
@@ -455,7 +461,7 @@ public:
   virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
 };
 
-using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;
+using UdpListenerCallbacksOptRef = std::optional<std::reference_wrapper<UdpListenerCallbacks>>;
 
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.

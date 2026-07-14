@@ -49,9 +49,10 @@ private:
                               public Logger::Loggable<Logger::Id::compression> {
     QatzstdThreadLocal();
     ~QatzstdThreadLocal() override;
+    // NOLINTNEXTLINE(readability-identifier-naming)
     void* GetQATSession();
-    bool initialized_;
-    void* sequenceProducerState_;
+    bool initialized_{false};
+    void* sequenceProducerState_{nullptr};
   };
   const uint32_t compression_level_;
   const bool enable_checksum_;
@@ -71,7 +72,7 @@ public:
 private:
   Envoy::Compression::Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
       const envoy::extensions::compression::qatzstd::compressor::v3alpha::Qatzstd& config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::GenericFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(QatzstdCompressorLibraryFactory);

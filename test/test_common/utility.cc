@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <list>
+#include <random>
 #include <regex>
 #include <stdexcept>
 #include <string>
@@ -36,9 +37,11 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
@@ -161,74 +164,48 @@ Stats::ParentHistogramSharedPtr TestUtility::findHistogram(Stats::Store& store,
   return findByName(store.histograms(), name);
 }
 
-AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
-                                              uint64_t value, Event::TestTimeSystem& time_system,
-                                              std::chrono::milliseconds timeout,
-                                              Event::Dispatcher* dispatcher) {
+AssertionResult TestUtility::waitForCounter(Stats::Store& store, const std::string& name,
+                                            testing::Matcher<uint64_t> value_matcher,
+                                            Event::TestTimeSystem& time_system,
+                                            std::chrono::milliseconds timeout,
+                                            Event::Dispatcher* dispatcher) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
+  while (true) {
+    Stats::CounterSharedPtr counter = findCounter(store, name);
+    if (counter != nullptr && value_matcher.Matches(counter->value())) {
+      return AssertionSuccess();
+    }
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      std::string current_value;
-      if (findCounter(store, name)) {
-        current_value = absl::StrCat(findCounter(store, name)->value());
-      } else {
-        current_value = "nil";
-      }
-      return AssertionFailure() << fmt::format(
-                 "timed out waiting for {} to be {}, current value {}", name, value, current_value);
+      counter = findCounter(store, name);
+      const std::string current_value = counter != nullptr ? absl::StrCat(counter->value()) : "nil";
+      return AssertionFailure() << "timed out waiting for " << name << " to " << value_matcher
+                                << ": current value " << current_value;
     }
     if (dispatcher != nullptr) {
       dispatcher->run(Event::Dispatcher::RunType::NonBlock);
     }
   }
-  return AssertionSuccess();
 }
 
-AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,
-                                              uint64_t value, Event::TestTimeSystem& time_system,
-                                              std::chrono::milliseconds timeout) {
+AssertionResult TestUtility::waitForGauge(Stats::Store& store, const std::string& name,
+                                          testing::Matcher<uint64_t> value_matcher,
+                                          Event::TestTimeSystem& time_system,
+                                          std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
+  while (true) {
+    Stats::GaugeSharedPtr gauge = findGauge(store, name);
+    if (gauge != nullptr && value_matcher.Matches(gauge->value())) {
+      return AssertionSuccess();
+    }
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be >= {}", name, value);
+      gauge = findGauge(store, name);
+      const std::string current_value = gauge != nullptr ? absl::StrCat(gauge->value()) : "nil";
+      return AssertionFailure() << "timed out waiting for " << name << " to " << value_matcher
+                                << ": current value " << current_value;
     }
   }
-  return AssertionSuccess();
-}
-
-AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name,
-                                            uint64_t value, Event::TestTimeSystem& time_system,
-                                            std::chrono::milliseconds timeout) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
-    }
-  }
-  return AssertionSuccess();
-}
-
-AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name,
-                                            uint64_t value, Event::TestTimeSystem& time_system,
-                                            std::chrono::milliseconds timeout) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      std::string current_value;
-      if (findGauge(store, name)) {
-        current_value = absl::StrCat(findGauge(store, name)->value());
-      } else {
-        current_value = "nil";
-      }
-      return AssertionFailure() << fmt::format(
-                 "timed out waiting for {} to be {}, current value {}", name, value, current_value);
-    }
-  }
-  return AssertionSuccess();
 }
 
 AssertionResult TestUtility::waitForProactiveOverloadResourceUsageEq(
@@ -437,13 +414,13 @@ bool TestUtility::gaugesZeroed(
 }
 
 void ConditionalInitializer::setReady() {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   EXPECT_FALSE(ready_);
   ready_ = true;
 }
 
 void ConditionalInitializer::waitReady() {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   if (ready_) {
     ready_ = false;
     return;
@@ -455,7 +432,7 @@ void ConditionalInitializer::waitReady() {
 }
 
 void ConditionalInitializer::wait() {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   mutex_.Await(absl::Condition(&ready_));
   EXPECT_TRUE(ready_);
 }

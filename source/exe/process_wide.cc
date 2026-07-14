@@ -25,7 +25,7 @@ ProcessWide::ProcessWide(bool validate_proto_descriptors) {
   // Note that the following lock has the dual use of making sure that initialization is complete
   // before a second caller can enter and leave this function.
   auto& init_data = processWideInitData();
-  absl::MutexLock lock(&init_data.mutex_);
+  absl::MutexLock lock(init_data.mutex_);
 
   if (init_data.count_++ == 0) {
     // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
@@ -59,7 +59,7 @@ ProcessWide::ProcessWide(bool validate_proto_descriptors) {
 
 ProcessWide::~ProcessWide() {
   auto& init_data = processWideInitData();
-  absl::MutexLock lock(&init_data.mutex_);
+  absl::MutexLock lock(init_data.mutex_);
 
   ASSERT(init_data.count_ > 0);
   if (--init_data.count_ == 0) {

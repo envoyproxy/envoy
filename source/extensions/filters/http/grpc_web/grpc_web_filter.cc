@@ -208,7 +208,7 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
       // Client end stream with invalid base64. Note, base64 padding is mandatory.
       decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                          "Bad gRPC-web request, invalid base64 data.", nullptr,
-                                         absl::nullopt, RcDetails::get().GrpcDecodeFailedDueToSize);
+                                         std::nullopt, RcDetails::get().GrpcDecodeFailedDueToSize);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   } else if (available < 4) {
@@ -225,7 +225,7 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
     // Error happened when decoding base64.
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        "Bad gRPC-web request, invalid base64 data.", nullptr,
-                                       absl::nullopt, RcDetails::get().GrpcDecodeFailedDueToData);
+                                       std::nullopt, RcDetails::get().GrpcDecodeFailedDueToData);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -250,6 +250,10 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
 
   needs_transformation_for_non_proto_encoded_response_ =
       needsTransformationForNonProtoEncodedResponse(headers, end_stream);
+
+  // If upstream sets a content length, we must remove it because we're going to change the
+  // length of the body
+  headers.removeContentLength();
 
   if (is_text_response_) {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
@@ -365,7 +369,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
 }
 
 void GrpcWebFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
-  cluster_ = decoder_callbacks_->clusterInfo();
+  cluster_ = decoder_callbacks_->clusterInfoSharedPtr();
   if (!cluster_) {
     return;
   }

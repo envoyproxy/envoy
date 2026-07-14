@@ -77,7 +77,7 @@ private:
 
   // Set by calling newGrpcClientImpl. Only one of response_ or failure_reason_ will be set.
   std::unique_ptr<envoy::service::auth::v3::CheckResponse> response_;
-  absl::optional<std::string> failure_reason_;
+  std::optional<std::string> failure_reason_;
   Filters::Common::ExtAuthz::GrpcClientImpl* grpc_client_;
 };
 
@@ -104,6 +104,9 @@ DEFINE_PROTO_FUZZER(ExtAuthzTestCaseGrpc& input) {
   static Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter->get()),
                  input.base().request_data());
+  fuzzer.runData(static_cast<Envoy::Http::StreamEncoderFilter*>(filter->get()),
+                 input.base().response_data());
+  fuzzer.reset();
 }
 
 } // namespace

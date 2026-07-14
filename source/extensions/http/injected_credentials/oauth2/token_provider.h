@@ -1,7 +1,9 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.h"
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
@@ -80,11 +82,13 @@ private:
   }
 
   std::string token_;
+  MonotonicTime token_expiry_time_;
   const Common::SecretReaderConstSharedPtr secret_reader_;
   ThreadLocal::SlotPtr tls_;
   std::unique_ptr<OAuth2Client> oauth2_client_;
   std::string client_id_;
   const std::string oauth_scopes_;
+  const std::map<std::string, std::string> endpoint_params_;
   Event::Dispatcher* dispatcher_;
   Event::TimerPtr timer_;
   TokenProviderStats stats_;

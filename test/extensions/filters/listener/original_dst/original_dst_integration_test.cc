@@ -36,7 +36,7 @@ ConfigHelper::ConfigModifierFunction setOriginalDstCluster(int port) {
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.listener.original_dst");
     envoy::extensions::filters::listener::original_dst::v3::OriginalDst original_dst;
-    listener_filter->mutable_typed_config()->PackFrom(original_dst);
+    std::ignore = listener_filter->mutable_typed_config()->PackFrom(original_dst);
   };
 }
 
@@ -141,7 +141,7 @@ TEST_P(OriginalDstTcpProxyIntegrationTest, TestManyConnections) {
     ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
-  test_server_->waitForCounterGe("cluster_manager.cluster_updated", kMaxConnections);
+  test_server_->waitForCounter("cluster_manager.cluster_updated", testing::Ge(kMaxConnections));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, OriginalDstTcpProxyIntegrationTest,

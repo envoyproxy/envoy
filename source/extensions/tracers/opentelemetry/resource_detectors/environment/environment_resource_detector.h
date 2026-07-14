@@ -22,14 +22,14 @@ class EnvironmentResourceDetector : public ResourceDetector, Logger::Loggable<Lo
 public:
   EnvironmentResourceDetector(const envoy::extensions::tracers::opentelemetry::resource_detectors::
                                   v3::EnvironmentResourceDetectorConfig& config,
-                              Server::Configuration::TracerFactoryContext& context)
+                              Server::Configuration::ServerFactoryContext& context)
       : config_(config), context_(context) {}
   Resource detect() override;
 
 private:
   const envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig config_;
-  Server::Configuration::TracerFactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
 };
 
 } // namespace OpenTelemetry

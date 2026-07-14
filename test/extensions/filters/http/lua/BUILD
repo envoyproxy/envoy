@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -10,6 +11,11 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "lua_test_filter_proto",
+    srcs = ["lua_test_filter.proto"],
+)
 
 envoy_extension_cc_test(
     name = "lua_filter_test",
@@ -30,6 +36,7 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -40,9 +47,14 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/network:upstream_subject_alt_names_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:bool_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/stream_info:uint64_accessor_lib",
         "//source/extensions/filters/http/lua:wrappers_lib",
         "//test/extensions/filters/common/lua:lua_wrappers_lib",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -54,13 +66,22 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["lua_integration_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "6gig",
+    rbe_pool = "4core",
     deps = [
+        ":lua_test_filter_proto_cc_proto",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/lua:config",
+        "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/filters/listener/proxy_protocol:config",
         "//test/config:v2_link_hacks",
+        "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

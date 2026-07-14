@@ -18,7 +18,6 @@ namespace {
 using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
@@ -260,6 +259,23 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) 
           {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropDuplicateUnderscoreHeaders) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x_foo", "bar"}};
+  headers.addCopy("x_foo", "baz");
+  auto uhv = createH2ServerUhv(drop_headers_with_underscores_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(
+      headers,
+      ::Envoy::Http::TestRequestHeaderMapImpl(
+          {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectUnderscoreHeaders) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "GET"},
@@ -490,6 +506,13 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
   request_headers.setContentLength("100");
   EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
 
+  request_headers.setContentLength("100,100");
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
+
+  request_headers.setContentLength("100,101");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+
   request_headers.setContentLength("10a2");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
                              UhvResponseCodeDetail::get().InvalidContentLength);
@@ -500,6 +523,13 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderContentLength) {
   TestResponseHeaderMapImpl response_headers = makeGoodResponseHeaders();
   response_headers.setContentLength("100");
   EXPECT_ACCEPT(uhv->validateResponseHeaders(response_headers));
+
+  response_headers.setContentLength("100,100");
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(response_headers));
+
+  response_headers.setContentLength("100,101");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
 
   response_headers.setContentLength("10a2");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
@@ -621,7 +651,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestGenericHeaderName) {
                                HeaderString(absl::string_view("some value")));
 
     auto result = uhv->validateRequestHeaders(request_headers);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -644,7 +674,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseGenericHeaderName) {
     headers.addViaMove(std::move(header_string), HeaderString(absl::string_view("some value")));
 
     auto result = uhv->validateResponseHeaders(headers);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);

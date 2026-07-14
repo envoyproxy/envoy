@@ -15,6 +15,11 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 HOMEBREW_RETRY_ATTEMPTS=10
 HOMEBREW_RETRY_INTERVAL=3
 
+XCODE_DEFAULT_VERSION=16.1
+XCODE_VERSION="${XCODE_VERSION:-${XCODE_DEFAULT_VERSION}}"
+if [[ -n "$XCODE_VERSION" ]]; then
+    sudo xcode-select --switch "/Applications/Xcode_${XCODE_VERSION}.app"
+fi
 
 function is_installed {
     brew ls --versions "$1" >/dev/null
@@ -50,7 +55,7 @@ if ! retry "$HOMEBREW_RETRY_ATTEMPTS" "$HOMEBREW_RETRY_INTERVAL" brew update; th
   echo "Failed to update homebrew"
 fi
 
-DEPS="automake cmake coreutils libtool wget ninja"
+DEPS="automake coreutils libtool wget"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"

@@ -1,15 +1,19 @@
 #include "source/common/quic/active_quic_listener.h"
 
+#include <memory>
 #include <utility>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/session_idle_list.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
@@ -39,7 +43,7 @@ ActiveQuicListener::ActiveQuicListener(
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-    bool reject_new_connections)
+    bool reject_new_connections, bool enable_session_idle_list)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           std::make_unique<Network::UdpListenerImpl>(
@@ -95,12 +99,16 @@ ActiveQuicListener::ActiveQuicListener(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
-      *connection_id_generator_, debug_visitor_factory);
+      *connection_id_generator_, debug_visitor_factory,
+      enable_session_idle_list ? std::make_unique<Http::SessionIdleList>(dispatcher) : nullptr);
+
+  absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
       listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
-          listen_socket_.ioHandle(), listener_config.listenerScope());
+          listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
+          std::move(on_can_write_cb));
   udp_packet_writer_ = udp_packet_writer.get();
 
   // Some packet writers (like `UdpGsoBatchWriter`) already directly implement
@@ -129,6 +137,10 @@ ActiveQuicListener::ActiveQuicListener(
       udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
     }
   }
+
+  max_sessions_per_event_loop_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(listener_config.udpListenerConfig()->config().quic_options(),
+                                      max_sessions_per_event_loop, kNumSessionsToCreatePerLoop);
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -198,7 +210,7 @@ void ActiveQuicListener::onReadReady() {
     event_loops_with_buffered_chlo_for_test_++;
   }
 
-  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
+  quic_dispatcher_->ProcessBufferedChlos(max_sessions_per_event_loop_);
 
   // If there were more buffered than the limit, schedule again for the next event loop.
   if (quic_dispatcher_->HasChlosBuffered()) {
@@ -226,7 +238,7 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
   if (kernel_worker_routing_) {
     uint32_t expected_worker_index = select_connection_id_worker_(*data.buffer_, worker_index_);
     if (expected_worker_index != worker_index_) {
-      ENVOY_LOG_EVERY_POW_2(error, "Mismacthed worker index. expected {}, actual {}",
+      ENVOY_LOG_EVERY_POW_2(error, "Mismatched worker index. expected {}, actual {}",
                             expected_worker_index, worker_index_);
     }
 
@@ -260,8 +272,23 @@ void ActiveQuicListener::onFilterChainDraining(
   }
 }
 
+void ActiveQuicListener::onFilterChainDrainStart(
+    const std::list<const Network::FilterChain*>& /*draining_filter_chains*/) {
+  // TODO: notify QUIC connections in the given filter chains that draining has begun
+  // (e.g. via HTTP/3 GOAWAY) without closing them.
+}
+
+void ActiveQuicListener::onListenerDrainStart() {
+  // TODO: notify all QUIC connections on this listener that draining has begun without
+  // closing them.
+}
+
 void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {
   quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
+}
+
+void ActiveQuicListener::onCloseIdleHttpConnections(bool is_saturated) {
+  quic_dispatcher_->closeIdleQuicConnections(is_saturated);
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
@@ -296,7 +323,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     // If not specified, use the quic crypto stream created by QUICHE.
     crypto_stream_config.set_name("envoy.quic.crypto_stream.server.quiche");
     envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig empty_crypto_stream_config;
-    crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
+    std::ignore = crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
   } else {
     crypto_stream_config = config.crypto_stream_config();
   }
@@ -309,7 +336,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   if (!config.has_proof_source_config()) {
     proof_source_config.set_name("envoy.quic.proof_source.filter_chain");
     envoy::extensions::quic::proof_source::v3::ProofSourceConfig empty_proof_source_config;
-    proof_source_config.mutable_typed_config()->PackFrom(empty_proof_source_config);
+    std::ignore = proof_source_config.mutable_typed_config()->PackFrom(empty_proof_source_config);
   } else {
     proof_source_config = config.proof_source_config();
   }
@@ -333,7 +360,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     cid_generator_config.set_name("envoy.quic.deterministic_connection_id_generator");
     envoy::extensions::quic::connection_id_generator::v3::DeterministicConnectionIdGeneratorConfig
         empty_connection_id_generator_config;
-    cid_generator_config.mutable_typed_config()->PackFrom(empty_connection_id_generator_config);
+    std::ignore =
+        cid_generator_config.mutable_typed_config()->PackFrom(empty_connection_id_generator_config);
   } else {
     cid_generator_config = config.connection_id_generator_config();
   }
@@ -439,12 +467,21 @@ ActiveQuicListenerFactory::createActiveQuicListener(
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator) {
+  bool enable_session_idle_list = false;
+  for (const auto& action :
+       context_.serverFactoryContext().bootstrap().overload_manager().actions()) {
+    if (action.name() == Server::OverloadActionNames::get().CloseIdleHttpConnections) {
+      enable_session_idle_list = true;
+      break;
+    }
+  }
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
       std::move(cid_generator), worker_selector_,
-      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_);
+      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_,
+      enable_session_idle_list);
 }
 
 } // namespace Quic

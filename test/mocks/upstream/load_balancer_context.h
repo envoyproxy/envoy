@@ -12,7 +12,7 @@ public:
   MockLoadBalancerContext();
   ~MockLoadBalancerContext() override;
 
-  MOCK_METHOD(absl::optional<uint64_t>, computeHashKey, ());
+  MOCK_METHOD(std::optional<uint64_t>, computeHashKey, ());
   MOCK_METHOD(Router::MetadataMatchCriteria*, metadataMatchCriteria, ());
   MOCK_METHOD(const Network::Connection*, downstreamConnection, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo*, requestStreamInfo, (), (const));
@@ -25,8 +25,9 @@ public:
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, upstreamSocketOptions, (), (const));
   MOCK_METHOD(Network::TransportSocketOptionsConstSharedPtr, upstreamTransportSocketOptions, (),
               (const));
-  MOCK_METHOD(absl::optional<OverrideHost>, overrideHostToSelect, (), (const));
+  MOCK_METHOD(OptRef<const OverrideHost>, overrideHostToSelect, (), (const));
   MOCK_METHOD(void, onAsyncHostSelection, (HostConstSharedPtr && host, std::string&& details));
+  MOCK_METHOD(void, setHeadersModifier, (std::function<void(Http::ResponseHeaderMap&)>));
 
 private:
   HealthyAndDegradedLoad priority_load_;

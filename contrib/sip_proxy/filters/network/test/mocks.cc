@@ -1,6 +1,7 @@
 #include "contrib/sip_proxy/filters/network/test/mocks.h"
 
 #include <memory>
+#include <optional>
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -12,9 +13,9 @@ using testing::ReturnRef;
 
 namespace Envoy {
 
-// Provide a specialization for ProtobufWkt::Struct (for MockFilterConfigFactory)
+// Provide a specialization for Protobuf::Struct (for MockFilterConfigFactory)
 template <>
-void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&, bool) {}
+void MessageUtil::validate(const Protobuf::Struct&, ProtobufMessage::ValidationVisitor&, bool) {}
 
 namespace Extensions {
 namespace NetworkFilters {
@@ -68,7 +69,7 @@ FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProto(
     Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(context);
 
-  config_struct_ = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+  config_struct_ = dynamic_cast<const Protobuf::Struct&>(proto_config);
   config_stat_prefix_ = stats_prefix;
 
   return [this](FilterChainFactoryCallbacks& callbacks) -> void {
@@ -99,7 +100,7 @@ MockTrafficRoutingAssistantHandler::MockTrafficRoutingAssistantHandler(
     : TrafficRoutingAssistantHandler(parent, dispatcher, config, context, stream_info) {
   ON_CALL(*this, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillByDefault(
-          Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+          Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
                      SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Continue;

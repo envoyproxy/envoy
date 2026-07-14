@@ -19,6 +19,7 @@ envoy_cc_library(
         "substitution_formatter.h",
     ],
     deps = [
+        ":builtin_command_parser_factory_helper_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -28,7 +29,10 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_streamer_lib",
         "//source/common/json:json_utility_lib",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -43,6 +47,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/server:generic_factory_context_lib",
+        "@abseil-cpp//absl/status:statusor",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -64,10 +69,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "coalesce_formatter_lib",
+    srcs = ["coalesce_formatter.cc"],
+    hdrs = ["coalesce_formatter.h"],
+    deps = [
+        ":builtin_command_parser_factory_helper_lib",
+        ":substitution_format_utility_lib",
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/json:json_object_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:fmt_lib",
+        "//source/common/common:statusor_lib",
+        "//source/common/json:json_loader_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "http_speicific_formatter_extension_lib",
     srcs = ["http_specific_formatter.cc"],
     hdrs = ["http_specific_formatter.h"],
     deps = [
+        ":coalesce_formatter_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/runtime:runtime_interface",
@@ -91,7 +113,9 @@ envoy_cc_library(
     hdrs = ["stream_info_formatter.h"],
     rbe_pool = "6gig",
     deps = [
+        ":substitution_format_utility_lib",
         "//envoy/api:api_interface",
+        "//envoy/common:exception_lib",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -99,13 +123,14 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
-        "//source/common/formatter:substitution_format_utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
     alwayslink = 1,  # has factory registration
 )
@@ -115,6 +140,19 @@ envoy_cc_library(
     deps = [
         ":http_speicific_formatter_extension_lib",
         ":stream_info_formatter_extension_lib",
+    ],
+    alwayslink = 1,  # has factory registration
+)
+
+envoy_cc_library(
+    name = "builtin_command_parser_factory_helper_lib",
+    srcs = ["builtin_command_parser_factory_helper.cc"],
+    hdrs = ["builtin_command_parser_factory_helper.h"],
+    deps = [
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/registry",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
     ],
     alwayslink = 1,  # has factory registration
 )

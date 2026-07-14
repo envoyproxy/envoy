@@ -63,6 +63,15 @@ public:
     Metadata = 77,
   };
 
+  enum class Setting : uint16_t {
+    HeaderTableSize = 0x1,
+    EnablePush = 0x2,
+    MaxConcurrentStreams = 0x3,
+    InitialWindowSize = 0x4,
+    MaxFrameSize = 0x5,
+    MaxHeaderListSize = 0x6,
+  };
+
   enum class SettingsFlags : uint8_t {
     None = 0,
     Ack = 1,
@@ -265,6 +274,18 @@ public:
   // Headers are directly encoded
   void appendStaticHeader(StaticHeaderIndex index);
   void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
+  void appendHeaderWithIncrementalIndexing(StaticHeaderIndex index, absl::string_view value) {
+    size_t start_size = data_.size();
+    appendHpackInt(static_cast<uint8_t>(index), 0x3f);
+    data_[start_size] |= 0x40;
+    appendHpackInt(value.size(), 0x7f);
+    appendData(value);
+  }
+  void appendIndexedHeader(uint32_t index) {
+    size_t start_size = data_.size();
+    appendHpackInt(index, 0x7f);
+    data_[start_size] |= 0x80;
+  }
 
 private:
   void buildHeader(Type type, uint32_t payload_size = 0, uint8_t flags = 0, uint32_t stream_id = 0);

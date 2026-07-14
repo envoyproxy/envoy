@@ -73,7 +73,7 @@ public:
     // Update per route config of default route.
     if (!per_route_config_yaml.empty()) {
       auto* route = virtual_host.mutable_routes(0);
-      ProtobufWkt::Any per_route_config;
+      Protobuf::Any per_route_config;
       TestUtility::loadFromYaml(per_route_config_yaml, per_route_config);
 
       route->mutable_typed_per_filter_config()->insert(
@@ -434,10 +434,10 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -476,10 +476,10 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -516,10 +516,10 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     envoy::Cookie cookie;
     cookie.set_address(std::string("127.0.0.1:50000"));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -599,10 +599,10 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&cookie_string);
+    std::ignore = cookie.SerializeToString(&cookie_string);
 
     std::string encoded_address = Envoy::Base64::encode(cookie_string.data(), cookie_string.size());
 
@@ -640,10 +640,10 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&cookie_string);
+    std::ignore = cookie.SerializeToString(&cookie_string);
 
     std::string encoded_address = Envoy::Base64::encode(cookie_string.data(), cookie_string.size());
 
@@ -681,10 +681,10 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
     std::string cookie_string;
     cookie.set_address(std::string("127.0.0.7:50000"));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&cookie_string);
+    std::ignore = cookie.SerializeToString(&cookie_string);
 
     std::string encoded_address = Envoy::Base64::encode(cookie_string.data(), cookie_string.size());
 
@@ -928,10 +928,10 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -1066,10 +1066,10 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -1114,10 +1114,10 @@ TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -1243,10 +1243,10 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByReque
     cookie.set_address(std::string(
         fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
     cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now().time_since_epoch())
+                           std::chrono::system_clock::now().time_since_epoch())
                            .count() +
                        120);
-    cookie.SerializeToString(&address_string);
+    std::ignore = cookie.SerializeToString(&address_string);
     const std::string encoded_address =
         Envoy::Base64::encode(address_string.data(), address_string.size());
 
@@ -1425,11 +1425,11 @@ TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionRejectExpiredCo
   cookie.set_address(std::string(
       fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value())));
   cookie.set_expires(std::chrono::duration_cast<std::chrono::seconds>(
-                         std::chrono::steady_clock::now().time_since_epoch())
+                         std::chrono::system_clock::now().time_since_epoch())
                          .count() -
                      10);
   std::string address_string;
-  cookie.SerializeToString(&address_string);
+  std::ignore = cookie.SerializeToString(&address_string);
   std::string encoded_address = Envoy::Base64::encode(address_string.data(), address_string.size());
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{

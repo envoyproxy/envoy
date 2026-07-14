@@ -12,7 +12,7 @@ namespace Common {
 namespace RBAC {
 
 class Matcher;
-using MatcherConstSharedPtr = std::shared_ptr<const Matcher>;
+using MatcherConstPtr = std::unique_ptr<const Matcher>;
 
 /**
  *  Matchers describe the rules for matching either a permission action or principal.
@@ -34,19 +34,19 @@ public:
                        const StreamInfo::StreamInfo& info) const PURE;
 
   /**
-   * Creates a shared instance of a matcher based off the rules defined in the Permission config
+   * Creates an instance of a matcher based off the rules defined in the Permission config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Permission& permission,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                      Server::Configuration::CommonFactoryContext& context);
+  static MatcherConstPtr create(const envoy::config::rbac::v3::Permission& permission,
+                                ProtobufMessage::ValidationVisitor& validation_visitor,
+                                Server::Configuration::CommonFactoryContext& context);
 
   /**
-   * Creates a shared instance of a matcher based off the rules defined in the Principal config
+   * Creates an instance of a matcher based off the rules defined in the Principal config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Principal& principal,
-                                      Server::Configuration::CommonFactoryContext& context);
+  static MatcherConstPtr create(const envoy::config::rbac::v3::Principal& principal,
+                                Server::Configuration::CommonFactoryContext& context);
 };
 
 } // namespace RBAC

@@ -85,7 +85,8 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
   }
 
   if (config_->getController().averageRps() < config_->rpsThreshold()) {
-    ENVOY_LOG(debug, "Current rps: {} is below rps_threshold: {}, continue");
+    ENVOY_LOG(debug, "Current rps: {} is below rps_threshold: {}, continue",
+              config_->getController().averageRps(), config_->rpsThreshold());
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -97,7 +98,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     record_request_ = false;
 
     stats_.rq_rejected_.inc();
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, std::nullopt,
                                        "denied_by_admission_control");
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -116,7 +117,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
 
   bool successful_response = false;
   if (Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
-    absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
+    std::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
 
     // If the GRPC status isn't found in the headers, it must be found in the trailers.
     expect_grpc_status_in_trailer_ = !grpc_status.has_value();
@@ -144,7 +145,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
 Http::FilterTrailersStatus
 AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (expect_grpc_status_in_trailer_) {
-    absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers, false);
+    std::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers, false);
 
     if (grpc_status.has_value() &&
         config_->responseEvaluator().isGrpcSuccess(grpc_status.value())) {

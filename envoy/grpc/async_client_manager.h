@@ -55,7 +55,7 @@ public:
 
   const envoy::config::core::v3::GrpcService& config() const { return config_; }
 
-  void setConfig(const envoy::config::core::v3::GrpcService g) {
+  void setConfig(const envoy::config::core::v3::GrpcService& g) {
     config_ = g;
     pre_computed_hash_ = Envoy::MessageUtil::hash(g);
   }
@@ -91,7 +91,7 @@ public:
    * Create a Grpc::RawAsyncClient. The async client is cached thread locally and shared across
    * different filter instances.
    * @param grpc_service Envoy::Grpc::GrpcServiceConfigWithHashKey which contains config and
-   * hashkey.
+   * hash key.
    * @param scope stats scope.
    * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
    * configured.

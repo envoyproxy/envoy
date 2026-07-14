@@ -1,5 +1,7 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 
+#include "envoy/server/overload/load_shed_point.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/debug_recursion_checker.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -52,10 +54,18 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    Upstream::ClusterConnectivityState& state)
+    Upstream::ClusterConnectivityState& state, Server::OverloadManager& overload_manager)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
       transport_socket_options_(transport_socket_options), cluster_connectivity_state_(state),
-      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
+      create_new_connection_load_shed_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().ConnectionPoolNewConnection)),
+      skip_pending_overflow_on_active_rq_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.skip_pending_overflow_count_on_active_rq")) {
+  ENVOY_LOG_ONCE_IF(trace, create_new_connection_load_shed_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.connection_pool_new_connection is not "
+                    "found. Is it configured?");
+}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ENVOY_BUG(isIdleImpl(), dumpState());
@@ -180,6 +190,13 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
   }
   ENVOY_LOG(trace, "creating new preconnect connection");
 
+  // Drop new connection attempts if the load shed point indicates overload.
+  if (create_new_connection_load_shed_) {
+    if (create_new_connection_load_shed_->shouldShedLoad()) {
+      return ConnectionResult::LoadShed;
+    }
+  }
+
   const bool can_create_connection = host_->canCreateConnection(priority_);
 
   if (!can_create_connection) {
@@ -226,7 +243,10 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
     ENVOY_LOG(debug, "max streams overflow");
     onPoolFailure(client.real_host_description_, absl::string_view(),
                   ConnectionPool::PoolFailureReason::Overflow, context);
-    traffic_stats.upstream_rq_pending_overflow_.inc();
+    traffic_stats.upstream_rq_active_overflow_.inc();
+    if (!skip_pending_overflow_on_active_rq_) {
+      traffic_stats.upstream_rq_pending_overflow_.inc();
+    }
     return;
   }
   ENVOY_CONN_LOG(debug, "creating stream", client);
@@ -346,11 +366,13 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
   // length of pending_streams_ to determine if a new connection is needed.
   const ConnectionResult result = tryCreateNewConnections();
   // If there is not enough connecting capacity, the only reason to not
-  // increase capacity is if the connection limits are exceeded.
+  // increase capacity is if the connection limits are exceeded or load shed is
+  // triggered.
   ENVOY_BUG(pending_streams_.size() <= connecting_stream_capacity_ ||
                 connecting_stream_capacity_ > old_capacity ||
                 (result == ConnectionResult::NoConnectionRateLimited ||
-                 result == ConnectionResult::FailedToCreateConnection),
+                 result == ConnectionResult::FailedToCreateConnection ||
+                 result == ConnectionResult::LoadShed),
             fmt::format("Failed to create expected connection: {}", *this));
   if (result == ConnectionResult::FailedToCreateConnection) {
     // This currently only happens for HTTP/3 if secrets aren't yet loaded.
@@ -358,6 +380,11 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
     onPoolFailure(nullptr, absl::string_view(),
                   ConnectionPool::PoolFailureReason::LocalConnectionFailure, context);
+    return nullptr;
+  } else if (result == ConnectionResult::LoadShed) {
+    pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+    onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
+                  context);
     return nullptr;
   }
   return pending;
@@ -377,9 +404,15 @@ void ConnPoolImplBase::onUpstreamReady() {
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
     // Pending streams are pushed onto the front, so pull from the back.
-    attachStreamToClient(*client, pending_streams_.back()->context());
-    cluster_connectivity_state_.decrPendingStreams(1);
-    pending_streams_.pop_back();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
+      PendingStreamPtr pending_stream = pending_streams_.back()->removeFromList(pending_streams_);
+      cluster_connectivity_state_.decrPendingStreams(1);
+      attachStreamToClient(*client, pending_stream->context());
+    } else {
+      attachStreamToClient(*client, pending_streams_.back()->context());
+      cluster_connectivity_state_.decrPendingStreams(1);
+      pending_streams_.pop_back();
+    }
   }
   if (!pending_streams_.empty()) {
     tryCreateNewConnections();
@@ -635,7 +668,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     }
 
     // Now that the active client is ready, set up a timer for max connection duration.
-    const absl::optional<std::chrono::milliseconds> max_connection_duration =
+    const std::optional<std::chrono::milliseconds> max_connection_duration =
         client.parent_.host()->cluster().maxConnectionDuration();
     if (max_connection_duration.has_value()) {
       client.connection_duration_timer_ = client.parent_.dispatcher().createTimer(
@@ -674,11 +707,13 @@ PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
   Upstream::ClusterTrafficStats& traffic_stats = *parent_.host()->cluster().trafficStats();
   traffic_stats.upstream_rq_pending_total_.inc();
   traffic_stats.upstream_rq_pending_active_.inc();
+  parent_.host()->stats().rq_pending_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();
 }
 
 PendingStream::~PendingStream() {
   parent_.host()->cluster().trafficStats()->upstream_rq_pending_active_.dec();
+  parent_.host()->stats().rq_pending_active_.dec();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().dec();
 }
 
@@ -795,9 +830,15 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
 
     if (stream.can_send_early_data_) {
       ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
-      attachStreamToClient(client, stream.context());
-      cluster_connectivity_state_.decrPendingStreams(1);
-      stream.removeFromList(pending_streams_);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
+        PendingStreamPtr pending_stream = stream.removeFromList(pending_streams_);
+        cluster_connectivity_state_.decrPendingStreams(1);
+        attachStreamToClient(client, pending_stream->context());
+      } else {
+        attachStreamToClient(client, stream.context());
+        cluster_connectivity_state_.decrPendingStreams(1);
+        stream.removeFromList(pending_streams_);
+      }
     }
     if (stop_iteration) {
       return;

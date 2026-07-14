@@ -7,7 +7,7 @@ namespace Ssl {
 
 MockContextManager::MockContextManager() {
   ON_CALL(*this, createSslClientContext(_, _)).WillByDefault(testing::Return(nullptr));
-  ON_CALL(*this, createSslServerContext(_, _, _, _)).WillByDefault(testing::Return(nullptr));
+  ON_CALL(*this, createSslServerContext(_, _, _)).WillByDefault(testing::Return(nullptr));
 }
 MockContextManager::~MockContextManager() = default;
 
@@ -29,7 +29,7 @@ MockClientContextConfig::MockClientContextConfig() {
   ON_CALL(*this, tlsKeyLogLocal()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogRemote()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogPath()).WillByDefault(testing::ReturnRef(path_));
-  ON_CALL(*this, compliancePolicy()).WillByDefault(testing::Return(absl::nullopt));
+  ON_CALL(*this, compliancePolicy()).WillByDefault(testing::Return(std::nullopt));
 }
 MockClientContextConfig::~MockClientContextConfig() = default;
 
@@ -45,7 +45,8 @@ MockServerContextConfig::MockServerContextConfig() {
   ON_CALL(*this, tlsKeyLogLocal()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogRemote()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogPath()).WillByDefault(testing::ReturnRef(path_));
-  ON_CALL(*this, compliancePolicy()).WillByDefault(testing::Return(absl::nullopt));
+  ON_CALL(*this, compliancePolicy()).WillByDefault(testing::Return(std::nullopt));
+  ON_CALL(*this, serverNames()).WillByDefault(testing::ReturnRef(server_names_));
 }
 MockServerContextConfig::~MockServerContextConfig() = default;
 

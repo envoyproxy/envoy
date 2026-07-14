@@ -19,13 +19,12 @@
 #include "test/integration/clusters/cluster_factory_config.pb.validate.h"
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/common.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/registry.h"
 
 using testing::NiceMock;
 
@@ -89,9 +88,8 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
   Registry::InjectFactory<ClusterFactory> registered_factory(factory);
 
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  auto create_result =
-      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
-                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
   auto cluster = create_result->first;
   cluster->initialize([] { return absl::OkStatus(); });
 
@@ -133,9 +131,8 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
     )EOF";
 
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  auto create_result =
-      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
-                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
   auto cluster = create_result->first;
   cluster->initialize([] { return absl::OkStatus(); });
 
@@ -175,9 +172,8 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
     )EOF";
 
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  auto create_result =
-      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
-                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
   auto cluster = create_result->first;
   cluster->initialize([] { return absl::OkStatus(); });
 
@@ -212,9 +208,8 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterName) {
   )EOF";
   // the factory is not registered, expect to fail
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  auto create_result =
-      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
-                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
   EXPECT_FALSE(create_result.ok());
   EXPECT_EQ(create_result.status().message(),
             "Didn't find a registered cluster factory implementation for name: "
@@ -241,9 +236,8 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
   )EOF";
   // the factory is not registered, expect to fail
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  auto create_result =
-      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
-                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
   EXPECT_FALSE(create_result.ok());
   EXPECT_EQ(create_result.status().message(),
             "Didn't find a registered cluster factory implementation for type: "
@@ -271,9 +265,8 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
     )EOF";
 
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  auto create_result =
-      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
-                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
   EXPECT_FALSE(create_result.ok());
   EXPECT_EQ(create_result.status().message(),
             "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "

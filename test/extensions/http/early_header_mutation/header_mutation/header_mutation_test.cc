@@ -1,6 +1,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/http/early_header_mutation/header_mutation/header_mutation.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -42,10 +43,12 @@ TEST(HeaderMutationTest, TestAll) {
       append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   )EOF";
 
+  Server::Configuration::MockServerFactoryContext context;
+
   ProtoHeaderMutation proto_mutation;
   TestUtility::loadFromYaml(config, proto_mutation);
 
-  HeaderMutation mutation(proto_mutation);
+  HeaderMutation mutation(proto_mutation, context);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   Envoy::Http::TestRequestHeaderMapImpl headers = {

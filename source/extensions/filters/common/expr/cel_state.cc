@@ -40,12 +40,12 @@ CelValue CelState::exprValue(Protobuf::Arena* arena, bool last) const {
 }
 
 ProtobufTypes::MessagePtr CelState::serializeAsProto() const {
-  auto any = std::make_unique<ProtobufWkt::Any>();
+  auto any = std::make_unique<Protobuf::Any>();
 
   if (type_ != CelStateType::Protobuf) {
-    ProtobufWkt::BytesValue value;
+    Protobuf::BytesValue value;
     value.set_value(value_);
-    any->PackFrom(value);
+    std::ignore = any->PackFrom(value);
   } else {
     any->set_type_url(std::string(schema_));
     any->set_value(value_);

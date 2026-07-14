@@ -3,7 +3,6 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 
-#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/real_threads_test_helper.h"
 
 namespace Envoy {
@@ -20,7 +19,7 @@ public:
   StatName makeStatName(absl::string_view name);
 
   SymbolTableImpl symbol_table_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   ThreadLocalStoreImplPtr store_;
   Scope& scope_;
   StatNamePool pool_;

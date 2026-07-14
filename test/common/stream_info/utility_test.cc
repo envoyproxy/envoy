@@ -4,7 +4,6 @@
 #include "source/common/stream_info/utility.h"
 
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -151,8 +150,8 @@ TEST_F(ProxyStatusTest, ToStringAbsentDetails) {
   proxy_status_config_.set_remove_details(false);
   proxy_status_config_.set_remove_connection_termination_details(false);
   proxy_status_config_.set_remove_response_flags(false);
-  stream_info_.response_code_details_ = absl::nullopt;
-  stream_info_.connection_termination_details_ = absl::nullopt;
+  stream_info_.response_code_details_ = std::nullopt;
+  stream_info_.connection_termination_details_ = std::nullopt;
   EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(
                   stream_info_, ProxyStatusError::ProxyConfigurationError,
                   /*proxy_name=*/"UNUSED", proxy_status_config_),
@@ -216,7 +215,7 @@ TEST_F(ProxyStatusTest, ToStringAbsentConnectionTerminationDetails) {
   proxy_status_config_.set_remove_connection_termination_details(false); // Don't remove them,
   proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some_response_code_details";
-  stream_info_.connection_termination_details_ = absl::nullopt; // But they're absent,
+  stream_info_.connection_termination_details_ = std::nullopt; // But they're absent,
   EXPECT_THAT(
       ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
                                               ProxyStatusError::ProxyConfigurationError,
@@ -284,7 +283,7 @@ TEST_F(ProxyStatusTest, ToStringLiteral) {
 
 TEST(ProxyStatusRecommendedHttpStatusCode, TestAll) {
   for (const auto& [proxy_status_error, http_code] :
-       std::vector<std::pair<ProxyStatusError, absl::optional<Http::Code>>>{
+       std::vector<std::pair<ProxyStatusError, std::optional<Http::Code>>>{
            {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
            {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
            {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
@@ -317,8 +316,8 @@ TEST(ProxyStatusRecommendedHttpStatusCode, TestAll) {
            {ProxyStatusError::DestinationUnavailable, Http::Code::ServiceUnavailable},
            {ProxyStatusError::ConnectionLimitReached, Http::Code::ServiceUnavailable},
            {ProxyStatusError::HttpRequestDenied, Http::Code::Forbidden},
-           {ProxyStatusError::ProxyInternalResponse, absl::nullopt},
-           {ProxyStatusError::HttpRequestError, absl::nullopt},
+           {ProxyStatusError::ProxyInternalResponse, std::nullopt},
+           {ProxyStatusError::HttpRequestError, std::nullopt},
        }) {
     EXPECT_THAT(ProxyStatusUtils::recommendedHttpStatusCode(proxy_status_error), http_code);
   }
@@ -364,44 +363,7 @@ TEST(ProxyStatusErrorToString, TestAll) {
   }
 }
 
-TEST(ProxyStatusFromStreamInfo, TestAll) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_mapping_more_core_response_flags", "false"}});
-  for (const auto& [response_flag, proxy_status_error] :
-       std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
-           {CoreResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
-           {CoreResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
-           {CoreResponseFlag::UpstreamRequestTimeout, ProxyStatusError::HttpResponseTimeout},
-           {CoreResponseFlag::LocalReset, ProxyStatusError::ConnectionTimeout},
-           {CoreResponseFlag::UpstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
-           {CoreResponseFlag::UpstreamConnectionFailure, ProxyStatusError::ConnectionRefused},
-           {CoreResponseFlag::UpstreamConnectionTermination,
-            ProxyStatusError::ConnectionTerminated},
-           {CoreResponseFlag::UpstreamOverflow, ProxyStatusError::ConnectionLimitReached},
-           {CoreResponseFlag::NoRouteFound, ProxyStatusError::DestinationNotFound},
-           {CoreResponseFlag::RateLimited, ProxyStatusError::ConnectionLimitReached},
-           {CoreResponseFlag::RateLimitServiceError, ProxyStatusError::ConnectionLimitReached},
-           {CoreResponseFlag::UpstreamRetryLimitExceeded, ProxyStatusError::DestinationUnavailable},
-           {CoreResponseFlag::StreamIdleTimeout, ProxyStatusError::HttpResponseTimeout},
-           {CoreResponseFlag::InvalidEnvoyRequestHeaders, ProxyStatusError::HttpRequestError},
-           {CoreResponseFlag::DownstreamProtocolError, ProxyStatusError::HttpRequestError},
-           {CoreResponseFlag::UpstreamMaxStreamDurationReached,
-            ProxyStatusError::HttpResponseTimeout},
-           {CoreResponseFlag::NoFilterConfigFound, ProxyStatusError::ProxyConfigurationError},
-           {CoreResponseFlag::UpstreamProtocolError, ProxyStatusError::HttpProtocolError},
-           {CoreResponseFlag::NoClusterFound, ProxyStatusError::DestinationUnavailable},
-           {CoreResponseFlag::DnsResolutionFailed, ProxyStatusError::DnsError}}) {
-    NiceMock<MockStreamInfo> stream_info;
-    ON_CALL(stream_info, hasResponseFlag(response_flag)).WillByDefault(Return(true));
-    EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), proxy_status_error);
-  }
-}
-
-TEST(ProxyStatusFromStreamInfo, TestNewAll) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_mapping_more_core_response_flags", "true"}});
+TEST(ProxyStatusFromStreamInfo, TestAllWithExpandedResponseFlags) {
   for (const auto& [response_flag, proxy_status_error] :
        std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
            {CoreResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},

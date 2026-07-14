@@ -22,9 +22,8 @@ constructByteVectorForRandom(const Protobuf::RepeatedField<Protobuf::uint32>& ra
 HostVector
 LoadBalancerFuzzBase::initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info) {
   HostVector hosts;
-  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   for (uint32_t i = 1; i <= 60000; ++i) {
-    hosts.push_back(makeTestHost(info, "tcp://127.0.0.1:" + std::to_string(i), *time_source));
+    hosts.push_back(makeTestHost(info, "tcp://127.0.0.1:" + std::to_string(i)));
   }
   return hosts;
 }

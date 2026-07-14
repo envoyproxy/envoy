@@ -7,6 +7,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/upstream/load_balancer_factory_base.h"
 #include "source/extensions/load_balancing_policies/override_host/config.h"
 #include "source/extensions/load_balancing_policies/override_host/load_balancer.h"
 
@@ -18,6 +19,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -26,7 +28,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 namespace {
 
@@ -46,6 +48,11 @@ public:
     ON_CALL(load_balancer_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
     ON_CALL(load_balancer_context_, downstreamHeaders())
         .WillByDefault(Return(&downstream_headers_));
+    ON_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_))
+        .WillByDefault(
+            testing::Invoke([this](const std::string& name, const Protobuf::Struct& value) {
+              (*metadata_.mutable_filter_metadata())[std::string(name)].MergeFrom(value);
+            }));
   }
 
 protected:
@@ -69,7 +76,7 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }
@@ -86,7 +93,7 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     config.add_override_host_sources()->set_header(primary_header_name);
     setMetadataHostSource(config.add_override_host_sources(), primary_header_name);
@@ -102,7 +109,7 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     setMetadataHostSource(config.add_override_host_sources(), primary_header_name);
     config.add_override_host_sources()->set_header(primary_header_name);
@@ -120,14 +127,33 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
+    return config;
+  }
+
+  OverrideHost makeDefaultConfigWithSelectedHostKey(absl::string_view selected_endpoint_key_name) {
+    OverrideHost config;
+
+    OverrideHost::OverrideHostSource* host_source = config.add_override_host_sources();
+    host_source->mutable_metadata()->set_key("envoy.lb");
+    host_source->mutable_metadata()->add_path()->set_key("x-gateway-destination-endpoint");
+
+    auto* metadata_key = config.mutable_selected_host_key();
+    metadata_key->set_key("envoy.lb");
+    metadata_key->add_path()->set_key(selected_endpoint_key_name);
+
+    Config locality_picker_config;
+    auto* typed_extension_config =
+        config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }
 
   void setSelectedEndpointsMetadata(absl::string_view key,
                                     absl::string_view selected_endpoints_text_proto) {
-    Envoy::ProtobufWkt::Struct selected_endpoints;
+    Envoy::Protobuf::Struct selected_endpoints;
     EXPECT_TRUE(
         Protobuf::TextFormat::ParseFromString(selected_endpoints_text_proto, &selected_endpoints));
     (*metadata_.mutable_filter_metadata())[key] = selected_endpoints;
@@ -171,13 +197,12 @@ protected:
   LoadBalancerPtr load_balancer_;
 };
 
-TEST_F(OverrideHostLoadBalancerTest, NoMetadatOrHeaders) {
+TEST_F(OverrideHostLoadBalancerTest, NoMetadataOrHeaders) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -200,8 +225,7 @@ TEST_F(OverrideHostLoadBalancerTest, NullptrHeaders) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -239,14 +263,11 @@ TEST_F(OverrideHostLoadBalancerTest, PrimaryAddressDoesNotExist) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
-      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2002:a17:93c:a62::1]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2002:a17:93c:a62::1]:80", us_central1_b,
+                                    1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -280,14 +301,11 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -296,7 +314,6 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
       "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
 
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  load_balancer_->chooseHost(&load_balancer_context_);
 
   setSelectedEndpointsMetadata("envoy.lb", R"pb(
     fields {
@@ -319,6 +336,55 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
 }
 
+TEST_F(OverrideHostLoadBalancerTest, HeaderWithMultipleValueIsPreferredOverMetadata) {
+  // In this configuration header based override source is configured before the metadata based
+  // override source. Verify that header based value is chosen first.
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+  Locality us_central1_b = makeLocality("us-central1", "us-central1-b");
+  Locality us_west3_c = makeLocality("us-west3", "us-west3-c");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
+      {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithHeadersEnabled(
+      "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "[2600:2d00:1:cc00:172:b9fb:a00:4]:80" }
+    }
+  )pb");
+  addHeader("x-gateway-destination-endpoint",
+            "[2600:2d00:1:cc00:172:b9fb:a00:3]:80,[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  // Expect the the address from the header to be used.
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
+  // Next call to chooseHost will use the second host in the header.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
+  // Next call to chooseHost will use the host from the metadata since it is
+  // second in the override source order.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:4]:80");
+  // Since there are no more overridden hosts, the fallback LB is called while always returns
+  // the first host in the set.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
+}
+
 TEST_F(OverrideHostLoadBalancerTest, MetadataIsPreferredOverHeaders) {
   // In this configuration metadata based override source is configured before the header based
   // override source. Verify that metadata based value is chosen first.
@@ -329,14 +395,11 @@ TEST_F(OverrideHostLoadBalancerTest, MetadataIsPreferredOverHeaders) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -345,7 +408,6 @@ TEST_F(OverrideHostLoadBalancerTest, MetadataIsPreferredOverHeaders) {
       "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
 
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  load_balancer_->chooseHost(&load_balancer_context_);
 
   setSelectedEndpointsMetadata("envoy.lb", R"pb(
     fields {
@@ -378,14 +440,11 @@ TEST_F(OverrideHostLoadBalancerTest, UnparseableHeaderValueUsesFallback) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -395,7 +454,6 @@ TEST_F(OverrideHostLoadBalancerTest, UnparseableHeaderValueUsesFallback) {
       "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
 
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  load_balancer_->chooseHost(&load_balancer_context_);
 
   setSelectedEndpointsMetadata("envoy.lb", R"pb(
     fields {
@@ -420,12 +478,11 @@ TEST_F(OverrideHostLoadBalancerTest, SelectIpv4EndpointWithHeader) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://1.2.3.4:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
-                      Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://5.6.7.8:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://5.6.7.8:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ =
       ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
@@ -444,12 +501,10 @@ TEST_F(OverrideHostLoadBalancerTest, SelectIpv6EndpointWithHeader) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://[::1]:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
-                      Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://[::2]:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[::1]:80", us_central1_a,
+                                                    1, 0, Host::HealthStatus::HEALTHY),
+                      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[::2]:80", us_central1_a,
+                                                    1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ =
       ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
@@ -468,12 +523,10 @@ TEST_F(OverrideHostLoadBalancerTest, WrongHeaderName) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://[::1]:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
-                      Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://[::2]:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[::1]:80", us_central1_a,
+                                                    1, 0, Host::HealthStatus::HEALTHY),
+                      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[::2]:80", us_central1_a,
+                                                    1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ =
       ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
@@ -496,7 +549,6 @@ TEST_F(OverrideHostLoadBalancerTest, WrongHeaderName) {
 }
 
 TEST_F(OverrideHostLoadBalancerTest, NullptrFromFallbackLb) {
-  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   thread_local_priority_set_.getMockHostSet(0);
   // Do not populate any hosts, so that the fallback LB returns nullptr.
@@ -513,8 +565,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectIpv4EndpointUsingMetadata) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -536,8 +587,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectEndpointUsingMetadataMissingEndpoint)
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -562,14 +612,11 @@ TEST_F(OverrideHostLoadBalancerTest, SelectIPv6UsingMetadata) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -594,8 +641,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectEndpointBadMetadata) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -618,8 +664,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectEndpointBadMetadataType) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -641,12 +686,11 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderOnlySourceWithNoHeader) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://1.2.3.4:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
-                      Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://5.6.7.8:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://5.6.7.8:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ =
       ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
@@ -673,8 +717,7 @@ TEST_F(OverrideHostLoadBalancerTest, NullDownstreamHeaders) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -687,8 +730,213 @@ TEST_F(OverrideHostLoadBalancerTest, NullDownstreamHeaders) {
   EXPECT_NE(load_balancer_->chooseHost(&load_balancer_context_).host, nullptr);
 }
 
+TEST_F(OverrideHostLoadBalancerTest, SelectedHostStoredInMetadata) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithSelectedHostKey("x-gateway-destination-endpoint-served"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "1.2.3.4:80" }
+    }
+  )pb");
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  // Expect the address from the metadata to be used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "1.2.3.4:80");
+
+  // Expect that the selected host metadata key will contain the selected address.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+
+  const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(
+      &metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
+
+  EXPECT_EQ(metadata_value.string_value(), "1.2.3.4:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, SelectedHostMetadataMultipleHostsChosen) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://5.6.7.8:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://3.5.8.13:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::DEGRADED)};
+  host_set->hosts_per_locality_ =
+      ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}, {host_set->hosts_[1]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithSelectedHostKey("x-gateway-destination-endpoint-served"));
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "3.5.8.13:80,5.6.7.8:80" }
+    }
+  )pb");
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  // Expect the address from the metadata to be used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "3.5.8.13:80");
+
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "5.6.7.8:80");
+
+  // Expect that the selected host metadata key will contain the final selected address.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+  const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(
+      &metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
+
+  EXPECT_EQ(metadata_value.string_value(), "5.6.7.8:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataDoesNotOverwriteEnvoyLb) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithSelectedHostKey("x-gateway-destination-endpoint-served"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "1.2.3.4:80" }
+    }
+  )pb");
+
+  // Set metadata under "envoy.lb" before choosing a host.
+  Protobuf::Struct new_metadata;
+  (*new_metadata.mutable_fields())["canary"].set_string_value("false");
+  load_balancer_context_.requestStreamInfo()->setDynamicMetadata("envoy.lb", new_metadata);
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  // Expect the address from the metadata to be used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+
+  // Expect that the pre-existing metadata under envoy.lb was not removed.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+  const Protobuf::Value& metadata_value =
+      ::Envoy::Config::Metadata::metadataValue(&metadata, "envoy.lb", "canary");
+  EXPECT_EQ(metadata_value.string_value(), "false");
+}
+
+// Test-only fallback factory whose worker-local factory opts into the legacy
+// recreate-on-host-change semantics and counts each invocation. Used to verify
+// that OverrideHostLoadBalancer locally rebuilds the inner fallback LB on host
+// changes when the inner factory still asks for that contract.
+class RecreatingFallbackLb : public Envoy::Upstream::ThreadAwareLoadBalancer {
+public:
+  explicit RecreatingFallbackLb(int& worker_lb_create_count)
+      : factory_(std::make_shared<WorkerFactory>(worker_lb_create_count)) {}
+
+  Envoy::Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
+  absl::Status initialize() override { return absl::OkStatus(); }
+
+private:
+  class WorkerLb : public Envoy::Upstream::LoadBalancer {
+  public:
+    Envoy::Upstream::HostSelectionResponse
+    chooseHost(Envoy::Upstream::LoadBalancerContext*) override {
+      return {nullptr};
+    }
+    Envoy::Upstream::HostConstSharedPtr
+    peekAnotherHost(Envoy::Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
+    std::optional<Envoy::Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Envoy::Upstream::LoadBalancerContext*, const Envoy::Upstream::Host&,
+                             std::vector<uint8_t>&) override {
+      return std::nullopt;
+    }
+  };
+
+  class WorkerFactory : public Envoy::Upstream::LoadBalancerFactory {
+  public:
+    explicit WorkerFactory(int& count) : count_(count) {}
+    Envoy::Upstream::LoadBalancerPtr create(Envoy::Upstream::LoadBalancerParams) override {
+      ++count_;
+      return std::make_unique<WorkerLb>();
+    }
+    bool recreateOnHostChangeDeprecated() const override { return true; }
+
+  private:
+    int& count_;
+  };
+
+  std::shared_ptr<WorkerFactory> factory_;
+};
+
+class RecreatingFallbackLbFactory : public Envoy::Upstream::TypedLoadBalancerFactoryBase<
+                                        ::test::load_balancing_policies::override_host::Config> {
+public:
+  explicit RecreatingFallbackLbFactory(int& worker_lb_create_count)
+      : TypedLoadBalancerFactoryBase("envoy.load_balancers.override_host.test"),
+        worker_lb_create_count_(worker_lb_create_count) {}
+
+  absl::StatusOr<Envoy::Upstream::LoadBalancerConfigPtr>
+  loadConfig(Envoy::Server::Configuration::ServerFactoryContext&,
+             const Envoy::Protobuf::Message&) override {
+    return std::make_unique<Envoy::Upstream::LoadBalancerConfig>();
+  }
+
+private:
+  Envoy::Upstream::ThreadAwareLoadBalancerPtr
+  create(OptRef<const Envoy::Upstream::LoadBalancerConfig>, const Envoy::Upstream::ClusterInfo&,
+         const Envoy::Upstream::PrioritySet&, Envoy::Runtime::Loader&,
+         Envoy::Random::RandomGenerator&, TimeSource&) override {
+    return std::make_unique<RecreatingFallbackLb>(worker_lb_create_count_);
+  }
+
+  int& worker_lb_create_count_;
+};
+
+// When the fallback LB's factory still asks for recreate-on-host-change
+// (typical of not-yet-migrated out-of-tree LBs), the outer override_host LB
+// must locally rebuild its inner fallback whenever the worker priority set
+// fires its member-update callback.
+TEST_F(OverrideHostLoadBalancerTest, FallbackRecreatedOnHostChange) {
+  int worker_lb_create_count = 0;
+  RecreatingFallbackLbFactory recreating_factory(worker_lb_create_count);
+  Registry::InjectFactory<Envoy::Upstream::TypedLoadBalancerFactory> injected(recreating_factory);
+
+  createLoadBalancer(makeDefaultConfig());
+
+  // Initial worker LB construction invokes the inner factory once.
+  EXPECT_EQ(worker_lb_create_count, 1);
+
+  // Each host change on the worker priority set should trigger the LB's
+  // member-update callback, which rebuilds the inner fallback LB.
+  thread_local_priority_set_.runUpdateCallbacks(0, {}, {});
+  EXPECT_EQ(worker_lb_create_count, 2);
+
+  thread_local_priority_set_.runUpdateCallbacks(0, {}, {});
+  EXPECT_EQ(worker_lb_create_count, 3);
+}
 } // namespace
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

@@ -1,6 +1,8 @@
 #include <regex>
 #include <string>
 
+#include "envoy/server/factory_context.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/router/header_parser.h"
@@ -64,6 +66,13 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
                      "Header formatter: JSON format of {}_METADATA parameters has been obsoleted. "
                      "Use colon format: {}",
                      matches[1], new_format.c_str());
+      // The parsing should only happen on the main thread and the singleton context should be
+      // available. In case it is not set in tests or other non-standard Envoy usage, we skip
+      // counting the deprecated feature usage instead of crashing.
+      auto* context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+      if (context != nullptr) {
+        context->runtime().countDeprecatedFeatureUse();
+      }
 
       int subs = absl::StrReplaceAll({{matches[0], new_format}}, &new_header_value);
       ASSERT(subs > 0);
@@ -94,6 +103,15 @@ std::string HeaderParser::translatePerRequestState(const std::string& header_val
 
     ENVOY_LOG_MISC(warn, "PER_REQUEST_STATE header formatter has been obsoleted. Use {}",
                    new_format.c_str());
+
+    // The parsing should only happen on the main thread and the singleton context should be
+    // available. In case it is not set in tests or other non-standard Envoy usage, we skip
+    // counting the deprecated feature usage instead of crashing.
+    auto* context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+    if (context != nullptr) {
+      context->runtime().countDeprecatedFeatureUse();
+    }
+
     int subs = absl::StrReplaceAll({{matches[0], new_format}}, &new_header_value);
     ASSERT(subs > 0);
   }

@@ -20,9 +20,7 @@ namespace Tls {
   COUNTER(ocsp_staple_failed)                                                                      \
   COUNTER(ocsp_staple_omitted)                                                                     \
   COUNTER(ocsp_staple_responses)                                                                   \
-  COUNTER(ocsp_staple_requests)                                                                    \
-  COUNTER(was_key_usage_invalid)
-
+  COUNTER(ocsp_staple_requests)
 /**
  * Wrapper struct for SSL stats. @see stats_macros.h
  */
@@ -31,6 +29,8 @@ struct SslStats {
 };
 
 SslStats generateSslStats(Stats::Scope& store);
+
+Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name);
 
 } // namespace Tls
 } // namespace TransportSockets

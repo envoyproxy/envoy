@@ -6,10 +6,8 @@
 #include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -46,20 +44,19 @@ public:
                                     int degraded_hosts, int unhealthy_hosts, uint32_t priority) {
     Upstream::HostVector hosts;
     for (int i = 0; i < healthy_hosts; ++i) {
-      hosts.emplace_back(
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80", simTime(), 1, priority));
+      hosts.emplace_back(Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80", 1, priority));
     }
 
     for (int i = 0; i < degraded_hosts; ++i) {
       Upstream::HostSharedPtr host =
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.2:80", simTime(), 1, priority);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.2:80", 1, priority);
       host->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
       hosts.emplace_back(host);
     }
 
     for (int i = 0; i < unhealthy_hosts; ++i) {
       Upstream::HostSharedPtr host =
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.3:80", simTime(), 1, priority);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.3:80", 1, priority);
       host->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
       hosts.emplace_back(host);
     }
@@ -74,7 +71,7 @@ public:
         priority,
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts, {}, 123, absl::nullopt, 100);
+        nullptr, hosts, {}, std::nullopt, 100);
   }
 
   void setupSecondary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
@@ -84,7 +81,7 @@ public:
         priority,
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts, {}, 123, absl::nullopt, 100);
+        nullptr, hosts, {}, std::nullopt, 100);
   }
 
   void setupPrioritySet() {
@@ -102,14 +99,13 @@ public:
         cluster_config.cluster_type().typed_config(), ProtobufMessage::getStrictValidationVisitor(),
         config));
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<Cluster>(
         new Cluster(cluster_config, config, factory_context, creation_status));
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
 
     server_context_.cluster_manager_.initializeThreadLocalClusters({"primary", "secondary"});
     primary_.cluster_.info_->name_ = "primary";
@@ -132,7 +128,6 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Ssl::MockContextManager ssl_context_manager_;
 
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_{Api::createApiForTest(server_context_.store_, random_)};
@@ -178,8 +173,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   // Cluster 2:
   //     Priority 0: 33.3%
   //     Priority 1: 33.3%
-  Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
     return Upstream::HostSelectionResponse{host};
   }));
@@ -195,7 +189,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
         lb_->lifetimeCallbacks();
     EXPECT_FALSE(lifetime_callbacks.has_value());
     std::vector<uint8_t> hash_key = {1, 2, 3};
-    absl::optional<Upstream::SelectedPoolAndConnection> selection =
+    std::optional<Upstream::SelectedPoolAndConnection> selection =
         lb_->selectExistingConnection(nullptr, *host, hash_key);
     EXPECT_FALSE(selection.has_value());
     EXPECT_EQ(host.get(), target.get());
@@ -251,8 +245,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
 
 TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
   initialize(default_yaml_config_);
-  Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
   // Set up the HostSet with 0 healthy, 0 degraded and 2 unhealthy.
   setupPrimary(0, 0, 0, 2);
   setupPrimary(1, 0, 0, 2);
@@ -298,8 +291,7 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
 
 TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   initialize(default_yaml_config_);
-  Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
   setupPrimary(0, 1, 0, 4);
   setupPrimary(1, 1, 0, 4);
   setupSecondary(0, 1, 0, 4);
@@ -386,6 +378,7 @@ TEST_F(AggregateClusterTest, LBContextTest) {
   EXPECT_EQ(context.downstreamHeaders(), nullptr);
   EXPECT_EQ(context.upstreamSocketOptions(), nullptr);
   EXPECT_EQ(context.upstreamTransportSocketOptions(), nullptr);
+  context.setHeadersModifier(nullptr);
 }
 
 TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
@@ -398,7 +391,7 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
 
   const uint32_t invalid_priority = 42;
   Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime(), 1, invalid_priority);
+      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", 1, invalid_priority);
 
   // The linearized priorities are [P0, P1, S0, S1].
   Upstream::HealthyAndDegradedLoad secondary_priority_1{Upstream::HealthyLoad({0, 0, 0, 100}),
@@ -419,10 +412,10 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
           return *(ps.hostSetsPerPriority()[priority]->hosts()[0]);
         };
 
-        EXPECT_EQ(mapping_func(host_from_priority(primary_ps_, 0)), absl::optional<uint32_t>(0));
-        EXPECT_EQ(mapping_func(host_from_priority(primary_ps_, 1)), absl::optional<uint32_t>(1));
-        EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 0)), absl::optional<uint32_t>(2));
-        EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 1)), absl::optional<uint32_t>(3));
+        EXPECT_EQ(mapping_func(host_from_priority(primary_ps_, 0)), std::optional<uint32_t>(0));
+        EXPECT_EQ(mapping_func(host_from_priority(primary_ps_, 1)), std::optional<uint32_t>(1));
+        EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 0)), std::optional<uint32_t>(2));
+        EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 1)), std::optional<uint32_t>(3));
 
         return secondary_priority_1;
       }));

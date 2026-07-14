@@ -21,7 +21,7 @@ namespace HttpFilters {
 namespace Cache {
 
 namespace {
-// This value is only used if there is no encoderBufferLimit on the stream;
+// This value is only used if there is no bufferLimit on the stream;
 // without *some* constraint here, a very large chunk can be requested and
 // attempt to load into a memory buffer.
 //
@@ -61,8 +61,8 @@ void CacheFilter::onDestroy() {
 }
 
 void CacheFilter::sendUpstreamRequest(Http::RequestHeaderMap& request_headers) {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  const Router::RouteEntry* route_entry = (route == nullptr) ? nullptr : route->routeEntry();
+  const auto route = decoder_callbacks_->route();
+  const Router::RouteEntry* route_entry = route ? route->routeEntry() : nullptr;
   if (route_entry == nullptr) {
     return sendNoRouteResponse();
   }
@@ -78,14 +78,14 @@ void CacheFilter::sendUpstreamRequest(Http::RequestHeaderMap& request_headers) {
 }
 
 void CacheFilter::sendNoRouteResponse() {
-  decoder_callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, std::nullopt,
                                      "cache_no_route");
 }
 
 void CacheFilter::sendNoClusterResponse(absl::string_view cluster_name) {
   ENVOY_STREAM_LOG(debug, "upstream cluster '{}' was not available to cache", *decoder_callbacks_,
                    cluster_name);
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, std::nullopt,
                                      "cache_no_cluster");
 }
 
@@ -94,8 +94,7 @@ void CacheFilter::onStreamComplete() {
   InsertStatus insert_status = insertStatus();
   decoder_callbacks_->streamInfo().filterState()->setData(
       CacheFilterLoggingInfo::FilterStateKey,
-      std::make_shared<CacheFilterLoggingInfo>(lookup_status, insert_status),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      std::make_shared<CacheFilterLoggingInfo>(lookup_status, insert_status));
 }
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -141,7 +140,7 @@ void CacheFilter::onUpstreamRequestComplete() { upstream_request_ = nullptr; }
 
 void CacheFilter::onUpstreamRequestReset() {
   upstream_request_ = nullptr;
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, std::nullopt,
                                      "cache_upstream_reset");
 }
 
@@ -176,7 +175,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 }
 
 /*static*/ LookupStatus
-CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status,
+CacheFilter::resolveLookupStatus(std::optional<CacheEntryStatus> cache_entry_status,
                                  FilterState filter_state) {
   if (cache_entry_status.has_value()) {
     switch (cache_entry_status.value()) {
@@ -261,7 +260,7 @@ void CacheFilter::getBody() {
   ASSERT(!remaining_ranges_.empty(), "No reason to call getBody when there's no body to get.");
 
   // We don't want to request more than a buffer-size at a time from the cache.
-  uint64_t fetch_size_limit = encoder_callbacks_->encoderBufferLimit();
+  uint64_t fetch_size_limit = encoder_callbacks_->bufferLimit();
   // If there is no buffer size limit, we still want *some* constraint.
   if (fetch_size_limit == 0) {
     fetch_size_limit = MAX_BYTES_TO_FETCH_FROM_CACHE_PER_REQUEST;

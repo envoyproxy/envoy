@@ -88,6 +88,8 @@ TEST_P(DynatraceSamplerIntegrationTest, TestWithTraceparentAndTracestate) {
       << "Received tracestate: " << tracestate_value;
   EXPECT_TRUE(absl::StrContains(tracestate_value, ",key=value"))
       << "Received tracestate: " << tracestate_value;
+  EXPECT_TRUE(absl::StrContains(tracestate_value, "8h0101"))
+      << "ATM reason in tcr extension: " << tracestate_value;
 }
 
 // Sends a request with traceparent but no tracestate header.
@@ -118,6 +120,8 @@ TEST_P(DynatraceSamplerIntegrationTest, TestWithTraceparentOnly) {
   // use StartsWith because path-info (last element in trace state contains a random value)
   EXPECT_TRUE(absl::StartsWith(tracestate_value, "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;"))
       << "Received tracestate: " << tracestate_value;
+  EXPECT_TRUE(absl::StrContains(tracestate_value, "8h0101"))
+      << "ATM reason in tcr extension: " << tracestate_value;
 }
 
 // Sends a request without traceparent and tracestate header.
@@ -142,6 +146,45 @@ TEST_P(DynatraceSamplerIntegrationTest, TestWithoutTraceparentAndTracestate) {
                                            .getStringView();
   EXPECT_TRUE(absl::StartsWith(tracestate_value, "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;"))
       << "Received tracestate: " << tracestate_value;
+  EXPECT_TRUE(absl::StrContains(tracestate_value, "8h0101"))
+      << "ATM reason in tcr extension: " << tracestate_value;
+}
+
+// Sends a request with traceparent and tracestate header
+// containing a Dynatrace tag with a trace capture reason in it
+TEST_P(DynatraceSamplerIntegrationTest, TestWithTraceStateWithTcrExtensionPresent) {
+  // tracestate does not contain a Dynatrace tag
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"tracestate", "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0106"},
+      {"traceparent", TRACEPARENT_VALUE}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  // traceparent should be set: traceid should be re-used, span id should be different
+  absl::string_view traceparent_value = upstream_request_->headers()
+                                            .get(Http::LowerCaseString("traceparent"))[0]
+                                            ->value()
+                                            .getStringView();
+  EXPECT_TRUE(absl::StartsWith(traceparent_value, TRACEPARENT_VALUE_START));
+  EXPECT_NE(TRACEPARENT_VALUE, traceparent_value);
+  // Dynatrace tracestate should be added to existing tracestate
+  absl::string_view tracestate_value = upstream_request_->headers()
+                                           .get(Http::LowerCaseString("tracestate"))[0]
+                                           ->value()
+                                           .getStringView();
+  // use StartsWith because path-info (last element in trace state) contains a random value
+  EXPECT_TRUE(absl::StartsWith(tracestate_value, "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;"))
+      << "Received tracestate: " << tracestate_value;
+  EXPECT_TRUE(absl::StrContains(tracestate_value, "8h0106"))
+      << "ATM reason in tcr extension: " << tracestate_value;
 }
 
 } // namespace

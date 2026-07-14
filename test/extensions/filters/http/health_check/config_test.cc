@@ -135,7 +135,8 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::filters::http::health_check::v3::HealthCheck config =
-      *dynamic_cast<envoy::extensions::filters::http::health_check::v3::HealthCheck*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::health_check::v3::HealthCheck>(
           healthCheckFilterConfig.createEmptyConfigProto().get());
 
   config.mutable_pass_through_mode()->set_value(false);
@@ -154,8 +155,8 @@ void testHealthCheckHeaderMatch(
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ProtobufTypes::MessagePtr config_msg = healthCheckFilterConfig.createEmptyConfigProto();
-  auto config = dynamic_cast<envoy::extensions::filters::http::health_check::v3::HealthCheck*>(
-      config_msg.get());
+  auto config = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::health_check::v3::HealthCheck>(config_msg.get());
   ASSERT_NE(config, nullptr);
 
   *config = input_config;
@@ -280,6 +281,26 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   Http::TestRequestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
 
   testHealthCheckHeaderMatch(config, headers, false);
+}
+
+TEST(HealthCheckFilterConfig, HealthCheckFilterWithServerContext) {
+  const std::string yaml_string = R"EOF(
+  pass_through_mode: true
+  headers:
+    - name: ":path"
+      string_match:
+        exact: "/hc"
+  )EOF";
+
+  envoy::extensions::filters::http::health_check::v3::HealthCheck proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  HealthCheckFilterConfig factory;
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
 }
 
 } // namespace

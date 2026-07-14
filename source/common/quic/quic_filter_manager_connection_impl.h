@@ -45,6 +45,7 @@ public:
   void addReadFilter(Network::ReadFilterSharedPtr filter) override;
   void removeReadFilter(Network::ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   // Network::Connection
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
@@ -66,8 +67,8 @@ public:
     IS_ENVOY_BUG("unexpected call to closeConnection for QUIC");
   }
 
-  Network::DetectedCloseType detectedCloseType() const override {
-    return Network::DetectedCloseType::Normal;
+  StreamInfo::DetectedCloseType detectedCloseType() const override {
+    return StreamInfo::DetectedCloseType::Normal;
   }
   Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
@@ -100,9 +101,9 @@ public:
     return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   // Unix domain socket is not supported.
-  absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
+  std::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
@@ -131,6 +132,7 @@ public:
     IS_ENVOY_BUG("unexpected write call");
   }
   void setBufferLimits(uint32_t limit) override;
+  void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) override;
   uint32_t bufferLimit() const override {
     // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
     PANIC("not implemented");
@@ -142,10 +144,11 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
-  absl::optional<uint64_t> congestionWindowInBytes() const override;
+  std::optional<uint64_t> congestionWindowInBytes() const override;
+  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
@@ -179,6 +182,8 @@ public:
 
   void incrementSentQuicResetStreamErrorStats(quic::QuicResetStreamError error, bool from_self,
                                               bool is_upstream);
+
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override;
 
 protected:
   // Propagate connection close to network_connection_callbacks_.
@@ -234,7 +239,7 @@ private:
   // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
-  absl::optional<Network::ConnectionCloseType> close_type_during_initialize_;
+  std::optional<Network::ConnectionCloseType> close_type_during_initialize_;
 };
 
 } // namespace Quic

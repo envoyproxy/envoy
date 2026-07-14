@@ -7,17 +7,6 @@
 namespace Envoy {
 namespace Server {
 
-class FilterChainInfoImpl : public Network::FilterChainInfo {
-public:
-  FilterChainInfoImpl(absl::string_view name) : name_(name) {}
-
-  // Network::FilterChainInfo
-  absl::string_view name() const override { return name_; }
-
-private:
-  const std::string name_;
-};
-
 ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& parent,
                                                    Event::Dispatcher& dispatcher,
                                                    Network::ListenerPtr&& listener,
@@ -51,9 +40,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     return;
   }
 
-  socket->connectionInfoProvider().setListenerInfo(config_->listenerInfo());
-  socket->connectionInfoProvider().setFilterChainInfo(
-      std::make_shared<FilterChainInfoImpl>(filter_chain->name()));
+  socket->connectionInfoProvider().setFilterChainInfo(filter_chain->filterChainInfo());
 
   auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
   auto server_conn_ptr = dispatcher().createServerConnection(
@@ -64,6 +51,10 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
         timeout, stats_.downstream_cx_transport_socket_connect_timeout_);
   }
   server_conn_ptr->setBufferLimits(config_->perConnectionBufferLimitBytes());
+  const auto timeout = config_->perConnectionBufferHighWatermarkTimeout();
+  if (timeout.count() > 0) {
+    server_conn_ptr->setBufferHighWatermarkTimeout(timeout);
+  }
   RELEASE_ASSERT(server_conn_ptr->connectionInfoProvider().remoteAddress() != nullptr, "");
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *server_conn_ptr, filter_chain->networkFilterFactories());
@@ -127,7 +118,8 @@ void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   // Any event leads to destruction of the connection.
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
-    stream_info_->setDownstreamTransportFailureReason(connection_->transportFailureReason());
+    // NOTE: Transport failure reason is set in ConnectionImpl::closeSocket() before events
+    // are raised, so it should already be available in stream_info_ at this point.
     active_connections_.listener_.removeConnection(*this);
   }
 }
@@ -158,6 +150,45 @@ ActiveConnections& OwnedActiveStreamListenerBase::getOrCreateActiveConnections(
     connections = std::make_unique<ActiveConnections>(*this, filter_chain);
   }
   return *connections;
+}
+
+void OwnedActiveStreamListenerBase::onFilterChainDrainStart(
+    const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  // A drain callback may synchronously close the current connection, which removes it from
+  // `connections_` via removeConnection(). Capture `next` before invoking onDrain() so the
+  // std::list iteration survives erasure of the current node. Pin `is_deleting_` while
+  // iterating so removeConnection() does not also erase the map entry mid-loop if the
+  // filter chain's last connection closes.
+  const bool was_deleting = is_deleting_;
+  is_deleting_ = true;
+  for (const auto* filter_chain : draining_filter_chains) {
+    auto map_iter = connections_by_context_.find(filter_chain);
+    if (map_iter == connections_by_context_.end()) {
+      continue;
+    }
+    auto& connections = map_iter->second->connections_;
+    for (auto it = connections.begin(); it != connections.end();) {
+      auto next = std::next(it);
+      (*it)->connection_->onDrain();
+      it = next;
+    }
+  }
+  is_deleting_ = was_deleting;
+}
+
+void OwnedActiveStreamListenerBase::onListenerDrainStart() {
+  // See onFilterChainDrainStart for why `next` is captured and `is_deleting_` is pinned.
+  const bool was_deleting = is_deleting_;
+  is_deleting_ = true;
+  for (auto& entry : connections_by_context_) {
+    auto& connections = entry.second->connections_;
+    for (auto it = connections.begin(); it != connections.end();) {
+      auto next = std::next(it);
+      (*it)->connection_->onDrain();
+      it = next;
+    }
+  }
+  is_deleting_ = was_deleting;
 }
 
 void OwnedActiveStreamListenerBase::removeFilterChain(const Network::FilterChain* filter_chain) {

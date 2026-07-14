@@ -1,15 +1,19 @@
 #include <cstdlib>
 #include <memory>
+#include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
 #include "envoy/network/exception.h"
 
-#include "source/common/common/logger.h"
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/envoy_quic_clock.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -23,8 +27,6 @@
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
@@ -107,6 +109,10 @@ public:
   static bool enabled(ActiveQuicListener& listener) { return listener.enabled_->enabled(); }
 
   static Network::Socket& socket(ActiveQuicListener& listener) { return listener.listen_socket_; }
+
+  static uint32_t getMaxSessionsPerEventLoop(ActiveQuicListener& listener) {
+    return listener.max_sessions_per_event_loop_;
+  }
 };
 
 class ActiveQuicListenerFactoryPeer {
@@ -127,10 +133,10 @@ protected:
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getAnyAddress(version_, true)),
-        connection_handler_(*dispatcher_, absl::nullopt),
+        connection_handler_(*dispatcher_, std::nullopt),
         transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
-            true, *store_.rootScope(), std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-            ssl_context_manager_, {})),
+            /*enable_early_data=*/true, /*enable_resumption=*/true, *store_.rootScope(),
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -159,9 +165,10 @@ protected:
         .WillByDefault(Return(Network::UdpListenerConfigOptRef(udp_listener_config_)));
     ON_CALL(udp_listener_config_, packetWriterFactory())
         .WillByDefault(ReturnRef(udp_packet_writer_factory_));
-    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
-        .WillByDefault(Invoke(
-            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
+    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
+        .WillByDefault(
+            Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
+                       absl::AnyInvocable<void()&&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
               return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
@@ -222,10 +229,6 @@ protected:
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
         }));
-    if (!quic_version_.UsesTls()) {
-      EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-          .Times(connection_count);
-    }
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
 
@@ -278,26 +281,28 @@ protected:
     }
     int value = kECT1;
     client_sockets_.back()->setSocketOption(level, optname, &value, sizeof(value));
-    Buffer::OwnedImpl payload =
-        generateChloPacketToSend(quic_version_, quic_config_, connection_id);
-    Buffer::RawSliceVector slice = payload.getRawSlices();
-    ASSERT_EQ(1u, slice.size());
-    Network::Address::InstanceConstSharedPtr dest_address;
-    if (client_address->ip()->version() == Network::Address::IpVersion::v4) {
-      dest_address = std::make_shared<const Network::Address::Ipv4Instance>(
-          client_address->ip()->addressAsString(),
-          listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
-          &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
-    } else {
-      dest_address = std::make_shared<const Network::Address::Ipv6Instance>(
-          client_address->ip()->addressAsString(),
-          listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
-          &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+    std::vector<Buffer::OwnedImpl> payloads =
+        generateChloPacketsToSend(quic_version_, quic_config_, connection_id);
+    for (Buffer::OwnedImpl& payload : payloads) {
+      Buffer::RawSliceVector slice = payload.getRawSlices();
+      ASSERT_EQ(1u, slice.size());
+      Network::Address::InstanceConstSharedPtr dest_address;
+      if (client_address->ip()->version() == Network::Address::IpVersion::v4) {
+        dest_address = std::make_shared<const Network::Address::Ipv4Instance>(
+            client_address->ip()->addressAsString(),
+            listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+            &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+      } else {
+        dest_address = std::make_shared<const Network::Address::Ipv6Instance>(
+            client_address->ip()->addressAsString(),
+            listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+            &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+      }
+      // Send a full CHLO to finish 0-RTT handshake.
+      auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(),
+                                                     slice.data(), 1, nullptr, *dest_address);
+      ASSERT_EQ(slice[0].len_, send_rc.return_value_);
     }
-    // Send a full CHLO to finish 0-RTT handshake.
-    auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(),
-                                                   1, nullptr, *dest_address);
-    ASSERT_EQ(slice[0].len_, send_rc.return_value_);
   }
 
   void readFromClientSockets() {
@@ -471,7 +476,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 0);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  EXPECT_CALL(mock_packet_forwarding, handle(_, _));
+  EXPECT_CALL(mock_packet_forwarding, handle(_, _))
+      .Times(generateChloPacketsToSend(quic_version_, quic_config_, connection_id).size());
   sendCHLO(connection_id);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
@@ -621,7 +627,7 @@ TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
 TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
   initialize();
   Network::Socket& socket = ActiveQuicListenerPeer::socket(*quic_listener_);
-  absl::optional<Network::Address::IpVersion> version = socket.ipVersion();
+  std::optional<Network::Address::IpVersion> version = socket.ipVersion();
   EXPECT_TRUE(version.has_value());
   int optval = 0;
   socklen_t optlen = sizeof(optval);
@@ -673,6 +679,23 @@ TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
   ASSERT(connection != nullptr);
   const quic::QuicConnectionStats& stats = connection->GetStats();
   EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
+}
+
+TEST_P(ActiveQuicListenerTest, MaxSessionsPerEventLoopNotConfigured) {
+  initialize();
+  EXPECT_EQ(ActiveQuicListener::kNumSessionsToCreatePerLoop,
+            ActiveQuicListenerPeer::getMaxSessionsPerEventLoop(*quic_listener_));
+}
+
+TEST_P(ActiveQuicListenerTest, MaxSessionsPerEventLoopConfigured) {
+  const uint32_t max_sessions_per_event_loop = 2;
+  envoy::config::listener::v3::UdpListenerConfig udp_listener_config;
+  udp_listener_config.mutable_quic_options()->mutable_max_sessions_per_event_loop()->set_value(
+      max_sessions_per_event_loop);
+  ON_CALL(udp_listener_config_, config()).WillByDefault(ReturnRef(udp_listener_config));
+  initialize();
+  EXPECT_EQ(max_sessions_per_event_loop,
+            ActiveQuicListenerPeer::getMaxSessionsPerEventLoop(*quic_listener_));
 }
 
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {
@@ -742,8 +765,9 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   envoy::config::listener::v3::QuicProtocolOptions quic_config;
   quic_config.mutable_connection_debug_visitor_config()->set_name(
       "envoy.quic.connection_debug_visitor.mock");
-  quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
-      test::common::config::DummyConfig());
+  std::ignore =
+      quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
+          test::common::config::DummyConfig());
   auto listener_factory = createQuicListenerFactory(quic_config);
   auto debug_visitor_factory =
       ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());

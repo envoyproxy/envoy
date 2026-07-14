@@ -14,26 +14,31 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/cpu_affinity.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/filter_matcher.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
+#include "absl/types/span.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
-#include "source/server/api_listener_impl.h"
+#include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
-#include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -72,7 +77,7 @@ envoy::admin::v3::ListenersConfigDump::DynamicListener* getOrCreateDynamicListen
 void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
-  state.mutable_listener()->PackFrom(listener.config());
+  listener.dumpListenerConfig(*state.mutable_listener());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 } // namespace
@@ -201,7 +206,6 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
       return absl::InvalidArgumentError(fmt::format("UDP listener filter: {} is configured with "
                                                     "unsupported dynamic configuration",
                                                     proto_config.name()));
-      return ret;
     }
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -283,9 +287,62 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
     const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+
+#if defined(__linux__)
+  auto netns = address->networkNamespace();
+  if (netns.has_value()) {
+    auto fn = [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
+      return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                        worker_index);
+    };
+
+    // Here we're running `fn` in a different network namespace. It will return a `absl::StatusOr`
+    // that wraps the result of the function we pass in, which is another `absl::StatusOr`.
+    auto outer_result = Network::Utility::execInNetworkNamespace(fn, netns.value().c_str());
+
+    // We have a nested absl::StatusOr type. The "outer" result is the result of our attempt to jump
+    // between network namespaces. The "inner" result is that of the `createListenSocketInternal`
+    // function we passed in to run in the other netns.
+    if (outer_result.ok()) {
+      // We successfully jumped network namespaces and ran `createListenSocketInternal` in that
+      // namespace before jumping back. Here we return the result of that
+      // `createListenSocketInternal` function.
+      return outer_result.value();
+    }
+
+    // The "outer" result was not ok, which means we failed to jump network namespaces.
+    return outer_result.status();
+  }
+#endif
+
+  return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                    worker_index);
+}
+
+absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocketInternal(
+    Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
+  // Use the address's socket interface for socket creation.
+  const Network::SocketInterface& socket_interface = address->socketInterface();
+  const Network::SocketInterface& default_interface = Network::SocketInterfaceSingleton::get();
+
+  // Check if this address specifies a custom socket interface.
+  if (&socket_interface != &default_interface) {
+    ENVOY_LOG(debug, "creating socket using custom interface for address: {}",
+              address->logicalName());
+    auto io_handle = socket_interface.socket(socket_type, address, creation_options);
+    if (!io_handle) {
+      return absl::InvalidArgumentError("failed to create socket using custom interface");
+    }
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options,
+                                                      std::nullopt, bind_type != BindType::NoBind);
+  }
+
+  // Continue with standard socket creation for addresses using the default interface.
   // First we try to get the socket from our parent if applicable in each case below.
   if (address->type() == Network::Address::Type::Pipe) {
     if (socket_type != Network::Socket::Type::Stream) {
@@ -296,7 +353,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
           fmt::format("socket type {} not supported for pipes", toString(socket_type)));
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
-    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index, "");
     Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
     if (io_handle->isOpen()) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
@@ -316,7 +373,8 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
   const std::string addr = absl::StrCat(scheme, address->asString());
 
   if (bind_type != BindType::NoBind) {
-    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(
+        addr, worker_index, address->networkNamespace().value_or(""));
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
       Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
@@ -362,7 +420,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
     factory_ = std::make_unique<ProdListenerComponentFactory>(server);
   }
   if (server.admin().has_value()) {
-    config_tracker_entry_ = server.admin()->getConfigTracker().add(
+    listeners_config_tracker_entry_ = server.admin()->getConfigTracker().add(
         "listeners", [this](const Matchers::StringMatcher& name_matcher) {
           return dumpListenerConfigs(name_matcher);
         });
@@ -371,6 +429,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(worker_factory.createWorker(
         i, server.overloadManager(), server.nullOverloadManager(), absl::StrCat("worker_", i)));
+    ENVOY_LOG(debug, "starting worker: {}", i);
   }
 }
 
@@ -384,12 +443,12 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   absl::flat_hash_map<std::string, DynamicListener*> listener_map;
 
   for (const auto& listener : active_listeners_) {
-    if (!name_matcher.match(listener->config().name())) {
+    if (!name_matcher.match(listener->configName())) {
       continue;
     }
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
-      static_listener.mutable_listener()->PackFrom(listener->config());
+      listener->dumpListenerConfig(*static_listener.mutable_listener());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
       continue;
@@ -411,7 +470,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   }
 
   for (const auto& listener : warming_listeners_) {
-    if (!name_matcher.match(listener->config().name())) {
+    if (!name_matcher.match(listener->configName())) {
       continue;
     }
     DynamicListener* dynamic_listener =
@@ -421,7 +480,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   }
 
   for (const auto& draining_listener : draining_listeners_) {
-    if (!name_matcher.match(draining_listener.listener_->config().name())) {
+    if (!name_matcher.match(draining_listener.listener_->configName())) {
       continue;
     }
     const auto& listener = draining_listener.listener_;
@@ -431,7 +490,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
     fillState(*dump_listener, *listener);
   }
 
-  for (const auto& [error_name, error_state] : error_state_tracker_) {
+  for (const auto& [error_name, error_state] : lds_error_state_tracker_) {
     DynamicListener* dynamic_listener =
         getOrCreateDynamicListener(error_name, *config_dump, listener_map);
 
@@ -473,7 +532,14 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
           name));
     }
     if (!api_listener_ && !added_via_api) {
-      auto listener_or_error = HttpApiListener::create(config, server_, config.name());
+      auto* api_listener_factory =
+          Registry::FactoryRegistry<Server::ApiListenerFactory>::getFactory(
+              "envoy.http_api_listener");
+      if (api_listener_factory == nullptr) {
+        return absl::InvalidArgumentError(fmt::format(
+            "error adding listener named '{}': missing the API listener extension", name));
+      }
+      auto listener_or_error = api_listener_factory->create(config, server_, config.name());
       RETURN_IF_NOT_OK_REF(listener_or_error.status());
       api_listener_ = std::move(listener_or_error.value());
       return true;
@@ -490,7 +556,7 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
         fmt::format("error adding listener named '{}': address is necessary", name));
   }
 
-  auto it = error_state_tracker_.find(name);
+  auto it = lds_error_state_tracker_.find(name);
   absl::StatusOr<bool> add_or_update_status;
   TRY_ASSERT_MAIN_THREAD {
     add_or_update_status = addOrUpdateListenerInternal(config, version_info, added_via_api, name);
@@ -498,13 +564,13 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
   END_TRY
   CATCH(const EnvoyException& e, { add_or_update_status = absl::InvalidArgumentError(e.what()); })
   if (!add_or_update_status.status().ok()) {
-    if (it == error_state_tracker_.end()) {
-      it = error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
+    if (it == lds_error_state_tracker_.end()) {
+      it = lds_error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
     }
     TimestampUtil::systemClockToTimestamp(server_.api().timeSource().systemTime(),
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(add_or_update_status.status().message());
-    it->second->mutable_failed_configuration()->PackFrom(config);
+    std::ignore = it->second->mutable_failed_configuration()->PackFrom(config);
   }
   return add_or_update_status;
 }
@@ -547,7 +613,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // removed.
   if (existing_warming_listener != warming_listeners_.end() &&
       existing_active_listener != active_listeners_.end() &&
-      (*existing_active_listener)->blockUpdate(hash)) {
+      (*existing_active_listener)->blockLdsUpdate(hash)) {
     warming_listeners_.erase(existing_warming_listener);
     updateWarmingActiveGauges();
     stats_.listener_modified_.inc();
@@ -557,9 +623,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
-       (*existing_warming_listener)->blockUpdate(hash)) ||
+       (*existing_warming_listener)->blockLdsUpdate(hash)) ||
       (existing_active_listener != active_listeners_.end() &&
-       (*existing_active_listener)->blockUpdate(hash))) {
+       (*existing_active_listener)->blockLdsUpdate(hash))) {
     ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
   }
@@ -626,6 +692,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     stats_.listener_modified_.inc();
   }
 
+  // Notify callbacks when the listener is directly placed into the active list (workers not
+  // started). When workers are started, the notification will be fired from onListenerWarmed()
+  // or inPlaceFilterChainUpdate() instead.
+  if (!workers_started_) {
+    notifyListenerUpdateCallbacks(name, new_listener_ref);
+  }
+
   new_listener_ref.initialize();
   return true;
 }
@@ -671,6 +744,13 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
       }
     }
   });
+
+  // Notify existing connections on this listener that draining has begun so that callbacks
+  // (e.g. HTTP/2 codecs) can react before the drain timer expires and connections are
+  // forcibly closed.
+  for (const auto& worker : workers_) {
+    worker->onListenerDrain(*draining_it->listener_);
+  }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
@@ -761,7 +841,7 @@ bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
 }
 
 void ListenerManagerImpl::addListenerToWorker(Worker& worker,
-                                              absl::optional<uint64_t> overridden_listener,
+                                              std::optional<uint64_t> overridden_listener,
                                               ListenerImpl& listener,
                                               ListenerCompletionCallback completion_callback) {
   if (overridden_listener.has_value()) {
@@ -793,7 +873,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
     return;
   }
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, absl::nullopt, listener, nullptr);
+    addListenerToWorker(*worker, std::nullopt, listener, nullptr);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -812,6 +892,8 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
+
+  notifyListenerUpdateCallbacks(listener.name(), listener);
 }
 
 void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
@@ -840,6 +922,8 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
+
+  notifyListenerUpdateCallbacks(listener.name(), **existing_active_listener);
 }
 
 void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
@@ -858,6 +942,14 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
   draining_group->getDrainingListener().debugLog(
       absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
                    draining_group->getDrainingListener().name()));
+
+  // Notify existing connections in the draining filter chains that draining has begun so
+  // callbacks (e.g. HTTP/2 codecs) can react before the drain timer expires and the
+  // connections are forcibly closed.
+  for (const auto& worker : workers_) {
+    worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
+                               draining_group->getDrainingFilterChains());
+  }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
@@ -938,9 +1030,36 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
     }
   }
 
+  notifyListenerRemovalCallbacks(name);
+
   stats_.listener_removed_.inc();
   updateWarmingActiveGauges();
   return true;
+}
+
+absl::Span<const uint32_t> ListenerManagerImpl::workerCpus() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Pin each worker thread to a CPU when worker CPU affinity is enabled so each worker keeps its
+  // cache and `NUMA` locality. The assignment depends only on the worker count and the process
+  // affinity mask, both fixed at startup, so it is computed once and cached for reuse when building
+  // listeners and when starting workers.
+  if (!worker_cpus_.has_value()) {
+    worker_cpus_ = server_.bootstrap().enable_worker_cpu_affinity()
+                       ? Thread::workerCpuAssignment(workers_.size())
+                       : std::vector<uint32_t>{};
+  }
+  return *worker_cpus_;
+}
+
+bool ListenerManagerImpl::reusePortBpfCpuSteeringSupported() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Steering needs every worker pinned to a CPU and a kernel that supports the program. Both inputs
+  // are fixed at startup, so the result is computed once and cached.
+  if (!reuse_port_bpf_cpu_steering_supported_.has_value()) {
+    reuse_port_bpf_cpu_steering_supported_ =
+        !workerCpus().empty() && Api::OsSysCallsSingleton::get().supportsReusePortBpfCpuSteering();
+  }
+  return *reuse_port_bpf_cpu_steering_supported_;
 }
 
 absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
@@ -975,7 +1094,7 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
       continue;
     }
     for (const auto& worker : workers_) {
-      addListenerToWorker(*worker, absl::nullopt, *listener,
+      addListenerToWorker(*worker, std::nullopt, *listener,
                           [this, listeners_pending_init, callback]() {
                             if (--(*listeners_pending_init) == 0) {
                               stats_.workers_started_.set(1);
@@ -984,9 +1103,27 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
                           });
     }
   }
+  const absl::Span<const uint32_t> worker_cpus = workerCpus();
+  if (server_.bootstrap().enable_worker_cpu_affinity()) {
+    // The gauge counts workers assigned a CPU. Each assigned CPU is in the process mask so the
+    // per-worker pin normally succeeds, and a rare failure to set affinity is logged by
+    // `setThreadAffinity()`.
+    stats_.workers_pinned_.set(worker_cpus.size());
+    if (worker_cpus.empty()) {
+      ENVOY_LOG(warn, "worker CPU affinity is enabled but no worker could be pinned for {} workers",
+                workers_.size());
+    } else {
+      ENVOY_LOG(info, "worker CPU affinity is enabled, pinning {} workers to CPUs {}",
+                worker_cpus.size(), absl::StrJoin(worker_cpus, ","));
+    }
+  }
   for (const auto& worker : workers_) {
     ENVOY_LOG(debug, "starting worker {}", i);
-    worker->start(guard_dog, worker_started_running);
+    std::optional<uint32_t> cpu_id;
+    if (i < worker_cpus.size()) {
+      cpu_id = worker_cpus[i];
+    }
+    worker->start(guard_dog, worker_started_running, cpu_id);
     if (enable_dispatcher_stats_) {
       worker->initializeStats(*scope_);
     }
@@ -1062,88 +1199,6 @@ void ListenerManagerImpl::stopWorkers() {
 
 void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
   overall_error_state_ = std::move(failure_states);
-}
-
-ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
-    ListenerImpl& listener,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : listener_(listener), validator_(listener.validation_visitor_),
-      listener_component_factory_(*listener.parent_.factory_), factory_context_(factory_context) {}
-
-absl::StatusOr<Network::DrainableFilterChainSharedPtr>
-ListenerFilterChainFactoryBuilder::buildFilterChain(
-    const envoy::config::listener::v3::FilterChain& filter_chain,
-    FilterChainFactoryContextCreator& context_creator) const {
-  return buildFilterChainInternal(filter_chain,
-                                  context_creator.createFilterChainFactoryContext(&filter_chain));
-}
-
-absl::StatusOr<Network::DrainableFilterChainSharedPtr>
-ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
-    const envoy::config::listener::v3::FilterChain& filter_chain,
-    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const {
-  // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
-  // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
-  // We copy by value first then override if necessary.
-  auto transport_socket = filter_chain.transport_socket();
-  if (!filter_chain.has_transport_socket()) {
-    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
-    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
-    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
-  }
-
-  auto& config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
-  // The only connection oriented UDP transport protocol right now is QUIC.
-  const bool is_quic =
-      listener_.udpListenerConfig().has_value() &&
-      !listener_.udpListenerConfig()->listenerFactory().isTransportConnectionless();
-#if defined(ENVOY_ENABLE_QUIC)
-  if (is_quic &&
-      dynamic_cast<Quic::QuicServerTransportSocketConfigFactory*>(&config_factory) == nullptr) {
-    return absl::InvalidArgumentError(
-        fmt::format("error building filter chain for quic listener: wrong "
-                    "transport socket config specified for quic transport socket: "
-                    "{}. \nUse QuicDownstreamTransport instead.",
-                    transport_socket.DebugString()));
-  }
-  const std::string hcm_str =
-      "type.googleapis.com/"
-      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
-  if (is_quic &&
-      (filter_chain.filters().empty() ||
-       filter_chain.filters(filter_chain.filters().size() - 1).typed_config().type_url() !=
-           hcm_str)) {
-    return absl::InvalidArgumentError(
-        fmt::format("error building network filter chain for quic listener: requires "
-                    "http_connection_manager filter to be last in the chain."));
-  }
-#else
-  // When QUIC is compiled out it should not be possible to configure either the QUIC transport
-  // socket or the QUIC listener and get to this point.
-  ASSERT(!is_quic);
-#endif
-  ProtobufTypes::MessagePtr message =
-      Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
-
-  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
-                                        filter_chain.filter_chain_match().server_names().end());
-
-  auto factory_or_error = config_factory.createTransportSocketFactory(*message, factory_context_,
-                                                                      std::move(server_names));
-  RETURN_IF_NOT_OK(factory_or_error.status());
-  auto factory_list_or_error = listener_component_factory_.createNetworkFilterFactoryList(
-      filter_chain.filters(), *filter_chain_factory_context);
-  RETURN_IF_NOT_OK(factory_list_or_error.status());
-
-  auto filter_chain_res = std::make_shared<FilterChainImpl>(
-      std::move(factory_or_error.value()), std::move(*factory_list_or_error),
-      std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
-      filter_chain.name());
-
-  filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
-  return filter_chain_res;
 }
 
 absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
@@ -1266,7 +1321,34 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
 }
 
 ApiListenerOptRef ListenerManagerImpl::apiListener() {
-  return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
+  return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : std::nullopt;
+}
+
+ListenerUpdateCallbacksHandlePtr
+ListenerManagerImpl::addListenerUpdateCallbacks(ListenerUpdateCallbacks& cb) {
+  return std::make_unique<ListenerUpdateCallbacksHandleImpl>(cb, update_callbacks_);
+}
+
+template <typename F> void ListenerManagerImpl::notifyListenerCallbacks(F notify_fn) {
+  for (auto cb_it = update_callbacks_.begin(); cb_it != update_callbacks_.end();) {
+    // The current callback may remove itself from the list, so a handle for
+    // the next item is fetched before calling the callback.
+    auto curr_cb_it = cb_it;
+    ++cb_it;
+    notify_fn(*curr_cb_it);
+  }
+}
+
+void ListenerManagerImpl::notifyListenerUpdateCallbacks(absl::string_view listener_name,
+                                                        Network::ListenerConfig& listener_config) {
+  notifyListenerCallbacks([&](ListenerUpdateCallbacks* cb) {
+    cb->onListenerAddOrUpdate(listener_name, listener_config);
+  });
+}
+
+void ListenerManagerImpl::notifyListenerRemovalCallbacks(const std::string& listener_name) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onListenerRemoval(listener_name); });
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);

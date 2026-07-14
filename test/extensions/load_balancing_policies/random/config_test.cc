@@ -2,7 +2,7 @@
 
 #include "source/extensions/load_balancing_policies/random/config.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 
@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Random {
 namespace {
 
@@ -23,7 +23,7 @@ TEST(RandomConfigTest, ValidateFail) {
   envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancing_policies.random");
   envoy::extensions::load_balancing_policies::random::v3::Random config_msg;
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.random", factory.name());
@@ -45,6 +45,6 @@ TEST(RandomConfigTest, ValidateFail) {
 
 } // namespace
 } // namespace Random
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

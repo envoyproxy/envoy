@@ -34,7 +34,12 @@ ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::strin
 
 void ZlibDecompressorImpl::init(int64_t window_bits) {
   ASSERT(initialized_ == false);
+  // The inflateInit2 macro from zlib.h contains an old-style cast, so we need to suppress the
+  // warning for this call.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
   const int result = inflateInit2(zstream_ptr_.get(), window_bits);
+#pragma GCC diagnostic pop
   RELEASE_ASSERT(result >= 0, "");
   initialized_ = true;
 }

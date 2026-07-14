@@ -3,6 +3,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
@@ -15,6 +16,8 @@ namespace Extensions {
 namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
+
+using ::Envoy::Matcher::DataInputGetResult;
 
 // Verify that we do not get TSAN or other errors when creating scratch in
 // multi-threading.
@@ -67,7 +70,8 @@ TEST(ThreadLocalTest, NotInitialized) {
   instance.data_[0].reset();
 
   EXPECT_CALL(dispatcher, post(_));
-  EXPECT_TRUE(matcher.match("/asdf/1"));
+  EXPECT_EQ(matcher.match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that comparing works correctly for bounds.
@@ -101,68 +105,87 @@ protected:
 TEST_F(MatcherTest, Regex) {
   setup("^/asdf/.+", 0, false);
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/ASDF/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/\n")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("\n/asdf/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that matching will be performed successfully on empty optional value.
 TEST_F(MatcherTest, Nullopt) {
   setup("^/asdf/.+", 0, false);
 
-  EXPECT_FALSE(matcher_->match(absl::monostate()));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::NoData()), ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that matching will be performed case-insensitively.
 TEST_F(MatcherTest, RegexWithCaseless) {
   setup("^/asdf/.+", HS_FLAG_CASELESS, false);
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_TRUE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/ASDF/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/\n")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("\n/asdf/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that matching a `.` will not exclude newlines.
 TEST_F(MatcherTest, RegexWithDotAll) {
   setup("^/asdf/.+", HS_FLAG_DOTALL, false);
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_TRUE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/ASDF/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/\n")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("\n/asdf/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that `^` and `$` anchors match any newlines in data.
 TEST_F(MatcherTest, RegexWithMultiline) {
   setup("^/asdf/.+", HS_FLAG_MULTILINE, false);
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_TRUE(matcher_->match("\n/asdf/1"));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/ASDF/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/\n")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("\n/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that expressions which can match against an empty string.
 TEST_F(MatcherTest, RegexWithAllowEmpty) {
   setup(".*", HS_FLAG_ALLOWEMPTY, false);
 
-  EXPECT_TRUE(matcher_->match(""));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that treating the pattern as a sequence of UTF-8 characters.
 TEST_F(MatcherTest, RegexWithUTF8) {
   setup("^.$", HS_FLAG_UTF8, false);
 
-  EXPECT_TRUE(matcher_->match("😀"));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("😀")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that using Unicode properties for character classes.
 TEST_F(MatcherTest, RegexWithUCP) {
   setup("^\\w$", HS_FLAG_UTF8 | HS_FLAG_UCP, false);
 
-  EXPECT_TRUE(matcher_->match("Á"));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("Á")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that using logical combination.
@@ -173,7 +196,8 @@ TEST_F(MatcherTest, RegexWithCombination) {
 
   matcher_ = std::make_unique<Matcher>(expressions, flags, ids, dispatcher_, instance_, false);
 
-  EXPECT_TRUE(matcher_->match("a"));
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("a")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that invalid expression will cause a throw.

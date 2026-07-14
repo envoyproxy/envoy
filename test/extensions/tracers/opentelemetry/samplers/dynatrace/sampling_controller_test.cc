@@ -89,6 +89,24 @@ TEST(SamplingControllerTest, TestWithOneAllowedSpan) {
   EXPECT_EQ(sc.getSamplingState("1").getMultiplicity(), 1);
 }
 
+// Test with 1 root span per minute and more offered entries
+TEST(SamplingControllerTest, TestWithOneAllowedSpanMoreEntries) {
+  auto scf = std::make_unique<TestSamplerConfigProvider>(1);
+  SamplingController sc(std::move(scf));
+  sc.update();
+  EXPECT_EQ(sc.getSamplingState("1").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
+  offerEntry(sc, "1", 1);
+  offerEntry(sc, "2", 1);
+  offerEntry(sc, "3", 1);
+  EXPECT_EQ(sc.getSamplingState("1").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
+  EXPECT_EQ(sc.getSamplingState("2").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
+  EXPECT_EQ(sc.getSamplingState("3").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
+  sc.update();
+  EXPECT_EQ(sc.getSamplingState("1").getMultiplicity(), 2);
+  EXPECT_EQ(sc.getSamplingState("2").getMultiplicity(), 2);
+  EXPECT_EQ(sc.getSamplingState("3").getMultiplicity(), 1);
+}
+
 // Test with StreamSummary size not exceeded
 TEST(SamplingControllerTest, TestStreamSummarySizeNotExceeded) {
   auto scf = std::make_unique<TestSamplerConfigProvider>();

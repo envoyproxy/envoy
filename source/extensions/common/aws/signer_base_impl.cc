@@ -75,7 +75,8 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     addRequiredHeaders(headers, long_date, credentials.sessionToken(), override_region);
   }
 
-  const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
+  const auto canonical_headers =
+      Utility::canonicalizeHeaders(headers, excluded_header_matchers_, included_header_matchers_);
 
   // Phase 1: Create a canonical request
   const auto credential_scope = createCredentialScope(short_date, override_region);
@@ -140,7 +141,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
 void SignerBaseImpl::addRequiredHeaders(Http::RequestHeaderMap& headers,
                                         const std::string long_date,
-                                        const absl::optional<std::string> session_token,
+                                        const std::optional<std::string> session_token,
                                         const absl::string_view override_region) {
   // Explicitly remove Authorization and security token header if present
   headers.remove(Http::CustomHeaders::get().Authorization);
@@ -175,7 +176,7 @@ SignerBaseImpl::createAuthorizationCredential(absl::string_view access_key_id,
 void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
                                        const absl::string_view credential,
                                        const absl::string_view long_date,
-                                       const absl::optional<std::string> session_token,
+                                       const std::optional<std::string> session_token,
                                        const std::map<std::string, std::string>& signed_headers,
                                        const uint16_t expiration_time) const {
   // X-Amz-Algorithm
@@ -193,11 +194,11 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   }
   // X-Amz-Credential
   query_params.add(SignatureQueryParameterValues::AmzCredential,
-                   Utility::encodeQueryComponent(credential));
+                   Utility::encodeQueryComponentPreservingPlus(credential));
   // X-Amz-SignedHeaders
-  query_params.add(
-      SignatureQueryParameterValues::AmzSignedHeaders,
-      Utility::encodeQueryComponent(Utility::joinCanonicalHeaderNames(signed_headers)));
+  query_params.add(SignatureQueryParameterValues::AmzSignedHeaders,
+                   Utility::encodeQueryComponentPreservingPlus(
+                       Utility::joinCanonicalHeaderNames(signed_headers)));
 }
 
 } // namespace Aws

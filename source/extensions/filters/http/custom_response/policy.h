@@ -19,9 +19,9 @@ namespace CustomResponse {
 class CustomResponseFilter;
 
 // Base class for custom response policies.
-class Policy : public std::enable_shared_from_this<Policy> {
+class Policy : public std::enable_shared_from_this<Policy>,
+               public Matcher::ActionBase<Protobuf::Any> {
 public:
-  virtual ~Policy() = default;
   virtual Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool,
                                                   CustomResponseFilter&) const PURE;
 
@@ -34,17 +34,12 @@ using PolicySharedPtr = std::shared_ptr<const Policy>;
 struct CustomResponseFilterState : public std::enable_shared_from_this<CustomResponseFilterState>,
                                    public StreamInfo::FilterState::Object {
 
-  CustomResponseFilterState(PolicySharedPtr a_policy, absl::optional<::Envoy::Http::Code> code)
+  CustomResponseFilterState(PolicySharedPtr a_policy, std::optional<::Envoy::Http::Code> code)
       : policy(a_policy), original_response_code(code) {}
 
   PolicySharedPtr policy;
-  absl::optional<::Envoy::Http::Code> original_response_code;
+  std::optional<::Envoy::Http::Code> original_response_code;
   static constexpr absl::string_view kFilterStateName = "envoy.filters.http.custom_response";
-};
-
-struct CustomResponseMatchAction : public Matcher::ActionBase<ProtobufWkt::Any> {
-  explicit CustomResponseMatchAction(PolicySharedPtr policy) : policy_(policy) {}
-  const PolicySharedPtr policy_;
 };
 
 struct CustomResponseActionFactoryContext {
@@ -57,12 +52,10 @@ template <typename PolicyConfig>
 class PolicyMatchActionFactory : public Matcher::ActionFactory<CustomResponseActionFactoryContext>,
                                  Logger::Loggable<Logger::Id::config> {
 public:
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
-                                                 CustomResponseActionFactoryContext& context,
-                                                 ProtobufMessage::ValidationVisitor&) override {
-    return [policy = createPolicy(config, context.server_, context.stats_prefix_)] {
-      return std::make_unique<CustomResponseMatchAction>(policy);
-    };
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
+                                             CustomResponseActionFactoryContext& context,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return createPolicy(config, context.server_, context.stats_prefix_);
   }
 
   std::string category() const override { return "envoy.http.custom_response"; }

@@ -25,7 +25,7 @@ public:
   }
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return context_->computeHashKey(); }
+  std::optional<uint64_t> computeHashKey() override { return context_->computeHashKey(); }
   const Network::Connection* downstreamConnection() const override {
     return context_->downstreamConnection();
   }
@@ -64,6 +64,9 @@ public:
   }
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return context_->upstreamTransportSocketOptions();
+  }
+  void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) override {
+    context_->setHeadersModifier(std::move(modifier));
   }
 
 private:

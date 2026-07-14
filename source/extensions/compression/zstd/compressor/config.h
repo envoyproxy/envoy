@@ -53,7 +53,7 @@ public:
 private:
   Envoy::Compression::Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
       const envoy::extensions::compression::zstd::compressor::v3::Zstd& config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::GenericFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(ZstdCompressorLibraryFactory);

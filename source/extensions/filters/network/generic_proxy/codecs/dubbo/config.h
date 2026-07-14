@@ -41,7 +41,7 @@ public:
   // Request
   absl::string_view protocol() const override { return DubboProtocolName; }
   void forEach(IterateCallback callback) const override;
-  absl::optional<absl::string_view> get(absl::string_view key) const override;
+  std::optional<absl::string_view> get(absl::string_view key) const override;
   void set(absl::string_view key, absl::string_view val) override;
   absl::string_view host() const override { return inner_metadata_->request().service(); }
   absl::string_view path() const override { return inner_metadata_->request().service(); }
@@ -164,10 +164,18 @@ public:
   }
 
   void decode(Buffer::Instance& buffer, bool) override {
-    while (buffer.length() > 0) {
+    decoding_buffer_.move(buffer);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.generic_proxy_codec_buffer_limit")) {
+      if (decoding_buffer_.length() > callback_->connection()->bufferLimit()) {
+        callback_->onDecodingFailure();
+        return;
+      }
+    }
+    while (decoding_buffer_.length() > 0) {
       // Continue decoding if the buffer has more data and the previous decoding is
       // successful.
-      if (decodeOne(buffer) != Common::Dubbo::DecodeStatus::Success) {
+      if (decodeOne(decoding_buffer_) != Common::Dubbo::DecodeStatus::Success) {
         break;
       }
     }
@@ -191,6 +199,7 @@ public:
   CallBackType* callback_{};
 
 private:
+  Buffer::OwnedImpl decoding_buffer_;
   Buffer::OwnedImpl encoding_buffer_;
 };
 

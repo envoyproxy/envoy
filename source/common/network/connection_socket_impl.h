@@ -52,13 +52,10 @@ public:
   absl::string_view detectedTransportProtocol() const override { return transport_protocol_; }
 
   void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) override {
-    application_protocols_.clear();
-    for (const auto& protocol : protocols) {
-      application_protocols_.emplace_back(protocol);
-    }
+    connectionInfoProvider().setRequestedApplicationProtocols(protocols);
   }
   const std::vector<std::string>& requestedApplicationProtocols() const override {
-    return application_protocols_;
+    return connectionInfoProvider().requestedApplicationProtocols();
   }
 
   void setRequestedServerName(absl::string_view server_name) override {
@@ -79,11 +76,11 @@ public:
   }
   absl::string_view ja4Hash() const override { return connectionInfoProvider().ja4Hash(); }
 
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
   }
 
-  absl::optional<uint64_t> congestionWindowInBytes() const override {
+  std::optional<uint64_t> congestionWindowInBytes() const override {
     return ioHandle().congestionWindowInBytes();
   }
 
@@ -95,7 +92,6 @@ public:
 
 protected:
   std::string transport_protocol_;
-  std::vector<std::string> application_protocols_;
 };
 
 // ConnectionSocket used with client connections.

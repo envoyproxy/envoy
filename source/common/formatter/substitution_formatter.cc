@@ -1,5 +1,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 
+#include "source/common/formatter/builtin_command_parser_factory_helper.h"
+
 namespace Envoy {
 namespace Formatter {
 
@@ -167,14 +169,14 @@ public:
    *
    * @param struct_format the proto struct format configuration.
    */
-  FormatElements fromStruct(const ProtobufWkt::Struct& struct_format);
+  FormatElements fromStruct(const Protobuf::Struct& struct_format);
 
 private:
-  using ProtoDict = Protobuf::Map<std::string, ProtobufWkt::Value>;
-  using ProtoList = Protobuf::RepeatedPtrField<ProtobufWkt::Value>;
+  using ProtoDict = Protobuf::Map<std::string, Protobuf::Value>;
+  using ProtoList = Protobuf::RepeatedPtrField<Protobuf::Value>;
 
   void formatValueToFormatElements(const ProtoDict& dict_value);
-  void formatValueToFormatElements(const ProtobufWkt::Value& value);
+  void formatValueToFormatElements(const Protobuf::Value& value);
   void formatValueToFormatElements(const ProtoList& list_value);
 
   std::string buffer_;                       // JSON writer buffer.
@@ -183,7 +185,7 @@ private:
 };
 
 JsonFormatBuilder::FormatElements
-JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
+JsonFormatBuilder::fromStruct(const Protobuf::Struct& struct_format) {
   elements_.clear();
 
   // This call will iterate through the map tree and serialize the key/values as JSON.
@@ -197,16 +199,16 @@ JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
   return std::move(elements_);
 };
 
-void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& value) {
+void JsonFormatBuilder::formatValueToFormatElements(const Protobuf::Value& value) {
   switch (value.kind_case()) {
-  case ProtobufWkt::Value::KIND_NOT_SET:
-  case ProtobufWkt::Value::kNullValue:
+  case Protobuf::Value::KIND_NOT_SET:
+  case Protobuf::Value::kNullValue:
     serializer_.addNull();
     break;
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     serializer_.addNumber(value.number_value());
     break;
-  case ProtobufWkt::Value::kStringValue: {
+  case Protobuf::Value::kStringValue: {
     absl::string_view string_format = value.string_value();
     if (!absl::StrContains(string_format, '%')) {
       serializer_.addString(string_format);
@@ -223,13 +225,13 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& va
     elements_.push_back(FormatElement{std::string(string_format), true});
     break;
   }
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     serializer_.addBool(value.bool_value());
     break;
-  case ProtobufWkt::Value::kStructValue: {
+  case Protobuf::Value::kStructValue: {
     formatValueToFormatElements(value.struct_value().fields());
     break;
-  case ProtobufWkt::Value::kListValue:
+  case Protobuf::Value::kListValue:
     formatValueToFormatElements(value.list_value().values());
     break;
   }
@@ -304,7 +306,7 @@ SubstitutionFormatParser::parse(absl::string_view format,
     const size_t sub_format_size = sub_format.size();
 
     absl::string_view command, command_arg;
-    absl::optional<size_t> max_len;
+    std::optional<size_t> max_len;
 
     if (!re2::RE2::Consume(&sub_format, commandWithArgsRegex(), &command, &command_arg, &max_len)) {
       return absl::InvalidArgumentError(fmt::format(
@@ -316,7 +318,10 @@ SubstitutionFormatParser::parse(absl::string_view format,
     // First try the command parsers provided by the user. This allows the user to override
     // built-in command parsers.
     for (const auto& cmd : command_parsers) {
-      auto formatter = cmd->parse(command, command_arg, max_len);
+      absl::StatusOr<FormatterProviderPtr> formatter_result =
+          cmd->parse(command, command_arg, max_len);
+      RETURN_IF_ERROR(formatter_result.status());
+      FormatterProviderPtr formatter = std::move(formatter_result).value();
       if (formatter) {
         formatters.push_back(std::move(formatter));
         added = true;
@@ -327,7 +332,10 @@ SubstitutionFormatParser::parse(absl::string_view format,
     // Next, try the built-in command parsers.
     if (!added) {
       for (const auto& cmd : BuiltInCommandParserFactoryHelper::commandParsers()) {
-        auto formatter = cmd->parse(command, command_arg, max_len);
+        absl::StatusOr<FormatterProviderPtr> formatter_result =
+            cmd->parse(command, command_arg, max_len);
+        RETURN_IF_ERROR(formatter_result.status());
+        FormatterProviderPtr formatter = std::move(formatter_result).value();
         if (formatter) {
           formatters.push_back(std::move(formatter));
           added = true;
@@ -363,13 +371,13 @@ FormatterImpl::create(absl::string_view format, bool omit_empty_values,
   return ret;
 }
 
-std::string FormatterImpl::formatWithContext(const Context& context,
-                                             const StreamInfo::StreamInfo& stream_info) const {
+std::string FormatterImpl::format(const Context& context,
+                                  const StreamInfo::StreamInfo& stream_info) const {
   std::string log_line;
   log_line.reserve(256);
 
   for (const auto& provider : providers_) {
-    const absl::optional<std::string> bit = provider->formatWithContext(context, stream_info);
+    const std::optional<std::string> bit = provider->format(context, stream_info);
     // Add the formatted value if there is one. Otherwise add a default value
     // of "-" if omit_empty_values_ is not set.
     if (bit.has_value()) {
@@ -383,50 +391,56 @@ std::string FormatterImpl::formatWithContext(const Context& context,
 }
 
 void stringValueToLogLine(const JsonFormatterImpl::Formatters& formatters, const Context& context,
-                          const StreamInfo::StreamInfo& info, JsonStringSerializer& serializer,
-                          bool omit_empty_values) {
-
-  serializer.addRawString(Json::Constants::DoubleQuote); // Start the JSON string.
+                          const StreamInfo::StreamInfo& info, std::string& log_line,
+                          std::string& sanitize, bool omit_empty_values) {
+  log_line.push_back('"'); // Start the JSON string.
   for (const JsonFormatterImpl::Formatter& formatter : formatters) {
-    const absl::optional<std::string> value = formatter->formatWithContext(context, info);
+    const std::optional<std::string> value = formatter->format(context, info);
     if (!value.has_value()) {
       // Add the empty value. This needn't be sanitized.
-      serializer.addRawString(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueStringView);
+      log_line.append(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueStringView);
       continue;
     }
     // Sanitize the string value and add it to the buffer. The string value will not be quoted
     // since we handle the quoting by ourselves at the outer level.
-    serializer.addSanitized({}, value.value(), {});
+    log_line.append(Json::sanitize(sanitize, value.value()));
   }
-  serializer.addRawString(Json::Constants::DoubleQuote); // End the JSON string.
+  log_line.push_back('"'); // End the JSON string.
 }
 
-JsonFormatterImpl::JsonFormatterImpl(const ProtobufWkt::Struct& struct_format,
-                                     bool omit_empty_values, const CommandParsers& commands)
-    : omit_empty_values_(omit_empty_values) {
+absl::StatusOr<std::unique_ptr<JsonFormatterImpl>>
+JsonFormatterImpl::create(const Protobuf::Struct& struct_format, bool omit_empty_values,
+                          const CommandParsers& commands) {
+  std::vector<ParsedFormatElement> parsed_elements;
   for (JsonFormatBuilder::FormatElement& element : JsonFormatBuilder().fromStruct(struct_format)) {
     if (element.is_template_) {
-      parsed_elements_.emplace_back(
-          THROW_OR_RETURN_VALUE(SubstitutionFormatParser::parse(element.value_, commands),
-                                std::vector<FormatterProviderPtr>));
+      absl::StatusOr<std::vector<FormatterProviderPtr>> providers_or =
+          SubstitutionFormatParser::parse(element.value_, commands);
+      RETURN_IF_NOT_OK_REF(providers_or.status());
+      parsed_elements.emplace_back(std::move(providers_or).value());
     } else {
-      parsed_elements_.emplace_back(std::move(element.value_));
+      parsed_elements.emplace_back(std::move(element.value_));
     }
   }
+  return std::make_unique<JsonFormatterImpl>(omit_empty_values, std::move(parsed_elements));
 }
 
-std::string JsonFormatterImpl::formatWithContext(const Context& context,
-                                                 const StreamInfo::StreamInfo& info) const {
+JsonFormatterImpl::JsonFormatterImpl(bool omit_empty_values,
+                                     std::vector<ParsedFormatElement>&& parsed_elements)
+    : omit_empty_values_(omit_empty_values), parsed_elements_(std::move(parsed_elements)) {}
+
+std::string JsonFormatterImpl::format(const Context& context,
+                                      const StreamInfo::StreamInfo& info) const {
   std::string log_line;
   log_line.reserve(2048);
-  JsonStringSerializer serializer(log_line); // Helper to serialize the value to log line.
+  std::string sanitize; // Helper to serialize the value to log line.
 
   for (const ParsedFormatElement& element : parsed_elements_) {
     // 1. Handle the raw string element.
     if (absl::holds_alternative<std::string>(element)) {
       // The raw string element will be added to the buffer directly.
       // It is sanitized when loading the configuration.
-      serializer.addRawString(absl::get<std::string>(element));
+      log_line.append(absl::get<std::string>(element));
       continue;
     }
 
@@ -436,11 +450,11 @@ std::string JsonFormatterImpl::formatWithContext(const Context& context,
 
     if (formatters.size() != 1) {
       // 2. Handle the formatter element with multiple or zero providers.
-      stringValueToLogLine(formatters, context, info, serializer, omit_empty_values_);
+      stringValueToLogLine(formatters, context, info, log_line, sanitize, omit_empty_values_);
     } else {
       // 3. Handle the formatter element with a single provider and value
       //    type needs to be kept.
-      auto value = formatters[0]->formatValueWithContext(context, info);
+      const auto value = formatters[0]->formatValue(context, info);
       Json::Utility::appendValueToString(value, log_line);
     }
   }

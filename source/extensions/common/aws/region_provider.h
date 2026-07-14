@@ -1,10 +1,9 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/pure.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,13 +21,13 @@ public:
    * Discover and return the AWS region.
    * @return AWS region, or nullopt if unable to discover the region.
    */
-  virtual absl::optional<std::string> getRegion() PURE;
+  virtual std::optional<std::string> getRegion() PURE;
 
   /**
    * Discover and return the AWS region set string.
    * @return AWS region, or nullopt if unable to discover the region set.
    */
-  virtual absl::optional<std::string> getRegionSet() PURE;
+  virtual std::optional<std::string> getRegionSet() PURE;
 };
 
 using RegionProviderPtr = std::unique_ptr<RegionProvider>;

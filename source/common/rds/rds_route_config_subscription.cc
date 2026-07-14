@@ -49,9 +49,14 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       resource_decoder_(std::move(resource_decoder)) {
   const auto resource_type = route_config_provider_manager_.protoTraits().resourceType();
   auto subscription_or_error =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
-          resource_decoder_, {});
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")
+          ? factory_context.xdsManager().subscribeToSingletonResource(
+                route_config_name_, config_source, Envoy::Grpc::Common::typeUrl(resource_type),
+                *scope_, *this, resource_decoder_, {})
+          : factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+                config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
+                resource_decoder_, {});
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
   local_init_manager_.add(local_init_target_);
@@ -79,24 +84,28 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     return absl::OkStatus();
   }
   if (resources.size() != 1) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected {} resource length: {}", rds_type_, resources.size()));
+    const auto msg = fmt::format("Unexpected {} resource length: {}", rds_type_, resources.size());
+    ENVOY_LOG(warn, "rds: route config '{}' rejected: {}", route_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
 
   const auto& route_config = resources[0].get().resource();
   Protobuf::ReflectableMessage reflectable_config = createReflectableMessage(route_config);
   if (reflectable_config->GetDescriptor()->full_name() !=
       route_config_provider_manager_.protoTraits().resourceType()) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected {} configuration type (expecting {}): {}", rds_type_,
-                    route_config_provider_manager_.protoTraits().resourceType(),
-                    reflectable_config->GetDescriptor()->full_name()));
+    const auto msg = fmt::format("Unexpected {} configuration type (expecting {}): {}", rds_type_,
+                                 route_config_provider_manager_.protoTraits().resourceType(),
+                                 reflectable_config->GetDescriptor()->full_name());
+    ENVOY_LOG(warn, "rds: route config '{}' rejected: {}", route_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
   if (resourceName(route_config_provider_manager_.protoTraits(), route_config) !=
       route_config_name_) {
-    return absl::InvalidArgumentError(
+    const auto msg =
         fmt::format("Unexpected {} configuration (expecting {}): {}", rds_type_, route_config_name_,
-                    resourceName(route_config_provider_manager_.protoTraits(), route_config)));
+                    resourceName(route_config_provider_manager_.protoTraits(), route_config));
+    ENVOY_LOG(warn, "rds: route config '{}' rejected: {}", route_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
   std::unique_ptr<Init::ManagerImpl> noop_init_manager;
   std::unique_ptr<Cleanup> resume_rds;

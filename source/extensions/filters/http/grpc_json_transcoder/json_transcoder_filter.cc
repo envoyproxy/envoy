@@ -112,7 +112,7 @@ private:
 JsonTranscoderConfig::JsonTranscoderConfig(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    Api::Api& api) {
+    Api::Api& api, absl::Status& creation_status) {
 
   disabled_ = proto_config.services().empty();
   if (disabled_) {
@@ -125,31 +125,45 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptor: {
     auto file_or_error = api.fileSystem().fileReadToEnd(proto_config.proto_descriptor());
-    THROW_IF_NOT_OK_REF(file_or_error.status());
+    SET_AND_RETURN_IF_NOT_OK(file_or_error.status(), creation_status);
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
-      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
+      creation_status =
+          absl::InvalidArgumentError("transcoding_filter: Unable to parse proto descriptor");
+      return;
     }
     break;
   }
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptorBin:
     if (!descriptor_set.ParseFromString(proto_config.proto_descriptor_bin())) {
-      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
+      creation_status =
+          absl::InvalidArgumentError("transcoding_filter: Unable to parse proto descriptor");
+      return;
     }
     break;
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::DESCRIPTOR_SET_NOT_SET:
-    throw EnvoyException("transcoding_filter: descriptor not set");
+    creation_status = absl::InvalidArgumentError("transcoding_filter: descriptor not set");
+    return;
   }
 
   for (const auto& file : descriptor_set.file()) {
-    addFileDescriptor(file);
+    creation_status = addFileDescriptor(file);
+    if (!creation_status.ok()) {
+      return;
+    }
   }
 
   convert_grpc_status_ = proto_config.convert_grpc_status();
   if (convert_grpc_status_) {
-    addBuiltinSymbolDescriptor("google.protobuf.Any");
-    addBuiltinSymbolDescriptor("google.rpc.Status");
+    creation_status = addBuiltinSymbolDescriptor("google.protobuf.Any");
+    if (!creation_status.ok()) {
+      return;
+    }
+    creation_status = addBuiltinSymbolDescriptor("google.rpc.Status");
+    if (!creation_status.ok()) {
+      return;
+    }
   }
 
   type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
@@ -169,8 +183,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   for (const auto& service_name : proto_config.services()) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
     if (service == nullptr) {
-      throw EnvoyException("transcoding_filter: Could not find '" + service_name +
-                           "' in the proto descriptor");
+      creation_status = absl::InvalidArgumentError("transcoding_filter: Could not find '" +
+                                                   service_name + "' in the proto descriptor");
+      return;
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
@@ -187,14 +202,16 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       MethodInfoSharedPtr method_info;
       Status status = createMethodInfo(method, http_rule, method_info);
       if (!status.ok()) {
-        throw EnvoyException(absl::StrCat("transcoding_filter: Cannot register '",
-                                          method->full_name(), "': ", status.message()));
+        creation_status = absl::InvalidArgumentError(absl::StrCat(
+            "transcoding_filter: Cannot register '", method->full_name(), "': ", status.message()));
+        return;
       }
 
       if (!PathMatcherUtility::RegisterByHttpRule(pmb, http_rule, ignored_query_parameters,
                                                   method_info)) {
-        throw EnvoyException(absl::StrCat("transcoding_filter: Cannot register '",
-                                          method->full_name(), "' to path matcher"));
+        creation_status = absl::InvalidArgumentError(absl::StrCat(
+            "transcoding_filter: Cannot register '", method->full_name(), "' to path matcher"));
+        return;
       }
     }
   }
@@ -245,33 +262,34 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 }
 
-void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
+absl::Status JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
   if (descriptor_pool_.BuildFile(file) == nullptr) {
-    throw EnvoyException("transcoding_filter: Unable to build proto descriptor pool");
+    return absl::InvalidArgumentError("transcoding_filter: Unable to build proto descriptor pool");
   }
+  return absl::OkStatus();
 }
 
-void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_name) {
+absl::Status JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_name) {
   if (descriptor_pool_.FindFileContainingSymbol(symbol_name) != nullptr) {
-    return;
+    return absl::OkStatus();
   }
 
   auto* builtin_pool = Protobuf::DescriptorPool::generated_pool();
   if (!builtin_pool) {
-    return;
+    return absl::OkStatus();
   }
 
   Protobuf::DescriptorPoolDatabase pool_database(*builtin_pool);
   Protobuf::FileDescriptorProto file_proto;
-  pool_database.FindFileContainingSymbol(symbol_name, &file_proto);
-  addFileDescriptor(file_proto);
+  std::ignore = pool_database.FindFileContainingSymbol(symbol_name, &file_proto);
+  return addFileDescriptor(file_proto);
 }
 
 Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor,
                                           const std::string& field_path_str,
-                                          std::vector<const ProtobufWkt::Field*>* field_path,
+                                          std::vector<const Protobuf::Field*>* field_path,
                                           bool* is_http_body) {
-  const ProtobufWkt::Type* message_type =
+  const Protobuf::Type* message_type =
       type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
   if (message_type == nullptr) {
     return {StatusCode::kNotFound,
@@ -287,7 +305,7 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
   if (field_path->empty()) {
     *is_http_body = descriptor->full_name() == google::api::HttpBody::descriptor()->full_name();
   } else {
-    const ProtobufWkt::Type* body_type =
+    const Protobuf::Type* body_type =
         type_helper_->Info()->GetTypeByTypeUrl(field_path->back()->type_url());
     *is_http_body = body_type != nullptr &&
                     body_type->name() == google::api::HttpBody::descriptor()->full_name();
@@ -450,12 +468,12 @@ void JsonTranscoderFilter::initPerRouteConfig() {
 
 void JsonTranscoderFilter::maybeExpandBufferLimits() {
   const uint32_t max_request_size = per_route_config_->max_request_body_size_.value_or(0);
-  if (max_request_size > decoder_callbacks_->decoderBufferLimit()) {
-    decoder_callbacks_->setDecoderBufferLimit(max_request_size);
+  if (max_request_size > decoder_callbacks_->bufferLimit()) {
+    decoder_callbacks_->setBufferLimit(max_request_size);
   }
   const uint32_t max_response_size = per_route_config_->max_response_body_size_.value_or(0);
-  if (max_response_size > encoder_callbacks_->encoderBufferLimit()) {
-    encoder_callbacks_->setEncoderBufferLimit(max_response_size);
+  if (max_response_size > encoder_callbacks_->bufferLimit()) {
+    encoder_callbacks_->setBufferLimit(max_response_size);
   }
 }
 
@@ -511,7 +529,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                      *decoder_callbacks_);
     error_ = true;
     decoder_callbacks_->sendLocalReply(
-        static_cast<Http::Code>(http_code), status.message(), nullptr, absl::nullopt,
+        static_cast<Http::Code>(http_code), status.message(), nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
                      StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
                      "}"));
@@ -536,7 +554,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
           *decoder_callbacks_);
       error_ = true;
       decoder_callbacks_->sendLocalReply(
-          Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt,
+          Http::Code::BadRequest, "Bad request", nullptr, std::nullopt,
           absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -594,12 +612,23 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (method_->request_type_is_http_body_) {
     stats_->transcoder_request_buffer_bytes_.add(data.length());
     request_data_.move(data);
-    if (decoderBufferLimitReached(request_data_.length())) {
+    if (!method_->descriptor_->client_streaming() &&
+        decoderBufferLimitReached(request_data_.length())) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
-    // TODO(euroelessar): Upper bound message size for streaming case.
-    if (end_stream || method_->descriptor_->client_streaming()) {
+    if (method_->descriptor_->client_streaming()) {
+      // To avoid sending a grpc frame larger than 4MB (which grpc will by default reject),
+      // split the input buffer into 1MB pieces until the buffer is smaller than 1MB.
+      Buffer::OwnedImpl remaining_request_data;
+      remaining_request_data.move(request_data_);
+      while (!first_request_sent_ || remaining_request_data.length() > 0) {
+        uint64_t piece_size = std::min<uint64_t>(remaining_request_data.length(),
+                                                 JsonTranscoderConfig::MaxStreamedPieceSize);
+        request_data_.move(remaining_request_data, piece_size);
+        maybeSendHttpBodyRequestMessage(&data);
+      }
+    } else if (end_stream) {
       maybeSendHttpBodyRequestMessage(&data);
     } else {
       // TODO(euroelessar): Avoid buffering if content length is already known.
@@ -667,6 +696,11 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
+  if (error_ || !transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     ENVOY_STREAM_LOG(
         debug,
@@ -674,10 +708,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
         "without transcoding.",
         *encoder_callbacks_);
     error_ = true;
-  }
-
-  if (error_ || !transcoder_) {
-    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -699,7 +729,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (per_route_config_->isStreamSSEStyleDelimited()) {
+  if (method_->descriptor_->server_streaming() && per_route_config_->isStreamSSEStyleDelimited()) {
     headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
   } else {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
@@ -784,7 +814,7 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
 
   response_in_.finish();
 
-  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+  const std::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(headers_or_trailers, true);
   if (grpc_status && maybeConvertGrpcStatus(*grpc_status, headers_or_trailers)) {
     return;
@@ -860,7 +890,7 @@ bool JsonTranscoderFilter::checkAndRejectIfRequestTranscoderFailed(const std::st
     decoder_callbacks_->sendLocalReply(
         Http::Code::BadRequest,
         absl::string_view(request_status.message().data(), request_status.message().size()),
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(
             details, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(request_status.code())),
@@ -880,7 +910,7 @@ bool JsonTranscoderFilter::checkAndRejectIfResponseTranscoderFailed() {
     encoder_callbacks_->sendLocalReply(
         Http::Code::BadGateway,
         absl::string_view(response_status.message().data(), response_status.message().size()),
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(
             RcDetails::get().GrpcTranscodeFailed, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(response_status.code())),
@@ -960,7 +990,7 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
         encoder_callbacks_->resetStream();
         return true;
       }
-      const auto& body = http_body.data();
+      const auto& body = MessageUtil::bytesToString(http_body.data());
 
       data.add(body);
 
@@ -1052,7 +1082,7 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
   // The limit is either the configured maximum request body size, or, if not configured,
   // the default buffer limit.
   const uint32_t max_size =
-      per_route_config_->max_request_body_size_.value_or(decoder_callbacks_->decoderBufferLimit());
+      per_route_config_->max_request_body_size_.value_or(decoder_callbacks_->bufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(debug,
                      "Request rejected because the transcoder's internal buffer size exceeds the "
@@ -1063,7 +1093,7 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
         Http::Code::PayloadTooLarge,
         "Request rejected because the transcoder's internal buffer size exceeds the configured "
         "limit.",
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{request_buffer_size_limit_reached}"));
     return true;
   }
@@ -1074,7 +1104,7 @@ bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
   // The limit is either the configured maximum response body size, or, if not configured,
   // the default buffer limit.
   const uint32_t max_size =
-      per_route_config_->max_response_body_size_.value_or(encoder_callbacks_->encoderBufferLimit());
+      per_route_config_->max_response_body_size_.value_or(encoder_callbacks_->bufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(
         debug,
@@ -1086,7 +1116,7 @@ bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
         Http::Code::InternalServerError,
         "Response not transcoded because the transcoder's internal buffer size exceeds the "
         "configured limit.",
-        nullptr, absl::nullopt,
+        nullptr, std::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{response_buffer_size_limit_reached}"));
     return true;
   }
