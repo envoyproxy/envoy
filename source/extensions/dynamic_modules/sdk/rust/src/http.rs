@@ -1952,6 +1952,9 @@ pub trait EnvoyHttpFilter {
   /// Returns `true` if the override was set successfully, `false` if the host address is invalid.
   fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool;
 
+  /// Get the upstream connection ID, or 0 if not available.
+  fn get_upstream_connection_id(&self) -> u64;
+
   // ------------------- Stream Control methods -------------------------
 
   /// Reset the HTTP stream with the specified reason.
@@ -3942,6 +3945,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         strict,
       )
     }
+  }
+
+  fn get_upstream_connection_id(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_upstream_connection_id(self.raw_ptr) }
   }
 
   fn reset_stream(

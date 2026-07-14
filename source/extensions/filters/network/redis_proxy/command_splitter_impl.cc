@@ -827,21 +827,24 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
   }
 }
 
-SplitRequestPtr TransactionRequest::create(Router& router,
-                                           Common::Redis::RespValuePtr&& incoming_request,
-                                           SplitCallbacks& callbacks, CommandStats& command_stats,
-                                           TimeSource& time_source, bool delay_command_latency,
-                                           const StreamInfo::StreamInfo& stream_info) {
+SplitRequestPtr
+TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                           SplitCallbacks& callbacks, CommandStats& command_stats,
+                           TimeSource& time_source, bool delay_command_latency,
+                           const StreamInfo::StreamInfo& stream_info,
+                           const absl::flat_hash_set<std::string>& custom_commands) {
   Common::Redis::Client::Transaction& transaction = callbacks.transaction();
   std::string command_name = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
 
-  // Within transactions we only support simple commands.
-  // So if this is not a transaction command or a simple command, it is an error.
+  // Within transactions we only support simple commands, including configured custom commands
+  // which are treated as simple commands.
+  // So if this is not a transaction command, a simple command or a custom command, it is an error.
   // We also support multi-key commands, but will leave it to the client to handle the case where
   // the keys provided are not from the same shard.
   if (Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0 &&
       Common::Redis::SupportedCommands::simpleCommands().count(command_name) == 0 &&
-      Common::Redis::SupportedCommands::multiKeyCommands().count(command_name) == 0) {
+      Common::Redis::SupportedCommands::multiKeyCommands().count(command_name) == 0 &&
+      custom_commands.count(command_name) == 0) {
     callbacks.onResponse(Common::Redis::Utility::makeError(
         fmt::format("'{}' command is not supported within transaction",
                     incoming_request->asArray()[0].asString())));
@@ -971,10 +974,10 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
       eval_command_handler_(*router_), object_command_handler_(*router_), mget_handler_(*router_),
       mset_handler_(*router_), scan_handler_(*router_), shard_info_handler_(*router_),
       random_shard_handler_(*router_), split_keys_sum_result_handler_(*router_),
-      transaction_handler_(*router_), cluster_scope_handler_(*router_),
+      custom_commands_(std::move(custom_commands)),
+      transaction_handler_(*router_, custom_commands_), cluster_scope_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source), fault_manager_(std::move(fault_manager)),
-      custom_commands_(std::move(custom_commands)) {
+      time_source_(time_source), fault_manager_(std::move(fault_manager)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }

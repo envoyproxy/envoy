@@ -194,9 +194,28 @@ message OAuth2TokenForwarding {
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
 
+// Configuration for the ``post_logout_redirect_uri`` parameter used in OpenID Connect
+// `RP-Initiated Logout requests <https://openid.net/specs/openid-connect-rpinitiated-1_0.html>`_.
+// This configuration is ignored if ``end_session_endpoint`` is not set.
+message PostLogoutRedirectUri {
+  oneof config {
+    option (validate.required) = true;
+
+    // Do not include the ``post_logout_redirect_uri`` parameter in requests to the
+    // configured ``end_session_endpoint``.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // URI to send as the ``post_logout_redirect_uri`` parameter. Supports header formatting
+    // tokens, and will be percent-encoded automatically when building the logout URL.
+    //
+    // The URI should be registered with the authorization server.
+    string uri = 2 [(validate.rules).string = {min_len: 1}];
+  }
+}
+
 // OAuth config
 //
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -237,6 +256,15 @@ message OAuth2Config {
   //
   // If configured, the OAuth2 filter will redirect users to this endpoint when they access the signout_path.
   string end_session_endpoint = 23;
+
+  // Optional control for the ``post_logout_redirect_uri`` parameter sent to the ``end_session_endpoint`` when a user
+  // accesses the ``signout_path``.
+  // This field should be set only if ``openid`` is in the ``auth_scopes``, the ``end_session_endpoint`` is configured,
+  // and the authorization server supports the OpenID Connect RP-Initiated Logout specification.
+  //
+  // If unset, Envoy preserves the historical behavior and sends ``<scheme>://<host>/``, constructed from the inbound
+  // request, as ``post_logout_redirect_uri``.
+  PostLogoutRedirectUri post_logout_redirect_uri = 33;
 
   // Credentials used for OAuth.
   OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];

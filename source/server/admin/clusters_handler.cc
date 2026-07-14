@@ -1,12 +1,15 @@
 #include "source/server/admin/clusters_handler.h"
 
 #include "envoy/admin/v3/clusters.pb.h"
+#include "envoy/upstream/admin_endpoint_provider.h"
 
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/server/admin/utils.h"
+
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Server {
@@ -214,6 +217,27 @@ void ClustersHandler::writeClustersAsJson(const std::optional<const re2::RE2>& f
         }
       }
     }
+
+    // Render a cluster's synthetic admin endpoints (not load-balanced hosts) as host statuses.
+    if (const auto* provider = cluster.adminEndpointProvider()) {
+      for (const auto& endpoint : provider->adminEndpoints()) {
+        if (endpoint.address == nullptr) {
+          continue;
+        }
+        envoy::admin::v3::HostStatus& host_status = *cluster_status.add_host_statuses();
+        Network::Utility::addressToProtobufAddress(*endpoint.address,
+                                                   *host_status.mutable_address());
+        host_status.set_hostname(endpoint.hostname);
+        host_status.set_weight(endpoint.weight);
+        for (const auto& [gauge_name, gauge_value] : endpoint.gauges) {
+          auto& metric = *host_status.add_stats();
+          metric.set_name(gauge_name);
+          metric.set_value(gauge_value);
+          metric.set_type(envoy::admin::v3::SimpleMetric::GAUGE);
+        }
+        host_status.mutable_health_status()->set_eds_health_status(endpoint.health);
+      }
+    }
   }
   response.add(MessageUtil::getJsonStringFromMessageOrError(clusters, true)); // pretty-print
 }
@@ -288,6 +312,27 @@ void ClustersHandler::writeClustersAsText(const std::optional<const re2::RE2>& f
             "{}::{}::local_origin_success_rate::{}\n", cluster_name, host_address,
             host->outlierDetector().successRate(
                 Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
+      }
+    }
+
+    // Render a cluster's synthetic admin endpoints (not load-balanced hosts) as host statuses.
+    if (const auto* provider = cluster.adminEndpointProvider()) {
+      for (const auto& endpoint : provider->adminEndpoints()) {
+        if (endpoint.address == nullptr) {
+          continue;
+        }
+        const std::string address = endpoint.address->asString();
+        for (const auto& [gauge_name, gauge_value] : endpoint.gauges) {
+          response.add(
+              fmt::format("{}::{}::{}::{}\n", cluster_name, address, gauge_name, gauge_value));
+        }
+        response.add(
+            fmt::format("{}::{}::hostname::{}\n", cluster_name, address, endpoint.hostname));
+        response.add(fmt::format("{}::{}::weight::{}\n", cluster_name, address, endpoint.weight));
+        // Lower-case to match the token a regular host emits.
+        response.add(fmt::format(
+            "{}::{}::health_flags::{}\n", cluster_name, address,
+            absl::AsciiStrToLower(envoy::config::core::v3::HealthStatus_Name(endpoint.health))));
       }
     }
   }

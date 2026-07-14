@@ -13,8 +13,14 @@ namespace Http {
 Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveClient() {
   uint32_t initial_streams = Http2::ActiveClient::calculateInitialStreamsLimit(
       http_server_properties_cache_, origin_, host());
-  return std::make_unique<Tcp::ActiveTcpClient>(
+  auto client = std::make_unique<Tcp::ActiveTcpClient>(
       *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams, std::nullopt);
+  // The underlying connection could not be created (e.g. network namespace binding failure).
+  // Return null so the pool surfaces this as a connection failure instead of using a broken client.
+  if (client->connection_ == nullptr) {
+    return nullptr;
+  }
+  return client;
 }
 
 CodecClientPtr

@@ -397,7 +397,7 @@ invocation_mode: asynchronous
   AwsLambdaFilterFactory factory;
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);

@@ -122,3 +122,5 @@ areas:
     title: zstd
   server:
     title: server
+  udp:
+    title: udp
