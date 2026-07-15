@@ -1247,6 +1247,14 @@ TEST(OwnedImplTest, SliceRecycling) {
   buffer.drain(128 * 1024);
   EXPECT_EQ(0, buffer.length());
 
+  // Allocate spoiler memory to consume any heap-freed blocks.
+  // If the slices were not recycled, they were freed to the heap,
+  // and these allocations will likely consume those addresses.
+  std::vector<std::unique_ptr<uint8_t[]>> spoilers;
+  for (size_t i = 0; i < 8; ++i) {
+    spoilers.push_back(std::make_unique<uint8_t[]>(16 * 1024));
+  }
+
   // Reserve again. It should reuse the recycled slices.
   {
     Buffer::Reservation reservation = buffer.reserveForRead();
@@ -1294,6 +1302,12 @@ TEST(OwnedImplTest, SliceRecyclingNonDefaultSize) {
 
   // 4. Drain buffer1 (128KB). These 8 slices should be recycled.
   buffer1.drain(128 * 1024);
+
+  // Allocate spoiler memory to consume any heap-freed blocks.
+  std::vector<std::unique_ptr<uint8_t[]>> spoilers;
+  for (size_t i = 0; i < 8; ++i) {
+    spoilers.push_back(std::make_unique<uint8_t[]>(16 * 1024));
+  }
 
   // 5. Reserve 8 slices in buffer1 again.
   {

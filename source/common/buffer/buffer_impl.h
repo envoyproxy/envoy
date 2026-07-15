@@ -111,31 +111,7 @@ public:
     rhs.reservable_ = 0;
   }
 
-  Slice& operator=(Slice&& rhs) noexcept {
-    if (this != &rhs) {
-      callAndClearDrainTrackersAndCharges();
-
-      capacity_ = rhs.capacity_;
-      storage_ = std::move(rhs.storage_);
-      base_ = rhs.base_;
-      data_ = rhs.data_;
-      reservable_ = rhs.reservable_;
-      drain_trackers_ = std::move(rhs.drain_trackers_);
-      account_ = std::move(rhs.account_);
-      if (releasor_) {
-        releasor_();
-      }
-      releasor_ = rhs.releasor_;
-      rhs.releasor_ = nullptr;
-
-      rhs.capacity_ = 0;
-      rhs.base_ = nullptr;
-      rhs.data_ = 0;
-      rhs.reservable_ = 0;
-    }
-
-    return *this;
-  }
+  Slice& operator=(Slice&& rhs) noexcept;
 
   ~Slice();
 
@@ -863,6 +839,35 @@ private:
 };
 
 using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
+
+inline Slice& Slice::operator=(Slice&& rhs) noexcept {
+  if (this != &rhs) {
+    callAndClearDrainTrackersAndCharges();
+    if (storage_) {
+      OwnedImpl::OwnedImplReservationSlicesOwnerMultiple::recycle(std::move(storage_), capacity_);
+    }
+    if (releasor_) {
+      releasor_();
+    }
+
+    capacity_ = rhs.capacity_;
+    storage_ = std::move(rhs.storage_);
+    base_ = rhs.base_;
+    data_ = rhs.data_;
+    reservable_ = rhs.reservable_;
+    drain_trackers_ = std::move(rhs.drain_trackers_);
+    account_ = std::move(rhs.account_);
+    releasor_ = rhs.releasor_;
+    rhs.releasor_ = nullptr;
+
+    rhs.capacity_ = 0;
+    rhs.base_ = nullptr;
+    rhs.data_ = 0;
+    rhs.reservable_ = 0;
+  }
+
+  return *this;
+}
 
 // Define Slice destructor after OwnedImpl is fully defined
 inline Slice::~Slice() {
