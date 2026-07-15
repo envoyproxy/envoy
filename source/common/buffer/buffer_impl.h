@@ -735,7 +735,7 @@ private:
 
   struct OwnedImplReservationSlicesOwnerMultiple : public OwnedImplReservationSlicesOwner {
   public:
-    static constexpr uint32_t free_list_max_ = Buffer::Reservation::MAX_SLICES_;
+    static constexpr uint32_t free_list_max_ = 4 * Buffer::Reservation::MAX_SLICES_;
 
     OwnedImplReservationSlicesOwnerMultiple() : free_list_ref_(free_list_) {}
     ~OwnedImplReservationSlicesOwnerMultiple() override {
