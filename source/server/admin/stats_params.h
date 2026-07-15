@@ -93,6 +93,7 @@ struct StatsParams {
   }
 
   bool shouldShowMetricName(absl::string_view metric_name) const {
+    ASSERT(re2_filter_ != nullptr);
     bool should_show = re2::RE2::PartialMatch(metric_name, *re2_filter_);
     return should_show != filter_inverted_;
   }

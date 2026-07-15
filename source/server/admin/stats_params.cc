@@ -21,12 +21,12 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     }
   }
 
-  auto val = query_.getFirstValue("invert_filter");
-  if (val.has_value() && !re2_filter_) {
+  const bool has_invert_filter = query_.has("invert_filter");
+  if (has_invert_filter && !re2_filter_) {
     response.add("invert_filter can only be used if filter is also provided");
     return Http::Code::BadRequest;
   }
-  filter_inverted_ = val.has_value();
+  filter_inverted_ = has_invert_filter;
 
   absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode_);
   if (!status.ok()) {
