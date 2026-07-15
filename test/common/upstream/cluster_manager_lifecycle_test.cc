@@ -2864,7 +2864,7 @@ TEST_P(ClusterManagerLifecycleTest, CoalescedLbRefreshPartitionCorrectionOnDefer
   // put host into healthy_hosts_
   cluster1->priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(hosts, HostsPerLocalityImpl::empty()), nullptr, {host}, {},
-      absl::nullopt, absl::nullopt);
+      std::nullopt, std::nullopt);
 
   auto* tls_cluster = cluster_manager_->getThreadLocalCluster("fake_cluster");
   ASSERT_NE(nullptr, tls_cluster);
@@ -2877,7 +2877,7 @@ TEST_P(ClusterManagerLifecycleTest, CoalescedLbRefreshPartitionCorrectionOnDefer
   host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   cluster1->priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(hosts, HostsPerLocalityImpl::empty()), nullptr, {host}, {},
-      absl::nullopt, absl::nullopt);
+      std::nullopt, std::nullopt);
 
   EXPECT_EQ(1u, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(host, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
