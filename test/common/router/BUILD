@@ -276,11 +276,13 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/config:utility_lib",
+        "//source/common/init:manager_lib",
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
         "//source/common/router:vhds_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",

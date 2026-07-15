@@ -17,6 +17,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -73,8 +75,16 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       init_target_(fmt::format("VhdsConfigSubscription {}",
                                config_update_info_->protobufConfigurationCast().name()),
                    [this]() {
-                     subscription_->start(
-                         {config_update_info_->protobufConfigurationCast().name()});
+                     const auto& config = config_update_info_->protobufConfigurationCast();
+                     // Subscribe to the route configuration itself plus any configured default
+                     // virtual host resources. Each default resource is prefixed with the route
+                     // configuration name before being sent to the management server, matching the
+                     // alias format used for on-demand updates.
+                     absl::flat_hash_set<std::string> initial_resources{config.name()};
+                     for (const auto& default_resource : config.vhds().default_resources()) {
+                       initial_resources.insert(domainNameToAlias(config.name(), default_resource));
+                     }
+                     subscription_->start(initial_resources);
                    }),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name"),

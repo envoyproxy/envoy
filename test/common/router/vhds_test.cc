@@ -8,6 +8,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/init/manager_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
@@ -22,6 +23,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -103,6 +105,43 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
                                                        context_, provider_)
                   .status()
                   .ok());
+}
+
+// Verify that configured default resources are prefixed with the route configuration name and
+// subscribed at startup alongside the route configuration resource itself.
+TEST_F(VhdsTest, VhdsSubscribesToPrefixedDefaultResourcesOnStart) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  default_resources:
+  - "*"
+  - example.com
+)EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+  auto subscription = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                               context_, provider_)
+                          .value();
+
+  absl::flat_hash_set<std::string> started_resources;
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              start(::testing::_))
+      .WillOnce(::testing::SaveArg<0>(&started_resources));
+
+  Init::ManagerImpl init_manager("vhds_test_init");
+  subscription->registerInitTargetWithInitManager(init_manager);
+  Init::ExpectableWatcherImpl watcher;
+  watcher.expectReady().Times(::testing::AnyNumber());
+  init_manager.initialize(watcher);
+
+  EXPECT_THAT(started_resources,
+              ::testing::UnorderedElementsAre("my_route", "my_route/*", "my_route/example.com"));
 }
 
 // verify that api_type: GRPC fails validation
