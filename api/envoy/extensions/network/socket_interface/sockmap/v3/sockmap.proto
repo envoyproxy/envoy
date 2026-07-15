@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package envoy.extensions.network.socket_interface.sockmap.v3;
+
+import "envoy/type/v3/range.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.socket_interface.sockmap.v3";
+option java_outer_classname = "SockmapProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/socket_interface/sockmap/v3;sockmapv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Sockmap socket interface configuration]
+// Sockmap socket interface :ref:`configuration overview <config_sock_interface_sockmap>`.
+// [#extension: envoy.extensions.network.socket_interface.sockmap]
+
+// Configuration for the ``sockmap`` socket interface. It accelerates same-host TCP hops by
+// loading eBPF ``sock_ops`` and ``sk_msg`` programs that redirect payloads between local sockets
+// through a ``BPF_MAP_TYPE_SOCKHASH``, bypassing the kernel TCP/IP stack. Connections whose peer
+// is not on the same host are not present in the map and transparently fall back to TCP/IP.
+//
+// This interface requires a Linux kernel 4.18 or later and the capabilities to load and attach the
+// eBPF network programs (``CAP_SYS_ADMIN``, or ``CAP_BPF`` and ``CAP_NET_ADMIN`` on newer kernels).
+// When the programs cannot be loaded or attached, the interface logs the failure and every socket
+// falls back to the standard datapath, so traffic is never interrupted.
+// [#next-free-field: 6]
+message Sockmap {
+  // Filesystem path to the compiled eBPF object that holds the ``sock_ops`` and ``sk_msg``
+  // programs and the ``sockhash`` map. Envoy does not ship this object. Build it from the
+  // extension's ``sockmap_kern.c`` source, or supply a custom build that exports the
+  // ``envoy_sockops`` and ``envoy_sk_msg`` programs and the ``envoy_sockhash`` map with a matching
+  // key layout. If not specified, acceleration is disabled and all sockets use the standard
+  // datapath.
+  string bpf_program_path = 1;
+
+  // Path to the cgroup v2 directory the ``sock_ops`` program is attached to. While attached, every
+  // socket that reaches the established state inside this cgroup is added to the ``sockhash``,
+  // which accelerates application-to-proxy hops. If not specified, the ``sock_ops`` program
+  // is not attached and only sockets accepted or connected by Envoy are registered, which still
+  // accelerates proxy-to-proxy hops on the same host.
+  string cgroup_path = 2;
+
+  // Maximum number of entries in the ``sockhash`` map. Each accelerated socket consumes one entry.
+  // If not specified, defaults to ``65536``.
+  google.protobuf.UInt32Value sockhash_max_entries = 3 [(validate.rules).uint32 = {gte: 1}];
+
+  // Whether sockets accepted or connected by Envoy are registered into the ``sockhash`` from user
+  // space. This is independent of ``cgroup_path`` and lets proxy-to-proxy hops be accelerated
+  // without attaching the ``sock_ops`` program. If not specified, defaults to ``true``.
+  google.protobuf.BoolValue register_user_space_sockets = 4;
+
+  // Proxy listener port ranges that scope which connections the ``sock_ops`` program adds to the
+  // ``sockhash``. Each range is half-open ``[start, end)`` with ``1 <= start < end <= 65536``, so a
+  // single port ``P`` is ``{ start: P, end: P + 1 }``. When set, only a connection whose local or
+  // peer port falls in one of these ranges is registered, so other same-host connections in the
+  // cgroup stay on the standard datapath. This applies only when ``cgroup_path`` is set. If empty,
+  // every such connection is registered. At most ``128`` ranges are allowed.
+  repeated type.v3.Int64Range accelerated_ports = 5 [(validate.rules).repeated = {max_items: 128}];
+}

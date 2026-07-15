@@ -543,7 +543,7 @@ void IoUringServerSocket::onReadCompleted(int32_t result) {
   ReadParam param{read_buf_, result};
   read_param_ = param;
   IoUringSocketEntry::onReadCompleted();
-  read_param_ = absl::nullopt;
+  read_param_ = std::nullopt;
   ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, read_buf_.length());
 }
 
@@ -687,7 +687,7 @@ void IoUringServerSocket::onWriteCompleted(int32_t result) {
   WriteParam param{result};
   write_param_ = param;
   IoUringSocketEntry::onWriteCompleted();
-  write_param_ = absl::nullopt;
+  write_param_ = std::nullopt;
 }
 
 void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {

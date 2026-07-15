@@ -20,9 +20,9 @@ GeoipFilterConfig::GeoipFilterConfig(
       xff_num_trusted_hops_(config.has_xff_config() ? config.xff_config().xff_num_trusted_hops()
                                                     : 0),
       ip_address_header_(config.has_custom_header_config()
-                             ? absl::make_optional<Http::LowerCaseString>(
+                             ? std::make_optional<Http::LowerCaseString>(
                                    config.custom_header_config().header_name())
-                             : absl::nullopt) {
+                             : std::nullopt) {
   stat_name_set_->rememberBuiltin("total");
 }
 

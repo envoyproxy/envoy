@@ -1,6 +1,6 @@
 #pragma once
 
-#include "absl/types/optional.h" // required for absl::nullopt
+#include <optional> // required for std::nullopt
 
 namespace Envoy {
 
@@ -11,7 +11,7 @@ namespace Envoy {
 //     }
 //   }
 //
-// Using absl::optional directly you must write optref.value().method() which is
+// Using std::optional directly you must write optref.value().method() which is
 // a bit more awkward.
 //
 // This class also consumes less memory -- e.g. 8 bytes for a pointer rather
@@ -19,7 +19,7 @@ namespace Envoy {
 template <class T> struct OptRef {
   OptRef(T& t) : ptr_(&t) {}
   OptRef() : ptr_(nullptr) {}
-  OptRef(absl::nullopt_t) : ptr_(nullptr) {}
+  OptRef(std::nullopt_t) : ptr_(nullptr) {}
 
   /**
    * Copy constructor that allows conversion.
@@ -42,7 +42,7 @@ template <class T> struct OptRef {
    * @return a ref to the converted object.
    */
   template <class U> operator OptRef<U>() {
-    return ptr_ == nullptr ? absl::nullopt : OptRef<U>(*ptr_);
+    return ptr_ == nullptr ? std::nullopt : OptRef<U>(*ptr_);
   }
 
   /**
@@ -88,8 +88,8 @@ template <class T> struct OptRef {
    *
    * @return an optional copy of the referenced object (or nullopt).
    */
-  absl::optional<T> copy() const {
-    absl::optional<T> ret;
+  std::optional<T> copy() const {
+    std::optional<T> ret;
     if (has_value()) {
       ret = *ptr_;
     }
@@ -136,7 +136,7 @@ template <class T> OptRef<T> makeOptRef(T& ref) { return {ref}; }
 /**
  * Constructs an OptRef<T> from the provided pointer.
  * @param ptr the pointer to wrap
- * @return OptRef<T> the wrapped pointer, or absl::nullopt if the pointer is nullptr
+ * @return OptRef<T> the wrapped pointer, or std::nullopt if the pointer is nullptr
  */
 template <class T> OptRef<T> makeOptRefFromPtr(T* ptr) {
   if (ptr == nullptr) {
@@ -146,17 +146,17 @@ template <class T> OptRef<T> makeOptRefFromPtr(T* ptr) {
   return {*ptr};
 }
 
-// Overloads for comparing OptRef against absl::nullopt.
-template <class T> bool operator!=(const OptRef<T>& optref, absl::nullopt_t) {
+// Overloads for comparing OptRef against std::nullopt.
+template <class T> bool operator!=(const OptRef<T>& optref, std::nullopt_t) {
   return optref.has_value();
 }
-template <class T> bool operator!=(absl::nullopt_t, const OptRef<T>& optref) {
+template <class T> bool operator!=(std::nullopt_t, const OptRef<T>& optref) {
   return optref.has_value();
 }
-template <class T> bool operator==(const OptRef<T>& optref, absl::nullopt_t) {
+template <class T> bool operator==(const OptRef<T>& optref, std::nullopt_t) {
   return !optref.has_value();
 }
-template <class T> bool operator==(absl::nullopt_t, const OptRef<T>& optref) {
+template <class T> bool operator==(std::nullopt_t, const OptRef<T>& optref) {
   return !optref.has_value();
 }
 

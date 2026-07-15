@@ -9,6 +9,7 @@ use crate::{
 };
 use mockall::*;
 use std::any::Any;
+use std::ffi::c_void;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// The trait that represents the configuration for an Envoy Http filter configuration.
@@ -130,6 +131,13 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
 /// All the event hooks are called on the same thread as the one that the [`HttpFilter`] is created
 /// via the [`HttpFilterConfig::new_http_filter`] method. In other words, the [`HttpFilter`] object
 /// is thread-local.
+///
+/// The response hooks (`on_response_headers`, `on_response_body`, `on_response_trailers`) and
+/// `on_stream_complete` can run for a stream whose request hooks never ran, for example an
+/// Envoy-generated local reply for a request that failed before reaching this filter. Such a
+/// stream has no per-stream state built during decode, so these hooks must not assume it exists.
+/// Keep per-stream state in an `Option` set from a request hook and treat `None` as the
+/// never-decoded case.
 pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// This is called when the request headers are received.
   /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
@@ -1161,6 +1169,12 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Set the dynamic metadata value with the given namespace and key to raw bytes.
+  ///
+  /// The bytes are stored as the metadata value as is, so non-UTF-8 values are preserved. Read
+  /// them back with [`Self::get_metadata_string`].
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]);
+
   /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
   ///
   /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
@@ -1295,6 +1309,42 @@ pub trait EnvoyHttpFilter {
   /// Returns None if the key does not exist, the object does not support serialization, or the
   /// filter state is not accessible.
   fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Store an opaque, module-owned object in the filter state under `key`. Envoy never interprets
+  /// the object; it calls `destructor` exactly once when the entry is destroyed. Objects stored at
+  /// `Request` or `Connection` lifespan survive `recreate_stream`; `FilterChain` objects do not.
+  ///
+  /// Typical use: `Box::into_raw(Box::new(state)) as *mut c_void`, with a destructor that calls
+  /// `drop(Box::from_raw(ptr as *mut State))`. The module must only recover the object via
+  /// [`EnvoyHttpFilter::get_filter_state_object`] and never free it itself.
+  ///
+  /// Ownership transfers to Envoy on every path: the destructor runs exactly once, either when the
+  /// entry is destroyed or before this returns `false`, so a failed store never leaks the object.
+  ///
+  /// Returns true if stored. Returns false, after running the destructor, if the filter state is
+  /// not accessible or the key already holds an entry at a different `life_span`.
+  ///
+  /// # Safety
+  ///
+  /// `object` must be a valid pointer that `destructor` can free, and `destructor` must free it
+  /// without unwinding: it runs on the teardown path, and a panic crossing the FFI boundary is
+  /// undefined behavior. Use an `extern "C"` destructor, which aborts rather than unwinds.
+  unsafe fn set_filter_state_object(
+    &mut self,
+    key: &[u8],
+    object: *mut c_void,
+    destructor: extern "C" fn(*mut c_void),
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  ) -> bool;
+
+  /// Borrow the opaque object previously stored under `key`, or `None` if absent. Ownership stays
+  /// with Envoy; the module must not free the returned pointer.
+  ///
+  /// The pointer is valid only on the worker thread owning the stream, and only until the entry is
+  /// destroyed or overwritten. It is shared: the rebuilt filter after a `recreate_stream`, or
+  /// another filter on the same stream, can hold it too, so the module must synchronize any
+  /// interior mutability through it.
+  fn get_filter_state_object(&self, key: &[u8]) -> Option<*mut c_void>;
 
   /// Get the received request body (the request body pieces received in the latest event).
   /// This should only be used in the [`HttpFilter::on_request_body`] callback.
@@ -1902,6 +1952,9 @@ pub trait EnvoyHttpFilter {
   /// Returns `true` if the override was set successfully, `false` if the host address is invalid.
   fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool;
 
+  /// Get the upstream connection ID, or 0 if not available.
+  fn get_upstream_connection_id(&self) -> u64;
+
   // ------------------- Stream Control methods -------------------------
 
   /// Reset the HTTP stream with the specified reason.
@@ -1998,6 +2051,14 @@ pub trait EnvoySpan {
   /// reported to the tracing system.
   fn set_sampled(&self, sampled: bool);
 
+  /// Stop using the Envoy local tracing decision for this span.
+  ///
+  /// Combined with [`EnvoySpan::set_sampled`], this keeps a filter's sampling decision when Envoy
+  /// refreshes tracing after a route cache change. With the OpenTelemetry tracer the connection
+  /// manager does not re-derive the decision after a route cache change. Other tracers may not
+  /// support this.
+  fn disable_local_decision(&self);
+
   /// Get a baggage value from this span.
   ///
   /// Baggage data may have been set by this span or any parent spans.
@@ -2073,6 +2134,12 @@ impl EnvoySpan for EnvoySpanImpl {
   fn set_sampled(&self, sampled: bool) {
     unsafe {
       abi::envoy_dynamic_module_callback_http_span_set_sampled(self.raw_ptr, sampled);
+    }
+  }
+
+  fn disable_local_decision(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_disable_local_decision(self.raw_ptr);
     }
   }
 
@@ -2613,6 +2680,17 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
   fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
     // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
     // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
@@ -2922,6 +3000,39 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
+    }
+  }
+
+  unsafe fn set_filter_state_object(
+    &mut self,
+    key: &[u8],
+    object: *mut c_void,
+    destructor: extern "C" fn(*mut c_void),
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  ) -> bool {
+    let destructor: unsafe extern "C" fn(*mut c_void) = destructor;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_object(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        object,
+        Some(destructor),
+        life_span,
+      )
+    }
+  }
+
+  fn get_filter_state_object(&self, key: &[u8]) -> Option<*mut c_void> {
+    let object = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_filter_state_object(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+      )
+    };
+    if object.is_null() {
+      None
+    } else {
+      Some(object)
     }
   }
 
@@ -3836,6 +3947,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn get_upstream_connection_id(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_upstream_connection_id(self.raw_ptr) }
+  }
+
   fn reset_stream(
     &mut self,
     reason: abi::envoy_dynamic_module_type_http_filter_stream_reset_reason,
@@ -4019,6 +4134,10 @@ pub trait EnvoyHttpFilterScheduler: Send + Sync {
   /// Once this is called, [`HttpFilter::on_scheduled`] will be called with
   /// the same `event_id` on the worker thread where the filter is running IF
   /// by the time the event is committed, the filter is still alive.
+  ///
+  /// This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+  /// module must join or quiesce any thread that may call this before worker shutdown so a
+  /// scheduled event cannot race the worker dispatcher teardown.
   fn commit(&self, event_id: u64);
 }
 

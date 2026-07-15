@@ -512,7 +512,7 @@ TEST(FilterFactoryCreatorTest, CreateFilterFactoryFromProtoWithServerContext) {
           .value();
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
   testing::NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(testing::_));
   cb(filter_callback);

@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
@@ -17,7 +19,6 @@
 #include "source/common/http/header_utility.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -51,9 +52,17 @@ public:
    */
   static std::pair<uint32_t, bool> parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
+  /**
+   * Returns any tokens from @param config that are not recognized by either
+   * the HTTP or gRPC retry policy parsers.
+   * @param config is the comma-separated retry_on field value.
+   * @return vector of unrecognized token strings.
+   */
+  static std::vector<std::string> getUnknownRetryOnTokens(absl::string_view config);
+
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
-  absl::optional<std::chrono::milliseconds>
+  std::optional<std::chrono::milliseconds>
   parseResetInterval(const Http::ResponseHeaderMap& response_headers) const override;
   RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                  const Http::RequestHeaderMap& original_request,

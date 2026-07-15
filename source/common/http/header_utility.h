@@ -40,11 +40,11 @@ public:
    */
   class GetAllOfHeaderAsStringResult {
   public:
-    // The ultimate result of the concatenation. If absl::nullopt, no header values were found.
+    // The ultimate result of the concatenation. If std::nullopt, no header values were found.
     // If the final string required a string allocation, the memory is held in
     // backingString(). This allows zero allocation in the common case of a single header
     // value.
-    absl::optional<absl::string_view> result() const {
+    std::optional<absl::string_view> result() const {
       // This is safe for move/copy of this class as the backing string will be moved or copied.
       // Otherwise result_ is valid. The assert verifies that both are empty or only 1 is set.
       ASSERT((!result_.has_value() && result_backing_string_.empty()) ||
@@ -55,7 +55,7 @@ public:
     const std::string& backingString() const { return result_backing_string_; }
 
   private:
-    absl::optional<absl::string_view> result_;
+    std::optional<absl::string_view> result_;
     // Valid only if result_ relies on memory allocation that must live beyond the call. See above.
     std::string result_backing_string_;
 
@@ -426,9 +426,9 @@ public:
   /**
    * Determines if request headers pass Envoy validity checks.
    * @param headers to validate
-   * @return details of the error if an error is present, otherwise absl::nullopt
+   * @return details of the error if an error is present, otherwise std::nullopt
    */
-  static absl::optional<std::reference_wrapper<const absl::string_view>>
+  static std::optional<std::reference_wrapper<const absl::string_view>>
   requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
@@ -453,11 +453,11 @@ public:
 
   /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
-   * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
+   * @return std::optional<uint32_t> containing the port, if removed, else std::nullopt.
    * If port is not passed, port part from host/authority header is removed.
    */
-  static absl::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
-                                                    absl::optional<uint32_t> listener_port);
+  static std::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
+                                                   std::optional<uint32_t> listener_port);
 
   /**
    * @brief Remove the port part from host if it exists.

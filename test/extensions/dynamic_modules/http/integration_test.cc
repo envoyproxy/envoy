@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/common/logger.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
@@ -74,7 +75,7 @@ filter_config:
                                ->Mutable(0)
                                ->mutable_typed_per_filter_config();
 
-            (*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
+            std::ignore = (*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
                 per_route_config_proto);
           });
     }
@@ -170,6 +171,62 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(10U, response->body().size());
+}
+
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionId) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the upstream_connection_id filter is only in the rust test module";
+  }
+
+  initializeFilter("upstream_connection_id");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, LogLevel) {
+  if (GetParam() == "cpp") {
+    GTEST_SKIP() << "the log_level filter is only in the rust and go test modules";
+  }
+
+  // Pin the dynamic modules logger to a known level so the assertions are deterministic, and
+  // restore it afterwards to avoid affecting other tests.
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::warn);
+
+  initializeFilter("log_level");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  logger.set_level(original_level);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  // Warn is index 3 in the ABI log level enum.
+  EXPECT_EQ(
+      "3",
+      response->headers().get(Http::LowerCaseString("x-log-level"))[0]->value().getStringView());
+  // Info is below the configured level so it is disabled, Error is above it so it is enabled.
+  EXPECT_EQ("false", response->headers()
+                         .get(Http::LowerCaseString("x-log-info-enabled"))[0]
+                         ->value()
+                         .getStringView());
+  EXPECT_EQ("true", response->headers()
+                        .get(Http::LowerCaseString("x-log-error-enabled"))[0]
+                        ->value()
+                        .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) { runHeaderCallbacksTest(false); }
@@ -425,6 +482,26 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
 }
 
+// A live, non-serializable object stored in filter state at Request lifespan is carried across
+// recreate_stream: the rebuilt filter recovers the same object and echoes its value.
+TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  }
+  initializeFilter("filter_state_object_recreate");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("0xabcd", response->headers()
+                          .get(Http::LowerCaseString("x-live-object-value"))[0]
+                          ->value()
+                          .getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestBody) {
   initializeFilter("send_response", "on_request_body");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -462,6 +539,57 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+// Regression test for the streaming-response re-entry fix. The filter produces its response with
+// send_response_headers and stamps a marker from on_response_headers. Before the fix the streaming
+// response re-entered that hook and leaked the marker onto the module's own response. Rust-only
+// because the streaming_response_reentry filter lives in the rust test module.
+TEST_P(DynamicModulesIntegrationTest, StreamingResponseDoesNotReenterEncodeHooks) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the streaming_response_reentry filter is only in the rust test module";
+  }
+  initializeFilter("streaming_response_reentry");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("x-produced")).empty());
+  // The module's response hook must not run for the response it produced.
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-reentered")).empty());
+}
+
+// Regression test for CatchUnwind re-entry. The filter is wrapped in the SDK's CatchUnwind panic
+// guard and completes its response with end-of-stream from on_scheduled. Completing with eos drives
+// FilterManager::onStreamComplete inline, synchronously re-entering the same wrapped filter's
+// on_stream_complete while the on_scheduled catch frame is still on the stack. on_stream_complete
+// bumps a counter; before the fix the re-entrant call is misread as a poisoned filter and skipped,
+// so the counter never moves. Rust-only because the reentrant_stream_complete filter lives in the
+// rust test module.
+TEST_P(DynamicModulesIntegrationTest, ReentrantStreamCompleteRunsUnderCatchUnwind) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the reentrant_stream_complete filter is only in the rust test module";
+  }
+  initializeFilter("reentrant_stream_complete");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("yes",
+            response->headers().get(Http::LowerCaseString("x-done"))[0]->value().getStringView());
+
+  // on_stream_complete must run even though the response was completed (eos) from on_scheduled,
+  // which re-enters the CatchUnwind-wrapped filter synchronously.
+  test_server_->waitForCounter("dynamicmodulescustom.reentrant_stream_complete_total",
+                               testing::Eq(1));
 }
 
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {

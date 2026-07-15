@@ -12,14 +12,14 @@ namespace AccessLoggers {
 namespace Filters {
 namespace ProcessRateLimit {
 
-AccessLog::FilterPtr ProcessRateLimitFilterFactory::createFilter(
+absl::StatusOr<AccessLog::FilterPtr> ProcessRateLimitFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config,
     Server::Configuration::GenericFactoryContext& context) {
   auto factory_config =
       Config::Utility::translateToFactoryConfig(config, context.messageValidationVisitor(), *this);
-  const auto& process_ratelimit_config =
-      dynamic_cast<const envoy::extensions::access_loggers::filters::process_ratelimit::v3::
-                       ProcessRateLimitFilter&>(*factory_config);
+  const auto& process_ratelimit_config = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter>(
+      *factory_config);
   auto filter = std::make_unique<ProcessRateLimitFilter>(context, process_ratelimit_config);
   return filter;
 }

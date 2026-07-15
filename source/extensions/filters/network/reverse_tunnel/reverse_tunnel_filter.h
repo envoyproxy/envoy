@@ -138,7 +138,7 @@ private:
 
   // Process reverse tunnel connection.
   void processAcceptedConnection(absl::string_view node_id, absl::string_view cluster_id,
-                                 absl::string_view tenant_id);
+                                 absl::string_view tenant_id, int64_t initiation_time_ms);
 
   ReverseTunnelFilterConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{nullptr};
@@ -165,7 +165,7 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&&) override;
     void sendLocalReply(Http::Code code, absl::string_view body,
                         const std::function<void(Http::ResponseHeaderMap& headers)>&,
-                        const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) override;
+                        const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) override;
     StreamInfo::StreamInfo& streamInfo() override;
     AccessLog::InstanceSharedPtrVector accessLogHandlers() override;
     Http::RequestDecoderHandlePtr getRequestDecoderHandle() override;

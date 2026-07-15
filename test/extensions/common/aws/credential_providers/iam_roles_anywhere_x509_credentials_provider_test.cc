@@ -739,7 +739,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   TestUtility::loadFromYamlAndValidate(yaml, private_key_data_source);
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context_, certificate_data_source, private_key_data_source, absl::nullopt);
+      context_, certificate_data_source, private_key_data_source, std::nullopt);
   auto status = provider->initialize();
   EXPECT_TRUE(status.ok());
   auto credentials = provider->getCredentials();
@@ -968,15 +968,15 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
 
 TEST(EmptyPem, PemToAlgorithmSerialExpiration) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   X509Credentials::PublicKeySignatureAlgorithm algorithm;
   std::string serial;
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration("", algorithm, serial, time);
@@ -986,15 +986,15 @@ TEST(EmptyPem, PemToAlgorithmSerialExpiration) {
 
 TEST(ExpiredPem, PemToAlgorithmSerialExpiration) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   X509Credentials::PublicKeySignatureAlgorithm algorithm;
   std::string serial;
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status =
@@ -1005,8 +1005,8 @@ TEST(ExpiredPem, PemToAlgorithmSerialExpiration) {
 
 TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string large_cert(10240 + 10, 'a');
 
@@ -1015,7 +1015,7 @@ TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(large_cert, algorithm, serial, time);
@@ -1025,8 +1025,8 @@ TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
 
 TEST(JunkPem, PemToAlgorithmSerialExpiration) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string junk_pem(2000, 'a');
 
@@ -1035,7 +1035,7 @@ TEST(JunkPem, PemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
@@ -1045,8 +1045,8 @@ TEST(JunkPem, PemToAlgorithmSerialExpiration) {
 
 TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string junk_pem;
   junk_pem.append(server_root_cert_rsa_pem);
@@ -1057,7 +1057,7 @@ TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
@@ -1069,15 +1069,15 @@ TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
 
 TEST(JunkPem, PemToDerB64) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string in_cert(100, 'a');
 
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
@@ -1087,15 +1087,15 @@ TEST(JunkPem, PemToDerB64) {
 
 TEST(JunkPemChain, PemToDerB64) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string in_cert(100, 'a');
 
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, true);
@@ -1105,8 +1105,8 @@ TEST(JunkPemChain, PemToDerB64) {
 
 TEST(JunkCertStartLine, PemToDerB64) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string in_cert("-----BEGIN CERTIFICATE-----\n");
   in_cert.append("000000000");
@@ -1114,7 +1114,7 @@ TEST(JunkCertStartLine, PemToDerB64) {
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
@@ -1124,8 +1124,8 @@ TEST(JunkCertStartLine, PemToDerB64) {
 
 TEST(JunkChainStartLine, PemToDerB64) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string in_cert("-----BEGIN CERTIFICATE-----\n"
                       "");
@@ -1134,7 +1134,7 @@ TEST(JunkChainStartLine, PemToDerB64) {
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, true);
@@ -1144,15 +1144,15 @@ TEST(JunkChainStartLine, PemToDerB64) {
 
 TEST(SingleCertTooLarge, PemToDerB64) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string in_cert(11000, 'a');
 
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
@@ -1162,8 +1162,8 @@ TEST(SingleCertTooLarge, PemToDerB64) {
 
 TEST(ChainTooLarge, PemToDerB64) {
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   // This buffer is the size of 6 max size certificates, we only allow 5
   std::string in_chain(10240 * 6, 'a');
@@ -1171,7 +1171,7 @@ TEST(ChainTooLarge, PemToDerB64) {
   std::string out_chain;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_chain, out_chain, true);
@@ -1201,8 +1201,8 @@ TEST(ChainParse, PemToDerB64) {
                               "94GljZhJfjD28BvBnDBf0hsSw2E0F8kTutkWdgOAUApxMTwHgnOcW7e47W/5qVn+"
                               "12Rbw03UvzxS78GnjfKNwVqqGUeo4L/HPg==";
 
-  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
-      cert_chain_data_source;
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source;
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string chain;
 
@@ -1213,7 +1213,7 @@ TEST(ChainParse, PemToDerB64) {
   std::string out_chain;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, std::nullopt);
   auto status = provider->initialize();
   EXPECT_FALSE(status.ok());
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));

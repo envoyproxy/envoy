@@ -21,7 +21,7 @@ TEST(Authentication, UriSanInput) {
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -33,7 +33,7 @@ TEST(Authentication, UriSanInput) {
 
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   {
@@ -62,7 +62,7 @@ TEST(Authentication, DnsSanInput) {
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -73,7 +73,7 @@ TEST(Authentication, DnsSanInput) {
 
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   {
@@ -104,7 +104,7 @@ TEST(Authentication, SubjectInput) {
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -116,7 +116,7 @@ TEST(Authentication, SubjectInput) {
   {
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   {

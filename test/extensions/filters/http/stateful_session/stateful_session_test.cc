@@ -102,7 +102,7 @@ TEST_F(StatefulSessionTest, NormalSessionStateTest) {
 
   EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(std::move(session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+      .WillOnce(Return(std::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
         EXPECT_EQ("1.2.3.4", host.host);
@@ -143,7 +143,7 @@ TEST_F(StatefulSessionTest, SessionStateOverrideByRoute) {
   EXPECT_CALL(*route_factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::move(session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+      .WillOnce(Return(std::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
         EXPECT_EQ("1.2.3.4", host.host);
@@ -168,7 +168,7 @@ TEST_F(StatefulSessionTest, SessionStateHasNoUpstreamAddress) {
 
   EXPECT_CALL(*route_factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::move(session_state))));
-  EXPECT_CALL(*raw_session_state, upstreamAddress()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*raw_session_state, upstreamAddress()).WillOnce(Return(std::nullopt));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
@@ -188,7 +188,7 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
 
   EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(std::move(session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+      .WillOnce(Return(std::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
         EXPECT_EQ("1.2.3.4", host.host);
@@ -247,7 +247,7 @@ stat_prefix: "test"
   EXPECT_CALL(*factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+      .WillOnce(Return(std::make_optional<absl::string_view>("127.0.0.1:8080")));
 
   // Initial stats should be zero.
   EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
@@ -283,7 +283,7 @@ stat_prefix: "test"
   EXPECT_CALL(*factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+      .WillOnce(Return(std::make_optional<absl::string_view>("127.0.0.1:8080")));
 
   // Initial stats should be zero.
   EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
@@ -321,7 +321,7 @@ stat_prefix: "test"
   EXPECT_CALL(*factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+      .WillOnce(Return(std::make_optional<absl::string_view>("127.0.0.1:8080")));
 
   // Initial stats should be zero.
   EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
@@ -427,7 +427,7 @@ status_on_strict_destination_not_found: 421
   EXPECT_CALL(*factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+      .WillOnce(Return(std::make_optional<absl::string_view>("127.0.0.1:8080")));
 
   Upstream::LoadBalancerContext::OverrideHost captured_host;
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
@@ -459,7 +459,7 @@ stat_prefix: "test"
   EXPECT_CALL(*factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+      .WillOnce(Return(std::make_optional<absl::string_view>("127.0.0.1:8080")));
 
   Upstream::LoadBalancerContext::OverrideHost captured_host;
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))

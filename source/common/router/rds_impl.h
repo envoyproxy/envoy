@@ -122,7 +122,7 @@ public:
 
   // Router::RouteConfigProvider
   Rds::ConfigConstSharedPtr config() const override { return base_.config(); }
-  const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
+  const std::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
 
   absl::Status onConfigUpdate() override;

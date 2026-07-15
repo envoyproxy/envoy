@@ -419,6 +419,11 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
     envoy::data::core::v3::HealthCheckFailureType type, bool retriable, uint64_t http_status_code) {
   HealthTransition changed_state = setUnhealthy(type, retriable, http_status_code);
+  // Clear the cached HTTP status code on non-HTTP failures so the HDS report does
+  // not ship a stale code from the last successful response.
+  if (type == envoy::data::core::v3::NETWORK || type == envoy::data::core::v3::NETWORK_TIMEOUT) {
+    host_->setLastHealthCheckHttpStatus(0);
+  }
   // It's possible that the previous call caused this session to be deferred deleted.
   if (timeout_timer_ != nullptr) {
     timeout_timer_->disableTimer();

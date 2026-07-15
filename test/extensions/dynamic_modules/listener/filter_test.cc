@@ -402,6 +402,31 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsInvalidId) {
                 static_cast<void*>(filter.get()), 999, 1));
 }
 
+// The listener manager owns filters as a unique_ptr, so the adapter holds the filter in a
+// shared_ptr and forwards every ListenerFilter method to it. Shared ownership is what lets the
+// async callout and scheduler paths call shared_from_this. The integration test is the guard for
+// the production factory wiring.
+TEST_F(DynamicModuleListenerFilterTest, AdapterForwardsAndOwnsFilter) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  std::weak_ptr<DynamicModuleListenerFilter> weak = filter;
+  auto adapter = std::make_unique<SharedListenerFilterAdapter>(filter);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, adapter->onAccept(callbacks_));
+  EXPECT_EQ(&callbacks_, filter->callbacks());
+
+  Buffer::OwnedImpl buffer("test data");
+  TestListenerFilterBuffer test_buffer(buffer);
+  EXPECT_EQ(Network::FilterStatus::Continue, adapter->onData(test_buffer));
+  EXPECT_EQ(filter->maxReadBytes(), adapter->maxReadBytes());
+  adapter->onClose();
+
+  // The adapter holds the only remaining strong reference and releases it on destruction.
+  filter.reset();
+  EXPECT_FALSE(weak.expired());
+  adapter.reset();
+  EXPECT_TRUE(weak.expired());
+}
+
 } // namespace ListenerFilters
 } // namespace DynamicModules
 } // namespace Extensions

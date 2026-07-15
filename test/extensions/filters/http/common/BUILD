@@ -56,6 +56,20 @@ envoy_extension_cc_test(
 )
 
 envoy_cc_test(
+    name = "factory_base_test",
+    srcs = ["factory_base_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//envoy/http:filter_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "stream_rate_limiter_test",
     srcs = ["stream_rate_limiter_test.cc"],
     rbe_pool = "6gig",

@@ -11,6 +11,9 @@ envoy_package()
 envoy_cc_library(
     name = "secret_callbacks_interface",
     hdrs = ["secret_callbacks.h"],
+    deps = [
+        "//envoy/common:pure_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -30,7 +33,10 @@ envoy_cc_library(
     hdrs = ["secret_manager.h"],
     deps = [
         ":secret_provider_interface",
-        "//envoy/init:target_interface",
+        "//envoy/common:optref_lib",
+        "//envoy/common:pure_lib",
+        "//envoy/init:manager_interface",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],

@@ -82,7 +82,7 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
       auto& state = failure_state.back();
       state.set_details(error_message);
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-      state.mutable_failed_configuration()->PackFrom(resource.get().resource());
+      std::ignore = state.mutable_failed_configuration()->PackFrom(resource.get().resource());
 #endif
       absl::StrAppend(&message, listener_name, ": ", error_message, "\n");
       ENVOY_LOG(warn, "lds: listener '{}' config rejected: {}", listener_name, error_message);
@@ -90,7 +90,8 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
 
     TRY_ASSERT_MAIN_THREAD {
       const envoy::config::listener::v3::Listener& listener =
-          dynamic_cast<const envoy::config::listener::v3::Listener&>(resource.get().resource());
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::listener::v3::Listener>(
+              resource.get().resource());
       listener_name = listener.name();
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully

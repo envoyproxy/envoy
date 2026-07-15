@@ -323,7 +323,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     // If not specified, use the quic crypto stream created by QUICHE.
     crypto_stream_config.set_name("envoy.quic.crypto_stream.server.quiche");
     envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig empty_crypto_stream_config;
-    crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
+    std::ignore = crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
   } else {
     crypto_stream_config = config.crypto_stream_config();
   }
@@ -336,7 +336,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   if (!config.has_proof_source_config()) {
     proof_source_config.set_name("envoy.quic.proof_source.filter_chain");
     envoy::extensions::quic::proof_source::v3::ProofSourceConfig empty_proof_source_config;
-    proof_source_config.mutable_typed_config()->PackFrom(empty_proof_source_config);
+    std::ignore = proof_source_config.mutable_typed_config()->PackFrom(empty_proof_source_config);
   } else {
     proof_source_config = config.proof_source_config();
   }
@@ -360,7 +360,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     cid_generator_config.set_name("envoy.quic.deterministic_connection_id_generator");
     envoy::extensions::quic::connection_id_generator::v3::DeterministicConnectionIdGeneratorConfig
         empty_connection_id_generator_config;
-    cid_generator_config.mutable_typed_config()->PackFrom(empty_connection_id_generator_config);
+    std::ignore =
+        cid_generator_config.mutable_typed_config()->PackFrom(empty_connection_id_generator_config);
   } else {
     cid_generator_config = config.connection_id_generator_config();
   }

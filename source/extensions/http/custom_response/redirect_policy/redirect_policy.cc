@@ -75,9 +75,9 @@ RedirectPolicy::RedirectPolicy(
                                  createRedirectConfig(config.redirect_action()))
                            : nullptr},
       status_code_{config.has_status_code()
-                       ? absl::optional<::Envoy::Http::Code>(
+                       ? std::optional<::Envoy::Http::Code>(
                              static_cast<::Envoy::Http::Code>(config.status_code().value()))
-                       : absl::optional<::Envoy::Http::Code>{}},
+                       : std::optional<::Envoy::Http::Code>{}},
       response_header_parser_(THROW_OR_RETURN_VALUE(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
           Router::HeaderParserPtr)),
@@ -135,11 +135,11 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
     ENVOY_BUG(filter_state->policy.get() == this, "Policy filter state should be this policy.");
     // Apply header mutations.
     response_header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
-    const absl::optional<::Envoy::Http::Code> status_code_to_use =
+    const std::optional<::Envoy::Http::Code> status_code_to_use =
         status_code_.has_value() ? status_code_
                                  : (filter_state->original_response_code.has_value()
                                         ? filter_state->original_response_code
-                                        : absl::nullopt);
+                                        : std::nullopt);
     // Modify response status code.
     if (status_code_to_use.has_value()) {
       auto const code = *status_code_to_use;
@@ -228,8 +228,8 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   downstream_headers->setMethod(::Envoy::Http::Headers::get().MethodValues.Get);
   downstream_headers->remove(::Envoy::Http::Headers::get().ContentLength);
   // Cache the original response code.
-  absl::optional<::Envoy::Http::Code> original_response_code;
-  absl::optional<uint64_t> current_code =
+  std::optional<::Envoy::Http::Code> original_response_code;
+  std::optional<uint64_t> current_code =
       ::Envoy::Http::Utility::getResponseStatusOrNullopt(headers);
   if (current_code.has_value()) {
     original_response_code = static_cast<::Envoy::Http::Code>(*current_code);

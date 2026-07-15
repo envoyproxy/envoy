@@ -206,8 +206,13 @@ TEST(FactoryTest, FactoryTestWithServerContext) {
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config, proto_config);
 
-  auto cb = factory->createFilterFactoryFromProtoWithServerContext(proto_config, "test",
-                                                                   mock_server_context);
+  // The typed createHttpFilterFactoryFromProto overload is only visible on the concrete factory
+  // type (the base NamedHttpFilterConfigFactory pointer exposes only the Protobuf::Message
+  // overload, which routes through the legacy path).
+  HeaderMutationFactoryConfig header_mutation_factory;
+  auto cb = header_mutation_factory
+                .createHttpFilterFactoryFromProto(proto_config, "test", mock_server_context)
+                .value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

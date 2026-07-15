@@ -61,7 +61,7 @@ private:
    */
   ContentParser::MetadataAction
   keyValuePairToAction(const KeyValuePair& kv_pair,
-                       const absl::optional<Envoy::Json::ValueType>& extracted_value) const;
+                       const std::optional<Envoy::Json::ValueType>& extracted_value) const;
 
   /**
    * Convert JSON value to Protobuf::Value for metadata.

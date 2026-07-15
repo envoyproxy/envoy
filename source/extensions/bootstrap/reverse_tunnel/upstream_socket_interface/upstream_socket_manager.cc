@@ -304,6 +304,11 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
   return key;
 }
 
+std::string UpstreamSocketManager::getClusterForNode(absl::string_view node_id) const {
+  const auto it = node_to_cluster_map_.find(node_id);
+  return it != node_to_cluster_map_.end() ? it->second : std::string();
+}
+
 const ReverseTunnelLifecycleInfo* UpstreamSocketManager::getLifecycleInfo(int fd) const {
   auto it = fd_to_lifecycle_info_.find(fd);
   return it != fd_to_lifecycle_info_.end() ? &it->second : nullptr;
@@ -526,7 +531,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   const auto ping_size =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::PING_MESSAGE
           .size();
-  Api::IoCallUint64Result result = io_handle.read(buffer, absl::make_optional(ping_size));
+  Api::IoCallUint64Result result = io_handle.read(buffer, std::make_optional(ping_size));
   if (!result.ok()) {
     ENVOY_LOG(debug, "reverse_tunnel: Read error on FD: {}: error - {}", fd,
               result.err_->getErrorDetails());
@@ -660,13 +665,10 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
 }
 
 uint64_t UpstreamSocketManager::pingIntervalWithJitterMs() {
-  uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  // 15% upward jitter, matching the HTTP/2 keepalive pattern.
   constexpr uint64_t jitter_percent = 15;
-  uint64_t jitter_mod = jitter_percent * interval_ms / 100;
-  if (jitter_mod > 0) {
-    interval_ms += random_generator_->random() % jitter_mod;
-  }
-  return interval_ms;
+  const uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  return ReverseConnectionUtility::addJitter(interval_ms, jitter_percent, *random_generator_);
 }
 
 void UpstreamSocketManager::rearmPingSendTimer(int fd) {

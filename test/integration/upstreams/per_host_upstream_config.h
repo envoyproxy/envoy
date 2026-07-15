@@ -73,13 +73,13 @@ public:
   PerHostHttpConnPool(Upstream::HostConstSharedPtr host,
                       Upstream::ThreadLocalCluster& thread_local_cluster,
                       Upstream::ResourcePriority priority,
-                      absl::optional<Envoy::Http::Protocol> downstream_protocol,
+                      std::optional<Envoy::Http::Protocol> downstream_protocol,
                       Upstream::LoadBalancerContext* ctx)
       : HttpConnPool(host, thread_local_cluster, priority, downstream_protocol, ctx) {}
 
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
-                   absl::optional<Http::Protocol> protocol) override {
+                   std::optional<Http::Protocol> protocol) override {
     conn_pool_stream_handle_ = nullptr;
     auto upstream = std::make_unique<PerHostHttpUpstream>(callbacks_->upstreamToDownstream(),
                                                           &callbacks_encoder, host);
@@ -98,9 +98,8 @@ public:
   Router::GenericConnPoolPtr createGenericConnPool(
       Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
       Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-      Upstream::ResourcePriority priority,
-      absl::optional<Envoy::Http::Protocol> downstream_protocol, Upstream::LoadBalancerContext* ctx,
-      const Protobuf::Message&) const override {
+      Upstream::ResourcePriority priority, std::optional<Envoy::Http::Protocol> downstream_protocol,
+      Upstream::LoadBalancerContext* ctx, const Protobuf::Message&) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       // This example factory doesn't support terminating CONNECT/CONNECT-UDP stream.
       return nullptr;
