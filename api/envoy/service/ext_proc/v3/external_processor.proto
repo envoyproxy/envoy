@@ -525,6 +525,14 @@ message StreamedBodyResponse {
   // This field is used in ``GRPC`` body send mode to indicate whether the message is compressed.
   // This will never be set to ``true`` by gRPC but may be set to ``true`` by a proxy like Envoy.
   bool grpc_message_compressed = 4;
+
+  // [#not-implemented-hide:]
+  // In ``FULL_DUPLEX_STREAMED`` or ``GRPC`` body send modes, if the
+  // ext_proc server has seen the
+  // :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
+  // field, it will populate this field to indicate that it has finished
+  // sending data back to the data plane.
+  bool drain_complete = 5;
 }
 
 // This message specifies the body mutation the server sends to the data plane.
