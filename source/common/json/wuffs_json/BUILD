@@ -21,6 +21,16 @@ cc_library(
 )
 
 envoy_cc_library(
+    name = "extract_field_spec_lib",
+    srcs = ["extract_field_spec.cc"],
+    hdrs = ["extract_field_spec.h"],
+    deps = [
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "wuffs_json_cursor_lib",
     srcs = ["wuffs_json_cursor.cc"],
     hdrs = ["wuffs_json_cursor.h"],

@@ -9,6 +9,14 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "extract_field_spec_test",
+    srcs = ["extract_field_spec_test.cc"],
+    deps = [
+        "//source/common/json/wuffs_json:extract_field_spec_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "wuffs_json_cursor_test",
     srcs = ["wuffs_json_cursor_test.cc"],
     deps = [
