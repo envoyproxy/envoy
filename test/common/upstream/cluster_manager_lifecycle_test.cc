@@ -2848,8 +2848,7 @@ TEST_P(ClusterManagerLifecycleTest,
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(*cluster1, initialize(_))
-      .WillOnce(Invoke([cluster1](std::function<void()> cb) { cb(); }));
+  EXPECT_CALL(*cluster1, initialize(_)).WillOnce(Invoke([](std::function<void()> cb) { cb(); }));
 
   create(parseBootstrapFromV3Json(json));
 
