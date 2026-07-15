@@ -22,6 +22,8 @@
 #include "source/extensions/filters/network/redis_proxy/config.h"
 
 #include "absl/algorithm/container.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -206,15 +208,18 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
         // Notify the subscription registry of a topology change so per-shard subscriptions can be
         // re-routed to their correct shards. This must fire not only on host add/remove but ALSO on
         // a slot-only rebalance — a channel's hash slot migrating between EXISTING nodes with no
-        // host delta (Redis resharding / CLUSTER SETSLOT). RedisCluster::onClusterSlotUpdate calls
+        // host delta (slot migration / CLUSTER SETSLOT). RedisCluster::onClusterSlotUpdate calls
         // updateAllHosts({}, {}) — firing this callback with empty deltas — whenever the slot map
-        // changed, so gating on a non-empty host delta stranded the resharded subscription on its
+        // changed, so gating on a non-empty host delta stranded the migrated subscription on its
         // old owner (it stopped receiving messages). updateAllHosts runs only when hosts OR slots
         // actually changed, so this posts onClusterTopologyChange only on real topology changes (a
         // no-op when there are no subscriptions); that handler walks the whole subscription set and
-        // re-routes each channel to its current slot owner. Defer to the next event loop iteration
-        // — the load balancer hasn't been recreated yet here, so chooseHost() would otherwise use
-        // the stale slot mapping.
+        // re-routes each channel to its current slot owner. Defer to the next event loop iteration:
+        // this callback fires from within the host-set update, and although the LB's own refresh
+        // callback is registered first (so its slot map is already fresh here), running the
+        // subscription walk inline would re-enter the registry while this same update's host
+        // removals and planned connection closes are still settling. Deferring lets that update
+        // finish, so the walk resolves each channel against a consistent post-update topology.
         if (subscription_registry_ != nullptr) {
           // Deferred + weak-captured — see postToRegistry.
           postToRegistry(subscription_registry_, [](SubscriptionRegistry& registry) {
@@ -238,7 +243,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type =
       info->clusterType();
   is_redis_cluster_ = cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
-  // Cache the shard-membership resolver once per cluster add/update: the SHARD_MEMBERS
+  // Cache the shard-membership resolver once per cluster add/update: the record-validity
   // placement callbacks would otherwise dynamic_cast the load balancer on every call — O(channels)
   // per topology event. The LB reference is stable between cluster updates
   // (RedisClusterLoadBalancerFactory's recreateOnHostChangeDeprecated() is false, so host changes
@@ -393,7 +398,11 @@ InstanceImpl::ThreadLocalActiveClient* InstanceImpl::ThreadLocalPool::getOrCreat
       // call, including the warm path where ``client`` already exists and when rate limiting is
       // disabled entirely, growing the map with dead entries on the hot data path (efficiency). The
       // bucket is created lazily per host on first need and persists across calls so it refills
-      // over time.
+      // over time. It is per HOST, shared by that host's data AND subscription connections:
+      // sustained data-connection churn to a host can therefore consume the tokens a new
+      // subscription connection to the same host would need, briefly starving it (the subscription
+      // retries on its next attempt). Acceptable under the current single-rate config; a
+      // per-connection-kind bucket would be the fix if that starvation is ever observed.
       TokenBucketPtr& rate_limiter = cx_rate_limiter_map_[host];
       if (!rate_limiter) {
         rate_limiter = std::make_unique<TokenBucketImpl>(config_->connectionRateLimitPerSec(),
@@ -613,6 +622,17 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& h
     }
     pending_request.request_handler_ = client->redis_client_->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
+  } else if (transaction.clients_[client_idx] == nullptr) {
+    // The transaction leg's client was never established — e.g. a mirror leg not sampled at the
+    // MULTI whose later command does sample it, or a MULTI whose slot host was momentarily
+    // unavailable so clients_[0] was never created. Guard the null rather than crash the
+    // worker (R8-12); return a null handle so the caller surfaces NoUpstreamHost and poisons the
+    // transaction (dirty EXEC).
+    ENVOY_LOG(debug, "redis: transaction client leg {} not established, failing request",
+              client_idx);
+    pending_request.request_handler_ = nullptr;
+    onRequestCompleted();
+    return nullptr;
   } else {
     pending_request.request_handler_ = transaction.clients_[client_idx]->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
@@ -639,6 +659,9 @@ void InstanceImpl::ThreadLocalPool::onRequestCompleted() {
     pending_requests_.pop_front();
   }
 }
+
+InstanceImpl::ThreadLocalActiveClient::ThreadLocalActiveClient(ThreadLocalPool& parent)
+    : parent_(parent), connection_id_(parent.next_connection_id_++) {}
 
 void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
@@ -684,7 +707,7 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
         if (!planned_removal_ && !registry->empty()) {
           // Seed the retry scope SYNCHRONOUSLY, scoped to THIS host's channels: capture
           // exactly the channels this dead connection carried BEFORE a same-iteration replacement
-          // subscribe to the same host can add a fresh channel — which must NOT be re-SSUBSCRIBEd.
+          // subscribe to the same host can add a fresh channel — which must NOT be sent twice.
           // It keeps each channel's owner, so a concurrent unsubscribe in the window still
           // sends its SUNSUBSCRIBE and the dedup path still defers a joiner.
           registry->markHostChannelsForResubscribe(host_);
@@ -804,7 +827,7 @@ void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
     // cancel() / onLoadDnsCacheComplete), and doRedirection installs a fresh ``request_handler_``
     // once the lookup lands. Leaving the stale pointer would UAF on a concurrent cancel() or
     // ~PendingRequest. Mark the entry mid-redirect so it is treated as
-    // pending-but-not-poppable until the lookup lands: onRequestCompleted must not reclaim
+    // pending-but-not-pop-able until the lookup lands: onRequestCompleted must not reclaim
     // it, and cancel()/dtor must cancel the DNS continuation.
     request_handler_ = nullptr;
     in_dns_redirect_ = true;
@@ -828,7 +851,7 @@ void InstanceImpl::PendingRequest::onLoadDnsCacheComplete(
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   cache_load_handle_.reset();
   // The DNS window has closed: doRedirection below installs a fresh request_handler_, or onResponse
-  // completes the entry — either way it is poppable again, so clear the mid-redirect guard first.
+  // completes the entry — either way it is pop-able again, so clear the mid-redirect guard first.
   in_dns_redirect_ = false;
 
   if (!host_info || !host_info->address()) {
@@ -896,20 +919,14 @@ SubscriptionRegistryPtr InstanceImpl::subscriptionRegistryShared() {
   }
   if (!tls_pool.subscription_registry_) {
     // Thread the pub/sub tuning knobs from ConnPoolSettings.pubsub_settings; each getter
-    // returns the historical default when the config omits the field. ``subscription_placement`` is
-    // passed AS CONFIGURED: the SHARD_MEMBERS -> PRIMARY degrade for a non-cluster upstream
-    // is decided PER-PLACEMENT in shardCandidatesForChannel / hostServesChannelSlot, NOT baked in
-    // here. This registry is built lazily on the first subscribe, which can land during CDS warm-up
-    // while the target cluster is still absent (cluster_ == nullptr, is_redis_cluster_ == false) —
-    // resolving the degrade at that instant would pin the whole worker's pub/sub to PRIMARY for the
-    // process lifetime even after the Redis Cluster appears. Deciding per placement re-evaluates
-    // the actual upstream each time, so SHARD_MEMBERS begins working as soon as the cluster loads,
-    // and a genuinely non-cluster upstream is warned once from shardCandidatesForChannel.
+    // returns the historical default when the config omits the field. Subscription placement
+    // carries no knob of its own: chooseUpstreamHostForChannel resolves each fresh placement
+    // through the SAME read-policy routing the data path uses, so homing follows ``read_policy``
+    // by construction.
     tls_pool.subscription_registry_ = std::make_shared<RedisProxy::SubscriptionRegistry>(
         tls_pool, tls_pool.api_.randomGenerator(), tls_pool.dispatcher_,
         tls_pool.config_->subscribeAckTimeout(), tls_pool.config_->resubscribeBackoffBaseInterval(),
-        tls_pool.config_->resubscribeBackoffMaxInterval(),
-        tls_pool.config_->subscriptionPlacement());
+        tls_pool.config_->resubscribeBackoffMaxInterval());
   }
   return tls_pool.subscription_registry_;
 }
@@ -938,110 +955,53 @@ InstanceImpl::ThreadLocalPool::chooseUpstreamHostForChannel(const std::string& c
   if (cluster_ == nullptr) {
     return nullptr;
   }
-  Common::Redis::RespValue dummy_request;
   // Hashtagging MUST match the PUBLISH/SPUBLISH path (see PublishRequest, which uses
   // ``config_->enableHashtagging()``): if subscribe and publish hash different substrings of a
   // ``{tag}key`` channel, they select different shards on a non-Redis-cluster upstream and messages
   // are silently lost. ``is_redis_cluster_`` upstreams force hashtagging on both sides regardless.
   //
-  // This resolves to the PRIMARY replica, ALWAYS — and that is intentional, not an oversight.
-  // ``dummy_request`` is an empty RespValue, so RedisLoadBalancerContextImpl's
-  // isReadRequest sees a null command and ``is_read_`` is false; the LB then ignores the
-  // ``readPolicy()`` /
-  // ``client_zone_`` arguments and picks the primary. The two arguments are passed only to keep
-  // this call shape identical to the data path's makeRequest — they are deliberately moot here. Do
-  // NOT "fix" this into zone-/replica-aware routing by handing it a read-shaped request:
-  // primary-only resolution is load-bearing. onClusterTopologyChange dry-resolves each channel here
-  // to decide "did the owner move?", so a replica/zone-varying result would judge most channels as
-  // "moved" on every topology event and churn re-subscribes; and SPUBLISH routes to the primary, so
-  // a subscribe that landed on a replica would sit on a different host than the messages it must
-  // receive.
+  // The probe request is READ-shaped (``GET <channel>``) on purpose: RedisLoadBalancerContextImpl
+  // then marks the lookup a read and the LB applies ``readPolicy()`` / ``client_zone_`` exactly as
+  // it does for data-path reads — subscription placement follows the configured read policy
+  // literally, including the zone-affinity fallback chains, with no second policy model. Stability
+  // does NOT depend on this resolve being deterministic: the channel's home is the registry's
+  // RECORD, and record validity is judged by hostServesChannelSlot (slot primary under the
+  // ``MASTER`` policy, shard membership otherwise), never by re-resolving here and comparing.
+  Common::Redis::RespValue read_probe = Common::Redis::Utility::makeRequest("GET", {channel});
   Clusters::Redis::RedisLoadBalancerContextImpl lb_context(channel, config_->enableHashtagging(),
-                                                           is_redis_cluster_, dummy_request,
+                                                           is_redis_cluster_, read_probe,
                                                            config_->readPolicy(), client_zone_);
   return Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       cluster_->loadBalancer().chooseHost(&lb_context));
 }
 
-bool InstanceImpl::ThreadLocalPool::shardCandidatesForChannel(
-    const std::string& channel, std::vector<Upstream::HostConstSharedPtr>& out) {
-  if (cluster_ == nullptr) {
-    return false;
-  }
-  // The cluster LB implements ShardMembershipResolver only for a Redis Cluster upstream; a
-  // non-cluster LB (ring-hash / maglev on a standalone) has no shard-membership model (cached
-  // resolver is null), so the registry degrades this channel to PRIMARY. is_redis_cluster_
-  // upstreams force hashtagging, so ``redisSlotForKey`` (hashtag always on) resolves the SAME slot
-  // chooseUpstreamHostForChannel / SPUBLISH route to — the placement lands on the shard that
-  // receives the channel's messages.
-  if (shard_membership_resolver_ == nullptr) {
-    // Genuine non-cluster upstream (the cluster is present but its load balancer exposes no
-    // shard-membership model) configured with SHARD_MEMBERS: warn once per worker, then degrade
-    // this placement to PRIMARY. The cluster_ == nullptr case above is CDS warm-up rather than a
-    // config error, so it is intentionally not warned — SHARD_MEMBERS starts working once the
-    // cluster loads.
-    if (!warned_shard_members_non_cluster_) {
-      ENVOY_LOG(warn,
-                "redis: pub/sub subscription_placement SHARD_MEMBERS requires a Redis Cluster "
-                "upstream; this cluster is not one — homing subscriptions on the slot primary");
-      warned_shard_members_non_cluster_ = true;
-    }
-    return false;
-  }
-  const auto members =
-      shard_membership_resolver_->membersForSlot(Clusters::Redis::redisSlotForKey(channel));
-  if (!members.has_value() || members->all_hosts->empty()) {
-    return false; // no shard snapshot yet (transient) — degrade this placement to PRIMARY
-  }
-  // Health-tier a NEW placement, following Envoy's Healthy -> Degraded -> all ordering: offer the
-  // healthy members; if none is healthy, offer the DEGRADED members (still usable, just failing
-  // some checks) rather than dropping straight to hosts with no healthy or degraded status; and
-  // only if the shard has neither healthy nor degraded members fall back to the full membership so
-  // the channel can still be placed rather than failing — the record then re-places once a member
-  // recovers via the normal validity/topology path. The tiering also sharpens failure-driven
-  // escape: an unhealthy owner is left out of the healthy/degraded candidate sets, so it escapes to
-  // a better sibling instead of only when the WHOLE shard is down.
-  const size_t before = out.size();
-  for (const auto& host : *members->all_hosts) {
-    if (host->coarseHealth() == Upstream::Host::Health::Healthy) {
-      out.push_back(host);
-    }
-  }
-  if (out.size() == before) {
-    for (const auto& host : *members->all_hosts) {
-      if (host->coarseHealth() == Upstream::Host::Health::Degraded) {
-        out.push_back(host);
-      }
-    }
-  }
-  if (out.size() == before) {
-    out.insert(out.end(), members->all_hosts->begin(), members->all_hosts->end());
-  }
-  return true;
-}
-
 bool InstanceImpl::ThreadLocalPool::hostServesChannelSlot(
     const std::string& channel, const Upstream::HostConstSharedPtr& host) {
-  // Cached at cluster add/update: null for a non-cluster upstream or before the cluster loads.
+  // Record-validity for a channel's recorded home under the configured read policy. Cached at
+  // cluster add/update: null for a non-cluster upstream or before the cluster loads.
   const auto* resolver = shard_membership_resolver_;
   if (resolver == nullptr) {
-    // No shard-membership model — a non-cluster upstream, or the cluster not yet present. Validity
-    // must match the PRIMARY policy EXACTLY so a SHARD_MEMBERS deployment on such an upstream truly
-    // "behaves as PRIMARY": fresh placement already degrades to chooseUpstreamHostForChannel, and
-    // here the recorded owner is valid iff it still matches the slot's current primary resolution
-    // (or that resolution is transiently null — cluster warm-up / momentary absence — in which case
-    // the record is kept). Returning an unconditional true instead would strand a record on the
-    // host it was first placed on while PUBLISH/SPUBLISH re-route as the primary moves, splitting a
-    // channel's subscribe from its publish.
-    const auto primary = chooseUpstreamHostForChannel(channel);
-    return primary == nullptr || primary == host;
+    // No shard-membership model — a non-cluster upstream, or the cluster not yet present.
+    // Validity must match the read-policy placement EXACTLY: the recorded owner is valid iff it
+    // still matches what chooseUpstreamHostForChannel resolves for the channel (or that
+    // resolution is transiently null — cluster warm-up / momentary absence — in which case the
+    // record is kept). Hash-routed standalone upstreams resolve deterministically per channel, so
+    // this parity is stable for every policy.
+    const auto placed = chooseUpstreamHostForChannel(channel);
+    return placed == nullptr || placed == host;
   }
   const auto members = resolver->membersForSlot(Clusters::Redis::redisSlotForKey(channel));
   if (!members.has_value()) {
-    return true; // no shard snapshot yet (transient) — keep the record (PRIMARY-null parity)
+    return true; // no shard snapshot yet (transient) — keep the record
   }
-  // Membership is health-AGNOSTIC: a momentarily-unhealthy member still "serves" the slot, so
-  // a flap does not re-home its subscriptions. all_hosts is the primary + all replicas.
+  if (config_->readPolicy() == Common::Redis::Client::ReadPolicy::Primary) {
+    // ``MASTER`` homing: the only valid home is the slot's current primary (members are ordered
+    // primary-first), so a moved primary re-homes the channel — read/subscribe parity.
+    return members->all_hosts->empty() || members->all_hosts->front() == host;
+  }
+  // Replica-capable read policies: validity is shard MEMBERSHIP, health-AGNOSTIC — a momentarily
+  // unhealthy member keeps its channels rather than churning on a flap (failure-driven escapes
+  // are handled by the registry, which re-resolves through the read policy when a retry fires).
   return absl::c_linear_search(*members->all_hosts, host);
 }
 
@@ -1131,7 +1091,7 @@ void InstanceImpl::ThreadLocalPool::scheduleResubscribe(std::chrono::millisecond
 void InstanceImpl::ThreadLocalPool::requestTopologyRefresh() {
   // Route through the shared cluster refresh manager, exactly as the data path does on a MOVED/ASK
   // redirection (see PendingRequest::doRedirection). The manager throttles refreshes, so a burst of
-  // subscription redirects during a reshard collapses into a bounded number of slot-map refreshes.
+  // subscription redirects mid-migration collapses into a bounded number of slot-map refreshes.
   if (refresh_manager_ != nullptr) {
     refresh_manager_->onRedirection(cluster_name_);
   }
@@ -1155,6 +1115,66 @@ bool InstanceImpl::ThreadLocalPool::retireSubscriptionConnectionIfIdle(
   // resolved; ``it`` is unused after this call. Return its decision so the registry caller
   // clears the host's control ledger off the ACTUAL retire rather than re-deriving the predicate.
   return maybeCleanupSubscriptionMode(host, it);
+}
+
+void InstanceImpl::ThreadLocalPool::closeSubscriptionConnection(
+    const Upstream::HostConstSharedPtr& host) {
+  if (host == nullptr) {
+    return;
+  }
+  // DEFERRED close: the sole caller (SubscriptionRegistry::onUpstreamControlError) runs on THIS
+  // subscription client's own onRespValue stack, so closing inline would tear the client down
+  // mid-callback (self-destruct reentrancy). Queue it and arm a 0-delay timer to close on the next
+  // iteration, after the reply stack has unwound. The timer is a pool member, so pool teardown
+  // cancels any pending fire — the deferred close can never run against a destroyed pool.
+  //
+  // Pin the OFFENDING client's identity NOW, while it is still this host's current subscription
+  // connection (the caller is running on it). By the time the timer fires this host's connection
+  // may already have been replaced by a fresh, healthy one; flush must close the offender, not
+  // whatever happens to occupy the slot then (see flushDeferredSubscriptionCloses). We record the
+  // connection_id_ rather than the pointer so a replacement reusing the freed wrapper's address
+  // cannot be mistaken for the offender.
+  auto it = subscription_client_map_.find(host);
+  if (it == subscription_client_map_.end() || it->second == nullptr) {
+    return; // no live subscription connection for this host — nothing to close
+  }
+  hosts_pending_sub_close_[host] = it->second->connection_id_;
+  if (deferred_sub_close_timer_ == nullptr) {
+    deferred_sub_close_timer_ =
+        dispatcher_.createTimer([this]() { flushDeferredSubscriptionCloses(); });
+  }
+  if (!deferred_sub_close_timer_->enabled()) {
+    deferred_sub_close_timer_->enableTimer(std::chrono::milliseconds(0));
+  }
+}
+
+void InstanceImpl::ThreadLocalPool::flushDeferredSubscriptionCloses() {
+  // Swap the queue out FIRST: closing a client drives its onEvent synchronously
+  // (forgetHostConnectionLedger + markHostChannelsForResubscribe + a re-subscribe that can create a
+  // fresh subscription connection within this same iteration), and none of that must mutate the set
+  // we are iterating.
+  absl::flat_hash_map<Upstream::HostConstSharedPtr, uint64_t> to_close;
+  to_close.swap(hosts_pending_sub_close_);
+  for (const auto& [host, expected_connection_id] : to_close) {
+    auto it = subscription_client_map_.find(host);
+    if (it == subscription_client_map_.end() || it->second == nullptr) {
+      continue; // connection already gone (retired / re-resolved) before this fired
+    }
+    if (it->second->connection_id_ != expected_connection_id) {
+      // This host's subscription connection was REPLACED between scheduling and now: the offender
+      // is already gone (its own close reclaimed the leaked shard subscription) and the current
+      // client is a fresh, healthy one with a new connection_id_. Closing it would be pointless
+      // disconnect/resubscribe churn, so skip.
+      continue;
+    }
+    // Close WITHOUT setting planned_removal_: onEvent treats this as a GENUINE connection loss —
+    // clearing the host's control ledger and re-subscribing its remaining HEALTHY channels on a
+    // fresh connection (markHostChannelsForResubscribe + backoff). Redis drops ALL of this host's
+    // shard subscriptions on close, reclaiming the leaked one whose SUNSUBSCRIBE it refused.
+    // onEvent erases this entry from subscription_client_map_ synchronously; ``it`` is unused
+    // afterward.
+    it->second->redis_client_->close();
+  }
 }
 
 bool InstanceImpl::ThreadLocalPool::maybeCleanupSubscriptionMode(

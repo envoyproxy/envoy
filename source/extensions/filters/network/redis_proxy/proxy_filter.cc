@@ -126,7 +126,7 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
                          ProxyFilterConfigSharedPtr config,
                          ExternalAuth::ExternalAuthClientPtr&& auth_client)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
-      config_(config), transaction_(this) {
+      config_(config), transaction_(&upstream_transaction_cb_) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ = config_->downstream_auth_username_.empty() &&
@@ -246,25 +246,57 @@ DownstreamSubscriberPtr ProxyFilter::getOrCreateSubscriber() {
 }
 
 void ProxyFilter::onEvent(Network::ConnectionEvent event) {
+  // The downstream connection's own event. Runs the full close cleanup, including the subscriber
+  // teardown.
+  handleConnectionEvent(event, /*is_downstream=*/true);
+}
+
+void ProxyFilter::handleConnectionEvent(Network::ConnectionEvent event, bool is_downstream) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_LOG(trace, "new connection to redis proxy filter");
   }
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_LOG(trace, "connection to redis proxy filter closed");
-    while (!pending_requests_.empty()) {
-      if (pending_requests_.front().request_handle_ != nullptr) {
-        pending_requests_.front().request_handle_->cancel();
+    // The response-FIFO cancel + push-accounting reset below are DOWNSTREAM-close semantics: the
+    // client is gone, so cancel everything it had in flight. On an upstream transaction-client
+    // close (is_downstream=false — a keyed EXEC/DISCARD closing the transaction client, or the
+    // upstream dying mid-transaction) they must NOT run: that client's own in-flight commands are
+    // already failed by its ClientImpl::onEvent (registered ahead of this adapter), and the
+    // remaining FIFO entries — a deferred SUBSCRIBE awaiting its pool's ack, unrelated pipelined
+    // commands on other pools — belong to a live downstream. Cancelling them would strand
+    // the downstream with zero responses AND (for the deferred SUBSCRIBE, whose cancel() does not
+    // roll back its optimistic registry registration) leave a zombie subscription that later
+    // receives pushes it never acked (R8-1).
+    if (is_downstream) {
+      while (!pending_requests_.empty()) {
+        if (pending_requests_.front().request_handle_ != nullptr) {
+          pending_requests_.front().request_handle_->cancel();
+        }
+        pending_requests_.pop_front();
       }
-      pending_requests_.pop_front();
+      // Any MESSAGE pushes parked on those requests were destroyed with them; keep the byte
+      // accounting invariant (held_push_bytes_ == sum of trailing_pushes_ lengths) intact.
+      held_push_bytes_ = 0;
     }
-    // Any MESSAGE pushes parked on those requests were destroyed with them; keep the byte
-    // accounting invariant (held_push_bytes_ == sum of trailing_pushes_ lengths) intact.
-    held_push_bytes_ = 0;
     transaction_.close();
 
     if (external_auth_call_status_ == ExternalAuthCallStatus::Pending) {
       auth_client_->cancel();
+    }
+
+    // The subscriber teardown below is DOWNSTREAM-only. ProxyFilter is also the connection callback
+    // of the transaction client's UPSTREAM connection: that client is created with
+    // transaction_.connection_cb_, which is the upstream_transaction_cb_ adapter (see the ctor and
+    // header), so a keyed EXEC/DISCARD that closes the transaction client (NoFlush -> synchronous
+    // LocalClose), or an upstream that dies mid-transaction, routes here with is_downstream=false.
+    // Those must NOT destroy the live downstream subscriber — real Redis keeps subscriptions across
+    // MULTI/EXEC; tearing them down would silently strand the client (open downstream, lost
+    // subscription, no error). Only transaction_.close() and the auth cancel above run on both
+    // close directions; the response-FIFO cancel (R8-1) and the subscriber teardown below are
+    // downstream-only.
+    if (!is_downstream) {
+      return;
     }
 
     // Clean up subscriptions on disconnect — notify registry to send upstream UNSUBSCRIBE.
@@ -429,8 +461,11 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
     response->asString() = "OK";
     connection_allowed_ = true;
   } else {
+    // A failed AUTH must not revoke an existing grant: real Redis leaves the connection's
+    // authentication state unchanged on an AUTH error, replying only with the error. Leave
+    // connection_allowed_ as-is rather than revoking auth for an authenticated client, which
+    // would otherwise lock every subsequent command (including UNSUBSCRIBE) behind NOAUTH (R8-8).
     response = Common::Redis::Utility::makeError("ERR invalid password");
-    connection_allowed_ = false;
   }
   request.onResponse(std::move(response));
 }
@@ -456,8 +491,9 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
     response->asString() = "OK";
     connection_allowed_ = true;
   } else {
+    // A failed AUTH must not revoke an existing grant — see the R8-8 note in the single-argument
+    // onAuth above. Reply with the error but leave connection_allowed_ unchanged.
     response = Common::Redis::Utility::makeError("WRONGPASS invalid username-password pair");
-    connection_allowed_ = false;
   }
   request.onResponse(std::move(response));
 }
@@ -489,9 +525,14 @@ ProxyFilter::attemptDownstreamAuthInline(PendingRequest& request, const std::str
         "ERR Client sent AUTH, but no username-password pair is set"));
     return AuthAttempt::ImplOwnsResponse;
   }
-  // Same local-credential policy as the AUTH command paths (checkCredentials).
-  connection_allowed_ = checkCredentials(username, password);
-  return connection_allowed_ ? AuthAttempt::Allowed : AuthAttempt::Denied;
+  // Same local-credential policy as the AUTH command paths (checkCredentials). A failed re-AUTH
+  // must not revoke an existing grant (see the R8-8 note in onAuth): set connection_allowed_ only
+  // on success, and report Denied for this attempt without clearing a prior successful AUTH.
+  const bool credentials_ok = checkCredentials(username, password);
+  if (credentials_ok) {
+    connection_allowed_ = true;
+  }
+  return credentials_ok ? AuthAttempt::Allowed : AuthAttempt::Denied;
 }
 
 bool ProxyFilter::checkCredentials(const std::string& username, const std::string& password) {
@@ -522,12 +563,13 @@ void ProxyFilter::respond(PendingRequest& request, CommandSplitter::RespValueFra
   // first respond() triggered.
   ASSERT(!request.complete_);
   // Move the splitter's accumulated frames into the FIFO entry in arrival order. Zero frames is
-  // normal (all output flowed out-of-band via subscriber->deliver, or a bare UNSUBSCRIBE with no
-  // channels); one is the common single-reply case (via the onResponse sugar); several is a
-  // multi-channel SUBSCRIBE's per-channel -ERR batch. Move-assign the whole vector (respond() is
-  // the one-shot terminal, so pending_responses_ is empty here): steals the splitter's buffer
-  // instead of allocating a container node per frame (the previous std::list added a malloc to
-  // every response on the hot path).
+  // normal for a request that completed with nothing to write (a bare UNSUBSCRIBE on an
+  // already-gone subscriber); one is the common single-reply case (via the onResponse sugar);
+  // several is a multi-channel SUBSCRIBE / UNSUBSCRIBE whose per-channel acks and inline -ERR
+  // replies share this entry. Move-assign the whole vector (respond() is the one-shot terminal, so
+  // pending_responses_ is empty here): steals the splitter's buffer instead of allocating a
+  // container node per frame (the previous std::list added a malloc to every response on the hot
+  // path).
   request.pending_responses_ = std::move(frames);
   request.complete_ = true;
   request.request_handle_ = nullptr;
@@ -546,10 +588,10 @@ void ProxyFilter::flushReadyResponses() {
     if (request_version != current_version) {
       encoder_->setProtocolVersion(Common::Redis::toRespProtocolVersion(request_version));
     }
-    // Drain all frames the splitter accumulated for this request, in arrival order. Empty deque
-    // is normal for entries whose entire output flowed out-of-band via subscriber->deliver
-    // (e.g., a multi-channel SUBSCRIBE whose channels all succeeded — acks deferred to the
-    // upstream Push).
+    // Drain all frames the splitter accumulated for this request, in arrival order. Empty deque is
+    // normal for an entry that completed with nothing to write (a bare UNSUBSCRIBE on an
+    // already-gone subscriber); a fresh SUBSCRIBE instead fills its ack frames here as each
+    // channel's upstream ack lands, then flushes them all once complete.
     for (auto& resp : front.pending_responses_) {
       encoder_->encode(*resp, encoder_buffer_);
     }
@@ -600,8 +642,30 @@ void ProxyFilter::enqueueOrderedPush(Buffer::Instance& encoded) {
   }
   // In-order fast path: nothing is queued ahead, so the push goes straight to the wire in the order
   // it arrived — delivered now, so count it (the message counter reflects ACTUAL delivery, not
-  // enqueue, so evicted/dropped parked frames are not overcounted). write() drains ``encoded``.
+  // enqueue, so evicted/dropped parked frames are not double-counted). write() drains ``encoded``.
   if (pending_requests_.empty()) {
+    // Slow-subscriber eviction on this path cannot rely on the connection high-watermark callback
+    // (onAboveWriteBufferHighWatermark) alone: that callback is EDGE-triggered — it fires once when
+    // the write buffer crosses the high mark and re-arms only after a drain below the low mark. If
+    // its rising edge was consumed earlier while the eviction gate was false (e.g. a pre-SUBSCRIBE
+    // ordinary-reply backlog crossed the mark while ``subscriber_`` was still null), the latch
+    // stays set and the callback never re-fires — so an unread subscriber's fast-path push burst
+    // would grow the connection write buffer without bound (memory-exhaustion DoS). Add a LEVEL
+    // check here, BEFORE the write (a post-write check is unsafe — write() may synchronously close
+    // and destroy this filter): if the buffer is already over the high mark for an active
+    // subscriber, evict now instead of appending more. This bounds the fast-path push contribution
+    // to the write buffer at the high watermark plus at most one push (the push that first crosses
+    // is written; the next one evicts) — the same bound the park path applies to
+    // ``held_push_bytes_``. Ordinary pipelined replies still use the write buffer as they do on the
+    // mainline proxy path; this level check governs only the subscriber push fast path.
+    if (subscriber_ != nullptr && subscriber_->totalSubscriptionCount() > 0 &&
+        !slow_subscriber_closed_ && callbacks_->connection().aboveHighWatermark()) {
+      // Drop the undelivered frame (honor routePush's empty-buffer contract) before evicting; the
+      // subscriber is closing, so there is nothing to deliver it to.
+      encoded.drain(encoded.length());
+      closeSlowSubscriber("write buffer above high watermark on fast-path push");
+      return;
+    }
     // Count BEFORE the write: write() can in principle synchronously drive a downstream close that
     // re-enters and destroys this filter, after which touching ``config_`` would be a use-after-
     // free. Counting first is still delivery-accurate (write() hands the frame to the connection
@@ -670,6 +734,14 @@ ProxyFilter::PendingRequest::~PendingRequest() {
 }
 
 void ProxyFilter::PendingRequest::setDownstreamRespVersion(uint32_t version) {
+  // A version flip must never happen while the connection holds active subscriptions: pub/sub Push
+  // frames are RESP3-only and the fan-out assumes a fixed RESP3 downstream, so flipping the encoder
+  // to RESP2 mid-subscription (or back) would corrupt the stream. Today this is unreachable: the
+  // pre-HELLO NOPROTO gate only accepts a HELLO whose version equals the listener policy, so a
+  // subscribed RESP3 client can only re-assert HELLO 3 (a no-op flip). Assert it so a future
+  // "accept both 2 and 3" mode cannot silently introduce the corruption (R8-N3).
+  ASSERT(parent_.subscriber_ == nullptr || parent_.subscriber_->totalSubscriptionCount() == 0 ||
+         parent_.downstream_resp_version_ == version);
   parent_.downstream_resp_version_ = version;
   parent_.encoder_->setProtocolVersion(Common::Redis::toRespProtocolVersion(version));
   // Re-stamp this HELLO and any auth-held followers; onResponse would otherwise encode

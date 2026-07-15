@@ -595,7 +595,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     }
 
     // Range-check the slot bounds before they index the fixed-size (16384-entry) slot array in the
-    // load balancer. A buggy or malicious upstream (or a middlebox) returning start/end outside
+    // load balancer. A buggy or malicious upstream (or a middle-box) returning start/end outside
     // [0, 16383], or start > end, would otherwise throw std::out_of_range from std::array::at on
     // the cluster-discovery callback — which runs on the main thread with no handler — aborting the
     // whole proxy. Reject the malformed response instead.

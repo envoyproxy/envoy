@@ -40,6 +40,22 @@ class RedisHealthCheckerTest
       public testing::Test,
       public Extensions::NetworkFilters::Common::Redis::Client::ClientFactory {
 public:
+  // ``RedisConfig`` is private to the checker and gtest test bodies are derived classes (friend
+  // status does not inherit), so the fixture exposes this helper.
+  static void verifyPubsubConfigDefaults() {
+    RedisHealthChecker::RedisConfig config(std::chrono::milliseconds(1000));
+    EXPECT_EQ(std::chrono::milliseconds(
+                  NetworkFilters::Common::Redis::Client::kDefaultSubscribeAckTimeoutMs),
+              config.subscribeAckTimeout());
+    EXPECT_EQ(std::chrono::milliseconds(
+                  NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffBaseMs),
+              config.resubscribeBackoffBaseInterval());
+    EXPECT_EQ(std::chrono::milliseconds(
+                  NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffMaxMs),
+              config.resubscribeBackoffMaxInterval());
+    EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, config.readPolicy());
+  }
+
   RedisHealthCheckerTest()
       : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),
         event_logger_(new Upstream::MockHealthCheckEventLogger()), api_(Api::createApiForTest()) {}
@@ -290,6 +306,14 @@ public:
   std::string auth_password_;
 };
 
+// The pub/sub additions to the health checker's Client::Config are inert defaults — the
+// health-check client never subscribes. Pin them so the interface stubs stay wired to the shared
+// default constants.
+// Plain TEST (no fixture instance): constructing the full checker fixture just for these
+// stateless getter assertions leaks its gtest test object under ASan.
+TEST(RedisHealthCheckerPubsubConfig, DefaultsAreInert) {
+  RedisHealthCheckerTest::verifyPubsubConfigDefaults();
+}
 TEST_F(RedisHealthCheckerTest, PingWithAuth) {
   InSequence s;
 

@@ -233,6 +233,34 @@ public:
   std::vector<RespValuePtr> decoded_values_;
 };
 
+// A RESP3 BigNumber frame with no digits at all is malformed.
+TEST_F(RedisEncoderDecoderImplTest, Resp3EmptyBigNumberThrows) {
+  buffer_.add("(\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid big number value");
+}
+
+// A RESP3 BigNumber frame carrying only a sign is likewise malformed.
+TEST_F(RedisEncoderDecoderImplTest, Resp3SignOnlyBigNumberThrows) {
+  buffer_.add("(-\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError, "invalid big number value");
+}
+
+// Inline command: a quote character immediately after a closing quote (no separating space) is
+// malformed — real Redis rejects it the same way.
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuoteAfterCloseThrows) {
+  buffer_.add("echo \"hi\"\"x\"\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
+}
+
+// Inline command: a quoted-string escape sequence cut off by the line terminator leaves the quote
+// unbalanced.
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandEscapeAtLineEndThrows) {
+  buffer_.add("echo \"a\\\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "unbalanced quotes in request");
+}
+
 TEST_F(RedisEncoderDecoderImplTest, Null) {
   RespValue value;
   EXPECT_EQ("null", value.toString());

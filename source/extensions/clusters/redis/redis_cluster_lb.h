@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,13 @@ namespace Clusters {
 namespace Redis {
 
 static const uint64_t MaxSlot = 16384;
+
+// Sentinel stored in ``SlotArray`` entries for slots CLUSTER SLOTS did not cover. Deliberately
+// numeric_limits max rather than ``MaxSlot``: a malformed response with duplicate slot coverage
+// can yield more than ``MaxSlot`` distinct shards, which would make ``MaxSlot`` a valid shard
+// index and silently break ``membersForSlot``'s nullopt-for-unassigned contract (and
+// ``chooseHost``'s shard-0 fallback for unassigned slots).
+static constexpr uint64_t SlotUnassigned = std::numeric_limits<uint64_t>::max();
 
 using ReplicaToResolve = std::pair<std::string, uint16_t>;
 
@@ -332,6 +340,9 @@ private:
         return std::nullopt;
       }
       const uint64_t idx = (*slot_array_)[slot];
+      // Unassigned slots carry an out-of-range sentinel (see updateClusterSlots' ``fill``), so this
+      // bound is what actually enforces the "nullopt for an unassigned slot" contract above — a
+      // slot CLUSTER SLOTS never covered is not silently placed on shard 0.
       if (idx >= shard_vector_->size()) {
         return std::nullopt;
       }

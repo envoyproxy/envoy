@@ -112,6 +112,10 @@ order of commands it receives.
 Note that faults must have a ``fault_enabled`` field, and are not enabled by default (if no default value
 or runtime key are set).
 
+The pub/sub subscription commands (``SUBSCRIBE`` / ``UNSUBSCRIBE``) bypass fault injection: they are
+handled on the dedicated pub/sub path before the fault-injection layer, so a fault configured for
+all commands (``ALL_KEY``) is not applied to them.
+
 Example configuration:
 
 .. literalinclude:: _include/redis-fault-injection.yaml
@@ -163,9 +167,11 @@ When ``protocol_version`` is ``RESP3``:
   operator-facing error always points to "client failed to handshake" rather than masking
   the missing handshake.
 * Both explicit ``HELLO N`` and bare ``HELLO`` are exact-matched against the listener's
-  ``protocol_version``: bare ``HELLO`` on a fresh ``RESP3`` listener is rejected because the
-  connection's current version (default ``2``) does not match the required ``3``. After a
-  successful ``HELLO 3``, bare ``HELLO`` reaffirms the negotiated version.
+  ``protocol_version``: bare ``HELLO`` on a fresh ``RESP3`` listener is rejected with ``-NOPROTO``
+  because the connection's current version (default ``2``) does not match the required ``3`` — a
+  real Redis server would instead answer a bare ``HELLO`` with its server info map, so a client that
+  depends on that map must send an explicit ``HELLO 3`` here. After a successful ``HELLO 3``, bare
+  ``HELLO`` reaffirms the negotiated version.
 
 Downstream ``HELLO N AUTH <user> <pass>`` is supported with both locally configured
 credentials (``downstream_auth_passwords`` / ``downstream_auth_username``) and an external

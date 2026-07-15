@@ -219,9 +219,9 @@ settings:
 // A pub/sub duration far above any sane value must be rejected. The PGV ``gt`` rule bounds
 // each Duration only above zero (its upper bound is ~292 years), but these feed deadline arithmetic
 // — the subscribe-ack scheduler computes ``monotonicTime() + timeout_`` (a MonotonicTime point) —
-// so an extreme value would overflow the signed nanosecond representation (UB) and could wrap to a
-// PAST deadline, timing out a healthy upstream immediately. Reject anything over 1 hour at load,
-// matching the fail-at-load spirit of the >0 / base<=max checks.
+// so an extreme value would overflow the signed nanosecond representation (undefined behavior) and
+// could wrap to a PAST deadline, timing out a healthy upstream immediately. Reject anything over
+// 1 hour at load, matching the fail-at-load spirit of the >0 / base<=max checks.
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsExcessivePubsubDuration) {
   const std::string yaml = R"EOF(
 prefix_routes:
@@ -246,10 +246,35 @@ settings:
 }
 
 // Sharded_subscription_mode is a ``defined_only`` enum, so an out-of-range numeric value
-// is rejected at config load rather than silently treated as SHARDED (config.cc enables the sharded
+// is rejected at config load rather than silently treated as sharded (config.cc enables the sharded
 // rewrite for any value != DISABLED) — a dangerous silent fallback for a Redis 6.x compatibility
 // switch. A numeric ``2`` is a valid proto3 enum wire value but not a defined
 // ShardedSubscriptionMode.
+
+// enable_sharded_publish together with sharded_subscription_mode: DISABLED is accepted (a valid
+// Redis 7.x policy mix) but warns, since a Redis 6.x upstream would reject every rewritten
+// SPUBLISH.
+TEST(RedisProxyFilterConfigFactoryTest, ShardedPublishWithDisabledSubscriptionModeWarns) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+enable_sharded_publish: true
+settings:
+  op_timeout: 0.02s
+  pubsub_settings:
+    sharded_subscription_mode: DISABLED
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  EXPECT_LOG_CONTAINS("warn", "enable_sharded_publish is set while sharded_subscription_mode", {
+    EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, context).ok());
+  });
+}
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsUndefinedShardedSubscriptionMode) {
   const std::string yaml = R"EOF(
 prefix_routes:

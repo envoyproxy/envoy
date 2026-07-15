@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/redis_proxy:router_interface",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
@@ -170,10 +171,12 @@ envoy_extension_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/network/redis_proxy:subscription_registry_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:connection_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:host_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

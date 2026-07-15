@@ -33,6 +33,15 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsSharedPtr&
   }
 
   auto updated_slots = std::make_shared<SlotArray>();
+  // Mark every slot UNASSIGNED up front. ``SlotArray`` is zero-initialized and 0 is a valid shard
+  // index, so an unwritten slot would otherwise be indistinguishable from "owned by shard 0". A
+  // slot that CLUSTER SLOTS does not cover keeps the ``SlotUnassigned`` sentinel — out of range
+  // (``>= shard_vector.size()``) for ANY shard count, unlike ``MaxSlot``, which a malformed
+  // response with duplicate slot coverage can turn into a valid index (see the sentinel's
+  // definition). ``membersForSlot`` then honors its ``nullopt`` contract for unassigned slots,
+  // while ``chooseHost`` falls back to shard 0 — unchanged data-path behavior, since that shard's
+  // ``-MOVED`` reply drives the redirect.
+  updated_slots->fill(SlotUnassigned);
   auto shard_vector = std::make_shared<std::vector<RedisShardSharedPtr>>();
   absl::flat_hash_map<std::string, uint64_t> shards;
 
@@ -165,8 +174,14 @@ RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
       return {nullptr};
     }
   } else {
-    shard = shard_vector_->at(
-        slot_array_->at(hash.value() % Envoy::Extensions::Clusters::Redis::MaxSlot));
+    uint64_t idx = slot_array_->at(hash.value() % Envoy::Extensions::Clusters::Redis::MaxSlot);
+    // An unassigned slot carries the out-of-range sentinel (see updateClusterSlots). Route it to
+    // shard 0 as before — the shard's ``-MOVED`` reply drives the redirect; membersForSlot instead
+    // returns nullopt for it. (A cluster with a live slot_array_ always has at least one shard.)
+    if (idx >= shard_vector_->size()) {
+      idx = 0;
+    }
+    shard = shard_vector_->at(idx);
   }
 
   auto redis_context = dynamic_cast<RedisLoadBalancerContext*>(context);

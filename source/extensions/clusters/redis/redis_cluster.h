@@ -308,10 +308,6 @@ private:
     }
     // Not a pub/sub connection pool (topology-discovery client), so subscription placement is moot;
     // report the default.
-    Extensions::NetworkFilters::Common::Redis::Client::SubscriptionPlacement
-    subscriptionPlacement() const override {
-      return Extensions::NetworkFilters::Common::Redis::Client::SubscriptionPlacement::Primary;
-    }
     // For any readPolicy other than Primary, the RedisClientFactory will send a READONLY command
     // when establishing a new connection. Since we're only using this for making the "cluster
     // slots" commands, the READONLY command is not relevant in this context. We're setting it to

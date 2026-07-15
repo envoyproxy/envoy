@@ -251,9 +251,6 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
     return std::chrono::milliseconds(30000);
   }
-  SubscriptionPlacement subscriptionPlacement() const override {
-    return SubscriptionPlacement::Primary;
-  }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -422,9 +419,6 @@ class ConfigEnableCommandStats : public Config {
   }
   std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
     return std::chrono::milliseconds(30000);
-  }
-  SubscriptionPlacement subscriptionPlacement() const override {
-    return SubscriptionPlacement::Primary;
   }
 };
 
@@ -704,30 +698,6 @@ TEST_F(RedisClientImplTest, InitializedWithLocalZoneAffinityReplicasAndPrimaryRe
                                ConnPoolSettings::LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY);
 }
 
-// ConfigImpl maps pubsub_settings.subscription_placement to the internal enum, defaulting to
-// Primary when unset (configs predating the field are unaffected). Standalone (no client fixture) —
-// this exercises only the config value mapping.
-TEST(RedisConfigImplTest, SubscriptionPlacement) {
-  using ProtoPubsub = envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-      ConnPoolSettings::PubsubSettings;
-  {
-    ConfigImpl config(createConnPoolSettings());
-    EXPECT_EQ(SubscriptionPlacement::Primary, config.subscriptionPlacement()); // unset default
-  }
-  {
-    auto settings = createConnPoolSettings();
-    settings.mutable_pubsub_settings()->set_subscription_placement(ProtoPubsub::PRIMARY);
-    ConfigImpl config(settings);
-    EXPECT_EQ(SubscriptionPlacement::Primary, config.subscriptionPlacement());
-  }
-  {
-    auto settings = createConnPoolSettings();
-    settings.mutable_pubsub_settings()->set_subscription_placement(ProtoPubsub::SHARD_MEMBERS);
-    ConfigImpl config(settings);
-    EXPECT_EQ(SubscriptionPlacement::ShardMembers, config.subscriptionPlacement());
-  }
-}
-
 TEST_F(RedisClientImplTest, Cancel) {
   InSequence s;
 
@@ -945,9 +915,6 @@ class ConfigOutlierDisabled : public Config {
   }
   std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
     return std::chrono::milliseconds(30000);
-  }
-  SubscriptionPlacement subscriptionPlacement() const override {
-    return SubscriptionPlacement::Primary;
   }
 };
 
@@ -2632,7 +2599,7 @@ TEST_F(RedisClientImplTest, Resp3ReadonlyErrorReplyIsBestEffortAndReachesReady) 
 }
 
 // READONLY MOVED redirection during AwaitingReadonly: treated like an error reply —
-// best-effort on every version (READONLY is a non-keyed init command; redirection is unspec'd
+// best-effort on every version (READONLY is a non-keyed init command; redirection is undefined
 // here). Init continues to Ready (client goes idle), no close, no failure signal.
 TEST_F(RedisClientImplTest, Resp3ReadonlyRedirectionIsBestEffortAndReachesReady) {
   InSequence s;
@@ -2895,6 +2862,55 @@ namespace {
 // Rule 1: sendCommand issued while init_state_ == AwaitingHello must be parked behind the held
 // queue and replayed on HELLO 3 success. Without the gate, SUBSCRIBE bytes would race ahead of
 // the in-flight HELLO 3 on the wire.
+// A HELLO 3 Map whose leading key is not a string is still a valid hello reply as long as a
+// ``proto`` -> 3 pair appears later: the detector skips non-string keys instead of rejecting.
+// Mirrors the held-SUBSCRIBE handshake test so the Ready-transition expectations stay identical.
+// PushMessageCallbacks::onUpstreamControlError defaults to a no-op so non-subscription Push
+// consumers need not implement it; pin the default.
+TEST(PushMessageCallbacksDefaults, ControlErrorDefaultIsNoOp) {
+  struct Minimal : public PushMessageCallbacks {
+    void onPushMessage(Common::Redis::RespValuePtr&&,
+                       const Upstream::HostConstSharedPtr&) override {}
+  } cb;
+  auto err = std::make_unique<Common::Redis::RespValue>();
+  cb.onUpstreamControlError(std::move(err), nullptr);
+}
+
+TEST_F(RedisClientImplTest, Resp3HelloReplyWithNonStringKeySkipsAndSucceeds) {
+  InSequence s;
+  enableResp3();
+  setup();
+
+  Common::Redis::RespValue hello3 = makeBareHello3Request();
+  EXPECT_CALL(*encoder_, encode(Eq(hello3), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize(auth_username_, auth_password_);
+
+  Common::Redis::RespValue subscribe = Utility::makeRequest("SUBSCRIBE", {"chan"});
+  client_->sendCommand(subscribe);
+
+  EXPECT_CALL(*encoder_, encode(Eq(subscribe), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  auto reply = std::make_unique<Common::Redis::RespValue>();
+  reply->type(Common::Redis::RespType::Map);
+  std::vector<Common::Redis::RespValue> kv(4);
+  kv[0].type(Common::Redis::RespType::Integer);
+  kv[0].asInteger() = 7; // non-string key — skipped by the proto:3 scan
+  kv[1].type(Common::Redis::RespType::Integer);
+  kv[1].asInteger() = 7;
+  kv[2].type(Common::Redis::RespType::BulkString);
+  kv[2].asString() = "proto";
+  kv[3].type(Common::Redis::RespType::Integer);
+  kv[3].asInteger() = 3;
+  reply->asArray().swap(kv);
+  respondWith(std::move(reply));
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
 TEST_F(RedisClientImplTest, Resp3SendCommandDuringAwaitingHelloIsHeldUntilHelloSuccess) {
   InSequence s;
   enableResp3();
@@ -3143,6 +3159,25 @@ TEST(RedisClientFactoryImplTest, Basic) {
                      auth_username, auth_password, false, std::nullopt, std::nullopt,
                      Common::Redis::RespProtocolVersion::Resp2, std::nullopt);
   client->close();
+}
+
+// R9-2: Transaction::close() must skip a null client leg. A mirror leg is left null when its
+// RequestMirrorPolicy runtime_fraction did not sample at MULTI time (the mirror send is skipped),
+// and the conn pool refuses to create it later, so the null persists for the whole transaction.
+// With the connection marked established, close() (invoked at EXEC/DISCARD completion, downstream
+// disconnect, and ~Transaction) walks clients_ and must not dereference the null leg. A plain TEST
+// (not the ClientImpl fixture) since it exercises only Transaction and needs no upstream client.
+TEST(RedisTransactionCloseTest, SkipsNullClientLeg) {
+  Transaction transaction(nullptr);
+  transaction.active_ = true;
+  transaction.connection_established_ = true;
+  transaction.clients_.push_back(nullptr); // unsampled mirror leg: a null ClientPtr
+
+  // Must not crash on the null-leg dereference; the flags reset as usual.
+  transaction.close();
+
+  EXPECT_FALSE(transaction.active_);
+  EXPECT_FALSE(transaction.connection_established_);
 }
 } // namespace Client
 } // namespace Redis

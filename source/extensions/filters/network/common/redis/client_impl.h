@@ -60,7 +60,6 @@ public:
   std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
     return resubscribe_backoff_max_interval_;
   }
-  SubscriptionPlacement subscriptionPlacement() const override { return subscription_placement_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -76,7 +75,6 @@ private:
   const std::chrono::milliseconds subscribe_ack_timeout_;
   const std::chrono::milliseconds resubscribe_backoff_base_interval_;
   const std::chrono::milliseconds resubscribe_backoff_max_interval_;
-  SubscriptionPlacement subscription_placement_;
 };
 
 class ClientImpl : public Client,
@@ -221,9 +219,9 @@ private:
     PendingRequest* live_request_{nullptr}; // set during replay
     bool canceled_{false};
     // This entry's own position in ``held_init_queue_``. The queue is a std::list, so the iterator
-    // stays valid across other insertions/erasals; stored at enqueue time so removeHeldUserRequest
-    // can drop this entry in O(1) rather than linear-scanning the whole queue (which, behind a
-    // stalled HELLO with a deep pipeline, made teardown O(depth^2)).
+    // stays valid across other insertions/erasures; stored at enqueue time so
+    // removeHeldUserRequest can drop this entry in O(1) rather than linear-scanning the whole
+    // queue (which, behind a stalled HELLO with a deep pipeline, made teardown O(depth^2)).
     std::list<HeldInitEntry>::iterator queue_it_{};
   };
 

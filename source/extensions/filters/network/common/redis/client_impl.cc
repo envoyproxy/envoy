@@ -98,18 +98,6 @@ ConfigImpl::ConfigImpl(
     break;
   }
 
-  switch (config.pubsub_settings().subscription_placement()) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
-      PubsubSettings::PRIMARY:
-    subscription_placement_ = SubscriptionPlacement::Primary;
-    break;
-  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
-      PubsubSettings::SHARD_MEMBERS:
-    subscription_placement_ = SubscriptionPlacement::ShardMembers;
-    break;
-  }
-
   if (config.has_connection_rate_limit()) {
     connection_rate_limit_enabled_ = true;
     connection_rate_limit_per_sec_ = config.connection_rate_limit().connection_rate_limit_per_sec();
@@ -456,7 +444,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   // 2. The connection is Open and carries subscriptions (push_callbacks_ installed): this is an
   //  out-of-band control reply to a fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE (SSUBSCRIBE is
   //  dispatched without a tracked PendingRequest, see conn_pool_impl.cc), e.g. a normal -ERR
-  //  from ACL/CLUSTERDOWN or a -MOVED/-ASK observed mid-reshard. Route it to the subscription
+  //  from ACL/CLUSTERDOWN or a -MOVED/-ASK observed mid-migration. Route it to the subscription
   //  registry so it can reconcile subscription state (host-scoped re-subscribe) WITHOUT tearing
   //  down the shared connection — every other channel multiplexed on it must stay live. This is
   //  expected control-plane traffic, so it does NOT bump the protocol-error stat.

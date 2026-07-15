@@ -89,9 +89,13 @@ void DownstreamSubscriber::deliver(const Common::Redis::RespValue& message) {
 }
 
 void DownstreamSubscriber::appendAck(const Common::Redis::RespValue& ack) {
-  // Side-effect-free accumulate into the shared batch buffer: no write here, so the caller
-  // can encode acks mid-loop and still defer their delivery to flushAckBatch after its terminal
-  // respond(). Skip once the connection is gone — flushAckBatch drains whatever accumulated.
+  // Encode the ack into the shared buffer without writing. The sole caller, deliver(), pairs this
+  // with an immediate flushAckBatch() (atomic append+write, no yield between), so the buffer never
+  // carries ack bytes across a call — the two stay split only to mirror the message-delivery
+  // encode/flush shape. Do NOT revive a deferred multi-append batch on this buffer without
+  // accounting for the message-delivery paths that also use it (deliverMessage / deliverSharedFrame
+  // assume it is empty on entry; see their ASSERTs). Skip once the connection is gone —
+  // flushAckBatch drains whatever accumulated.
   if (connection_.state() != Network::Connection::State::Open) {
     return;
   }
@@ -114,6 +118,10 @@ void DownstreamSubscriber::deliverMessage(const Common::Redis::RespValue& messag
   if (connection_.state() != Network::Connection::State::Open) {
     return;
   }
+  // The shared buffer carries nothing between calls (routePush moves/writes it out, and appendAck
+  // is only ever paired with an immediate flush), so a MESSAGE never inherits stale ack bytes as a
+  // prefix. Assert it, so reviving a deferred-ack batch cannot silently corrupt a push.
+  ASSERT(encode_buffer_.length() == 0);
   encoder_.encode(message, encode_buffer_);
   if (encode_buffer_.length() == 0) {
     return;
@@ -125,6 +133,9 @@ void DownstreamSubscriber::deliverSharedFrame(const std::shared_ptr<const std::s
   if (connection_.state() != Network::Connection::State::Open || bytes->empty()) {
     return;
   }
+  // Same invariant as deliverMessage: the shared buffer is empty on entry, so the fan-out fragment
+  // is not appended behind stale ack bytes.
+  ASSERT(encode_buffer_.length() == 0);
   // Reference the shared encode via a zero-copy fragment instead of copying the payload into this
   // subscriber's buffer: the whole fan-out then costs ONE buffer->string copy (in
   // deliverFrameToSubscribers) plus a small per-subscriber fragment, not N full payload copies. The
@@ -166,10 +177,9 @@ SubscriptionRegistry::SubscriptionRegistry(UpstreamSubscriptionCallbacks& upstre
                                            Event::Dispatcher& dispatcher,
                                            std::chrono::milliseconds subscribe_ack_timeout,
                                            std::chrono::milliseconds resubscribe_backoff_base,
-                                           std::chrono::milliseconds resubscribe_backoff_max,
-                                           Common::Redis::Client::SubscriptionPlacement placement)
+                                           std::chrono::milliseconds resubscribe_backoff_max)
     : upstream_callbacks_(upstream_callbacks), random_(random), dispatcher_(dispatcher),
-      subscribe_ack_timeout_(subscribe_ack_timeout), placement_(placement),
+      subscribe_ack_timeout_(subscribe_ack_timeout),
       resubscribe_backoff_(resubscribe_backoff_base.count(), resubscribe_backoff_max.count(),
                            random_),
       ack_scheduler_(
@@ -305,7 +315,8 @@ void SubscriptionRegistry::removeSubscriber(const DownstreamSubscriberPtr& subsc
 
 SubscriptionRegistry::SubscribeResult
 SubscriptionRegistry::subscribe(const std::string& channel,
-                                const DownstreamSubscriberPtr& subscriber) {
+                                const DownstreamSubscriberPtr& subscriber,
+                                const SubscriptionAckTargetWeakPtr& ack_target) {
   // addSubscription mirrors the channel into the subscriber's set and returns whether THIS registry
   // now newly owns it (0 -> 1 subscribers). One channel per call, so there is no batch step
   // machinery: the ack count is simply the subscriber's total AS OF this channel (Redis's per-step
@@ -320,6 +331,31 @@ SubscriptionRegistry::subscribe(const std::string& channel,
   const auto [subscriber_newly_added, first_subscriber] = addSubscription(channel, subscriber);
   const uint64_t count = subscriber->totalSubscriptionCount();
   if (first_subscriber) {
+    if (!subscriber_newly_added) {
+      // Invariant guard: THIS registry is the first subscriber for the channel, yet the subscriber
+      // already holds it — so it is subscribed via ANOTHER registry (a cluster-update registry swap
+      // that bypassed the connection's per-channel owner map). Do NOT establish a SECOND upstream
+      // subscription. Back the channel out of THIS registry's map ONLY — registry-scoped, leaving
+      // the subscriber's shared channel set alone: addSubscription's addChannel returned false, so
+      // this call never added it there, and the OWNING registry still holds the real reference.
+      // Touching the shared set here (e.g. via removeSubscriptions) would strand that owner — an
+      // over-decremented gauge and a leaked upstream SSUBSCRIBE. Ack immediately, exactly like a
+      // dedup on an already-active channel. The splitter's owner-first routing makes this
+      // unreachable in normal operation; the guard keeps any future bypass from corrupting the
+      // owning registry.
+      ENVOY_BUG(subscriber_newly_added,
+                "pub/sub: first-subscriber for a channel the subscriber already owns via another "
+                "registry; backing out registry-scoped");
+      if (auto it = subscriptions_.find(channel); it != subscriptions_.end()) {
+        it->second.erase(subscriber);
+        if (it->second.empty()) {
+          subscriptions_.erase(it);
+        }
+      }
+      // bind_owner=false: the channel is really owned by another registry, so the splitter must NOT
+      // rebind it here (that would strand the true owner on a later UNSUBSCRIBE).
+      return {/*success=*/true, count, /*ack_deferred=*/false, /*bind_owner=*/false};
+    }
     // First subscriber for this channel on this thread — issue the sharded upstream subscribe and
     // park the downstream ack until the upstream confirms.
     ENVOY_LOG(debug, "redis: ssubscribing channel '{}' to correct shard", channel);
@@ -331,21 +367,19 @@ SubscriptionRegistry::subscribe(const std::string& channel,
         !upstream_callbacks_.sendUpstreamSsubscribeToHost(channel, *this, chosen_host)) {
       ENVOY_LOG(warn, "redis: upstream ssubscribe failed for '{}', rolling back", channel);
       removeSubscriptions(absl::MakeConstSpan(&channel, 1), subscriber);
-      return {/*success=*/false, subscriber->totalSubscriptionCount(), /*ack_deferred=*/false};
+      return {/*success=*/false, subscriber->totalSubscriptionCount(), /*ack_deferred=*/false,
+              /*bind_owner=*/false};
     }
     // Park the downstream ack keyed by channel; the eventual downstream ack always emits the client
     // verb ``subscribe`` (see deliverPendingSubscribeAck) since cluster sharding is transparent.
-    // ``newly_added=true``: the first subscriber ON THIS REGISTRY establishes the subscription
-    // here. (Exotic edge: a subscriber that ALREADY holds this channel on a
-    // DIFFERENT registry — a mid-flight prefix-route re-home — is "first" here yet not newly added
-    // to its cross-registry set, so a failed reissue would roll back a reference it still holds
-    // elsewhere. Faithful handling needs registry-scoped vs subscriber-scoped rollback separation;
-    // left as-is because it matches prior behavior and no such re-home path exists today.)
-    registerPendingSubscribeAck(channel, subscriber, count, /*newly_added=*/true);
+    // ``subscriber_newly_added`` is necessarily true here — the guard at the top of this branch
+    // returns for the already-owned-via-another-registry case — so a failed reissue rolls back
+    // exactly the reference THIS call established, never one the subscriber holds elsewhere.
+    registerPendingSubscribeAck(channel, subscriber, count, subscriber_newly_added, ack_target);
     // A non-null return is the chosen shard owner (no separate success flag), so record it
     // unconditionally as the channel's current attempt.
     recordSsubscribeAttempt(channel, chosen_host);
-    return {/*success=*/true, count, /*ack_deferred=*/true};
+    return {/*success=*/true, count, /*ack_deferred=*/true, /*bind_owner=*/true};
   }
   // Dedup, but the channel may not be confirmed on its upstream yet. A SINGLE find on
   // pending_subscribe_acks_ decides which case and, for the common one, joins the bucket without a
@@ -357,34 +391,39 @@ SubscriptionRegistry::subscribe(const std::string& channel,
     // Still SUBSCRIBING — a prior subscriber's pending bucket is open. Join it (reuses its
     // ack-timeout schedule entry) so this subscriber is acked when the upstream ack lands, not
     // prematurely.
-    appendPendingSubscribeAck(it->second, channel, subscriber, count, subscriber_newly_added);
-    return {/*success=*/true, count, /*ack_deferred=*/true};
+    appendPendingSubscribeAck(it->second, channel, subscriber, count, subscriber_newly_added,
+                              ack_target);
+    return {/*success=*/true, count, /*ack_deferred=*/true, /*bind_owner=*/true};
   }
   if (pending_resubscribe_channels_.contains(channel)) {
     // RE-subscribing after a connection loss / slot move (upstream ack not yet re-confirmed) —
     // there is no pending bucket yet, so open one and arm its ack timeout.
-    registerPendingSubscribeAck(channel, subscriber, count, subscriber_newly_added);
-    return {/*success=*/true, count, /*ack_deferred=*/true};
+    registerPendingSubscribeAck(channel, subscriber, count, subscriber_newly_added, ack_target);
+    return {/*success=*/true, count, /*ack_deferred=*/true, /*bind_owner=*/true};
   }
   // Dedup on an already-ACTIVE channel (its upstream ack has landed and drained the bucket) — no
   // upstream ack will fire for this subscriber, so the splitter fabricates the ack immediately.
-  return {/*success=*/true, count, /*ack_deferred=*/false};
+  // This registry owns the active channel, so it is the correct owner to bind.
+  return {/*success=*/true, count, /*ack_deferred=*/false, /*bind_owner=*/true};
 }
 
 uint64_t SubscriptionRegistry::unsubscribe(absl::Span<const std::string> channels,
                                            const DownstreamSubscriberPtr& subscriber,
                                            std::vector<Common::Redis::RespValue>* preserved_acks) {
   for (const auto& channel : channels) {
-    // Redis-compatible SUBSCRIBE-then-UNSUBSCRIBE: if this channel's SUBSCRIBE is still
-    // awaiting its upstream ack, preserve that ``subscribe`` ack rather than silently dropping it —
-    // Redis replies ``subscribe ch <n>`` then ``unsubscribe ch <n-1>``. We COLLECT it here (NO
-    // downstream write) into the caller's buffer so the splitter flushes it — ahead of its own
-    // unsubscribe ack — only after its terminal respond(); delivering mid-teardown would let a
-    // synchronous downstream close re-enter and mutate the very pending bucket we are draining
-    // (reentrancy/UAF). On an already-ACTIVE channel (bucket drained) this is a no-op. The
+    // Redis-compatible SUBSCRIBE-then-UNSUBSCRIBE: if this channel's SUBSCRIBE is still awaiting
+    // its upstream ack, complete that ``subscribe`` ack rather than silently dropping it — Redis
+    // replies ``subscribe ch <n>`` then ``unsubscribe ch <n-1>`` — WITHOUT waiting for the upstream
+    // (a client-cancelled subscribe; a late ack/error for the channel is thereafter ignored).
+    // collectPreservedSubscribeAcks routes it: if the parked SUBSCRIBE request's ack target is
+    // still live it POSTS the ack to complete that request at its own FIFO slot; otherwise it
+    // COLLECTS the ack (NO downstream write) into the caller's buffer so the splitter flushes it —
+    // ahead of its own unsubscribe ack — only after its terminal respond(); delivering mid-teardown
+    // would let a synchronous downstream close re-enter and mutate the very pending bucket we are
+    // draining (reentrancy/UAF). On an already-ACTIVE channel (bucket drained) this is a no-op. The
     // rollback (failPendingSubscribers) passes a null buffer — its bucket was already erased — and
-    // simply drops the entry, so the subscriber still gets the rollback (connection close), not
-    // a spurious success.
+    // simply drops the entry, so the subscriber still gets the rollback (connection close), not a
+    // spurious success.
     if (preserved_acks != nullptr) {
       collectPreservedSubscribeAcks(channel, subscriber, *preserved_acks);
     } else {
@@ -419,10 +458,10 @@ void SubscriptionRegistry::scheduleResubscribe() {
   // channel(s) in pending_resubscribe_channels_ BEFORE calling here, and doResubscribe re-reads
   // that whole set at fire time, so a coalesced signal is not lost. Returning early avoids two
   // defects a burst of signals would otherwise cause: (a) advancing the backoff once PER SIGNAL
-  // rather than once per fired cycle — a K-channel slot move (K unsolicited SUNSUBSCRIBEs in one
-  // read, or K -MOVEDs for K re-issued SSUBSCRIBEs) would jump the FIRST retry from ~100ms to ~15s;
-  // (b) enableTimer replacing the pending deadline, so a steady drip of signals (e.g. the
-  // generation-timeout re-arm while a pool cycle is already pending) defers the scheduled
+  // rather than once per fired cycle — a K-channel slot move (K unsolicited SUNSUBSCRIBE pushes
+  // in one read, or K -MOVEDs for K re-issued SSUBSCRIBE sends) would jump the FIRST retry from
+  // ~100ms to ~15s; (b) enableTimer replacing the pending deadline, so a steady drip of signals
+  // (e.g. the generation-timeout re-arm while a pool cycle is already pending) defers the
   // doResubscribe indefinitely. The backoff therefore advances exactly once per fired cycle — a
   // permanently-rejecting upstream still escalates to the 30s cap (doResubscribe's failure path
   // re-arms after the timer has fired, when it is no longer pending) — and is reset when the retry
@@ -500,8 +539,8 @@ void SubscriptionRegistry::onUpstreamControlError(Common::Redis::RespValuePtr&& 
   // Redis answers a connection's pipelined fire-and-forget control commands IN ORDER, so EVERY
   // non-Push reply consumes the oldest outstanding command's reply slot: an -ERR here, and even an
   // anomalous non-Error (real Redis only acks a control command with a Push or answers with an
-  // Error, so a plain reply is middlebox / desync noise). Pop the FIFO head for BOTH to keep the
-  // ledger in lockstep with the reply stream: leaving a non-Error un-popped desyncs the
+  // Error, so a bare reply is middle-box/out-of-sync noise). Pop the FIFO head for BOTH to keep the
+  // ledger in lockstep with the reply stream: leaving a non-Error un-popped slips the
   // FIFO by one — the next ssubscribe ack then head-mismatches and its pending subscribe hangs to
   // the ack timeout. For a SUNSUBSCRIBE the pop also IS the drop of its expected-ack bookkeeping
   // (the FIFO is the single ledger), so a later genuine unsolicited SUNSUBSCRIBE is not
@@ -520,12 +559,18 @@ void SubscriptionRegistry::onUpstreamControlError(Common::Redis::RespValuePtr&& 
 
   // -MOVED / -ASK / -CLUSTERDOWN: the local slot map is stale, so a plain re-subscribe would just
   // draw the same redirect. Refresh the cluster topology (throttled by the shared refresh manager)
-  // and re-resolve on backoff once it lands. Match the leading error-code token against the shared
-  // wire constants (client.h) — the same tokens the client uses to classify redirects.
+  // and re-resolve on backoff once it lands. Unlike the data path (which follows an -ASK with an
+  // ASKING handshake + a retry to the migration target), the subscription control path treats -ASK
+  // like -MOVED — a topology-refresh signal — with no per-channel ASKING retry: sharded pub/sub
+  // signals slot moves with an unsolicited SUNSUBSCRIBE, not a per-key -ASK, so an SSUBSCRIBE
+  // caught mid-migration is re-resolved when the refresh lands (or, if the migration never settles
+  // the subscribe-ack timeout, closed and reconnected) rather than redirected key-by-key. Match the
+  // leading error-code token against the shared wire constants (client.h) — the same tokens the
+  // client uses to classify redirects.
   const auto& redirect = Common::Redis::Client::RedirectionResponse::get();
   // Match the leading error-code TOKEN (the code followed by a space or end-of-string), not a bare
   // prefix: a redirect reply is "MOVED <slot> <endpoint>" / "ASK <slot> <endpoint>" / "CLUSTERDOWN
-  // <msg>", so requiring the boundary keeps a hypothetical "MOVEDX ..." / "ASKING ..." from being
+  // <msg>", so requiring the boundary keeps a hypothetical "MOVED2 ..." / "ASKING ..." from being
   // misclassified as a redirect.
   const auto is_redirect_code = [&error_str](const std::string& code) {
     return absl::StartsWith(error_str, code) &&
@@ -550,7 +595,7 @@ void SubscriptionRegistry::onUpstreamControlError(Common::Redis::RespValuePtr&& 
     //  generation does not, or a channel that already re-resolved off this host) — the channel
     //  has already moved on.
     // The FIFO head was already consumed above, so just return. A redirect with NO correlated
-    // command (empty FIFO — middlebox / desync noise) still falls through to the host re-subscribe.
+    // command (empty FIFO — middle-box/out-of-sync noise) still falls through to host re-subscribe.
     if (reply.has_value() && (reply->verb != "ssubscribe" ||
                               !ssubscribeAckIsCurrent(reply->channel, host, reply->generation))) {
       ENVOY_LOG(debug,
@@ -574,7 +619,7 @@ void SubscriptionRegistry::onUpstreamControlError(Common::Redis::RespValuePtr&& 
       pending_resubscribe_channels_.insert(reply->channel);
       scheduleResubscribe();
     } else {
-      // No correlated command (empty FIFO — middlebox / desync noise): the redirect cannot be
+      // No correlated command (empty FIFO — middle-box / out-of-sync noise): the redirect cannot be
       // attributed to a specific channel, so fall back to the whole-host re-mark.
       ENVOY_LOG(debug, "redis: uncorrelated control redirect '{}', scheduling host re-subscribe",
                 error_str);
@@ -652,6 +697,27 @@ void SubscriptionRegistry::onUpstreamControlError(Common::Redis::RespValuePtr&& 
   if (reply.has_value()) {
     auto owner_it = channel_hosts_.find(reply->channel);
     if (owner_it == channel_hosts_.end() || owner_it->second.host != host) {
+      // A plain-error reply to a SUNSUBSCRIBE we sent (the redirect cases returned above) means the
+      // old owner REFUSED to drop a channel we already re-routed off it: it keeps that shard
+      // subscription and keeps pushing the channel's messages — now dropped downstream by the
+      // smessage source-host check, but at a real upstream + cluster-bus + parse cost per message
+      // for the life of the connection. Force Redis-side cleanup by closing the source host's
+      // subscription connection: Redis drops ALL its shard subscriptions on close, and the conn
+      // pool re-subscribes the host's remaining HEALTHY channels via the genuine-connection-loss
+      // path (deferred, no planned_removal_). Bounded and loop-free: closing clears the host's
+      // control ledger (no lingering entry re-triggers this), and every re-issue is an SSUBSCRIBE
+      // (handled by the ssubscribe path), never another SUNSUBSCRIBE. Only a SUNSUBSCRIBE error
+      // takes this branch — a stale SSUBSCRIBE error is handled above, and a channel whose slot
+      // genuinely MOVED (-MOVED/-ASK) returned in the redirect branch, since Redis cleans that up
+      // server-side.
+      if (reply->verb == "sunsubscribe") {
+        ENVOY_LOG(debug,
+                  "redis: SUNSUBSCRIBE for '{}' failed ('{}'); closing the source host's "
+                  "subscription connection to reclaim the leaked shard subscription",
+                  reply->channel, error_str);
+        upstream_callbacks_.closeSubscriptionConnection(host);
+        return;
+      }
       ENVOY_LOG(debug, "redis: ignoring stale control error for '{}' (host no longer owns it)",
                 reply->channel);
       return;
@@ -728,7 +794,7 @@ void SubscriptionRegistry::doResubscribe() {
     // A send failed (no healthy host / conn-pool hiccup). The failed channels stay in
     // pending_resubscribe_channels_ (reissueSsubscribe enrolled them before the send), so just
     // re-arm the escalating backoff to retry exactly them. Do NOT fall back to a
-    // whole-registry re-mark: that re-marks and re-SSUBSCRIBEs every OTHER host's healthy channels
+    // whole-registry re-mark: that re-marks and re-subscribes every OTHER host's healthy channels
     // too, and — now that owners are kept — would leave the successfully-rerouted channels'
     // in-flight acks intact but pointlessly re-send them, a re-subscribe storm on a single
     // channel's failure.
@@ -774,7 +840,7 @@ bool SubscriptionRegistry::reissueSsubscribe(
     auto it = channel_hosts_.find(channel);
     Upstream::HostConstSharedPtr resolved;
     // This is the FAILURE-driven re-issue path (lost connection / failed send), so validity is
-    // checked health-aware: a still-member but unhealthy SHARD_MEMBERS owner is re-placed onto a
+    // checked health-aware: a still-valid but unhealthy owner is re-placed onto a
     // healthy sibling rather than retried forever (topology reroutes stay health-agnostic).
     if (it != channel_hosts_.end() &&
         recordedOwnerValid(channel, it->second.host, resolved, ValidityMode::FailureDriven)) {
@@ -782,10 +848,10 @@ bool SubscriptionRegistry::reissueSsubscribe(
     } else {
       // No valid record: re-place. recordedOwnerValid resolves the new owner of an INVALID record
       // and hands it back via ``resolved`` so this path does not resolve a second time:
-      // PRIMARY always does so; SHARD_MEMBERS does when a still-member owner ESCAPED an unhealthy
-      // home (the candidates were already computed for the validity check). ``resolved`` stays null
-      // only when the owner LEFT the shard entirely or the channel has no record at all, so resolve
-      // fresh for those.
+      // the MASTER policy always does so; replica-capable policies do when an owner ESCAPED an
+      // unhealthy home (the candidates were already computed for the validity check). ``resolved``
+      // stays null only when the owner LEFT the shard entirely or the channel has no record at all,
+      // so resolve fresh for those.
       target = (it != channel_hosts_.end() && resolved != nullptr) ? resolved
                                                                    : resolvePlacement(channel);
       // if a LIVE old owner is being left for a DIFFERENT host, that old host still carries
@@ -828,7 +894,15 @@ void SubscriptionRegistry::armResubscribeGenerationTimer() {
       resubscribe_generation_timer_ =
           dispatcher_.createTimer([this]() { handleResubscribeGenerationTimeout(); });
     }
-    resubscribe_generation_timer_->enableTimer(subscribe_ack_timeout_);
+    // Coalesce like the pool backoff timer (resubscribeTimerPending): keep an already-running
+    // generation timer's deadline rather than pushing it out to a fresh full window on every
+    // reissue batch. Otherwise a channel that keeps re-issuing (topology / backoff churn) would
+    // defer its ack-timeout indefinitely and never retry. The timer re-arms after it fires
+    // (handleResubscribeGenerationTimeout leaves it disabled, then re-enrolls), so escalation is
+    // preserved.
+    if (!resubscribe_generation_timer_->enabled()) {
+      resubscribe_generation_timer_->enableTimer(subscribe_ack_timeout_);
+    }
   }
 }
 
@@ -854,20 +928,23 @@ void SubscriptionRegistry::onClusterTopologyChange() {
   bool any_failed = false;
   bool any_reissued = false;
   // Ordering trade-off: ``SUNSUBSCRIBE`` to the old host is sent immediately followed by
-  // ``SSUBSCRIBE`` to the new host, without waiting for the unsubscribe ack. This favors
-  // continuity (no message gap during a slot move) over strictly avoiding duplicate
-  // delivery: there is a brief window where both hosts may push the same message, and a
-  // subscriber may see one duplicate. The alternative — chaining ``SSUBSCRIBE`` after the
-  // unsubscribe ack arrives — eliminates the duplicate window but introduces a real
-  // delivery gap on every topology change. Pub/sub semantics already permit best-effort
-  // delivery, and Redis itself does not promise no duplicates across slot migrations, so
-  // the gap-free choice is the expected one. Reviewers asking about strict no-duplicate
-  // delivery should see this comment.
+  // ``SSUBSCRIBE`` to the new host, without waiting for the unsubscribe ack. The channel's recorded
+  // owner is re-pointed to the new host as part of the SSUBSCRIBE (recordSsubscribeAttempt), and
+  // the smessage fan-out's source-host check (see onPushMessage) then DROPS any message still
+  // arriving from the OLD host. So a slot move is now a brief best-effort GAP — roughly one round
+  // trip, from the moment the owner flips to the new host until that host's SSUBSCRIBE lands and it
+  // begins delivering — rather than the former brief DUPLICATE window (both hosts delivering). We
+  // deliberately choose "no duplicates, brief gap" over "no gap, brief duplicate": the same
+  // source-host check is what stops a leaked/stale old owner (e.g. a refused SUNSUBSCRIBE) from
+  // duplicate-delivering for the life of its connection, so making the normal reroute
+  // duplicate-free keeps ONE rule for both. Pub/sub is best-effort and Redis does not promise
+  // no-loss / no-duplicate across slot migrations, so a sub-RTT gap is within contract. Reviewers
+  // asking about the former "continuity over duplicates" choice should see this note.
   for (const auto& [channel, _] : subscriptions_) {
     auto it = channel_hosts_.find(channel);
     Upstream::HostConstSharedPtr resolved;
     // Record still valid — the recorded home matches the current slot owner, OR the resolve is a
-    // TRANSIENT null (resharding window / momentary primary absence — a genuine ownership loss
+    // TRANSIENT null (slot-migration window / momentary primary absence — a genuine ownership loss
     // arrives separately as Redis's unsolicited SUNSUBSCRIBE). Leave it untouched: re-issuing
     // SUNSUBSCRIBE+SSUBSCRIBE on an unmoved channel wastes upstream control traffic AND opens a
     // needless message gap / duplicate window. A slot-only rebalance moves only some slots, so
@@ -878,14 +955,15 @@ void SubscriptionRegistry::onClusterTopologyChange() {
       continue;
     }
     // Record invalid (slot moved to a DIFFERENT known host) or owner-less: (re)place the channel. A
-    // LIVE old owner is dropped + SUNSUBSCRIBEd BEFORE the reissue so any subscription-mode cleanup
+    // LIVE old owner is dropped + sent SUNSUBSCRIBE BEFORE reissue so any subscription-mode cleanup
     // along the send path observes the up-to-date map and tears down push_callbacks_ on the old
-    // client. recordedOwnerValid already resolved the new owner for an invalid record (reused
-    // as reissueSsubscribe's pre_resolved_host); an owner-less channel resolves once here.
+    // client. recordedOwnerValid already resolved the new owner for an invalid record and hands it
+    // back via ``resolved`` (reused as reissueSsubscribe's pre_resolved_host). An owner-less
+    // channel has no old owner and no pre-resolved host, so reissueSsubscribe resolves it below — a
+    // single resolve, rather than resolving here and again there when the first attempt returns
+    // null.
     if (it != channel_hosts_.end()) {
       forgetOwnerAndSunsubscribe(channel);
-    } else {
-      resolved = resolvePlacement(channel);
     }
     any_reissued = true;
     // Reissue via the shared helper so the rerouted channel is enrolled in the resubscribe
@@ -949,8 +1027,8 @@ void SubscriptionRegistry::deliverFrameToSubscribers(
   // subscribers between deliveries. Same non-nesting invariant as fanout_encoder_/fanout_buffer_.
   fanout_targets_.assign(subscribers.begin(), subscribers.end());
   fanout_encoder_.encode(frame, fanout_buffer_);
-  // One linearizing copy of the encode into a refcounted string that every subscriber's fragment
-  // references; freed once the last fragment drains. Drain the scratch buffer immediately.
+  // One serializing copy of the encode into a reference-counted string that every subscriber's
+  // fragment references; freed when the last fragment drains. Drain the scratch buffer now.
   auto shared_bytes = std::make_shared<const std::string>(fanout_buffer_.toString());
   fanout_buffer_.drain(fanout_buffer_.length());
   for (const auto& subscriber : fanout_targets_) {
@@ -996,6 +1074,25 @@ void SubscriptionRegistry::onPushMessage(Common::Redis::RespValuePtr&& value,
     if (it == subscriptions_.end()) {
       return;
     }
+    // Source-host verification: a channel's messages must come from its CURRENT owner. After a
+    // re-route A -> B — or any window where the old owner A did not actually drop its shard
+    // subscription (its SUNSUBSCRIBE was refused/failed, or a late race) — A can keep pushing
+    // ``smessage`` for a channel now owned by B. Delivering both A's and B's copies would duplicate
+    // every message to the client for as long as A lingers subscribed. Drop a message from a host
+    // that is not the channel's recorded owner. When the channel is owner-less (a transient
+    // mid-re-resolve window with no recorded owner) we cannot attribute a source, so deliver —
+    // matching the prior behavior for that window. ``host`` is null only in registry unit-test
+    // injection; skip the check there.
+    if (host != nullptr) {
+      auto owner_it = channel_hosts_.find(channel);
+      if (owner_it != channel_hosts_.end() && owner_it->second.host != host) {
+        ENVOY_LOG(debug,
+                  "redis: dropping 'smessage' for '{}' from a non-owning host (stale/leaked shard "
+                  "subscription); the current owner delivers its own copy",
+                  channel);
+        return;
+      }
+    }
     // Normalize ``smessage`` to ``message`` for downstream delivery. The splitter only ever
     // exposes ``SUBSCRIBE`` to clients (sharded routing is internal), so clients expect the
     // traditional ``message`` push type — they never asked for sharded pub/sub and would not
@@ -1021,7 +1118,7 @@ void SubscriptionRegistry::onPushMessage(Common::Redis::RespValuePtr&& value,
     // Drop this ack's entry from the host's outstanding-control FIFO FIRST, and learn WHICH attempt
     // (generation) it acked: acks return in per-connection FIFO order, so the oldest outstanding
     // (ssubscribe, target) send on this host is the one being acked. (Also keeps a later error from
-    // misattributing itself to an already-acked command.)
+    // attributing itself to the wrong already-acked command.)
     const std::optional<uint64_t> acked_generation =
         control_ledger_.consumeAck(host, "ssubscribe", target);
     // An ack completes/advances the channel only if it is for the CURRENT attempt — same owning
@@ -1049,7 +1146,7 @@ void SubscriptionRegistry::onPushMessage(Common::Redis::RespValuePtr&& value,
     //  left, or a topology re-route). Those live as the (sunsubscribe, channel) entry the send
     //  recorded on the host's outstanding-control FIFO, so consume one here and leave state
     //  alone.
-    //  2. UNSOLICITED — this node lost ownership of the channel's slot (Redis resharding:
+    //  2. UNSOLICITED — this node lost ownership of the channel's slot (Redis slot migration:
     //  pubsubShardUnsubscribeAllChannelsInSlot -> addReplyPubsubUnsubscribed) and dropped our
     //  shard subscription while the channel is STILL active here. Forget the now-stale
     //  channel->host mapping so it is re-resolved; leave ``subscriptions_`` intact.
@@ -1137,20 +1234,19 @@ void SubscriptionRegistry::onPushMessage(Common::Redis::RespValuePtr&& value,
   }
 }
 
-void SubscriptionRegistry::registerPendingSubscribeAck(const std::string& target,
-                                                       const DownstreamSubscriberPtr& subscriber,
-                                                       uint64_t snapshot_count, bool newly_added) {
+void SubscriptionRegistry::registerPendingSubscribeAck(
+    const std::string& target, const DownstreamSubscriberPtr& subscriber, uint64_t snapshot_count,
+    bool newly_added, const SubscriptionAckTargetWeakPtr& ack_target) {
   appendPendingSubscribeAck(pending_subscribe_acks_[target], target, subscriber, snapshot_count,
-                            newly_added);
+                            newly_added, ack_target);
 }
 
-void SubscriptionRegistry::appendPendingSubscribeAck(PendingBucket& bucket,
-                                                     const std::string& target,
-                                                     const DownstreamSubscriberPtr& subscriber,
-                                                     uint64_t snapshot_count, bool newly_added) {
+void SubscriptionRegistry::appendPendingSubscribeAck(
+    PendingBucket& bucket, const std::string& target, const DownstreamSubscriberPtr& subscriber,
+    uint64_t snapshot_count, bool newly_added, const SubscriptionAckTargetWeakPtr& ack_target) {
   const bool new_bucket = bucket.entries_.empty();
   bucket.entries_.push_back(
-      {std::weak_ptr<DownstreamSubscriber>(subscriber), snapshot_count, newly_added});
+      {std::weak_ptr<DownstreamSubscriber>(subscriber), snapshot_count, newly_added, ack_target});
   // Schedule the subscribe-ack timeout. If the upstream never acks this subscribe, the timeout
   // fails it downstream and rolls it back instead of hanging the SUBSCRIBE forever. A subscriber
   // that JOINS a still-pending bucket waits on the same upstream ack, so it reuses the bucket's
@@ -1189,7 +1285,7 @@ void SubscriptionRegistry::failPendingSubscribers(const std::string& target,
   // roll back ONCE per (subscriber, channel), not once per bucket entry. A duplicate
   // pipelined SUBSCRIBE (``SUBSCRIBE ch ch``) parks TWO entries for the SAME subscriber on this one
   // channel, yet the channel was added to the pubsub_active_subscriptions gauge only once
-  // (addChannel dedups) and is rolled back only once — so recording pubsub_subscribe_ack_error per
+  // (addChannel deduplicates) and is rolled back once — so recording pubsub_subscribe_ack_error per
   // entry would drift the documented identity
   // ``active = pubsub_subscribe_total − pubsub_unsubscribe_total − pubsub_subscribe_ack_error`` by
   // −1 per duplicate (pubsub_subscribe_total is the NET subscription delta, +1). Gate on the
@@ -1214,7 +1310,13 @@ void SubscriptionRegistry::failPendingSubscribers(const std::string& target,
       // ``SUBSCRIBE ch ch`` whose first entry closed the subscriber leaves ``contains`` false here,
       // so the duplicate is correctly moot.)
       if (subscriber->subscribedChannels().contains(target)) {
-        subscriber->deliver(makeSubscriptionAck("subscribe", &target, entry.snapshot_count));
+        // Route the surviving duplicate's success ack to its own waiting request (FIFO), or fall
+        // back to out-of-band deliver() for a direct-registry caller / a request already torn down.
+        if (auto target_req = entry.ack_target.lock()) {
+          target_req->onSubscribeAck(target, entry.snapshot_count);
+        } else {
+          subscriber->deliver(makeSubscriptionAck("subscribe", &target, entry.snapshot_count));
+        }
       }
       continue;
     }
@@ -1230,7 +1332,7 @@ void SubscriptionRegistry::failPendingSubscribers(const std::string& target,
     unsubscribe(absl::MakeConstSpan(&target, 1), subscriber);
     // close the subscriber's connection instead of writing a bare out-of-band ``-ERR``. An
     // unsolicited Error frame on a RESP3 connection has no reply to attach to, so a pipelining
-    // client attributes it to the wrong (earlier, still-pending) command — permanently desyncing
+    // client attributes it to the wrong (earlier, still-pending) command — scrambling
     // its request/response matching. Closing is protocol-clean and consistent with slow-subscriber
     // eviction; the resulting disconnect cleans up the subscriber's remaining subscriptions. (The
     // ``bucket`` was moved out and erased above, so this close-driven removeSubscriber cannot
@@ -1276,29 +1378,42 @@ void SubscriptionRegistry::deliverPendingSubscribeAck(const std::string& target,
   // varies between subscribers. The downstream verb is always the literal ``subscribe`` (not the
   // upstream verb ``ssubscribe``): the client only ever issued ``SUBSCRIBE`` and the splitter
   // rewrote it to ``SSUBSCRIBE`` internally, so cluster sharding stays invisible.
+  // Fallback ack skeleton, used only for entries with no live ack_target (see below). Built once:
+  // verb and target are identical for every entry (same channel), so only the trailing
+  // per-subscriber Integer count varies.
   Common::Redis::RespValue ack =
       makeSubscriptionAck("subscribe", &target, /*subscription_count=*/0);
+  // Drain-first is already done (bucket moved out above), so a re-entrant teardown a delivery
+  // drives (onSubscribeAck -> respond() -> a write that closes the connection) only expires the
+  // LATER entries' weak refs, which the ``lock()`` guards below skip — it cannot corrupt this local
+  // bucket or the erased map slot.
   for (auto& entry : bucket.entries_) {
     auto sub = entry.subscriber.lock();
     if (!sub) {
       continue; // disconnected before ack arrived
     }
-    // Use the snapshot count from subscribe-call time (matches Redis's "number of subscriptions the
-    // client now has at THIS step" semantics). Upstream's echoed count is ignored — it's the
-    // registry-wide distinct channel count, wrong for a per-subscriber ack. Only this trailing
-    // Integer changes between subscribers, so mutate it in place on the shared skeleton.
-    ack.asArray()[2].asInteger() = entry.snapshot_count;
-    sub->deliver(ack);
-    // DELIVER an ack per bucket entry — a pipelined ``SUBSCRIBE ch ch`` gets two subscribe
-    // acks, matching real Redis — but COUNT success ONCE per (subscriber, channel), symmetric with
-    // the error path's dedup gate. Otherwise a duplicate would inflate
-    // pubsub_subscribe_ack_success by +1 while pubsub_subscribe_ack_error counts per (subscriber,
-    // channel), so the two counters would be in different units and any ``attempts ~= success +
-    // error`` / success-rate dashboard would drift under duplicates. The newly_added entry is the
-    // one that actually established the subscription (and bumped the active gauge once); a
-    // duplicate (newly_added == false) re-delivered the ack but established nothing, so it must not
-    // re-count.
-    if (entry.newly_added) {
+    // Full-strict ordering: hand the confirming ack to the in-flight SUBSCRIBE request waiting on
+    // it (its weak ack_target) so the request completes and flushes at its FIFO position, ordered
+    // against any pipelined command replies. It builds the ack from the snapshot count — Redis's
+    // "number of subscriptions the client has at THIS step" (upstream's echoed count is the
+    // registry-wide distinct-channel count, wrong for a per-subscriber ack). A registration with no
+    // live target — a direct registry caller (tests), or a request already torn down (connection
+    // close) — falls back to the legacy out-of-band write: for a dead request the subscriber is
+    // closing too, so deliver() is a safe no-op; a test exercises the same on-the-wire ack bytes.
+    if (auto target_req = entry.ack_target.lock()) {
+      target_req->onSubscribeAck(target, entry.snapshot_count);
+    } else {
+      ack.asArray()[2].asInteger() = entry.snapshot_count;
+      sub->deliver(ack);
+    }
+    // Count success ONCE per (subscriber, channel) — a pipelined ``SUBSCRIBE ch ch`` gets two acks
+    // (per entry, matching real Redis) but only the newly_added entry established the subscription
+    // (and bumped the active gauge once); a duplicate re-acked but established nothing, so it must
+    // not re-count, symmetric with the error path's dedup gate. Gate on connectionOpen() too: an
+    // earlier entry's delivery in this loop can trip the slow-subscriber watermark and close THIS
+    // subscriber, in which case deliver()/onSubscribeAck just dropped the confirming ack at the
+    // Open gate — so the success counter must not move for an ack never delivered (R8-13).
+    if (entry.newly_added && sub->connectionOpen()) {
       sub->recordSubscribeAckSuccess();
     }
   }
@@ -1351,22 +1466,60 @@ bool SubscriptionRegistry::collectPreservedSubscribeAcks(
   if (it == pending_subscribe_acks_.end()) {
     return false; // not subscribing (already ACTIVE, or rolled back) — nothing to preserve.
   }
-  // Collect one ``subscribe`` ack per entry this subscriber parked on the channel (a pipelined
-  // duplicate SUBSCRIBE has its own entry, each acked once — symmetric with
-  // deliverPendingSubscribeAck). The downstream verb is always the literal ``subscribe``: the
-  // client issued SUBSCRIBE and the splitter rewrote it to SSUBSCRIBE, so sharding stays invisible.
-  // The trailing count is the subscriber's snapshot at subscribe-call time. We do NOT write here
-  // and do NOT touch the subscribe-ack outcome counters: this is a client-cancelled
-  // subscribe, not an upstream ack resolution — the caller delivers ``out_acks`` after its terminal
-  // respond().
+  // Redis-compatible SUBSCRIBE-then-UNSUBSCRIBE: the pending ``subscribe`` ack must still be
+  // delivered (``subscribe ch <n>`` then ``unsubscribe ch <n-1>``). WHERE it goes depends on
+  // whether a SUBSCRIBE request is still holding a FIFO slot for it:
+  //   - A live ack_target (the common full-strict path) means a SUBSCRIBE request is parked in the
+  //     response FIFO waiting on this ack. Its ack must COMPLETE that request at its OWN FIFO
+  //     position, NOT ride out on this UNSUBSCRIBE response: doing the latter would leave the
+  //     SUBSCRIBE request forever pending (the bucket that completes it is scrubbed below) and,
+  //     being ahead in the FIFO, block this UNSUBSCRIBE reply behind it — a permanent stall. The
+  //     completion is DEFERRED via dispatcher_.post so onSubscribeAck -> respond() cannot re-enter
+  //     and close the connection while THIS UNSUBSCRIBE command is still on the stack (reentrancy/
+  //     UAF). The weak target lapses harmlessly if the request is already gone when the post fires.
+  //   - No live target (a direct-registry caller/test, or the SUBSCRIBE request already torn down):
+  //     nothing to complete — preserve the ack into ``out_acks`` for the caller to flush, the
+  //     pre-full-strict behavior.
+  // One ack per entry the subscriber parked (a pipelined duplicate SUBSCRIBE has its own entry).
+  // The downstream verb is always ``subscribe``; the count is the snapshot at subscribe-call time.
+  // We do NOT touch the subscribe-ack outcome counters — this is a client-cancelled subscribe, not
+  // an upstream ack resolution. Completing the ``subscribe`` here as SUCCESS is a DELIBERATE
+  // Redis-compatible short-circuit, not a bug: the client pipelined SUBSCRIBE-then-UNSUBSCRIBE, and
+  // real Redis — which resolves the SUBSCRIBE synchronously before it processes the UNSUBSCRIBE —
+  // shows exactly this pair (``subscribe ch <n>`` then ``unsubscribe ch <n-1>``). A late upstream
+  // SSUBSCRIBE ack OR error for this now-cancelled channel is thereafter ignored (its bucket is
+  // scrubbed below); see the "UNSUBSCRIBE before the upstream confirms" note in docs redis.rst.
+  // Two things this intentionally does NOT do, both correct:
+  //   - It does not HOLD the subscribe ack for the real upstream outcome. Holding it would also
+  //     hold this UNSUBSCRIBE ack behind it in the response FIFO (the SUBSCRIBE request is still
+  //     parked), re-introducing the pipeline stall / ack-timeout connection-close that the
+  //     FIFO-ordering Blocker fix removed — a regression for a subscription the client has already
+  //     abandoned.
+  //   - It does not record ``pubsub_subscribe_ack_error`` if that ignored late ack turns out to be
+  //     an error. The teardown of this cancelled subscribe is already counted as an UNSUBSCRIBE
+  //     (pubsub_unsubscribe_total), and the documented identity ``active = subscribe_total −
+  //     unsubscribe_total − subscribe_ack_error`` reserves the error counter for rollbacks NOT
+  //     otherwise counted as an unsubscribe. Adding it here would double count the removal and
+  //     drift the gauge by −1.
   bool collected = false;
   for (auto& entry : it->second.entries_) {
     auto sp = entry.subscriber.lock();
     if (sp != subscriber) {
       continue;
     }
-    out_acks.push_back(
-        makeSubscriptionAck("subscribe", &target, /*subscription_count=*/entry.snapshot_count));
+    if (entry.ack_target.lock() != nullptr) {
+      SubscriptionAckTargetWeakPtr weak = entry.ack_target;
+      const std::string channel(target);
+      const uint64_t count = entry.snapshot_count;
+      dispatcher_.post([weak, channel, count]() {
+        if (auto target_req = weak.lock()) {
+          target_req->onSubscribeAck(channel, count);
+        }
+      });
+    } else {
+      out_acks.push_back(
+          makeSubscriptionAck("subscribe", &target, /*subscription_count=*/entry.snapshot_count));
+    }
     collected = true;
   }
   if (collected) {

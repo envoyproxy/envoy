@@ -16,7 +16,10 @@ so existing RESP2 / Redis < 7.0 deployments are unaffected. When the rewrite is 
 pin to the same conn pool under a ``read_command_policy`` (classic ``PUBLISH`` keeps its prior
 read/mirror routing). Pattern subscriptions (``PSUBSCRIBE`` / ``PUNSUBSCRIBE``) are intentionally not
 supported and are rejected with ``ERR unknown command``. ``PUBLISH`` inside a ``MULTI`` transaction
-routes through the transaction handler with the verb the client sent. Subscription commands require
+routes through the transaction handler with the verb the client sent. ``SUBSCRIBE`` / ``UNSUBSCRIBE``
+issued inside a ``MULTI`` are rejected (they are not queueable in a transaction) and, like a real
+Redis dirty transaction, mark it so the subsequent ``EXEC`` aborts with ``-EXECABORT`` rather than
+running the commands that did queue. Subscription commands require
 the downstream client to have negotiated ``HELLO 3``; ``PUBLISH`` / ``SPUBLISH`` also work on RESP2
 downstream connections. A slow subscriber whose downstream write buffer overruns the connection's
 ``per_connection_buffer_limit_bytes`` is closed to bound memory (mirroring Redis's pub/sub
@@ -24,17 +27,17 @@ downstream connections. A slow subscriber whose downstream write buffer overruns
 counter. The subscribe-ack timeout and the sharded-subscription resubscribe backoff (base and max
 interval) used by the failover path are tunable via the new
 :ref:`pubsub_settings <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.pubsub_settings>`
-connection-pool option; each field defaults to its previous hardcoded value, so existing
-configurations are unaffected. For a RESP3-speaking upstream that does not implement ``SSUBSCRIBE``
+connection-pool option; each field is optional and defaults to a built-in value, so leaving
+``pubsub_settings`` unset preserves the default behavior. For a RESP3-speaking upstream that does
+not implement ``SSUBSCRIBE``
 (e.g. Redis 6.x), set
 :ref:`pubsub_settings.sharded_subscription_mode <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.sharded_subscription_mode>`
 to ``DISABLED`` to reject ``SUBSCRIBE`` / ``UNSUBSCRIBE`` with ``ERR unknown command`` (the
 pre-sharded behavior) instead of rewriting them to an ``SSUBSCRIBE`` the upstream cannot answer; it
-defaults to ``SHARDED``, preserving the transparent rewrite described above. Where each channel's
-upstream ``SSUBSCRIBE`` is homed within its slot's shard is controlled by the new
-:ref:`pubsub_settings.subscription_placement <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.subscription_placement>`:
-it defaults to ``PRIMARY`` (the slot primary), while ``SHARD_MEMBERS`` spreads channels
-across the slot shard's primary and replicas (least-loaded first) to offload the primary's
-cluster-bus fan-out egress — Redis Cluster upstreams only; a non-cluster upstream logs a warning and
-behaves as ``PRIMARY``. A replica-homed subscription receives each message via a fire-and-forget
-cluster-bus hop (at-most-once, within the pub/sub delivery contract).
+defaults to ``SHARDED``, preserving the transparent rewrite described above. Each channel's upstream
+``SSUBSCRIBE`` is homed by the conn pool's
+:ref:`read_policy <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.read_policy>`,
+so subscriptions follow the same routing rule as reads: the slot primary under ``MASTER`` (the
+default), a shard replica under the replica-capable policies, and zone-preferring placement under
+the zone-affinity policies. A replica-homed subscription receives each message via a
+fire-and-forget cluster-bus hop (at-most-once, within the pub/sub delivery contract).
