@@ -13,11 +13,10 @@
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
-#include "contrib/istio/filters/common/source/peer_metadata_registry.h"
-
 #include "contrib/envoy/extensions/filters/network/peer_metadata/v3/peer_metadata.pb.h"
 #include "contrib/envoy/extensions/filters/network/peer_metadata/v3/peer_metadata.pb.validate.h"
 #include "contrib/istio/filters/common/source/metadata_object.h"
+#include "contrib/istio/filters/common/source/peer_metadata_registry.h"
 
 /**
  * PeerMetadata network and upstream network filters are used in one of ambient

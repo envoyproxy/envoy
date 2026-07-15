@@ -2,12 +2,12 @@
 
 #include <optional>
 
+#include "envoy/stream_info/uint64_accessor.h"
+
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
-
-#include "envoy/stream_info/uint64_accessor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -174,9 +174,11 @@ void Filter::storeInRegistry(const Envoy::Protobuf::Any& peer_metadata) {
     return;
   }
   const auto* connection_id =
-      read_callbacks_->connection().streamInfo().filterState()->getDataReadOnly<
-          Router::StringAccessor>(
-          Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
+      read_callbacks_->connection()
+          .streamInfo()
+          .filterState()
+          ->getDataReadOnly<Router::StringAccessor>(
+              Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
   if (connection_id == nullptr) {
     ENVOY_LOG(debug, "No upstream connection ID in filter state, cannot store in TLS registry");
     return;
@@ -266,8 +268,8 @@ bool UpstreamFilter::tryRegistryLookup() {
   if (registry_ == nullptr || callbacks_ == nullptr) {
     return false;
   }
-  // UpstreamFilter reads the downstream connection ID shared via transitive 
-  // filter state and use it as the registry key, the listener-side Filter 
+  // UpstreamFilter reads the downstream connection ID shared via transitive
+  // filter state and use it as the registry key, the listener-side Filter
   // stores peer metadata under the same key.
   const auto* connection_id =
       callbacks_->connection().streamInfo().filterState()->getDataReadOnly<Router::StringAccessor>(
@@ -349,8 +351,7 @@ ConfigFactory::ConfigFactory()
 absl::StatusOr<Network::FilterFactoryCb>
 ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
                                                  Server::Configuration::FactoryContext& context) {
-  auto registry =
-      Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
+  auto registry = Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
   return [config, &context,
           registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
     const auto& local_info = context.serverFactoryContext().localInfo();
@@ -360,8 +361,7 @@ ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
 
 Network::FilterFactoryCb UpstreamConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message&, Server::Configuration::UpstreamFactoryContext& context) {
-  auto registry =
-      Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
+  auto registry = Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
   return [registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<UpstreamFilter>(registry));
   };

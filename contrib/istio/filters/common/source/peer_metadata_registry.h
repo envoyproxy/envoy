@@ -7,7 +7,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +30,7 @@ public:
 
   virtual void setValue(absl::string_view key, const std::string& value) PURE;
 
-  virtual absl::optional<std::string> getValue(absl::string_view key) const PURE;
+  virtual std::optional<std::string> getValue(absl::string_view key) const PURE;
 
   virtual void removeValue(absl::string_view key) PURE;
 };
@@ -40,8 +39,7 @@ using PeerMetadataRegistrySharedPtr = std::shared_ptr<PeerMetadataRegistry>;
 
 // Returns the process-wide PeerMetadataRegistry singleton, creating it if
 // necessary. The registry is pinned in the singleton manager.
-PeerMetadataRegistrySharedPtr
-getRegistry(Server::Configuration::ServerFactoryContext& context);
+PeerMetadataRegistrySharedPtr getRegistry(Server::Configuration::ServerFactoryContext& context);
 
 constexpr absl::string_view ConnectionIdFilterStateKey =
     "envoy.peer_metadata.downstream_connection_id";

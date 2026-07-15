@@ -36,14 +36,14 @@ public:
     }
   }
 
-  absl::optional<std::string> getValue(absl::string_view key) const override {
+  std::optional<std::string> getValue(absl::string_view key) const override {
     if (auto tls = tls_->get(); tls.has_value()) {
       const auto it = tls->values_.find(key);
       if (it != tls->values_.end()) {
         return it->second;
       }
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   void removeValue(absl::string_view key) override {
@@ -60,13 +60,10 @@ private:
 
 SINGLETON_MANAGER_REGISTRATION(peer_metadata_registry);
 
-PeerMetadataRegistrySharedPtr
-getRegistry(Server::Configuration::ServerFactoryContext& context) {
+PeerMetadataRegistrySharedPtr getRegistry(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<PeerMetadataRegistry>(
       SINGLETON_MANAGER_REGISTERED_NAME(peer_metadata_registry),
-      [&context] {
-        return std::make_shared<PeerMetadataRegistryImpl>(context.threadLocal());
-      },
+      [&context] { return std::make_shared<PeerMetadataRegistryImpl>(context.threadLocal()); },
       /*pin=*/true);
 }
 
