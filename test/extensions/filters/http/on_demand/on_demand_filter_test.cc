@@ -6,12 +6,14 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -19,6 +21,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
+
+using StatusHelpers::HasStatus;
+using StatusHelpers::IsOk;
 
 class OnDemandFilterTest : public testing::Test {
 public:
@@ -105,6 +110,21 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailable) {
   EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
+// tests onRouteConfigUpdateCompletion() invoked synchronously while decodeHeaders() is still
+// active: the callback must not continue decoding (decode_headers_active_ == true).
+TEST_F(OnDemandFilterTest, TestDecodeHeadersRouteConfigUpdateCompletesSynchronously) {
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  // Invoke the route config update callback synchronously, before requestRouteConfigUpdate()
+  // returns, i.e. while decode_headers_active_ is still true.
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_))
+      .WillOnce(Invoke(
+          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(true); }));
+  // continueDecoding() must not be called from within decodeHeaders().
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  filter_->decodeHeaders(headers, true);
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeTrailers) {
@@ -222,6 +242,34 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
   filter_->onRouteConfigUpdateCompletion(true);
 }
 
+// Tests onRouteConfigUpdateCompletion() with the on_demand_track_end_stream flag disabled
+// (old behavior: stream recreation is gated on the absence of a decoding buffer).
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamOldBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.on_demand_track_end_stream", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  // No decoding buffer, so the stream can be recreated.
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Tests onClusterDiscoveryCompletion() with the on_demand_track_end_stream flag disabled
+// (old behavior: stream recreation is gated on the absence of a decoding buffer).
+TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundOldBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"},
+       {"envoy.reloadable_features.on_demand_track_end_stream", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  // No decoding buffer, so the stream can be recreated.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+}
+
 // tests onClusterDiscoveryCompletion when a cluster is missing
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterNotFound) {
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
@@ -327,15 +375,26 @@ TEST(OnDemandConfigTest, Basic) {
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::extensions::filters::http::on_demand::v3::OnDemand config;
 
-  OnDemandFilterConfig config1(config, cm, visitor);
+  absl::Status status1 = absl::OkStatus();
+  OnDemandFilterConfig config1(config, cm, visitor, status1);
+  EXPECT_THAT(status1, IsOk());
 
   config.mutable_odcds();
-  OnDemandFilterConfig config2(config, cm, visitor);
+  absl::Status status2 = absl::OkStatus();
+  OnDemandFilterConfig config2(config, cm, visitor, status2);
+  EXPECT_THAT(status2, IsOk());
 
   config.mutable_odcds()->set_resources_locator("foo");
-  EXPECT_THROW_WITH_MESSAGE(
-      { OnDemandFilterConfig config3(config, cm, visitor); }, EnvoyException,
-      "foo does not have a xdstp:, http: or file: scheme");
+  absl::Status status3 = absl::OkStatus();
+  OnDemandFilterConfig config3(config, cm, visitor, status3);
+  EXPECT_THAT(status3, HasStatus(absl::StatusCode::kInvalidArgument,
+                                 "foo does not have a xdstp:, http: or file: scheme"));
+
+  // A valid xdstp resources_locator is decoded and an OdCds API is allocated with it.
+  config.mutable_odcds()->set_resources_locator("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
+  absl::Status status4 = absl::OkStatus();
+  OnDemandFilterConfig config4(config, cm, visitor, status4);
+  EXPECT_THAT(status4, IsOk());
 }
 
 } // namespace OnDemand

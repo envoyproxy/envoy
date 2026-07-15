@@ -92,13 +92,13 @@ extensions/filters/common/original_src @klarose @mattklein123
 # UDP packet writer
 /*/extensions/udp_packet_writer/ @danzh2010 @ryantheoptimist
 # redis cluster extension
-/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @nezdolik @dinesh-murugiah
+/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @dinesh-murugiah
 # reverse conn cluster extension
 /*/extensions/clusters/reverse_connection @agrawroh @basundhara-c @botengyao @yanavlasov
-/*/extensions/common/redis @msukalski @henryyyang @mattklein123 @nezdolik @dinesh-murugiah
-/*/extensions/health_checkers/redis @mattklein123 @nezdolik @dinesh-murugiah
-/*/extensions/filters/network/redis_proxy @mattklein123 @nezdolik @dinesh-murugiah
-/*/extensions/filters/network/common/redis @mattklein123 @nezdolik @dinesh-murugiah
+/*/extensions/common/redis @msukalski @henryyyang @mattklein123 @dinesh-murugiah
+/*/extensions/health_checkers/redis @mattklein123 @dinesh-murugiah
+/*/extensions/filters/network/redis_proxy @mattklein123 @dinesh-murugiah
+/*/extensions/filters/network/common/redis @mattklein123 @dinesh-murugiah
 # dynamic forward proxy
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @ryantheoptimist
@@ -345,6 +345,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
 /*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
 /*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
+/*/extensions/filters/udp/udp_proxy/session_filters/ext_authz @antonkanug @yanavlasov
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
 # mongo proxy

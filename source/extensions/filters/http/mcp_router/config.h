@@ -14,9 +14,10 @@ namespace McpRouter {
  * Config factory for MCP router filter.
  */
 class McpRouterFilterConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::mcp_router::v3::McpRouter> {
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::http::mcp_router::v3::McpRouter> {
 public:
-  McpRouterFilterConfigFactory() : FactoryBase("envoy.filters.http.mcp_router") {}
+  McpRouterFilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.mcp_router") {}
 
 private:
   bool
@@ -24,7 +25,7 @@ private:
                                Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

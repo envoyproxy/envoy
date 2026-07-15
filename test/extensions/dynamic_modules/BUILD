@@ -54,6 +54,7 @@ envoy_cc_test(
     size = "large",
     srcs = ["abi_impl_test.cc"],
     deps = [
+        "//source/common/common:minimal_logger_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",

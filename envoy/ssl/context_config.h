@@ -119,7 +119,7 @@ public:
   virtual AccessLog::AccessLogManager& accessLogManager() const PURE;
 
   /**
-   * @return the compiance policy for the TLS context.
+   * @return the compliance policy for the TLS context.
    */
   virtual std::optional<
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>

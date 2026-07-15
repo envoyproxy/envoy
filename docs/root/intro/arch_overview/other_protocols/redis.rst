@@ -72,7 +72,7 @@ When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a n
 implemented in any language to connect to the proxy as if it's a single node Redis instance.
 The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the
 cluster according to the `spec <https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/>`_. Advance features such as reading
-from replicas can also be added to the Envoy proxy instead of updating redis clients in each language.
+from replicas can also be added to the Envoy proxy instead of updating Redis clients in each language.
 
 Envoy proxy tracks the topology of the cluster by sending periodic
 `cluster slots <https://redis.io/commands/cluster-slots>`_ commands to a random node in the cluster, and maintains the
@@ -146,12 +146,12 @@ original Redis command except possibly in failure scenarios.
 
 RESP Protocol
 ^^^^^^^^^^^^^
-Envoy redis proxy supports only RESP2 protocol for now. Clients should connect to Envoy using RESP2 protocol.
+Envoy Redis proxy supports only RESP2 protocol for now. Clients should connect to Envoy using RESP2 protocol.
 hello command with only hello 2 argument is supported, hello 3 will result in error response from Envoy.
 
 INFO command
 ^^^^^^^^^^^^
-INFO command is handled by envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
+INFO command is handled by Envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
 An optional section parameter can be provided to filter the output (e.g., INFO memory).
 INFO.SHARD is an Envoy-specific command introduced for debugging purposes that queries a specific shard by index
 and returns that shard's complete INFO response (e.g., INFO.SHARD 0 memory).
