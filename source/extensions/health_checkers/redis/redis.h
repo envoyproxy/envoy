@@ -110,11 +110,6 @@ private:
       return std::chrono::milliseconds(
           NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffMaxMs);
     }
-    // Health-check client, not a pub/sub connection pool; subscription placement is moot.
-    NetworkFilters::Common::Redis::Client::SubscriptionPlacement
-    subscriptionPlacement() const override {
-      return NetworkFilters::Common::Redis::Client::SubscriptionPlacement::Primary;
-    }
 
     const std::chrono::milliseconds parent_timeout_;
     std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;

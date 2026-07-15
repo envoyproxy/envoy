@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <optional>
 #include <string>
 #include <vector>
@@ -20,6 +21,7 @@
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
@@ -304,13 +306,47 @@ public:
                                 TimeSource& time_source, bool delay_command_latency,
                                 const StreamInfo::StreamInfo& stream_info);
 
-  // RedisProxy::CommandSplitter::SplitRequest
-  void cancel() override {}
+  // RedisProxy::CommandSplitter::SplitRequest. Detach the ack sink so a deferred upstream ack that
+  // arrives after cancellation (a connection close mid-subscribe) finds an expired weak ref and is
+  // dropped rather than completing a torn-down request.
+  void cancel() override;
 
 private:
-  SubscriptionRequest(CommandStats& command_stats, TimeSource& time_source,
-                      bool delay_command_latency)
-      : SplitRequestBase(command_stats, time_source, delay_command_latency) {}
+  SubscriptionRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                      TimeSource& time_source, bool delay_command_latency)
+      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {
+  }
+
+  // Adapter the registry's pending-ack bucket weak-refs. Forwards a landed upstream ack to
+  // onChannelAck while the request is alive; the request owns the sole shared_ptr, so cancel() /
+  // completion drops it and any later ack degrades to a no-op on an expired weak ref.
+  struct AckSink : public SubscriptionAckTarget {
+    void onSubscribeAck(const std::string& channel, uint64_t subscription_count) override {
+      if (request_ != nullptr) {
+        request_->onChannelAck(channel, subscription_count);
+      }
+    }
+    SubscriptionRequest* request_{nullptr};
+  };
+
+  // Fill the next command-order placeholder for ``channel`` with its ``subscribe`` ack; when the
+  // last deferred channel's ack lands, flush every frame in one respond() at this request's FIFO
+  // position.
+  void onChannelAck(const std::string& channel, uint64_t subscription_count);
+  void complete();
+
+  SplitCallbacks& callbacks_;
+  // Response frames in command-argument order. A nullptr element is a placeholder for a channel
+  // whose upstream ack has not landed yet; onChannelAck fills it in place, preserving order.
+  RespValueFrames frames_;
+  // channel -> FIFO of placeholder indices in ``frames_`` awaiting that channel's ack (a FIFO so a
+  // duplicate ``SUBSCRIBE ch ch`` fills its two placeholders in arrival order).
+  absl::flat_hash_map<std::string, std::deque<size_t>> pending_slots_;
+  size_t pending_count_{0};
+  bool any_succeeded_{false};
+  bool any_failed_{false};
+  bool completed_{false};
+  std::shared_ptr<AckSink> ack_sink_;
 };
 
 /**
@@ -635,7 +671,7 @@ private:
     //  forbidden_in_transaction - reject inside MULTI instead of routing to the transaction
     //  handler (the subscribe family; Redis forbids pub/sub in MULTI).
     //  bypasses_fault_injection - dispatch directly, never through DelayFault/ErrorFault (the
-    //  subscribe family, whose acks flow out-of-band as RESP3 Push).
+    //  subscribe family; its handler owns downstream delivery and ack ordering).
     bool owns_arity_check{false};
     bool forbidden_in_transaction{false};
     bool bypasses_fault_injection{false};

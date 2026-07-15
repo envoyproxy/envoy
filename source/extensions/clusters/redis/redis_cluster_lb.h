@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,13 @@ namespace Clusters {
 namespace Redis {
 
 static const uint64_t MaxSlot = 16384;
+
+// Sentinel stored in ``SlotArray`` entries for slots CLUSTER SLOTS did not cover. Deliberately
+// numeric_limits max rather than ``MaxSlot``: a malformed response with duplicate slot coverage
+// can yield more than ``MaxSlot`` distinct shards, which would make ``MaxSlot`` a valid shard
+// index and silently break ``membersForSlot``'s nullopt-for-unassigned contract (and
+// ``chooseHost``'s shard-0 fallback for unassigned slots).
+static constexpr uint64_t SlotUnassigned = std::numeric_limits<uint64_t>::max();
 
 using ReplicaToResolve = std::pair<std::string, uint16_t>;
 
@@ -106,6 +114,26 @@ public:
                                    NetworkFilters::Common::Redis::Client::ReadPolicy::Primary,
                                const std::string& client_zone = "");
 
+  /**
+   * A context for a routing lookup that has no concrete Redis request — e.g. resolving a pub/sub
+   * channel's subscription placement. ``is_read`` states the routing intent explicitly instead of
+   * deriving it from a request's command classification, so a caller that wants the read-policy
+   * routing of ``key`` (and none of a request's other semantics) is not coupled to how any
+   * particular verb is read/write-classified.
+   * @param key specify the key (or channel name) to hash for shard selection.
+   * @param enabled_hashtagging specify whether to enable hashtagging, this will always be true if
+   * is_redis_cluster is true.
+   * @param is_redis_cluster specify whether this is a lookup against a Redis cluster, if true the
+   * key will be hashed using crc16.
+   * @param is_read specify whether the lookup takes the read-policy routing path.
+   * @param read_policy specify the read policy.
+   * @param client_zone specify the client zone for zone-aware routing.
+   */
+  RedisLoadBalancerContextImpl(const std::string& key, bool enabled_hashtagging,
+                               bool is_redis_cluster, bool is_read,
+                               NetworkFilters::Common::Redis::Client::ReadPolicy read_policy,
+                               const std::string& client_zone);
+
   // Upstream::LoadBalancerContextBase
   std::optional<uint64_t> computeHashKey() override { return hash_key_; }
 
@@ -162,10 +190,11 @@ inline uint64_t redisSlotForKey(absl::string_view key) {
 }
 
 // A read-only snapshot of the members (primary + replicas) of the shard that owns a given slot,
-// exposed via ShardMembershipResolver so the pub/sub conn pool can home SHARD_MEMBERS-placed
-// subscriptions across a slot shard's replicas without depending on the load balancer's internal
-// shard type. Shares the LB snapshot's host vector rather than copying it; the slot primary is
-// ``all_hosts->front()`` when a caller needs it, so no separate field is carried.
+// exposed via ShardMembershipResolver so the pub/sub conn pool can judge whether a channel's
+// recorded home still lies inside the configured read policy's feasible set without depending on
+// the load balancer's internal shard type. Shares the LB snapshot's host vector rather than
+// copying it; the slot primary is ``all_hosts->front()`` when a caller needs it, so no separate
+// field is carried.
 struct ShardMembers {
   Upstream::HostVectorConstSharedPtr all_hosts; // primary first, then replicas — LB snapshot order.
 };
@@ -173,7 +202,9 @@ struct ShardMembers {
 // Implemented by RedisClusterLoadBalancer so a caller holding an Upstream::LoadBalancer& can
 // dynamic_cast to it and query shard membership off the LB's immutable per-instance topology
 // snapshot. Non-cluster load balancers do not implement it (the dynamic_cast yields nullptr, which
-// the caller reads as "no membership model" and degrades to primary-only placement).
+// the caller reads as "no membership model" and falls back to read-policy parity: a recorded owner
+// stays valid while it matches what the channel's placement resolve returns, a transiently-null
+// resolve keeping the record).
 class ShardMembershipResolver {
 public:
   virtual ~ShardMembershipResolver() = default;
@@ -332,6 +363,9 @@ private:
         return std::nullopt;
       }
       const uint64_t idx = (*slot_array_)[slot];
+      // Unassigned slots carry an out-of-range sentinel (see updateClusterSlots' ``fill``), so this
+      // bound is what actually enforces the "nullopt for an unassigned slot" contract above — a
+      // slot CLUSTER SLOTS never covered is not silently placed on shard 0.
       if (idx >= shard_vector_->size()) {
         return std::nullopt;
       }

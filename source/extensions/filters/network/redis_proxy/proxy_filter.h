@@ -20,6 +20,7 @@
 #include "source/extensions/filters/network/redis_proxy/external_auth.h"
 #include "source/extensions/filters/network/redis_proxy/subscription_registry.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/span.h"
 
 namespace Envoy {
@@ -130,7 +131,7 @@ public:
     // Backpressure for the pub/sub "slow consumer": a subscriber receives unsolicited Push frames
     // it cannot pace (unlike a request/response client, which self-paces via its own requests). If
     // its downstream write buffer overflows the connection's high watermark, close it rather than
-    // buffer unboundedly — matching Redis's client-output-buffer-limit pubsub eviction. Only
+    // buffer without bound — matching Redis's client-output-buffer-limit pubsub eviction. Only
     // subscriber connections are subject to this (a non-subscriber's overflow is its own
     // request/reply backlog, which it drains by reading). Idempotent: the high watermark can
     // re-fire before the close completes, and a deliver path may also observe the overflow.
@@ -164,6 +165,31 @@ private:
   friend class ProxyFilterPushSink;
 
   enum class ExternalAuthCallStatus { Pending, Ready };
+
+  // Shared close handler for both paths: the downstream connection's own event
+  // (``is_downstream=true``, via onEvent) and the transaction client's UPSTREAM connection event
+  // (``is_downstream=false``, via the upstream_transaction_cb_ adapter). Only the transaction close
+  // and the auth-call cancel run on both directions; the response-FIFO cleanup (cancel +
+  // held_push_bytes reset) and the pub/sub subscriber teardown are downstream-only (R8-1) — on an
+  // upstream transaction-client close the downstream is still live, so its FIFO and subscriber must
+  // survive.
+  void handleConnectionEvent(Network::ConnectionEvent event, bool is_downstream);
+
+  // The transaction client's upstream connection registers a ConnectionCallbacks (base wiring:
+  // conn_pool addConnectionCallbacks(*transaction.connection_cb_)). We give it this thin adapter
+  // instead of the ProxyFilter itself, so an upstream transaction-client close (a keyed MULTI/EXEC
+  // closing the transaction, or an upstream dying mid-transaction) does NOT run ProxyFilter's
+  // downstream subscriber teardown — which would silently strand a live subscriber across a keyed
+  // MULTI/EXEC (real Redis keeps subscriptions across transactions).
+  struct UpstreamTransactionCallbacks : public Network::ConnectionCallbacks {
+    explicit UpstreamTransactionCallbacks(ProxyFilter& parent) : parent_(parent) {}
+    void onEvent(Network::ConnectionEvent event) override {
+      parent_.handleConnectionEvent(event, /*is_downstream=*/false);
+    }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
+    ProxyFilter& parent_;
+  };
 
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
     PendingRequest(ProxyFilter& parent);
@@ -217,10 +243,11 @@ private:
     // This value is set when the request is on hold, waiting for an external auth response.
     Common::Redis::RespValuePtr pending_request_value_;
     // Pending response frames in the order the splitter handed them to respond(). A request may
-    // carry zero frames (e.g., a multi-channel SUBSCRIBE whose acks all flowed out-of-band via
-    // subscriber->deliver — no FIFO frames to encode), exactly one (the common single-reply case
-    // fed via the onResponse sugar), or several (multi-channel SUBSCRIBE with per-channel ``-ERR``
-    // plus out-of-band acks for the successful channels). Drained in order by
+    // carry zero frames (a request that completed with nothing to write — a bare UNSUBSCRIBE on an
+    // already-gone subscriber), exactly one (the common single-reply case fed via the onResponse
+    // sugar), or several (a multi-channel SUBSCRIBE / UNSUBSCRIBE whose per-channel acks and inline
+    // ``-ERR`` replies share this entry; a fresh SUBSCRIBE fills its ack frames as each channel's
+    // upstream ack lands, then respond()s them all here). Drained in order by
     // ProxyFilter::flushReadyResponses once complete_ becomes true and the request reaches the
     // front of pending_requests_.
     CommandSplitter::RespValueFrames pending_responses_;
@@ -236,7 +263,7 @@ private:
     std::unique_ptr<Buffer::OwnedImpl> trailing_pushes_;
     // Count of MESSAGE push frames parked in ``trailing_pushes_``. flushReadyResponses adds it to
     // ``pubsub_push_messages_delivered`` when the frames actually reach the wire, so parked frames
-    // dropped on slow-subscriber eviction / disconnect (never flushed) are not overcounted.
+    // dropped on slow-subscriber eviction / disconnect (never flushed) are not double-counted.
     uint32_t trailing_push_count_{0};
     // Set to true exactly once, when the splitter calls respond() (the one-shot terminal) with the
     // request's full frame batch. The flush loop pops from the front of pending_requests_ only when
@@ -317,29 +344,64 @@ private:
       subscription_registries_.push_back(registry);
     }
   }
+  SubscriptionRegistryPtr subscriptionRegistryForChannel(const std::string& channel) override {
+    auto it = subscription_registry_by_channel_.find(channel);
+    if (it == subscription_registry_by_channel_.end()) {
+      return nullptr;
+    }
+    auto registry = it->second.lock();
+    if (registry == nullptr) {
+      // Owner registry was torn down (cluster update) without going through unbind — prune the dead
+      // entry so the caller falls back to the current route.
+      subscription_registry_by_channel_.erase(it);
+    }
+    return registry;
+  }
+  void bindSubscriptionRegistryForChannel(const std::string& channel,
+                                          const SubscriptionRegistryPtr& registry) override {
+    // Track for the disconnect / cross-registry UNSUBSCRIBE walk (idempotent), then pin this
+    // channel's owner so a later duplicate SUBSCRIBE routes back here rather than to whatever the
+    // current route now resolves.
+    setSubscriptionRegistry(registry);
+    subscription_registry_by_channel_[channel] = registry;
+  }
+  void unbindSubscriptionRegistryForChannel(const std::string& channel) override {
+    subscription_registry_by_channel_.erase(channel);
+  }
   uint64_t unsubscribeChannelAcrossRegistries(
       const std::string& channel, const DownstreamSubscriberPtr& subscriber,
       std::vector<Common::Redis::RespValue>& preserved_acks) override {
-    const uint64_t prev_count = subscriber->totalSubscriptionCount();
-    uint64_t count = prev_count;
+    // Client-facing UNSUBSCRIBE drives the sharded path (the matching SUBSCRIBE was rewritten to
+    // SSUBSCRIBE), so only subscriptions_/subscribed_channels_ carry state to clean up. A
+    // still-pending ``subscribe`` ack for the channel is completed at its parked SUBSCRIBE
+    // request's FIFO slot (posted by the registry) when that request is still live; only when it is
+    // not does ``preserved_acks`` buffer the ack for the splitter to flush after its terminal
+    // respond(), never mid-teardown (reentrancy/UAF). Owner-first: a channel is bound to exactly
+    // one registry on subscribe (bindSubscriptionRegistryForChannel), so the common path
+    // unsubscribes there directly with no scan, and drops the binding once the subscriber no longer
+    // holds the channel anywhere.
+    if (auto owner = subscriptionRegistryForChannel(channel)) {
+      const uint64_t count =
+          owner->unsubscribe(absl::MakeConstSpan(&channel, 1), subscriber, &preserved_acks);
+      if (!subscriber->subscribedChannels().contains(channel)) {
+        unbindSubscriptionRegistryForChannel(channel);
+      }
+      return count;
+    }
+    // Fallback with no binding (channel subscribed before ownership tracking, or the owner registry
+    // expired): sweep EVERY tracked registry and clean up in all of them — do NOT break at the
+    // first drop. A channel normally lives in one registry, but were an earlier defect to duplicate
+    // it across registries, an early break would strand the copies; a full sweep converges the
+    // state. The per-subscriber count only really moves in the one owning registry, so the
+    // subscriber's post-sweep total is the correct downstream ack count.
     for (const auto& weak_reg : subscription_registries_) {
       auto reg = weak_reg.lock();
       if (!reg) {
         continue;
       }
-      // Client-facing UNSUBSCRIBE drives the sharded path (the matching SUBSCRIBE was rewritten to
-      // SSUBSCRIBE), so only subscriptions_/subscribed_channels_ carry state to clean up. Passing
-      // ``preserved_acks`` buffers any still-pending ``subscribe`` ack for the splitter
-      // to flush after its terminal respond(), never mid-teardown (reentrancy/UAF).
-      count = reg->unsubscribe(absl::MakeConstSpan(&channel, 1), subscriber, &preserved_acks);
-      // A channel lives in exactly one registry: once a registry actually drops the subscriber's
-      // count, stop scanning so the ack count does not depend on later registries' unchanged totals
-      // (hash-map order) under a future multi-registry (prefix-routed) config.
-      if (count != prev_count) {
-        break;
-      }
+      reg->unsubscribe(absl::MakeConstSpan(&channel, 1), subscriber, &preserved_acks);
     }
-    return count;
+    return subscriber->totalSubscriptionCount();
   }
   void onPubsubSubscriptionChange(int64_t delta) override {
     // Cumulative subscribe/unsubscribe event counters only. The pubsub_active_subscriptions GAUGE
@@ -377,29 +439,16 @@ private:
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};
   // RESP3 permits subscribed clients to continue issuing ordinary commands. Ordinary command
-  // replies flow through pending_requests_ (FIFO). MESSAGE Push frames are ordered AGAINST them
-  // too: DownstreamSubscriber routes each via enqueueOrderedPush, which parks the push behind any
-  // in-flight command reply so a self-publish cannot overtake the publisher's own reply. Only
-  // the out-of-band subscription CONTROL acks (subscribe / unsubscribe) bypass this ordering —
-  // delivered directly through DownstreamSubscriber, so a dedup/immediate ack CAN precede a
-  // still-pending command reply. That reversal is intentional and safe: control acks are RESP3 Push
-  // frames (they never break the client's request/reply matching), and a deferred ack cannot
-  // preserve strict Redis wire-order in this model anyway (see the ControlAck* ordering test).
-  //
-  // A SECOND, related consequence of the same bypass: an ``unsubscribe`` ack can also
-  // overtake a MESSAGE push that is PARKED behind a pending reply for the same channel. If a
-  // subscribed client pipelines a slow ``GET`` (FIFO non-empty), a ``message ch`` for it parks
-  // behind the GET entry; a concurrent ``UNSUBSCRIBE ch`` acks straight to the wire, then the GET
-  // reply flushes and releases the parked message — wire order ``unsubscribe ch 0``, ``+OK``,
-  // ``message ch
-  // ...`` — which a single serial Redis push stream can never produce, so a client that closes the
-  // channel's state machine on the unsubscribe ack may treat the trailing message as a protocol
-  // violation. This is the accepted trade-off of the bypass; the structural alternative (route
-  // control acks through enqueueOrderedPush too, parking them at their own request position) would
-  // restore Redis-faithful ordering AND close the joiner message-before-ack edge, but reopens the
-  // ordering trade-offs settled above and is deferred. Pub/sub already permits best-effort
-  // delivery, so the gap-free bypass is the chosen behavior; strict-ordering clients should not
-  // pipeline commands with an in-flight UNSUBSCRIBE.
+  // replies, subscribe / unsubscribe acks, and inline pub/sub ``-ERR``s ALL flow through
+  // pending_requests_ (the FIFO): each is a frame on its own request, so it flushes at that
+  // request's position and never overtakes an earlier pipelined reply. A fresh SUBSCRIBE holds its
+  // FIFO entry until every one of its channels' upstream SSUBSCRIBE acks lands, then respond()s
+  // them in command order — so even a deferred subscribe ack is ordered exactly where a single
+  // serial Redis connection would place it (a command pipelined behind a slow subscribe waits for
+  // its reply, just as it would behind any other in-flight command). MESSAGE Push frames are the
+  // one exception: they carry no request/reply matching, so they are ordered separately via
+  // DownstreamSubscriber::enqueueOrderedPush, which parks each behind any in-flight command reply
+  // so a self-publish cannot overtake the publisher's own reply.
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
   // Per-connection negotiated downstream RESP version, held as the wire integer (2 or 3) so
@@ -410,7 +459,6 @@ private:
   // HELLO) and is flipped by ``setDownstreamRespVersion`` when a ``HELLO N`` whose ``N``
   // matches the listener policy succeeds.
   uint32_t downstream_resp_version_{2};
-  Common::Redis::Client::Transaction transaction_;
   bool connection_quit_;
   // True while resumeAuthHeldRequests is draining. A resumed AUTH that resolves synchronously
   // re-enters resumeAuthHeldRequests via onAuthenticateExternal; the nested call must not start
@@ -434,6 +482,25 @@ private:
   uint64_t held_push_bytes_{0};
   std::vector<std::weak_ptr<SubscriptionRegistry>>
       subscription_registries_; // Weak refs, from conn pools.
+  // Per-channel owning registry (weak refs), enforcing "one channel -> one registry per
+  // connection". Bound on first SUBSCRIBE, consulted before route resolution on every SUBSCRIBE /
+  // UNSUBSCRIBE, and erased when the subscriber no longer holds the channel. Weak so a registry a
+  // cluster update tears down does not linger; a lapsed entry is pruned on lookup
+  // (subscriptionRegistryForChannel).
+  absl::flat_hash_map<std::string, std::weak_ptr<SubscriptionRegistry>>
+      subscription_registry_by_channel_;
+  // Declared LAST (R8-N4) so it is destroyed FIRST. ProxyFilter is registered as the connection
+  // callback of the transaction client's UPSTREAM connection via upstream_transaction_cb_
+  // (transaction_ holds &upstream_transaction_cb_ as its connection_cb_). If ~Transaction ever
+  // closes that connection synchronously it re-enters handleConnectionEvent(is_downstream=false),
+  // which reads external_auth_call_status_ / auth_client_. Members are destroyed in reverse
+  // declaration order, so declaring transaction_ last guarantees every member that re-entry can
+  // touch is still alive. upstream_transaction_cb_ precedes transaction_ (constructed first,
+  // destroyed last) because transaction_ dereferences it during that very re-entry. The normal
+  // teardown already closes the transaction before ~ProxyFilter (making the dtor a no-op); this
+  // layout makes safety a property of the declaration order, not of that external invariant.
+  UpstreamTransactionCallbacks upstream_transaction_cb_{*this};
+  Common::Redis::Client::Transaction transaction_;
 };
 
 } // namespace RedisProxy

@@ -4,13 +4,17 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+CLUSTERDOWN
+EXECABORT
 FCS
 FLUSHALL
+NOPROTO
 NUMPAT
 PSUBSCRIBE
 PUBSUB
+PUNSUBSCRIBE
 RANDOMKEY
-SHARDED
+SETSLOT
 SLOWLOG
 SMESSAGE
 SPUBLISH
@@ -20,7 +24,6 @@ UNWATCH
 addend
 addrlen
 arity
-changelog
 defragmentation
 evictable
 flushdb
@@ -1438,6 +1441,7 @@ setenv
 SETNAME
 setsockopt
 sfixed
+sharded
 sidestream
 sig
 sigaction
@@ -1622,8 +1626,6 @@ unix
 unref
 unreferenced
 dereferenced
-unspec
-untransformed
 unzigzag
 upcasts
 upsert

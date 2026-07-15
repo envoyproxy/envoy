@@ -1041,43 +1041,43 @@ class RedisProxyResp3UpstreamIntegrationTest : public RedisProxyIntegrationTest 
 public:
   RedisProxyResp3UpstreamIntegrationTest() : RedisProxyIntegrationTest(CONFIG_RESP3_UPSTREAM, 1) {}
 
-  // Drive the per-connection RESP3 init handshake: expect ``HELLO 3`` on the wire and reply with
-  // the minimum proto:3 Map, then CLEAR the buffer so the next request the proxy issues appears at
-  // the head of the buffer. Shares the wire expectation with the free
-  // ``expectUpstreamHello3AndReply`` (the sole source of the HELLO-3 shape); this variant discards
-  // the accumulated bytes and clears instead of appending them to a cumulative-ordering
-  // accumulator.
-  void expectResp3HelloHandshake(FakeRawConnectionPtr& conn) {
-    std::string discarded_accumulator;
-    expectUpstreamHello3AndReply(conn, discarded_accumulator);
-    conn->clearData();
+  // Wait until the upstream connection's cumulative byte stream starts with ``expected`` — a
+  // prefix-tolerant alternative to the exact-size ``waitForData(n)``. The exact-size wait only
+  // matches ``data_.size() == n`` and the buffer is never cleared here, so it is brittle on slow
+  // (sanitizer / loaded-CI) runs: a ``clearData()`` can race with proxy bytes already in flight,
+  // and any extra coalesced bytes overshoot ``n`` so the condition never becomes true again.
+  static testing::AssertionResult waitForUpstreamPrefix(FakeRawConnectionPtr& conn,
+                                                        const std::string& expected) {
+    return conn->waitForData(
+        [expected](const std::string& data) { return data.rfind(expected, 0) == 0; });
   }
 
   // Drive the full downstream + upstream handshake that establishes a subscription on ``channel``:
   // client HELLO 3, client SUBSCRIBE, then the proxy's dedicated RESP3 subscription connection
   // (HELLO 3 + SSUBSCRIBE), the upstream ssubscribe ack, and the rewritten downstream subscribe
-  // ack. On return ``upstream_conn`` is the established subscription connection and both the client
-  // and upstream buffers are cleared, so the caller can drive the message / failover behavior it is
-  // actually testing. Extracted from the SUBSCRIBE-and-smessage and resubscribe end-to-end tests,
-  // which inlined the same ~20-line driver.
+  // ack. On return ``upstream_conn`` is the established subscription connection and the client
+  // buffer is cleared. The upstream buffer is deliberately NEVER cleared (see
+  // waitForUpstreamPrefix); the proxy writes nothing more on it unprompted after the SSUBSCRIBE,
+  // so callers own the connection from here. Extracted from the SUBSCRIBE-and-smessage and
+  // resubscribe end-to-end tests, which inlined the same ~20-line driver.
   void establishSubscription(IntegrationTcpClientPtr& client, FakeRawConnectionPtr& upstream_conn,
                              const std::string& channel) {
     ASSERT_TRUE(client->write(makeBulkStringArray({"HELLO", "3"})));
+    // The HELLO 3 reply is a RESP3 Map whose final field is ``modules`` -> empty array, encoded as
+    // ``*0\r\n``. Wait (non-exact, since the map has many preceding fields) for that trailing token
+    // as the signal that the whole HELLO reply has arrived before issuing the SUBSCRIBE.
     client->waitForData("*0\r\n", false);
     client->clearData();
 
     ASSERT_TRUE(client->write(makeBulkStringArray({"subscribe", channel})));
 
     // The proxy opens a dedicated RESP3 subscription connection: HELLO 3 handshake, then
-    // SSUBSCRIBE.
+    // SSUBSCRIBE, asserted as one cumulative prefix of the connection's byte stream.
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_conn));
-    expectResp3HelloHandshake(upstream_conn);
-
-    const std::string ssubscribe_wire = makeBulkStringArray({"SSUBSCRIBE", channel});
-    std::string proxy_to_server;
-    EXPECT_TRUE(upstream_conn->waitForData(ssubscribe_wire.size(), &proxy_to_server));
-    EXPECT_EQ(ssubscribe_wire, proxy_to_server);
-    upstream_conn->clearData();
+    std::string expected_upstream;
+    ASSERT_NO_FATAL_FAILURE(expectUpstreamHello3AndReply(upstream_conn, expected_upstream));
+    expected_upstream += makeBulkStringArray({"SSUBSCRIBE", channel});
+    ASSERT_TRUE(waitForUpstreamPrefix(upstream_conn, expected_upstream));
 
     // Server-initiated ack push ``[ssubscribe, channel, 1]``; the proxy rewrites the verb to the
     // client-facing ``subscribe`` before forwarding it downstream.
@@ -1639,16 +1639,14 @@ TEST_P(RedisProxyResp3UpstreamIntegrationTest,
   ASSERT_TRUE(upstream_conn1->close());
 
   // The resubscribe timer fires and opens a NEW upstream connection, re-handshakes HELLO 3, and
-  // re-issues SSUBSCRIBE foo — all without the downstream client doing anything.
+  // re-issues SSUBSCRIBE foo — all without the downstream client doing anything. Asserted as one
+  // cumulative prefix, same as establishSubscription (no clears, no exact-size waits).
   FakeRawConnectionPtr upstream_conn2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_conn2));
-  expectResp3HelloHandshake(upstream_conn2);
-
-  const std::string ssubscribe_foo_wire = makeBulkStringArray({"SSUBSCRIBE", "foo"});
-  std::string data;
-  EXPECT_TRUE(upstream_conn2->waitForData(ssubscribe_foo_wire.size(), &data));
-  EXPECT_EQ(ssubscribe_foo_wire, data);
-  upstream_conn2->clearData();
+  std::string expected_upstream2;
+  ASSERT_NO_FATAL_FAILURE(expectUpstreamHello3AndReply(upstream_conn2, expected_upstream2));
+  expected_upstream2 += makeBulkStringArray({"SSUBSCRIBE", "foo"});
+  ASSERT_TRUE(waitForUpstreamPrefix(upstream_conn2, expected_upstream2));
 
   // The re-issued SSUBSCRIBE has no pending ack (resubscribe is transparent), so this upstream ack
   // is dropped and produces NO downstream frame. A message on the new connection is what proves
@@ -1677,7 +1675,7 @@ TEST_P(RedisProxyIntegrationTest, SsubscribeRejectedNotForwarded) {
   redis_client->clearData();
   ASSERT_TRUE(redis_client->write(downstream_request));
 
-  // ``ERR unknown command 'ssubscribe', with args beginning with: ch``
+  // ``ERR unknown command 'ssubscribe', with args beginning with: 'ch' ``
   const std::string expected_prefix = "-ERR unknown command 'ssubscribe'";
   EXPECT_TRUE(redis_client->waitForData(expected_prefix.size()));
   EXPECT_EQ(expected_prefix, redis_client->data().substr(0, expected_prefix.size()));
@@ -1774,7 +1772,7 @@ TEST_P(RedisProxyIntegrationTest, UnknownCommand) {
 TEST_P(RedisProxyIntegrationTest, UnknownCommandWithArgs) {
   std::stringstream error_response;
   error_response << "-"
-                 << "ERR unknown command 'unknowncmd', with args beginning with: world"
+                 << "ERR unknown command 'unknowncmd', with args beginning with: 'world' "
                  << "\r\n";
   initialize();
   simpleProxyResponse(makeBulkStringArray({"unknowncmd", "world"}), error_response.str());
@@ -2956,7 +2954,7 @@ TEST_P(RedisProxyIntegrationTest, SendNestedMulti) {
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
 
   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"multi"}), "-MULTI calls can not be nested\r\n",
+  proxyResponseStep(makeBulkStringArray({"multi"}), "-ERR MULTI calls can not be nested\r\n",
                     redis_client);
 
   redis_client->close();
@@ -2967,7 +2965,7 @@ TEST_P(RedisProxyIntegrationTest, SendNestedMulti) {
 
 TEST_P(RedisProxyIntegrationTest, ExecWithoutMulti) {
   initialize();
-  simpleProxyResponse(makeBulkStringArray({"exec"}), "-EXEC without MULTI\r\n");
+  simpleProxyResponse(makeBulkStringArray({"exec"}), "-ERR EXEC without MULTI\r\n");
 }
 
 // This test sends an DISCARD command without a MULTI command
@@ -2975,7 +2973,7 @@ TEST_P(RedisProxyIntegrationTest, ExecWithoutMulti) {
 
 TEST_P(RedisProxyIntegrationTest, DiscardWithoutMulti) {
   initialize();
-  simpleProxyResponse(makeBulkStringArray({"discard"}), "-DISCARD without MULTI\r\n");
+  simpleProxyResponse(makeBulkStringArray({"discard"}), "-ERR DISCARD without MULTI\r\n");
 }
 
 // This test executes an empty transaction. The proxy responds
@@ -2996,12 +2994,20 @@ TEST_P(RedisProxyIntegrationTest, UnwatchNoTransactionNoOp) {
   simpleProxyResponse(makeBulkStringArray({"unwatch"}), "+OK\r\n");
 }
 
-TEST_P(RedisProxyIntegrationTest, UnwatchWithTransactionNoOp) {
+// UNWATCH inside a MULTI with no transaction key cannot be relayed onto the transaction
+// connection. Real Redis queues it and EXEC returns its +OK; faking a local +QUEUED and then
+// sending nothing upstream would leave EXEC's reply array one element short. The proxy instead
+// flags the transaction dirty and rejects, so EXEC then aborts with ``-EXECABORT`` (R8-4).
+TEST_P(RedisProxyIntegrationTest, UnwatchInEmptyTransactionDirtiesExecAborts) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
 
   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"unwatch"}),
+                    "-'unwatch' command is not supported within transaction\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"exec"}),
+                    "-EXECABORT Transaction discarded because of previous errors.\r\n",
+                    redis_client);
 
   redis_client->close();
 }
@@ -3103,6 +3109,32 @@ TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
                           redis_client, fake_upstream_conn, "", "");
 
   EXPECT_TRUE(fake_upstream_conn->close());
+  redis_client->close();
+}
+
+// A command rejected while queueing inside a MULTI flags the transaction dirty, so the subsequent
+// EXEC aborts with -EXECABORT (Redis CLIENT_DIRTY_EXEC) rather than committing. This is the
+// integration-level counterpart to the unit dirty-EXEC tests (there was no integration EXECABORT
+// coverage at all). CLIENT SETNAME is answered/rejected locally and establishes no transaction key,
+// so the whole sequence resolves on the proxy with no upstream transaction connection — the
+// keyed-``clients_`` teardown that EXEC-abort drives is covered separately by conn_pool_impl_test
+// and the WATCH/UNWATCH-in-transaction upstream tests.
+TEST_P(RedisProxyIntegrationTest, DirtyCommandInTransactionAbortsExec) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+
+  // CLIENT SETNAME cannot be relayed onto the transaction connection, so the proxy rejects it
+  // locally and flags the transaction dirty.
+  proxyResponseStep(makeBulkStringArray({"client", "setname", "myapp"}),
+                    "-'client' command is not supported within transaction\r\n", redis_client);
+
+  // EXEC then aborts with -EXECABORT and discards, rather than committing the (empty) transaction.
+  proxyResponseStep(makeBulkStringArray({"exec"}),
+                    "-EXECABORT Transaction discarded because of previous errors.\r\n",
+                    redis_client);
+
   redis_client->close();
 }
 

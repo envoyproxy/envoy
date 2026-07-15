@@ -20,7 +20,7 @@ namespace Common {
 namespace Redis {
 namespace Client {
 
-// The Redis error-code tokens that signal a stale local cluster topology: MOVED/ASK redirections
+// The Redis error-code tokens that signal a stale local cluster topology: MOVED/ASK redirects
 // and CLUSTERDOWN. Kept here in the client INTERFACE (not the impl) so both the client — which
 // matches the tokenized first word of a redirect reply (client_impl.cc) — and the subscription
 // registry — which prefix-matches a control-command error line to trigger a slot-map refresh
@@ -104,7 +104,7 @@ public:
   /**
    * Called when a subscription connection receives an out-of-band, non-Push control reply that has
    * no outstanding request — typically a normal error to a fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE
-   * (e.g. ACL denial, CLUSTERDOWN, or a MOVED/ASK observed mid-reshard). Implementations reconcile
+   * (e.g. ACL denial, CLUSTERDOWN, or a MOVED/ASK seen mid-migration). Implementations reconcile
    * subscription state (e.g. a host-scoped re-subscribe) WITHOUT tearing down the shared upstream
    * connection, since every other channel multiplexed on it must stay live. Defaults to a no-op so
    * non-subscription Push consumers need not implement it.
@@ -191,21 +191,6 @@ enum class ReadPolicy {
   LocalZoneAffinity,
   // Zone-aware routing: prefer replicas in same zone, then primary in same zone, then any
   LocalZoneAffinityReplicasAndPrimary
-};
-
-/**
- * Where the RESP3 sharded pub/sub proxy homes each channel's upstream ``SSUBSCRIBE`` within the
- * shard that owns the channel's hash slot (``pubsub_settings.subscription_placement``). Distinct
- * from ReadPolicy, which governs the DATA path — placement governs the SUBSCRIBE path only.
- */
-enum class SubscriptionPlacement {
-  // Home every channel on its slot's primary (the default; the v1 behavior).
-  Primary,
-  // Spread channels across the slot shard's members (primary + replicas), least-loaded first, to
-  // offload the primary's cluster-bus fan-out. Redis Cluster upstreams only; a non-cluster upstream
-  // has no shard-membership model and the conn pool degrades it to Primary (with a one-time
-  // warning).
-  ShardMembers
 };
 
 // Historical hardcoded defaults for the RESP3 pub/sub tuning knobs (``pubsub_settings``), the
@@ -307,13 +292,6 @@ public:
    * @return the maximum interval the pub/sub re-subscribe backoff escalates to.
    */
   virtual std::chrono::milliseconds resubscribeBackoffMaxInterval() const PURE;
-
-  /**
-   * @return where the proxy homes each pub/sub channel's upstream ``SSUBSCRIBE`` within its slot's
-   * shard (RESP3 sharded pub/sub). ``ShardMembers`` on a non-cluster upstream is degraded to
-   * ``Primary`` by the conn pool.
-   */
-  virtual SubscriptionPlacement subscriptionPlacement() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<const Config>;
@@ -386,23 +364,42 @@ struct Transaction {
   Transaction(Network::ConnectionCallbacks* connection_cb) : connection_cb_(connection_cb) {}
   ~Transaction() { close(); }
 
-  void start() { active_ = true; }
+  void start() {
+    active_ = true;
+    dirty_ = false;
+  }
 
   void close() {
     active_ = false;
     key_.clear();
     if (connection_established_) {
       for (auto& client : clients_) {
-        client->close();
+        // A mirror leg is left null when its RequestMirrorPolicy runtime_fraction did not sample at
+        // MULTI time (makeSingleServerRequest skips the unsampled leg), and the pool refuses to
+        // create it later, so the null persists for the transaction. Guard the dereference — the
+        // main leg (clients_[0]) is established, but clients_[1..] may be null (R9-2).
+        if (client != nullptr) {
+          client->close();
+        }
       }
       connection_established_ = false;
     }
     should_close_ = false;
+    dirty_ = false;
   }
 
   bool active_{false};
   bool connection_established_{false};
   bool should_close_{false};
+  // Set when a command is rejected or short-circuited while queueing inside this MULTI in a way
+  // that would leave the eventual EXEC reply array inconsistent with what the client queued: an
+  // unknown or wrong-arity command, a no-multi command (SUBSCRIBE / UNSUBSCRIBE), or any command
+  // the proxy cannot relay onto the transaction path and so answers or rejects locally (AUTH /
+  // HELLO / CLIENT / PING / ECHO / TIME, a key-less command, or one off the transaction allowlist).
+  // A subsequent EXEC then aborts with ``-EXECABORT`` and discards rather than committing a
+  // partial, non-atomic transaction — matching how a real Redis client treats any queue-time
+  // error. (WATCH inside MULTI is a plain error, not a dirty.) Cleared on transaction start/end.
+  bool dirty_{false};
 
   // The key which represents the transaction hash slot.
   std::string key_;

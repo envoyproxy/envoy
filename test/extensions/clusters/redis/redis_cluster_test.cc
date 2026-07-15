@@ -276,6 +276,14 @@ protected:
     return zone_client;
   }
 
+  // Direct driver for the zone-discovery entry point (the fixture is a friend): lets tests hit
+  // the degraded branches (no nodes to discover, a node address that does not parse) without
+  // full hostname-resolution round through onResponse.
+  void driveZoneDiscovery(NetworkFilters::Common::Redis::RespValuePtr) = delete;
+  void driveZoneDiscovery(ClusterSlotsSharedPtr&& slots) {
+    cluster_->redis_discovery_session_->startZoneDiscovery(std::move(slots));
+  }
+
   NetworkFilters::Common::Redis::RespValuePtr singleSlotPrimary(const std::string& primary,
                                                                 int64_t port) const {
     std::vector<NetworkFilters::Common::Redis::RespValue> primary_1(2);
@@ -1639,6 +1647,68 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
       {"127.0.0.1:22120", "127.0.0.3:22120"}));
   }
   */
+}
+
+// Zone discovery with no node addresses to discover (e.g. every slot entry still pending
+// hostname resolution): the round degrades to a plain slot update and re-arms the resolve timer
+// instead of hanging with a zero pending-request count.
+TEST_F(RedisClusterTest, ZoneDiscoveryWithNoDiscoverableNodes) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
+  std::bitset<ResponseReplicaFlagSize> no_replica(0);
+  expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+
+  EXPECT_CALL(membership_updated_, ready()).Times(testing::AtMost(1));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+  driveZoneDiscovery(std::make_shared<std::vector<ClusterSlot>>());
+}
+
+// Zone discovery where a node address does not parse as IP:port (a hostname replica awaiting
+// resolution): the node is skipped via onZoneDiscoveryFailure and discovery proceeds with the
+// parseable nodes only.
+TEST_F(RedisClusterTest, ZoneDiscoverySkipsUnparseableNodeAddress) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
+  std::bitset<ResponseReplicaFlagSize> no_replica(0);
+  expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+
+  // Zone round: one parseable primary (INFO client created) + one hostname replica (skipped).
+  auto* zone_client = new Extensions::NetworkFilters::Common::Redis::Client::MockClient();
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(zone_client));
+  EXPECT_CALL(*zone_client, addConnectionCallbacks(_));
+  EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+      .WillOnce(Return(&pool_request_));
+  EXPECT_CALL(*zone_client, close());
+
+  auto slots = std::make_shared<std::vector<ClusterSlot>>();
+  ClusterSlot slot(0, 16383,
+                   Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.9:22120", false));
+  slot.addReplicaToResolve("still-a-hostname.example.com", 6379);
+  slots->push_back(std::move(slot));
+  driveZoneDiscovery(std::move(slots));
 }
 
 // Test that verifies cluster destruction does not cause segfault when refresh manager

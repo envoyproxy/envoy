@@ -73,7 +73,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   // (> 0), but a SUB-millisecond value rounds to 0ms here and an inverted base/max pair passes
   // proto validation — either would otherwise load fine and then abort a worker (the strategy's
   // ASSERT, or a ``% 0``) on the first RESP3 subscription. Compare the EFFECTIVE values, defaulting
-  // via the SAME shared constexprs Common::Redis::Client::ConfigImpl uses (kDefault*Ms) so the
+  // via the shared constexpr values Common::Redis::Client::ConfigImpl uses (kDefault*Ms) so the
   // validator can never drift from the runtime. Same fail-at-config-load posture as the
   // custom_commands pub/sub guard below.
   const auto& pubsub_settings = proto_config.settings().pubsub_settings();
@@ -101,10 +101,10 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   // cap each duration at 1 hour. These feed deadline arithmetic — the subscribe-ack scheduler
   // computes ``monotonicTime() + timeout_`` (a MonotonicTime point), and the generation / backoff
   // timers arm on these values — so an extreme value (PGV's Duration validator allows up to ~292
-  // years) would overflow the time-point's signed nanosecond representation (UB) and could wrap to
-  // a PAST deadline, making a healthy upstream time out, roll back, and close immediately. One hour
-  // is far above any sane ack or backoff window, matching the fail-at-load spirit of the >0 /
-  // base<=max checks above.
+  // years) would overflow the time-point's signed nanosecond representation (undefined behavior)
+  // and could wrap to a PAST deadline, making a healthy upstream time out, roll back, and close
+  // immediately. One hour is far above any sane ack or backoff window, matching the fail-at-load
+  // spirit of the >0 / base<=max checks above.
   constexpr int64_t kMaxPubsubDurationMs = 60 * 60 * 1000; // 1 hour
   if (subscribe_ack_timeout_ms > kMaxPubsubDurationMs ||
       resubscribe_backoff_base_ms > kMaxPubsubDurationMs ||

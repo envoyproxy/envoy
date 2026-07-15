@@ -34,9 +34,6 @@ public:
 
   MOCK_METHOD(Upstream::HostConstSharedPtr, chooseUpstreamHostForChannel,
               (const std::string& channel), (override));
-  MOCK_METHOD(bool, shardCandidatesForChannel,
-              (const std::string& channel, std::vector<Upstream::HostConstSharedPtr>& out),
-              (override));
   MOCK_METHOD(bool, hostServesChannelSlot,
               (const std::string& channel, const Upstream::HostConstSharedPtr& host), (override));
   MOCK_METHOD(bool, sendUpstreamSsubscribeToHost,
@@ -51,6 +48,8 @@ public:
   MOCK_METHOD(void, cancelResubscribeTimer, (), (override));
   MOCK_METHOD(void, requestTopologyRefresh, (), (override));
   MOCK_METHOD(bool, retireSubscriptionConnectionIfIdle, (const Upstream::HostConstSharedPtr& host),
+              (override));
+  MOCK_METHOD(void, closeSubscriptionConnection, (const Upstream::HostConstSharedPtr& host),
               (override));
 };
 
@@ -158,6 +157,12 @@ class NoOpPubsubSession : public PubsubSession {
 public:
   RedisProxy::DownstreamSubscriberPtr downstreamSubscriber() override { return nullptr; }
   void setSubscriptionRegistry(const RedisProxy::SubscriptionRegistryPtr&) override {}
+  RedisProxy::SubscriptionRegistryPtr subscriptionRegistryForChannel(const std::string&) override {
+    return nullptr;
+  }
+  void bindSubscriptionRegistryForChannel(const std::string&,
+                                          const RedisProxy::SubscriptionRegistryPtr&) override {}
+  void unbindSubscriptionRegistryForChannel(const std::string&) override {}
   uint64_t unsubscribeChannelAcrossRegistries(const std::string&,
                                               const RedisProxy::DownstreamSubscriberPtr&,
                                               std::vector<Common::Redis::RespValue>&) override {
@@ -178,8 +183,9 @@ public:
   //  onResponse() sugar; also a single-channel pub/sub error, which is genuinely
   //  indistinguishable from any other single reply at this seam).
   //  * >= 2 frames -> respond_ — a multi-channel SUBSCRIBE emitting several per-channel -ERRs.
-  //  * zero frames -> silent, matching the old completePendingRequest() no-op, so bare-UNSUBSCRIBE
-  //  and all-out-of-band subscribe tests (which pin onResponse_ Times(0)) need no expectation;
+  //  * zero frames -> silent, matching the old completePendingRequest() no-op: a completion that
+  //  carries no downstream frame — e.g. a bare UNSUBSCRIBE with nothing to ack, which respond({})s
+  //  only to complete the request — pins onResponse_ Times(0) and needs no expectation;
   //  TestSplitCallbacks still records the completion via completed_pending_request_.
   void respond(CommandSplitter::RespValueFrames&& frames) override {
     if (frames.size() == 1) {
@@ -237,24 +243,23 @@ public:
   // downstreamSubscriber / setSubscriptionRegistry / onPubsubSubscriptionChange are the inherited
   // NoOpPubsubSession no-ops; only pubsub() and the real cross-registry unsubscribe differ.
   PubsubSession* pubsub() override { return this; }
-  // Mirrors ProxyFilter's cross-registry unsubscribe: scan the tracked registries, stopping
-  // at the first that drops the subscriber's count.
+  // Mirrors ProxyFilter's cross-registry unsubscribe FALLBACK path. This mock tracks no per-channel
+  // owner (subscriptionRegistryForChannel returns null), so the production owner-first shortcut
+  // never applies and every unsubscribe takes the sweep: clean up in EVERY tracked registry, do NOT
+  // break at the first count drop. A channel normally lives in one registry, but were an earlier
+  // defect to duplicate it across registries, an early break would strand the copies; a full sweep
+  // converges the state. The subscriber's post-sweep total is the downstream ack count.
   uint64_t unsubscribeChannelAcrossRegistries(
       const std::string& channel, const RedisProxy::DownstreamSubscriberPtr& subscriber,
       std::vector<Common::Redis::RespValue>& preserved_acks) override {
-    const uint64_t prev = subscriber->totalSubscriptionCount();
-    uint64_t count = prev;
     for (const auto& weak_reg : tracked_registries_) {
       auto reg = weak_reg.lock();
       if (!reg) {
         continue;
       }
-      count = reg->unsubscribe(absl::MakeConstSpan(&channel, 1), subscriber, &preserved_acks);
-      if (count != prev) {
-        break;
-      }
+      reg->unsubscribe(absl::MakeConstSpan(&channel, 1), subscriber, &preserved_acks);
     }
-    return count;
+    return subscriber->totalSubscriptionCount();
   }
 
   std::vector<std::weak_ptr<RedisProxy::SubscriptionRegistry>> tracked_registries_;

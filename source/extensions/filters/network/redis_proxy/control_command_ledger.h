@@ -18,7 +18,7 @@ namespace RedisProxy {
 
 /**
  * A per-host FIFO of the fire-and-forget control commands (``SSUBSCRIBE`` / ``SUNSUBSCRIBE``) the
- * subscription registry has sent upstream but not yet seen acked or errored. Redis answers a
+ * subscription registry has sent upstream but not yet seen acked or failed. Redis answers a
  * connection's pipelined control commands IN ORDER, so the head of a host's FIFO is always the
  * oldest command still awaiting a reply. That is how the registry correlates an out-of-band
  * upstream Push (a subscribe/unsubscribe ack) or a non-Push reply (an ``-ERR``) back to the exact
@@ -115,7 +115,7 @@ private:
   void popHead(Map::iterator it) {
     it->second.pop_front();
     if (it->second.empty()) {
-      commands_.erase(it); // keep the map free of empty deques so ``find`` == "has outstanding"
+      commands_.erase(it); // keep the map free of empty queues so ``find`` == "has outstanding"
     }
   }
   Map commands_;
