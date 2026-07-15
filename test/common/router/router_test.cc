@@ -6293,6 +6293,107 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesParentContext) {
   router_->onDestroy();
 }
 
+// The downstream request's dynamic ``envoy.lb`` metadata (request-level merged over
+// connection-level) must be forwarded to the shadow stream so that subset load balancing can
+// select the same host subset as the main request.
+TEST_P(RouterShadowingTest, ShadowRequestInheritsDynamicMetadata) {
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  // Connection-level metadata provides a base value that request-level metadata overrides, and a
+  // value that is only present at connection level.
+  envoy::config::core::v3::Metadata connection_metadata;
+  Config::Metadata::mutableMetadataValue(connection_metadata,
+                                         Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("v1");
+  Config::Metadata::mutableMetadataValue(connection_metadata,
+                                         Config::MetadataFilters::get().ENVOY_LB, "from_connection")
+      .set_string_value("yes");
+  router_->downstream_connection_.stream_info_.metadata_ = connection_metadata;
+
+  Config::Metadata::mutableMetadataValue(callbacks_.streamInfo().dynamicMetadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("v2");
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        const auto it =
+            options.metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
+        EXPECT_NE(it, options.metadata.filter_metadata().end());
+        const auto& fields = it->second.fields();
+        // Request-level value wins over connection-level value.
+        EXPECT_EQ("v2", fields.at("version").string_value());
+        // Connection-level-only value is preserved.
+        EXPECT_EQ("yes", fields.at("from_connection").string_value());
+        return &foo_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+
+  router_->onDestroy();
+}
+
+// When the runtime guard is disabled, the shadow stream should not receive any forwarded
+// ``envoy.lb`` dynamic metadata, preserving the legacy behavior.
+TEST_P(RouterShadowingTest, ShadowRequestDoesNotInheritDynamicMetadataWhenDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata", "false"}});
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  Config::Metadata::mutableMetadataValue(callbacks_.streamInfo().dynamicMetadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("v2");
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_TRUE(options.metadata.filter_metadata().empty());
+        return &foo_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+
+  router_->onDestroy();
+}
+
 TEST_P(RouterShadowingTest, ShadowWithHeaderManipulation) {
   const std::vector<std::string> mutation_yamls = {
       R"EOF(

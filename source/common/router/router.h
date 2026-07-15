@@ -580,6 +580,14 @@ private:
                                                     const Http::HeaderMap& headers) const;
   void applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
                                 Http::RequestHeaderMap& headers) const;
+  // Collects the downstream request's dynamic ``envoy.lb`` metadata (from the request and, at
+  // lower precedence, the downstream connection) so it can be forwarded to shadow streams. This
+  // mirrors how the main request path merges dynamic metadata into subset load balancer match
+  // criteria (see ``metadataMatchCriteria()``); without it, shadowed requests only honor the
+  // static route-level ``metadata_match`` and ignore dynamically-set subset selectors (for
+  // example those produced by the header-to-metadata filter). Returns an empty metadata when no
+  // ``envoy.lb`` dynamic metadata is present.
+  envoy::config::core::v3::Metadata shadowDynamicMetadata() const;
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();

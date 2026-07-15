@@ -901,6 +901,20 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     active_shadow_policies.clear();
   }
 
+  // Compute the downstream request's dynamic ``envoy.lb`` metadata once for all shadow policies.
+  // Its value depends only on the downstream request/connection, not on the individual policy, so
+  // it is hoisted out of the loop below to avoid recomputing it per policy.
+  const bool inherit_dynamic_metadata =
+      !active_shadow_policies.empty() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata");
+  envoy::config::core::v3::Metadata shadow_metadata;
+  if (inherit_dynamic_metadata) {
+    shadow_metadata = shadowDynamicMetadata();
+  }
+  const bool has_shadow_metadata =
+      inherit_dynamic_metadata && !shadow_metadata.filter_metadata().empty();
+
   // Start the shadow streams.
   const size_t num_shadow_policies = active_shadow_policies.size();
   for (size_t i = 0; i < num_shadow_policies; ++i) {
@@ -921,7 +935,7 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
     }
     applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
-    const auto options =
+    auto options =
         Http::AsyncClient::RequestOptions()
             .setTimeout(timeout_.global_timeout_)
             .setParentSpan(callbacks_->activeSpan())
@@ -940,6 +954,16 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
             .setDiscardResponseBody(true)
             .setFilterConfig(config_)
             .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
+
+    // Forward the downstream request's dynamic ``envoy.lb`` metadata to the shadow stream so that
+    // subset load balancing selects the same host subset for shadowed traffic as it does for the
+    // main request. The async client route only exposes the static route-level ``metadata_match``,
+    // so without this dynamically-set subset selectors (for example from the header-to-metadata
+    // filter) would be ignored by the shadow cluster's load balancer.
+    if (has_shadow_metadata) {
+      options.setMetadata(shadow_metadata);
+    }
+
     if (end_stream) {
       // This is a header-only request, and can be dispatched immediately to the shadow
       // without waiting.
@@ -1274,6 +1298,32 @@ std::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& po
                      policy.clusterHeader());
     return std::nullopt;
   }
+}
+
+envoy::config::core::v3::Metadata Filter::shadowDynamicMetadata() const {
+  envoy::config::core::v3::Metadata metadata;
+
+  // Precedence matches the main request path in metadataMatchCriteria(): connection metadata is
+  // applied first and then the request metadata is merged on top so request-level values win.
+  const auto* downstream_conn = downstreamConnection();
+  if (downstream_conn != nullptr) {
+    const auto& connection_fm =
+        downstream_conn->streamInfo().dynamicMetadata().filter_metadata();
+    if (const auto it = connection_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        it != connection_fm.end()) {
+      (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+          it->second;
+    }
+  }
+
+  const auto& request_fm = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  if (const auto it = request_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+      it != request_fm.end()) {
+    (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB].MergeFrom(
+        it->second);
+  }
+
+  return metadata;
 }
 
 void Filter::applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
