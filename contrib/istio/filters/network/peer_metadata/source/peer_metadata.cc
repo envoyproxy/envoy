@@ -60,13 +60,6 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
 
 Network::FilterStatus Filter::onNewConnection() {
   ENVOY_LOG(trace, "New connection from downstream");
-  // Store this connection's ID in filter state so the listener-side filter
-  // can use it as a key in the thread-local registry.
-  read_callbacks_->connection().streamInfo().filterState()->setData(
-      Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey,
-      std::make_shared<StreamInfo::UInt64AccessorImpl>(read_callbacks_->connection().id()),
-      StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::StreamSharingMayImpactPooling::None);
   populateBaggage();
   if (disableDiscovery()) {
     state_ = PeerMetadataState::PassThrough;
@@ -177,21 +170,19 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
 
 void Filter::storeInRegistry(const Envoy::Protobuf::Any& peer_metadata) {
   if (registry_ == nullptr || read_callbacks_ == nullptr) {
+    ENVOY_LOG(error, "No instance for registry or callbacks");
     return;
   }
-  // Read the upstream connection ID that was passed through PassthroughState.
   const auto* connection_id =
       read_callbacks_->connection().streamInfo().filterState()->getDataReadOnly<
-          StreamInfo::UInt64Accessor>(
+          Router::StringAccessor>(
           Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
   if (connection_id == nullptr) {
-    ENVOY_LOG(trace, "No upstream connection ID in filter state, cannot store in registry");
+    ENVOY_LOG(debug, "No upstream connection ID in filter state, cannot store in TLS registry");
     return;
   }
   std::string serialized = peer_metadata.SerializeAsString();
-  registry_->setValue(connection_id->value(), serialized);
-  ENVOY_LOG(trace, "Stored peer metadata in registry for connection ID {}",
-            connection_id->value());
+  registry_->setValue(connection_id->asString(), serialized);
 }
 
 UpstreamFilter::UpstreamFilter(
@@ -275,30 +266,35 @@ bool UpstreamFilter::tryRegistryLookup() {
   if (registry_ == nullptr || callbacks_ == nullptr) {
     return false;
   }
-  // Use this connection's ID as the registry key — the listener-side Filter
-  // stored peer metadata under the same key after receiving it via
-  // PassthroughState.
-  uint64_t conn_id = callbacks_->connection().id();
+  // UpstreamFilter reads the downstream connection ID shared via transitive 
+  // filter state and use it as the registry key, the listener-side Filter 
+  // stores peer metadata under the same key.
+  const auto* connection_id =
+      callbacks_->connection().streamInfo().filterState()->getDataReadOnly<Router::StringAccessor>(
+          Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
+  if (connection_id == nullptr) {
+    ENVOY_LOG(debug, "No downstream connection ID in filter state");
+    return false;
+  }
+  absl::string_view conn_id = connection_id->asString();
   auto value = registry_->getValue(conn_id);
   if (!value.has_value()) {
-    ENVOY_LOG(trace, "No peer metadata in registry for connection ID {}", conn_id);
+    ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", conn_id);
     return false;
   }
 
-  ENVOY_LOG(trace, "Found peer metadata in registry for connection ID {}", conn_id);
-  // Remove the entry to avoid leaking memory.
   registry_->removeValue(conn_id);
 
   Envoy::Protobuf::Any any;
   if (!any.ParseFromString(*value)) {
-    ENVOY_LOG(trace, "Failed to parse peer metadata from registry");
+    ENVOY_LOG(error, "Failed to parse peer metadata from registry");
     populateNoPeerMetadata();
     return true;
   }
 
   Envoy::Protobuf::Struct peer_metadata;
   if (!any.UnpackTo(&peer_metadata)) {
-    ENVOY_LOG(trace, "Failed to unpack peer metadata struct from registry");
+    ENVOY_LOG(error, "Failed to unpack peer metadata struct from registry");
     populateNoPeerMetadata();
     return true;
   }

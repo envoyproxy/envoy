@@ -20,7 +20,7 @@ namespace PeerMetadataShared {
 namespace {
 
 struct ThreadLocalRegistry : public ThreadLocal::ThreadLocalObject {
-  absl::flat_hash_map<uint64_t, std::string> values_;
+  absl::flat_hash_map<std::string, std::string> values_;
 };
 
 class PeerMetadataRegistryImpl : public PeerMetadataRegistry, public Singleton::Instance {
@@ -30,13 +30,13 @@ public:
     tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalRegistry>(); });
   }
 
-  void setValue(uint64_t key, const std::string& value) override {
+  void setValue(absl::string_view key, const std::string& value) override {
     if (auto tls = tls_->get(); tls.has_value()) {
-      tls->values_[key] = value;
+      tls->values_[std::string(key)] = value;
     }
   }
 
-  absl::optional<std::string> getValue(uint64_t key) const override {
+  absl::optional<std::string> getValue(absl::string_view key) const override {
     if (auto tls = tls_->get(); tls.has_value()) {
       const auto it = tls->values_.find(key);
       if (it != tls->values_.end()) {
@@ -46,7 +46,7 @@ public:
     return absl::nullopt;
   }
 
-  void removeValue(uint64_t key) override {
+  void removeValue(absl::string_view key) override {
     if (auto tls = tls_->get(); tls.has_value()) {
       tls->values_.erase(key);
     }

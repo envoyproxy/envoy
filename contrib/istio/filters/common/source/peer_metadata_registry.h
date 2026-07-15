@@ -29,15 +29,11 @@ class PeerMetadataRegistry {
 public:
   virtual ~PeerMetadataRegistry() = default;
 
-  // Store `value` under `key` in the current worker thread's store.
-  virtual void setValue(uint64_t key, const std::string& value) PURE;
+  virtual void setValue(absl::string_view key, const std::string& value) PURE;
 
-  // Look up `key` in the current worker thread's store. Returns absl::nullopt
-  // if no value was stored (on this thread) under `key`.
-  virtual absl::optional<std::string> getValue(uint64_t key) const PURE;
+  virtual absl::optional<std::string> getValue(absl::string_view key) const PURE;
 
-  // Remove the entry for `key` from the current worker thread's store.
-  virtual void removeValue(uint64_t key) PURE;
+  virtual void removeValue(absl::string_view key) PURE;
 };
 
 using PeerMetadataRegistrySharedPtr = std::shared_ptr<PeerMetadataRegistry>;
@@ -47,9 +43,8 @@ using PeerMetadataRegistrySharedPtr = std::shared_ptr<PeerMetadataRegistry>;
 PeerMetadataRegistrySharedPtr
 getRegistry(Server::Configuration::ServerFactoryContext& context);
 
-// Filter state key under which the originating upstream connection ID is stored.
 constexpr absl::string_view ConnectionIdFilterStateKey =
-    "envoy.peer_metadata.upstream_connection_id";
+    "envoy.peer_metadata.downstream_connection_id";
 
 } // namespace PeerMetadataShared
 } // namespace Common
