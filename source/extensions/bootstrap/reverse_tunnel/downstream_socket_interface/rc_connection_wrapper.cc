@@ -79,7 +79,8 @@ Network::FilterStatus SimpleConnReadFilter::onData(Buffer::Instance& buffer, boo
 
 std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
                                          const std::string& src_cluster_id,
-                                         const std::string& src_node_id) {
+                                         const std::string& src_node_id,
+                                         std::optional<int64_t> initiation_time_ms) {
   // Register connection callbacks.
   ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, adding connection callbacks",
             connection_->id());
@@ -157,10 +158,15 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
 
   const Http::LowerCaseString& initiation_time_hdr =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader();
-  auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    connection_->dispatcher().timeSource().systemTime().time_since_epoch())
-                    .count();
-  headers->addCopy(initiation_time_hdr, absl::StrCat(now_ms));
+  // Prefer the episode initiation time supplied by the caller so that handshake retries during
+  // initial establishment carry the original intent time; fall back to now for direct callers.
+  const int64_t initiation_ms =
+      initiation_time_ms.has_value()
+          ? *initiation_time_ms
+          : std::chrono::duration_cast<std::chrono::milliseconds>(
+                connection_->dispatcher().timeSource().systemTime().time_since_epoch())
+                .count();
+  headers->addCopy(initiation_time_hdr, absl::StrCat(initiation_ms));
 
   using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
   const auto apply_header = [&headers](const Http::LowerCaseString& key, absl::string_view value,
