@@ -50,7 +50,7 @@ struct ExtractFieldSpec {
 // On success, result.path == path and result.segments is populated.
 absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path);
 
-// Configuration passed to a filter or handler to control JSON decoding.
+// Configuration that controls JSON decoding.
 //
 // Usage pattern at filter init:
 //   DecoderConfig cfg = ...;    // populate from proto
@@ -58,10 +58,7 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path);
 //   WuffsJsonCursor cursor(handler, track_paths,
 //                          depth > 0 ? depth : WuffsJsonCursor::kMaxDepth);
 struct DecoderConfig {
-  // Maximum raw body bytes to feed into the cursor. The outer filter should
-  // compare cursor.nextSourcePosition() against this limit between feed()
-  // calls and return ResourceExhausted before calling feed() again.
-  // 0 = no limit (tests only; production must set a non-zero value).
+  // Maximum raw body bytes to feed into the cursor.
   size_t max_body_bytes{0};
 
   // Maximum decoded bytes to capture for a single inline scalar string value.
