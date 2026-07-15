@@ -11,7 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace StatefulSession {
 
-Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context, stats_prefix,

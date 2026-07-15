@@ -751,6 +751,15 @@ Host::CreateConnectionData HostImplBase::createConnection(
         upstream_local_address.socket_options_, transport_socket_options);
   }
 
+  // `createClientConnection` can return nullptr, for example when binding the upstream connection
+  // to a configured network namespace fails (e.g. the namespace was removed at runtime). Returning
+  // a null connection lets the caller (connection pools) treat this as a connection failure rather
+  // than crashing on a null dereference below.
+  if (connection == nullptr) {
+    ENVOY_LOG(debug, "Failed to create upstream connection to host {}", address->asString());
+    return {nullptr, host};
+  }
+
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
