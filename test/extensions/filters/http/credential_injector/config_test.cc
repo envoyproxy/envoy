@@ -37,7 +37,7 @@ TEST(Factory, UnregisteredExtension) {
                          "type URL: 'test.mock_credential.Unregistered'"));
 }
 
-TEST(Factory, ValidConfigWithServerContext) {
+TEST(Factory, UnregisteredExtensionWithServerContext) {
   const std::string yaml_string = R"EOF(
   overwrite: true
   allow_request_without_credential: true
@@ -51,11 +51,10 @@ TEST(Factory, ValidConfigWithServerContext) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   CredentialInjectorFilterFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW_WITH_REGEX(
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value(),
-      EnvoyException,
-      ".*Didn't find a registered implementation for 'undefined_credential' with "
-      "type URL: 'test.mock_credential.Unregistered'.*");
+  EXPECT_THAT(
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).status().message(),
+      testing::HasSubstr("Didn't find a registered implementation for 'undefined_credential' with "
+                         "type URL: 'test.mock_credential.Unregistered'"));
 }
 
 } // namespace

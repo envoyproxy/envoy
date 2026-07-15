@@ -238,9 +238,26 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
-  priority_set_.updateHosts(0,
-                            HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
-                            {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.skip_partition_original_dst_hosts")) {
+    // OriginalDstCluster::LoadBalancer selects the exact destination address from host_map_ and
+    // does not consult HostSet health partitions. Preserve all hosts in healthy_hosts so that host
+    // set updates expose the complete routable destination set.
+    auto healthy_hosts = std::make_shared<HealthyHostVector>(*all_hosts);
+    auto degraded_hosts = std::make_shared<DegradedHostVector>();
+    auto excluded_hosts = std::make_shared<ExcludedHostVector>();
+    priority_set_.updateHosts(
+        0,
+        HostSetImpl::updateHostsParams(std::move(all_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
+                                       std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
+        {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
+  } else {
+    priority_set_.updateHosts(0,
+                              HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
+                              {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
+  }
 }
 
 void OriginalDstCluster::cleanup() {
@@ -309,9 +326,26 @@ void OriginalDstCluster::cleanup() {
       new_host_map->erase(addr);
     }
     setHostMap(new_host_map);
-    priority_set_.updateHosts(
-        0, HostSetImpl::partitionHosts(keeping_hosts, HostsPerLocalityImpl::empty()), {}, {},
-        to_be_removed, false, std::nullopt);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.skip_partition_original_dst_hosts")) {
+      // OriginalDstCluster::LoadBalancer selects the exact destination address from host_map_ and
+      // does not consult HostSet health partitions. Preserve all hosts in healthy_hosts so that
+      // host set updates expose the complete routable destination set.
+      auto healthy_hosts = std::make_shared<HealthyHostVector>(*keeping_hosts);
+      auto degraded_hosts = std::make_shared<DegradedHostVector>();
+      auto excluded_hosts = std::make_shared<ExcludedHostVector>();
+      priority_set_.updateHosts(
+          0,
+          HostSetImpl::updateHostsParams(std::move(keeping_hosts), HostsPerLocalityImpl::empty(),
+                                         std::move(healthy_hosts), HostsPerLocalityImpl::empty(),
+                                         std::move(degraded_hosts), HostsPerLocalityImpl::empty(),
+                                         std::move(excluded_hosts), HostsPerLocalityImpl::empty()),
+          {}, {}, to_be_removed, false, std::nullopt);
+    } else {
+      priority_set_.updateHosts(
+          0, HostSetImpl::partitionHosts(keeping_hosts, HostsPerLocalityImpl::empty()), {}, {},
+          to_be_removed, false, std::nullopt);
+    }
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);

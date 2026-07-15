@@ -18,6 +18,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -29,8 +30,9 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 namespace Configuration {
-
 namespace {
+
+using StatusHelpers::HasStatus;
 
 // Reads the value of a ``dynamic_modules.<leaf>`` failure counter tagged with the given filter
 // name.
@@ -127,7 +129,7 @@ TEST_F(DynamicModuleFilterConfigTest, NoModuleOrName) {
               testing::HasSubstr("Either 'name' or 'module' must be specified"));
 }
 
-TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerThrows) {
+TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerReturnsError) {
   const std::string yaml = R"EOF(
   dynamic_module_config:
     module:
@@ -146,11 +148,10 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerThrows) {
 
   // The ServerFactoryContext path has no init manager, so remote sources should be rejected.
   DynamicModuleConfigFactory factory;
-  EXPECT_THROW_WITH_REGEX(
-      factory
-          .createHttpFilterFactoryFromProto(proto_config, "stats", context_.server_factory_context_)
-          .value(),
-      EnvoyException, "Remote module sources require an init manager");
+  EXPECT_THAT(factory.createHttpFilterFactoryFromProto(proto_config, "stats",
+                                                       context_.server_factory_context_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Remote module sources require an init manager"));
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteSourceRegistersInitTarget) {
