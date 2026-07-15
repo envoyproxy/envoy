@@ -63,7 +63,7 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::ratelimit::v3::RateLimitResponse>&& response,
+  void onSuccess(Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;

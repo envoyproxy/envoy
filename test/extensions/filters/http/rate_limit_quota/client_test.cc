@@ -622,7 +622,7 @@ TEST_F(GlobalClientTest, TestBasicResponseProcessing) {
   int max_tokens = 300;
   auto token_bucket_action =
       buildTokenBucketAction(sample_bucket_id3, max_tokens, 60, std::chrono::seconds(12));
-  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(deny_action);
   response->add_bucket_action()->CopyFrom(allow_action);
   response->add_bucket_action()->CopyFrom(token_bucket_action);
@@ -650,7 +650,7 @@ TEST_F(GlobalClientTest, TestBasicResponseProcessing) {
   EXPECT_EQ(cached_tb->consume(max_tokens, false), max_tokens);
 
   // Resend the same token bucket action.
-  response = std::make_unique<RateLimitQuotaResponse>();
+  response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(token_bucket_action);
   // Send the response across the stream.
   global_client_->onReceiveMessage(std::move(response));
@@ -700,7 +700,7 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
   int max_tokens = 300;
   auto token_bucket_action =
       buildTokenBucketAction(sample_bucket_id_, max_tokens, 60, std::chrono::seconds(12));
-  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(token_bucket_action);
 
   // Send the response across the stream.
@@ -721,7 +721,7 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
   EXPECT_EQ(cached_tb->consume(max_tokens, false), max_tokens);
 
   // Resend the same token bucket action.
-  response = std::make_unique<RateLimitQuotaResponse>();
+  response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(token_bucket_action);
   // Send the response across the stream.
   global_client_->onReceiveMessage(std::move(response));
@@ -785,7 +785,7 @@ TEST_F(GlobalClientTest, TestResponseProcessingForNonExistentBucket) {
 
   auto deny_action = buildBlanketAction(sample_bucket_id_, true);
   auto allow_action = buildBlanketAction(sample_bucket_id2, false);
-  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(deny_action);
   response->add_bucket_action()->CopyFrom(allow_action);
 
@@ -860,8 +860,7 @@ TEST_F(GlobalClientTest, TestResponseEdgeCases) {
 
   // Check handling of empty responses & null responses from the RLQS server to
   // make sure the external server cannot cause the envoy to crash.
-  std::unique_ptr<RateLimitQuotaResponse> empty_response =
-      std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr empty_response = RateLimitQuotaResponsePtr();
   global_client_->onReceiveMessage(std::move(empty_response));
   waitForNotification(cb_ptr_->response_processed);
   global_client_->onReceiveMessage(nullptr);
@@ -875,7 +874,7 @@ TEST_F(GlobalClientTest, TestResponseEdgeCases) {
   *invalid_unset_action.mutable_quota_assignment_action()->mutable_rate_limit_strategy() =
       RateLimitStrategy();
 
-  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(requests_per_time_action);
   response->add_bucket_action()->CopyFrom(invalid_unset_action);
 
@@ -982,7 +981,7 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   // Bucket3: allow-all assignment -> fallback-deny -> default-allow.
   BucketAction allow_action = buildBlanketAction(sample_bucket_id3, false);
 
-  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(deny_action);
   response->add_bucket_action()->CopyFrom(token_bucket_action);
   response->add_bucket_action()->CopyFrom(allow_action);
@@ -1090,8 +1089,7 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
 
   // Send a new assignment for the third bucket. Expect fallback & expiration
   // timers to reset.
-  std::unique_ptr<RateLimitQuotaResponse> replacement_response =
-      std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr replacement_response = RateLimitQuotaResponsePtr();
   replacement_response->add_bucket_action()->CopyFrom(allow_action);
 
   // Mimic sending the response across the stream.
@@ -1170,7 +1168,7 @@ TEST_F(GlobalClientTest, TestFallbackToDuplicateTokenBucket) {
   BucketAction token_bucket_action =
       buildTokenBucketAction(sample_bucket_id_, max_tokens, 60, std::chrono::seconds(12));
 
-  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(token_bucket_action);
 
   // Mimic sending the response across the stream.
@@ -1247,7 +1245,7 @@ TEST_F(GlobalClientTest, TestAbandonAction) {
 
   // Test abandon-action response handling.
   auto abandon_action = buildAbandonAction(sample_bucket_id_);
-  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(abandon_action);
 
   // Mimic sending the response across the stream.
@@ -1294,7 +1292,7 @@ TEST_F(GlobalClientTest, TestResponseBucketMissingId) {
   // buckets.
   auto empty_id_allow_action = buildBlanketAction(BucketId(), false);
   auto deny_action = buildBlanketAction(sample_bucket_id_, true);
-  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  RateLimitQuotaResponsePtr response = RateLimitQuotaResponsePtr();
   response->add_bucket_action()->CopyFrom(empty_id_allow_action);
   response->add_bucket_action()->CopyFrom(deny_action);
 
