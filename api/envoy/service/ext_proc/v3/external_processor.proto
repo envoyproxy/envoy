@@ -500,6 +500,7 @@ message HeaderMutation {
 }
 
 // The body response message corresponding to ``FULL_DUPLEX_STREAMED`` or ``GRPC`` body modes.
+// [#next-free-field: 6]
 message StreamedBodyResponse {
   // In ``FULL_DUPLEX_STREAMED`` body send mode, contains the body response chunk that will be
   // passed to the upstream/downstream by the data plane. In ``GRPC`` body send mode, contains
