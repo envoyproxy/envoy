@@ -9,6 +9,7 @@
 #include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/api_version.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
@@ -1178,6 +1179,50 @@ TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
   EXPECT_EQ("example.foo", cvc_config->subjectAltNameMatchers()[3].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS,
             cvc_config->subjectAltNameMatchers()[3].san_type());
+}
+
+// Verify the secret_provider does not change after changing the initial fetch timeout
+TEST_F(SecretManagerImplTest, NormalizeDynamicTlsCertificateSecretProviderConfig) {
+  for (const bool normalize_config : {true, false}) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.normalize_sds_config",
+                                  normalize_config);
+
+    SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+
+    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+    NiceMock<LocalInfo::MockLocalInfo> local_info;
+    NiceMock<Event::MockDispatcher> dispatcher;
+    NiceMock<Init::MockManager> init_manager;
+    Init::TargetHandlePtr init_target_handle;
+    EXPECT_CALL(init_manager, add(_))
+        .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+          init_target_handle = target.createHandle("test");
+        }));
+    EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+        .WillRepeatedly(ReturnRef(dispatcher));
+    EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+
+    envoy::config::core::v3::ConfigSource config_source;
+    TestUtility::loadFromYaml(R"(
+ads: {}
+initial_fetch_timeout: 5s
+    )", config_source);
+    auto secret_provider1 = secret_manager->findOrCreateTlsCertificateProvider(
+        config_source, "abc.com", secret_context.server_context_, init_manager, true);
+
+    // Change only initial_fetch_timeout, which does not affect the identity of the SDS
+    // subscription.
+    config_source.mutable_initial_fetch_timeout()->set_seconds(
+        config_source.initial_fetch_timeout().seconds() + 1);
+    auto secret_provider2 = secret_manager->findOrCreateTlsCertificateProvider(
+        config_source, "abc.com", secret_context.server_context_, init_manager, true);
+
+    if (normalize_config) {
+      EXPECT_EQ(secret_provider1, secret_provider2);
+    } else {
+      EXPECT_NE(secret_provider1, secret_provider2);
+    }
+  }
 }
 
 } // namespace
