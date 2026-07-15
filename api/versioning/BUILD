@@ -241,6 +241,7 @@ proto_library(
         "//envoy/extensions/filters/udp/dns_filter/v3:pkg",
         "//envoy/extensions/filters/udp/dynamic_modules/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/session/dynamic_forward_proxy/v3:pkg",
+        "//envoy/extensions/filters/udp/udp_proxy/session/ext_authz/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/v3:pkg",
         "//envoy/extensions/formatter/cel/v3:pkg",
