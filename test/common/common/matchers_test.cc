@@ -10,6 +10,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -435,6 +436,31 @@ TEST_F(StringMatcher, SafeRegexValue) {
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("foo"));
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("foobar"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("bar"));
+}
+
+TEST_F(StringMatcher, SafeRegexValueLatin1) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex(".*bar=foo.*");
+  // UTF-8 should still match in Latin1 mode
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("\"bar=foo\", \"beep=\uc38b\""));
+  // Non UTF-8 should also match in Latin1 mode
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("\"bar=foo\", \"beep=\xFF\""));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("\"zzz=foo\", \"beep=\xFF\""));
+}
+
+TEST_F(StringMatcher, SafeRegexValueUtf8) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.re2_use_latin1_mode", "false"}});
+
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex(".*bar=foo.*");
+  // UTF-8 should still match in Latin1 mode
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("\"bar=foo\", \"beep=\uc38b\""));
+  // Non UTF-8 does not match in UTF-8 mode
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("\"bar=foo\", \"beep=\xFF\""));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("\"zzz=foo\", \"beep=\xFF\""));
 }
 
 TEST_F(StringMatcher, SafeRegexValueIgnoreCase) {
