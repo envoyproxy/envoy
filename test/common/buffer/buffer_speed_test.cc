@@ -364,10 +364,7 @@ static void bufferReserveCommitMultiBuffer(benchmark::State& state) {
     }
   }
 }
-BENCHMARK(bufferReserveCommitMultiBuffer)
-    ->Arg(16 * 1024)
-    ->Arg(64 * 1024)
-    ->Arg(128 * 1024);
+BENCHMARK(bufferReserveCommitMultiBuffer)->Arg(16 * 1024)->Arg(64 * 1024)->Arg(128 * 1024);
 
 // Test the linearization of a buffer in the best case where the data is in one slice.
 static void bufferLinearizeSimple(benchmark::State& state) {
