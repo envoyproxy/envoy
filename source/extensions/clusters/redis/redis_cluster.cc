@@ -386,7 +386,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     // redis cluster implementation
     client->client_ = client_factory_.create(
         host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
-        parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt);
+        parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt,
+        Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2, std::nullopt);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
@@ -746,7 +747,8 @@ void RedisCluster::RedisDiscoverySession::startZoneDiscovery(ClusterSlotsSharedP
       client->host_ = addr;
       client->client_ = client_factory_.create(
           host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
-          parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt);
+          parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt,
+          Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2, std::nullopt);
       client->client_->addConnectionCallbacks(*client);
     }
 
