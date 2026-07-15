@@ -2834,8 +2834,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsIdleDeleted) {
   }
 }
 
-TEST_P(ClusterManagerLifecycleTest,
-       CoalescedLbRefreshPartitionCorrectionOnDeferredClusterInit) {
+TEST_P(ClusterManagerLifecycleTest, CoalescedLbRefreshPartitionCorrectionOnDeferredClusterInit) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
@@ -2871,8 +2870,7 @@ TEST_P(ClusterManagerLifecycleTest,
   ASSERT_NE(nullptr, tls_cluster);
 
   // healthy_hosts will be empty because FAILED_ACTIVE_HC is already set.
-  EXPECT_TRUE(
-      tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().empty());
+  EXPECT_TRUE(tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().empty());
 
   // clear the HC failure flag, re-push via updateHosts.
   // refreshPartition will re-classify the host as healthy.
@@ -2881,10 +2879,8 @@ TEST_P(ClusterManagerLifecycleTest,
       0, HostSetImpl::partitionHosts(hosts, HostsPerLocalityImpl::empty()), nullptr, {host}, {},
       absl::nullopt, absl::nullopt);
 
-  EXPECT_EQ(1u,
-            tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(host,
-            tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
+  EXPECT_EQ(1u, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(host, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
 
   factory_.tls_.shutdownThread();
 }
