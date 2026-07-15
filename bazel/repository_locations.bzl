@@ -150,8 +150,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Cyan4973/xxHash/archive/v{version}.tar.gz"],
     ),
     sql_parser = dict(
-        version = "3b40ba2d106587bdf053a292f7e3bb17e818a57f",
-        sha256 = "96c10c8e950a141a32034f19b19cdeb1da48fe859cf96ae5e19f894f36c62c71",
+        version = "52e5ad1f4fbb21301fcee7f9d18eef7e6ae6ab3e",
+        sha256 = "011e4786048436b90384cd2124a6ab4dd1961ae026df8d9dab9286e95a1e295f",
         strip_prefix = "sql-parser-{version}",
         urls = ["https://github.com/envoyproxy/sql-parser/archive/{version}.tar.gz"],
     ),
