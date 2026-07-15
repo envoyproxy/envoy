@@ -174,6 +174,31 @@ TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlr
                                                        callback2.AsStdFunction());
 }
 
+TEST_F(HotRestartingChildTest, ParentStopAcceptingCallbacksAreCalledOnDrainRequest) {
+  testing::MockFunction<void()> callback1;
+  testing::MockFunction<void()> callback2;
+  hot_restarting_child_->registerParentStopAcceptingCallback(callback1.AsStdFunction());
+  hot_restarting_child_->registerParentStopAcceptingCallback(callback2.AsStdFunction());
+  EXPECT_CALL(callback1, Call());
+  EXPECT_CALL(callback2, Call());
+  // drainParentListeners() sends the (fire-and-forget) drain-listeners request; expect one send.
+  fake_parent_->expectParentTerminateMessages();
+  hot_restarting_child_->drainParentListeners();
+}
+
+TEST_F(HotRestartingChildTest,
+       ParentStopAcceptingCallbacksAreCalledImmediatelyWhenAlreadyRequested) {
+  testing::MockFunction<void()> callback1;
+  testing::MockFunction<void()> callback2;
+  fake_parent_->expectParentTerminateMessages();
+  hot_restarting_child_->drainParentListeners();
+  // Registered after the drain request was already sent, so they fire immediately.
+  EXPECT_CALL(callback1, Call());
+  EXPECT_CALL(callback2, Call());
+  hot_restarting_child_->registerParentStopAcceptingCallback(callback1.AsStdFunction());
+  hot_restarting_child_->registerParentStopAcceptingCallback(callback2.AsStdFunction());
+}
+
 TEST_F(HotRestartingChildTest, LogsErrorOnReplyMessageInUdpStream) {
   envoy::HotRestartMessage msg;
   msg.mutable_reply();

@@ -248,8 +248,29 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeadersLiteralWithoutFormat
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
-  // This should be a no-op.
   extension_->onServerInitialized(server_);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, RunWhenParentStopsAcceptingForwardsToHotRestart) {
+  extension_->onServerInitialized(server_);
+  // After the server is captured, the request is forwarded to the hot restart registrar rather
+  // than run inline.
+  absl::AnyInvocable<void()> captured;
+  EXPECT_CALL(server_.hot_restart_, registerParentStopAcceptingCallback(_))
+      .WillOnce([&captured](absl::AnyInvocable<void()> cb) { captured = std::move(cb); });
+  bool ran = false;
+  extension_->runWhenParentStopsAccepting([&ran]() { ran = true; });
+  EXPECT_FALSE(ran);
+  ASSERT_TRUE(static_cast<bool>(captured));
+  std::move(captured)();
+  EXPECT_TRUE(ran);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, RunWhenParentStopsAcceptingRunsInlineWithoutServer) {
+  // Before onServerInitialized(), there is no server to reach hotRestart(); the callback runs now.
+  bool ran = false;
+  extension_->runWhenParentStopsAccepting([&ran]() { ran = true; });
+  EXPECT_TRUE(ran);
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnWorkerThreadInitialized) {

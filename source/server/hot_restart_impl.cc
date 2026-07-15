@@ -116,6 +116,10 @@ void HotRestartImpl::drainParentListeners() {
   shmem_->flags_ &= ~SHMEM_FLAGS_INITIALIZING;
 }
 
+void HotRestartImpl::registerParentStopAcceptingCallback(absl::AnyInvocable<void()> callback) {
+  as_child_.registerParentStopAcceptingCallback(std::move(callback));
+}
+
 int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
                                                 absl::string_view network_namespace) {
   return as_child_.duplicateParentListenSocket(address, worker_index, network_namespace);

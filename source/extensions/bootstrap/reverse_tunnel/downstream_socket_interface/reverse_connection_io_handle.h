@@ -395,6 +395,15 @@ private:
 
   // Functions to maintain connections to remote clusters.
   /**
+   * Kick off the first maintenance pass, but defer it (via the extension's hot-restart hook) until
+   * the parent instance has been asked to stop accepting new connections. On a fresh start, with
+   * hot restart disabled, or with no extension available, this dials immediately. During a hot
+   * restart it prevents the child from dialing while the parent's listeners are still open (which
+   * could otherwise route the child's tunnel through the draining parent).
+   */
+  void startReverseConnectionsWhenParentStopsAccepting();
+
+  /**
    * Maintain reverse connections for all configured clusters.
    * Initiates and maintains the required number of connections to each remote cluster.
    */
@@ -522,6 +531,11 @@ private:
 
   // Store original socket FD for cleanup.
   os_fd_t original_socket_fd_{-1};
+
+  // Liveness guard for the deferred parent-listeners-drained callback. The callback fires on the
+  // main thread and posts back to the worker dispatcher; both hops check this handle so a callback
+  // outliving the io handle becomes a no-op. Reset in the destructor.
+  std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
 };
 
 } // namespace ReverseConnection

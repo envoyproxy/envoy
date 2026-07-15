@@ -63,6 +63,8 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
 
 ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
   ENVOY_LOG_MISC(debug, "Destroying ReverseConnectionIOHandle - performing cleanup.");
+  // Invalidate any pending deferred-start callback so it becomes a no-op if it fires after this.
+  alive_.reset();
   cleanup();
 }
 
@@ -193,7 +195,7 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
       ENVOY_LOG(debug, "Reverse connection timer triggered on worker thread");
       maintainReverseConnections();
     });
-    maintainReverseConnections();
+    startReverseConnectionsWhenParentStopsAccepting();
   }
 
   is_reverse_conn_started_ = true;
@@ -936,6 +938,32 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
 
   ENVOY_LOG(trace, "{} state gauge for host {} cluster {} state {}",
             increment ? "Incremented" : "Decremented", host_address, cluster_name, state_suffix);
+}
+
+void ReverseConnectionIOHandle::startReverseConnectionsWhenParentStopsAccepting() {
+  auto* extension = getDownstreamExtension();
+  if (extension == nullptr) {
+    // No extension (e.g. some unit tests): preserve the original immediate-start behavior.
+    maintainReverseConnections();
+    return;
+  }
+
+  // Defer the first dial until the hot-restart parent has been asked to stop accepting. The
+  // callback fires on the main thread (or synchronously if there is no parent), so bounce back to
+  // this worker's dispatcher before touching worker-thread state. Guard against this io handle
+  // being destroyed before the callback runs.
+  Event::Dispatcher* worker_dispatcher = worker_dispatcher_;
+  std::weak_ptr<bool> alive = alive_;
+  extension->runWhenParentStopsAccepting([this, worker_dispatcher, alive]() {
+    worker_dispatcher->post([this, alive]() {
+      if (alive.lock() == nullptr) {
+        return;
+      }
+      ENVOY_LOG(info,
+                "reverse_tunnel: parent asked to stop accepting; starting reverse connections");
+      maintainReverseConnections();
+    });
+  });
 }
 
 void ReverseConnectionIOHandle::maintainReverseConnections() {

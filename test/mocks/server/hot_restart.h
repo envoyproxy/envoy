@@ -15,6 +15,7 @@ public:
 
   // Server::HotRestart
   MOCK_METHOD(void, drainParentListeners, ());
+  MOCK_METHOD(void, registerParentStopAcceptingCallback, (absl::AnyInvocable<void()> callback));
   MOCK_METHOD(int, duplicateParentListenSocket,
               (const std::string& address, uint32_t worker_index,
                absl::string_view network_namespace));

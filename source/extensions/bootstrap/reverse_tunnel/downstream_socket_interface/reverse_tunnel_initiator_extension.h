@@ -20,6 +20,7 @@
 #include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/functional/any_invocable.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,8 +51,21 @@ public:
       const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
           DownstreamReverseConnectionSocketInterface& config);
 
-  void onServerInitialized(Server::Instance&) override;
+  void onServerInitialized(Server::Instance& server) override;
   void onWorkerThreadInitialized() override;
+
+  /**
+   * Defer starting reverse connections until the hot-restart parent (if any) has been asked to
+   * stop accepting new connections. This avoids a freshly-forked child dialing into a loopback
+   * listener whose accept queue is still shared with the draining parent, which would otherwise
+   * let the child's tunnel be serviced by the old process during the handoff window.
+   *
+   * If there is no parent (fresh start), hot restart is disabled, or the request has already been
+   * sent, @p callback runs synchronously. Otherwise it runs later, on the main thread, when the
+   * parent is asked to stop accepting; callers that must act on a worker dispatcher should post.
+   * @param callback the action to run once the parent has been asked to stop accepting.
+   */
+  void runWhenParentStopsAccepting(absl::AnyInvocable<void()> callback);
 
   /**
    * @return reference to the stat prefix string.
@@ -182,6 +196,8 @@ public:
 
 private:
   Server::Configuration::ServerFactoryContext& context_;
+  // Captured in onServerInitialized() to reach hotRestart(); not owned. Null until then.
+  Server::Instance* server_{nullptr};
   const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
