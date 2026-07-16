@@ -16,8 +16,6 @@ namespace BasicAuth {
 
 using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
 
 TEST(Factory, ValidConfig) {
   const std::string yaml = R"(
@@ -55,9 +53,8 @@ TEST(Factory, InvalidConfigNoColon) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_THAT(status_or, Not(IsOk()));
-  EXPECT_EQ(status_or.status().message(),
-            "basic auth: invalid htpasswd format, username:password is expected");
+  EXPECT_THAT(status_or, HasStatusMessage(
+                             "basic auth: invalid htpasswd format, username:password is expected"));
 }
 
 TEST(Factory, InvalidConfigDuplicateUsers) {
@@ -129,9 +126,8 @@ TEST(Factory, InvalidConfigNoHash) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_THAT(status_or, Not(IsOk()));
-  EXPECT_EQ(status_or.status().message(),
-            "basic auth: invalid htpasswd format, invalid SHA hash length");
+  EXPECT_THAT(status_or,
+              HasStatusMessage("basic auth: invalid htpasswd format, invalid SHA hash length"));
 }
 
 TEST(Factory, InvalidConfigNotSHA) {
@@ -149,9 +145,8 @@ TEST(Factory, InvalidConfigNotSHA) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_THAT(status_or, Not(IsOk()));
-  EXPECT_EQ(status_or.status().message(),
-            "basic auth: unsupported htpasswd format: please use {SHA}");
+  EXPECT_THAT(status_or,
+              HasStatusMessage("basic auth: unsupported htpasswd format: please use {SHA}"));
 }
 
 TEST(Factory, ValidConfigWithServerContext) {

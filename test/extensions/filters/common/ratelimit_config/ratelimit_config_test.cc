@@ -118,9 +118,8 @@ TEST_F(RateLimitConfigTest, DisableKeyIsNotAllowed) {
 
     factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
     setupTest(yaml);
-    EXPECT_THAT(creation_status_, Not(IsOk()));
-    EXPECT_EQ(creation_status_.message(),
-              "'stage' field and 'disable_key' field are not supported");
+    EXPECT_THAT(creation_status_,
+                HasStatusMessage("'stage' field and 'disable_key' field are not supported"));
   }
 }
 

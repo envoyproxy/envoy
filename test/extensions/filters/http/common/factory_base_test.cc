@@ -18,8 +18,7 @@ namespace HttpFilters {
 namespace Common {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatus;
 using RouterProto = envoy::extensions::filters::http::router::v3::Router;
 
 // A minimal concrete filter factory used to test the default (non-overridden) behavior of
@@ -122,10 +121,10 @@ TEST(FactoryBaseTest, ExceptionFreeServerContextNotSupported) {
   EXPECT_EQ("test.exception_free_factory_base", factory.name());
 
   auto result = factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(absl::StatusCode::kInvalidArgument, result.status().code());
-  EXPECT_EQ("Creating HTTP filter factory from server factory context is not supported",
-            result.status().message());
+  EXPECT_THAT(
+      result,
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                "Creating HTTP filter factory from server factory context is not supported"));
 }
 
 // ExceptionFreeFactoryBase's downstream FactoryContext path works.
