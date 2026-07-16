@@ -922,6 +922,7 @@ fn
 formatter
 formatters
 formedness
+freelist
 frontend
 ftruncate
 func
