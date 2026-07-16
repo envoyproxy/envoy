@@ -33,6 +33,293 @@ absl::Status LocalityLbHostData::onOrcaLoadReport(const Upstream::OrcaLoadReport
   return absl::OkStatus();
 }
 
+// --- LoadAwareLocalityLoadBalancer (main thread) ---
+
+LoadAwareLocalityLoadBalancer::LoadAwareLocalityLoadBalancer(
+    OptRef<const Upstream::LoadBalancerConfig> lb_config, const Upstream::ClusterInfo& cluster_info,
+    const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
+    Envoy::Random::RandomGenerator& random, TimeSource& time_source)
+    : priority_set_(priority_set), lb_stats_{ALL_LOAD_AWARE_LOCALITY_STATS(POOL_COUNTER_PREFIX(
+                                       cluster_info.statsScope(), "load_aware_locality"))},
+      time_source_(time_source) {
+  const auto* typed_config = dynamic_cast<const LoadAwareLocalityLbConfig*>(lb_config.ptr());
+  ASSERT(typed_config != nullptr);
+
+  utilization_variance_threshold_ = typed_config->utilizationVarianceThreshold();
+  ewma_alpha_ = typed_config->ewmaAlpha();
+  remote_probe_fraction_ = typed_config->remoteProbeFraction();
+  weight_expiration_period_ = typed_config->weightExpirationPeriod();
+  weight_update_period_ = typed_config->weightUpdatePeriod();
+  metric_names_ = std::make_shared<const std::vector<std::string>>(
+      typed_config->metricNamesForComputingUtilization());
+
+  child_factory_name_ = typed_config->endpointPickingPolicyName();
+  auto child_config_ref = makeOptRefFromPtr<const Upstream::LoadBalancerConfig>(
+      typed_config->endpointPickingPolicyConfig().get());
+  child_thread_aware_lb_ = typed_config->endpointPickingPolicyFactory().create(
+      child_config_ref, cluster_info, priority_set, runtime, random, time_source);
+
+  factory_ = std::make_shared<WorkerLocalLbFactory>(
+      child_thread_aware_lb_ != nullptr ? child_thread_aware_lb_->factory() : nullptr,
+      typed_config->endpointPickingPolicyConfig(), cluster_info, runtime, random,
+      typed_config->tlsSlotAllocator());
+
+  weight_update_timer_ = typed_config->mainThreadDispatcher().createTimer(
+      [this]() { computeLocalityRoutingWeights(); });
+}
+
+LoadAwareLocalityLoadBalancer::~LoadAwareLocalityLoadBalancer() = default;
+
+void LoadAwareLocalityLoadBalancer::addLbPolicyDataToHosts(const Upstream::HostVector& hosts) {
+  for (const auto& host_ptr : hosts) {
+    if (!host_ptr->typedLbPolicyData<LocalityLbHostData>().has_value()) {
+      auto data = std::make_unique<LocalityLbHostData>(time_source_, metric_names_);
+      host_ptr->addLbPolicyData(std::move(data));
+    }
+  }
+}
+
+absl::Status LoadAwareLocalityLoadBalancer::initialize() {
+  if (child_thread_aware_lb_ == nullptr) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Unsupported endpoint picking policy for load_aware_locality: ", child_factory_name_,
+        ". Child load balancer could not be instantiated per locality."));
+  }
+  RETURN_IF_NOT_OK(child_thread_aware_lb_->initialize());
+
+  for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
+    addLbPolicyDataToHosts(host_set->hosts());
+  }
+
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+      [this](uint32_t, const Upstream::HostVector& hosts_added, const Upstream::HostVector&) {
+        addLbPolicyDataToHosts(hosts_added);
+      });
+
+  computeLocalityRoutingWeights();
+  return absl::OkStatus();
+}
+
+void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
+  weight_update_timer_->enableTimer(weight_update_period_);
+
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  const auto& host_sets = priority_set_.hostSetsPerPriority();
+  snapshot->priority_weights.resize(host_sets.size());
+
+  for (auto& per_source_state : ewma_state_) {
+    per_source_state.resize(host_sets.size());
+  }
+
+  const MonotonicTime now = time_source_.monotonicTime();
+
+  bool tick_all_overloaded = false;
+  bool tick_local_preferred = false;
+  bool tick_probe_active = false;
+  bool tick_spill_active = false;
+  uint32_t tick_stale_localities = 0;
+
+  for (size_t priority = 0; priority < host_sets.size(); ++priority) {
+    const auto& host_set = host_sets[priority];
+    const auto& hosts_per_locality = host_set->hostsPerLocality();
+    const auto& locality_hosts = hosts_per_locality.get();
+    auto& priority_snapshot = snapshot->priority_weights[priority];
+
+    if (locality_hosts.empty()) {
+      for (auto& per_source_state : ewma_state_) {
+        per_source_state[priority].clear();
+      }
+      continue;
+    }
+
+    using SelectionSource = PriorityRoutingWeights::SelectionSource;
+    const auto run_source = [&](SelectionSource src,
+                                const std::vector<Upstream::HostVector>& eligible_hosts) {
+      const size_t s = static_cast<size_t>(src);
+      auto& sw = priority_snapshot.by_source[s];
+      return computeSourceWeights(hosts_per_locality, eligible_hosts, now, sw.weights, sw.all_local,
+                                  ewma_state_[s][priority]);
+    };
+    const auto healthy_result =
+        run_source(SelectionSource::Healthy, host_set->healthyHostsPerLocality().get());
+    const auto degraded_result =
+        run_source(SelectionSource::Degraded, host_set->degradedHostsPerLocality().get());
+    const auto all_hosts_result = run_source(SelectionSource::AllHosts, locality_hosts);
+
+    tick_all_overloaded |= healthy_result.all_overloaded || degraded_result.all_overloaded ||
+                           all_hosts_result.all_overloaded;
+    tick_local_preferred |= healthy_result.local_preferred || degraded_result.local_preferred ||
+                            all_hosts_result.local_preferred;
+    tick_probe_active |= healthy_result.probe_active || degraded_result.probe_active ||
+                         all_hosts_result.probe_active;
+    tick_spill_active |= healthy_result.spill_active || degraded_result.spill_active ||
+                         all_hosts_result.spill_active;
+    tick_stale_localities += all_hosts_result.stale_localities;
+  }
+
+  if (tick_all_overloaded) {
+    lb_stats_.all_overloaded_total_.inc();
+  }
+  if (tick_local_preferred) {
+    lb_stats_.local_preferred_total_.inc();
+  }
+  if (tick_probe_active) {
+    lb_stats_.probe_active_total_.inc();
+  }
+  if (tick_spill_active) {
+    lb_stats_.spill_active_total_.inc();
+  }
+  if (tick_stale_localities > 0) {
+    lb_stats_.stale_locality_total_.add(tick_stale_localities);
+  }
+  lb_stats_.recompute_total_.inc();
+
+  ENVOY_LOG(trace, "computeLocalityRoutingWeights: {} priorities",
+            snapshot->priority_weights.size());
+  factory_->updateRoutingWeights(std::move(snapshot));
+}
+
+LoadAwareLocalityLoadBalancer::SourceComputeResult
+LoadAwareLocalityLoadBalancer::computeSourceWeights(
+    const Upstream::HostsPerLocality& all_hosts_per_locality,
+    const std::vector<Upstream::HostVector>& eligible_hosts_per_locality, MonotonicTime now,
+    LocalityRoutingWeightsMap& weights_map, bool& all_local, LocalityEwmaMap& ewma_state) {
+  SourceComputeResult result;
+  const auto& locality_hosts = all_hosts_per_locality.get();
+  const size_t locality_count = locality_hosts.size();
+  std::vector<double> weights(locality_count, 0.0);
+  all_local = false;
+
+  std::vector<double> avg_utils(locality_count, 0.0);
+  std::vector<uint32_t> valid_counts(locality_count, 0);
+  std::vector<uint32_t> host_counts(locality_count, 0);
+
+  for (size_t i = 0; i < locality_count; ++i) {
+    const bool has_eligible = i < eligible_hosts_per_locality.size();
+    host_counts[i] =
+        has_eligible ? static_cast<uint32_t>(eligible_hosts_per_locality[i].size()) : 0u;
+
+    double util_sum = 0.0;
+    uint32_t valid_count = 0;
+    if (has_eligible) {
+      for (const auto& host : eligible_hosts_per_locality[i]) {
+        auto host_data = host->typedLbPolicyData<LocalityLbHostData>();
+        if (!host_data.has_value()) {
+          continue;
+        }
+        const MonotonicTime last_update = host_data->lastUpdateTime();
+        if (last_update == LocalityLbHostData::kNeverReported) {
+          continue;
+        }
+
+        if (weight_expiration_period_.count() > 0 &&
+            (now - last_update) > weight_expiration_period_) {
+          continue;
+        }
+
+        util_sum += host_data->utilization();
+        valid_count++;
+      }
+    }
+
+    avg_utils[i] = valid_count > 0 ? util_sum / valid_count : 0.0;
+    valid_counts[i] = valid_count;
+  }
+
+  LocalityEwmaMap new_state;
+  new_state.reserve(locality_count);
+  std::vector<double> utilizations(locality_count, 0.0);
+  std::vector<bool> stale(locality_count, false);
+  for (size_t i = 0; i < locality_count; ++i) {
+    if (locality_hosts[i].empty()) {
+      continue; // No identity and no hosts: weight below is 0 regardless.
+    }
+    const auto prev = ewma_state.find(locality_hosts[i][0]->locality());
+    if (valid_counts[i] > 0) {
+      const double smoothed = prev == ewma_state.end()
+                                  ? avg_utils[i]
+                                  : ewma_alpha_ * avg_utils[i] + (1.0 - ewma_alpha_) * prev->second;
+      new_state[locality_hosts[i][0]->locality()] = smoothed;
+      utilizations[i] = smoothed;
+    } else if (prev != ewma_state.end()) {
+      new_state[locality_hosts[i][0]->locality()] = prev->second;
+      utilizations[i] = prev->second;
+      stale[i] = true;
+      ++result.stale_localities;
+    }
+  }
+  ewma_state = std::move(new_state);
+
+  uint32_t total_hosts = 0;
+  for (size_t i = 0; i < locality_count; ++i) {
+    weights[i] = stale[i] ? static_cast<double>(host_counts[i])
+                          : host_counts[i] * std::max(0.0, 1.0 - utilizations[i]);
+    total_hosts += host_counts[i];
+  }
+
+  const auto set_all_local = [&weights, &all_local]() {
+    all_local = true;
+    std::fill(weights.begin(), weights.end(), 0.0);
+    weights[0] = 1.0;
+  };
+
+  const double total_base_weight = std::accumulate(weights.begin(), weights.end(), 0.0);
+  if (total_base_weight == 0.0 && total_hosts > 0) {
+    for (size_t i = 0; i < locality_count; ++i) {
+      weights[i] = static_cast<double>(host_counts[i]);
+    }
+    result.all_overloaded = true;
+  } else if (total_base_weight > 0.0) {
+    uint32_t remote_hosts = 0;
+    if (all_hosts_per_locality.hasLocalLocality()) {
+      double remote_util_sum = 0.0;
+      for (size_t i = 1; i < locality_count; ++i) {
+        remote_util_sum += utilizations[i] * host_counts[i];
+        remote_hosts += host_counts[i];
+      }
+
+      // Comparison needs eligible local hosts: an empty local slice spills for health, not load,
+      // and does not count as spill.
+      if (host_counts[0] > 0 && remote_hosts > 0) {
+        const double target_util = remote_util_sum / remote_hosts;
+        if (utilizations[0] <= target_util + utilization_variance_threshold_) {
+          set_all_local();
+          result.local_preferred = true;
+        } else {
+          result.spill_active = true;
+        }
+      }
+    }
+
+    if (remote_hosts > 0 && remote_probe_fraction_ > 0.0) {
+      const double total = std::accumulate(weights.begin(), weights.end(), 0.0);
+      const double remote_target = total * remote_probe_fraction_;
+      const double remote_sum = total - weights[0];
+      if (remote_sum < remote_target) {
+        const double take_from_local = std::min(remote_target - remote_sum, weights[0]);
+        weights[0] -= take_from_local;
+        for (size_t i = 1; i < locality_count; ++i) {
+          weights[i] += take_from_local * static_cast<double>(host_counts[i]) / remote_hosts;
+        }
+        result.probe_active = true;
+        // Weights are no longer 100% local, so local picks count as sampled, not all-directly.
+        all_local = false;
+      }
+    }
+  }
+
+  weights_map.clear();
+  weights_map.reserve(locality_count);
+  for (size_t i = 0; i < locality_count; ++i) {
+    if (locality_hosts[i].empty()) {
+      continue;
+    }
+    weights_map[locality_hosts[i][0]->locality()] = weights[i];
+  }
+
+  return result;
+}
+
 // --- WorkerLocalLbFactory ---
 
 WorkerLocalLbFactory::WorkerLocalLbFactory(

@@ -31,6 +31,18 @@ namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
 
+#define ALL_LOAD_AWARE_LOCALITY_STATS(COUNTER)                                                     \
+  COUNTER(all_overloaded_total)                                                                    \
+  COUNTER(local_preferred_total)                                                                   \
+  COUNTER(probe_active_total)                                                                      \
+  COUNTER(recompute_total)                                                                         \
+  COUNTER(spill_active_total)                                                                      \
+  COUNTER(stale_locality_total)
+
+struct LoadAwareLocalityStats {
+  ALL_LOAD_AWARE_LOCALITY_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 // Per-host ORCA data written by workers and read by the main-thread weight computation.
 // The release/acquire timestamp store publishes the preceding utilization store.
 class LocalityLbHostData : public Upstream::HostLbPolicyData {
@@ -329,6 +341,59 @@ private:
   // Destroyed explicitly in the destructor before other members so the callback doesn't fire
   // during destruction and access freed per-locality state.
   Envoy::Common::CallbackHandlePtr priority_sync_cb_;
+};
+
+// Main-thread LB: computes locality weights and publishes snapshots to workers.
+class LoadAwareLocalityLoadBalancer : public Upstream::ThreadAwareLoadBalancer,
+                                      protected Logger::Loggable<Logger::Id::upstream> {
+public:
+  LoadAwareLocalityLoadBalancer(OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                const Upstream::ClusterInfo& cluster_info,
+                                const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
+                                Envoy::Random::RandomGenerator& random, TimeSource& time_source);
+  ~LoadAwareLocalityLoadBalancer() override;
+
+  // Upstream::ThreadAwareLoadBalancer
+  Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
+  absl::Status initialize() override;
+
+private:
+  void computeLocalityRoutingWeights();
+
+  void addLbPolicyDataToHosts(const Upstream::HostVector& hosts);
+
+  struct SourceComputeResult {
+    bool all_overloaded{false};
+    bool local_preferred{false};
+    bool probe_active{false};
+    bool spill_active{false};
+    uint32_t stale_localities{0};
+  };
+
+  SourceComputeResult
+  computeSourceWeights(const Upstream::HostsPerLocality& all_hosts_per_locality,
+                       const std::vector<Upstream::HostVector>& eligible_hosts_per_locality,
+                       MonotonicTime now, LocalityRoutingWeightsMap& weights_map, bool& all_local,
+                       LocalityEwmaMap& ewma_state);
+
+  const Upstream::PrioritySet& priority_set_;
+  LoadAwareLocalityStats lb_stats_;
+  TimeSource& time_source_;
+  double utilization_variance_threshold_;
+  double ewma_alpha_;
+  double remote_probe_fraction_;
+  std::chrono::milliseconds weight_expiration_period_;
+  std::shared_ptr<const std::vector<std::string>> metric_names_;
+  // Per-source, per-priority EWMA state keyed by locality identity (main thread only).
+  std::array<std::vector<LocalityEwmaMap>, PriorityRoutingWeights::kSourceCount> ewma_state_;
+  Event::TimerPtr weight_update_timer_;
+  std::chrono::milliseconds weight_update_period_;
+  std::string child_factory_name_;
+  // Child ThreadAwareLoadBalancer owned here so any priority-set callback handles it registers
+  // are created and destroyed on the main thread; workers hold only its worker factory.
+  Upstream::ThreadAwareLoadBalancerPtr child_thread_aware_lb_;
+  std::shared_ptr<WorkerLocalLbFactory> factory_;
+  Envoy::Common::CallbackHandlePtr priority_update_cb_;
 };
 
 } // namespace LoadAwareLocality
