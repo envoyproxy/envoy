@@ -21,8 +21,7 @@ namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::Return;
 
 // =============================================================================
@@ -172,8 +171,7 @@ TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuAllocated) {
 
   // Test that getUtilization also handles the error
   auto result = container_stats_reader.getUtilization();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to read CPU times")));
 }
 
 TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuTimes) {
@@ -253,8 +251,7 @@ TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationFirstCallReturnsZero) {
   // Also test negative work_over_period error scenario (cpu_times decreased)
   setCpuTimes("500\n");
   result = container_stats_reader.getUtilization();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Work_over_period")));
 }
 
 // =============================================================================
@@ -400,8 +397,7 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuEffectiveFormats) {
   CgroupV2CpuStatsReader reader(api->fileSystem(), test_time_source, v2CpuStatPath(),
                                 v2CpuMaxPath(), v2CpuEffectivePath());
   auto result = reader.getUtilization();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to read CPU times")));
 }
 
 // Error: Invalid cpu.max file formats
@@ -418,8 +414,7 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuMaxFormats) {
   CpuTimesV2 envoy_container_stats = container_stats_reader1.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   auto result = container_stats_reader1.getUtilization();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to read CPU times")));
 
   // Test 2: Failed to parse - non-numeric quota
   setV2CpuMax("notanumber 100000\n");
@@ -453,8 +448,7 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuStatFile) {
 
   // Test that getUtilization also handles the error
   auto result = container_stats_reader.getUtilization();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to read CPU times")));
 }
 
 TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadEffectiveCpusFile) {
@@ -504,8 +498,7 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero)
   // Also test negative work_over_period error scenario (usage decreased)
   setV2CpuStat("usage_usec 400000\n");
   result = container_stats_reader.getUtilization();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Work_over_period")));
 }
 
 // =============================================================================
@@ -624,8 +617,7 @@ TEST(LinuxCpuStatsReaderUtilizationTest, InvalidFileReturnsError) {
   LinuxCpuStatsReader cpu_stats_reader(temp_path);
   auto result = cpu_stats_reader.getUtilization();
 
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to read CPU times")));
 }
 
 TEST(LinuxCpuStatsReaderUtilizationTest, NegativeWorkDeltaReturnsError) {
@@ -640,15 +632,13 @@ TEST(LinuxCpuStatsReaderUtilizationTest, NegativeWorkDeltaReturnsError) {
   file_updater.update("cpu  500 100 200 1100 0 0 0 0 0 0\n");
   auto result = cpu_stats_reader.getUtilization();
 
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Work_over_period")));
 
   // Also test zero total_over_period by keeping stats unchanged
   file_updater.update("cpu  500 100 200 1100 0 0 0 0 0 0\n");
   result = cpu_stats_reader.getUtilization();
 
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_NE(result.status().message().find("total_over_period"), std::string::npos);
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("total_over_period")));
 }
 
 } // namespace

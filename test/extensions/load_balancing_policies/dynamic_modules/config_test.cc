@@ -27,6 +27,7 @@ namespace LoadBalancingPolicies {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::NiceMock;
 using ::testing::Not;
@@ -109,9 +110,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_THAT(lb_config_or_error, Not(IsOk()));
-  EXPECT_THAT(lb_config_or_error.status().message(),
-              testing::HasSubstr("Failed to load dynamic module"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
   EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
 }
 
@@ -123,9 +123,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleConfigNewFails) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_THAT(lb_config_or_error, Not(IsOk()));
-  EXPECT_THAT(lb_config_or_error.status().message(),
-              testing::HasSubstr("failed to create load balancer config"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("failed to create load balancer config")));
 
   // The module loads fine but its config creation fails, so this is counted as config_init_error.
   EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
@@ -160,9 +159,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleMissingSymbol) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_THAT(lb_config_or_error, Not(IsOk()));
-  EXPECT_THAT(lb_config_or_error.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_lb_choose_host"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("envoy_dynamic_module_on_lb_choose_host")));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStringValueConfig) {

@@ -18,12 +18,10 @@
 #include "gtest/gtest.h"
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AnyNumber;
 using testing::Invoke;
 using testing::NiceMock;
-using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -75,9 +73,8 @@ TEST_F(BridgeConfigTest, CreateFailConfigNewReturnsNull) {
   ASSERT_OK(module);
 
   auto config = BridgeConfig::create("test_bridge", "test_config", std::move(module.value()));
-  ASSERT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("failed to initialize dynamic module bridge configuration"));
+  ASSERT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "failed to initialize dynamic module bridge configuration")));
 }
 
 // =============================================================================

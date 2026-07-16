@@ -10,6 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
 using ::testing::Not;
@@ -77,8 +78,7 @@ TEST_F(TracerConfigTest, CreateFailConfigInitReturnsNull) {
   Stats::IsolatedStoreImpl store;
   auto config = newDynamicModuleTracerConfig("test_tracer", "", "test_ns",
                                              std::move(module.value()), *store.rootScope());
-  ASSERT_THAT(config, Not(IsOk()));
-  EXPECT_EQ(config.status().message(), "Failed to initialize dynamic module tracer config");
+  ASSERT_THAT(config, HasStatusMessage("Failed to initialize dynamic module tracer config"));
 }
 
 // =============================================================================

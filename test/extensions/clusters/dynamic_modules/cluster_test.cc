@@ -34,6 +34,7 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
@@ -221,15 +222,13 @@ cluster_type:
 )EOF";
 
   auto result = createCluster(yaml);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("CLUSTER_PROVIDED"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("CLUSTER_PROVIDED")));
 }
 
 // Test that a missing module fails gracefully.
 TEST_F(DynamicModuleClusterTest, MissingModule) {
   auto result = createCluster(makeYamlConfig("nonexistent_module"));
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
 
   EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
@@ -237,9 +236,8 @@ TEST_F(DynamicModuleClusterTest, MissingModule) {
 // Test that on_cluster_config_new returning nullptr fails.
 TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
   auto result = createCluster(makeYamlConfig("cluster_config_new_fail"));
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to create in-module cluster configuration"));
+  ASSERT_THAT(result, HasStatusMessage(
+                          testing::HasSubstr("Failed to create in-module cluster configuration")));
 
   // The module loads fine but its config creation fails, counted as config_init_error.
   EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
@@ -249,9 +247,8 @@ TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
 // Test that on_cluster_new returning nullptr fails.
 TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   auto result = createCluster(makeYamlConfig("cluster_new_fail"));
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to create in-module cluster instance"));
+  ASSERT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("Failed to create in-module cluster instance")));
 }
 
 // The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
@@ -1057,9 +1054,8 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
 TEST_F(DynamicModuleClusterTest, MissingClusterSymbol) {
   // The "no_op" module exports on_program_init but not cluster symbols.
   auto result = createCluster(makeYamlConfig("no_op"));
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_cluster_config_new"));
+  ASSERT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("envoy_dynamic_module_on_cluster_config_new")));
 }
 
 // Test that creating a cluster with BytesValue config type works.

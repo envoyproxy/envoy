@@ -15,8 +15,7 @@ namespace HttpFilters {
 namespace ApiKeyAuth {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
   const std::string yaml = R"(
@@ -37,8 +36,7 @@ TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
 
-  EXPECT_THAT(status_or, Not(IsOk()));
-  EXPECT_EQ("Duplicated credential key: 'key1'", status_or.status().message());
+  EXPECT_THAT(status_or, HasStatusMessage("Duplicated credential key: 'key1'"));
 }
 
 TEST(ApiKeyAuthFilterFactoryTest, EmptyKeySource) {
@@ -60,8 +58,7 @@ TEST(ApiKeyAuthFilterFactoryTest, EmptyKeySource) {
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
 
-  EXPECT_THAT(status_or, Not(IsOk()));
-  EXPECT_EQ("One of 'header'/'query'/'cookie' must be set.", status_or.status().message());
+  EXPECT_THAT(status_or, HasStatusMessage("One of 'header'/'query'/'cookie' must be set."));
 }
 
 TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {

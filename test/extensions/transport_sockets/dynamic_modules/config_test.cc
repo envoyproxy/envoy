@@ -172,9 +172,9 @@ TEST_F(DynamicModuleTransportSocketConfigTest, ConfigInitializationFailure) {
   // The reference module returns null for an unknown socket name.
   auto config = buildProtoConfig(kReferenceModule, "unknown_socket");
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
-  EXPECT_THAT(factory_or_error, Not(IsOk()));
-  EXPECT_THAT(factory_or_error.status().message(),
-              HasSubstr("Failed to initialize dynamic module transport socket config"));
+  EXPECT_THAT(
+      factory_or_error,
+      HasStatusMessage(HasSubstr("Failed to initialize dynamic module transport socket config")));
 
   EXPECT_EQ(1U, failureCounter(context_.server_context_.serverScope(), "config_init_error",
                                "unknown_socket"));

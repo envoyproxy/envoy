@@ -24,6 +24,7 @@ namespace Tls {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::NiceMock;
 using ::testing::Not;
@@ -70,9 +71,8 @@ TEST_F(DynamicModuleCertValidatorTest, ConfigNewSuccess) {
 
 TEST_F(DynamicModuleCertValidatorTest, ConfigNewReturnsNull) {
   auto config_or_error = createConfig("cert_validator_config_new_fail");
-  ASSERT_THAT(config_or_error, Not(IsOk()));
-  EXPECT_THAT(config_or_error.status().message(),
-              testing::HasSubstr("Failed to initialize dynamic module cert validator config"));
+  ASSERT_THAT(config_or_error, HasStatusMessage(testing::HasSubstr(
+                                   "Failed to initialize dynamic module cert validator config")));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, ConfigNewModuleNotFound) {
@@ -521,9 +521,8 @@ typed_config:
   DynamicModuleCertValidatorFactory factory;
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to initialize dynamic module cert validator config"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Failed to initialize dynamic module cert validator config")));
 
   // The module loads fine but its config creation fails, counted as config_init_error.
   EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test"));
