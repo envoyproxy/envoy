@@ -91,7 +91,7 @@ protected:
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse&) override {}
   void onError() override {}
 
-  Grpc::ResponsePtr<ProcessingResponse> last_response_;
+  Grpc::ResponsePtr<ProcessingResponse> last_response_{nullptr};
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   std::string grpc_error_message_;
   bool grpc_closed_ = false;
