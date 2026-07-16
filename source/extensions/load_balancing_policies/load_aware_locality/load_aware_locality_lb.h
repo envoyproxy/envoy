@@ -231,6 +231,106 @@ private:
   std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
 };
 
+struct PerSourceLocalityState {
+  std::unique_ptr<Upstream::PrioritySetImpl> priority_set;
+  Upstream::LoadBalancerPtr lb;
+};
+
+struct PerLocalityState {
+  std::array<PerSourceLocalityState, PriorityRoutingWeights::kSourceCount> by_source;
+  // Empty for a locality with no hosts.
+  envoy::config::core::v3::Locality locality;
+
+  PerSourceLocalityState& stateFor(PriorityRoutingWeights::SelectionSource s) {
+    return by_source[static_cast<size_t>(s)];
+  }
+  const PerSourceLocalityState& stateFor(PriorityRoutingWeights::SelectionSource s) const {
+    return by_source[static_cast<size_t>(s)];
+  }
+};
+
+struct PerPriorityLocalityState {
+  std::vector<PerLocalityState> localities;
+  // Whether index 0 is the local locality on this worker.
+  bool has_local_locality{false};
+  // Index-aligned cumulative routing weights (prefix sums) derived from the snapshot once per
+  // publish, so the per-pick path binary-searches by locality index instead of hashing locality
+  // identity. Rebuilt on snapshot or topology change.
+  std::array<std::vector<double>, PriorityRoutingWeights::kSourceCount> source_weights;
+};
+
+// Worker-local LB: picks live priority/source, then delegates to a per-locality child LB.
+class WorkerLocalLb : public Upstream::LoadBalancerBase {
+public:
+  WorkerLocalLb(WorkerLocalLbFactory& factory, const Upstream::PrioritySet& priority_set);
+  ~WorkerLocalLb() override;
+
+  // Upstream::LoadBalancer
+  Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
+  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext* context) override;
+
+private:
+  void buildPerPriorityLocalities();
+
+  void buildPerLocality(uint32_t priority, const Upstream::HostSet& host_set);
+
+  // allow_rebuild gates topology rebuilds for empty-delta in-place host updates.
+  void syncPriority(uint32_t priority, bool allow_rebuild);
+
+  void updateLocalityHosts(PerSourceLocalityState& state, const Upstream::HostVector& hosts,
+                           bool is_local, const Upstream::HostVector& hosts_added,
+                           const Upstream::HostVector& hosts_removed);
+
+  void syncLocalityState(PerLocalityState& state, const Upstream::HostSet& host_set,
+                         size_t locality_index, bool recreate_child);
+
+  struct PrioritySourcePick {
+    uint32_t priority;
+    PriorityRoutingWeights::SelectionSource source;
+    // The pick's single random draw; chooseLocality derives its target from this so each peek
+    // stashes exactly one entry, keeping the preconnect gate and peek/choose replay aligned.
+    uint64_t hash;
+    bool in_panic;
+  };
+
+  struct LocalityLbSelection {
+    Upstream::LoadBalancer* lb{nullptr};
+    const RoutingWeightsSnapshot* snapshot{nullptr};
+    size_t locality_idx{0};
+  };
+
+  PrioritySourcePick resolvePrioritySource(Upstream::LoadBalancerContext* context, bool peeking);
+
+  LocalityLbSelection selectLocalityLb(const PrioritySourcePick& pick);
+
+  void recordZoneRoutingStats(const PrioritySourcePick& pick, const LocalityLbSelection& selection);
+
+  // Returns 0 for single locality, no/stale snapshot, or zero effective total.
+  size_t chooseLocality(uint32_t priority, PriorityRoutingWeights::SelectionSource source,
+                        uint64_t hash);
+
+  // Rebuilds per-priority index-aligned weights when the published snapshot changes (or a topology
+  // change reset built_snapshot_), so chooseLocality reads by index instead of hashing per pick.
+  void refreshLocalityWeights(const RoutingWeightsSnapshot* snapshot);
+
+  // Falls back to any usable child LB when the routing snapshot lags membership.
+  Upstream::LoadBalancer* pickLocalityLb(const std::vector<PerLocalityState>& per_locality,
+                                         PriorityRoutingWeights::SelectionSource source,
+                                         size_t preferred_idx, size_t& actual_idx) const;
+
+  WorkerLocalLbFactory& factory_;
+  // Lazily cached per-thread shim so the per-pick snapshot read is a plain pointer load instead
+  // of a virtual TLS lookup plus shared_ptr copy; see tlsShim() for the lifetime contract.
+  const ThreadLocalShim* shim_{nullptr};
+  std::vector<PerPriorityLocalityState> per_priority_locality_;
+  // Snapshot the index-aligned weights in per_priority_locality_ were built from; reset to force a
+  // rebuild after a topology change.
+  RoutingWeightsSnapshotConstSharedPtr built_snapshot_;
+  // Destroyed explicitly in the destructor before other members so the callback doesn't fire
+  // during destruction and access freed per-locality state.
+  Envoy::Common::CallbackHandlePtr priority_sync_cb_;
+};
+
 } // namespace LoadAwareLocality
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
