@@ -12,8 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JsonToMetadata {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(Factory, Basic) {
   const std::string yaml_request = R"(
@@ -192,10 +191,11 @@ TEST(Factory, NoRuleInRouteConfig) {
                     .createRouteSpecificFilterConfig(*proto_config, context,
                                                      ProtobufMessage::getNullValidationVisitor())
                     .status();
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ(status.message(),
-            "json_to_metadata_filter: Per route configs must at least specify one of request_rules "
-            "or response_rules.");
+  EXPECT_THAT(
+      status,
+      HasStatusMessage(
+          "json_to_metadata_filter: Per route configs must at least specify one of request_rules "
+          "or response_rules."));
 }
 
 TEST(Factory, PerRouteConfig) {

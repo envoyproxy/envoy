@@ -1320,9 +1320,8 @@ TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoCredentials) {
   headers.setPath("/");
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
   status = roles_anywhere_signer->signEmptyPayload(headers, "ap-southeast-2");
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ(status.message(),
-            "Unable to sign IAM Roles Anywhere payload - no x509 credentials found");
+  EXPECT_THAT(status, HasStatusMessage(
+                          "Unable to sign IAM Roles Anywhere payload - no x509 credentials found"));
 }
 
 class ControlledCredentialsProvider : public CredentialsProvider {

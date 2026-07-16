@@ -15,8 +15,7 @@ namespace Eventstream {
 namespace {
 
 using ::Envoy::StatusHelpers::HasStatusCode;
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 // Test helper: compute CRC32 using zlib directly (since EventstreamParser::computeCrc32 is private)
 uint32_t testComputeCrc32(absl::string_view data, uint32_t initial_crc = 0) {
@@ -131,8 +130,7 @@ TEST_F(EventstreamParserTest, ParseMessageBadPreludeCrc) {
 
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Prelude CRC"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Prelude CRC")));
 }
 
 // Test parseMessage with no headers and no payload
@@ -196,8 +194,7 @@ TEST_F(EventstreamParserTest, ParseMessageBadMessageCrc) {
   msg[msg.size() - 1] ^= 0xFF;
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Message CRC"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Message CRC")));
 }
 
 // Test all header value types via parseMessage
@@ -385,8 +382,7 @@ TEST_F(EventstreamParserTest, ParseMessageTotalLengthTooSmall) {
 
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Invalid message length"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Invalid message length")));
 }
 
 // Test total_length exceeds MAX_TOTAL_LENGTH
@@ -438,8 +434,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeadersLengthExceedsMessage) {
 
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Headers length exceeds message"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Headers length exceeds message")));
 }
 
 // Test headers_length exceeds maximum allowed
@@ -491,8 +486,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderNameLengthZero) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Invalid header name length"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Invalid header name length")));
 }
 
 // Test header with unknown type
@@ -506,8 +500,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderUnknownType) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Unknown header value type"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Unknown header value type")));
 }
 
 // Test Int32 header type
@@ -545,8 +538,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedName) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header truncated")));
 }
 
 // Test header truncation: missing byte value
@@ -561,8 +553,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedByteValue) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header truncated")));
 }
 
 // Test header truncation: missing short value
@@ -577,8 +568,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedShortValue) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header truncated")));
 }
 
 // Test header truncation: missing int32 value
@@ -594,8 +584,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedInt32Value) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header truncated")));
 }
 
 // Test header truncation: missing int64 value
@@ -613,8 +602,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedInt64Value) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header truncated")));
 }
 
 // Test header truncation: missing string length
@@ -629,8 +617,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedStringLength) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header truncated")));
 }
 
 // Test header truncation: missing string data
@@ -648,8 +635,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedStringData) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header truncated")));
 }
 
 // Test header truncation: missing uuid value
@@ -666,8 +652,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedUuidValue) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header truncated")));
 }
 
 // Test header value too long (> MAX_HEADER_STRING_LENGTH)
@@ -684,8 +669,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderValueTooLong) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Header value too long"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Header value too long")));
 }
 
 // Test string with length 0 (spec requires minimum length 1)
@@ -701,8 +685,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderStringLengthZero) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "must not be empty"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("must not be empty")));
 }
 
 // Test byte_array with length 0 (spec requires minimum length 1)
@@ -718,8 +701,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderByteArrayLengthZero) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "must not be empty"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("must not be empty")));
 }
 
 // Test CRC errors return DataLoss status code
