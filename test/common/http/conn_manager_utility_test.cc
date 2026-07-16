@@ -2170,7 +2170,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
 
   // Parse the JSON output — this verifies the result is valid JSON, including after the append.
   auto json_or = Json::Factory::loadFromString(result);
-  ASSERT_OK(json_or) << json_or.status().message();
+  ASSERT_OK(json_or);
   auto array = json_or.value()->asObjectArray();
   ASSERT_OK(array);
   ASSERT_EQ(2, array.value().size());
