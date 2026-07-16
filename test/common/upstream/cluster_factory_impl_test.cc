@@ -27,9 +27,8 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
-using ::testing::Not;
 
 namespace Envoy {
 namespace Upstream {
@@ -213,10 +212,9 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterName) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_THAT(create_result, Not(IsOk()));
-  EXPECT_EQ(create_result.status().message(),
-            "Didn't find a registered cluster factory implementation for name: "
-            "'envoy.clusters.bad_cluster_name'");
+  EXPECT_THAT(create_result,
+              HasStatusMessage("Didn't find a registered cluster factory implementation for name: "
+                               "'envoy.clusters.bad_cluster_name'"));
 }
 
 TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
@@ -241,10 +239,9 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_THAT(create_result, Not(IsOk()));
-  EXPECT_EQ(create_result.status().message(),
-            "Didn't find a registered cluster factory implementation for type: "
-            "'envoy.config.cluster.v3.Cluster'");
+  EXPECT_THAT(create_result,
+              HasStatusMessage("Didn't find a registered cluster factory implementation for type: "
+                               "'envoy.config.cluster.v3.Cluster'"));
 }
 
 TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
@@ -270,10 +267,10 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_THAT(create_result, Not(IsOk()));
-  EXPECT_EQ(create_result.status().message(),
-            "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
-            "'envoy.clusters.custom_static'");
+  EXPECT_THAT(create_result,
+              HasStatusMessage(
+                  "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
+                  "'envoy.clusters.custom_static'"));
 }
 
 } // namespace
