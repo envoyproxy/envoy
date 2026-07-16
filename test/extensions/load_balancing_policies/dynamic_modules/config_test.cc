@@ -81,8 +81,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccessWithLocalFile) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(::testing::NotNull()))
-      << lb_config_or_error.status().message();
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(::testing::NotNull()));
 }
 
 // Remote module sources are not supported for load balancing policies (no init manager is wired

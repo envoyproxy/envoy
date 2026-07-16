@@ -124,8 +124,7 @@ TEST_F(DynamicModuleTransportSocketConfigTest, ValidConfigWithLocalFile) {
   config.set_transport_socket_name("passthrough");
 
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
-  ASSERT_THAT(factory_or_error, IsOkAndHolds(::testing::NotNull()))
-      << factory_or_error.status().message();
+  ASSERT_THAT(factory_or_error, IsOkAndHolds(::testing::NotNull()));
 }
 
 TEST_F(DynamicModuleTransportSocketConfigTest, ImplementsSecureTransport) {

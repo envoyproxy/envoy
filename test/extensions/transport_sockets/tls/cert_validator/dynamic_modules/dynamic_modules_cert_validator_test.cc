@@ -423,7 +423,7 @@ typed_config:
   DynamicModuleCertValidatorFactory factory;
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull())) << result.status().message();
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 }
 
 // Remote module sources are not supported for cert validators (no init manager is wired up).
