@@ -24,8 +24,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
     ),
     bazel_features = dict(
-        version = "1.45.0",
-        sha256 = "adfdb3cffab3a99a63363d844d559a81965d2b61a6062dd51a3d2478d416768f",
+        version = "1.51.0",
+        sha256 = "5450bfb2c8b4bc961c75368838f86156f563cc9adef1be7d504fc5619d54daab",
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
     ),
