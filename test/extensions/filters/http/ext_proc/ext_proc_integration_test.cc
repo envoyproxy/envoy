@@ -5004,6 +5004,7 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
                         ContainsRegex("\"response_trailer_call_status\""),
                         ContainsRegex("\"response_trailer_processing_effect\""),
                         ContainsRegex("\"bytes_sent\""), ContainsRegex("\"bytes_received\"")))));
+  auto typed_json_str = (*typed_obj)->asJsonString();
 
   // Test individual field extraction.
   auto validateField = [&](const std::string& field_name) {
