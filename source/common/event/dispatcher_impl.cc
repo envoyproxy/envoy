@@ -69,7 +69,7 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
     : name_(name), thread_factory_(thread_factory), time_source_(time_source),
-      file_system_(file_system), buffer_factory_(watermark_factory),
+      file_system_(file_system), buffer_factory_(watermark_factory), base_scheduler_(time_source),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
