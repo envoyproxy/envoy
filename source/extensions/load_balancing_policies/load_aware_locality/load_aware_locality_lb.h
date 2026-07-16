@@ -31,6 +31,45 @@ namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
 
+// Per-host ORCA data written by workers and read by the main-thread weight computation.
+// The release/acquire timestamp store publishes the preceding utilization store.
+class LocalityLbHostData : public Upstream::HostLbPolicyData {
+public:
+  // Out-of-band sentinel so monotonic time 0 remains a valid report timestamp.
+  static constexpr MonotonicTime kNeverReported = MonotonicTime::min();
+
+  LocalityLbHostData(TimeSource& time_source,
+                     std::shared_ptr<const std::vector<std::string>> metric_names)
+      : time_source_(time_source), metric_names_(std::move(metric_names)) {}
+
+  bool receivesOrcaLoadReport() const override { return true; }
+
+  absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
+                                const StreamInfo::StreamInfo&) override;
+
+  double utilization() const { return utilization_.load(std::memory_order_relaxed); }
+  MonotonicTime lastUpdateTime() const { return last_update_time_.load(std::memory_order_acquire); }
+
+private:
+  void storeUtilization(double util, MonotonicTime now) {
+    if (!std::isfinite(util)) {
+      return;
+    }
+    utilization_.store(std::clamp(util, 0.0, 1.0), std::memory_order_relaxed);
+    last_update_time_.store(now, std::memory_order_release);
+  }
+
+  static_assert(std::atomic<double>::is_always_lock_free,
+                "std::atomic<double> must be lock-free for safe cross-thread utilization updates");
+  static_assert(std::atomic<MonotonicTime>::is_always_lock_free,
+                "std::atomic<MonotonicTime> must be lock-free for safe cross-thread freshness "
+                "updates");
+  std::atomic<double> utilization_{0.0};
+  std::atomic<MonotonicTime> last_update_time_{kNeverReported};
+  TimeSource& time_source_;
+  const std::shared_ptr<const std::vector<std::string>> metric_names_;
+};
+
 // Shared between config and worker factory; must outlive the child LB.
 using LoadBalancerConfigSharedPtr = std::shared_ptr<Upstream::LoadBalancerConfig>;
 
