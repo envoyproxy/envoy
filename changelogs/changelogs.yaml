@@ -94,8 +94,6 @@ areas:
     title: resource_monitors
   router:
     title: router
-  server:
-    title: server
   set_metadata_filter:
     title: set_metadata_filter
   sockets:
