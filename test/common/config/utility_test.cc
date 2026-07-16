@@ -113,9 +113,9 @@ TEST(UtilityTest, ParseNanFillRateLimitSettings) {
   rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::quiet_NaN());
   const absl::StatusOr<RateLimitSettings> rate_limit_settings =
       Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_THAT(rate_limit_settings, Not(IsOk()));
-  EXPECT_EQ(rate_limit_settings.status().message(),
-            "The value of fill_rate in RateLimitSettings (nan) must not be NaN nor Inf");
+  EXPECT_THAT(rate_limit_settings,
+              HasStatusMessage(
+                  "The value of fill_rate in RateLimitSettings (nan) must not be NaN nor Inf"));
 }
 
 TEST(UtilityTest, ParseInfiniteFillRateLimitSettings) {
@@ -126,9 +126,9 @@ TEST(UtilityTest, ParseInfiniteFillRateLimitSettings) {
   rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::infinity());
   const absl::StatusOr<RateLimitSettings> rate_limit_settings =
       Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_THAT(rate_limit_settings, Not(IsOk()));
-  EXPECT_EQ(rate_limit_settings.status().message(),
-            "The value of fill_rate in RateLimitSettings (inf) must not be NaN nor Inf");
+  EXPECT_THAT(rate_limit_settings,
+              HasStatusMessage(
+                  "The value of fill_rate in RateLimitSettings (inf) must not be NaN nor Inf"));
 }
 
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured

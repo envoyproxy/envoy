@@ -25,12 +25,11 @@ namespace Envoy {
 namespace Config {
 namespace {
 using ::Envoy::StatusHelpers::HasStatus;
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::testing::_;
 using ::testing::AtLeast;
 using ::testing::HasSubstr;
 using ::testing::NiceMock;
-using ::testing::Not;
 using ::testing::Return;
 
 class AsyncDataSourceTest : public testing::Test {
@@ -353,8 +352,7 @@ TEST(DataSourceProviderTest, FileDataSourceNoWatchWithFailedDataTransformCb) {
   auto provider_or_error =
       DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
           config, *dispatcher, tls, *api, false, data_transform_cb, 0);
-  EXPECT_THAT(provider_or_error, Not(IsOk()));
-  EXPECT_EQ("Failed to transform data", provider_or_error.status().message());
+  EXPECT_THAT(provider_or_error, HasStatusMessage("Failed to transform data"));
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
@@ -743,9 +741,8 @@ TEST(DataSourceProviderTest, FileDataSourceAndWatchDirectoryCreationFailure) {
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api, false,
       [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
-  EXPECT_THAT(provider_or_error, Not(IsOk()));
-  EXPECT_THAT(provider_or_error.status().message(),
-              testing::HasSubstr("/non/existent/directory/path"));
+  EXPECT_THAT(provider_or_error,
+              HasStatusMessage(testing::HasSubstr("/non/existent/directory/path")));
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());

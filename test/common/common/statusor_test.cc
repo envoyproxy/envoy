@@ -8,15 +8,13 @@
 
 namespace Envoy {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(StatusOr, Initialization) {
   StatusOr<int> statusor(
       Http::prematureResponseError("foobar", Http::Code::ProxyAuthenticationRequired));
-  EXPECT_THAT(statusor, Not(IsOk()));
+  EXPECT_THAT(statusor, HasStatusMessage("foobar"));
   EXPECT_TRUE(Http::isPrematureResponseError(statusor.status()));
-  EXPECT_EQ("foobar", statusor.status().message());
   EXPECT_EQ(Http::Code::ProxyAuthenticationRequired,
             Http::getPrematureResponseHttpCode(statusor.status()));
 }

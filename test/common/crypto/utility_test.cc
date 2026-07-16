@@ -13,8 +13,7 @@ namespace Common {
 namespace Crypto {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(UtilityTest, TestSha256Digest) {
   const Buffer::OwnedImpl buffer("test data");
@@ -222,29 +221,25 @@ TEST(UtilityTest, TestVerifySignature) {
 
   // Test error cases using DER public key
   auto result = UtilitySingleton::get().verifySignature("unknown", *der_crypto, sig, text);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ("unknown is not supported.", result.message());
+  EXPECT_THAT(result, HasStatusMessage("unknown is not supported."));
 
   // Test with an empty crypto object
   auto empty_crypto = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().verifySignature("sha256", *empty_crypto, sig, text);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ("Failed to initialize digest verify.", result.message());
+  EXPECT_THAT(result, HasStatusMessage("Failed to initialize digest verify."));
 
   // Test with incorrect data
   auto bad_data = "baddata";
   std::vector<uint8_t> bad_text(bad_data, bad_data + strlen(bad_data));
   result = UtilitySingleton::get().verifySignature("sha256", *der_crypto, sig, bad_text);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ("Failed to verify digest. Error code: 0", result.message());
+  EXPECT_THAT(result, HasStatusMessage("Failed to verify digest. Error code: 0"));
 
   // Test with incorrect signature
   auto good_data = "hello";
   std::vector<uint8_t> good_text(good_data, good_data + strlen(good_data));
   result = UtilitySingleton::get().verifySignature("sha256", *der_crypto, Hex::decode("000000"),
                                                    good_text);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ("Failed to verify digest. Error code: 0", result.message());
+  EXPECT_THAT(result, HasStatusMessage("Failed to verify digest. Error code: 0"));
 }
 
 TEST(UtilityTest, TestImportPrivateKey) {
@@ -423,15 +418,13 @@ TEST(UtilityTest, TestSign) {
 
   // Test with unknown hash function
   auto result = UtilitySingleton::get().sign("unknown", *crypto, text);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ("unknown is not supported.", result.status().message());
+  EXPECT_THAT(result, HasStatusMessage("unknown is not supported."));
 
   // Test with empty crypto object
   auto empty_crypto = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().sign("sha256", *empty_crypto, text);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ("Invalid key type: private key required for signing operation.",
-            result.status().message());
+  EXPECT_THAT(result,
+              HasStatusMessage("Invalid key type: private key required for signing operation."));
 
   // Test with empty text
   std::vector<uint8_t> empty_text;
@@ -500,26 +493,24 @@ TEST(UtilityTest, TestHashFunctionSupport) {
   std::vector<std::string> unsupported_hashes = {"md5", "sha3", "unknown", ""};
   for (const auto& hash : unsupported_hashes) {
     auto result = UtilitySingleton::get().sign(hash, *crypto, text);
-    EXPECT_THAT(result, Not(IsOk())) << "Unsupported hash should fail: " << hash;
-    EXPECT_EQ(hash + " is not supported.", result.status().message())
-        << "Wrong error message for " << hash;
+    EXPECT_THAT(result, HasStatusMessage(hash + " is not supported."))
+        << "Unsupported hash should fail: " << hash;
   }
 
   // Test additional edge cases for hash function support
   // Test with very long hash function names
   std::string long_hash_name(1000, 'a');
   auto result = UtilitySingleton::get().sign(long_hash_name, *crypto, text);
-  EXPECT_THAT(result, Not(IsOk())) << "Very long hash name should not be supported";
-  EXPECT_EQ(long_hash_name + " is not supported.", result.status().message());
+  EXPECT_THAT(result, HasStatusMessage(long_hash_name + " is not supported."))
+      << "Very long hash name should not be supported";
 
   // Test with hash names containing special characters
   std::vector<std::string> special_hashes = {"sha-256", "sha_256", "sha.256", "sha256!",
                                              "sha256@#$"};
   for (const auto& hash : special_hashes) {
     auto result = UtilitySingleton::get().sign(hash, *crypto, text);
-    EXPECT_THAT(result, Not(IsOk()))
+    EXPECT_THAT(result, HasStatusMessage(hash + " is not supported."))
         << "Hash with special characters should not be supported: " << hash;
-    EXPECT_EQ(hash + " is not supported.", result.status().message());
   }
 }
 

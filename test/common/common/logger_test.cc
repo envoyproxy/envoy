@@ -15,11 +15,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatus;
 using testing::_;
 using testing::HasSubstr;
 using testing::Invoke;
-using ::testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -338,10 +337,9 @@ TEST(LoggerTest, TestJsonFormatError) {
 
   // This scenario shouldn't happen in production, the test is added mainly for coverage.
   auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-  EXPECT_THAT(status, Not(IsOk()));
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "Provided struct cannot be serialized as JSON string"));
   EXPECT_FALSE(Envoy::Logger::Registry::jsonLogFormatSet());
-  EXPECT_EQ("INVALID_ARGUMENT: Provided struct cannot be serialized as JSON string",
-            status.ToString());
 }
 
 TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
@@ -353,10 +351,9 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
     (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
 
     auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-    EXPECT_THAT(status, Not(IsOk()));
+    EXPECT_THAT(status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                  "Usage of %v is unavailable for JSON log formats"));
     EXPECT_FALSE(Envoy::Logger::Registry::jsonLogFormatSet());
-    EXPECT_EQ("INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats",
-              status.ToString());
   }
 
   {
@@ -365,10 +362,9 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
     (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
 
     auto status = Envoy::Logger::Registry::setJsonLogFormat(log_struct);
-    EXPECT_THAT(status, Not(IsOk()));
+    EXPECT_THAT(status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                  "Usage of %_ is unavailable for JSON log formats"));
     EXPECT_FALSE(Envoy::Logger::Registry::jsonLogFormatSet());
-    EXPECT_EQ("INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats",
-              status.ToString());
   }
 }
 
