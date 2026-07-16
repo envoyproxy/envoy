@@ -137,6 +137,10 @@ public:
   static const QuicConnectionIdWorkerSelector& workerSelector(ActiveQuicListenerFactory& factory) {
     return factory.worker_selector_;
   }
+  static const Network::Socket::OptionsSharedPtr&
+  socketOptions(ActiveQuicListenerFactory& factory) {
+    return factory.options_;
+  }
 };
 
 class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -863,7 +867,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, FactoryCreatedPreWorke
                           { ASSERT_OK(factory_->doFinalPreWorkerInit(socket_factories_)); });
 
   EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), cid_generator_factory);
-  const auto& options = factory_->socketOptions();
+  const auto& options = ActiveQuicListenerFactoryPeer::socketOptions(*factory_);
   ASSERT_EQ(options->size(), 1u);
   EXPECT_EQ((*options)[0].get(), mock_option.get());
   EXPECT_TRUE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
@@ -879,7 +883,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, UnimplementedLogsWarn)
   EXPECT_LOG_CONTAINS("warn", "Efficient routing of QUIC packets",
                       { ASSERT_OK(factory_->doFinalPreWorkerInit(socket_factories_)); });
 
-  EXPECT_TRUE(factory_->socketOptions()->empty());
+  EXPECT_TRUE(ActiveQuicListenerFactoryPeer::socketOptions(*factory_)->empty());
   EXPECT_FALSE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
 }
 

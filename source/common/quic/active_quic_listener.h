@@ -131,7 +131,6 @@ public:
                           Network::SocketSharedPtr&& listen_socket_ptr,
                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
-  const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
   absl::Status doFinalPreWorkerInit(absl::Span<const Network::ListenSocketFactoryPtr>) override;
 
   static void setDisableKernelBpfPacketRoutingForTest(bool val) {
