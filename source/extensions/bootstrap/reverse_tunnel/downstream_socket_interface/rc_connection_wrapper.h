@@ -169,7 +169,7 @@ public:
    * Release ownership of the connection.
    * @return the connection pointer (ownership transferred to caller)
    */
-  Network::ClientConnectionPtr releaseConnection() { return std::move(connection_); }
+  Network::ClientConnectionPtr releaseConnection();
 
   /**
    * Process HTTP response from upstream.
@@ -244,6 +244,7 @@ private:
   std::unique_ptr<Http::Http1::ClientConnectionImpl> http1_client_codec_;
   // Base interface pointer used to call dispatch via public API.
   Http::Connection* http1_parse_connection_{nullptr};
+  std::shared_ptr<SimpleConnReadFilter> read_filter_{std::make_shared<SimpleConnReadFilter>(this)};
 };
 
 } // namespace ReverseConnection

@@ -1320,7 +1320,7 @@ TEST_F(RCConnectionWrapperTest, ConnectEmitsUpgradeHeaders) {
   upgrade_config.use_http_upgrade = true;
   auto upgrade_io_handle = createTestIOHandle(upgrade_config);
 
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = getDeletableConn(dispatcher_);
   std::string written;
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, addReadFilter(_));
@@ -1422,6 +1422,49 @@ TEST_F(RCConnectionWrapperTest, ReleaseConnection) {
   EXPECT_EQ(wrapper.getConnection(), nullptr);
 }
 
+// releaseConnection() must detach the wrapper's connection callbacks and read filter before
+// transferring ownership, so the handed-off connection no longer references the soon-to-be-deleted
+// wrapper. A second call must be a safe no-op (no double detach).
+TEST_F(RCConnectionWrapperTest, ReleaseConnectionDetachesCallbacksAndReadFilter) {
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, removeReadFilter(_));
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  auto released_connection = wrapper.releaseConnection();
+  EXPECT_NE(released_connection, nullptr);
+  EXPECT_EQ(wrapper.getConnection(), nullptr);
+
+  // Releasing again returns null and does not re-detach (the EXPECT_CALLs above are Times(1)).
+  EXPECT_EQ(wrapper.releaseConnection(), nullptr);
+}
+
+// shutdown() must detach the connection callbacks and read filter and hand the connection to the
+// dispatcher's deferred-delete queue instead of closing/destroying it inline. Deferring ensures the
+// connection (and the wrapper that owns the codec/read filter) outlives the active dispatch.
+TEST_F(RCConnectionWrapperTest, ShutdownDetachesAndDefersConnectionDeletion) {
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, removeReadFilter(_));
+  EXPECT_CALL(*mock_connection, close(_)).Times(0);
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(4242));
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  const size_t deferred_before = dispatcher_.to_delete_.size();
+  wrapper.shutdown();
+
+  // Connection ownership transferred to the deferred-delete queue, not destroyed inline.
+  EXPECT_EQ(wrapper.getConnection(), nullptr);
+  EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 1);
+}
+
 // Test RCConnectionWrapper::getConnection method.
 TEST_F(RCConnectionWrapperTest, GetConnection) {
   // Create a mock connection with proper socket setup.
@@ -1508,10 +1551,12 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
     auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
     // Set up connection expectations for closed connection.
+    EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
     EXPECT_CALL(*mock_connection, state())
         .WillRepeatedly(Return(Network::Connection::State::Closed));
-    EXPECT_CALL(*mock_connection, close(_))
-        .Times(0); // Should not call close on already closed connection
+    // shutdown() defers destruction of the connection via the dispatcher rather than
+    // closing it explicitly, so close() is never invoked here.
+    EXPECT_CALL(*mock_connection, close(_)).Times(0);
     EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12346));
 
     RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
@@ -1530,8 +1575,9 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
     EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
     EXPECT_CALL(*mock_connection, state())
         .WillRepeatedly(Return(Network::Connection::State::Closing));
-    EXPECT_CALL(*mock_connection, close(_))
-        .Times(0); // Should not call close on already closing connection
+    // shutdown() defers destruction of the connection via the dispatcher rather than
+    // closing it explicitly, so close() is never invoked here.
+    EXPECT_CALL(*mock_connection, close(_)).Times(0);
     EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12347));
 
     RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
