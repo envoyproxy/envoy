@@ -83,8 +83,7 @@ sink_config:
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()))
-      << sink_or_error.status().message();
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()));
 
   // The happy path emits no load-failure counters.
   EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_sink"));
@@ -100,8 +99,7 @@ TEST_F(DynamicModuleStatsSinkFactoryTest, ValidConfigLocalFile) {
   proto_config.set_sink_name("test_sink");
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()))
-      << sink_or_error.status().message();
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()));
 }
 
 // Remote module sources are not supported for stats sinks (no init manager is wired up).
@@ -131,8 +129,7 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()))
-      << sink_or_error.status().message();
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()));
 }
 
 // A Struct config is JSON-serialized before being handed to the module.
