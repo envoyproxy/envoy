@@ -22,6 +22,7 @@ namespace McpRouter {
 namespace {
 
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
@@ -783,16 +784,16 @@ TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
 
   // Verify all attributes are present.
   auto name = tool->getString("name");
-  EXPECT_THAT(name, ::Envoy::StatusHelpers::IsOkAndHolds("get_weather"));
+  EXPECT_THAT(name, IsOkAndHolds("get_weather"));
 
   auto title = tool->getString("title");
-  EXPECT_THAT(title, ::Envoy::StatusHelpers::IsOkAndHolds("Weather Tool"));
+  EXPECT_THAT(title, IsOkAndHolds("Weather Tool"));
 
   auto desc = tool->getString("description");
-  EXPECT_THAT(desc, ::Envoy::StatusHelpers::IsOkAndHolds("Get weather information"));
+  EXPECT_THAT(desc, IsOkAndHolds("Get weather information"));
 
   auto input_schema = tool->getObject("inputSchema");
-  EXPECT_THAT(input_schema, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  EXPECT_THAT(input_schema, IsOkAndHolds(::testing::NotNull()));
 
   // Verify nested inputSchema properties are present.
   auto props = (*input_schema)->getObject("properties");
@@ -842,7 +843,7 @@ TEST(AggregateToolsListTest, SerializationPreservesNestedInputSchema) {
 
   // Verify the nested properties are preserved.
   auto count_type = (*count_prop)->getString("type");
-  EXPECT_THAT(count_type, ::Envoy::StatusHelpers::IsOkAndHolds("integer"));
+  EXPECT_THAT(count_type, IsOkAndHolds("integer"));
 }
 
 // Verifies lazy_initialization config field defaults to false and can be enabled.
