@@ -15,8 +15,7 @@ namespace NetworkFilters {
 namespace ReverseTunnel {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(ReverseTunnelFilterConfigFactoryTest, ValidConfiguration) {
   ReverseTunnelFilterConfigFactory factory;
@@ -261,8 +260,7 @@ validation:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse node_id_format"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse node_id_format")));
 }
 
 TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithOnlyNodeIdValidation) {
@@ -358,8 +356,7 @@ validation:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse tenant_id_format"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse tenant_id_format")));
 }
 
 // Tests that the ReverseTunnelFilterConfig is formed properly and the filter construction works.
