@@ -4961,8 +4961,8 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
 
   // Verify PLAIN format contains all processing phases.
   auto plain_value = json_log->getString("ext_proc_plain");
-  EXPECT_OK(plain_value);
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("rh:[0-9]+:[0-9]+"));        // request header
+  EXPECT_THAT(plain_value, ::Envoy::StatusHelpers::IsOkAndHolds(
+                               testing::ContainsRegex("rh:[0-9]+:[0-9]+")));    // request header
   EXPECT_THAT(*plain_value, testing::ContainsRegex("rb:[0-9]+:[0-9]+:[0-9]+")); // request body
   EXPECT_THAT(*plain_value, testing::ContainsRegex("rt:[0-9]+:[0-9]+"));        // request trailer
   EXPECT_THAT(*plain_value, testing::ContainsRegex("sh:[0-9]+:[0-9]+"));        // response header
