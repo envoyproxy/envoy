@@ -1402,8 +1402,7 @@ TEST(IPMatcher, MultipleRangesCreateSuccess) {
   range3->mutable_prefix_len()->set_value(32);
 
   auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_OK(result);
-  EXPECT_NE(result.value(), nullptr);
+  EXPECT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 
   // Test that the created matcher works
   NiceMock<Envoy::Network::MockConnection> conn;

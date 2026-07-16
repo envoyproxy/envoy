@@ -78,8 +78,7 @@ TEST(FactoryBaseTest, CommonBehavior) {
   // The default route-specific config implementation returns a nullptr config.
   auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, server_context, server_context.messageValidationVisitor());
-  ASSERT_OK(route_config);
-  EXPECT_EQ(nullptr, route_config.value());
+  ASSERT_THAT(route_config, ::Envoy::StatusHelpers::IsOkAndHolds(nullptr));
 }
 
 // FactoryBase falls back to createFilterFactoryFromProtoWithServerContextTyped for the
@@ -107,8 +106,7 @@ TEST(FactoryBaseTest, FactoryContextCreation) {
   RouterProto proto_config;
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_OK(cb);
-  EXPECT_NE(nullptr, cb.value());
+  ASSERT_THAT(cb, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 }
 
 // ExceptionFreeFactoryBase returns an error status (rather than throwing) when server-context based
@@ -134,8 +132,7 @@ TEST(FactoryBaseTest, ExceptionFreeFactoryContextCreation) {
   RouterProto proto_config;
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_OK(cb);
-  EXPECT_NE(nullptr, cb.value());
+  ASSERT_THAT(cb, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 }
 
 // DualFactoryBase's downstream and upstream FactoryContext paths both work.
@@ -148,13 +145,11 @@ TEST(FactoryBaseTest, DualFactoryContextCreation) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> downstream_context;
   auto downstream_cb =
       factory.createFilterFactoryFromProto(proto_config, "stats", downstream_context);
-  ASSERT_OK(downstream_cb);
-  EXPECT_NE(nullptr, downstream_cb.value());
+  ASSERT_THAT(downstream_cb, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 
   testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_context;
   auto upstream_cb = factory.createFilterFactoryFromProto(proto_config, "stats", upstream_context);
-  ASSERT_OK(upstream_cb);
-  EXPECT_NE(nullptr, upstream_cb.value());
+  ASSERT_THAT(upstream_cb, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 }
 
 // DualFactoryBase falls back to the (throwing) server-context typed implementation for both the
