@@ -20,6 +20,7 @@
 #include "gtest/gtest.h"
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
@@ -1402,7 +1403,7 @@ TEST(IPMatcher, MultipleRangesCreateSuccess) {
   range3->mutable_prefix_len()->set_value(32);
 
   auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  EXPECT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 
   // Test that the created matcher works
   NiceMock<Envoy::Network::MockConnection> conn;

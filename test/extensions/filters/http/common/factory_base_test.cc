@@ -19,6 +19,7 @@ namespace Common {
 namespace {
 
 using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using RouterProto = envoy::extensions::filters::http::router::v3::Router;
 
 // A minimal concrete filter factory used to test the default (non-overridden) behavior of
@@ -78,7 +79,7 @@ TEST(FactoryBaseTest, CommonBehavior) {
   // The default route-specific config implementation returns a nullptr config.
   auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, server_context, server_context.messageValidationVisitor());
-  ASSERT_THAT(route_config, ::Envoy::StatusHelpers::IsOkAndHolds(nullptr));
+  ASSERT_THAT(route_config, IsOkAndHolds(nullptr));
 }
 
 // FactoryBase falls back to createFilterFactoryFromProtoWithServerContextTyped for the
@@ -106,7 +107,7 @@ TEST(FactoryBaseTest, FactoryContextCreation) {
   RouterProto proto_config;
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_THAT(cb, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  ASSERT_THAT(cb, IsOkAndHolds(::testing::NotNull()));
 }
 
 // ExceptionFreeFactoryBase returns an error status (rather than throwing) when server-context based
@@ -132,7 +133,7 @@ TEST(FactoryBaseTest, ExceptionFreeFactoryContextCreation) {
   RouterProto proto_config;
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_THAT(cb, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  ASSERT_THAT(cb, IsOkAndHolds(::testing::NotNull()));
 }
 
 // DualFactoryBase's downstream and upstream FactoryContext paths both work.
@@ -145,11 +146,11 @@ TEST(FactoryBaseTest, DualFactoryContextCreation) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> downstream_context;
   auto downstream_cb =
       factory.createFilterFactoryFromProto(proto_config, "stats", downstream_context);
-  ASSERT_THAT(downstream_cb, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  ASSERT_THAT(downstream_cb, IsOkAndHolds(::testing::NotNull()));
 
   testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_context;
   auto upstream_cb = factory.createFilterFactoryFromProto(proto_config, "stats", upstream_context);
-  ASSERT_THAT(upstream_cb, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  ASSERT_THAT(upstream_cb, IsOkAndHolds(::testing::NotNull()));
 }
 
 // DualFactoryBase falls back to the (throwing) server-context typed implementation for both the
