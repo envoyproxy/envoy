@@ -34,6 +34,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::An;
 using testing::Const;
@@ -2197,10 +2198,10 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
   }
 
   auto hash = obj->getString("hash");
-  ASSERT_THAT(hash, ::Envoy::StatusHelpers::IsOkAndHolds(expected_sha));
+  ASSERT_THAT(hash, IsOkAndHolds(expected_sha));
 
   auto subject = obj->getString("subject");
-  ASSERT_THAT(subject, ::Envoy::StatusHelpers::IsOkAndHolds(peer_subject));
+  ASSERT_THAT(subject, IsOkAndHolds(peer_subject));
 
   auto uri = obj->getStringArray("uri");
   ASSERT_OK(uri);
@@ -2225,7 +2226,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
   EXPECT_EQ(expected_dns[2], dns.value()[2]);
 
   auto cert = obj->getString("cert");
-  ASSERT_THAT(cert, ::Envoy::StatusHelpers::IsOkAndHolds(expected_pem));
+  ASSERT_THAT(cert, IsOkAndHolds(expected_pem));
 
   auto chain = obj->getStringArray("chain");
   ASSERT_OK(chain);
