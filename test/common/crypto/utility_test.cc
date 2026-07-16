@@ -411,8 +411,7 @@ TEST(UtilityTest, TestSign) {
 
     auto pem_verify_result =
         UtilitySingleton::get().verifySignature(hash_func, *pem_public_crypto, *result, text);
-    ASSERT_OK(pem_verify_result) << "PEM verification failed with " << hash_func << ": "
-                                 << pem_verify_result.message();
+    ASSERT_OK(pem_verify_result) << "PEM verification failed with " << hash_func;
   }
 
   // Test with unknown hash function
