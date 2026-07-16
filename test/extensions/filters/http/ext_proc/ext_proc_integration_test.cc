@@ -62,7 +62,7 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::ProtocolConfiguration;
 using envoy::service::ext_proc::v3::TrailersResponse;
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
@@ -5040,9 +5040,7 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   // When a field doesn't exist, it's not included in the JSON output at all.
   auto non_existent = json_log->getString("field_non_existent");
   EXPECT_THAT(non_existent,
-              Not(IsOk())); // Should fail to find the key
-  EXPECT_THAT(non_existent.status().message(),
-              testing::HasSubstr("key 'field_non_existent' missing"));
+              HasStatusMessage(testing::HasSubstr("key 'field_non_existent' missing")));
 
   // Bytes are only populated for Envoy gRPC, not Google gRPC.
   auto bytes_sent = json_log->getString("field_bytes_sent");

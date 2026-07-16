@@ -16,8 +16,7 @@ namespace HttpFilters {
 namespace HeaderMutation {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(FactoryTest, FactoryTest) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
@@ -96,8 +95,7 @@ TEST(FactoryTest, FactoryTest) {
 
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
-    EXPECT_THAT(cb_or_error.status(), Not(IsOk()));
-    EXPECT_EQ("One of 'append'/'remove' must be specified.", cb_or_error.status().message());
+    EXPECT_THAT(cb_or_error, HasStatusMessage("One of 'append'/'remove' must be specified."));
   }
 
   {
@@ -116,8 +114,7 @@ TEST(FactoryTest, FactoryTest) {
 
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
-    EXPECT_THAT(cb_or_error.status(), Not(IsOk()));
-    EXPECT_EQ("Only one of 'append'/'remove can be specified.", cb_or_error.status().message());
+    EXPECT_THAT(cb_or_error, HasStatusMessage("Only one of 'append'/'remove can be specified."));
   }
 
   {
@@ -132,8 +129,7 @@ TEST(FactoryTest, FactoryTest) {
 
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
-    EXPECT_THAT(cb_or_error.status(), Not(IsOk()));
-    EXPECT_EQ("No record specified for append mutation.", cb_or_error.status().message());
+    EXPECT_THAT(cb_or_error, HasStatusMessage("No record specified for append mutation."));
   }
   {
     const std::string config = R"EOF(
@@ -150,8 +146,7 @@ TEST(FactoryTest, FactoryTest) {
 
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
-    EXPECT_THAT(cb_or_error.status(), Not(IsOk()));
-    EXPECT_EQ("Only string value is allowed for record value.", cb_or_error.status().message());
+    EXPECT_THAT(cb_or_error, HasStatusMessage("Only string value is allowed for record value."));
   }
   {
     const std::string config = R"EOF(
@@ -167,8 +162,7 @@ TEST(FactoryTest, FactoryTest) {
 
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
-    EXPECT_THAT(cb_or_error.status(), Not(IsOk()));
-    EXPECT_EQ("Only string value is allowed for record value.", cb_or_error.status().message());
+    EXPECT_THAT(cb_or_error, HasStatusMessage("Only string value is allowed for record value."));
   }
 }
 
