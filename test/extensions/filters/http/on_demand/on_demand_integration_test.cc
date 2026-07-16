@@ -1312,11 +1312,14 @@ TEST_P(VhdsXdstpCollectionWithOnDemandIntegrationTest, VhdsXdstpCollectionAndOnD
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
                                            {onDemandResourceName("vhost.first")}, {},
                                            vhds_stream_.get()));
-  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-      Config::TestTypeUrl::get().VirtualHost,
-      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-          virtualHostYaml("vhost_1", "vhost.first"))},
-      {}, "2", vhds_stream_.get(), {onDemandResourceName("vhost.first")});
+  // The collection subscription (NewGrpcMuxImpl) routes resources by exact name, so the
+  // on-demand response must use the subscribed xdstp resource name directly rather than
+  // the proto name + alias form used in legacy namespace-matching mode.
+  sendDeltaVhdsResponse(vhds_stream_,
+                        {{onDemandResourceName("vhost.first"),
+                          TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+                              virtualHostYaml("vhost_1", "vhost.first"))}},
+                        {}, "2");
 
   waitForNextUpstreamRequest(1);
   upstream_request_->encodeHeaders(default_response_headers_, true);
