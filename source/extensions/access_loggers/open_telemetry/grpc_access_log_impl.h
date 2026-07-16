@@ -132,7 +132,8 @@ private:
   GrpcAccessLoggerImpl::SharedPtr createLogger(
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
-      Event::Dispatcher& dispatcher) override;
+      Event::Dispatcher& dispatcher,
+      Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata) override;
 
   Server::Configuration::ServerFactoryContext& context_;
 };

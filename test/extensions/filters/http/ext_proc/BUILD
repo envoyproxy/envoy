@@ -22,6 +22,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/http:header_evaluator",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//test/mocks/http:http_mocks",

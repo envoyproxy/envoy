@@ -32,8 +32,15 @@ absl::StatusOr<Network::FilterFactoryCb> RateLimitConfigFactory::createFilterFac
 
   RETURN_IF_NOT_OK(
       Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
-  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Grpc::GrpcServiceConfigWithHashKey(proto_config.rate_limit_service().grpc_service());
+  auto initial_metadata_or_error =
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .parseGrpcServiceInitialMetadata(proto_config.rate_limit_service().grpc_service());
+  RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(
+      proto_config.rate_limit_service().grpc_service(),
+      std::move(initial_metadata_or_error.value()));
   return [config_with_hash_key, &context, timeout,
           filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(

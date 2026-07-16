@@ -1,3 +1,5 @@
+#include "envoy/http/header_evaluator.h"
+
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
@@ -277,6 +279,39 @@ TEST_F(NetworkExtProcFilterTest, StreamCreationFailureWithFailureModeAllow) {
   EXPECT_EQ(data.length(), 4);
   // Check failure counters
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_open_failures"));
+}
+
+// Stands in for a gRPC service's initial metadata parsed by parseGrpcServiceInitialMetadata().
+class NoopHeaderEvaluator : public Http::HeaderEvaluator {
+public:
+  void evaluateHeaders(Http::HeaderMap&, const Formatter::Context&,
+                       const StreamInfo::StreamInfo&) const override {}
+};
+
+// The gRPC service's parsed initial metadata given to the filter is passed along with the service
+// when opening the stream.
+TEST_F(NetworkExtProcFilterTest, ParsedGrpcInitialMetadataPassedToClient) {
+  auto parsed_grpc_initial_metadata = std::make_shared<const NoopHeaderEvaluator>();
+  auto filter_config = std::make_shared<Config>(createConfig(true), scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client),
+                                                   parsed_grpc_initial_metadata);
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&parsed_grpc_initial_metadata](
+              ExternalProcessorCallbacks&,
+              const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            EXPECT_EQ(parsed_grpc_initial_metadata, config_with_hash_key.initialMetadata());
+            return nullptr;
+          }));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 }
 
 // Test failure mode disallow behavior when stream creation fails

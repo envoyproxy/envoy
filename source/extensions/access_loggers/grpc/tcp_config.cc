@@ -28,10 +28,17 @@ AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
       const envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
+  auto initial_metadata = THROW_OR_RETURN_VALUE(
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .parseGrpcServiceInitialMetadata(proto_config.common_config().grpc_service()),
+      Grpc::GrpcServiceInitialMetadataPtr);
+
   return std::make_shared<TcpGrpcAccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
       GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()),
-      command_parsers);
+      command_parsers, std::move(initial_metadata));
 }
 
 ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {

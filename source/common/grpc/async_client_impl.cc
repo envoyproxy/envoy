@@ -4,10 +4,14 @@
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -42,28 +46,56 @@ void base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
 }
 } // namespace
 
+absl::StatusOr<GrpcServiceInitialMetadataPtr>
+parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config,
+                                Server::Configuration::ServerFactoryContext& context) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  Server::GenericFactoryContextImpl generic_context{context, context.messageValidationVisitor()};
+  auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(config.formatters(),
+                                                                            generic_context);
+  RETURN_IF_NOT_OK_REF(commands.status());
+  // The formatters created while parsing hold whatever state they need, so the command parsers
+  // don't need to outlive the parsed metadata.
+  auto parser_or_error = Router::HeaderParser::configure(
+      config.initial_metadata(),
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, *commands);
+  RETURN_IF_NOT_OK_REF(parser_or_error.status());
+  return GrpcServiceInitialMetadataPtr(std::move(*parser_or_error));
+}
+
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
 AsyncClientImpl::create(const envoy::config::core::v3::GrpcService& config,
-                        Server::Configuration::CommonFactoryContext& context) {
+                        Server::Configuration::ServerFactoryContext& context,
+                        GrpcServiceInitialMetadataPtr initial_metadata) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret =
-      std::unique_ptr<AsyncClientImpl>(new AsyncClientImpl(config, context, creation_status));
+  auto ret = std::unique_ptr<AsyncClientImpl>(
+      new AsyncClientImpl(config, context, std::move(initial_metadata), creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 AsyncClientImpl::AsyncClientImpl(const envoy::config::core::v3::GrpcService& config,
-                                 Server::Configuration::CommonFactoryContext& context,
+                                 Server::Configuration::ServerFactoryContext& context,
+                                 GrpcServiceInitialMetadataPtr initial_metadata,
                                  absl::Status& creation_status)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
       skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()), cm_(context.clusterManager()),
       remote_cluster_name_(config.envoy_grpc().cluster_name()),
-      host_name_(config.envoy_grpc().authority()), time_source_(context.timeSource()) {
-  auto parser_or_error = Router::HeaderParser::configure(
-      config.initial_metadata(),
-      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  SET_AND_RETURN_IF_NOT_OK(parser_or_error.status(), creation_status);
+      host_name_(config.envoy_grpc().authority()), time_source_(context.timeSource()),
+      metadata_parser_(std::move(initial_metadata)) {
+  // The initial metadata is normally parsed on the main thread (see
+  // parseGrpcServiceInitialMetadata()) and passed in, because formatters can only be parsed
+  // there. Otherwise, for callers that can't parse it on the main thread, parse it here with only
+  // the built-in commands. That fails for formatter extensions' commands, and doesn't work for
+  // built-in commands that must be parsed on the main thread if this is called on a worker thread.
+  if (metadata_parser_ == nullptr) {
+    auto parser_or_error = Router::HeaderParser::configure(
+        config.initial_metadata(),
+        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+    SET_AND_RETURN_IF_NOT_OK(parser_or_error.status(), creation_status);
+    metadata_parser_ = std::move(*parser_or_error);
+  }
 
   if (config.has_retry_policy()) {
     auto route_policy = Http::Utility::convertCoreToRouteRetryPolicy(config.retry_policy(), "");
@@ -72,8 +104,6 @@ AsyncClientImpl::AsyncClientImpl(const envoy::config::core::v3::GrpcService& con
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
     retry_policy_ = std::move(*policy_or_error);
   }
-
-  metadata_parser_ = std::move(*parser_or_error);
 }
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -207,8 +237,17 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   // request headers should not be stored in stream_info.
   // Maybe put it to parent_context?
   // Since request headers may be empty, consider using Envoy::OptRef.
+  // Fall back to an empty stream info when the caller does not provide one, so that formatters
+  // that don't require stream info (such as secret-backed extensions) still resolve. The stream
+  // info is only read during the synchronous evaluateHeaders() call below, so a stack local
+  // suffices.
+  StreamInfo::StreamInfoImpl empty_stream_info(parent_.time_source_, nullptr,
+                                               StreamInfo::FilterState::LifeSpan::FilterChain);
+  const StreamInfo::StreamInfo& stream_info = options_.parent_context.stream_info != nullptr
+                                                  ? *options_.parent_context.stream_info
+                                                  : empty_stream_info;
   parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
-                                            options_.parent_context.stream_info);
+                                            {stream_info.getRequestHeaders()}, stream_info);
 
   Tracing::HttpTraceContext trace_context(headers_message_->headers());
   Tracing::UpstreamContext upstream_context(nullptr,                         // host_

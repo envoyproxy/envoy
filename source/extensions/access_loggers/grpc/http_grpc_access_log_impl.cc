@@ -25,11 +25,11 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
     GrpcCommon::GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
 
-HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
-                                     const HttpGrpcAccessLogConfig config,
-                                     ThreadLocal::SlotAllocator& tls,
-                                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-                                     const Formatter::CommandParserPtrVector& command_parsers)
+HttpGrpcAccessLog::HttpGrpcAccessLog(
+    AccessLog::FilterPtr&& filter, const HttpGrpcAccessLogConfig config,
+    ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+    const Formatter::CommandParserPtrVector& command_parsers,
+    Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata)
     : Common::ImplBase(std::move(filter)),
       config_(std::make_shared<const HttpGrpcAccessLogConfig>(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),
@@ -46,11 +46,12 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
     response_trailers_to_log_.emplace_back(header);
   }
   THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(config_->common_config()));
-  tls_slot_->set(
-      [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
-        return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
-            config->common_config(), Common::GrpcAccessLoggerType::HTTP));
-      });
+  tls_slot_->set([config = config_, access_logger_cache = access_logger_cache_,
+                  parsed_grpc_initial_metadata =
+                      std::move(parsed_grpc_initial_metadata)](Event::Dispatcher&) {
+    return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
+        config->common_config(), Common::GrpcAccessLoggerType::HTTP, parsed_grpc_initial_metadata));
+  });
 }
 
 void HttpGrpcAccessLog::emitLog(const Formatter::Context& context,

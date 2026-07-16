@@ -103,9 +103,14 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
 
   std::shared_ptr<Grpc::AsyncClientFactory> grpc_client_factory;
   if (opentelemetry_config.has_grpc_service()) {
+    auto grpc_initial_metadata = THROW_OR_RETURN_VALUE(
+        factory_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+            opentelemetry_config.grpc_service()),
+        Grpc::GrpcServiceInitialMetadataPtr);
     auto factory_or_error =
         factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-            opentelemetry_config.grpc_service(), factory_context.scope(), true);
+            opentelemetry_config.grpc_service(), factory_context.scope(), true,
+            std::move(grpc_initial_metadata));
     THROW_IF_NOT_OK_REF(factory_or_error.status());
     grpc_client_factory = std::move(factory_or_error.value());
   }

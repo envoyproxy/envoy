@@ -57,8 +57,12 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
             ? std::nullopt
             : std::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
     RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
-    Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-        Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
+    auto initial_metadata_or_error =
+        server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+            proto_config.grpc_service());
+    RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+    Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(
+        proto_config.grpc_service(), std::move(*initial_metadata_or_error));
     callback = [&server_context, filter_config = std::move(filter_config), timeout,
                 config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client_or_error = server_context.clusterManager()
@@ -78,9 +82,18 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  Grpc::GrpcServiceInitialMetadataPtr initial_metadata;
+  if (proto_config.has_check_settings() && proto_config.check_settings().has_grpc_service()) {
+    auto initial_metadata_or_error =
+        context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+            proto_config.check_settings().grpc_service());
+    RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+    initial_metadata = std::move(*initial_metadata_or_error);
+  }
   absl::Status creation_status = absl::OkStatus();
-  auto config = std::make_shared<FilterConfigPerRoute>(proto_config, creation_status);
+  auto config = std::make_shared<FilterConfigPerRoute>(proto_config, std::move(initial_metadata),
+                                                       creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   return config;
 }

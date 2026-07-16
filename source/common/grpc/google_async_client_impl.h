@@ -8,6 +8,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client_manager.h"
+#include "envoy/http/header_evaluator.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
@@ -176,8 +178,9 @@ public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
                         const envoy::config::core::v3::GrpcService& config,
-                        Server::Configuration::CommonFactoryContext& context,
-                        const StatNames& stat_names);
+                        Server::Configuration::ServerFactoryContext& context,
+                        const StatNames& stat_names,
+                        GrpcServiceInitialMetadataPtr initial_metadata = nullptr);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -206,7 +209,10 @@ private:
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
   uint64_t per_stream_buffer_limit_bytes_;
-  Router::HeaderParserPtr metadata_parser_;
+  // The service's parsed initial metadata. Shared with the other clients for the service when it
+  // was parsed on the main thread with formatter extensions (see
+  // parseGrpcServiceInitialMetadata()).
+  const GrpcServiceInitialMetadataPtr metadata_parser_;
 
   friend class GoogleAsyncClientThreadLocal;
   friend class GoogleAsyncRequestImpl;

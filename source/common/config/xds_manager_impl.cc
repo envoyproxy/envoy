@@ -86,10 +86,14 @@ absl::Status createSharedClients(Grpc::AsyncClientManager& async_client_manager,
                                                 xdstp_config_source);
   RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
   if (maybe_grpc_service.value().has_value()) {
+    auto initial_metadata =
+        async_client_manager.parseGrpcServiceInitialMetadata(*maybe_grpc_service.value());
+    RETURN_IF_NOT_OK_REF(initial_metadata.status());
     absl::StatusOr<Grpc::RawAsyncClientSharedPtr> success =
         async_client_manager.getOrCreateRawAsyncClientWithHashKey(
-            Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), stats_scope,
-            skip_cluster_check);
+            Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value(),
+                                               std::move(*initial_metadata)),
+            stats_scope, skip_cluster_check);
     RETURN_IF_NOT_OK_REF(success.status());
     primary_client = std::move(*success);
   }
@@ -99,10 +103,14 @@ absl::Status createSharedClients(Grpc::AsyncClientManager& async_client_manager,
                                                   xdstp_config_source);
     RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
     if (maybe_grpc_service.value().has_value()) {
+      auto initial_metadata =
+          async_client_manager.parseGrpcServiceInitialMetadata(*maybe_grpc_service.value());
+      RETURN_IF_NOT_OK_REF(initial_metadata.status());
       absl::StatusOr<Grpc::RawAsyncClientSharedPtr> success =
           async_client_manager.getOrCreateRawAsyncClientWithHashKey(
-              Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), stats_scope,
-              skip_cluster_check);
+              Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value(),
+                                                 std::move(*initial_metadata)),
+              stats_scope, skip_cluster_check);
       RETURN_IF_NOT_OK_REF(success.status());
       failover_client = std::move(*success);
     }

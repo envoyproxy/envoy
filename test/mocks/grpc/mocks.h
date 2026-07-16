@@ -118,15 +118,18 @@ public:
 
   MOCK_METHOD(absl::StatusOr<AsyncClientFactoryPtr>, factoryForGrpcService,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
-               bool skip_cluster_check));
+               bool skip_cluster_check, GrpcServiceInitialMetadataPtr initial_metadata));
 
   MOCK_METHOD(absl::StatusOr<RawAsyncClientSharedPtr>, getOrCreateRawAsyncClient,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
-               bool skip_cluster_check));
+               bool skip_cluster_check, GrpcServiceInitialMetadataPtr initial_metadata));
 
   MOCK_METHOD(absl::StatusOr<RawAsyncClientSharedPtr>, getOrCreateRawAsyncClientWithHashKey,
               (const GrpcServiceConfigWithHashKey& config_with_hash_key, Stats::Scope& scope,
                bool skip_cluster_check));
+
+  MOCK_METHOD(absl::StatusOr<GrpcServiceInitialMetadataPtr>, parseGrpcServiceInitialMetadata,
+              (const envoy::config::core::v3::GrpcService& grpc_service));
 };
 
 #if defined(ENVOY_ENABLE_FULL_PROTOS)

@@ -30,6 +30,25 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "grpc_initial_metadata_test",
+    srcs = ["grpc_initial_metadata_test.cc"],
+    extension_names = ["envoy.formatter.generic_secret"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/grpc:async_client_lib",
+        "//source/extensions/formatter/generic_secret:config",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/generic_secret/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "generic_secret_integration_test",
     size = "large",

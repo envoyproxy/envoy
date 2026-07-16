@@ -53,7 +53,8 @@ private:
   // Common::GrpcAccessLoggerCache
   GrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Event::Dispatcher& dispatcher) override;
+               Event::Dispatcher& dispatcher,
+               Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata) override;
 
   const LocalInfo::LocalInfo& local_info_;
 };

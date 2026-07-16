@@ -61,13 +61,14 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    Event::Dispatcher& dispatcher) {
+    Event::Dispatcher& dispatcher,
+    Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata) {
   // We pass skip_cluster_check=true to factoryForGrpcService in order to avoid throwing
   // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
   // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
   // the main thread if necessary.
-  auto factory_or_error =
-      async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true);
+  auto factory_or_error = async_client_manager_.factoryForGrpcService(
+      config.grpc_service(), scope_, true, std::move(parsed_grpc_initial_metadata));
   THROW_IF_NOT_OK_REF(factory_or_error.status());
   return std::make_shared<GrpcAccessLoggerImpl>(
       THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),

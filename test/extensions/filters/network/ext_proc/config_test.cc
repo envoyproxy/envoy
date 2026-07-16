@@ -120,6 +120,41 @@ TEST(NetworkExtProcConfigTest, ConfigWithOptions) {
   cb(filter_manager);
 }
 
+// The gRPC service's initial metadata is parsed when the filter config is created.
+TEST(NetworkExtProcConfigTest, ParsesGrpcServiceInitialMetadata) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+  TestUtility::loadFromYaml(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  stat_prefix: "test_ext_proc"
+  )EOF",
+                            proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(ProtoEq(proto_config.grpc_service())));
+  NetworkExtProcConfigFactory factory;
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, context).ok());
+}
+
+TEST(NetworkExtProcConfigTest, ParseGrpcInitialMetadataError) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+  TestUtility::loadFromYaml(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  stat_prefix: "test_ext_proc"
+  )EOF",
+                            proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
+              parseGrpcServiceInitialMetadata(_))
+      .WillOnce(testing::Return(absl::InvalidArgumentError("bad formatters")));
+  NetworkExtProcConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(auto cb = factory.createFilterFactoryFromProto(proto_config, context),
+                            EnvoyException, "bad formatters");
+}
+
 // Test the config without a gRPC service.
 TEST(NetworkExtProcConfigFactoryTest, MissingGrpcService) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;

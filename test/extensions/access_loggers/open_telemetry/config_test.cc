@@ -36,8 +36,9 @@ public:
   // Helper to set up gRPC config and expectations using top-level fields.
   void setupGrpcConfig() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+                factoryForGrpcService(_, _, _, _))
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                            Grpc::GrpcServiceInitialMetadataPtr) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
         }));
 
@@ -82,8 +83,9 @@ TEST_F(OpenTelemetryAccessLogConfigTest, HttpConfigOk) {
 // Verifies top-level grpc_service configuration creates a valid access log instance.
 TEST_F(OpenTelemetryAccessLogConfigTest, TopLevelGrpcServiceConfigOk) {
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-              factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+              factoryForGrpcService(_, _, _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                          Grpc::GrpcServiceInitialMetadataPtr) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 

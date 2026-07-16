@@ -60,7 +60,8 @@ public:
       GrpcAccessLoggerSharedPtr, getOrCreateLogger,
       (const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
            config,
-       Common::GrpcAccessLoggerType logger_type));
+       Common::GrpcAccessLoggerType logger_type,
+       Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata));
 };
 
 class AccessLogTest : public testing::Test {
@@ -72,10 +73,11 @@ public:
     config_.mutable_common_config()->set_log_name("test_log");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
         .WillOnce([this](const envoy::extensions::access_loggers::open_telemetry::v3::
                              OpenTelemetryAccessLogConfig& config,
-                         Common::GrpcAccessLoggerType logger_type) {
+                         Common::GrpcAccessLoggerType logger_type,
+                         Grpc::GrpcServiceInitialMetadataPtr) {
           EXPECT_EQ(config.DebugString(), config_.DebugString());
           EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
           return logger_;

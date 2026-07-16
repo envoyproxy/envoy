@@ -23,7 +23,20 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 static constexpr int DefaultBufferLimitBytes = 1024 * 1024;
+
+absl::StatusOr<GrpcServiceInitialMetadataPtr>
+buildMetadataParser(const envoy::config::core::v3::GrpcService& config,
+                    GrpcServiceInitialMetadataPtr initial_metadata) {
+  if (initial_metadata != nullptr) {
+    return initial_metadata;
+  }
+  auto parser_or_error = Router::HeaderParser::configure(
+      config.initial_metadata(),
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  RETURN_IF_NOT_OK_REF(parser_or_error.status());
+  return GrpcServiceInitialMetadataPtr(std::move(*parser_or_error));
 }
+} // namespace
 
 GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Api::Api& api)
     : completion_thread_(api.threadFactory().createThread([this] { completionThread(); },
@@ -82,17 +95,16 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
                                              const envoy::config::core::v3::GrpcService& config,
-                                             Server::Configuration::CommonFactoryContext& context,
-                                             const StatNames& stat_names)
+                                             Server::Configuration::ServerFactoryContext& context,
+                                             const StatNames& stat_names,
+                                             GrpcServiceInitialMetadataPtr initial_metadata)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
-      metadata_parser_(THROW_OR_RETURN_VALUE(
-          Router::HeaderParser::configure(
-              config.initial_metadata(),
-              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
-          Router::HeaderParserPtr)) {
+      metadata_parser_(
+          THROW_OR_RETURN_VALUE(buildMetadataParser(config, std::move(initial_metadata)),
+                                GrpcServiceInitialMetadataPtr)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
@@ -215,7 +227,14 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   // TODO(cpakulski): Find a better way to access requestHeaders
   // request headers should not be stored in stream_info.
   // Maybe put it to parent_context?
-  parent_.metadata_parser_->evaluateHeaders(*initial_metadata, options_.parent_context.stream_info);
+  // Fall back to this stream's (otherwise unused) stream info when the caller does not provide
+  // one, so that formatters that don't require stream info (such as secret-backed extensions)
+  // still resolve.
+  const StreamInfo::StreamInfo& stream_info = options_.parent_context.stream_info != nullptr
+                                                  ? *options_.parent_context.stream_info
+                                                  : unused_stream_info_;
+  parent_.metadata_parser_->evaluateHeaders(*initial_metadata, {stream_info.getRequestHeaders()},
+                                            stream_info);
   Tracing::HttpTraceContext trace_context(*initial_metadata);
   Tracing::UpstreamContext upstream_context(nullptr,                          // host_
                                             nullptr,                          // cluster_

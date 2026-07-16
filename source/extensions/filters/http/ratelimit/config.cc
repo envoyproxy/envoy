@@ -33,8 +33,12 @@ absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactory
           : std::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
 
   RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
-  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Grpc::GrpcServiceConfigWithHashKey(proto_config.rate_limit_service().grpc_service());
+  auto initial_metadata_or_error =
+      context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+          proto_config.rate_limit_service().grpc_service());
+  RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(
+      proto_config.rate_limit_service().grpc_service(), std::move(*initial_metadata_or_error));
   return [config_with_hash_key, &context, timeout,
           filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(

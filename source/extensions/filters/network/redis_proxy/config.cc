@@ -140,9 +140,13 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto has_external_auth_provider_ = proto_config.has_external_auth_provider();
   auto grpc_service = proto_config.external_auth_provider().grpc_service();
   auto timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, 200);
+  auto initial_metadata = THROW_OR_RETURN_VALUE(
+      server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+          grpc_service),
+      Grpc::GrpcServiceInitialMetadataPtr);
 
-  return [has_external_auth_provider_, grpc_service, &context, splitter, filter_config,
-          timeout_ms](Network::FilterManager& filter_manager) -> void {
+  return [has_external_auth_provider_, grpc_service, &context, splitter, filter_config, timeout_ms,
+          initial_metadata](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl decoder_factory;
 
     ExternalAuth::ExternalAuthClientPtr&& auth_client{nullptr};
@@ -151,7 +155,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
           context.serverFactoryContext()
               .clusterManager()
               .grpcAsyncClientManager()
-              .factoryForGrpcService(grpc_service, context.scope(), true);
+              .factoryForGrpcService(grpc_service, context.scope(), true, initial_metadata);
       THROW_IF_NOT_OK_REF(auth_client_factory_or_error.status());
 
       auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(

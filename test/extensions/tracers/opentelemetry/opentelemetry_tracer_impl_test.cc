@@ -107,7 +107,8 @@ public:
         .WillByDefault(Return(ByMove(std::move(mock_client))));
     auto& factory_context = context_.server_factory_context_;
     ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
-    ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+    ON_CALL(factory_context.cluster_manager_.async_client_manager_,
+            factoryForGrpcService(_, _, _, _))
         .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
     ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
@@ -254,7 +255,7 @@ TEST_F(OpenTelemetryDriverTest, PassSetTelemetrySdkResourceAttributesFalse) {
       .WillByDefault(Return(ByMove(std::move(mock_client))));
   auto& factory_context = context_.server_factory_context_;
   ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _, _))
       .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
   ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
@@ -287,7 +288,7 @@ TEST_F(OpenTelemetryDriverTest, PassSetTelemetrySdkResourceAttributesDefaultTrue
       .WillByDefault(Return(ByMove(std::move(mock_client))));
   auto& factory_context = context_.server_factory_context_;
   ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _, _))
       .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
   ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
@@ -320,7 +321,7 @@ TEST_F(OpenTelemetryDriverTest, PassSetServiceNameResourceAttributeFalse) {
       .WillByDefault(Return(ByMove(std::move(mock_client))));
   auto& factory_context = context_.server_factory_context_;
   ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _, _))
       .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
   ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
@@ -353,7 +354,7 @@ TEST_F(OpenTelemetryDriverTest, PassSetServiceNameResourceAttributeDefaultTrue) 
       .WillByDefault(Return(ByMove(std::move(mock_client))));
   auto& factory_context = context_.server_factory_context_;
   ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _, _))
       .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
   ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
@@ -446,7 +447,7 @@ TEST_F(OpenTelemetryDriverTest, UnconfiguredExporterIncrementsSpansDropped) {
 
   auto& factory_context = context_.server_factory_context_;
   ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _, _))
       .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
   ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 

@@ -1,13 +1,17 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/grpc/async_client_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/protobuf/protobuf.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -22,6 +26,25 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Grpc {
 namespace {
+
+// A formatter command parser factory that records the GenericFactoryContext it is handed. Used to
+// verify that the gRPC client wires the server factory context and init manager through to
+// formatter extensions (the init manager is what SDS-backed formatter extensions register their
+// init targets with).
+class ContextCapturingCommandFactory : public Envoy::Formatter::TestCommandFactory {
+public:
+  Envoy::Formatter::CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message& message,
+                               Server::Configuration::GenericFactoryContext& context) override {
+    captured_server_context = &context.serverFactoryContext();
+    captured_init_manager = &context.initManager();
+    return Envoy::Formatter::TestCommandFactory::createCommandParserFromProto(message, context);
+  }
+  std::string name() const override { return "envoy.formatter.ContextCapturing"; }
+
+  Server::Configuration::ServerFactoryContext* captured_server_context{};
+  Init::Manager* captured_init_manager{};
+};
 
 class EnvoyAsyncClientImplTest : public testing::Test {
 public:
@@ -269,6 +292,131 @@ TEST_F(EnvoyAsyncClientImplTest, BinaryMetadataInClientInitialMetadataIsBase64Es
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that a formatter extension declared in `formatters` is used to resolve substitution
+// commands in the initial metadata header values. This exercises the fallback to an empty stream
+// info, since the stream is started without a caller-provided stream info.
+TEST_F(EnvoyAsyncClientImplTest, InitialMetadataUsesFormatterExtension) {
+  Envoy::Formatter::TestCommandFactory factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
+
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+
+  auto* initial_metadata_entry = config.mutable_initial_metadata()->Add();
+  initial_metadata_entry->set_key("x-formatted");
+  initial_metadata_entry->set_value("value-%COMMAND_EXTENSION()%");
+
+  auto* formatter = config.mutable_formatters()->Add();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  auto formatters = parseGrpcServiceInitialMetadata(config, context_);
+  ASSERT_TRUE(formatters.ok());
+  grpc_client_ = *AsyncClientImpl::create(config, context_, *formatters);
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+  EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
+  EXPECT_CALL(
+      http_stream,
+      sendHeaders(
+          testing::Truly([](Http::HeaderMap& headers) {
+            EXPECT_EQ(headers.get(Http::LowerCaseString("x-formatted"))[0]->value().getStringView(),
+                      "value-TestFormatter");
+            return true;
+          }),
+          _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that the initial metadata is unaffected when no formatter command is used.
+TEST_F(EnvoyAsyncClientImplTest, InitialMetadataFormatterExtensionUnusedForStaticValue) {
+  Envoy::Formatter::TestCommandFactory factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
+
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+
+  auto* initial_metadata_entry = config.mutable_initial_metadata()->Add();
+  initial_metadata_entry->set_key("x-static");
+  initial_metadata_entry->set_value("static-value");
+
+  auto* formatter = config.mutable_formatters()->Add();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  auto formatters = parseGrpcServiceInitialMetadata(config, context_);
+  ASSERT_TRUE(formatters.ok());
+  grpc_client_ = *AsyncClientImpl::create(config, context_, *formatters);
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+  EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
+  EXPECT_CALL(
+      http_stream,
+      sendHeaders(testing::Truly([](Http::HeaderMap& headers) {
+                    EXPECT_EQ(
+                        headers.get(Http::LowerCaseString("x-static"))[0]->value().getStringView(),
+                        "static-value");
+                    return true;
+                  }),
+                  _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that parseGrpcServiceInitialMetadata hands formatter extensions a factory context
+// carrying the server factory context and its init manager. SDS-backed formatter extensions (such
+// as
+// ``envoy.formatter.generic_secret`` with an ``sds_config``) register their init targets with this
+// init manager, so this wiring is what allows dynamic secrets to load.
+TEST_F(EnvoyAsyncClientImplTest, FormatterExtensionReceivesServerContextAndInitManager) {
+  ContextCapturingCommandFactory factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
+
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  auto* formatter = config.mutable_formatters()->Add();
+  formatter->set_name("envoy.formatter.ContextCapturing");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  EXPECT_TRUE(parseGrpcServiceInitialMetadata(config, context_).ok());
+
+  EXPECT_EQ(factory.captured_server_context, &context_);
+  EXPECT_EQ(factory.captured_init_manager, &context_.initManager());
 }
 
 // Validates that "*-bin" server init metadata are NOT based64 decoded.

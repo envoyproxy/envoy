@@ -38,7 +38,8 @@ public:
       ::Envoy::AccessLog::FilterPtr&& filter,
       envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
       ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-      const std::vector<Formatter::CommandParserPtr>& commands);
+      const std::vector<Formatter::CommandParserPtr>& commands,
+      Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata = nullptr);
 
 private:
   /**

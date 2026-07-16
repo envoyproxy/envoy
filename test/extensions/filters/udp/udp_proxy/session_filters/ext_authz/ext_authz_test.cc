@@ -340,7 +340,7 @@ TEST_F(ExtAuthzFilterTest, BufferByteOverflowIsCountedAndDropped) {
 // A failure to create the gRPC client factory is surfaced as a configuration exception.
 TEST_F(ExtAuthzFilterTest, ConfigThrowsWhenGrpcClientFactoryFails) {
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-              factoryForGrpcService(_, _, _))
+              factoryForGrpcService(_, _, _, _))
       .WillOnce(Return(absl::InvalidArgumentError("bad grpc service")));
 
   FilterConfig proto_config;

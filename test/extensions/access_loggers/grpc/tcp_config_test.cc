@@ -54,8 +54,9 @@ public:
 
     if (cluster_name == good_cluster) {
       EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-                  factoryForGrpcService(_, _, _))
-          .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+                  factoryForGrpcService(_, _, _, _))
+          .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                              Grpc::GrpcServiceInitialMetadataPtr) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
           }));
       AccessLog::InstanceSharedPtr instance =
@@ -90,8 +91,9 @@ TEST_F(TcpGrpcAccessLogConfigTest, CustomTagFormatterRespectsCommandParsers) {
   TestUtility::jsonConvert(tcp_grpc_access_log_, *message_);
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-              factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+              factoryForGrpcService(_, _, _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                          Grpc::GrpcServiceInitialMetadataPtr) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 
@@ -108,7 +110,8 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type));
+               Common::GrpcAccessLoggerType logger_type,
+               Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata));
 };
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081
@@ -122,10 +125,10 @@ TEST(TcpGrpcAccessLog, TlsLifetimeCheck) {
     envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config;
     config.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _, _))
         .WillOnce([](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                          common_config,
-                     Common::GrpcAccessLoggerType type) {
+                     Common::GrpcAccessLoggerType type, Grpc::GrpcServiceInitialMetadataPtr) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
           std::ignore = std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;

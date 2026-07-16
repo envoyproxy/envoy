@@ -45,7 +45,8 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type));
+               Common::GrpcAccessLoggerType logger_type,
+               Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata));
 };
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081
@@ -59,10 +60,10 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
     envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
     config.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _, _))
         .WillOnce([](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                          common_config,
-                     Common::GrpcAccessLoggerType type) {
+                     Common::GrpcAccessLoggerType type, Grpc::GrpcServiceInitialMetadataPtr) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
           std::ignore = std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;
@@ -88,11 +89,11 @@ public:
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   Common::GrpcAccessLoggerType logger_type) {
+                   Common::GrpcAccessLoggerType logger_type, Grpc::GrpcServiceInitialMetadataPtr) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
@@ -109,11 +110,11 @@ public:
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   Common::GrpcAccessLoggerType logger_type) {
+                   Common::GrpcAccessLoggerType logger_type, Grpc::GrpcServiceInitialMetadataPtr) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;

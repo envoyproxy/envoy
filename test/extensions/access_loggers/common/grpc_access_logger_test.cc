@@ -604,12 +604,15 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Event::Dispatcher& dispatcher) override {
-    auto client = THROW_OR_RETURN_VALUE(
-        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
-            .value()
-            ->createUncachedRawAsyncClient(),
-        Grpc::RawAsyncClientPtr);
+               Event::Dispatcher& dispatcher,
+               Grpc::GrpcServiceInitialMetadataPtr parsed_grpc_initial_metadata) override {
+    auto client =
+        THROW_OR_RETURN_VALUE(async_client_manager_
+                                  .factoryForGrpcService(config.grpc_service(), scope_, true,
+                                                         std::move(parsed_grpc_initial_metadata))
+                                  .value()
+                                  ->createUncachedRawAsyncClient(),
+                              Grpc::RawAsyncClientPtr);
     return std::make_shared<MockGrpcAccessLoggerImpl>(std::move(client), config, dispatcher, scope_,
                                                       "mock_access_log_prefix.",
                                                       mockMethodDescriptor(), true);
@@ -623,8 +626,9 @@ public:
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;
     async_client_ = new Grpc::MockAsyncClient;
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true, _))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                Grpc::GrpcServiceInitialMetadataPtr) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));

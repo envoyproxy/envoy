@@ -13,6 +13,7 @@
 #include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "source/extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
 #include "source/extensions/access_loggers/open_telemetry/http_access_log_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -84,9 +85,17 @@ getHttpAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& c
         context.serverFactoryContext(), commands);
   }
 
+  auto initial_metadata =
+      THROW_OR_RETURN_VALUE(context.serverFactoryContext()
+                                .clusterManager()
+                                .grpcAsyncClientManager()
+                                .parseGrpcServiceInitialMetadata(getGrpcService(proto_config)),
+                            Grpc::GrpcServiceInitialMetadataPtr);
+
   return std::make_shared<AccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
-      getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()), commands);
+      getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()), commands,
+      std::move(initial_metadata));
 }
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {

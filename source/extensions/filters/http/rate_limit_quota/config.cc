@@ -39,8 +39,12 @@ RateLimitQuotaFilterFactory::createHttpFilterFactoryFromProtoTyped(
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>(
       filter_config);
 
-  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Grpc::GrpcServiceConfigWithHashKey(config->rlqs_server());
+  auto initial_metadata_or_error =
+      context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+          config->rlqs_server());
+  RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key(config->rlqs_server(),
+                                                          std::move(*initial_metadata_or_error));
 
   RateLimitOnMatchActionContext action_context;
   RateLimitQuotaValidationVisitor visitor;
