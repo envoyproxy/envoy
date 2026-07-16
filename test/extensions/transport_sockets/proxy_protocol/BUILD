@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/transport_sockets/proxy_protocol:upstream_proxy_protocol",
         "//test/mocks/buffer:buffer_mocks",
