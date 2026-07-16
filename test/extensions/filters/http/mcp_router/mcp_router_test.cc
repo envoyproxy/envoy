@@ -783,20 +783,16 @@ TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
 
   // Verify all attributes are present.
   auto name = tool->getString("name");
-  EXPECT_OK(name);
-  EXPECT_EQ(*name, "get_weather");
+  EXPECT_THAT(name, ::Envoy::StatusHelpers::IsOkAndHolds("get_weather"));
 
   auto title = tool->getString("title");
-  EXPECT_OK(title);
-  EXPECT_EQ(*title, "Weather Tool");
+  EXPECT_THAT(title, ::Envoy::StatusHelpers::IsOkAndHolds("Weather Tool"));
 
   auto desc = tool->getString("description");
-  EXPECT_OK(desc);
-  EXPECT_EQ(*desc, "Get weather information");
+  EXPECT_THAT(desc, ::Envoy::StatusHelpers::IsOkAndHolds("Get weather information"));
 
   auto input_schema = tool->getObject("inputSchema");
-  EXPECT_OK(input_schema);
-  EXPECT_TRUE(*input_schema != nullptr);
+  EXPECT_THAT(input_schema, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 
   // Verify nested inputSchema properties are present.
   auto props = (*input_schema)->getObject("properties");
@@ -846,8 +842,7 @@ TEST(AggregateToolsListTest, SerializationPreservesNestedInputSchema) {
 
   // Verify the nested properties are preserved.
   auto count_type = (*count_prop)->getString("type");
-  EXPECT_OK(count_type);
-  EXPECT_EQ(*count_type, "integer");
+  EXPECT_THAT(count_type, ::Envoy::StatusHelpers::IsOkAndHolds("integer"));
 }
 
 // Verifies lazy_initialization config field defaults to false and can be enabled.

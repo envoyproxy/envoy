@@ -114,8 +114,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_Valid) {
   report.set_application_utilization(0.5);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 0.0);
-  ASSERT_OK(result);
-  EXPECT_EQ(result.value(), 2000);
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(2000));
 }
 
 TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_NoQps) {
@@ -139,8 +138,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_MaxWeight) {
   report.set_application_utilization(0.0000001);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 0.0);
-  ASSERT_OK(result);
-  EXPECT_EQ(result.value(), std::numeric_limits<uint32_t>::max());
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(std::numeric_limits<uint32_t>::max()));
 }
 
 TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_ErrorPenalty) {
@@ -150,8 +148,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_ErrorPenalty) {
   report.set_application_utilization(0.5);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 2.0);
-  ASSERT_OK(result);
-  EXPECT_EQ(result.value(), 1428);
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(1428));
 }
 
 // ============================================================
