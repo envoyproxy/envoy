@@ -30,14 +30,13 @@
 #include "test/mocks/upstream/health_checker.h"
 #include "test/test_common/status_utility.h"
 
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::ContainerEq;
 using testing::DoAll;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
-using ::testing::Not;
 using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
@@ -1287,8 +1286,7 @@ TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
   )EOF";
 
   auto status = setupFactoryFromV3Yaml(basic_yaml_hosts, true);
-  ASSERT_THAT(status, Not(IsOk()));
-  EXPECT_EQ(status.message(), "Redis cluster can only created with redis cluster type.");
+  ASSERT_THAT(status, HasStatusMessage("Redis cluster can only created with redis cluster type."));
 }
 
 TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {

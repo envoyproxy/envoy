@@ -17,8 +17,7 @@ namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
 using ::Envoy::StatusHelpers::HasStatusCode;
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
@@ -409,10 +408,9 @@ match_excluded_headers:
   AwsRequestSigningFilterFactory factory;
 
   const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "SigV4 region string cannot contain wildcards or commas. Region "
-            "sets can be specified when using signing_algorithm: AWS_SIGV4A.");
+  EXPECT_THAT(result,
+              HasStatusMessage("SigV4 region string cannot contain wildcards or commas. Region "
+                               "sets can be specified when using signing_algorithm: AWS_SIGV4A."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4A) {
@@ -555,10 +553,9 @@ stat_prefix: foo_prefix
 
   const auto result = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "SigV4 region string cannot contain wildcards or commas. Region "
-            "sets can be specified when using signing_algorithm: AWS_SIGV4A.");
+  EXPECT_THAT(result,
+              HasStatusMessage("SigV4 region string cannot contain wildcards or commas. Region "
+                               "sets can be specified when using signing_algorithm: AWS_SIGV4A."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4RegionInEnv) {
@@ -606,10 +603,9 @@ match_excluded_headers:
 
   // Should fail as sigv4a requires region explicitly within config
   const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "AWS region is not set in xDS configuration and failed to retrieve "
-            "from environment variable or AWS profile/config files.");
+  EXPECT_THAT(result,
+              HasStatusMessage("AWS region is not set in xDS configuration and failed to retrieve "
+                               "from environment variable or AWS profile/config files."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, UpstreamFactoryTest) {
@@ -648,10 +644,9 @@ stat_prefix: foo_prefix
 
   const auto result = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "AWS region is not set in xDS configuration and failed to retrieve from "
-            "environment variable or AWS profile/config files.");
+  EXPECT_THAT(result, HasStatusMessage(
+                          "AWS region is not set in xDS configuration and failed to retrieve from "
+                          "environment variable or AWS profile/config files."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4ANoRegion) {
@@ -682,10 +677,9 @@ stat_prefix: foo_prefix
 
   const auto result = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "AWS region is not set in xDS configuration and failed to retrieve from "
-            "environment variable or AWS profile/config files.");
+  EXPECT_THAT(result, HasStatusMessage(
+                          "AWS region is not set in xDS configuration and failed to retrieve from "
+                          "environment variable or AWS profile/config files."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionNoRegionAvailable) {
@@ -714,10 +708,9 @@ match_excluded_headers:
 
   // Should fail as sigv4a requires region explicitly within config
   const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "AWS region is not set in xDS configuration and failed to retrieve "
-            "from environment variable or AWS profile/config files.");
+  EXPECT_THAT(result,
+              HasStatusMessage("AWS region is not set in xDS configuration and failed to retrieve "
+                               "from environment variable or AWS profile/config files."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidLowExpirationTime) {

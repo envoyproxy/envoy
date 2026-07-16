@@ -30,13 +30,12 @@ namespace GrpcFieldExtraction {
 namespace {
 
 using ::apikeys::CreateApiKeyRequest;
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatus;
 using ::google::grpc::transcoding::kGrpcDelimiterByteSize;
 using Protobuf::util::MessageDifferencer;
 using StatusHelpers::StatusIs;
 using ::testing::Bool;
 using ::testing::Combine;
-using ::testing::Not;
 using ::testing::Values;
 
 CreateApiKeyRequest getCreateApiKeyRequest() {
@@ -388,9 +387,8 @@ TEST_F(MessageConverterReadOnlyBehavior, ReachBufferLimit) {
 
   // Convert the message which is larger than the buffer_limit=0;
   auto result = converter.accumulateMessage(request_in, true);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().ToString(),
-            "FAILED_PRECONDITION: Rejected because internal buffer limits are exceeded.");
+  ASSERT_THAT(result, HasStatus(absl::StatusCode::kFailedPrecondition,
+                                "Rejected because internal buffer limits are exceeded."));
 }
 
 // Tests a streaming RPC request with only data (no trailers) where the stream
