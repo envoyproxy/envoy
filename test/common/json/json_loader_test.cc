@@ -15,7 +15,6 @@ namespace Json {
 namespace {
 
 using ::Envoy::StatusHelpers::HasStatus;
-using ::Envoy::StatusHelpers::HasStatusCode;
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
@@ -76,9 +75,9 @@ TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflow) {
   }
 
   auto status_or_object = Factory::loadFromString(json);
-  EXPECT_THAT(status_or_object, HasStatusCode(absl::StatusCode::kInternal));
-  EXPECT_THAT(status_or_object.status().message(),
-              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+  EXPECT_THAT(status_or_object,
+              HasStatus(absl::StatusCode::kInternal,
+                        testing::HasSubstr("JSON nesting depth exceeds limit of")));
 }
 
 TEST_F(JsonLoaderTest, DeeplyNestedJsonObjectDestructorStackOverflowConfigurable) {
@@ -94,9 +93,9 @@ TEST_F(JsonLoaderTest, DeeplyNestedJsonObjectDestructorStackOverflowConfigurable
   }
 
   auto status_or_object = Factory::loadFromString(json);
-  EXPECT_THAT(status_or_object, HasStatusCode(absl::StatusCode::kInternal));
-  EXPECT_THAT(status_or_object.status().message(),
-              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+  EXPECT_THAT(status_or_object,
+              HasStatus(absl::StatusCode::kInternal,
+                        testing::HasSubstr("JSON nesting depth exceeds limit of")));
 }
 
 // Verify that with the default nesting depth limit relaxed, Envoy still does not crash when
@@ -115,9 +114,9 @@ TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflowRuntimeOff) {
   }
 
   auto status_or_object = Factory::loadFromString(json);
-  EXPECT_THAT(status_or_object, HasStatusCode(absl::StatusCode::kInternal));
-  EXPECT_THAT(status_or_object.status().message(),
-              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+  EXPECT_THAT(status_or_object,
+              HasStatus(absl::StatusCode::kInternal,
+                        testing::HasSubstr("JSON nesting depth exceeds limit of")));
 }
 
 TEST_F(JsonLoaderTest, Basic) {
