@@ -1551,9 +1551,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
         absl::StrCat(example_input.substr(0, n), kNullCharacter, example_input.substr(n), "\r\n"));
     EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
     auto status = codec_->dispatch(buffer);
-    EXPECT_THAT(status, Not(IsOk())) << n;
+    EXPECT_THAT(status, HasStatusMessage(testing::HasSubstr("http/1.1 protocol error:"))) << n;
     EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_THAT(status.message(), testing::HasSubstr("http/1.1 protocol error:"));
   }
 }
 
@@ -1583,9 +1582,8 @@ TEST_F(Http1ServerConnectionImplTest, TrailerMutateEmbeddedNul) {
     EXPECT_CALL(decoder, decodeData).Times(testing::AnyNumber());
     EXPECT_CALL(decoder, sendLocalReply);
     auto status = codec_->dispatch(buffer);
-    EXPECT_THAT(status, Not(IsOk())) << n;
+    EXPECT_THAT(status, HasStatusMessage(testing::HasSubstr("http/1.1 protocol error:"))) << n;
     EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_THAT(status.message(), testing::HasSubstr("http/1.1 protocol error:"));
   }
 }
 // Mutate an HTTP GET with CR or LF. These can cause an error status or maybe
@@ -4192,8 +4190,8 @@ TEST_F(Http1ClientConnectionImplTest, 304WithBody) {
                              "\r\n"
                              "blah");
   auto status = codec_->dispatch(response);
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ("http/1.1 protocol error: extraneous data after response complete", status.message());
+  EXPECT_THAT(status,
+              HasStatusMessage("http/1.1 protocol error: extraneous data after response complete"));
 }
 
 // Receiving the first request byte results in a callbacks_->newStream() call.

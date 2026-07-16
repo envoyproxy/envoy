@@ -1344,9 +1344,8 @@ TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   request_encoder_->encodeMetadata(metadata_map_vector);
   driveToCompletion();
   // The error is detected by the server codec.
-  EXPECT_THAT(server_wrapper_->status_, Not(IsOk()));
+  EXPECT_THAT(server_wrapper_->status_, HasStatusMessage("The user callback function failed"));
   EXPECT_TRUE(isCodecProtocolError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "The user callback function failed");
 }
 
 // Encode response metadata while dispatching request data from the client, so
@@ -3464,9 +3463,9 @@ TEST_P(Http2CodecImplTest, PingFlood) {
 
   driveToCompletion();
   // The PING flood is detected by the server codec.
-  EXPECT_THAT(server_wrapper_->status_, Not(IsOk()));
+  EXPECT_THAT(server_wrapper_->status_,
+              HasStatusMessage("Too many control frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "Too many control frames in the outbound queue.");
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_control_flood").value());
 }
 
@@ -3539,9 +3538,9 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   submitPing(client_, 0);
   driveToCompletion();
   // The server codec should fail when it gets 1 PING too many.
-  EXPECT_THAT(server_wrapper_->status_, Not(IsOk()));
+  EXPECT_THAT(server_wrapper_->status_,
+              HasStatusMessage("Too many control frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "Too many control frames in the outbound queue.");
 }
 
 // Verify that codec detects flood of outbound HEADER frames
@@ -3724,9 +3723,8 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   submitPing(client_, 0);
   driveToCompletion();
   // The server codec should fail when it gets 1 frame too many.
-  EXPECT_THAT(server_wrapper_->status_, Not(IsOk()));
+  EXPECT_THAT(server_wrapper_->status_, HasStatusMessage("Too many frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "Too many frames in the outbound queue.");
 
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
@@ -3837,9 +3835,8 @@ TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
   windowUpdateFlood();
   driveToCompletion();
   // The server codec should fail when it gets 1 WINDOW_UPDATE frame too many.
-  EXPECT_THAT(server_wrapper_->status_, Not(IsOk()));
+  EXPECT_THAT(server_wrapper_->status_, HasStatusMessage("Too many WINDOW_UPDATE frames"));
   EXPECT_TRUE(isBufferFloodError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "Too many WINDOW_UPDATE frames");
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
@@ -3875,9 +3872,8 @@ TEST_P(Http2CodecImplTest, EmptyDataFlood) {
   EXPECT_CALL(request_decoder_, decodeData(_, false));
   driveToCompletion();
   const Http::Status& status = server_wrapper_->status_;
-  EXPECT_THAT(status, Not(IsOk()));
+  EXPECT_THAT(status, HasStatusMessage("Too many consecutive frames with an empty payload"));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(status));
-  EXPECT_EQ("Too many consecutive frames with an empty payload", status.message());
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {

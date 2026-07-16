@@ -11,9 +11,8 @@ namespace {
 
 using envoy::extensions::filters::common::dependency::v3::Dependency;
 using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::HasSubstr;
-using ::testing::Not;
 
 TEST(DependencyManagerTest, RegisterFilter) {
   DependencyManager manager;
@@ -64,9 +63,8 @@ TEST(DependencyManagerTest, MissingProvidencyInvalid) {
   manager.registerFilter("chef", dependencies);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.message(),
-              HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'")));
 }
 
 TEST(DependencyManagerTest, WrongProvidencyTypeInvalid) {
@@ -86,9 +84,8 @@ TEST(DependencyManagerTest, WrongProvidencyTypeInvalid) {
   manager.registerFilter("chef", d2);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.message(),
-              HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'")));
 }
 
 TEST(DependencyManagerTest, WrongProvidencyNameInvalid) {
@@ -108,9 +105,8 @@ TEST(DependencyManagerTest, WrongProvidencyNameInvalid) {
   manager.registerFilter("chef", d2);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.message(),
-              HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'")));
 }
 
 TEST(DependencyManagerTest, MisorderedFiltersInvalid) {
@@ -130,9 +126,8 @@ TEST(DependencyManagerTest, MisorderedFiltersInvalid) {
   manager.registerFilter("ingredient", d1);
 
   auto result = manager.validDecodeDependencies();
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.message(),
-              HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'")));
 }
 
 } // namespace

@@ -9,6 +9,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using testing::HasSubstr;
 using ::testing::Not;
@@ -41,9 +42,9 @@ TEST_F(ProtocolConstraintsTest, OutboundControlFrameFlood) {
   constraints.incrementOutboundFrameCount(true);
   EXPECT_OK(constraints.checkOutboundFrameLimits());
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_THAT(constraints.checkOutboundFrameLimits(), Not(IsOk()));
+  EXPECT_THAT(constraints.checkOutboundFrameLimits(),
+              HasStatusMessage("Too many control frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
-  EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
   EXPECT_EQ(3,
             stats_store_
@@ -62,9 +63,9 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFlood) {
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_THAT(constraints.checkOutboundFrameLimits(), Not(IsOk()));
+  EXPECT_THAT(constraints.checkOutboundFrameLimits(),
+              HasStatusMessage("Too many frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
-  EXPECT_EQ("Too many frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
   EXPECT_EQ(6,
             stats_store_.gauge("http2.outbound_frames_active", Stats::Gauge::ImportMode::Accumulate)
@@ -87,10 +88,10 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFloodStatusIsIdempotent) {
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_THAT(constraints.checkOutboundFrameLimits(), Not(IsOk()));
+  // The status should still reflect the first violation.
+  EXPECT_THAT(constraints.checkOutboundFrameLimits(),
+              HasStatusMessage("Too many control frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
-  // The status should still reflect the first violation
-  EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
   EXPECT_EQ(0, stats_store_.counter("http2.outbound_flood").value());
 }

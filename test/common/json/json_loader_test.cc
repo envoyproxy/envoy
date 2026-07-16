@@ -14,9 +14,10 @@ namespace Envoy {
 namespace Json {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::HasStatusCode;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
-using ::Envoy::StatusHelpers::StatusIs;
 using ::testing::Not;
 
 class JsonLoaderTest : public testing::Test {
@@ -58,9 +59,7 @@ protected:
   template <typename StatusOrType>
   void expectError(const StatusOrType& status_or, absl::StatusCode status_code,
                    const std::string& message) {
-    EXPECT_THAT(status_or, Not(IsOk()));
-    EXPECT_THAT(status_or, StatusIs(status_code));
-    EXPECT_EQ(status_or.status().message(), message);
+    EXPECT_THAT(status_or, HasStatus(status_code, message));
   }
   Api::ApiPtr api_;
 };
@@ -137,10 +136,9 @@ TEST_F(JsonLoaderTest, Basic) {
                       "key 'hello' not an object from line 1");
     EXPECT_THAT(json->getBoolean("hello").status(), Not(IsOk()));
     EXPECT_THAT(json->getObjectArray("hello").status(), Not(IsOk()));
-    EXPECT_THAT(json->getString("hello").status(), Not(IsOk()));
+    EXPECT_THAT(json->getString("hello"),
+                HasStatusMessage("key 'hello' missing or not a string from lines 1-1"));
     EXPECT_EQ(json->getString("hello", "").status().message(),
-              "key 'hello' missing or not a string from lines 1-1");
-    EXPECT_EQ(json->getString("hello").status().message(),
               "key 'hello' missing or not a string from lines 1-1");
   }
 

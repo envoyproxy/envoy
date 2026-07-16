@@ -8,8 +8,7 @@
 namespace Envoy {
 namespace Http {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(Status, Ok) {
   auto status = okStatus();
@@ -27,8 +26,7 @@ TEST(Status, Ok) {
 
 TEST(Status, CodecProtocolError) {
   auto status = codecProtocolError("foobar");
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ("foobar", status.message());
+  EXPECT_THAT(status, HasStatusMessage("foobar"));
   EXPECT_EQ("CodecProtocolError: foobar", toString(status));
   EXPECT_EQ(StatusCode::CodecProtocolError, getStatusCode(status));
   EXPECT_TRUE(isCodecProtocolError(status));
@@ -41,8 +39,7 @@ TEST(Status, CodecProtocolError) {
 
 TEST(Status, BufferFloodError) {
   auto status = bufferFloodError("foobar");
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ("foobar", status.message());
+  EXPECT_THAT(status, HasStatusMessage("foobar"));
   EXPECT_EQ("BufferFloodError: foobar", toString(status));
   EXPECT_EQ(StatusCode::BufferFloodError, getStatusCode(status));
   EXPECT_FALSE(isCodecProtocolError(status));
@@ -55,8 +52,7 @@ TEST(Status, BufferFloodError) {
 
 TEST(Status, PrematureResponseError) {
   auto status = prematureResponseError("foobar", Http::Code::ProxyAuthenticationRequired);
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ("foobar", status.message());
+  EXPECT_THAT(status, HasStatusMessage("foobar"));
   EXPECT_EQ("PrematureResponseError: HTTP code: 407: foobar", toString(status));
   EXPECT_EQ(StatusCode::PrematureResponseError, getStatusCode(status));
   EXPECT_FALSE(isCodecProtocolError(status));
@@ -70,8 +66,7 @@ TEST(Status, PrematureResponseError) {
 
 TEST(Status, CodecClientError) {
   auto status = codecClientError("foobar");
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ("foobar", status.message());
+  EXPECT_THAT(status, HasStatusMessage("foobar"));
   EXPECT_EQ("CodecClientError: foobar", toString(status));
   EXPECT_EQ(StatusCode::CodecClientError, getStatusCode(status));
   EXPECT_FALSE(isCodecProtocolError(status));
@@ -84,8 +79,7 @@ TEST(Status, CodecClientError) {
 
 TEST(Status, InboundFramesWithEmptyPayload) {
   auto status = inboundFramesWithEmptyPayloadError();
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ("Too many consecutive frames with an empty payload", status.message());
+  EXPECT_THAT(status, HasStatusMessage("Too many consecutive frames with an empty payload"));
   EXPECT_EQ("InboundFramesWithEmptyPayloadError: Too many consecutive frames with an empty payload",
             toString(status));
   EXPECT_EQ(StatusCode::InboundFramesWithEmptyPayload, getStatusCode(status));
@@ -99,8 +93,7 @@ TEST(Status, InboundFramesWithEmptyPayload) {
 
 TEST(Status, EnvoyOverloadError) {
   auto status = envoyOverloadError("foobar");
-  EXPECT_THAT(status, Not(IsOk()));
-  EXPECT_EQ("foobar", status.message());
+  EXPECT_THAT(status, HasStatusMessage("foobar"));
   EXPECT_EQ("EnvoyOverloadError: foobar", toString(status));
   EXPECT_EQ(StatusCode::EnvoyOverloadError, getStatusCode(status));
   EXPECT_FALSE(isCodecProtocolError(status));
@@ -119,13 +112,11 @@ TEST(Status, ReturnIfError) {
   };
 
   auto result = outer([]() { return okStatus(); });
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ("boom", result.message());
+  EXPECT_THAT(result, HasStatusMessage("boom"));
   EXPECT_TRUE(isBufferFloodError(result));
   result = outer([]() { return codecClientError("foobar"); });
-  EXPECT_THAT(result, Not(IsOk()));
+  EXPECT_THAT(result, HasStatusMessage("foobar"));
   EXPECT_TRUE(isCodecClientError(result));
-  EXPECT_EQ("foobar", result.message());
 
   // Check that passing a `Status` object directly into the RETURN_IF_ERROR works.
   auto direct_status = [](const Status& status) -> Status {
@@ -133,13 +124,11 @@ TEST(Status, ReturnIfError) {
     return bufferFloodError("baz");
   };
   result = direct_status(codecClientError("foobar"));
-  EXPECT_THAT(result, Not(IsOk()));
+  EXPECT_THAT(result, HasStatusMessage("foobar"));
   EXPECT_TRUE(isCodecClientError(result));
-  EXPECT_EQ("foobar", result.message());
 
   result = direct_status(okStatus());
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ("baz", result.message());
+  EXPECT_THAT(result, HasStatusMessage("baz"));
   EXPECT_TRUE(isBufferFloodError(result));
 }
 
