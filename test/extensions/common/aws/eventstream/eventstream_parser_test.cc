@@ -137,7 +137,7 @@ TEST_F(EventstreamParserTest, ParseMessageBadPreludeCrc) {
 TEST_F(EventstreamParserTest, ParseMessageMinimal) {
   std::string msg = createEventstreamMessage("", "");
   auto result = EventstreamParser::parseMessage(msg);
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   ASSERT_TRUE(result->message.has_value());
   EXPECT_TRUE(result->message->headers.empty());
   EXPECT_TRUE(result->message->payload_bytes.empty());
@@ -149,7 +149,7 @@ TEST_F(EventstreamParserTest, ParseMessageWithPayload) {
   std::string payload = R"({"type":"message_delta","usage":{"output_tokens":42}})";
   std::string msg = createEventstreamMessage("", payload);
   auto result = EventstreamParser::parseMessage(msg);
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   ASSERT_TRUE(result->message.has_value());
   EXPECT_TRUE(result->message->headers.empty());
   EXPECT_EQ(result->message->payload_bytes, payload);
@@ -178,7 +178,7 @@ TEST_F(EventstreamParserTest, ParseMessageWithHeadersAndPayload) {
 
   std::string msg = createEventstreamMessage(headers_data, payload);
   auto result = EventstreamParser::parseMessage(msg);
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   ASSERT_TRUE(result->message.has_value());
   ASSERT_EQ(result->message->headers.size(), 1);
   EXPECT_EQ(result->message->headers[0].name, ":message-type");
@@ -275,7 +275,7 @@ TEST_F(EventstreamParserTest, ParseMessageAllHeaderTypes) {
   std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
   std::string msg = createEventstreamMessage(headers_data, "");
   auto result = EventstreamParser::parseMessage(msg);
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   ASSERT_TRUE(result->message.has_value());
   const auto& headers = result->message->headers;
   ASSERT_EQ(headers.size(), 8);
@@ -519,7 +519,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderInt32) {
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   ASSERT_TRUE(result->message.has_value());
   ASSERT_EQ(result->message->headers.size(), 1);
   EXPECT_EQ(result->message->headers[0].name, "i");
