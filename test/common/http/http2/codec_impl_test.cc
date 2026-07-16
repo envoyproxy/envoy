@@ -120,6 +120,8 @@ namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
 public:
+  static uint64_t& unconsumedBytes(StreamImpl* stream) { return stream->unconsumed_bytes_; }
+
   static bool slowContainsStreamId(int id, ConnectionImpl& connection) {
     return connection.slowContainsStreamId(id);
   }
@@ -2608,13 +2610,13 @@ TEST_P(Http2CodecImplFlowControlTest, UnconsumedBytesOverflowPrevention) {
   ASSERT_NE(stream, nullptr);
 
   // Directly set unconsumed_bytes_ to a value close to UINT32_MAX.
-  stream->unconsumed_bytes_ = static_cast<uint64_t>(UINT32_MAX) - 100;
+  Http2CodecImplTestFixture::unconsumedBytes(stream) = static_cast<uint64_t>(UINT32_MAX) - 100;
 
   // Add more bytes to simulate receiving data while read-disabled.
-  stream->unconsumed_bytes_ += 200;
+  Http2CodecImplTestFixture::unconsumedBytes(stream) += 200;
 
   // Verify that it has successfully held a value larger than UINT32_MAX without overflow/wrap-around.
-  EXPECT_EQ(stream->unconsumed_bytes_, static_cast<uint64_t>(UINT32_MAX) + 100);
+  EXPECT_EQ(Http2CodecImplTestFixture::unconsumedBytes(stream), static_cast<uint64_t>(UINT32_MAX) + 100);
 }
 
 TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
