@@ -720,8 +720,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-x86_64.tar.gz"],
     ),
     fips_cmake_linux_aarch64 = dict(
-        version = "4.3.2",
-        sha256 = "377079ab739f5765176f427609d9a2015b756ea20d5cba908d279c3731a2f481",
+        version = "4.4.0",
+        sha256 = "e98bb53e0b00a8f672424517d34c05bb9b94fd1c888c89e0b81bc8df51d1a94b",
         strip_prefix = "cmake-{version}-linux-aarch64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
     ),
