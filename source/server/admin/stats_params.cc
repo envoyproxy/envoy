@@ -21,7 +21,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     }
   }
 
-  const bool has_invert_filter = query_.has("invert_filter");
+  const bool has_invert_filter = query_.getFirstValue("invert_filter").has_value();
   if (has_invert_filter && !re2_filter_) {
     response.add("invert_filter can only be used if filter is also provided");
     return Http::Code::BadRequest;
