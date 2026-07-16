@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -82,8 +83,7 @@ TEST_F(DrainAwareConfigTest, CreateFilterFactoryFromValidConfig) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);
   auto result = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
-      << result.status().message();
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull())) << result.status().message();
 }
 
 TEST_F(DrainAwareConfigTest, FilterFactoryCallbackIsNonNull) {
@@ -92,7 +92,7 @@ TEST_F(DrainAwareConfigTest, FilterFactoryCallbackIsNonNull) {
   auto result = factory.createFilterFactoryFromProto(proto_config, context_);
   // Verify a callable callback was produced. The actual ConnectionManagerImpl
   // installation path is exercised end-to-end in integration_test.cc.
-  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 }
 
 // Subclass that overrides createBaseCodec to return nullptr, exercising the defensive
