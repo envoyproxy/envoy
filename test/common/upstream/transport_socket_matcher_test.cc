@@ -516,7 +516,7 @@ transport_socket:
   auto result_or = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
                                                       mock_factory_context_, mock_default_factory_,
                                                       *stats_scope_);
-  ASSERT_OK(result_or) << result_or.status();
+  ASSERT_OK(result_or);
   matcher_ = std::move(*result_or);
 
   auto& factory = matcher_->resolve(nullptr, nullptr).factory_;

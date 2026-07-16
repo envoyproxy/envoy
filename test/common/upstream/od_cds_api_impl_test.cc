@@ -78,7 +78,7 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdate) {
       *cm_.subscription_factory_.subscription_,
       requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
   auto result = odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0");
-  ASSERT_OK(result) << result.message();
+  ASSERT_OK(result);
   //  ASSERT_OK(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0"));
 }
 
