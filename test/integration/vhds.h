@@ -164,6 +164,19 @@ vhds:
   default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my_route/*"
 )EOF";
 
+const char RdsConfigWithXdstpAndOnDemandTemplate[] = R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/default/*"
+  on_demand_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/on-demand/{domain}"
+)EOF";
+
 class VhdsIntegrationTest : public HttpIntegrationTest,
                             public testing::TestWithParam<VhdsIntegrationTestParam> {
 public:
@@ -350,7 +363,7 @@ inline void sendDeltaVhdsResponse(
     auto* resource = response.add_resources();
     resource->set_name(resource_name);
     resource->set_version(version);
-    resource->mutable_resource()->PackFrom(vhost);
+    std::ignore = resource->mutable_resource()->PackFrom(vhost);
   }
   stream->sendGrpcMessage(response);
 }
