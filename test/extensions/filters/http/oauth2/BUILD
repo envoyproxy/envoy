@@ -64,6 +64,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
+        "//source/common/stream_info:stream_id_provider_lib",
         "//source/extensions/filters/http/oauth2:config",
         "//source/extensions/filters/http/oauth2:oauth_callback_interface",
         "//source/extensions/filters/http/oauth2:oauth_client",

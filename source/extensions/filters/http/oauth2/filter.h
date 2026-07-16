@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -444,6 +445,11 @@ private:
   std::string flow_id_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
+
+  // Log tags (RequestId) added to OAuth2 application log lines so they can be correlated with the
+  // access log; populated once per request in decodeHeaders. RequestId matches access-log
+  // %STREAM_ID% / x-request-id.
+  std::map<std::string, std::string> log_tags_;
 
   std::shared_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr default_config_;
