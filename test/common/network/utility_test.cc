@@ -32,6 +32,7 @@
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using testing::DoAll;
 using testing::Eq;
@@ -913,8 +914,7 @@ TEST_F(ExecInNetnsTest, OpenFail) {
 
   // Expecting failure.
   auto result = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_TRUE(result.status().message().starts_with("failed to open netns file"));
+  EXPECT_THAT(result, HasStatusMessage(testing::StartsWith("failed to open netns file")));
 }
 
 TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
