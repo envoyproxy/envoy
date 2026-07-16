@@ -85,7 +85,20 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
                                                                 stats_store.symbolTable());
     total_nodes_gauge_ = &stats_store.gaugeFromStatName(total_nodes_stat_name_storage.statName(),
                                                         Stats::Gauge::ImportMode::NeverImport);
+
+    cx_idle_expire_time_ = getHistogram("cx_idle_expire_time", stats_store, stat_prefix);
+    cx_upgrade_time_ = getHistogram("cx_upgrade_time", stats_store, stat_prefix);
+    cx_post_upgrade_lifetime_ = getHistogram("cx_post_upgrade_lifetime", stats_store, stat_prefix);
   }
+}
+
+Stats::Histogram* UpstreamSocketThreadLocal::getHistogram(absl::string_view name,
+                                                          Stats::Scope& stats_store,
+                                                          absl::string_view stat_prefix) {
+  std::string stat_name = fmt::format("{}.{}.{}", stat_prefix, dispatcher().name(), name);
+  Stats::StatNameManagedStorage stat_name_storage(stat_name, stats_store.symbolTable());
+  return &stats_store.histogramFromStatName(stat_name_storage.statName(),
+                                            Stats::Histogram::Unit::Milliseconds);
 }
 
 ReverseTunnelAcceptorExtension::~ReverseTunnelAcceptorExtension() {

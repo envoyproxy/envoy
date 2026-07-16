@@ -201,6 +201,8 @@ private:
    */
   void rearmPingSendTimer(int fd);
 
+  OptRef<const MonotonicTime> findStartTime(int fd) const;
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
@@ -245,6 +247,11 @@ private:
 
   // Per-connection send timers that schedule individual ping sends with jitter.
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_ping_send_timer_map_;
+
+  // Per connection start time for tracking latency histogram metrics.
+  // The time is calculated from after the handshake complete -> reverse_tunnel_filter transfers
+  // this to us.
+  absl::flat_hash_map<int, MonotonicTime> fd_to_start_time_map_;
 
   // Track consecutive ping misses per file descriptor.
   absl::flat_hash_map<int, uint32_t> fd_to_miss_count_;

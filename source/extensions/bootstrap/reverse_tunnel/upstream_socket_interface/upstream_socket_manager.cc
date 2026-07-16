@@ -218,6 +218,9 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   fd_to_ping_send_timer_map_[fd]->enableTimer(
       std::chrono::milliseconds(pingIntervalWithJitterMs()));
 
+  // Note the reverse connection start time.
+  fd_to_start_time_map_[fd] = dispatcher_.timeSource().monotonicTime();
+
   ENVOY_LOG(debug, "reverse_tunnel: added socket to maps. node: {} connection key: {} fd: {}.",
             scoped_node_id, connectionKey, fd);
 }
@@ -285,6 +288,13 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
           AccessLog::AccessLogType::UpstreamPoolReady, kLifecycleHandoffKindPoolToUpstream);
     }
   }
+
+  auto start_time = findStartTime(fd);
+  auto extension = getUpstreamExtension();
+  if (extension && start_time.has_value()) {
+    extension->updateUpgradeTime(*start_time, dispatcher_.timeSource().monotonicTime());
+  }
+  fd_to_start_time_map_.erase(fd);
 
   return socket;
 }
@@ -444,6 +454,15 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     fd_to_event_map_.erase(fd);
     fd_to_timer_map_.erase(fd);
     fd_to_ping_send_timer_map_.erase(fd);
+
+    // Update the cx_idle_expire_time_ histogram with this info.
+    auto start_time = findStartTime(fd);
+    auto extension = getUpstreamExtension();
+    if (extension && start_time.has_value()) {
+      extension->updateIdleExpireTime(*start_time, dispatcher_.timeSource().monotonicTime());
+    }
+    fd_to_start_time_map_.erase(fd);
+
   } else {
     // FD not found in idle pool, this is a used socket.
     // The socket will be closed by the owning UpstreamReverseConnectionIOHandle.
@@ -753,6 +772,16 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   if (it != socket_managers_.end()) {
     socket_managers_.erase(it);
   }
+}
+
+OptRef<const MonotonicTime> UpstreamSocketManager::findStartTime(int fd) const {
+  auto it = fd_to_start_time_map_.find(fd);
+  if (it == fd_to_start_time_map_.end()) {
+    ENVOY_LOG(error, "reverse_tunnel: findStartTime: fd {} not found in fd_to_start_time_map_.",
+              fd);
+    return {};
+  }
+  return it->second;
 }
 
 } // namespace ReverseConnection.

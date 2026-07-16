@@ -25,6 +25,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -73,7 +74,14 @@ public:
   Stats::Gauge* total_clusters_gauge_{nullptr};
   Stats::Gauge* total_nodes_gauge_{nullptr};
 
+  Stats::Histogram* cx_upgrade_time_{nullptr};
+  Stats::Histogram* cx_idle_expire_time_{nullptr};
+  Stats::Histogram* cx_post_upgrade_lifetime_{nullptr};
+
 private:
+  Stats::Histogram* getHistogram(absl::string_view name, Stats::Scope& stats_store,
+                                 absl::string_view stat_prefix);
+
   // Thread-local dispatcher.
   Event::Dispatcher& dispatcher_;
   // Thread-local socket manager.
@@ -238,6 +246,18 @@ public:
   void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id) {
     if (reporter_ != nullptr) {
       reporter_->reportDisconnectionEvent(node_id, cluster_id);
+    }
+  }
+
+  void updateIdleExpireTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_idle_expire_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
+    }
+  }
+
+  void updateUpgradeTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_upgrade_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
     }
   }
 
