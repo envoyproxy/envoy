@@ -237,10 +237,8 @@ TEST_F(ClientAssertionTest, TwoAssertionsHaveDifferentJti) {
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
                               std::chrono::seconds(60), test_time_, random_);
   ASSERT_OK(result1);
-  ASSERT_OK(result2);
-
   // The two JWTs should differ because jti is different.
-  EXPECT_NE(result1.value(), result2.value());
+  ASSERT_THAT(result2, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::Ne(result1.value())));
 
   // Verify the jti values in the payloads.
   std::vector<std::string> parts1 = absl::StrSplit(result1.value(), '.');
