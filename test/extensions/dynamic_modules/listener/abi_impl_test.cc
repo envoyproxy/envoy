@@ -67,12 +67,12 @@ class DynamicModuleListenerFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
-    EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_OK(filter_config_or_status) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     filter_config_->stat_creation_frozen_ = false;
@@ -2439,12 +2439,12 @@ class DynamicModuleListenerFilterHttpCalloutTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
-    EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_OK(filter_config_or_status) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     filter_config_->stat_creation_frozen_ = false;

@@ -87,7 +87,7 @@ TEST_F(DynamicModuleFilterConfigTest, LocalFileLoading) {
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
@@ -173,7 +173,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceRegistersInitTarget) {
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 
   // The init manager should not be initialized yet — the remote fetch is pending.
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Uninitialized);
@@ -200,7 +200,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchFailureFailOpen) {
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 
   // Initialize the init manager to trigger the fetch. Cluster "cluster_1" is not set up
   // in the mock, so the fetch fails immediately. With num_retries=0 and allow_empty=true,
@@ -267,7 +267,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 
   // Initialize → triggers fetch → HTTP success → module loaded from bytes.
   EXPECT_CALL(init_watcher_, ready());
@@ -330,7 +330,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessInvalidModule) {
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
@@ -395,7 +395,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessMissingFilterSymbo
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
@@ -465,7 +465,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   // First call: remote fetch writes the module to disk.
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
@@ -477,7 +477,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   auto result2 =
       factory2.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
                                    /*init_manager=*/std::nullopt);
-  EXPECT_OK(result2) << result2.status().message();
+  EXPECT_OK(result2);
 
   // Verify the cache-loaded factory callback installs the filter.
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
@@ -529,7 +529,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeCacheHit) {
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 
   // Clean up.
   std::filesystem::remove(cached_path);
@@ -676,7 +676,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchPopulatesCache) {
   // Second call finds the cached file and succeeds.
   auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
                                              stats_scope_, init_manager_);
-  EXPECT_OK(result2) << result2.status().message();
+  EXPECT_OK(result2);
 
   // Clean up.
   std::filesystem::remove(cached_path);
@@ -966,7 +966,7 @@ TEST_F(DynamicModuleFilterConfigTest, ModulePrecedenceOverName) {
   // If name were used, this would fail because "nonexistent_module_should_be_ignored" doesn't
   // exist. Since module takes precedence, it should succeed with the local file.
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_OK(cb_or_error) << cb_or_error.status().message();
+  EXPECT_OK(cb_or_error);
 }
 
 } // namespace Configuration

@@ -40,7 +40,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfig) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_OK(result) << result.status().message();
+  EXPECT_OK(result);
 
   // The happy path emits no load-failure counters.
   auto& server_scope = context_.server_factory_context_.serverScope();
@@ -56,7 +56,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithLocalFile) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_OK(result) << result.status().message();
+  EXPECT_OK(result);
 }
 
 // Remote module sources are not supported for network filters (no init manager is wired up).
@@ -81,7 +81,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithFilterConfig) {
       config.mutable_filter_config()->PackFrom(ValueUtil::stringValue("test_config_value"));
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_OK(result) << result.status().message();
+  EXPECT_OK(result);
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, InvalidModuleName) {
@@ -172,7 +172,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithTerminalFilter) {
 
   // Terminal filter configuration should be accepted and create filter factory successfully.
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_OK(result) << result.status().message();
+  EXPECT_OK(result);
 
   // Verify the filter can still be added to filter manager.
   NiceMock<Network::MockFilterManager> filter_manager;
@@ -186,7 +186,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, FilterFactoryCallbackAddsFilter) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
 
   // Test that the filter factory callback correctly adds a filter.
   NiceMock<Network::MockFilterManager> filter_manager;
@@ -201,7 +201,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, DoNotCloseOption) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_OK(result) << result.status().message();
+  EXPECT_OK(result);
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, LoadGloballyOption) {
@@ -211,7 +211,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, LoadGloballyOption) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_OK(result) << result.status().message();
+  EXPECT_OK(result);
 }
 
 // Test that the legacy behavior registers the custom stat namespace when the runtime guard is
@@ -232,7 +232,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, LegacyBehaviorWithRuntimeGuard) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_OK(result) << result.status().message();
+  EXPECT_OK(result);
 
   // Verify the custom namespace was registered.
   EXPECT_TRUE(custom_stat_namespaces.registered("custom_namespace"));

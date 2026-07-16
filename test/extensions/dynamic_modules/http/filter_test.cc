@@ -109,7 +109,7 @@ INSTANTIATE_TEST_SUITE_P(HttpLanguageTests, DynamicModuleHttpLanguageTests,
 
 TEST_P(DynamicModuleHttpLanguageTests, ConfigInitializationFailure) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
@@ -520,7 +520,7 @@ TEST_P(DynamicModuleHttpLanguageTests, LocalReplyCallbacks) {
   const std::string filter_config = "";
 
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
@@ -546,7 +546,7 @@ TEST_P(DynamicModuleHttpLanguageTests, ResetStream) {
   const std::string filter_config = "";
 
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
@@ -575,7 +575,7 @@ TEST_P(DynamicModuleHttpLanguageTests, SendGoAwayAndClose) {
   const std::string filter_config = "";
 
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
@@ -604,7 +604,7 @@ TEST_P(DynamicModuleHttpLanguageTests, RecreateStream) {
   const std::string filter_config = "";
 
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
@@ -640,7 +640,7 @@ TEST_P(DynamicModuleHttpLanguageTests, SocketOptionCallbacks) {
   const std::string filter_config = "";
 
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
@@ -671,7 +671,7 @@ TEST_P(DynamicModuleHttpLanguageTests, SpanCallbacks) {
   const std::string filter_config = "";
 
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
@@ -733,7 +733,7 @@ TEST_P(DynamicModuleHttpLanguageTests, ClusterCallbacks) {
   mock_host_set->degraded_hosts_.resize(1);
 
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   Stats::IsolatedStoreImpl stats_store;
   auto filter_config_or_status =

@@ -20,7 +20,7 @@ public:
   void SetUp() override {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
-    EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter
         proto_config;

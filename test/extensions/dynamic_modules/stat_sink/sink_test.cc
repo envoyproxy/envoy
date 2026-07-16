@@ -47,11 +47,11 @@ public:
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"),
         /*do_not_close=*/false);
-    ASSERT_OK(dynamic_module) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
 
     auto config = newDynamicModuleStatsSinkConfig("test_sink", "test_config",
                                                   std::move(dynamic_module.value()), context_);
-    ASSERT_OK(config) << config.status().message();
+    ASSERT_OK(config);
     config_ = std::move(config.value());
   }
 
@@ -247,10 +247,10 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, DefineGaugeAfterFrozenIsRejected) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"),
       /*do_not_close=*/false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
   auto config = newDynamicModuleStatsSinkConfig("test_sink", "test_config",
                                                 std::move(dynamic_module.value()), context_);
-  ASSERT_OK(config) << config.status().message();
+  ASSERT_OK(config);
 
   size_t id = 0;
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
@@ -419,7 +419,7 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionMissingSymbol) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_missing_config_new", "c"),
       /*do_not_close=*/false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
@@ -433,7 +433,7 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionModuleReturnsNull) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_config_new_fail", "c"),
       /*do_not_close=*/false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(

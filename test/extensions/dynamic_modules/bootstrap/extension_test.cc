@@ -30,12 +30,12 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
   // extension_new returns nullptr).
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       testDataDir() + "/libbootstrap_extension_new_null.so", false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status();
+  ASSERT_OK(dynamic_module);
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  ASSERT_OK(config) << config.status();
+  ASSERT_OK(config);
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
 
@@ -58,12 +58,12 @@ TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
   // Test that isDestroyed and getExtensionConfig work correctly.
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status();
+  ASSERT_OK(dynamic_module);
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  ASSERT_OK(config) << config.status();
+  ASSERT_OK(config);
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
   extension->initializeInModuleExtension();
@@ -85,12 +85,12 @@ TEST_F(ExtensionTest, LifecycleWithValidExtension) {
   // Test the full lifecycle of a valid extension.
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status();
+  ASSERT_OK(dynamic_module);
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  ASSERT_OK(config) << config.status();
+  ASSERT_OK(config);
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
 
@@ -127,12 +127,12 @@ TEST_F(ExtensionTest, DrainCallbackInvoked) {
 
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status();
+  ASSERT_OK(dynamic_module);
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  ASSERT_OK(config) << config.status();
+  ASSERT_OK(config);
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
   extension->initializeInModuleExtension();
@@ -161,12 +161,12 @@ TEST_F(ExtensionTest, ShutdownCallbackWithCompletion) {
 
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status();
+  ASSERT_OK(dynamic_module);
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  ASSERT_OK(config) << config.status();
+  ASSERT_OK(config);
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
   extension->initializeInModuleExtension();
@@ -195,12 +195,12 @@ TEST_F(ExtensionTest, ShutdownCallbackAfterDestroy) {
 
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
-  ASSERT_OK(dynamic_module) << dynamic_module.status();
+  ASSERT_OK(dynamic_module);
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  ASSERT_OK(config) << config.status();
+  ASSERT_OK(config);
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
   extension->initializeInModuleExtension();

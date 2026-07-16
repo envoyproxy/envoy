@@ -153,7 +153,7 @@ sink_config:
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_OK(sink_or_error) << sink_or_error.status().message();
+  ASSERT_OK(sink_or_error);
 }
 
 // A sink_config Any that claims to be a StringValue but carries truncated wire bytes makes

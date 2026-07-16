@@ -24,12 +24,12 @@ class DynamicModuleNetworkFilterTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
-    EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_OK(filter_config_or_status) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     filter_config_->stat_creation_frozen_ = false;
@@ -117,12 +117,12 @@ TEST_F(DynamicModuleNetworkFilterTest, FilterDestroyWithoutInitialization) {
 TEST_F(DynamicModuleNetworkFilterTest, FilterWithoutInModuleFilter) {
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("network_filter_new_fail", "c"), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-  EXPECT_OK(filter_config_or_status) << filter_config_or_status.status().message();
+  EXPECT_OK(filter_config_or_status);
   auto filter_config = filter_config_or_status.value();
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config);
   filter->initializeReadFilterCallbacks(read_callbacks_);
@@ -231,7 +231,7 @@ TEST_F(DynamicModuleNetworkFilterTest, CallbackAccessors) {
 
 TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
@@ -255,7 +255,7 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
 TEST(DynamicModuleNetworkFilterConfigTest, MissingSymbols) {
   // Use the HTTP-only no_op module which lacks network filter symbols.
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
@@ -270,7 +270,7 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
   // Use a module that returns nullptr from config_new.
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("network_config_new_fail", "c"), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
@@ -285,7 +285,7 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
 TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("network_stop_iteration", "c"), false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;

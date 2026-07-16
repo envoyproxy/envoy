@@ -144,7 +144,7 @@ TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
       1);
 
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
-  EXPECT_OK(module) << "Failed to load module: " << module.status().message();
+  EXPECT_OK(module) << "Failed to load module";
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
@@ -153,7 +153,7 @@ TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathNotSetFallbackToCw
   std::filesystem::path staged_lib = TestEnvironment::substitute("{{ test_rundir }}/libfoo.so");
   std::filesystem::copy(test_lib, staged_lib);
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("foo", false);
-  EXPECT_OK(module) << "Failed to load module: " << module.status().message();
+  EXPECT_OK(module) << "Failed to load module";
   std::filesystem::remove(staged_lib);
 }
 
@@ -165,7 +165,7 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
       TestEnvironment::substitute("{{ test_rundir }}/libwhatever.so");
   std::filesystem::copy(test_lib, staged_lib);
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("whatever", false);
-  EXPECT_OK(module) << "Failed to load module: " << module.status().message();
+  EXPECT_OK(module) << "Failed to load module";
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
   std::filesystem::remove(staged_lib);
@@ -173,7 +173,7 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
 
 TEST(StaticModule, LoadSuccess) {
   absl::StatusOr<DynamicModulePtr> result = newStaticModule("matcher_no_op_static");
-  EXPECT_OK(result) << result.status().message();
+  EXPECT_OK(result);
 }
 
 TEST(StaticModule, SymbolNotFound) {
@@ -188,11 +188,11 @@ TEST(StaticModule, SymbolNotFound) {
 TEST(StaticModule, MultipleLoads) {
   absl::StatusOr<DynamicModulePtr> c_module =
       newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
-  EXPECT_OK(c_module) << c_module.status().message();
+  EXPECT_OK(c_module);
 
   absl::StatusOr<DynamicModulePtr> c_module_2 =
       newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
-  EXPECT_OK(c_module_2) << c_module_2.status().message();
+  EXPECT_OK(c_module_2);
 }
 
 TEST(CreateDynamicModulesByName, ModuleNotFound) {
@@ -218,7 +218,7 @@ TEST(NewDynamicModuleFromBytes, Success) {
 
   absl::StatusOr<DynamicModulePtr> module =
       newDynamicModuleFromBytes(module_bytes, sha256, false, false);
-  EXPECT_OK(module) << "Failed to load module from bytes: " << module.status().message();
+  EXPECT_OK(module) << "Failed to load module from bytes";
   EXPECT_TRUE(std::filesystem::exists(temp_path));
 
   // Cleanup.
@@ -348,14 +348,14 @@ TEST(NewDynamicModuleFromBytes, RepeatedLoadReusesDlopenHandle) {
   // First load writes and loads the module.
   absl::StatusOr<DynamicModulePtr> module1 =
       newDynamicModuleFromBytes(module_bytes, sha256, true, false);
-  ASSERT_OK(module1) << module1.status().message();
+  ASSERT_OK(module1);
   ASSERT_TRUE(std::filesystem::exists(temp_path));
 
   // Second load with the same sha256 — writes again but the RTLD_NOLOAD check in
   // newDynamicModule returns the existing handle, so the init function is not called twice.
   absl::StatusOr<DynamicModulePtr> module2 =
       newDynamicModuleFromBytes(module_bytes, sha256, true, false);
-  ASSERT_OK(module2) << module2.status().message();
+  ASSERT_OK(module2);
 
   // Cleanup.
   module1->reset();
@@ -421,7 +421,7 @@ TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
   ProtoDynamicModuleConfig config;
   config.set_name("no_op");
   auto result = newDynamicModuleByConfig(config, "test_module");
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   EXPECT_NE(result->loaded, nullptr);
   EXPECT_EQ(result->async, nullptr);
 }
@@ -439,7 +439,7 @@ TEST_F(NewDynamicModuleByConfigTest, LocalFileSuccess) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_filename(testSharedObjectPath("no_op", "c"));
   auto result = newDynamicModuleByConfig(config, "test_module");
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   EXPECT_NE(result->loaded, nullptr);
   EXPECT_EQ(result->async, nullptr);
 }
@@ -478,7 +478,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitLoads) {
                              std::filesystem::copy_options::overwrite_existing);
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   EXPECT_NE(result->loaded, nullptr);
   EXPECT_EQ(result->async, nullptr);
 
@@ -569,7 +569,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteAsyncReturnsAsyncState) {
   auto result =
       newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_, init_manager,
                                [&on_loaded_called](DynamicModulePtr) { on_loaded_called = true; });
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
   EXPECT_EQ(result->loaded, nullptr);
   ASSERT_NE(result->async, nullptr);
   EXPECT_NE(result->async->remote_provider, nullptr);
