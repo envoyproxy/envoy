@@ -21,7 +21,6 @@ namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
 using Server::Configuration::MockFactoryContext;
 using ::testing::_;
 using ::testing::Invoke;
@@ -200,9 +199,8 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenMissing) {
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
       .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
-        EXPECT_THAT(token, Not(IsOk()));
-        EXPECT_EQ(token.status().message(),
-                  "Failed to extract access_token or expires_in from response.");
+        EXPECT_THAT(
+            token, HasStatusMessage("Failed to extract access_token or expires_in from response."));
       }));
 
   client_callback_->onSuccess(client_request_, std::move(response));
@@ -227,9 +225,8 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenExpiresInMissing) {
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
       .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
-        EXPECT_THAT(token, Not(IsOk()));
-        EXPECT_EQ(token.status().message(),
-                  "Failed to extract access_token or expires_in from response.");
+        EXPECT_THAT(
+            token, HasStatusMessage("Failed to extract access_token or expires_in from response."));
       }));
 
   client_callback_->onSuccess(client_request_, std::move(response));
