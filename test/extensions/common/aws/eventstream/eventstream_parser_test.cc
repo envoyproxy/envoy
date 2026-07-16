@@ -4,7 +4,6 @@
 
 #include "test/test_common/status_utility.h"
 
-#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -14,6 +13,7 @@ namespace Aws {
 namespace Eventstream {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::HasStatusCode;
 using ::Envoy::StatusHelpers::HasStatusMessage;
 
@@ -356,8 +356,8 @@ TEST_F(EventstreamParserTest, ParseMessagePayloadExceedsMax) {
 
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kResourceExhausted));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Payload exceeds maximum"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kResourceExhausted,
+                                testing::HasSubstr("Payload exceeds maximum")));
 }
 
 // Test total_length smaller than minimum
@@ -408,8 +408,8 @@ TEST_F(EventstreamParserTest, ParseMessageTotalLengthExceedsMax) {
 
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kResourceExhausted));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Message length exceeds maximum"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kResourceExhausted,
+                                testing::HasSubstr("Message length exceeds maximum")));
 }
 
 // Test headers_length exceeds available space
@@ -461,8 +461,8 @@ TEST_F(EventstreamParserTest, ParseMessageHeadersLengthExceedsMax) {
 
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kResourceExhausted));
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Headers length exceeds maximum"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kResourceExhausted,
+                                testing::HasSubstr("Headers length exceeds maximum")));
 }
 
 // Test with AWS Bedrock-like payload (realistic JSON)
