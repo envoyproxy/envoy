@@ -2197,12 +2197,10 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
   }
 
   auto hash = obj->getString("hash");
-  ASSERT_OK(hash);
-  EXPECT_EQ(expected_sha, hash.value());
+  ASSERT_THAT(hash, ::Envoy::StatusHelpers::IsOkAndHolds(expected_sha));
 
   auto subject = obj->getString("subject");
-  ASSERT_OK(subject);
-  EXPECT_EQ(peer_subject, subject.value());
+  ASSERT_THAT(subject, ::Envoy::StatusHelpers::IsOkAndHolds(peer_subject));
 
   auto uri = obj->getStringArray("uri");
   ASSERT_OK(uri);
@@ -2227,8 +2225,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
   EXPECT_EQ(expected_dns[2], dns.value()[2]);
 
   auto cert = obj->getString("cert");
-  ASSERT_OK(cert);
-  EXPECT_EQ(expected_pem, cert.value());
+  ASSERT_THAT(cert, ::Envoy::StatusHelpers::IsOkAndHolds(expected_pem));
 
   auto chain = obj->getStringArray("chain");
   ASSERT_OK(chain);
