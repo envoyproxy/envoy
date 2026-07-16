@@ -300,9 +300,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           Network::ProxyProtocolFilterState::key())) {
     auto buf = reinterpret_cast<const uint8_t*>(buffer.rawSlice().mem_);
     if (proxy_protocol_header_.value().local_command_) {
-      ENVOY_LOG(trace, "Parsed proxy protocol header, cmd: LOCAL, length: {}, buffer: {}",
-                proxy_protocol_header_.value().wholeHeaderLength(),
-                Envoy::Hex::encode(buf, proxy_protocol_header_.value().wholeHeaderLength()));
+      ENVOY_LOG(
+          trace, "Parsed proxy protocol header, cmd: LOCAL, length: {}, buffer: {}",
+          proxy_protocol_header_.value().wholeHeaderLength(),
+          Envoy::Hex::encode(absl::Span(buf, proxy_protocol_header_.value().wholeHeaderLength())));
 
       cb_->filterState().setData(
           Network::ProxyProtocolFilterState::key(),
@@ -317,10 +318,11 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           "Parsed proxy protocol header, cmd: PROXY, length: {}, buffer: {}, TLV length: {}, TLV "
           "buffer: {}",
           proxy_protocol_header_.value().wholeHeaderLength(),
-          Envoy::Hex::encode(buf, proxy_protocol_header_.value().wholeHeaderLength()),
+          Envoy::Hex::encode(absl::Span(buf, proxy_protocol_header_.value().wholeHeaderLength())),
           proxy_protocol_header_.value().extensions_length_,
-          Envoy::Hex::encode(buf + proxy_protocol_header_.value().headerLengthWithoutExtension(),
-                             proxy_protocol_header_.value().extensions_length_));
+          Envoy::Hex::encode(
+              absl::Span(buf + proxy_protocol_header_.value().headerLengthWithoutExtension(),
+                         proxy_protocol_header_.value().extensions_length_)));
       cb_->filterState().setData(
           Network::ProxyProtocolFilterState::key(),
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
