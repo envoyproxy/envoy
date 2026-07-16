@@ -1194,6 +1194,15 @@ TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
   EXPECT_TRUE(envoy_quic_session_.ssl()->dnsSansLocalCertificate().empty());
   EXPECT_FALSE(envoy_quic_session_.ssl()->validFromPeerCertificate().has_value());
   EXPECT_FALSE(envoy_quic_session_.ssl()->expirationPeerCertificate().has_value());
+
+  // Call overridden methods to ensure coverage.
+  envoy_quic_session_.ssl()->ciphersuiteId();
+  envoy_quic_session_.ssl()->ciphersuiteString();
+  envoy_quic_session_.ssl()->tlsGroupId();
+  envoy_quic_session_.ssl()->tlsGroupString();
+  envoy_quic_session_.ssl()->tlsVersion();
+  envoy_quic_session_.ssl()->alpn();
+  envoy_quic_session_.ssl()->sni();
 }
 
 TEST_F(EnvoyQuicServerSessionTest, DisableQpack) {
@@ -1428,12 +1437,13 @@ TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, ResetSslAfterHandshakeEnable
 
   // In this suite, envoy_quic_session_ is NOT initialized in SetUp.
   // So we can initialize it now, and it will pick up the runtime flag!
-  
+
   envoy_quic_session_.Initialize();
-  
+
   EXPECT_TRUE(envoy_quic_session_.connection()->connected());
 
-  // The suite's TearDown will handle the rest of initialization and cleanup for envoy_quic_session_.
+  // The suite's TearDown will handle the rest of initialization and cleanup for
+  // envoy_quic_session_.
 }
 
 } // namespace Quic

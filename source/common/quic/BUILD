@@ -264,6 +264,7 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["quic_ssl_connection_info.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
+        ":envoy_quic_utils_lib",
         "//source/common/tls:connection_info_impl_base_lib",
         "@quiche//:quic_core_session_lib",
     ]),

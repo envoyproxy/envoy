@@ -457,5 +457,24 @@ void registerCertCompression(SSL_CTX* ssl_ctx) {
   Extensions::TransportSockets::Tls::CertCompression::registerZlib(ssl_ctx);
 }
 
+std::string GetTlsVersionFromString(absl::string_view quiche_version) {
+  if (quiche_version == "TLS_VERSION_1_3") {
+    return "TLSv1.3";
+  }
+  if (quiche_version == "TLS_VERSION_1_2") {
+    return "TLSv1.2";
+  }
+  if (quiche_version == "TLS_VERSION_1_1") {
+    return "TLSv1.1";
+  }
+  if (quiche_version == "TLS_VERSION_1_0" || quiche_version == "TLS_VERSION_1") {
+    return "TLSv1";
+  }
+  if (quiche_version == "TLS_VERSION_QUIC") {
+    return "QUIC";
+  }
+  return std::string(quiche_version);
+}
+
 } // namespace Quic
 } // namespace Envoy

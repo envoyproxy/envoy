@@ -63,10 +63,6 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
       quic_connection_(std::move(connection)),
       crypto_server_stream_factory_(crypto_server_stream_factory),
       connection_stats_(connection_stats), session_idle_list_(session_idle_list) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_enable_reset_ssl_after_handshake")) {
-    enable_reset_ssl_after_handshake();
-  }
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
@@ -183,7 +179,12 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 }
 
 void EnvoyQuicServerSession::Initialize() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_enable_reset_ssl_after_handshake")) {
+    enable_reset_ssl_after_handshake();
+  }
   quic::QuicServerSessionBase::Initialize();
+
   initialized_ = true;
   MaybeAddSessionToIdleList();
   quic_connection_->setEnvoyConnection(*this, *this);

@@ -456,5 +456,15 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
   connection_socket->close();
 }
 
+TEST(EnvoyQuicUtilsTest, GetTlsVersionFromString) {
+  EXPECT_EQ(GetTlsVersionFromString("TLS_VERSION_1_3"), "TLSv1.3");
+  EXPECT_EQ(GetTlsVersionFromString("TLS_VERSION_1_2"), "TLSv1.2");
+  EXPECT_EQ(GetTlsVersionFromString("TLS_VERSION_1_1"), "TLSv1.1");
+  EXPECT_EQ(GetTlsVersionFromString("TLS_VERSION_1_0"), "TLSv1");
+  EXPECT_EQ(GetTlsVersionFromString("TLS_VERSION_1"), "TLSv1");
+  EXPECT_EQ(GetTlsVersionFromString("TLS_VERSION_QUIC"), "QUIC");
+  EXPECT_EQ(GetTlsVersionFromString("UNKNOWN"), "UNKNOWN");
+}
+
 } // namespace Quic
 } // namespace Envoy

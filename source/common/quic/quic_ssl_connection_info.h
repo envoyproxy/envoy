@@ -1,33 +1,13 @@
 #pragma once
 
 #include "source/common/common/empty_string.h"
+#include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/tls/connection_info_impl_base.h"
 
 #include "quiche/quic/core/quic_session.h"
 
 namespace Envoy {
 namespace Quic {
-
-namespace {
-std::string GetTlsVersionFromString(absl::string_view quiche_version) {
-  if (quiche_version == "TLS_VERSION_1_3") {
-    return "TLSv1.3";
-  }
-  if (quiche_version == "TLS_VERSION_1_2") {
-    return "TLSv1.2";
-  }
-  if (quiche_version == "TLS_VERSION_1_1") {
-    return "TLSv1.1";
-  }
-  if (quiche_version == "TLS_VERSION_1_0" || quiche_version == "TLS_VERSION_1") {
-    return "TLSv1";
-  }
-  if (quiche_version == "TLS_VERSION_QUIC") {
-    return "QUIC";
-  }
-  return std::string(quiche_version);
-}
-} // namespace
 
 // A wrapper of a QUIC session to be passed around as an indicator of ssl support and to provide
 // access to the SSL object in QUIC crypto stream.
