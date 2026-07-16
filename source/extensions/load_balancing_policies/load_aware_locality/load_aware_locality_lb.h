@@ -132,6 +132,105 @@ private:
   ThreadLocal::SlotAllocator& tls_slot_allocator_;
 };
 
+// Key locality state by identity rather than HostsPerLocality position so add/remove index shifts
+// cannot map main-thread snapshots to the wrong worker-local membership. Named to avoid shadowing
+// Upstream::LocalityWeightsMap, which is a different type.
+using LocalityRoutingWeightsMap =
+    absl::flat_hash_map<envoy::config::core::v3::Locality, double, Upstream::LocalityHash,
+                        Upstream::LocalityEqualTo>;
+
+// EWMA state uses the same identity key: present-with-no-valid-hosts is stale; absent is cold.
+using LocalityEwmaMap = LocalityRoutingWeightsMap;
+
+struct PriorityRoutingWeights {
+  enum class SelectionSource : uint8_t { Healthy = 0, Degraded = 1, AllHosts = 2 };
+  static constexpr size_t kSourceCount = 3;
+
+  struct SourceWeights {
+    LocalityRoutingWeightsMap weights;
+    // Does not affect the routing decision (fully encoded in weights); read on the hot path only to
+    // pick the zone-routing stat counter.
+    bool all_local{false};
+  };
+
+  std::array<SourceWeights, kSourceCount> by_source;
+
+  const LocalityRoutingWeightsMap& weightsFor(SelectionSource s) const {
+    return by_source[static_cast<size_t>(s)].weights;
+  }
+  bool allLocalFor(SelectionSource s) const { return by_source[static_cast<size_t>(s)].all_local; }
+};
+
+// Advisory per-priority locality weights. Priority/health/panic selection stays live on workers.
+struct RoutingWeightsSnapshot {
+  std::vector<PriorityRoutingWeights> priority_weights;
+};
+
+using RoutingWeightsSnapshotConstSharedPtr = std::shared_ptr<const RoutingWeightsSnapshot>;
+
+struct ThreadLocalShim : public ThreadLocal::ThreadLocalObject {
+  RoutingWeightsSnapshotConstSharedPtr routing_weights;
+};
+
+class WorkerLocalLb;
+
+// Factory shared across workers; publishes routing-weight snapshots via TLS.
+class WorkerLocalLbFactory : public Upstream::LoadBalancerFactory {
+public:
+  WorkerLocalLbFactory(Upstream::LoadBalancerFactorySharedPtr child_worker_factory,
+                       LoadBalancerConfigSharedPtr child_config,
+                       const Upstream::ClusterInfo& cluster_info, Runtime::Loader& runtime,
+                       Envoy::Random::RandomGenerator& random,
+                       ThreadLocal::SlotAllocator& tls_slot_allocator);
+
+  // Upstream::LoadBalancerFactory
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override;
+  bool recreateOnHostChangeDeprecated() const override { return false; }
+
+  void updateRoutingWeights(RoutingWeightsSnapshotConstSharedPtr snapshot) {
+    tls_->runOnAllThreads([snapshot = std::move(snapshot)](OptRef<ThreadLocalShim> shim) {
+      if (shim.has_value()) {
+        shim->routing_weights = snapshot;
+      }
+    });
+  }
+
+  // SAFETY: Must only be called on a thread that owns a TLS slot instance (worker or main
+  // thread). The shim object is created once per thread at factory construction and never
+  // replaced (updateRoutingWeights mutates its field), and the factory outlives any worker LB it
+  // created, so callers on their own thread may cache the returned pointer for their lifetime.
+  const ThreadLocalShim* tlsShim() const {
+    auto shim = tls_->get();
+    return shim.ptr();
+  }
+
+  Upstream::LoadBalancerPtr
+  createWorkerChildLb(Upstream::PrioritySetImpl& per_locality_priority_set);
+
+  // Whether the child policy requires the worker LB to be recreated on host membership changes.
+  bool recreateChildOnHostChange() const;
+
+  Envoy::Random::RandomGenerator& random() const { return random_; }
+  Runtime::Loader& runtime() const { return runtime_; }
+  uint32_t healthyPanicThreshold() const { return healthy_panic_threshold_; }
+  Upstream::ClusterLbStats& lbStats() const { return cluster_info_.lbStats(); }
+
+private:
+  // Worker factory of the child ThreadAwareLoadBalancer (owned by the main-thread LB). Shared
+  // ownership keeps it valid on workers after the child LB is destroyed, per the
+  // ThreadAwareLoadBalancer factory contract.
+  Upstream::LoadBalancerFactorySharedPtr child_worker_factory_;
+  // Co-owns the child endpoint-picking config so it outlives the child LB on worker threads, even
+  // when the LoadAwareLocalityLbConfig that also owns it is destroyed first.
+  LoadBalancerConfigSharedPtr child_config_;
+  const Upstream::ClusterInfo& cluster_info_;
+  Envoy::Random::RandomGenerator& random_;
+  Runtime::Loader& runtime_;
+  uint32_t healthy_panic_threshold_;
+
+  std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
+};
+
 } // namespace LoadAwareLocality
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
