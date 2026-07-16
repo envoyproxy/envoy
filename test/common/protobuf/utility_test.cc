@@ -37,6 +37,7 @@
 #include "xds/type/v3/typed_struct.pb.h"
 
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::Not;
 using namespace std::chrono_literals;
 
@@ -1461,7 +1462,7 @@ TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
     Protobuf::Any source_any;
     std::ignore = source_any.PackFrom(source);
     auto result = MessageUtil::knownAnyToBytes(source_any);
-    ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(R"({"key":"value"})"));
+    ASSERT_THAT(result, IsOkAndHolds(R"({"key":"value"})"));
   }
   {
     envoy::config::cluster::v3::Filter filter;
@@ -1781,7 +1782,7 @@ TEST(DurationUtilTest, NoThrow) {
     duration.set_seconds(5);
     duration.set_nanos(10000000);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(5010));
+    EXPECT_THAT(result, IsOkAndHolds(5010));
   }
   // Below are out-of-range tests
   {

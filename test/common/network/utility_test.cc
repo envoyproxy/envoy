@@ -34,6 +34,7 @@
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::DoAll;
 using testing::Eq;
 using testing::Invoke;
@@ -882,7 +883,7 @@ TEST_F(ExecInNetnsTest, Basic) {
   // Now check basic functionality to ensure the function is called from a "different netns".
   std::function<std::string()> func = [&]() -> std::string { return getCurrentNetns(); };
   auto result = Utility::execInNetworkNamespace(func, "ns1");
-  EXPECT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds("ns1"));
+  EXPECT_THAT(result, IsOkAndHolds("ns1"));
 
   // Make sure the netns reverted back to the netns the execInNetworkNamespace function was called
   // from. When the netns was noted before making the jump, it used the fd of "/proc/self/ns/net"
@@ -891,7 +892,7 @@ TEST_F(ExecInNetnsTest, Basic) {
 
   // Try another netns.
   result = Utility::execInNetworkNamespace(func, "ns2");
-  EXPECT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds("ns2"));
+  EXPECT_THAT(result, IsOkAndHolds("ns2"));
 
   // Make sure the netns reverted back.
   EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
