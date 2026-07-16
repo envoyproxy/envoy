@@ -70,8 +70,8 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:cleanup_lib",
-        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
     ],
 )
 
