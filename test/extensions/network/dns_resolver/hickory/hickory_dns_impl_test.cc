@@ -59,7 +59,7 @@ public:
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     auto resolver_or =
         dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
-    ASSERT_OK(resolver_or) << resolver_or.status().message();
+    ASSERT_OK(resolver_or);
     resolver_ = std::move(*resolver_or);
   }
 
@@ -564,7 +564,7 @@ stubOnDnsResolveReturningNull(envoy_dynamic_module_type_dns_resolver_module_ptr,
 TEST_F(HickoryDnsImplTest, ResolveFailsSynchronouslyWhenFfiReturnsNull) {
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
   auto config_or = HickoryDnsResolverConfig::create(proto_config);
-  ASSERT_OK(config_or) << config_or.status().message();
+  ASSERT_OK(config_or);
   auto config = std::move(*config_or);
 
   config->on_dns_resolve_ = stubOnDnsResolveReturningNull;
