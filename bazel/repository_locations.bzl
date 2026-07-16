@@ -127,8 +127,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
     perfetto = dict(
-        version = "54.0",
-        sha256 = "57cd976ca0b5474b1d617d1a97450ad55a208aaaff918265db3513275bf51d34",
+        version = "57.2",
+        sha256 = "c6fa3d89aee30f7da39402c9cd178c9f2e344544fda5c2109fd8457e319c3a2f",
         urls = ["https://github.com/google/perfetto/releases/download/v{version}/perfetto-cpp-sdk-src.zip"],
     ),
     c_ares = dict(
