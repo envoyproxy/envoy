@@ -917,7 +917,7 @@ virtual_hosts:
                         creation_status_);
 
   if (!creation_status_.ok()) {
-    FAIL() << "Unexpected failure creating route config: " << creation_status_.ToString();
+    FAIL() << "Unexpected failure creating route config";
   }
 
   // No host header, no scheme and no path header testing.

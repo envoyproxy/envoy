@@ -814,7 +814,7 @@ TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
 
   std::vector<SSL_CTX*> ssl_contexts;
   auto result = validator->initializeSslContexts(ssl_contexts, true, *store.rootScope());
-  ASSERT_OK(result) << result.status().message();
+  ASSERT_OK(result);
 
   std::string expected_metric_name = "ssl.certificate.test_ca_cert.expiration_unix_time_seconds";
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
@@ -1042,9 +1042,9 @@ TEST(CrlCacheTest, SharesIdenticalCrlContent) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
 
   absl::StatusOr<CrlListSharedPtr> first = cache->getOrCreate(crl, "ca_cert.crl");
-  ASSERT_OK(first) << first.status().message();
+  ASSERT_OK(first);
   absl::StatusOr<CrlListSharedPtr> second = cache->getOrCreate(crl, "ca_cert.crl");
-  ASSERT_OK(second) << second.status().message();
+  ASSERT_OK(second);
 
   // Both lookups return the same CrlList and the same parsed X509_CRL.
   EXPECT_EQ(first->get(), second->get());
@@ -1062,9 +1062,9 @@ TEST(CrlCacheTest, SeparatesDistinctCrlContent) {
       "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"));
 
   absl::StatusOr<CrlListSharedPtr> first = cache->getOrCreate(crl1, "ca_cert.crl");
-  ASSERT_OK(first) << first.status().message();
+  ASSERT_OK(first);
   absl::StatusOr<CrlListSharedPtr> second = cache->getOrCreate(crl2, "intermediate_ca_cert.crl");
-  ASSERT_OK(second) << second.status().message();
+  ASSERT_OK(second);
 
   EXPECT_NE(first->get(), second->get());
   EXPECT_EQ(cache->size(), 2);
@@ -1079,7 +1079,7 @@ TEST(CrlCacheTest, ReleasesUnreferencedEntries) {
 
   {
     absl::StatusOr<CrlListSharedPtr> entry = cache->getOrCreate(crl, "ca_cert.crl");
-    ASSERT_OK(entry) << entry.status().message();
+    ASSERT_OK(entry);
     EXPECT_EQ(cache->size(), 1);
   }
   // The only reference is gone, so the entry is released.
@@ -1087,7 +1087,7 @@ TEST(CrlCacheTest, ReleasesUnreferencedEntries) {
 
   // Re-adding the same content succeeds and repopulates the cache.
   absl::StatusOr<CrlListSharedPtr> reloaded = cache->getOrCreate(crl, "ca_cert.crl");
-  ASSERT_OK(reloaded) << reloaded.status().message();
+  ASSERT_OK(reloaded);
   EXPECT_EQ(cache->size(), 1);
 }
 
@@ -1114,7 +1114,7 @@ TEST(CrlCacheTest, CrlListKeepsCacheAlive) {
     const std::string crl = TestEnvironment::readFileToStringForTest(
         TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
     absl::StatusOr<CrlListSharedPtr> result = cache->getOrCreate(crl, "ca_cert.crl");
-    ASSERT_OK(result) << result.status().message();
+    ASSERT_OK(result);
     crl_list = std::move(*result);
   }
   // The local cache reference is gone, but the CrlList still holds it alive.
