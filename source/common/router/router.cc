@@ -1307,8 +1307,7 @@ envoy::config::core::v3::Metadata Filter::shadowDynamicMetadata() const {
   // applied first and then the request metadata is merged on top so request-level values win.
   const auto* downstream_conn = downstreamConnection();
   if (downstream_conn != nullptr) {
-    const auto& connection_fm =
-        downstream_conn->streamInfo().dynamicMetadata().filter_metadata();
+    const auto& connection_fm = downstream_conn->streamInfo().dynamicMetadata().filter_metadata();
     if (const auto it = connection_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
         it != connection_fm.end()) {
       (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
