@@ -13,7 +13,7 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-using ::Envoy::StatusHelpers::HasStatusCode;
+using ::Envoy::StatusHelpers::HasStatus;
 
 class ReverseConnectionResolverTest : public testing::Test {
 protected:
@@ -84,8 +84,8 @@ TEST_F(ReverseConnectionResolverTest, ResolveNonReverseConnectionAddress) {
   auto socket_address = createSocketAddress("127.0.0.1");
 
   auto result = resolver_.resolve(socket_address);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Address must start with 'rc://'"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Address must start with 'rc://'")));
 }
 
 // Test resolution failure for non-zero port.
@@ -95,8 +95,8 @@ TEST_F(ReverseConnectionResolverTest, ResolveNonZeroPort) {
   auto socket_address = createSocketAddress(address_str, 8080); // Non-zero port
 
   auto result = resolver_.resolve(socket_address);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Only port 0 is supported"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Only port 0 is supported")));
 }
 
 // Test successful extraction of reverse connection config.
@@ -121,9 +121,8 @@ TEST_F(ReverseConnectionResolverTest, ResolveInvalidFormat) {
   auto socket_address = createSocketAddress("rc://node:cluster:tenant:cluster:5"); // Missing @
 
   auto result = resolver_.resolve(socket_address);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Invalid reverse connection address format"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Invalid reverse connection address format")));
 }
 
 // Test extraction failure for invalid source info format.
@@ -131,8 +130,8 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigInvalidSourc
   auto socket_address = createSocketAddress("rc://node:cluster@remote:5"); // Missing tenant_id
 
   auto result = extractReverseConnectionConfig(socket_address);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Invalid source info format"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Invalid source info format")));
 }
 
 // Test extraction failure for empty node ID.
@@ -140,8 +139,8 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigEmptyNodeId)
   auto socket_address = createSocketAddress("rc://:cluster:tenant@remote:5");
 
   auto result = extractReverseConnectionConfig(socket_address);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Source node ID cannot be empty"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Source node ID cannot be empty")));
 }
 
 // Test extraction failure for empty cluster ID.
@@ -149,8 +148,8 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigEmptyCluster
   auto socket_address = createSocketAddress("rc://node::tenant@remote:5");
 
   auto result = extractReverseConnectionConfig(socket_address);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Source cluster ID cannot be empty"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Source cluster ID cannot be empty")));
 }
 
 // Test extraction failure for invalid cluster config format.
@@ -158,8 +157,8 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigInvalidClust
   auto socket_address = createSocketAddress("rc://node:cluster:tenant@remote"); // Missing count
 
   auto result = extractReverseConnectionConfig(socket_address);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Invalid cluster config format"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Invalid cluster config format")));
 }
 
 // Test extraction failure for invalid connection count.
@@ -167,8 +166,8 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigInvalidCount
   auto socket_address = createSocketAddress("rc://node:cluster:tenant@remote:invalid");
 
   auto result = extractReverseConnectionConfig(socket_address);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Invalid connection count"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Invalid connection count")));
 }
 
 // Test extraction with zero connection count.
