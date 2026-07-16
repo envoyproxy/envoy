@@ -1177,9 +1177,6 @@ void ReverseConnectionIOHandle::onConnectionDone(
               connection_key);
   }
 
-  // Get connection pointer for safe access in success/failure handling.
-  connection = wrapper->getConnection();
-
   // Process connection result safely.
   bool is_success = (error == "reverse connection accepted" || error == "success" ||
                      error == "handshake successful" || error == "connection established");
@@ -1207,6 +1204,8 @@ void ReverseConnectionIOHandle::onConnectionDone(
   } else {
     // Handle connection success.
     ENVOY_LOG(debug, "reverse_tunnel: Connection succeeded for host {}", host_address);
+    auto released_conn = wrapper->releaseConnection();
+    ASSERT(released_conn != nullptr, "Connection should not be null after success");
 
     resetHostBackoff(host_address);
     updateConnectionState(host_address, cluster_name, connection_key,
@@ -1214,21 +1213,9 @@ void ReverseConnectionIOHandle::onConnectionDone(
 
     emitAccessLog("handshake_success", host_address, cluster_name, connection_key, "");
 
-    // Only proceed if connection is still valid.
-    if (!connection) {
-      ENVOY_LOG(error, "reverse_tunnel: Cannot complete successful handshake - connection is null");
-      return;
-    }
-
     ENVOY_LOG(info, "reverse_tunnel: Transferring tunnel socket for "
                     "reverse_conn_listener consumption");
-
-    // Reset file events safely.
-    if (connection->getSocket()) {
-      ENVOY_LOG(debug, "reverse_tunnel: Removing connection callbacks and resetting file events");
-      connection->removeConnectionCallbacks(*wrapper);
-      connection->getSocket()->ioHandle().resetFileEvents();
-    }
+    released_conn->getSocket()->ioHandle().resetFileEvents();
 
     // Update host connection tracking safely.
     auto host_it = host_to_conn_info_map_.find(host_address);
@@ -1240,29 +1227,25 @@ void ReverseConnectionIOHandle::onConnectionDone(
 
     // Set quiet shutdown since we are duplicating the socket and closing the original socket. When
     // the original socket is closed, a TLS close_notify alert is otherwise sent.
-    ReverseConnectionUtility::applySslQuietClose(*connection);
+    ReverseConnectionUtility::applySslQuietClose(*released_conn);
 
-    Network::ClientConnectionPtr released_conn = wrapper->releaseConnection();
+    ENVOY_LOG(info, "reverse_tunnel: Connection will be consumed by "
+                    "reverse_conn_listener for HTTP processing");
 
-    if (released_conn) {
-      ENVOY_LOG(info, "reverse_tunnel: Connection will be consumed by "
-                      "reverse_conn_listener for HTTP processing");
+    // Move connection to established queue for reverse_conn_listener to consume.
+    established_connections_.push(std::move(released_conn));
 
-      // Move connection to established queue for reverse_conn_listener to consume.
-      established_connections_.push(std::move(released_conn));
-
-      // Trigger accept mechanism safely.
-      if (isTriggerPipeReady()) {
-        char trigger_byte = 1;
-        ssize_t bytes_written = ::write(trigger_pipe_write_fd_, &trigger_byte, 1);
-        if (bytes_written == 1) {
-          ENVOY_LOG(info,
-                    "reverse_tunnel: Successfully triggered reverse_conn_listener "
-                    "accept() for host {}",
-                    host_address);
-        } else {
-          ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}", errorDetails(errno));
-        }
+    // Trigger accept mechanism safely.
+    if (isTriggerPipeReady()) {
+      char trigger_byte = 1;
+      ssize_t bytes_written = ::write(trigger_pipe_write_fd_, &trigger_byte, 1);
+      if (bytes_written == 1) {
+        ENVOY_LOG(info,
+                  "reverse_tunnel: Successfully triggered reverse_conn_listener "
+                  "accept() for host {}",
+                  host_address);
+      } else {
+        ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}", errorDetails(errno));
       }
     }
   }

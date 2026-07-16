@@ -150,8 +150,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Cyan4973/xxHash/archive/v{version}.tar.gz"],
     ),
     sql_parser = dict(
-        version = "3b40ba2d106587bdf053a292f7e3bb17e818a57f",
-        sha256 = "96c10c8e950a141a32034f19b19cdeb1da48fe859cf96ae5e19f894f36c62c71",
+        version = "52e5ad1f4fbb21301fcee7f9d18eef7e6ae6ab3e",
+        sha256 = "011e4786048436b90384cd2124a6ab4dd1961ae026df8d9dab9286e95a1e295f",
         strip_prefix = "sql-parser-{version}",
         urls = ["https://github.com/envoyproxy/sql-parser/archive/{version}.tar.gz"],
     ),
@@ -318,18 +318,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
     ),
     libevent = dict(
-        # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
-        # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
-        # in the watchers (see https://github.com/libevent/libevent/pull/802).
-        # This also includes the fixes for https://github.com/libevent/libevent/issues/806
-        # and https://github.com/envoyproxy/envoy-mobile/issues/215.
-        # This also includes the fixes for Phantom events with EV_ET (see
-        # https://github.com/libevent/libevent/issues/984).
-        # This also includes the wepoll backend for Windows (see
-        # https://github.com/libevent/libevent/pull/1006)
-        # TODO(adip): Update to v2.2 when it is released.
-        version = "62c152d9a7cd264b993dad730c4163c6ede2e0a3",
-        sha256 = "4c80e5fe044ce5f8055b20a2f141ee32ec2614000f3e95d2aa81611a4c8f5213",
+        version = "release-2.2.2-alpha",
+        sha256 = "f0a1ead383fb4992cde92dfea88a19e43d8198b592938e454da1f5b7dbc39da9",
         strip_prefix = "libevent-{version}",
         urls = ["https://github.com/libevent/libevent/archive/{version}.tar.gz"],
     ),
