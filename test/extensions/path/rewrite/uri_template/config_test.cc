@@ -11,8 +11,7 @@ namespace Extensions {
 namespace UriTemplate {
 namespace Rewrite {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(ConfigTest, TestEmptyConfig) {
   const std::string yaml_string = R"EOF(
@@ -66,9 +65,9 @@ TEST(ConfigTest, InvalidConfigSetup) {
   absl::StatusOr<Router::PathRewriterSharedPtr> config_or_error =
       factory->createPathRewriter(*message);
 
-  EXPECT_THAT(config_or_error, Not(IsOk()));
-  EXPECT_EQ(config_or_error.status().message(),
-            "path_rewrite_policy.path_template_rewrite /bar/{lang}/{country is invalid");
+  EXPECT_THAT(config_or_error,
+              HasStatusMessage(
+                  "path_rewrite_policy.path_template_rewrite /bar/{lang}/{country is invalid"));
 }
 
 TEST(ConfigTest, TestConfigSetup) {
@@ -124,9 +123,9 @@ TEST(ConfigTest, TestInvalidConfigSetup) {
   absl::StatusOr<Router::PathRewriterSharedPtr> config_or_error =
       factory->createPathRewriter(*message);
 
-  EXPECT_THAT(config_or_error, Not(IsOk()));
-  EXPECT_EQ(config_or_error.status().message(),
-            "path_rewrite_policy.path_template_rewrite /bar/{lang}/country} is invalid");
+  EXPECT_THAT(config_or_error,
+              HasStatusMessage(
+                  "path_rewrite_policy.path_template_rewrite /bar/{lang}/country} is invalid"));
 }
 
 } // namespace Rewrite

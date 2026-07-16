@@ -16,8 +16,7 @@ namespace HttpFilters {
 namespace Transform {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(FactoryTest, FactoryTest) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
@@ -99,9 +98,9 @@ clear_cluster_cache: true
 
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
-    EXPECT_THAT(cb_or_error.status(), Not(IsOk()));
-    EXPECT_EQ("Only one of clear_cluster_cache and clear_route_cache can be set to true",
-              cb_or_error.status().message());
+    EXPECT_THAT(cb_or_error,
+                HasStatusMessage(
+                    "Only one of clear_cluster_cache and clear_route_cache can be set to true"));
   }
 }
 

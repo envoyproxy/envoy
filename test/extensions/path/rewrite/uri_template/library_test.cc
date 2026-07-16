@@ -14,8 +14,6 @@ namespace UriTemplate {
 namespace Rewrite {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
 
 Router::PathMatcherSharedPtr createMatcherFromYaml(std::string yaml_string) {
   envoy::config::core::v3::TypedExtensionConfig config;
@@ -219,10 +217,10 @@ TEST(RewriteTest, MatchPatternInactive) {
   Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(rewrite_yaml_string);
 
   absl::Status error = rewriter->isCompatiblePathMatcher(nullptr);
-  EXPECT_THAT(error, Not(IsOk()));
-  EXPECT_EQ(error.message(), "unable to use envoy.path.rewrite.uri_template.uri_template_rewriter "
-                             "extension without envoy.path.match.uri_template.uri_template_matcher "
-                             "extension");
+  EXPECT_THAT(error, HasStatusMessage(
+                         "unable to use envoy.path.rewrite.uri_template.uri_template_rewriter "
+                         "extension without envoy.path.match.uri_template.uri_template_matcher "
+                         "extension"));
 }
 
 TEST(RewriteTest, MatchPatternMismatchedVars) {
@@ -244,9 +242,9 @@ TEST(RewriteTest, MatchPatternMismatchedVars) {
   Router::PathMatcherSharedPtr matcher = createMatcherFromYaml(match_yaml_string);
 
   absl::Status error = rewriter->isCompatiblePathMatcher(matcher);
-  EXPECT_THAT(error, Not(IsOk()));
-  EXPECT_EQ(error.message(), "mismatch between variables in path_match_policy "
-                             "/bar/{lang}/{country} and path_rewrite_policy /foo/{lang}/{missing}");
+  EXPECT_THAT(error, HasStatusMessage(
+                         "mismatch between variables in path_match_policy "
+                         "/bar/{lang}/{country} and path_rewrite_policy /foo/{lang}/{missing}"));
 }
 
 TEST(RewriteTest, MixedVariableLiteralRewrite) {
