@@ -35,12 +35,12 @@ public:
   void SetUp() override {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("access_log_no_op", "c"), false);
-    EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto config =
         newDynamicModuleAccessLogConfig("test_logger", "config", DefaultMetricsNamespace,
                                         std::move(dynamic_module.value()), *stats_.rootScope());
-    EXPECT_OK(config) << config.status().message();
+    EXPECT_OK(config);
     config_ = std::move(config.value());
     // Re-open stat creation so tests can call `define_*` from the test thread.
     config_->stat_creation_frozen_ = false;
@@ -229,7 +229,7 @@ TEST_F(DynamicModuleAccessLogTest, FactoryFunctionMissingSymbol) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("access_log_missing_config_new", "c"),
       false);
-  EXPECT_OK(dynamic_module) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto config =
       newDynamicModuleAccessLogConfig("test_logger", "config", DefaultMetricsNamespace,

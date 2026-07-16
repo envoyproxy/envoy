@@ -191,7 +191,7 @@ formatters:
     envoy::config::core::v3::SubstitutionFormatString config;
     TestUtility::loadFromYaml(yaml, config);
     auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-    EXPECT_OK(formatter.status()) << formatter.status().message();
+    EXPECT_OK(formatter.status());
     return (*formatter)->format(formatter_context_, stream_info_);
   }
 
@@ -243,7 +243,7 @@ formatters:
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-  ASSERT_OK(formatter.status()) << formatter.status().message();
+  ASSERT_OK(formatter.status());
   EXPECT_EQ("second", (*formatter)->format(context, stream_info_));
 }
 
@@ -310,7 +310,7 @@ formatters:
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-  ASSERT_OK(formatter.status()) << formatter.status().message();
+  ASSERT_OK(formatter.status());
   EXPECT_EQ("x-a,x-b", (*formatter)->format(context, stream_info_));
 }
 
@@ -344,7 +344,7 @@ formatters:
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-  ASSERT_OK(formatter.status()) << formatter.status().message();
+  ASSERT_OK(formatter.status());
   EXPECT_EQ("0,", (*formatter)->format(context, stream_info_));
 }
 
@@ -416,7 +416,7 @@ formatters:
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-  ASSERT_OK(formatter.status()) << formatter.status().message();
+  ASSERT_OK(formatter.status());
 
   const std::string expected = R"EOF({
   "value": "constant",
