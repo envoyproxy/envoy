@@ -268,9 +268,8 @@ TEST_F(DynamicModuleCertValidatorTest, InitializeSslContextsReturnsVerifyMode) {
 
   Stats::Scope& scope = *store_.rootScope();
   auto result = validator.initializeSslContexts({}, false, scope);
-  ASSERT_OK(result);
   // cert_validator_no_op returns SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT = 0x03.
-  EXPECT_EQ(0x03, result.value());
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(0x03));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, InitializeSslContextsHandshakerProvidesCerts) {
@@ -281,8 +280,7 @@ TEST_F(DynamicModuleCertValidatorTest, InitializeSslContextsHandshakerProvidesCe
 
   Stats::Scope& scope = *store_.rootScope();
   auto result = validator.initializeSslContexts({}, true, scope);
-  ASSERT_OK(result);
-  EXPECT_EQ(0x03, result.value());
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(0x03));
 }
 
 // =============================================================================
@@ -398,8 +396,7 @@ typed_config:
 
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_OK(result);
-  EXPECT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 
   // The happy path emits no load-failure counters.
   EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
@@ -425,8 +422,8 @@ typed_config:
   DynamicModuleCertValidatorFactory factory;
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_OK(result) << result.status().message();
-  EXPECT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
+      << result.status().message();
 }
 
 // Remote module sources are not supported for cert validators (no init manager is wired up).
@@ -474,8 +471,7 @@ typed_config:
   DynamicModuleCertValidatorFactory factory;
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_OK(result);
-  EXPECT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorInvalidValidatorConfig) {

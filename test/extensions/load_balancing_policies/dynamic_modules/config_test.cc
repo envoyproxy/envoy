@@ -63,8 +63,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_OK(lb_config_or_error);
-  EXPECT_NE(lb_config_or_error.value(), nullptr);
+  EXPECT_THAT(lb_config_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 
   // The happy path emits no load-failure counters.
   EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
@@ -81,8 +80,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccessWithLocalFile) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_OK(lb_config_or_error) << lb_config_or_error.status().message();
-  EXPECT_NE(lb_config_or_error.value(), nullptr);
+  EXPECT_THAT(lb_config_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
+      << lb_config_or_error.status().message();
 }
 
 // Remote module sources are not supported for load balancing policies (no init manager is wired
