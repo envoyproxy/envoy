@@ -21,9 +21,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
-using ::testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -168,9 +167,10 @@ TEST_F(GradientControllerConfigTest, MissingMinRTTValues) {
   TestUtility::loadFromYamlAndValidate(yaml, proto);
   absl::Status creation_status = absl::OkStatus();
   GradientControllerConfig config{proto, runtime_, creation_status};
-  EXPECT_THAT(creation_status, Not(IsOk()));
-  EXPECT_EQ(creation_status.message(),
-            "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set");
+  EXPECT_THAT(
+      creation_status,
+      HasStatusMessage(
+          "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set"));
 }
 
 TEST_F(GradientControllerConfigTest, Clamping) {

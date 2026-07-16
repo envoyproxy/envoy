@@ -13,8 +13,7 @@
 namespace Envoy {
 namespace Network {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatus;
 
 // Test peer that provides access to ``HickoryDnsResolverConfig::createForModule`` so failure
 // paths through the dynamic-module loader can be exercised with stub modules.
@@ -845,10 +844,9 @@ TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsOnJsonSerializationError) {
   proto_config.mutable_query_timeout()->set_nanos(1'000'000'000);
 
   auto result = HickoryDnsResolverConfig::create(proto_config);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(std::string(result.status().message()),
-              testing::HasSubstr("Failed to serialize HickoryDnsResolverConfig to JSON"));
+  ASSERT_THAT(result, HasStatus(absl::StatusCode::kInternal,
+                                testing::HasSubstr(
+                                    "Failed to serialize HickoryDnsResolverConfig to JSON")));
 }
 
 // Verifies that loading a module name with no static ``program_init`` symbol and no shared
@@ -857,10 +855,8 @@ TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenModuleMissing) {
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
   auto result =
       HickoryDnsResolverConfigTestPeer::createForModule(proto_config, "envoy_hickory_test_absent");
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(std::string(result.status().message()),
-              testing::HasSubstr("Failed to load Hickory DNS dynamic module"));
+  ASSERT_THAT(result, HasStatus(absl::StatusCode::kInternal,
+                                testing::HasSubstr("Failed to load Hickory DNS dynamic module")));
 }
 
 // Verifies that loading a module that exposes ``program_init`` but lacks the DNS resolver ABI
@@ -869,11 +865,10 @@ TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenModuleMissing) {
 TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenDnsAbiSymbolsMissing) {
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
   auto result = HickoryDnsResolverConfigTestPeer::createForModule(proto_config, "matcher_no_op");
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(std::string(result.status().message()),
-              testing::HasSubstr("Failed to resolve Hickory DNS ABI symbol "
-                                 "'envoy_dynamic_module_on_dns_resolver_config_new'"));
+  ASSERT_THAT(result,
+              HasStatus(absl::StatusCode::kInternal,
+                        testing::HasSubstr("Failed to resolve Hickory DNS ABI symbol "
+                                           "'envoy_dynamic_module_on_dns_resolver_config_new'")));
 }
 
 // Verifies that a module returning null from ``on_dns_resolver_config_new`` causes the shell
@@ -883,10 +878,9 @@ TEST_F(HickoryDnsConfigFailureTest, ConfigCreateFailsWhenModuleRejectsConfig) {
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
   auto result = HickoryDnsResolverConfigTestPeer::createForModule(proto_config,
                                                                   "dns_resolver_config_new_fail");
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(std::string(result.status().message()),
-              testing::HasSubstr("Hickory DNS module rejected the configuration"));
+  ASSERT_THAT(result,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::HasSubstr("Hickory DNS module rejected the configuration")));
 }
 
 // Verifies that the factory propagates an ``unpackTo`` failure when ``typed_config`` contains
@@ -910,11 +904,10 @@ TEST_F(HickoryDnsConfigFailureTest, FactoryReturnsErrorOnInvalidTypedConfig) {
   std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(unrelated_message);
 
   auto result = factory->createDnsResolver(*dispatcher, *api, typed_dns_resolver_config);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(std::string(result.status().message()),
-              testing::HasSubstr("Unable to unpack as envoy.extensions.network.dns_resolver."
-                                 "hickory.v3.HickoryDnsResolverConfig"));
+  ASSERT_THAT(result, HasStatus(absl::StatusCode::kInternal,
+                                testing::HasSubstr(
+                                    "Unable to unpack as envoy.extensions.network.dns_resolver."
+                                    "hickory.v3.HickoryDnsResolverConfig")));
 }
 
 // Verifies that the factory surfaces ``HickoryDnsResolverConfig::create()`` failures through
@@ -939,10 +932,9 @@ TEST_F(HickoryDnsConfigFailureTest, FactoryReturnsErrorWhenConfigCreateFails) {
   std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(proto_config);
 
   auto result = factory->createDnsResolver(*dispatcher, *api, typed_dns_resolver_config);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(std::string(result.status().message()),
-              testing::HasSubstr("Failed to serialize HickoryDnsResolverConfig to JSON"));
+  ASSERT_THAT(result, HasStatus(absl::StatusCode::kInternal,
+                                testing::HasSubstr(
+                                    "Failed to serialize HickoryDnsResolverConfig to JSON")));
 }
 
 // -- ABI callback shutdown fast-path test --------------------------------------------------------

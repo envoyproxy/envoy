@@ -18,10 +18,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::NiceMock;
-using ::testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -82,8 +81,7 @@ success_criteria:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto status_or = admission_control_filter_factory.createFilterFactoryFromProtoTyped(
       proto, "whatever", dual_info_, factory_context.serverFactoryContext());
-  EXPECT_THAT(status_or, Not(IsOk()));
-  EXPECT_EQ("Success rate threshold cannot be less than 1.0%.", status_or.status().message());
+  EXPECT_THAT(status_or, HasStatusMessage("Success rate threshold cannot be less than 1.0%."));
 }
 
 TEST_F(AdmissionControlConfigTest, SmallSuccessRateThreshold) {
@@ -110,8 +108,7 @@ success_criteria:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto status_or = admission_control_filter_factory.createFilterFactoryFromProtoTyped(
       proto, "whatever", dual_info_, factory_context.serverFactoryContext());
-  EXPECT_THAT(status_or, Not(IsOk()));
-  EXPECT_EQ("Success rate threshold cannot be less than 1.0%.", status_or.status().message());
+  EXPECT_THAT(status_or, HasStatusMessage("Success rate threshold cannot be less than 1.0%."));
 }
 
 // Verify the configuration when all fields are set.

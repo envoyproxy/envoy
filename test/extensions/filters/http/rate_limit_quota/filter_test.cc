@@ -44,14 +44,12 @@ namespace {
 using ::Envoy::Extensions::HttpFilters::RateLimitQuota::FilterConfig;
 using envoy::service::rate_limit_quota::v3::BucketId;
 using envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
-using ::Envoy::StatusHelpers::StatusIs;
 using envoy::type::v3::RateLimitStrategy;
 using envoy::type::v3::TokenBucket;
 using Server::Configuration::MockFactoryContext;
 using ::testing::NiceMock;
-using ::testing::Not;
 
 enum class MatcherConfigType {
   Valid,
@@ -202,9 +200,8 @@ TEST_F(FilterTest, EmptyMatcherConfig) {
   addMatcherConfig(MatcherConfigType::Empty);
   createFilter();
   auto match_result = filter_->requestMatching(default_headers_);
-  EXPECT_THAT(match_result, Not(IsOk()));
-  EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(match_result.status().message(), "Matcher tree has not been initialized yet.");
+  EXPECT_THAT(match_result,
+              HasStatus(absl::StatusCode::kInternal, "Matcher tree has not been initialized yet."));
 }
 
 TEST_F(FilterTest, RequestMatchingSucceeded) {
@@ -233,9 +230,8 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   auto match = filter_->requestMatching(default_headers_);
   // Not_OK status is expected to be returned because the matching failed due to
   // mismatched inputs.
-  EXPECT_THAT(match, Not(IsOk()));
-  EXPECT_THAT(match, StatusIs(absl::StatusCode::kNotFound));
-  EXPECT_EQ(match.status().message(), "Matching completed but no match result was found.");
+  EXPECT_THAT(match, HasStatus(absl::StatusCode::kNotFound,
+                               "Matching completed but no match result was found."));
 }
 
 TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
@@ -246,9 +242,8 @@ TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
   auto match = filter_->requestMatching(empty_header);
   // Not_OK status is expected to be returned because the matching failed due to
   // empty headers.
-  EXPECT_THAT(match, Not(IsOk()));
-  EXPECT_EQ(match.status().message(),
-            "Unable to match due to the required data not being available.");
+  EXPECT_THAT(match,
+              HasStatusMessage("Unable to match due to the required data not being available."));
 }
 
 TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
@@ -256,9 +251,8 @@ TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
   createFilter(/*set_callback*/ false);
 
   auto match = filter_->requestMatching(default_headers_);
-  EXPECT_THAT(match, Not(IsOk()));
-  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(match.status().message(), "Filter callback has not been initialized successfully yet.");
+  EXPECT_THAT(match, HasStatus(absl::StatusCode::kInternal,
+                               "Filter callback has not been initialized successfully yet."));
 }
 
 TEST_F(FilterTest, RequestMatchingWithOnNoMatch) {
