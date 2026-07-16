@@ -36,7 +36,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
     // We're full. Try to free up a pool. If we can't, bail out.
     if (!freeOnePool()) {
       host_->cluster().trafficStats()->upstream_cx_pool_overflow_.inc();
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     ASSERT(size() < connPoolResource.max(),
@@ -116,6 +116,25 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections(
 
   for (auto* pool : pools) {
     pool->drainConnections(drain_behavior);
+  }
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnectionsIf(
+    Envoy::ConnectionPool::DrainConnectionsPoolPredicate predicate,
+    Envoy::ConnectionPool::DrainBehavior drain_behavior) {
+  // Copy the `active_pools_` so that it is safe for the call to result
+  // in deletion, and avoid iteration through a mutating container.
+  std::vector<POOL_TYPE*> pools;
+  pools.reserve(active_pools_.size());
+  for (auto& pool_pair : active_pools_) {
+    pools.push_back(pool_pair.second.get());
+  }
+
+  for (auto* pool : pools) {
+    if (predicate(*pool)) {
+      pool->drainConnections(drain_behavior);
+    }
   }
 }
 

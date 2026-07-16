@@ -221,6 +221,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_get_all_version_names \
   --uncomment-func-decl SSL_get_all_curve_names \
   --uncomment-func-decl SSL_get_all_group_names \
+  --uncomment-func-decl SSL_CTX_set1_group_ids \
   --uncomment-macro SSL_GROUP_SECP256R1 \
   --uncomment-macro SSL_GROUP_SECP384R1 \
   --uncomment-macro SSL_GROUP_SECP521R1 \

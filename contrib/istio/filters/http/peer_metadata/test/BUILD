@@ -30,3 +30,18 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "peer_metadata_integration_test",
+    srcs = ["peer_metadata_integration_test.cc"],
+    deps = [
+        "//contrib/istio/filters/common/source:metadata_object_lib",
+        "//contrib/istio/filters/http/peer_metadata/source:config",
+        "//contrib/istio/filters/network/metadata_exchange/source:config",
+        "//source/common/common:base64_lib",
+        "//source/extensions/filters/http/router:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)

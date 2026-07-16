@@ -16,7 +16,8 @@ namespace McpJsonRestBridge {
  */
 class McpJsonRestBridgeFilterConfigFactory
     : public Common::ExceptionFreeFactoryBase<
-          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge> {
+          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge,
+          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute> {
 public:
   McpJsonRestBridgeFilterConfigFactory() : ExceptionFreeFactoryBase(FilterName) {}
 
@@ -25,6 +26,13 @@ private:
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
           proto_config,
       const std::string&, Server::Configuration::FactoryContext&) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace McpJsonRestBridge

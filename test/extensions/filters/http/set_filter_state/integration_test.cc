@@ -47,8 +47,10 @@ public:
     {
       SetFilterStateConfig factory;
       auto cb_1 = factory.createFilterFactoryFromProto(proto_config, "", context_);
-      auto cb_2 = factory.createFilterFactoryFromProtoWithServerContext(
-          proto_config, "", context_.server_factory_context_);
+      auto cb_2 =
+          factory
+              .createHttpFilterFactoryFromProto(proto_config, "", context_.server_factory_context_)
+              .value();
 
       NiceMock<Http::MockFilterChainFactoryCallbacks> filter_chain_factory_callbacks;
 

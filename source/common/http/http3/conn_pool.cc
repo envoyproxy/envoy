@@ -130,14 +130,14 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
       network_observer_registry_(network_observer_registry) {}
 
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
-  if (connect_callback_ != absl::nullopt) {
+  if (connect_callback_ != std::nullopt) {
     connect_callback_->onHandshakeComplete();
   }
 }
 
 void Http3ConnPoolImpl::onConnectFailed(Envoy::ConnectionPool::ActiveClient& client) {
   ASSERT(client.numActiveStreams() == 0);
-  if (static_cast<ActiveClient&>(client).hasCreatedStream() && connect_callback_ != absl::nullopt) {
+  if (static_cast<ActiveClient&>(client).hasCreatedStream() && connect_callback_ != std::nullopt) {
     connect_callback_->onZeroRttHandshakeFailed();
   }
 }

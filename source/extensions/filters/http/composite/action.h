@@ -32,7 +32,7 @@ public:
   // Constructor for single filter which is either typed_config or dynamic_config.
   explicit ExecuteFilterAction(
       FilterConfigProvider config_provider, const std::string& name,
-      const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
+      const std::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
       Runtime::Loader& runtime)
       : config_provider_(std::move(config_provider)), name_(name), sample_(sample),
         runtime_(runtime), is_filter_chain_(false) {}
@@ -40,7 +40,7 @@ public:
   // Constructor for filter chain (inline filter_chain).
   explicit ExecuteFilterAction(
       FilterFactoryCbList filter_factories, const std::string& name,
-      const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
+      const std::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
       Runtime::Loader& runtime)
       : filter_factories_(std::move(filter_factories)), name_(name), sample_(sample),
         runtime_(runtime), is_filter_chain_(true) {}
@@ -48,7 +48,7 @@ public:
   // Constructor for named filter chain lookup.
   explicit ExecuteFilterAction(
       const std::string& filter_chain_name,
-      const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
+      const std::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
       Runtime::Loader& runtime)
       : name_(filter_chain_name), sample_(sample), runtime_(runtime), is_filter_chain_(false),
         is_named_filter_chain_lookup_(true) {}
@@ -75,7 +75,7 @@ private:
   // Used for filter chain mode.
   FilterFactoryCbList filter_factories_;
   const std::string name_;
-  const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> sample_;
+  const std::optional<envoy::config::core::v3::RuntimeFractionalPercent> sample_;
   Runtime::Loader& runtime_;
   const bool is_filter_chain_;
   const bool is_named_filter_chain_lookup_{false};
@@ -121,9 +121,9 @@ private:
     return std::make_shared<ExecuteFilterAction>(
         [provider]() -> OptRef<Http::FilterFactoryCb> { return provider->config(); }, name,
         composite_action.has_sample_percent()
-            ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+            ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                   composite_action.sample_percent())
-            : absl::nullopt,
+            : std::nullopt,
         runtime);
   }
 

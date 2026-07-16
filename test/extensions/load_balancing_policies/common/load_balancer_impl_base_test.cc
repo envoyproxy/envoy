@@ -567,8 +567,7 @@ class TestZoneAwareLb : public ZoneAwareLoadBalancerBase {
 public:
   TestZoneAwareLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
                   Runtime::Loader& runtime, Random::RandomGenerator& random,
-                  uint32_t healthy_panic_threshold,
-                  absl::optional<LocalityLbConfig> locality_config)
+                  uint32_t healthy_panic_threshold, std::optional<LocalityLbConfig> locality_config)
       : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random,
                                   healthy_panic_threshold, locality_config) {}
 

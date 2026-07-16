@@ -276,7 +276,7 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
   for (const auto& resource : resources) {
     // Explicit copy so that we can std::move later.
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
-        dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
+        Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
             resource.get().resource());
     const std::string scope_name = scoped_route_config.name();
     if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
@@ -429,6 +429,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources =
       detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources, exception_msg);
   if (!exception_msg.empty()) {
+    ENVOY_LOG(warn, "srds: scoped route config '{}' rejected: {}", name_, exception_msg);
     return absl::InvalidArgumentError(
         fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
   }
@@ -442,6 +443,8 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
       added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
       version_info);
   if (!status_or_applied.status().ok()) {
+    ENVOY_LOG(warn, "srds: scoped route config '{}' rejected: {}", name_,
+              status_or_applied.status().message());
     return status_or_applied.status();
   }
   const bool any_applied = status_or_applied.value();
@@ -450,7 +453,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     return status;
   }
   if (any_applied || !to_be_removed_rds_providers.empty()) {
-    setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
+    setLastConfigInfo(std::optional<LastConfigInfo>({std::nullopt, version_info}));
   }
   stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
@@ -502,7 +505,7 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
   }
   for (const auto& resource : resources) {
     const auto& scoped_route =
-        dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
+        Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
             resource.get().resource());
     updated_or_removed_scopes.insert(scoped_route.name());
   }
@@ -518,7 +521,7 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
   for (const auto& resource : resources) {
     // Throws (thus rejects all) on any error.
     const auto& scoped_route =
-        dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
+        Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
             resource.get().resource());
     const std::string& scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
@@ -611,7 +614,8 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
         if (!name_matcher.match(it.second->configProto().name())) {
           continue;
         }
-        dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(it.second->configProto());
+        std::ignore = dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
+            it.second->configProto());
       }
       TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
@@ -621,14 +625,14 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
   for (const auto& provider : immutableConfigProviders(ConfigProviderInstanceType::Inline)) {
     const auto protos_info =
         provider->configProtoInfoVector<envoy::config::route::v3::ScopedRouteConfiguration>();
-    ASSERT(protos_info != absl::nullopt);
+    ASSERT(protos_info != std::nullopt);
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
     inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
       if (!name_matcher.match(config_proto->name())) {
         continue;
       }
-      inline_config->mutable_scoped_route_configs()->Add()->PackFrom(*config_proto);
+      std::ignore = inline_config->mutable_scoped_route_configs()->Add()->PackFrom(*config_proto);
     }
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *inline_config->mutable_last_updated());
@@ -649,8 +653,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
            &typed_optarg](const uint64_t manager_identifier,
                           ConfigProviderManagerImplBase& config_provider_manager)
               -> Envoy::Config::ConfigSubscriptionCommonBaseSharedPtr {
-            const auto& scoped_rds_config_source = dynamic_cast<
-                const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds&>(
+            const auto& scoped_rds_config_source = Envoy::Protobuf::DynamicCastMessage<
+                envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds>(
                 config_source_proto);
             return std::make_shared<ScopedRdsConfigSubscription>(
                 scoped_rds_config_source, manager_identifier, typed_optarg.scoped_routes_name_,

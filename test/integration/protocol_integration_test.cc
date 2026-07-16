@@ -156,6 +156,44 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_connect_fail")->value(), 1);
 }
 
+#if defined(__linux__)
+// Regression test: when the upstream connection cannot be created because binding to the
+// configured network namespace fails at connection time (the namespace file cannot be opened),
+// the request fails gracefully with a 503 instead of crashing on a null connection.
+TEST_P(ProtocolIntegrationTest, UpstreamConnectionCreationFailure) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // QUIC upstream connections are created through a different code path which does not support
+    // binding to a network namespace, so the connection-time failure exercised here does not
+    // apply.
+    return;
+  }
+
+  // This test intentionally fails to create the upstream connection, so bypass the check that
+  // the test used upstream connections.
+  testing_upstream_intentionally_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
+    source_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    source_address->set_port_value(0);
+    // The namespace file does not exist, so entering it at connection time fails and the
+    // dispatcher returns a null connection. Note validate_network_namespaces is intentionally not
+    // set, so the configuration is accepted and the failure happens at connection time.
+    source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+  });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  codec_client_->close();
+}
+#endif
+
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
   OsSysCallsWithMockedDns mock_os_sys_calls;
   mock_os_sys_calls.setIpVersion(GetParam().version);
@@ -174,7 +212,7 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
     envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
         getaddrinfo_config;
-    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
+    std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -207,7 +245,7 @@ TEST_P(ProtocolIntegrationTest, StrictDns) {
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
     envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
         getaddrinfo_config;
-    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
+    std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -412,7 +450,7 @@ TEST_P(ProtocolIntegrationTest, DEPRECATED_FEATURE_TEST(RouterOnlyTracing)) {
               hcm) -> void {
         envoy::extensions::filters::http::router::v3::Router router_config;
         router_config.set_start_child_span(true);
-        hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
+        std::ignore = hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1457,7 +1495,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   auto* retry_priority_config = retry_policy->mutable_retry_priority();
   retry_priority_config->set_name(factory.name());
   test::mocks::upstream::TestRetryPriorityConfig config;
-  retry_priority_config->mutable_typed_config()->PackFrom(config);
+  std::ignore = retry_priority_config->mutable_typed_config()->PackFrom(config);
   config_helper_.addVirtualHost(host);
   // We want to work with a cluster with two hosts.
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -1531,7 +1569,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   auto* host_predicate = retry_policy->add_retry_host_predicate();
   host_predicate->set_name(predicate_factory.name());
   ::test::integration::TestHostPredicate config;
-  host_predicate->mutable_typed_config()->PackFrom(config);
+  std::ignore = host_predicate->mutable_typed_config()->PackFrom(config);
   config_helper_.addVirtualHost(host);
 
   // We want to work with a cluster with two hosts.
@@ -2418,6 +2456,103 @@ TEST_P(ProtocolIntegrationTest, MissingStatusStreamError) {
   ASSERT_TRUE(upstream_request_->waitForReset());
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("502", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, CookiesAreSubjectToHeaderMapSizeLimit) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  // Set limit to 4K but allow 8K headers
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(4);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(8000);
+      });
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    setMaxRequestHeadersKb(96);
+    setMaxRequestHeadersCount(8000);
+  }
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"},
+                                                 {"content-length", "0"}};
+  // in oghttp2, there's a hardcoded HPACK decode buffer limit of 32k, if we
+  // trigger that limit, the connection is torn down instead of our intended
+  // behavior of stream reset.
+  for (int i = 0; i < 1000; i++) {
+    request_headers.addCopy("cookie", fmt::sprintf("a%x=b", i));
+  }
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("431", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, DownstreamCookieSizeLimit) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_max_cookies_size_in_kb", "1");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"},
+                                                 {"cookie", std::string(1025, 'a')}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.cookies_total_bytes_too_large"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, CookiesAreSubjectToHeaderMapCountLimit) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  uint32_t max_count = 2010;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // Make the size limit high enough, but the count low
+        hcm.mutable_max_request_headers_kb()->set_value(256);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(128);
+      });
+  setMaxRequestHeadersCount(max_count);
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"},
+                                                 {"content-length", "0"}};
+  for (int i = 0; i < 200; i++) {
+    request_headers.addCopy("cookie", fmt::sprintf("a%x=b", i));
+  }
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("431", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(response->resetReason(), Http::StreamResetReason::RemoteReset);
+
+    if (downstreamProtocol() == Http::CodecType::HTTP2) {
+      Stats::Store& stats = test_server_->server().stats();
+      EXPECT_EQ(1L, TestUtility::findCounter(stats, "http2.header_overflow")->value());
+      EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
+      codec_client_->close();
+    }
+  }
 }
 
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
@@ -3337,7 +3472,7 @@ TEST_P(ProtocolIntegrationTest, Http1SafeConnDurationTimeout) {
       });
   initialize();
 
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
 
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
   waitForNextUpstreamRequest();

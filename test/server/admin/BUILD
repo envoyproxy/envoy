@@ -253,6 +253,8 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":admin_instance_lib",
+        "//envoy/upstream:admin_endpoint_provider_interface",
+        "//source/common/network:address_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

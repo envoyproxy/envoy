@@ -668,7 +668,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     }
 
     // Now that the active client is ready, set up a timer for max connection duration.
-    const absl::optional<std::chrono::milliseconds> max_connection_duration =
+    const std::optional<std::chrono::milliseconds> max_connection_duration =
         client.parent_.host()->cluster().maxConnectionDuration();
     if (max_connection_duration.has_value()) {
       client.connection_duration_timer_ = client.parent_.dispatcher().createTimer(
@@ -707,11 +707,13 @@ PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
   Upstream::ClusterTrafficStats& traffic_stats = *parent_.host()->cluster().trafficStats();
   traffic_stats.upstream_rq_pending_total_.inc();
   traffic_stats.upstream_rq_pending_active_.inc();
+  parent_.host()->stats().rq_pending_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();
 }
 
 PendingStream::~PendingStream() {
   parent_.host()->cluster().trafficStats()->upstream_rq_pending_active_.dec();
+  parent_.host()->stats().rq_pending_active_.dec();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().dec();
 }
 

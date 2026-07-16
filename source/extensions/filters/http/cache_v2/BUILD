@@ -188,7 +188,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/cache_v2/v3:pkg_cc_proto",
     ],
 )
@@ -208,7 +207,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "@abseil-cpp//absl/container:btree",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/cache_v2/v3:pkg_cc_proto",
     ],
 )

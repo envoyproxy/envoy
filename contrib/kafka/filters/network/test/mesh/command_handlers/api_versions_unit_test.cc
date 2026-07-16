@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/api_versions.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,7 +22,7 @@ TEST(ApiVersionsTest, shouldBeAlwaysReadyForAnswer) {
   // given
   MockAbstractRequestListener filter;
   EXPECT_CALL(filter, onRequestReadyForAnswer());
-  const RequestHeader header = {API_VERSIONS_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const RequestHeader header = {API_VERSIONS_REQUEST_API_KEY, 0, 0, std::nullopt};
   ApiVersionsRequestHolder testee = {filter, header};
 
   // when, then - invoking should immediately notify the filter.

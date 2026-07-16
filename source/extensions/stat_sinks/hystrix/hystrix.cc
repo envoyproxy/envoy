@@ -352,7 +352,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   absl::node_hash_map<std::string, QuantileLatencyMap> time_histograms;
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().tagExtractedStatName() == cluster_upstream_rq_time_) {
-      absl::optional<Stats::StatName> value =
+      std::optional<Stats::StatName> value =
           Stats::Utility::findTag(histogram.get(), cluster_name_);
       // Make sure we found the cluster name tag
       ASSERT(value);

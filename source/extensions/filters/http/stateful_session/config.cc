@@ -11,7 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace StatefulSession {
 
-Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context, stats_prefix,
@@ -21,8 +22,8 @@ Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProto
   };
 }
 
-Http::FilterFactoryCb
-StatefulSessionFactoryConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+StatefulSessionFactoryConfig::createHttpFilterFactoryFromProtoTyped(
     const ProtoConfig& proto_config, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& context) {
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());

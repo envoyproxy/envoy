@@ -72,7 +72,7 @@ typed_config:
         default_configuration.set_stop_iteration_on_first_read(false);
         default_configuration.set_continue_filter_chain(false);
         default_configuration.set_stop_iteration_on_first_write(false);
-        discovery->mutable_default_config()->PackFrom(default_configuration);
+        std::ignore = discovery->mutable_default_config()->PackFrom(default_configuration);
       }
 
       discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -111,7 +111,7 @@ typed_config:
           configuration.set_continue_filter_chain(false);
           configuration.set_stop_iteration_on_first_write(false);
 
-          session_filter->mutable_typed_config()->PackFrom(configuration);
+          std::ignore = session_filter->mutable_typed_config()->PackFrom(configuration);
         });
   }
 
@@ -209,7 +209,7 @@ typed_config:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
-    response.add_resources()->PackFrom(listener_config_);
+    std::ignore = response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }
 
@@ -249,12 +249,12 @@ typed_config:
     configuration.set_stop_iteration_on_first_read(false);
     configuration.set_continue_filter_chain(false);
     configuration.set_stop_iteration_on_first_write(false);
-    typed_config.mutable_typed_config()->PackFrom(configuration);
-    resource.mutable_resource()->PackFrom(typed_config);
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
     }
-    response.add_resources()->PackFrom(resource);
+    std::ignore = response.add_resources()->PackFrom(resource);
     if (!second_connection) {
       ecds_stream_->sendGrpcMessage(response);
     } else {
@@ -691,13 +691,13 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) 
 
   // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
   Extensions::UdpFilters::UdpProxy::SessionFilters::DrainerConfig udp_session_filter_config;
-  filter_config.typed_config().UnpackTo(&udp_session_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&udp_session_filter_config);
   EXPECT_EQ(5, udp_session_filter_config.downstream_bytes_to_drain());
   EXPECT_EQ(5, udp_session_filter_config.upstream_bytes_to_drain());
 }
@@ -766,19 +766,19 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterTy
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(5, config_dump.configs_size());
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   envoy::config::core::v3::TypedExtensionConfig filter_config;
 
   Extensions::UdpFilters::UdpProxy::SessionFilters::DrainerConfig udp_session_filter_config;
   // Verify the first filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
-  filter_config.typed_config().UnpackTo(&udp_session_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&udp_session_filter_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, udp_session_filter_config));
   // Verify the second filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(1).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(1).ecds_filter().UnpackTo(&filter_config));
-  filter_config.typed_config().UnpackTo(&udp_session_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&udp_session_filter_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, udp_session_filter_config));
 }
 
@@ -810,13 +810,13 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest,
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(1, config_dump.configs_size());
   envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig ecds_msg;
-  config_dump.configs(0).UnpackTo(&ecds_msg);
+  std::ignore = config_dump.configs(0).UnpackTo(&ecds_msg);
   EXPECT_EQ("1", ecds_msg.version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
   Extensions::UdpFilters::UdpProxy::SessionFilters::DrainerConfig udp_session_filter_config;
-  filter_config.typed_config().UnpackTo(&udp_session_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&udp_session_filter_config);
   EXPECT_EQ(4, udp_session_filter_config.downstream_bytes_to_drain());
   EXPECT_EQ(4, udp_session_filter_config.upstream_bytes_to_drain());
 }

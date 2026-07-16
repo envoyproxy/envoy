@@ -129,6 +129,8 @@ message OAuth2Credentials {
   // The secret used to retrieve the access token. This value will be URL encoded when sent to the OAuth server.
   // This field is required unless :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
   // is set to ``TLS_CLIENT_AUTH``, in which case authentication is done via the client certificate.
+  // When ``auth_type`` is ``PRIVATE_KEY_JWT``, this field must contain the PEM-encoded private key
+  // used to sign the JWT client assertion.
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2;
 
   // Configures how the secret token should be created.
@@ -149,9 +151,71 @@ message OAuth2Credentials {
       [(validate.rules).string = {pattern: "^$|^[^\\x00-\\x1f\\x7f \",;<>\\\\]+$"}];
 }
 
+// Configuration for ``PRIVATE_KEY_JWT`` client authentication (RFC 7523).
+message PrivateKeyJwtConfig {
+  // Supported JWT signing algorithms for the client assertion.
+  enum SigningAlgorithm {
+    // ``RSASSA-PKCS1-v1_5`` using SHA-256.
+    RS256 = 0;
+
+    // ``RSASSA-PKCS1-v1_5`` using SHA-384.
+    RS384 = 1;
+
+    // ``RSASSA-PKCS1-v1_5`` using SHA-512.
+    RS512 = 2;
+
+    // ECDSA using P-256 and SHA-256.
+    ES256 = 3;
+
+    // ECDSA using P-384 and SHA-384.
+    ES384 = 4;
+
+    // ECDSA using P-521 and SHA-512.
+    ES512 = 5;
+  }
+
+  // The signing algorithm to use for the JWT assertion.
+  // The private key provided in ``token_secret`` must match the algorithm family: an RSA key for
+  // the ``RS*`` algorithms, or an EC key for the ``ES*`` algorithms.
+  // Default: ``RS256``.
+  SigningAlgorithm signing_algorithm = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The lifetime of the JWT assertion. After this duration, the assertion expires.
+  // The value is truncated to whole seconds, so it must be at least ``1s`` when set.
+  // Default: ``60s``.
+  google.protobuf.Duration assertion_lifetime = 2 [(validate.rules).duration = {gte {seconds: 1}}];
+}
+
+// Defines how an OAuth token is forwarded upstream.
+message OAuth2TokenForwarding {
+  // The upstream request header that will carry the token.
+  // Pseudo-headers (names starting with ``:``) and the ``Host`` header are not allowed.
+  string header = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+}
+
+// Configuration for the ``post_logout_redirect_uri`` parameter used in OpenID Connect
+// `RP-Initiated Logout requests <https://openid.net/specs/openid-connect-rpinitiated-1_0.html>`_.
+// This configuration is ignored if ``end_session_endpoint`` is not set.
+message PostLogoutRedirectUri {
+  oneof config {
+    option (validate.required) = true;
+
+    // Do not include the ``post_logout_redirect_uri`` parameter in requests to the
+    // configured ``end_session_endpoint``.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // URI to send as the ``post_logout_redirect_uri`` parameter. Supports header formatting
+    // tokens, and will be percent-encoded automatically when building the logout URL.
+    //
+    // The URI should be registered with the authorization server.
+    string uri = 2 [(validate.rules).string = {min_len: 1}];
+  }
+}
+
 // OAuth config
 //
-// [#next-free-field: 28]
+// [#next-free-field: 34]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -168,6 +232,12 @@ message OAuth2Config {
     // transport socket configuration.
     // This implements OAuth 2.0 Mutual-TLS Client Authentication as defined in RFC 8705.
     TLS_CLIENT_AUTH = 2;
+
+    // The client authenticates using a signed JWT assertion (RFC 7523).
+    // The ``token_secret`` in credentials must contain the PEM-encoded private key used to sign the assertion.
+    // The JWT assertion is sent as ``client_assertion`` in the token request body along with
+    // ``client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer``.
+    PRIVATE_KEY_JWT = 3;
   }
 
   // Endpoint on the authorization server to retrieve the access token from.
@@ -186,6 +256,15 @@ message OAuth2Config {
   //
   // If configured, the OAuth2 filter will redirect users to this endpoint when they access the signout_path.
   string end_session_endpoint = 23;
+
+  // Optional control for the ``post_logout_redirect_uri`` parameter sent to the ``end_session_endpoint`` when a user
+  // accesses the ``signout_path``.
+  // This field should be set only if ``openid`` is in the ``auth_scopes``, the ``end_session_endpoint`` is configured,
+  // and the authorization server supports the OpenID Connect RP-Initiated Logout specification.
+  //
+  // If unset, Envoy preserves the historical behavior and sends ``<scheme>://<host>/``, constructed from the inbound
+  // request, as ``post_logout_redirect_uri``.
+  PostLogoutRedirectUri post_logout_redirect_uri = 33;
 
   // Credentials used for OAuth.
   OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
@@ -206,6 +285,19 @@ message OAuth2Config {
 
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 7;
+
+  // Forward the OIDC ID token to the upstream.
+  //
+  // If the configured header is ``Authorization``, Envoy forwards the ID token using the
+  // ``Bearer`` prefix. For any other header, Envoy forwards the raw token value.
+  // If not specified, the ID token will not be forwarded.
+  //
+  // This can not be configured with :ref:`forward_bearer_token
+  // <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
+  // or :ref:`preserve_authorization_header
+  // <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.preserve_authorization_header>`
+  // when the header is ``Authorization``.
+  OAuth2TokenForwarding forward_id_token = 31;
 
   // If set to true, preserve the existing authorization header.
   // By default the client strips the existing authorization header before forwarding upstream.
@@ -304,6 +396,56 @@ message OAuth2Config {
   // Note: If a request matches pass_through_matcher, it bypasses OAuth validation and this matcher won't be evaluated.
   // This matcher takes precedence over deny_redirect_matcher.
   repeated config.route.v3.HeaderMatcher allow_failed_matcher = 27;
+
+  // Optional base URI (scheme + host, e.g. ``https://app.example.com``) used to build the
+  // original request URI that is encoded into the OAuth2 ``state`` parameter.
+  // This URI will be used later to redirect users on a successful OAuth.
+  //
+  // This is useful when Envoy sits behind a gateway or load balancer that terminates the
+  // user-facing hostname: In that case, the post-authentication redirect derived from ``state`` would
+  // send the user to an internal host they didn't request.
+  //
+  // Supports request header formatting tokens.
+  //
+  // Example:
+  //
+  //    original_request_uri: "%REQ(x-forwarded-proto?:scheme)%://%REQ(x-forwarded-host?:authority)%"
+  //
+  // If not set, defaults to ``<:scheme>://<:authority>`` of the incoming request.
+  string original_request_uri = 28;
+
+  // Optional list of domains that are allowed as
+  // 1. redirect_uri: which is what the IdP calls after OAuth
+  // 2. original_request_uri: the one extracted from the state of an OAuth callback (where should the request go after OAuth)
+  //
+  // This mitigates:
+  // - injecting a malicious x-forwarded-host or any header that is used to template the redirect urls
+  // - open redirect attacks where an attacker crafts a ``state`` value pointing to an untrusted host.
+  //
+  // Each entry is matched against the host (with any port stripped) extracted from the
+  // formatted ``redirect_uri``, the formatted ``original_request_uri``, and the URL decoded from
+  // the ``state`` parameter on callback. Matching is case-insensitive and supports two forms:
+  //
+  // * Exact match, e.g. ``example.com`` matches only ``example.com``.
+  // * Wildcard subdomain match using a leading ``*.``, e.g. ``*.example.com`` matches
+  //   ``foo.example.com`` and ``bar.baz.example.com`` but not ``example.com`` itself.
+  //
+  // IPv6 literals must be configured without surrounding brackets (e.g. ``::1``, not ``[::1]``).
+  //
+  // If this list is empty (the default), all hosts are allowed and no validation is performed.
+  repeated string allowed_redirect_domains = 29;
+
+  // If set to true, the expiration time for the ID token cookie will always be derived from the
+  // ``expires_in`` field of the access token response rather than from the ``exp`` claim in the
+  // ID token JWT. This is useful when the access token response advertises a longer lifetime than
+  // the ID token and you want the ID token cookie to remain valid for that full duration.
+  // Default is false (use the ID token's own ``exp`` claim when available).
+  bool use_access_token_expiry_for_id_token_cookie = 30;
+
+  // Configuration for ``PRIVATE_KEY_JWT`` client authentication.
+  // Only used when :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
+  // is set to ``PRIVATE_KEY_JWT``.
+  PrivateKeyJwtConfig private_key_jwt_config = 32;
 }
 
 // Per-route OAuth2 config.

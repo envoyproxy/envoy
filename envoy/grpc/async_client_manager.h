@@ -91,7 +91,7 @@ public:
    * Create a Grpc::RawAsyncClient. The async client is cached thread locally and shared across
    * different filter instances.
    * @param grpc_service Envoy::Grpc::GrpcServiceConfigWithHashKey which contains config and
-   * hashkey.
+   * hash key.
    * @param scope stats scope.
    * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
    * configured.

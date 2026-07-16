@@ -149,10 +149,14 @@ private:
                           envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                           envoy::RouterCheckToolSchema::ValidationFailure& failure);
+                           envoy::RouterCheckToolSchema::ValidationFailure& failure,
+                           const StreamInfo::StreamInfo& stream_info);
   bool compareRedirectCode(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                            envoy::RouterCheckToolSchema::ValidationFailure& failure);
+  bool compareTimeout(ToolConfig& tool_config,
+                      const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                      envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRequestHeaderFields(ToolConfig& tool_config,
                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                                   envoy::RouterCheckToolSchema::ValidationFailure& failure);

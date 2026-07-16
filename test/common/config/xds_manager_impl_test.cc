@@ -1522,8 +1522,6 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, SubscribeSingleValidConfigSource) {
   absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
       XdsResourceIdentifier::decodeUrn(resource_name);
   ASSERT_TRUE(resource_urn_or_error.ok());
-  xds::core::v3::ResourceName resource_urn = resource_urn_or_error.value();
-
   NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
   Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
   testing::NiceMock<MockSubscription>* mock_subscription =

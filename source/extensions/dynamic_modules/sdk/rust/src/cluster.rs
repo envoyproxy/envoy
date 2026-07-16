@@ -119,9 +119,23 @@ pub enum HostSelectionResult {
   NoHost,
   /// The module needs to perform async work (e.g., DNS resolution) before selecting a host.
   /// The module must eventually call
-  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the result,
+  /// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the result,
   /// unless [`AsyncHostSelectionHandle::cancel`] is called first.
   AsyncPending(Box<dyn AsyncHostSelectionHandle>),
+}
+
+/// A host's IP address and port as packed integers.
+///
+/// This is the decoded form of the packed address returned by
+/// [`EnvoyClusterLoadBalancer::get_member_update_host_packed_address`]. The address bytes are in
+/// network byte order and the port is in host byte order, letting a module key its own host map by
+/// an integer rather than a formatted string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PackedAddress {
+  /// An IPv4 address (4 bytes, network byte order) and port (host byte order).
+  V4([u8; 4], u16),
+  /// An IPv6 address (16 bytes, network byte order) and port (host byte order).
+  V6([u8; 16], u16),
 }
 
 /// A handle for canceling an in-progress asynchronous host selection.
@@ -139,18 +153,22 @@ pub trait AsyncHostSelectionHandle: Send {
 ///
 /// This is passed to [`ClusterLb::choose_host`] and must be stored by the module when returning
 /// [`HostSelectionResult::AsyncPending`]. The module calls
-/// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the async result.
+/// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the async result.
 #[automock]
 pub trait EnvoyAsyncHostSelectionComplete: Send {
-  /// Deliver the result of an asynchronous host selection.
-  ///
-  /// `host` is the selected host pointer, or `None` if host selection failed.
-  /// `details` is an optional description of the resolution outcome (e.g., error reason).
-  fn async_host_selection_complete(
-    &self,
+  /// Delivers the async host selection result and consumes the completion. `host` is the selected
+  /// host, or `None` on failure; `details` describes the outcome. Taking `self` by value means the
+  /// context borrowed via `request_context` cannot be read after the result is delivered.
+  fn complete(
+    self: Box<Self>,
     host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
     details: &str,
   );
+
+  /// The request context `choose_host` received, or `None` when there was none (e.g. health-check
+  /// selections). The view's lifetime is tied to the completion, so it cannot outlive it or
+  /// survive `complete`.
+  fn request_context<'a>(&'a self) -> Option<ClusterLbContextRef<'a>>;
 }
 
 /// The module-side load balancer instance.
@@ -161,12 +179,13 @@ pub trait ClusterLb: Send {
   /// Select a host for a request.
   ///
   /// The `context` provides access to per-request information such as downstream headers,
-  /// hash keys, override host, and retry state. It may be `None` if no context is available
-  /// (e.g., health check requests).
+  /// hash keys, override host, and retry state, and (via
+  /// [`ClusterLbContext::worker_timer_new`]) lets the module arm a per-worker timer from the
+  /// request path. It may be `None` if no context is available (e.g., health check requests).
   ///
   /// The `async_completion` callback must be used when returning
   /// [`HostSelectionResult::AsyncPending`]. The module stores it and later calls
-  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the result.
+  /// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the result.
   /// For synchronous results, `async_completion` can be ignored.
   fn choose_host(
     &mut self,
@@ -176,8 +195,8 @@ pub trait ClusterLb: Send {
 
   /// Called when the set of hosts in the cluster changes.
   ///
-  /// The `envoy_lb` provides access to the updated host set and to the addresses of hosts
-  /// that were added or removed via
+  /// The `envoy_lb` provides access to the updated host set and to the hosts that were added or
+  /// removed via [`EnvoyClusterLoadBalancer::get_member_update_host`], or their addresses via
   /// [`EnvoyClusterLoadBalancer::get_member_update_host_address`].
   ///
   /// After this callback returns, the standard host query methods reflect the new state.
@@ -189,6 +208,19 @@ pub trait ClusterLb: Send {
     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
     _num_hosts_added: usize,
     _num_hosts_removed: usize,
+  ) {
+  }
+
+  /// Called on the worker thread when a timer created via
+  /// [`EnvoyClusterLoadBalancer::worker_timer_new`] fires.
+  ///
+  /// The `timer` is a non-owning reference to the timer that fired. The module re-arms it by
+  /// calling [`EnvoyClusterWorkerTimer::enable`] for periodic behavior, or
+  /// [`EnvoyClusterWorkerTimer::disable`] to stop it. The default implementation is a no-op.
+  fn on_worker_timer_fired(
+    &mut self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _timer: &dyn EnvoyClusterWorkerTimer,
   ) {
   }
 }
@@ -207,17 +239,21 @@ pub trait ClusterLbContext {
   /// Returns the number of downstream request headers.
   fn get_downstream_headers_size(&self) -> usize;
 
-  /// Returns all downstream request headers as a vector of (key, value) pairs.
+  /// Returns all downstream request headers as a vector of borrowed (key, value) pairs.
   ///
-  /// Returns `None` if no headers are available.
-  fn get_downstream_headers(&self) -> Option<Vec<(String, String)>>;
+  /// Returns an empty vector if no headers are available.
+  fn get_downstream_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Returns a downstream request header value by key and index.
   ///
   /// Since a header key can have multiple values, the `index` parameter selects a specific value.
   /// Returns `Some((value, total_count))` where `total_count` is the number of values for the key,
   /// or `None` if the header was not found at the given index.
-  fn get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)>;
+  fn get_downstream_header<'a>(
+    &'a self,
+    key: &str,
+    index: usize,
+  ) -> Option<(EnvoyBuffer<'a>, usize)>;
 
   /// Returns the maximum number of times host selection should be retried if the chosen host
   /// is rejected by [`ClusterLbContext::should_select_another_host`].
@@ -234,12 +270,12 @@ pub trait ClusterLbContext {
   /// Override host allows upstream filters to direct the load balancer to prefer a specific host
   /// by address. Returns `Some((address, strict))` if an override host is set, `None` otherwise.
   /// When `strict` is true, the load balancer should return no host if the override is not valid.
-  fn get_override_host(&self) -> Option<(String, bool)>;
+  fn get_override_host<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, bool)>;
 
   /// Returns the requested server name (SNI) from the downstream connection.
   ///
   /// Returns `None` if the downstream connection or SNI is not available.
-  fn get_downstream_connection_sni(&self) -> Option<String>;
+  fn get_downstream_connection_sni<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the bytes value of a `Router::StringAccessor` filter state stored on the request.
   ///
@@ -264,6 +300,22 @@ pub trait ClusterLbContext {
   /// the current host-selection callback, whichever comes first.
   fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
+  /// Stores a `Router::StringAccessor` filter state on the request under `key`, so a later filter,
+  /// the access log (`%FILTER_STATE(key:PLAIN)%`), or another consumer can read it back on the
+  /// same request. The value is stored with FilterChain life span. If the key does not exist it is
+  /// created.
+  ///
+  /// Returns true on success, false if the request has no stream info.
+  fn set_filter_state_bytes(&self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Stores a typed filter state on the request under `key` via the key's registered
+  /// `ObjectFactory`, so a built-in Envoy filter that reads the key as a typed object can consume
+  /// it. The value is stored with FilterChain life span.
+  ///
+  /// Returns true on success, false if the request has no stream info, no `ObjectFactory` is
+  /// registered for the key, or the factory fails to create the object.
+  fn set_filter_state_typed(&self, key: &[u8], value: &[u8]) -> bool;
+
   /// Returns the value of a per-host stat for the given host pointer. The module must ensure
   /// `host` still belongs to the cluster's host set. Returns 0 if the host pointer is null.
   fn get_host_stat(
@@ -271,6 +323,31 @@ pub trait ClusterLbContext {
     host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
     stat: abi::envoy_dynamic_module_type_host_stat,
   ) -> u64;
+
+  /// Sets a number value on the request's dynamic metadata under `namespace` and `key`,
+  /// overwriting any existing value. The value is observable in the access log via
+  /// `%DYNAMIC_METADATA(namespace:key)%`.
+  ///
+  /// Returns `true` if the value was set, `false` if the request has no stream info.
+  fn set_dynamic_metadata_number(&self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Sets a string value on the request's dynamic metadata under `namespace` and `key`,
+  /// overwriting any existing value. The value is observable in the access log via
+  /// `%DYNAMIC_METADATA(namespace:key)%`.
+  ///
+  /// Returns `true` if the value was set, `false` if the request has no stream info.
+  fn set_dynamic_metadata_string(&self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Creates a per-worker timer on this request's worker dispatcher.
+  ///
+  /// The worker dispatcher is captured on this load balancer for the duration of host selection,
+  /// so this is callable during [`ClusterLb::choose_host`]. The timer is not armed on creation;
+  /// call [`EnvoyClusterWorkerTimer::enable`] to arm it. When it fires,
+  /// [`ClusterLb::on_worker_timer_fired`] is invoked on this same worker thread.
+  ///
+  /// Returns `None` if no worker dispatcher is available. The returned handle owns the underlying
+  /// Envoy timer and destroys it when dropped, which must happen on this worker thread.
+  fn worker_timer_new(&self) -> Option<Box<dyn EnvoyClusterWorkerTimer>>;
 }
 
 /// Envoy-side cluster operations available to the module.
@@ -412,6 +489,9 @@ pub trait EnvoyCluster: Send + Sync {
     &self,
   ) -> abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
 
+  /// This cluster's CDS name (`ClusterInfo::name()`). Available in any cluster-side callback.
+  fn get_cluster_name<'a>(&'a self) -> EnvoyBuffer<'a>;
+
   /// Sends an HTTP request to the specified cluster and asynchronously delivers the response
   /// via [`Cluster::on_http_callout_done`].
   ///
@@ -514,8 +594,8 @@ pub trait EnvoyClusterLoadBalancer: Send {
     address: &str,
   ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
 
-  /// Returns the cluster name.
-  fn get_cluster_name(&self) -> String;
+  /// Returns the cluster name, or `None` if the name is empty.
+  fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the number of all hosts at a given priority, regardless of health status.
   fn get_hosts_count(&self, priority: u32) -> usize;
@@ -527,7 +607,8 @@ pub trait EnvoyClusterLoadBalancer: Send {
   fn get_priority_set_size(&self) -> usize;
 
   /// Returns the address of a healthy host by index at a given priority.
-  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String>;
+  fn get_healthy_host_address<'a>(&'a self, priority: u32, index: usize)
+    -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the weight of a healthy host by index at a given priority.
   fn get_healthy_host_weight(&self, priority: u32, index: usize) -> u32;
@@ -549,7 +630,7 @@ pub trait EnvoyClusterLoadBalancer: Send {
   ) -> Option<abi::envoy_dynamic_module_type_host_health>;
 
   /// Returns the address of a host by index within all hosts at a given priority.
-  fn get_host_address(&self, priority: u32, index: usize) -> Option<String>;
+  fn get_host_address<'a>(&'a self, priority: u32, index: usize) -> Option<EnvoyBuffer<'a>>;
 
   /// Returns the weight of a host by index within all hosts at a given priority.
   fn get_host_weight(&self, priority: u32, index: usize) -> u32;
@@ -565,7 +646,11 @@ pub trait EnvoyClusterLoadBalancer: Send {
 
   /// Returns the locality information (region, zone, sub_zone) for a host by index within all
   /// hosts at a given priority. This enables zone-aware and locality-aware load balancing.
-  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)>;
+  fn get_host_locality<'a>(
+    &'a self,
+    priority: u32,
+    index: usize,
+  ) -> Option<(EnvoyBuffer<'a>, EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Stores an opaque value on a host identified by priority and index. This data is stored per
   /// load balancer instance (per worker thread) and can be used for per-host state such as moving
@@ -633,6 +718,64 @@ pub trait EnvoyClusterLoadBalancer: Send {
   ///
   /// Set `is_added` to `true` to get an added host address, `false` for a removed host address.
   fn get_member_update_host_address(&self, index: usize, is_added: bool) -> Option<String>;
+
+  /// Returns the host pointer of an added or removed host during the
+  /// [`ClusterLb::on_host_membership_update`] callback.
+  ///
+  /// Unlike [`EnvoyClusterLoadBalancer::get_member_update_host_address`], this returns the host
+  /// directly from the added or removed list without an address lookup. It is only valid during
+  /// the `on_host_membership_update` callback.
+  ///
+  /// Set `is_added` to `true` to get an added host, `false` for a removed host. Returns `None`
+  /// when the index is out of bounds or the callback is not active.
+  fn get_member_update_host(
+    &self,
+    index: usize,
+    is_added: bool,
+  ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+
+  /// Returns the address of an added or removed host during the
+  /// [`ClusterLb::on_host_membership_update`] callback as packed integers.
+  ///
+  /// Unlike [`EnvoyClusterLoadBalancer::get_member_update_host_address`], this reads the IP address
+  /// and port directly from the host's sockaddr without formatting a string, so a module can key
+  /// its own host map by an integer. It is only valid during the `on_host_membership_update`
+  /// callback.
+  ///
+  /// Set `is_added` to `true` to get an added host address, `false` for a removed host address.
+  /// Returns `None` when the index is out of bounds, the callback is not active, or the host has a
+  /// non-IP (pipe) address.
+  fn get_member_update_host_packed_address(
+    &self,
+    index: usize,
+    is_added: bool,
+  ) -> Option<PackedAddress>;
+}
+
+/// A per-worker timer handle, created via [`EnvoyClusterLoadBalancer::worker_timer_new`].
+///
+/// The timer runs on the worker thread that created it and fires by calling
+/// [`ClusterLb::on_worker_timer_fired`]. All methods, including dropping the owning handle, must be
+/// called on that worker thread, since the underlying Envoy timer is removed from the worker
+/// dispatcher's timer list when destroyed.
+///
+/// The owning handle returned by `worker_timer_new` automatically destroys the underlying Envoy
+/// timer when dropped. The non-owning reference passed to [`ClusterLb::on_worker_timer_fired`] does
+/// not. Each timer has a unique [`id`](EnvoyClusterWorkerTimer::id) stable for its lifetime.
+#[automock]
+pub trait EnvoyClusterWorkerTimer: Send {
+  /// Returns a unique opaque identifier for this timer, stable for its lifetime. Lets a module with
+  /// multiple timers identify which one fired in [`ClusterLb::on_worker_timer_fired`].
+  fn id(&self) -> usize;
+
+  /// Enable the timer with the given delay. If already enabled, it is reset to the new delay.
+  fn enable(&self, delay: std::time::Duration);
+
+  /// Disable the timer without destroying it. It can be re-enabled later.
+  fn disable(&self);
+
+  /// Check whether the timer is currently armed.
+  fn enabled(&self) -> bool;
 }
 
 /// Envoy-side scheduler that dispatches events to the main thread.
@@ -995,6 +1138,17 @@ impl EnvoyCluster for EnvoyClusterImpl {
     unsafe { abi::envoy_dynamic_module_callback_cluster_worker_slot_get(self.raw) }
   }
 
+  fn get_cluster_name(&self) -> EnvoyBuffer<'_> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_get_name(self.raw, &mut result);
+    }
+    unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) }
+  }
+
   fn send_http_callout<'a>(
     &self,
     cluster_name: &'a str,
@@ -1098,7 +1252,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     }
   }
 
-  fn get_cluster_name(&self) -> String {
+  fn get_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -1107,11 +1261,9 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       abi::envoy_dynamic_module_callback_cluster_lb_get_cluster_name(self.raw, &mut result);
     }
     if result.ptr.is_null() || result.length == 0 {
-      String::new()
+      None
     } else {
-      unsafe {
-        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
-      }
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     }
   }
 
@@ -1129,7 +1281,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     unsafe { abi::envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(self.raw) }
   }
 
-  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String> {
+  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -1143,9 +1295,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       )
     };
     if found && !result.ptr.is_null() && result.length > 0 {
-      Some(unsafe {
-        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
-      })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -1189,7 +1339,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     }
   }
 
-  fn get_host_address(&self, priority: u32, index: usize) -> Option<String> {
+  fn get_host_address(&self, priority: u32, index: usize) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -1203,9 +1353,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       )
     };
     if found && !result.ptr.is_null() && result.length > 0 {
-      Some(unsafe {
-        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
-      })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -1228,7 +1376,11 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     }
   }
 
-  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)> {
+  fn get_host_locality(
+    &self,
+    priority: u32,
+    index: usize,
+  ) -> Option<(EnvoyBuffer<'_>, EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let mut region = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -1252,26 +1404,13 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       )
     };
     if found {
-      unsafe {
-        let region_str = if region.ptr.is_null() || region.length == 0 {
-          String::new()
-        } else {
-          crate::ffi_helpers::str_lossy_from_raw(region.ptr as *const u8, region.length)
-            .into_owned()
-        };
-        let zone_str = if zone.ptr.is_null() || zone.length == 0 {
-          String::new()
-        } else {
-          crate::ffi_helpers::str_lossy_from_raw(zone.ptr as *const u8, zone.length).into_owned()
-        };
-        let sub_zone_str = if sub_zone.ptr.is_null() || sub_zone.length == 0 {
-          String::new()
-        } else {
-          crate::ffi_helpers::str_lossy_from_raw(sub_zone.ptr as *const u8, sub_zone.length)
-            .into_owned()
-        };
-        Some((region_str, zone_str, sub_zone_str))
-      }
+      Some(unsafe {
+        (
+          EnvoyBuffer::new_from_raw(region.ptr as *const u8, region.length),
+          EnvoyBuffer::new_from_raw(zone.ptr as *const u8, zone.length),
+          EnvoyBuffer::new_from_raw(sub_zone.ptr as *const u8, sub_zone.length),
+        )
+      })
     } else {
       None
     }
@@ -1455,6 +1594,149 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     } else {
       None
     }
+  }
+
+  fn get_member_update_host(
+    &self,
+    index: usize,
+    is_added: bool,
+  ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+    let host = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+        self.raw, index, is_added,
+      )
+    };
+    if host.is_null() {
+      None
+    } else {
+      Some(host)
+    }
+  }
+
+  fn get_member_update_host_packed_address(
+    &self,
+    index: usize,
+    is_added: bool,
+  ) -> Option<PackedAddress> {
+    let mut result = abi::envoy_dynamic_module_type_packed_address {
+      address_bytes: [0; 16],
+      port: 0,
+      family: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+        self.raw,
+        index,
+        is_added,
+        &mut result,
+      )
+    };
+    if !found {
+      return None;
+    }
+    match result.family {
+      4 => {
+        let mut v4 = [0u8; 4];
+        v4.copy_from_slice(&result.address_bytes[..4]);
+        Some(PackedAddress::V4(v4, result.port))
+      },
+      6 => Some(PackedAddress::V6(result.address_bytes, result.port)),
+      _ => None,
+    }
+  }
+}
+
+/// Owning implementation of [`EnvoyClusterWorkerTimer`]. Calls `worker_timer_delete` on drop.
+struct EnvoyClusterWorkerTimerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
+}
+
+// SAFETY: The raw pointer is only used on the worker thread that created the timer, matching
+// Envoy's threading model for worker timers.
+unsafe impl Send for EnvoyClusterWorkerTimerImpl {}
+
+impl Drop for EnvoyClusterWorkerTimerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyClusterWorkerTimer for EnvoyClusterWorkerTimerImpl {
+  fn id(&self) -> usize {
+    self.raw_ptr as usize
+  }
+
+  fn enable(&self, delay: std::time::Duration) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_enable(
+        self.raw_ptr,
+        delay.as_millis() as u64,
+      );
+    }
+  }
+
+  fn disable(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_disable(self.raw_ptr);
+    }
+  }
+
+  fn enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_worker_timer_enabled(self.raw_ptr) }
+  }
+}
+
+/// Non-owning reference to a worker timer, used in the [`ClusterLb::on_worker_timer_fired`]
+/// callback. Does NOT call `worker_timer_delete` on drop.
+struct EnvoyClusterWorkerTimerRef {
+  raw_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
+}
+
+// SAFETY: The raw pointer is only used on the worker thread that owns the timer.
+unsafe impl Send for EnvoyClusterWorkerTimerRef {}
+
+impl EnvoyClusterWorkerTimer for EnvoyClusterWorkerTimerRef {
+  fn id(&self) -> usize {
+    self.raw_ptr as usize
+  }
+
+  fn enable(&self, delay: std::time::Duration) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_enable(
+        self.raw_ptr,
+        delay.as_millis() as u64,
+      );
+    }
+  }
+
+  fn disable(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_worker_timer_disable(self.raw_ptr);
+    }
+  }
+
+  fn enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_worker_timer_enabled(self.raw_ptr) }
+  }
+}
+
+impl EnvoyClusterWorkerTimer for Box<dyn EnvoyClusterWorkerTimer> {
+  fn id(&self) -> usize {
+    (**self).id()
+  }
+
+  fn enable(&self, delay: std::time::Duration) {
+    (**self).enable(delay);
+  }
+
+  fn disable(&self) {
+    (**self).disable();
+  }
+
+  fn enabled(&self) -> bool {
+    (**self).enabled()
   }
 }
 
@@ -1776,8 +2058,8 @@ struct EnvoyAsyncHostSelectionCompleteImpl {
 unsafe impl Send for EnvoyAsyncHostSelectionCompleteImpl {}
 
 impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
-  fn async_host_selection_complete(
-    &self,
+  fn complete(
+    self: Box<Self>,
     host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
     details: &str,
   ) {
@@ -1791,26 +2073,40 @@ impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
       );
     }
   }
+
+  fn request_context(&self) -> Option<ClusterLbContextRef<'_>> {
+    // A null context pointer mirrors choose_host's `None` (e.g. health-check selections).
+    if self.raw_context.is_null() {
+      return None;
+    }
+    Some(ClusterLbContextRef::new(self.raw_context, self.raw_lb))
+  }
 }
 
-struct ClusterLbContextImpl {
+/// A view over a request's load-balancing context, valid only while the source it was obtained
+/// from is alive. Owns its handles like [`crate::EnvoyBuffer`]; the lifetime ties validity to that
+/// source rather than to any Rust-owned storage.
+#[derive(Clone, Copy)]
+pub struct ClusterLbContextRef<'a> {
   raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
   raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl ClusterLbContextImpl {
-  fn new(
+impl ClusterLbContextRef<'_> {
+  pub(crate) fn new(
     raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
     raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   ) -> Self {
     Self {
       raw_context,
       raw_lb,
+      _marker: std::marker::PhantomData,
     }
   }
 }
 
-impl ClusterLbContext for ClusterLbContextImpl {
+impl ClusterLbContext for ClusterLbContextRef<'_> {
   fn compute_hash_key(&self) -> Option<u64> {
     let mut hash: u64 = 0;
     let ok = unsafe {
@@ -1834,43 +2130,28 @@ impl ClusterLbContext for ClusterLbContextImpl {
     }
   }
 
-  fn get_downstream_headers(&self) -> Option<Vec<(String, String)>> {
+  fn get_downstream_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let size = self.get_downstream_headers_size();
     if size == 0 {
-      return None;
+      return Vec::default();
     }
-    let mut raw_headers = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: std::ptr::null_mut(),
-        key_length: 0,
-        value_ptr: std::ptr::null_mut(),
-        value_length: 0,
-      };
-      size
-    ];
+    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
         self.raw_context,
-        raw_headers.as_mut_ptr(),
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
       )
     };
     if !ok {
-      return None;
+      return Vec::default();
     }
-    Some(
-      raw_headers
-        .iter()
-        .map(|h| unsafe {
-          let key = crate::ffi_helpers::str_lossy_from_raw(h.key_ptr as *const u8, h.key_length);
-          let value =
-            crate::ffi_helpers::str_lossy_from_raw(h.value_ptr as *const u8, h.value_length);
-          (key.into_owned(), value.into_owned())
-        })
-        .collect(),
-    )
+    unsafe {
+      headers.set_len(size);
+    }
+    headers
   }
 
-  fn get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)> {
+  fn get_downstream_header(&self, key: &str, index: usize) -> Option<(EnvoyBuffer<'_>, usize)> {
     let key_buf = str_to_module_buffer(key);
     let mut result_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
@@ -1889,10 +2170,10 @@ impl ClusterLbContext for ClusterLbContextImpl {
     if !ok {
       return None;
     }
-    let value = unsafe {
-      crate::ffi_helpers::str_lossy_from_raw(result_buffer.ptr as *const u8, result_buffer.length)
-    };
-    Some((value.into_owned(), total_size))
+    Some((
+      unsafe { EnvoyBuffer::new_from_raw(result_buffer.ptr as *const u8, result_buffer.length) },
+      total_size,
+    ))
   }
 
   fn get_host_selection_retry_count(&self) -> u32 {
@@ -1914,7 +2195,7 @@ impl ClusterLbContext for ClusterLbContextImpl {
     }
   }
 
-  fn get_override_host(&self) -> Option<(String, bool)> {
+  fn get_override_host(&self) -> Option<(EnvoyBuffer<'_>, bool)> {
     let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1930,12 +2211,13 @@ impl ClusterLbContext for ClusterLbContextImpl {
     if !ok {
       return None;
     }
-    let addr_str =
-      unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
-    Some((addr_str.into_owned(), strict))
+    Some((
+      unsafe { EnvoyBuffer::new_from_raw(address.ptr as *const u8, address.length) },
+      strict,
+    ))
   }
 
-  fn get_downstream_connection_sni(&self) -> Option<String> {
+  fn get_downstream_connection_sni(&self) -> Option<EnvoyBuffer<'_>> {
     let mut result_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null_mut(),
       length: 0,
@@ -1949,10 +2231,7 @@ impl ClusterLbContext for ClusterLbContextImpl {
     if !ok {
       return None;
     }
-    let sni = unsafe {
-      crate::ffi_helpers::str_lossy_from_raw(result_buffer.ptr as *const u8, result_buffer.length)
-    };
-    Some(sni.into_owned())
+    Some(unsafe { EnvoyBuffer::new_from_raw(result_buffer.ptr as *const u8, result_buffer.length) })
   }
 
   fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
@@ -1993,6 +2272,28 @@ impl ClusterLbContext for ClusterLbContextImpl {
     }
   }
 
+  fn set_filter_state_bytes(&self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+        self.raw_context,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_filter_state_typed(&self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+        self.raw_context,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  // `host` is an opaque Envoy handle passed back to Envoy, never dereferenced in Rust.
+  #[allow(clippy::not_unsafe_ptr_arg_deref)]
   fn get_host_stat(
     &self,
     host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
@@ -2005,6 +2306,37 @@ impl ClusterLbContext for ClusterLbContextImpl {
         stat,
       )
     }
+  }
+
+  fn set_dynamic_metadata_number(&self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_string(&self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn worker_timer_new(&self) -> Option<Box<dyn EnvoyClusterWorkerTimer>> {
+    let raw_ptr =
+      unsafe { abi::envoy_dynamic_module_callback_cluster_worker_timer_new(self.raw_lb) };
+    if raw_ptr.is_null() {
+      return None;
+    }
+    Some(Box::new(EnvoyClusterWorkerTimerImpl { raw_ptr }))
   }
 }
 
@@ -2121,7 +2453,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
 }
 
 /// Wrapper that pairs a module-side load balancer with the Envoy-side LB pointer.
-/// The `lb_envoy_ptr` is needed by [`ClusterLbContextImpl::should_select_another_host`] to
+/// The `lb_envoy_ptr` is needed by [`ClusterLbContextRef::should_select_another_host`] to
 /// resolve host pointers from the priority set.
 struct ClusterLbWrapper {
   lb: Box<dyn ClusterLb>,
@@ -2184,7 +2516,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
     let context = if context_envoy_ptr.is_null() {
       None
     } else {
-      Some(ClusterLbContextImpl::new(
+      Some(ClusterLbContextRef::new(
         context_envoy_ptr,
         wrapper.lb_envoy_ptr,
       ))
@@ -2274,6 +2606,28 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_on_host_membership_u
       "envoy_dynamic_module_on_cluster_lb_on_host_membership_update",
       panic,
     );
+  });
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_timer_fired(
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+  timer_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
+) {
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let wrapper = &mut *(lb_module_ptr as *mut ClusterLbWrapper);
+    let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
+    // Non-owning reference so the module can re-arm the timer it already owns.
+    let timer_ref = EnvoyClusterWorkerTimerRef { raw_ptr: timer_ptr };
+    wrapper.lb.on_worker_timer_fired(&envoy_lb, &timer_ref);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_cluster_worker_timer_fired", panic);
   });
 }
 
@@ -2447,4 +2801,36 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
   .map_err(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_cluster_http_callout_done", panic);
   });
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // The per-request accessor callbacks are satisfied by the link-time stubs in lib_test.rs.
+  #[test]
+  fn request_context_present_when_context_retained() {
+    let completion = EnvoyAsyncHostSelectionCompleteImpl {
+      raw_lb: std::ptr::null_mut(),
+      // A non-null sentinel: the per-request callback stubs ignore the pointer value.
+      raw_context: 0x1 as *mut _,
+    };
+
+    // Reads route through the per-request callbacks; the stubs report no hash / zero headers.
+    let ctx = completion
+      .request_context()
+      .expect("a retained context must be re-presented");
+    assert_eq!(ctx.compute_hash_key(), None);
+    assert_eq!(ctx.get_downstream_headers_size(), 0);
+  }
+
+  // A null context pointer yields None, matching choose_host (e.g. health-check selections).
+  #[test]
+  fn request_context_absent_when_no_context() {
+    let completion = EnvoyAsyncHostSelectionCompleteImpl {
+      raw_lb: std::ptr::null_mut(),
+      raw_context: std::ptr::null_mut(),
+    };
+    assert!(completion.request_context().is_none());
+  }
 }

@@ -24,6 +24,7 @@
 #include "test/test_common/global.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -61,6 +62,7 @@ public:
   }
 
   using EnvoyQuicServerSession::GetCryptoStream;
+  using EnvoyQuicServerSession::GetSSLConfig;
 };
 
 class ProofSourceDetailsSetter {
@@ -936,7 +938,9 @@ TEST_F(EnvoyQuicServerSessionTest, ShutdownNotice) {
   testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
   envoy_quic_session_.set_debug_visitor(&debug_visitor);
   EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
   http_connection_->shutdownNotice();
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
 }
 
 TEST_F(EnvoyQuicServerSessionTest, GoAway) {
@@ -944,7 +948,9 @@ TEST_F(EnvoyQuicServerSessionTest, GoAway) {
   testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
   envoy_quic_session_.set_debug_visitor(&debug_visitor);
   EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
   http_connection_->goAway();
+  EXPECT_EQ(1U, stats_.goaway_sent_.value());
 }
 
 TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
@@ -1254,6 +1260,32 @@ TEST_F(EnvoyQuicServerSessionTest, Http3OptionsTest) {
   installReadFilter();
 }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+// WebTransport is opt-in: even with extended CONNECT enabled, the server advertises no WebTransport
+// versions (and so will not negotiate WebTransport) unless
+// envoy.reloadable_features.quic_support_web_transport is enabled.
+TEST_F(EnvoyQuicServerSessionTest, WebTransportNegotiationGatedByRuntimeFlag) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_allow_extended_connect(true);
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  // Disabled by default, even though extended CONNECT is enabled.
+  EXPECT_FALSE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
+  EXPECT_TRUE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  // WebTransport still requires extended CONNECT, even with the runtime flag enabled.
+  envoy::config::core::v3::Http3ProtocolOptions no_extended_connect;
+  no_extended_connect.set_allow_extended_connect(false);
+  envoy_quic_session_.setHttp3Options(no_extended_connect);
+  EXPECT_FALSE(envoy_quic_session_.WillNegotiateWebTransport());
+
+  installReadFilter();
+}
+#endif
+
 TEST_F(EnvoyQuicServerSessionTest, SetSocketOption) {
   installReadFilter();
 
@@ -1311,6 +1343,14 @@ TEST_F(EnvoyQuicServerSessionTest, TerminateIdleSession) {
   envoy_quic_session_.TerminateIdleSession();
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
+}
+
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigDefault) {
+  installReadFilter();
+  quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  ASSERT_TRUE(config.early_data_enabled.has_value());
+  EXPECT_TRUE(*config.early_data_enabled);
+  EXPECT_FALSE(config.disable_ticket_support);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {
@@ -1381,8 +1421,8 @@ class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessio
 };
 
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
-  EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), absl::nullopt);
-  EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), absl::nullopt);
+  EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), std::nullopt);
+  EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), std::nullopt);
 }
 
 } // namespace Quic

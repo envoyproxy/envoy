@@ -21,7 +21,7 @@ envoy_cc_test(
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/dynamic_modules:background_fetch_manager_lib",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
@@ -29,6 +29,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
@@ -38,6 +39,7 @@ envoy_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:http_filter_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:http_filter_per_route_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
@@ -150,6 +152,7 @@ envoy_cc_test(
     },
     rbe_pool = "6gig",
     deps = [
+        "//source/common/common:minimal_logger_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",

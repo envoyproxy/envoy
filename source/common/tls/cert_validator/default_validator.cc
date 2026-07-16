@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "envoy/network/transport_socket.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -23,6 +24,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/matchers.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
@@ -44,6 +46,67 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+SINGLETON_MANAGER_REGISTRATION(crl_cache);
+
+absl::StatusOr<CrlListSharedPtr> CrlCache::getOrCreate(const std::string& crl_pem,
+                                                       const std::string& crl_path) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  // Key by a SHA-256 digest of the CRL rather than the CRL itself, to avoid
+  // holding a second full copy of potentially large CRL data. SHA-256 is
+  // collision resistant, so distinct CRLs never share a cache entry.
+  std::array<uint8_t, SHA256_DIGEST_LENGTH> key;
+  SHA256(reinterpret_cast<const uint8_t*>(crl_pem.data()), crl_pem.size(), key.data());
+
+  if (auto it = cache_.find(key); it != cache_.end()) {
+    if (CrlListSharedPtr existing = it->second.lock(); existing != nullptr) {
+      return existing;
+    }
+  }
+
+  // Only reached when a new distinct CRL is seen, which is uncommon. Release
+  // entries whose last referencing context has been torn down so the map does
+  // not grow without bound across xDS updates.
+  absl::erase_if(cache_, [](const auto& entry) { return entry.second.expired(); });
+
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(crl_pem.data()), crl_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  // Based on BoringSSL's X509_load_cert_crl_file().
+  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+  if (list == nullptr) {
+    return absl::InvalidArgumentError(absl::StrCat("Failed to load CRL from ", crl_path));
+  }
+
+  auto crl_list = std::make_shared<CrlList>();
+  // Hold the cache alive for as long as this entry is referenced, so callers
+  // only need to keep the returned CrlList.
+  crl_list->cache = shared_from_this();
+  for (const X509_INFO* item : list.get()) {
+    if (item->crl) {
+      crl_list->crls.push_back(bssl::UpRef(item->crl));
+    }
+  }
+  cache_[key] = crl_list;
+  return crl_list;
+}
+
+size_t CrlCache::size() const {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  size_t count = 0;
+  for (const auto& entry : cache_) {
+    if (!entry.second.expired()) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<CrlCache>(SINGLETON_MANAGER_REGISTERED_NAME(crl_cache),
+                                              [] { return std::make_shared<CrlCache>(); });
+}
 
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
@@ -130,26 +193,22 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
   }
 
   if (config_ != nullptr && !config_->certificateRevocationList().empty()) {
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(config_->certificateRevocationList().data()),
-                        config_->certificateRevocationList().size()));
-    RELEASE_ASSERT(bio != nullptr, "");
-
-    // Based on BoringSSL's X509_load_cert_crl_file().
-    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-    if (list == nullptr) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to load CRL from ", config_->certificateRevocationListPath()));
-    }
+    // Parse the CRL through a process-wide cache so that identical CRL content
+    // referenced from many TLS contexts is materialized in memory only once. The
+    // returned CrlList keeps the cache alive, so no separate reference is needed.
+    std::shared_ptr<CrlCache> crl_cache = getCrlCache(context_.singletonManager());
+    absl::StatusOr<CrlListSharedPtr> crl_list_or_error = crl_cache->getOrCreate(
+        config_->certificateRevocationList(), config_->certificateRevocationListPath());
+    RETURN_IF_NOT_OK_REF(crl_list_or_error.status());
+    shared_crl_ = std::move(*crl_list_or_error);
 
     for (auto& ctx : contexts) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx);
       X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
-      for (const X509_INFO* item : list.get()) {
-        if (item->crl) {
-          X509_STORE_add_crl(store, item->crl);
-        }
+      for (const auto& crl : shared_crl_->crls) {
+        // X509_STORE_add_crl takes its own reference, so the shared CRL stays
+        // valid for the store's lifetime even after this cache entry is released.
+        X509_STORE_add_crl(store, crl.get());
       }
       X509_STORE_set_flags(store, config_->onlyVerifyLeafCertificateCrl()
                                       ? X509_V_FLAG_CRL_CHECK
@@ -226,7 +285,7 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
                         match_san_override.value_or(subject_alt_name_matchers_),
                         validation_context.callbacks != nullptr
                             ? makeOptRef(validation_context.callbacks->connection().streamInfo())
-                            : absl::nullopt,
+                            : std::nullopt,
                         error_details, out_alert);
 
   if (detailed_status == Envoy::Ssl::ClientValidationStatus::NotValidated ||
@@ -320,7 +379,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     const char* error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed,
-            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, absl::nullopt, error};
+            Envoy::Ssl::ClientValidationStatus::NoClientCertificate, std::nullopt, error};
   }
   Envoy::Ssl::ClientValidationStatus detailed_status =
       Envoy::Ssl::ClientValidationStatus::NotValidated;
@@ -344,7 +403,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
       stats_.fail_verify_error_.inc();
       ENVOY_LOG(debug, error);
       return {ValidationResults::ValidationStatus::Failed,
-              Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt, error};
+              Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt, error};
     }
     const bool verify_succeeded = (X509_verify_cert(ctx.get()) == 1);
 
@@ -355,8 +414,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
       ENVOY_LOG(debug, error);
       if (allow_untrusted_certificate_) {
         return ValidationResults{ValidationResults::ValidationStatus::Successful,
-                                 Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
-                                 absl::nullopt};
+                                 Envoy::Ssl::ClientValidationStatus::Failed, std::nullopt,
+                                 std::nullopt};
       }
       return {ValidationResults::ValidationStatus::Failed,
               Envoy::Ssl::ClientValidationStatus::Failed,
@@ -378,7 +437,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
                                 detailed_status, &error_details, &tls_alert);
   return succeeded
              ? ValidationResults{ValidationResults::ValidationStatus::Successful, detailed_status,
-                                 absl::nullopt, absl::nullopt, std::move(validated_chain)}
+                                 std::nullopt, std::nullopt, std::move(validated_chain)}
              : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
                                  tls_alert, error_details};
 }
@@ -534,6 +593,14 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
     bool auto_sni_san_match = config_->autoSniSanMatch();
     rc = EVP_DigestUpdate(md.get(), &auto_sni_san_match, sizeof(auto_sni_san_match));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    // Only hash when the flag is enabled, so session IDs for existing deployments
+    // (where the flag defaults to false) stay byte-identical to pre-feature behavior.
+    if (config_->suppressClientCaList()) {
+      bool suppress = true;
+      rc = EVP_DigestUpdate(md.get(), &suppress, sizeof(suppress));
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
   }
 }
 
@@ -543,46 +610,50 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     return absl::OkStatus();
   }
 
-  bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(const_cast<char*>(config_->caCert().data()), config_->caCert().size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
-  // Use a generic lambda to be compatible with BoringSSL before and after
-  // https://boringssl-review.googlesource.com/c/boringssl/+/56190
-  bssl::UniquePtr<STACK_OF(X509_NAME)> list(
-      sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
-  RELEASE_ASSERT(list != nullptr, "");
-  for (;;) {
-    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-    if (cert == nullptr) {
-      break;
+  // When the CA list is not suppressed, parse the trust bundle and advertise
+  // the CA names in the TLS CertificateRequest message.
+  if (!config_->suppressClientCaList()) {
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config_->caCert().data()), config_->caCert().size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
+    // Use a generic lambda to be compatible with BoringSSL before and after
+    // https://boringssl-review.googlesource.com/c/boringssl/+/56190
+    bssl::UniquePtr<STACK_OF(X509_NAME)> list(
+        sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
+    RELEASE_ASSERT(list != nullptr, "");
+    for (;;) {
+      bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+      if (cert == nullptr) {
+        break;
+      }
+      const X509_NAME* name = X509_get_subject_name(cert.get());
+      if (name == nullptr) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Failed to load trusted client CA certificates from ", config_->caCertPath()));
+      }
+      // Check for duplicates.
+      if (sk_X509_NAME_find(list.get(), nullptr, name)) {
+        continue;
+      }
+
+      bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
+      if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Failed to load trusted client CA certificates from ", config_->caCertPath()));
+      }
     }
-    const X509_NAME* name = X509_get_subject_name(cert.get());
-    if (name == nullptr) {
+
+    // Check for EOF.
+    const uint32_t err = ERR_peek_last_error();
+    if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+      ERR_clear_error();
+    } else {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));
     }
-    // Check for duplicates.
-    if (sk_X509_NAME_find(list.get(), nullptr, name)) {
-      continue;
-    }
-
-    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
-    if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "Failed to load trusted client CA certificates from ", config_->caCertPath()));
-    }
+    SSL_CTX_set_client_CA_list(ctx, list.release());
   }
-
-  // Check for EOF.
-  const uint32_t err = ERR_peek_last_error();
-  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-    ERR_clear_error();
-  } else {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load trusted client CA certificates from ", config_->caCertPath()));
-  }
-  SSL_CTX_set_client_CA_list(ctx, list.release());
 
   if (require_client_cert) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
@@ -617,7 +688,7 @@ void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
   expiration_gauge.set(Utility::getExpirationUnixTime(ca_cert_.get()).count());
 }
 
-absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
+std::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), context_.timeSource());
 }
 

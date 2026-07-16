@@ -7,6 +7,7 @@
 #include "test/extensions/common/async_files/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
 
@@ -79,11 +80,14 @@ protected:
 
   std::shared_ptr<FileSystemBufferFilterConfig> configFromYaml(absl::string_view yaml) {
     auto proto_config = configProtoFromYaml(yaml);
-    return std::make_shared<FileSystemBufferFilterConfig>(mock_file_manager_factory_,
-                                                          proto_config.has_manager_config()
-                                                              ? mock_async_file_manager_
-                                                              : std::shared_ptr<AsyncFileManager>(),
-                                                          proto_config);
+    absl::Status creation_status = absl::OkStatus();
+    auto config = std::make_shared<FileSystemBufferFilterConfig>(
+        mock_file_manager_factory_,
+        proto_config.has_manager_config() ? mock_async_file_manager_
+                                          : std::shared_ptr<AsyncFileManager>(),
+        proto_config, creation_status);
+    EXPECT_TRUE(creation_status.ok());
+    return config;
   }
 
   void useDeferredDispatcher() {

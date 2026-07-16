@@ -1,12 +1,22 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
+#include <memory>
+#include <optional>
 #include <string>
 
+#include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/network/address.h"
+#include "envoy/network/listener.h"
+#include "envoy/network/socket.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Server {
@@ -86,7 +96,7 @@ public:
    * to start up in the new process.
    * @return response if the parent is alive.
    */
-  virtual absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
+  virtual std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
 
   /**
    * Tell our parent process to gracefully terminate itself.
