@@ -19,9 +19,7 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
-using ::testing::Not;
 using testing::Return;
 
 namespace {
@@ -396,9 +394,8 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
+  EXPECT_THAT(result,
+              HasStatusMessage("token_secret is required when auth_type is not TLS_CLIENT_AUTH"));
 }
 
 TEST(ConfigTest, MissingTokenSecretNonTlsClientAuth) {
@@ -442,9 +439,8 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
+  EXPECT_THAT(result,
+              HasStatusMessage("token_secret is required when auth_type is not TLS_CLIENT_AUTH"));
 }
 
 TEST(ConfigTest, InvalidTokenSecret) {
@@ -617,11 +613,12 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "invalid OAuth2 configuration: at most one of forward_bearer_token, "
-            "preserve_authorization_header, or forward_id_token (when forwarding the ID token on "
-            "the Authorization header) may be set, as they all use the Authorization header");
+  EXPECT_THAT(
+      result,
+      HasStatusMessage(
+          "invalid OAuth2 configuration: at most one of forward_bearer_token, "
+          "preserve_authorization_header, or forward_id_token (when forwarding the ID token on "
+          "the Authorization header) may be set, as they all use the Authorization header"));
 }
 
 // Builds a minimal valid OAuth2 config YAML with the given extra fields spliced in, then asserts

@@ -65,9 +65,8 @@ const char RsaPrivateKeyPem[] = "-----BEGIN PRIVATE KEY-----\n"
                                 "ZNNg0dLTN88wdsU+TVn5Ef7u\n"
                                 "-----END PRIVATE KEY-----";
 
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
-using ::testing::Not;
 using testing::Return;
 
 class ClientAssertionTest : public testing::Test {
@@ -150,8 +149,7 @@ TEST_F(ClientAssertionTest, UnsupportedAlgorithm) {
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "PS256",
                               std::chrono::seconds(60), test_time_, random_);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_NE(std::string::npos, result.status().message().find("Unsupported signing algorithm"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Unsupported signing algorithm")));
 }
 
 TEST_F(ClientAssertionTest, InvalidPrivateKey) {
@@ -159,8 +157,7 @@ TEST_F(ClientAssertionTest, InvalidPrivateKey) {
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", "not-a-valid-pem-key",
                               "RS256", std::chrono::seconds(60), test_time_, random_);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_NE(std::string::npos, result.status().message().find("Failed to parse private key"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse private key")));
 }
 
 TEST_F(ClientAssertionTest, KeyTypeMismatch) {
@@ -168,17 +165,13 @@ TEST_F(ClientAssertionTest, KeyTypeMismatch) {
   auto rsa_alg_ec_key =
       ClientAssertion::create("client", "https://auth.example.com/token", EcP256PrivateKeyPem,
                               "RS256", std::chrono::seconds(60), test_time_, random_);
-  ASSERT_THAT(rsa_alg_ec_key, Not(IsOk()));
-  EXPECT_NE(std::string::npos,
-            rsa_alg_ec_key.status().message().find("requires an RSA private key"));
+  ASSERT_THAT(rsa_alg_ec_key, HasStatusMessage(testing::HasSubstr("requires an RSA private key")));
 
   // An EC algorithm with an RSA key is rejected.
   auto ec_alg_rsa_key =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "ES256",
                               std::chrono::seconds(60), test_time_, random_);
-  ASSERT_THAT(ec_alg_rsa_key, Not(IsOk()));
-  EXPECT_NE(std::string::npos,
-            ec_alg_rsa_key.status().message().find("requires an EC private key"));
+  ASSERT_THAT(ec_alg_rsa_key, HasStatusMessage(testing::HasSubstr("requires an EC private key")));
 }
 
 TEST_F(ClientAssertionTest, CustomLifetime) {
@@ -202,8 +195,7 @@ TEST_F(ClientAssertionTest, EmptyPrivateKey) {
   // uuid() is never reached — key import fails first.
   auto result = ClientAssertion::create("client", "https://auth.example.com/token", "", "RS256",
                                         std::chrono::seconds(60), test_time_, random_);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_NE(std::string::npos, result.status().message().find("Failed to parse private key"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse private key")));
 }
 
 TEST_F(ClientAssertionTest, SignatureIsVerifiable) {
@@ -340,8 +332,7 @@ TEST_F(ClientAssertionTest, SigningFailureReturnsError) {
   auto result =
       ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
                               std::chrono::seconds(60), test_time_, random_);
-  ASSERT_THAT(result, Not(IsOk()));
-  EXPECT_NE(std::string::npos, result.status().message().find("Failed to sign JWT assertion"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to sign JWT assertion")));
 }
 
 } // namespace
