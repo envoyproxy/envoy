@@ -750,8 +750,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
     ),
     fips_cmake_src = dict(
-        version = "4.3.2",
-        sha256 = "b0231eb39b3c3cabdc568c619df78208a7bd95ea10c9b2236d61218bac1b367d",
+        version = "4.4.0",
+        sha256 = "65757f442fdd242e27f1728fc26dc0cba4164f7a0791a5c788631c00080369bc",
         strip_prefix = "cmake-{version}",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}.tar.gz"],
     ),

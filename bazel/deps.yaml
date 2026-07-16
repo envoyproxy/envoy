@@ -957,7 +957,7 @@ fips_cmake_src:
   project_name: "CMake (source)"
   project_desc: "CMake built from source for ppc64le FIPS builds"
   project_url: "https://cmake.org/"
-  release_date: "2026-04-21"
+  release_date: "2026-07-09"
   use_category:
   - build
   - dataplane_core
