@@ -107,9 +107,67 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
                   .ok());
 }
 
+// Returns the resource names that VHDS subscribes to at startup for the given config.
+absl::flat_hash_set<std::string> startResourcesForConfig(VhdsTest& test, const std::string& yaml) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(yaml);
+  RouteConfigUpdatePtr config_update_info = test.makeRouteConfigUpdate(route_config);
+  auto subscription = VhdsSubscription::createVhdsSubscription(
+                          config_update_info, test.factory_context_, test.context_, test.provider_)
+                          .value();
+
+  absl::flat_hash_set<std::string> started_resources;
+  EXPECT_CALL(*test.factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              start(::testing::_))
+      .WillOnce(::testing::SaveArg<0>(&started_resources));
+
+  Init::ManagerImpl init_manager("vhds_test_init");
+  subscription->registerInitTargetWithInitManager(init_manager);
+  Init::ExpectableWatcherImpl watcher;
+  watcher.expectReady().Times(::testing::AnyNumber());
+  init_manager.initialize(watcher);
+  return started_resources;
+}
+
 // Verify that configured default resources are prefixed with the route configuration name and
 // subscribed at startup alongside the route configuration resource itself.
 TEST_F(VhdsTest, VhdsSubscribesToPrefixedDefaultResourcesOnStart) {
+  const auto started_resources = startResourcesForConfig(*this, R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  default_resources:
+  - example.com
+  - other.com
+)EOF");
+  EXPECT_THAT(started_resources, ::testing::UnorderedElementsAre("my_route", "my_route/example.com",
+                                                                 "my_route/other.com"));
+}
+
+// Verify that a lone wildcard ('*') default resource subscribes to the wildcard alias.
+TEST_F(VhdsTest, VhdsWildcardDefaultResourceOnly) {
+  const auto started_resources = startResourcesForConfig(*this, R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  default_resources:
+  - "*"
+)EOF");
+  EXPECT_THAT(started_resources, ::testing::UnorderedElementsAre("my_route", "my_route/*"));
+}
+
+// Verify that configuring '*' together with other default resources is rejected.
+TEST_F(VhdsTest, VhdsWildcardDefaultResourceWithOthersIsRejected) {
   const auto route_config =
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
 name: my_route
@@ -121,27 +179,18 @@ vhds:
         envoy_grpc:
           cluster_name: xds_cluster
   default_resources:
-  - "*"
   - example.com
+  - "*"
+  - other.com
 )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
-  auto subscription = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+
+  const auto status = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
                                                                context_, provider_)
-                          .value();
-
-  absl::flat_hash_set<std::string> started_resources;
-  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(::testing::_))
-      .WillOnce(::testing::SaveArg<0>(&started_resources));
-
-  Init::ManagerImpl init_manager("vhds_test_init");
-  subscription->registerInitTargetWithInitManager(init_manager);
-  Init::ExpectableWatcherImpl watcher;
-  watcher.expectReady().Times(::testing::AnyNumber());
-  init_manager.initialize(watcher);
-
-  EXPECT_THAT(started_resources,
-              ::testing::UnorderedElementsAre("my_route", "my_route/*", "my_route/example.com"));
+                          .status();
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(std::string(status.message()),
+              ::testing::HasSubstr("default_resources cannot contain '*' together with other"));
 }
 
 // verify that api_type: GRPC fails validation

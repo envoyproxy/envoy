@@ -1,5 +1,6 @@
 #include "source/common/router/vhds.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -39,6 +40,17 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
   if (!is_ads && !is_delta_grpc) {
     return absl::InvalidArgumentError(
         "vhds: only 'DELTA_GRPC' or 'ADS' (which uses Delta xDS) is supported as a config source.");
+  }
+
+  // A wildcard ('*') default resource subscribes to all virtual hosts, so combining it with other
+  // specific default resources is contradictory. Reject such configuration rather than silently
+  // ignoring the other entries.
+  const auto& default_resources =
+      config_update_info->protobufConfigurationCast().vhds().default_resources();
+  if (default_resources.size() > 1 && std::find(default_resources.begin(), default_resources.end(),
+                                                "*") != default_resources.end()) {
+    return absl::InvalidArgumentError(
+        "vhds: default_resources cannot contain '*' together with other resources.");
   }
 
   // If using ADS, verify the parent ADS stream is in Delta mode

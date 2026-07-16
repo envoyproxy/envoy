@@ -182,5 +182,8 @@ message Vhds {
   // management server, matching the alias format that VHDS uses for on-demand
   // updates. If this field is empty, no virtual host is subscribed by default and
   // all virtual hosts are fetched on demand.
+  //
+  // The wildcard ``*`` subscribes to all virtual hosts. It cannot be combined with other
+  // entries.
   repeated string default_resources = 2;
 }
