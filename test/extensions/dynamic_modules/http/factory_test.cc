@@ -12,7 +12,7 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
-using ::Envoy::StatusHelpers::HasStatusCode;
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
@@ -416,8 +416,8 @@ filter_config:
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module:"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Failed to load dynamic module:")));
 
   // A module that cannot be loaded at all bumps the module_load_error counter, tagged with the
   // filter name. The counter is on the server scope, which outlives the rejected listener config.
@@ -456,10 +456,9 @@ filter_config:
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
     auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-    EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-    EXPECT_THAT(
-        result.status().message(),
-        testing::HasSubstr(fmt::format("Failed to resolve symbol {}", missing_symbol_name)));
+    EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                  testing::HasSubstr(fmt::format("Failed to resolve symbol {}",
+                                                                 missing_symbol_name))));
   }
 
   // The module loads fine in each of these cases (dlopen + program_init succeed); the failure is in
@@ -514,8 +513,8 @@ filter_config:
 
     auto result = factory.createRouteSpecificFilterConfig(
         proto_config, context, ProtobufMessage::getNullValidationVisitor());
-    EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-    EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module:"));
+    EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                  testing::HasSubstr("Failed to load dynamic module:")));
     EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
   }
 
@@ -547,8 +546,8 @@ filter_config:
 
     auto result = factory.createRouteSpecificFilterConfig(
         proto_config, context, ProtobufMessage::getNullValidationVisitor());
-    EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-    EXPECT_THAT(result.status().message(), testing::HasSubstr(expected_error));
+    EXPECT_THAT(result,
+                HasStatus(absl::StatusCode::kInvalidArgument, testing::HasSubstr(expected_error)));
     // A fresh context is used per iteration, so the per-route failure counter is exactly one.
     EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
   }

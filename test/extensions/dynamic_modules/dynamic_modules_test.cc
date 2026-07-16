@@ -23,6 +23,7 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::HasStatusCode;
 using ::Envoy::StatusHelpers::HasStatusMessage;
 
@@ -114,18 +115,18 @@ TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("no_program_init", language), false);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to resolve symbol envoy_dynamic_module_on_program_init"));
+  EXPECT_THAT(result,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::HasSubstr(
+                            "Failed to resolve symbol envoy_dynamic_module_on_program_init")));
 }
 
 TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("program_init_fail", language), false);
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to initialize dynamic module:"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Failed to initialize dynamic module:")));
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
@@ -179,10 +180,9 @@ TEST(StaticModule, LoadSuccess) {
 TEST(StaticModule, SymbolNotFound) {
   // "nonexistent_module" has no prefixed symbols in the binary.
   absl::StatusOr<DynamicModulePtr> result = newStaticModule("nonexistent_module");
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to resolve symbol "
-                                 "envoy_dynamic_module_on_program_init"));
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Failed to resolve symbol "
+                                                   "envoy_dynamic_module_on_program_init")));
 }
 
 TEST(StaticModule, MultipleLoads) {
@@ -197,10 +197,11 @@ TEST(StaticModule, MultipleLoads) {
 
 TEST(CreateDynamicModulesByName, ModuleNotFound) {
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
-  EXPECT_THAT(module, HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(module.status().message(),
-              testing::HasSubstr(
-                  "Failed to load dynamic module: libno_op.so not found in any search path"));
+  EXPECT_THAT(
+      module,
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                testing::HasSubstr(
+                    "Failed to load dynamic module: libno_op.so not found in any search path")));
 }
 
 TEST(NewDynamicModuleFromBytes, Success) {
@@ -265,8 +266,8 @@ TEST(VerifyFileSha256, MismatchReturnsFailedPrecondition) {
   }
   const std::string wrong_sha = "0000000000000000000000000000000000000000000000000000000000000000";
   auto status = verifyFileSha256(tmp, wrong_sha);
-  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
-  EXPECT_THAT(std::string(status.message()), testing::HasSubstr("SHA256 mismatch"));
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kFailedPrecondition,
+                                testing::HasSubstr("SHA256 mismatch")));
   EXPECT_THAT(std::string(status.message()), testing::HasSubstr(wrong_sha));
   std::filesystem::remove(tmp);
 }
@@ -278,9 +279,8 @@ TEST(VerifyFileSha256, MissingFileReturnsInternal) {
   ASSERT_FALSE(std::filesystem::exists(missing));
   auto status =
       verifyFileSha256(missing, "0000000000000000000000000000000000000000000000000000000000000000");
-  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInternal));
-  EXPECT_THAT(std::string(status.message()),
-              testing::HasSubstr("Failed to open file for SHA256 verification"));
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kInternal,
+                                testing::HasSubstr("Failed to open file for SHA256 verification")));
 }
 
 TEST(VerifyFileSha256, EmptyFileMatchesEmptyDigest) {
