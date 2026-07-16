@@ -338,7 +338,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryCreatesOptionsAndRegistersAdminHan
   ReverseTunnelUpstreamCodecFactory factory;
   auto proto = makeProto(true);
   auto result = factory.createProtocolOptionsConfig(proto, factory_context);
-  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull())) << result.status().message();
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
   EXPECT_TRUE(result.value()->upstreamHttpClientCodecFactory().has_value());
 
   // Drive the admin handler with a drain_time_ms query param to exercise its body.
@@ -386,7 +386,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryDoesNotRegisterAdminHandlerWhenDis
   ReverseTunnelUpstreamCodecFactory factory;
   auto proto = makeProto(false);
   auto result = factory.createProtocolOptionsConfig(proto, factory_context);
-  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull())) << result.status().message();
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
   EXPECT_TRUE(result.value()->upstreamHttpClientCodecFactory().has_value());
 }
 

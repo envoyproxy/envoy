@@ -83,7 +83,7 @@ TEST_F(DrainAwareConfigTest, CreateFilterFactoryFromValidConfig) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);
   auto result = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull())) << result.status().message();
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 }
 
 TEST_F(DrainAwareConfigTest, FilterFactoryCallbackIsNonNull) {
