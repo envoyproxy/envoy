@@ -125,9 +125,9 @@ public:
     // Handler equivalent to the one the LB builds internally from the same config.
     auto report_handler = std::make_shared<OrcaLoadReportHandler>(
         Extensions::LoadBalancingPolicies::Common::OrcaWeightManagerConfig{
-            lb_config_.metric_names_for_computing_utilization,
-            lb_config_.error_utilization_penalty, lb_config_.blackout_period,
-            lb_config_.weight_expiration_period, lb_config_.weight_update_period},
+            lb_config_.metric_names_for_computing_utilization, lb_config_.error_utilization_penalty,
+            lb_config_.blackout_period, lb_config_.weight_expiration_period,
+            lb_config_.weight_update_period},
         simTime());
     lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancerFriend>(
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
