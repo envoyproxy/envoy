@@ -7,9 +7,8 @@
 
 #include "gtest/gtest.h"
 
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatus;
 using testing::HasSubstr;
-using ::testing::Not;
 
 namespace Envoy {
 namespace Server {
@@ -46,13 +45,13 @@ TEST_F(UtilsTest, HistogramMode) {
   EXPECT_OK(Utility::histogramBucketsParam(query_, histogram_buckets_mode));
   EXPECT_EQ(Utility::HistogramBucketsMode::PrometheusNative, histogram_buckets_mode);
   query_.overwrite("histogram_buckets", "garbage");
-  absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode);
-  EXPECT_THAT(status, Not(IsOk()));
   EXPECT_THAT(
-      status.ToString(),
-      HasSubstr(
-          "usage: "
-          "/stats?histogram_buckets=(cumulative|disjoint|detailed|summary|prometheusnative)"));
+      Utility::histogramBucketsParam(query_, histogram_buckets_mode),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          HasSubstr(
+              "usage: "
+              "/stats?histogram_buckets=(cumulative|disjoint|detailed|summary|prometheusnative)")));
 }
 
 TEST_F(UtilsTest, QueryParam) {
