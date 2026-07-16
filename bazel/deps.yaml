@@ -1319,7 +1319,7 @@ rules_java:
   project_name: "Java rules for Bazel"
   project_desc: "Bazel rules for the Java language"
   project_url: "https://github.com/bazelbuild/rules_java/"
-  release_date: "2026-02-24"
+  release_date: "2026-07-15"
   use_category:
   - build
   - dataplane_core
