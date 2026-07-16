@@ -93,7 +93,7 @@ TEST_F(DynamicModuleTransportSocketConfigTest, CreateEmptyConfigProto) {
 TEST_F(DynamicModuleTransportSocketConfigTest, DownstreamValidConfig) {
   auto config = buildProtoConfig(kReferenceModule, "passthrough");
   auto factory_or_error = downstream_factory_.createTransportSocketFactory(config, context_, {});
-  ASSERT_OK(factory_or_error) << factory_or_error.status().message();
+  ASSERT_OK(factory_or_error);
   auto factory = std::move(factory_or_error.value());
   EXPECT_FALSE(factory->implementsSecureTransport());
   EXPECT_NE(nullptr, factory->createDownstreamTransportSocket());
@@ -102,7 +102,7 @@ TEST_F(DynamicModuleTransportSocketConfigTest, DownstreamValidConfig) {
 TEST_F(DynamicModuleTransportSocketConfigTest, UpstreamValidConfig) {
   auto config = buildProtoConfig(kReferenceModule, "passthrough");
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
-  ASSERT_OK(factory_or_error) << factory_or_error.status().message();
+  ASSERT_OK(factory_or_error);
   auto factory = std::move(factory_or_error.value());
   EXPECT_FALSE(factory->implementsSecureTransport());
   EXPECT_EQ("", factory->defaultServerNameIndication());
@@ -132,7 +132,7 @@ TEST_F(DynamicModuleTransportSocketConfigTest, ImplementsSecureTransport) {
   auto config = buildProtoConfig(kReferenceModule, "passthrough");
   config.set_implements_secure_transport(true);
   auto factory_or_error = downstream_factory_.createTransportSocketFactory(config, context_, {});
-  ASSERT_OK(factory_or_error) << factory_or_error.status().message();
+  ASSERT_OK(factory_or_error);
   EXPECT_TRUE(factory_or_error.value()->implementsSecureTransport());
 }
 
@@ -141,7 +141,7 @@ TEST_F(DynamicModuleTransportSocketConfigTest, WithTransportSocketConfig) {
   std::ignore =
       config.mutable_transport_socket_config()->PackFrom(ValueUtil::stringValue("config_bytes"));
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
-  EXPECT_OK(factory_or_error) << factory_or_error.status().message();
+  EXPECT_OK(factory_or_error);
 }
 
 TEST_F(DynamicModuleTransportSocketConfigTest, InvalidModuleName) {
@@ -202,7 +202,7 @@ TEST_F(DynamicModuleTransportSocketConfigTest, DoNotCloseAndLoadGloballyOptions)
   config.mutable_dynamic_module_config()->set_do_not_close(true);
   config.mutable_dynamic_module_config()->set_load_globally(true);
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
-  EXPECT_OK(factory_or_error) << factory_or_error.status().message();
+  EXPECT_OK(factory_or_error);
 }
 
 // Tests that exercise a transport socket instance against a mocked I/O handle.
@@ -223,7 +223,7 @@ public:
       std::ignore = config.mutable_transport_socket_config()->PackFrom(bytes_value);
     }
     auto factory_or_error = factory_.createTransportSocketFactory(config, context_, {});
-    EXPECT_OK(factory_or_error) << factory_or_error.status().message();
+    EXPECT_OK(factory_or_error);
     factory_ptr_ = std::move(factory_or_error.value());
     auto socket = factory_ptr_->createDownstreamTransportSocket();
     socket->setTransportSocketCallbacks(callbacks_);
@@ -480,7 +480,7 @@ TEST_F(DynamicModuleTransportSocketTest, NullInModuleSocketDegradesSafely) {
 TEST_F(DynamicModuleTransportSocketTest, ConnectionCallbacksWithoutCallbacksAreSafe) {
   auto config = buildProtoConfig(kReferenceModule, "passthrough");
   auto factory_or_error = factory_.createTransportSocketFactory(config, context_, {});
-  ASSERT_OK(factory_or_error) << factory_or_error.status().message();
+  ASSERT_OK(factory_or_error);
   factory_ptr_ = std::move(factory_or_error.value());
   auto socket = factory_ptr_->createDownstreamTransportSocket();
   // setTransportSocketCallbacks is intentionally not called, so the callbacks pointer is null.
