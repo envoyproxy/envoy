@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -79,7 +80,7 @@ protected:
     config_ = std::make_shared<FilterConfig>(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
                                              *stats_store_.rootScope(), "", false, builder,
                                              factory_context_, creation_status);
-    ASSERT_TRUE(creation_status.ok());
+    ASSERT_OK(creation_status);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
