@@ -192,6 +192,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/buffer @adisuissa @mattklein123
 /*/extensions/transport_sockets/raw_buffer @botengyao @mattklein123
 # Watchdog Extensions
+/*/extensions/watchdog/backtrace_action @kbaichoo @jmsadair
 /*/extensions/watchdog/profile_action @kbaichoo @nezdolik
 # Core upstream code
 extensions/upstreams/http @yanavlasov @mattklein123
