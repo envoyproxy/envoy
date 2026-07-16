@@ -492,8 +492,7 @@ TEST_F(SocketConfigFactoryTest, CreateSocketFactoryWithoutTransportSocket) {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   auto factory_or_error = factory_->createTransportSocketFactory(config, context);
-  EXPECT_OK(factory_or_error.status());
-  EXPECT_NE(nullptr, factory_or_error.value());
+  EXPECT_THAT(factory_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 }
 
 TEST(ParseTest, TestValidResponse) {
