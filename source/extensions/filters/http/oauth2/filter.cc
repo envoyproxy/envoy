@@ -869,6 +869,20 @@ void OAuth2Filter::resolveAndSetActiveConfig() {
   oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
 }
 
+std::map<std::string, std::string> OAuth2Filter::getLogTags() const {
+  // Attach the request id (matching access-log %STREAM_ID% / x-request-id) so OAuth2 application
+  // logs can be correlated with access logs on a per-request basis.
+  std::map<std::string, std::string> log_tags;
+  const auto provider = decoder_callbacks_->streamInfo().getStreamIdProvider();
+  if (provider.has_value()) {
+    const auto request_id = provider->toStringView();
+    if (request_id.has_value()) {
+      log_tags.emplace("RequestId", std::string(request_id.value()));
+    }
+  }
+  return log_tags;
+}
+
 /**
  * primary cases:
  * 1) pass through header is matching
@@ -878,17 +892,6 @@ void OAuth2Filter::resolveAndSetActiveConfig() {
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  // Capture the request id (matching access-log %STREAM_ID% / x-request-id) once per request so it
-  // can be attached as a RequestId tag to the filter's application logs, allowing operators to
-  // correlate OAuth2 application logs with access logs on a per-request basis.
-  const auto provider = decoder_callbacks_->streamInfo().getStreamIdProvider();
-  if (provider.has_value()) {
-    const auto request_id = provider->toStringView();
-    if (request_id.has_value()) {
-      log_tags_.emplace("RequestId", std::string(request_id.value()));
-    }
-  }
-
   // Sanitize OAuth status headers unconditionally at the start of the filter to prevent clients
   // from spoofing them. These headers are only supposed to be set by the OAuth2 filter itself.
   headers.remove(OAuth2Headers::get().OAuthStatus);
@@ -1016,7 +1019,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // Check if we can update the access token via a refresh token.
     if (config_->useRefreshToken() && validator_->canUpdateTokenByRefreshToken()) {
 
-      ENVOY_TAGGED_STREAM_LOG(debug, log_tags_, *decoder_callbacks_,
+      ENVOY_TAGGED_STREAM_LOG(debug, getLogTags(), *decoder_callbacks_,
                               "Trying to update the access token using the refresh token");
 
       // try to update access token by refresh token
@@ -1048,7 +1051,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
           "Unauthorized, and redirecting to OAuth server is not allowed: {}", path_str));
       return Http::FilterHeadersStatus::StopIteration;
     } else {
-      ENVOY_TAGGED_STREAM_LOG(debug, log_tags_, *decoder_callbacks_,
+      ENVOY_TAGGED_STREAM_LOG(debug, getLogTags(), *decoder_callbacks_,
                               "redirecting to OAuth server: {}", path_str);
       redirectToOAuthServer(headers);
       return Http::FilterHeadersStatus::StopIteration;
@@ -1146,11 +1149,11 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardIdToken() && !validator_->idToken().empty()) {
       forwardIdToken(headers, validator_->idToken());
     }
-    ENVOY_TAGGED_STREAM_LOG(debug, log_tags_, *decoder_callbacks_,
+    ENVOY_TAGGED_STREAM_LOG(debug, getLogTags(), *decoder_callbacks_,
                             "skipping oauth flow due to valid hmac cookie");
     return true;
   }
-  ENVOY_TAGGED_STREAM_LOG(debug, log_tags_, *decoder_callbacks_, "can not skip oauth flow");
+  ENVOY_TAGGED_STREAM_LOG(debug, getLogTags(), *decoder_callbacks_, "can not skip oauth flow");
   return false;
 }
 
@@ -1224,7 +1227,7 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
                               !Http::HeaderUtility::headerValueIsValid(decrypt_result.plaintext);
 
   if (decrypt_failed) {
-    ENVOY_TAGGED_STREAM_LOG(error, log_tags_, *decoder_callbacks_,
+    ENVOY_TAGGED_STREAM_LOG(error, getLogTags(), *decoder_callbacks_,
                             "failed to decrypt token: {}, error: {}", encrypted_token,
                             decrypt_result.error.value_or("plaintext is not a valid header value"));
     // There are two cases:
@@ -1508,13 +1511,13 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
         return std::to_string(expiration_epoch.count());
       } else {
         ENVOY_TAGGED_STREAM_LOG(
-            debug, log_tags_, *decoder_callbacks_,
+            debug, getLogTags(), *decoder_callbacks_,
             "The expiration time in the refresh token is less than the current time");
         return "0";
       }
     }
     ENVOY_TAGGED_STREAM_LOG(
-        debug, log_tags_, *decoder_callbacks_,
+        debug, getLogTags(), *decoder_callbacks_,
         "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
         "refresh token will be taken from filter configuration");
     const std::chrono::seconds default_refresh_token_expires_in =
@@ -1543,12 +1546,12 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
         return std::to_string(expiration_epoch.count());
       } else {
         ENVOY_TAGGED_STREAM_LOG(
-            debug, log_tags_, *decoder_callbacks_,
+            debug, getLogTags(), *decoder_callbacks_,
             "The expiration time in the id token is less than the current time");
         return "0";
       }
     }
-    ENVOY_TAGGED_STREAM_LOG(debug, log_tags_, *decoder_callbacks_,
+    ENVOY_TAGGED_STREAM_LOG(debug, getLogTags(), *decoder_callbacks_,
                             "The id token is not a JWT or exp claim is omitted, even though it is "
                             "required by the OpenID Connect 1.0 specification. "
                             "The lifetime of the id token will be aligned with the access token");
@@ -1776,7 +1779,7 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
 }
 
 void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
-  ENVOY_TAGGED_STREAM_LOG(warn, log_tags_, *decoder_callbacks_,
+  ENVOY_TAGGED_STREAM_LOG(warn, getLogTags(), *decoder_callbacks_,
                           "Responding with 401 Unauthorized. Cause: {}", details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(
@@ -1793,7 +1796,7 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
 }
 
 void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
-  ENVOY_TAGGED_STREAM_LOG(warn, log_tags_, *decoder_callbacks_,
+  ENVOY_TAGGED_STREAM_LOG(warn, getLogTags(), *decoder_callbacks_,
                           "Responding with 503 Service Unavailable. Cause: {}", details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, ServiceUnavailableBodyMessage,
@@ -1827,7 +1830,7 @@ void OAuth2Filter::continueWithFailedOAuth(const std::string& reason,
   config_->stats().oauth_allow_failed_passthrough_.inc();
   const std::string log_details =
       extra_details.empty() ? reason : absl::StrCat(reason, ": ", extra_details);
-  ENVOY_TAGGED_STREAM_LOG(debug, log_tags_, *decoder_callbacks_,
+  ENVOY_TAGGED_STREAM_LOG(debug, getLogTags(), *decoder_callbacks_,
                           "allow_failed_matcher matched, continuing as unauthorized: {}",
                           log_details);
 }

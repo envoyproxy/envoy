@@ -446,11 +446,6 @@ private:
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
-  // Log tags (RequestId) added to OAuth2 application log lines so they can be correlated with the
-  // access log; populated once per request in decodeHeaders. RequestId matches access-log
-  // %STREAM_ID% / x-request-id.
-  std::map<std::string, std::string> log_tags_;
-
   std::shared_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr default_config_;
   const FilterConfig* config_{nullptr};
@@ -460,6 +455,10 @@ private:
   Random::RandomGenerator& random_;
 
   void resolveAndSetActiveConfig();
+
+  // Returns the log tags (RequestId, matching access-log %STREAM_ID% / x-request-id) attached to
+  // the filter's application logs so they can be correlated with the access log.
+  std::map<std::string, std::string> getLogTags() const;
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
