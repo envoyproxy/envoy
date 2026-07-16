@@ -397,24 +397,20 @@ absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit(
       quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
   if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
-      auto opt_or_status =
+      absl::StatusOr<Network::Socket::OptionConstSharedPtr> option =
           quic_cid_generator_factory_->createCompatibleLinuxBpfSocketOption(concurrency_);
-      switch (opt_or_status.status().code()) {
-      case absl::StatusCode::kOk:
+      if (option.ok()) {
         kernel_worker_routing_ = true;
-        if (opt_or_status.value() != nullptr) {
-          options_->push_back(opt_or_status.value());
+        if (option.value() != nullptr) {
+          options_->push_back(std::move(option.value()));
         }
-        break;
-      case absl::StatusCode::kUnimplemented:
+      } else if (absl::IsUnimplemented(option.status())) {
         ENVOY_LOG(warn,
                   "Efficient routing of QUIC packets to the correct worker is not supported or "
                   "not implemented by Envoy on this platform or by the configured "
                   "connection_id_generator. QUIC performance may be degraded.");
-        break;
-      default:
-        return opt_or_status.status();
-        break;
+      } else {
+        return option.status();
       }
     } else {
       ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
