@@ -16,6 +16,7 @@ namespace Ocsp {
 
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
@@ -276,9 +277,8 @@ TEST_F(Asn1UtilityTest, ParseGeneralizedTimeWrongFormatErrorTest) {
   std::string invalid_time = "";
   CBS cbs;
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, invalid_time, CBS_ASN1_GENERALIZEDTIME));
-  EXPECT_THAT(Asn1Utility::parseGeneralizedTime(cbs).status(), Not(IsOk()));
-  EXPECT_EQ("Input is not a well-formed ASN.1 GENERALIZEDTIME",
-            Asn1Utility::parseGeneralizedTime(cbs).status().message());
+  EXPECT_THAT(Asn1Utility::parseGeneralizedTime(cbs),
+              HasStatusMessage("Input is not a well-formed ASN.1 GENERALIZEDTIME"));
 }
 
 TEST_F(Asn1UtilityTest, ParseGeneralizedTimeTest) {

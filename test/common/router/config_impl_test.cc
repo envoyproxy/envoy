@@ -45,6 +45,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::_;
 using ::testing::ContainerEq;
@@ -1507,9 +1508,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(invalid_route), factory_context_, true,
                         creation_status_);
-  EXPECT_THAT(creation_status_, Not(IsOk()));
-  EXPECT_TRUE(
-      absl::StrContains(creation_status_.message(), "Failed to create path rewrite formatter: "));
+  EXPECT_THAT(creation_status_,
+              HasStatusMessage(testing::HasSubstr("Failed to create path rewrite formatter: ")));
 }
 
 TEST_F(RouteMatcherTest, TestRoutesWithInvalidHostRewriteFormatter) {
@@ -1529,9 +1529,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(invalid_route), factory_context_, true,
                         creation_status_);
-  EXPECT_THAT(creation_status_, Not(IsOk()));
-  EXPECT_TRUE(
-      absl::StrContains(creation_status_.message(), "Failed to create host rewrite formatter: "));
+  EXPECT_THAT(creation_status_,
+              HasStatusMessage(testing::HasSubstr("Failed to create host rewrite formatter: ")));
 }
 
 // Virtual cluster that contains neither pattern nor regex. This must be checked while pattern is

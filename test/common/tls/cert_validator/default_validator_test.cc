@@ -21,6 +21,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 using TestCertificateValidationContextConfigPtr =
@@ -1097,9 +1098,8 @@ TEST(CrlCacheTest, ReturnsErrorForInvalidCrl) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/not_a_crl.crl"));
 
   absl::StatusOr<CrlListSharedPtr> result = cache->getOrCreate(invalid, "not_a_crl.crl");
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to load CRL from not_a_crl.crl"));
+  EXPECT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("Failed to load CRL from not_a_crl.crl")));
   EXPECT_EQ(cache->size(), 0);
 }
 

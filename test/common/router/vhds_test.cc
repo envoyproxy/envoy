@@ -30,6 +30,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
@@ -189,9 +190,8 @@ vhds:
 
   auto result = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
                                                          context_, provider_);
-  EXPECT_THAT(result.status(), Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "vhds: ADS config source specified but no ADS configured in bootstrap.");
+  EXPECT_THAT(result, HasStatusMessage(
+                          "vhds: ADS config source specified but no ADS configured in bootstrap."));
 }
 
 // verify that ADS without DELTA_GRPC api_type in bootstrap fails validation
@@ -213,9 +213,9 @@ vhds:
 
   auto result = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
                                                          context_, provider_);
-  EXPECT_THAT(result.status(), Not(IsOk()));
-  EXPECT_EQ(result.status().message(),
-            "vhds: ADS must use DELTA_GRPC api_type when used as VHDS config source.");
+  EXPECT_THAT(
+      result,
+      HasStatusMessage("vhds: ADS must use DELTA_GRPC api_type when used as VHDS config source."));
 }
 
 // verify addition/updating of virtual hosts
