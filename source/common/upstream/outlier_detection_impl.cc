@@ -659,6 +659,13 @@ void DetectorImpl::setHostDegraded(HostSharedPtr host) {
 }
 
 void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
+  // The host may have been removed from host_monitors_ between the worker thread
+  // posting this degrade event and the main thread running it; if so, ignore it
+  // (mirrors the guard in the eject path) so host_monitors_[host] does not
+  // default-insert a null monitor that is then dereferenced.
+  if (host_monitors_.count(host) == 0) {
+    return;
+  }
   if (!host->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
     updateDetectedEjectionStats(envoy::data::cluster::v3::DEGRADED);
 

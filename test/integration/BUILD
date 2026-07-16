@@ -678,6 +678,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//test/integration/filters:encode1xx_local_reply_config_lib",
         "//test/integration/filters:local_reply_during_decoding_filter_lib",
+        "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:metadata_control_filter_lib",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
@@ -1919,6 +1920,27 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "listener_crl_share_integration_test",
+    size = "large",
+    srcs = ["listener_crl_share_integration_test.cc"],
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        ":http_integration_lib",
+        "//source/common/tls:client_ssl_socket_lib",
+        "//source/common/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:config",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 

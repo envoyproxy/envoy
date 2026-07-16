@@ -68,6 +68,8 @@ areas:
     title: http_inspector
   jwt_authn:
     title: jwt_authn
+  load_balancing:
+    title: load_balancing
   load_report:
     title: load_report
   logging:
@@ -120,3 +122,7 @@ areas:
     title: proxy_protocol
   zstd:
     title: zstd
+  server:
+    title: server
+  udp:
+    title: udp

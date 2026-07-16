@@ -395,7 +395,8 @@ public:
   CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata) const override;
+      Network::UpstreamTransportSocketFactory& factory,
+      Network::Address::InstanceConstSharedPtr orca_address) const override;
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {
@@ -489,6 +490,15 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       HostDescriptionConstSharedPtr host,
       const Network::UpstreamTransportSocketFactory& socket_factory);
+  // Shared body of createOrcaReportingConnection.
+  CreateConnectionData
+  createOrcaConnection(Event::Dispatcher& dispatcher,
+                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+                       Network::UpstreamTransportSocketFactory& factory,
+                       Network::Address::InstanceConstSharedPtr orca_address,
+                       const Network::Address::InstanceConstSharedPtr& host_address,
+                       const SharedConstAddressVector& address_list,
+                       HostDescriptionConstSharedPtr host) const;
 
 private:
   // Helper function to check multiple health flags at once.

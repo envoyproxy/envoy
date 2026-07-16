@@ -40,6 +40,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/quic_packet_writer_interface.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #endif
 
@@ -714,6 +716,18 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
         validation_visitor_, *listener_factory_context_);
+
+    if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
+      auto* quic_packet_writer_factory_factory =
+          Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
+              config.udp_listener_config().udp_packet_packet_writer_config());
+      if (quic_packet_writer_factory_factory != nullptr) {
+        udp_listener_config_->quic_writer_factory_ =
+            quic_packet_writer_factory_factory->createQuicPacketWriterFactory(
+                config.udp_listener_config().udp_packet_packet_writer_config(),
+                *listener_factory_context_);
+      }
+    }
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from

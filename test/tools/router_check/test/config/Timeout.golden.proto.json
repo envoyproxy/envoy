@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "test_name": "Test_1",
+      "input": {"authority": "www.example.com", "path": "/api/v1/resource", "method": "GET"},
+      "validate": {"cluster_name": "service", "timeout": "120s"}
+    },
+    {
+      "test_name": "Test_2",
+      "input": {"authority": "www.example.com", "path": "/other", "method": "GET"},
+      "validate": {"cluster_name": "service", "timeout": "30s"}
+    }
+  ]
+}

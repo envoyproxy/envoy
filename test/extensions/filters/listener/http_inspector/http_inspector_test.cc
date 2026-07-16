@@ -445,6 +445,43 @@ TEST_P(HttpInspectorTest, InvalidHttpMethod) {
   testHttpInspectNotFound(header);
 }
 
+TEST_P(HttpInspectorTest, JmxRmiBinaryPayload) {
+  const absl::string_view header("\x4a\x52\x4d\x49\x00\x02\x4b", 7);
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, BinaryWithEmbeddedNul) {
+  const absl::string_view header("\x4e\x00\x00\x00\x0a", 5);
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, HighBitBinaryPayload) {
+  const char data[] = {static_cast<char>(0xff), static_cast<char>(0xfe), static_cast<char>(0xfd),
+                       static_cast<char>(0xfc)};
+  const absl::string_view header(data, sizeof(data));
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, ShortRequestLineFollowedByHeaderWithNonTokenChars) {
+  const absl::string_view header = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
+}
+
+TEST_P(HttpInspectorTest, LeadingCrlfStillRejectedByExistingGuard) {
+  const absl::string_view header = "\r\nGET / HTTP/1.1\r\n";
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, FastFailGuardDisabled) {
+  if (parser_impl_ != Http1ParserImpl::BalsaParser) {
+    return;
+  }
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes", "false"}});
+  const absl::string_view header("\x4a\x52\x4d\x49\x00\x02\x4b\n", 8);
+  testHttpInspectMultipleReadsNotFound(header);
+}
+
 TEST_P(HttpInspectorTest, InvalidHttpRequestLine) {
   const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {

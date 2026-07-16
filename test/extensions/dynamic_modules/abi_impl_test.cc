@@ -1,5 +1,6 @@
 #include <thread>
 
+#include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -94,6 +95,33 @@ TEST(CommonAbiImplTest, GetConcurrencyBeforeServerContextFailsClosed) {
   EXPECT_ENVOY_BUG(EXPECT_EQ(0u, envoy_dynamic_module_callback_get_concurrency()),
                    "envoy_dynamic_module_callback_get_concurrency called before the server "
                    "context was initialized");
+}
+
+// =============================================================================
+// Log Level Tests
+// =============================================================================
+
+// Verifies that `get_log_level` reflects the level configured on the dynamic modules logger for
+// every level in the enum.
+TEST(CommonAbiImplTest, GetLogLevelReflectsConfiguredLevel) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+
+  const std::pair<spdlog::level::level_enum, envoy_dynamic_module_type_log_level> cases[] = {
+      {spdlog::level::trace, envoy_dynamic_module_type_log_level_Trace},
+      {spdlog::level::debug, envoy_dynamic_module_type_log_level_Debug},
+      {spdlog::level::info, envoy_dynamic_module_type_log_level_Info},
+      {spdlog::level::warn, envoy_dynamic_module_type_log_level_Warn},
+      {spdlog::level::err, envoy_dynamic_module_type_log_level_Error},
+      {spdlog::level::critical, envoy_dynamic_module_type_log_level_Critical},
+      {spdlog::level::off, envoy_dynamic_module_type_log_level_Off},
+  };
+  for (const auto& [spdlog_level, abi_level] : cases) {
+    logger.set_level(spdlog_level);
+    EXPECT_EQ(abi_level, envoy_dynamic_module_callback_get_log_level());
+  }
+
+  logger.set_level(original_level);
 }
 
 // =============================================================================
@@ -392,6 +420,22 @@ WEAK_STUB(ClusterLbContextGetOverrideHost,
 WEAK_STUB(ClusterLbContextGetDownstreamConnectionSni,
           envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(nullptr,
                                                                                          nullptr))
+WEAK_STUB(ClusterLbContextGetFilterStateBytes,
+          envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr))
+WEAK_STUB(ClusterLbContextGetFilterStateTyped,
+          envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr))
+WEAK_STUB(ClusterLbContextSetFilterStateBytes,
+          envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  {nullptr, 0}))
+WEAK_STUB(ClusterLbContextSetFilterStateTyped,
+          envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  {nullptr, 0}))
 WEAK_STUB(ClusterLbGetClusterName,
           envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(ClusterLbGetHostsCount,
@@ -717,6 +761,8 @@ WEAK_STUB(NetworkFilterGetUpstreamHostCluster,
           envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(nullptr, nullptr))
 WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
+WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
+          envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterReadEnabled,
@@ -1516,6 +1562,12 @@ WEAK_STUB(HttpSetFilterStateTyped,
                                                                     {nullptr, 0}))
 WEAK_STUB(HttpGetFilterStateTyped,
           envoy_dynamic_module_callback_http_get_filter_state_typed(nullptr, {nullptr, 0}, nullptr))
+WEAK_STUB(HttpSetFilterStateObject,
+          envoy_dynamic_module_callback_http_set_filter_state_object(
+              nullptr, {nullptr, 0}, nullptr, nullptr,
+              envoy_dynamic_module_type_filter_state_life_span_FilterChain))
+WEAK_STUB(HttpGetFilterStateObject,
+          envoy_dynamic_module_callback_http_get_filter_state_object(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpAddCustomFlag,
           envoy_dynamic_module_callback_http_add_custom_flag(nullptr, {nullptr, 0}))
 WEAK_STUB(HttpFilterSchedulerNew, envoy_dynamic_module_callback_http_filter_scheduler_new(nullptr))
@@ -1538,6 +1590,24 @@ WEAK_STUB(HttpFilterGetAttributeInt,
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
 WEAK_STUB(HttpFilterGetAttributeBool,
           envoy_dynamic_module_callback_http_filter_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeString,
+          envoy_dynamic_module_callback_network_filter_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeInt,
+          envoy_dynamic_module_callback_network_filter_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(NetworkFilterGetAttributeBool,
+          envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeString,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeInt,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(ListenerFilterGetAttributeBool,
+          envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
 WEAK_STUB(HttpFilterHttpCallout,
           envoy_dynamic_module_callback_http_filter_http_callout(nullptr, nullptr, {nullptr, 0},
@@ -1619,6 +1689,8 @@ WEAK_STUB(HttpGetClusterHostCount,
 WEAK_STUB(HttpSetUpstreamOverrideHost,
           envoy_dynamic_module_callback_http_set_upstream_override_host(nullptr, {nullptr, 0},
                                                                         false))
+WEAK_STUB(HttpGetUpstreamConnectionId,
+          envoy_dynamic_module_callback_http_get_upstream_connection_id(nullptr))
 WEAK_STUB(HttpFilterResetStream,
           envoy_dynamic_module_callback_http_filter_reset_stream(
               nullptr, envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,
@@ -1685,6 +1757,27 @@ WEAK_STUB(FormatterGetHeadersSize,
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
 WEAK_STUB(FormatterGetLocalReplyBody,
           envoy_dynamic_module_callback_formatter_get_local_reply_body(nullptr, nullptr))
+WEAK_STUB(HealthCheckerSchedulerNew,
+          envoy_dynamic_module_callback_health_checker_scheduler_new(nullptr))
+WEAK_STUB(HealthCheckerSchedulerReport,
+          envoy_dynamic_module_callback_health_checker_scheduler_report(
+              nullptr, envoy_dynamic_module_type_host_health_Healthy))
+WEAK_STUB(HealthCheckerSchedulerDelete,
+          envoy_dynamic_module_callback_health_checker_scheduler_delete(nullptr))
+WEAK_STUB(HealthCheckerGetHostAddress,
+          envoy_dynamic_module_callback_health_checker_get_host_address(nullptr, nullptr))
+WEAK_STUB(HealthCheckerGetHostMetadataString,
+          envoy_dynamic_module_callback_health_checker_get_host_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(HealthCheckerGetHostMetadataNumber,
+          envoy_dynamic_module_callback_health_checker_get_host_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(HealthCheckerGetHostMetadataBool,
+          envoy_dynamic_module_callback_health_checker_get_host_metadata_bool(nullptr, {nullptr, 0},
+                                                                              {nullptr, 0},
+                                                                              nullptr))
+WEAK_STUB(HealthCheckerGetHostHealth,
+          envoy_dynamic_module_callback_health_checker_get_host_health(nullptr))
 
 } // namespace
 } // namespace DynamicModules
