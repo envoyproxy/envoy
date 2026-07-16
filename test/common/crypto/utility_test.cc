@@ -205,8 +205,7 @@ TEST(UtilityTest, TestVerifySignature) {
       auto sig = Hex::decode(signature);
 
       auto result = UtilitySingleton::get().verifySignature(hash_func, *crypto, sig, text);
-      ASSERT_OK(result) << "Verification failed for " << description << " with " << hash_func
-                        << ": " << result.message();
+      ASSERT_OK(result) << "Verification failed for " << description << " with " << hash_func;
     }
   }
 
@@ -364,12 +363,12 @@ TEST(UtilityTest, TestSign) {
 
   for (const auto& hash_func : hash_functions) {
     auto result = UtilitySingleton::get().sign(hash_func, *crypto, text);
-    ASSERT_OK(result) << "Signing failed with " << hash_func << ": " << result.status();
+    ASSERT_OK(result) << "Signing failed with " << hash_func;
     EXPECT_FALSE(result->empty());
 
     // Test format equivalence: PEM private key should produce identical signature
     auto pem_result = UtilitySingleton::get().sign(hash_func, *pem_private_crypto, text);
-    ASSERT_OK(pem_result) << "PEM signing failed with " << hash_func << ": " << pem_result.status();
+    ASSERT_OK(pem_result) << "PEM signing failed with " << hash_func;
     EXPECT_FALSE(pem_result->empty()) << "PEM signature empty with " << hash_func;
 
     // Verify signatures are identical (validates format equivalence)
@@ -477,7 +476,7 @@ TEST(UtilityTest, TestHashFunctionSupport) {
   std::vector<std::string> supported_hashes = {"sha1", "sha224", "sha256", "sha384", "sha512"};
   for (const auto& hash : supported_hashes) {
     auto result = UtilitySingleton::get().sign(hash, *crypto, text);
-    ASSERT_OK(result) << "Signing failed with " << hash << ": " << result.status();
+    ASSERT_OK(result) << "Signing failed with " << hash;
     EXPECT_FALSE(result->empty()) << "Signature empty with " << hash;
   }
 
@@ -485,7 +484,7 @@ TEST(UtilityTest, TestHashFunctionSupport) {
   std::vector<std::string> case_variants = {"SHA1", "SHA256", "Sha384"};
   for (const auto& hash : case_variants) {
     auto result = UtilitySingleton::get().sign(hash, *crypto, text);
-    ASSERT_OK(result) << "Case insensitive signing failed with " << hash << ": " << result.status();
+    ASSERT_OK(result) << "Case insensitive signing failed with " << hash;
     EXPECT_FALSE(result->empty()) << "Case insensitive signature empty with " << hash;
   }
 
