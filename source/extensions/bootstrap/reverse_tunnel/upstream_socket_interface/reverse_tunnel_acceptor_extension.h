@@ -187,6 +187,11 @@ public:
   bool enableTenantIsolation() const { return enable_tenant_isolation_; }
 
   /**
+   * @return the configured maximum number of concurrently accepted reverse connections per node.
+   */
+  uint32_t maxConnectionsPerNode() const { return max_connections_per_node_; }
+
+  /**
    * @return whether lifecycle access logs are configured.
    */
   bool hasAccessLogs() const { return !access_logs_.empty(); }
@@ -268,6 +273,7 @@ private:
   uint32_t ping_failure_threshold_{3};
   bool enable_detailed_stats_{false};
   bool enable_tenant_isolation_{false};
+  const uint32_t max_connections_per_node_{0};
   AccessLog::InstanceSharedPtrVector access_logs_;
   ReverseTunnelReporterPtr reporter_{nullptr};
 
