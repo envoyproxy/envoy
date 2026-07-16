@@ -343,7 +343,7 @@ com_github_grpc_grpc:
   project_name: "gRPC"
   project_desc: "gRPC C core library"
   project_url: "https://grpc.io"
-  release_date: "2026-06-08"
+  release_date: "2026-07-08"
   use_category:
   - dataplane_core
   - controlplane
