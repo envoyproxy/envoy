@@ -85,6 +85,7 @@ envoy_cc_test(
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/strings",
