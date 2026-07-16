@@ -162,8 +162,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/mirror/tclap/archive/v{version}.tar.gz"],
     ),
     fmt = dict(
-        version = "12.1.0",
-        sha256 = "695fd197fa5aff8fc67b5f2bbc110490a875cdf7a41686ac8512fb480fa8ada7",
+        version = "12.2.0",
+        sha256 = "a2f4a8d51178f954e4c339007f77edd76ba0cb2e36f87a48e5a5403d9be5878f",
         strip_prefix = "fmt-{version}",
         urls = ["https://github.com/fmtlib/fmt/releases/download/{version}/fmt-{version}.zip"],
     ),

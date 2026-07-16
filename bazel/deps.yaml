@@ -224,7 +224,7 @@ fmt:
   project_name: "fmt"
   project_desc: "{fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams"
   project_url: "https://fmt.dev"
-  release_date: "2025-10-29"
+  release_date: "2026-06-16"
   use_category:
   - dataplane_core
   - controlplane
