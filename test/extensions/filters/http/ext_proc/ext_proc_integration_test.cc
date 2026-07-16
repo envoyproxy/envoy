@@ -63,6 +63,7 @@ using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::ProtocolConfiguration;
 using envoy::service::ext_proc::v3::TrailersResponse;
 using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
@@ -4961,8 +4962,8 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
 
   // Verify PLAIN format contains all processing phases.
   auto plain_value = json_log->getString("ext_proc_plain");
-  EXPECT_THAT(plain_value, ::Envoy::StatusHelpers::IsOkAndHolds(
-                               testing::ContainsRegex("rh:[0-9]+:[0-9]+")));    // request header
+  EXPECT_THAT(plain_value,
+              IsOkAndHolds(testing::ContainsRegex("rh:[0-9]+:[0-9]+")));        // request header
   EXPECT_THAT(*plain_value, testing::ContainsRegex("rb:[0-9]+:[0-9]+:[0-9]+")); // request body
   EXPECT_THAT(*plain_value, testing::ContainsRegex("rt:[0-9]+:[0-9]+"));        // request trailer
   EXPECT_THAT(*plain_value, testing::ContainsRegex("sh:[0-9]+:[0-9]+"));        // response header

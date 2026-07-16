@@ -320,7 +320,7 @@ TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_EmptyLastValue) {
 
   absl::StatusOr<std::string> st = SingularFieldUseLastValue(
       "first_value", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_THAT(st, ::Envoy::StatusHelpers::IsOkAndHolds("first_value"));
+  EXPECT_THAT(st, IsOkAndHolds("first_value"));
 }
 
 TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
@@ -332,7 +332,7 @@ TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
 
   absl::StatusOr<std::string> st = SingularFieldUseLastValue(
       "", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_THAT(st, ::Envoy::StatusHelpers::IsOkAndHolds("repeated-string-0"));
+  EXPECT_THAT(st, IsOkAndHolds("repeated-string-0"));
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_EmptyPath) {
@@ -403,7 +403,7 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_SingleStringField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(""));
+  ASSERT_THAT(result, IsOkAndHolds(""));
 }
 
 TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedStringField) {
@@ -415,7 +415,7 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedStringField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds("repeated-string-0"));
+  EXPECT_THAT(result, IsOkAndHolds("repeated-string-0"));
 }
 
 TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedMessageField) {
@@ -426,9 +426,8 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedMessageField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  ASSERT_THAT(result,
-              ::Envoy::StatusHelpers::IsOkAndHolds("\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-"
-                                                   "1\x1A\rtest-object-2\x1A\rtest-object-3"));
+  ASSERT_THAT(result, IsOkAndHolds("\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-"
+                                   "1\x1A\rtest-object-2\x1A\rtest-object-3"));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_string) {
