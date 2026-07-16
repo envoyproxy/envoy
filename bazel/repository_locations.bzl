@@ -635,8 +635,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     # May be removable once Envoy upgrades to Bazel 8.0+ which includes this by default.
     # See: https://github.com/envoyproxy/envoy/pull/41172#issuecomment-2365923085
     platforms = dict(
-        version = "1.0.0",
-        sha256 = "852b71bfa15712cec124e4a57179b6bc95d59fdf5052945f5d550e072501a769",
+        version = "1.1.0",
+        sha256 = "324f5381753a610e472f79563d44e2026438195042aae4dc660b8c021f7de7f5",
         strip_prefix = "platforms-{version}",
         urls = [
             "https://github.com/bazelbuild/platforms/archive/{version}.tar.gz",

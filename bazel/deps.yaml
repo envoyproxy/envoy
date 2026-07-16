@@ -1223,7 +1223,7 @@ platforms:
   project_name: "platforms"
   project_desc: "Constraint values for specifying platforms and toolchains"
   project_url: "https://github.com/bazelbuild/platforms"
-  release_date: "2025-05-27"
+  release_date: "2026-05-01"
   use_category:
   - build
   license: "Apache-2.0"
