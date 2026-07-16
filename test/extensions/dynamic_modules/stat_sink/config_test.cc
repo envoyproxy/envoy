@@ -19,6 +19,7 @@ namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::NiceMock;
 using ::testing::Not;
 
@@ -82,7 +83,7 @@ sink_config:
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_THAT(sink_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()))
       << sink_or_error.status().message();
 
   // The happy path emits no load-failure counters.
@@ -99,7 +100,7 @@ TEST_F(DynamicModuleStatsSinkFactoryTest, ValidConfigLocalFile) {
   proto_config.set_sink_name("test_sink");
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_THAT(sink_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()))
       << sink_or_error.status().message();
 }
 
@@ -130,7 +131,7 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_THAT(sink_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()))
       << sink_or_error.status().message();
 }
 
