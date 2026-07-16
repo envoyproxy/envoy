@@ -21,6 +21,7 @@
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
@@ -123,7 +124,7 @@ TEST_F(DynamicModuleTransportSocketConfigTest, ValidConfigWithLocalFile) {
   config.set_transport_socket_name("passthrough");
 
   auto factory_or_error = upstream_factory_.createTransportSocketFactory(config, context_);
-  ASSERT_THAT(factory_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
+  ASSERT_THAT(factory_or_error, IsOkAndHolds(::testing::NotNull()))
       << factory_or_error.status().message();
 }
 

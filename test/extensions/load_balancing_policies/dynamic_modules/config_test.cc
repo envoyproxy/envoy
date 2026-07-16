@@ -29,6 +29,7 @@ namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::NiceMock;
 using ::testing::Not;
 using ::testing::Return;
@@ -63,7 +64,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_THAT(lb_config_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(::testing::NotNull()));
 
   // The happy path emits no load-failure counters.
   EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
@@ -80,7 +81,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccessWithLocalFile) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_THAT(lb_config_or_error, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(::testing::NotNull()))
       << lb_config_or_error.status().message();
 }
 
