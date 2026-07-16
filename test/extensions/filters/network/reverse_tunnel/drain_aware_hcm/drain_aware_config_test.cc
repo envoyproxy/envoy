@@ -82,18 +82,17 @@ TEST_F(DrainAwareConfigTest, CreateFilterFactoryFromValidConfig) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);
   auto result = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_OK(result) << result.status().message();
-  EXPECT_NE(nullptr, result.value());
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()))
+      << result.status().message();
 }
 
 TEST_F(DrainAwareConfigTest, FilterFactoryCallbackIsNonNull) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);
   auto result = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_OK(result);
   // Verify a callable callback was produced. The actual ConnectionManagerImpl
   // installation path is exercised end-to-end in integration_test.cc.
-  EXPECT_NE(nullptr, result.value());
+  ASSERT_THAT(result, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
 }
 
 // Subclass that overrides createBaseCodec to return nullptr, exercising the defensive
