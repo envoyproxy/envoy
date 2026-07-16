@@ -4978,7 +4978,7 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
 
   // Verify TYPED format is valid JSON.
   auto typed_obj = json_log->getObject("ext_proc_typed");
-  EXPECT_THAT(typed_obj,
+  ASSERT_THAT(typed_obj,
               IsOkAndHolds(ResultOf(
                   [](const Json::ObjectSharedPtr& object) { return object->asJsonString(); },
                   AllOf(ContainsRegex("\"request_header_latency_us\""),
