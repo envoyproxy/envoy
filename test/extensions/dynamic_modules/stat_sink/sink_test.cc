@@ -20,11 +20,10 @@ namespace StatSinks {
 namespace DynamicModules {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
-using ::testing::Not;
 using testing::ReturnRef;
 
 // Tracks what the module was asked to do so individual tests can verify the
@@ -425,9 +424,7 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionMissingSymbol) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
       "test_sink", "test_config", std::move(dynamic_module.value()), context);
-  EXPECT_THAT(config_or_error, Not(IsOk()));
-  EXPECT_THAT(std::string(config_or_error.status().message()),
-              testing::ContainsRegex("config_new"));
+  EXPECT_THAT(config_or_error, HasStatusMessage(testing::ContainsRegex("config_new")));
 }
 
 // When on_stat_sink_config_new returns null, newDynamicModuleStatsSinkConfig
@@ -441,9 +438,8 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionModuleReturnsNull) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
       "test_sink", "test_config", std::move(dynamic_module.value()), context);
-  EXPECT_THAT(config_or_error, Not(IsOk()));
-  EXPECT_THAT(std::string(config_or_error.status().message()),
-              testing::HasSubstr("Failed to initialize dynamic module stats sink config"));
+  EXPECT_THAT(config_or_error, HasStatusMessage(testing::HasSubstr(
+                                   "Failed to initialize dynamic module stats sink config")));
 }
 
 } // namespace

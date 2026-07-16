@@ -25,8 +25,6 @@ namespace DynamicModules {
 
 using ::Envoy::StatusHelpers::HasStatusCode;
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
 
 TEST(DynamicModuleTestGeneral, InvalidPath) {
   absl::StatusOr<DynamicModulePtr> result = newDynamicModule("invalid_name", false);
@@ -414,9 +412,8 @@ protected:
 TEST_F(NewDynamicModuleByConfigTest, NoModuleNorName) {
   ProtoDynamicModuleConfig config;
   auto result = newDynamicModuleByConfig(config, "test_module");
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Either 'name' or 'module' must be specified"));
+  EXPECT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("Either 'name' or 'module' must be specified")));
 }
 
 // By-name loading succeeds synchronously and requires no context (the context-less caller path).
@@ -460,17 +457,15 @@ TEST_F(NewDynamicModuleByConfigTest, ModuleWithoutLocalFileOrRemoteRejected) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_inline_bytes("AAAA");
   auto result = newDynamicModuleByConfig(config, "test_module");
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Only local file path or remote HTTP source is supported"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Only local file path or remote HTTP source is supported")));
 }
 
 // A remote source without a factory context is rejected (the context-less caller cannot fetch).
 TEST_F(NewDynamicModuleByConfigTest, RemoteWithoutContextRejected) {
   auto result = newDynamicModuleByConfig(makeRemoteConfig("abc123"), "test_module");
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Remote module sources require a factory context"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          testing::HasSubstr("Remote module sources require a factory context")));
 }
 
 // A cached file whose contents match the expected SHA256 is loaded directly (cache hit).
@@ -503,9 +498,8 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitTamperedRemoved) {
   ASSERT_TRUE(std::filesystem::exists(cached));
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(expected_sha), "test_module", context_);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Remote module sources require an init manager"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          testing::HasSubstr("Remote module sources require an init manager")));
   // The tampered cache entry must have been removed.
   EXPECT_FALSE(std::filesystem::exists(cached));
 }
@@ -547,9 +541,8 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteNoCacheNoInitManager) {
   std::filesystem::remove(moduleTempPath(sha));
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Remote module sources require an init manager"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          testing::HasSubstr("Remote module sources require an init manager")));
 }
 
 // A remote source with a context and init manager but no on_loaded callback is rejected.
@@ -561,9 +554,8 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteNoOnLoadedCallbackRejected) {
   auto result =
       newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_, init_manager,
                                /*on_loaded=*/nullptr);
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Remote module sources require an on_loaded callback"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Remote module sources require an on_loaded callback")));
 }
 
 // A remote source with a context, init manager, and on_loaded callback starts an asynchronous

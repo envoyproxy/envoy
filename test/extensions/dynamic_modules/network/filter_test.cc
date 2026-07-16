@@ -16,6 +16,7 @@ namespace Extensions {
 namespace DynamicModules {
 namespace NetworkFilters {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
@@ -277,9 +278,8 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_THAT(filter_config_or_status, Not(IsOk()));
-  EXPECT_THAT(filter_config_or_status.status().message(),
-              testing::HasSubstr("Failed to initialize"));
+  EXPECT_THAT(filter_config_or_status,
+              HasStatusMessage(testing::HasSubstr("Failed to initialize")));
 }
 
 TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {

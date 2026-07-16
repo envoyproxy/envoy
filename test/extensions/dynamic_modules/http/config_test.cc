@@ -25,7 +25,6 @@
 #include "gtest/gtest.h"
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
 using testing::Invoke;
 using ::testing::Not;
 using testing::ReturnRef;
@@ -110,9 +109,8 @@ TEST_F(DynamicModuleFilterConfigTest, InlineBytesRejected) {
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_THAT(cb_or_error, Not(IsOk()));
-  EXPECT_THAT(cb_or_error.status().message(),
-              testing::HasSubstr("Only local file path or remote HTTP source is supported"));
+  EXPECT_THAT(cb_or_error, HasStatusMessage(testing::HasSubstr(
+                               "Only local file path or remote HTTP source is supported")));
 }
 
 TEST_F(DynamicModuleFilterConfigTest, NoModuleOrName) {
@@ -127,9 +125,8 @@ TEST_F(DynamicModuleFilterConfigTest, NoModuleOrName) {
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_THAT(cb_or_error, Not(IsOk()));
-  EXPECT_THAT(cb_or_error.status().message(),
-              testing::HasSubstr("Either 'name' or 'module' must be specified"));
+  EXPECT_THAT(cb_or_error,
+              HasStatusMessage(testing::HasSubstr("Either 'name' or 'module' must be specified")));
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerReturnsError) {
@@ -857,9 +854,7 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchBadModule) {
   // Next config push finds the cached file, tries to load it, and gets a load error.
   auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
                                              stats_scope_, init_manager_);
-  EXPECT_THAT(result2, Not(IsOk()));
-  EXPECT_THAT(result2.status().message(),
-              testing::HasSubstr("Cached remote module failed to load"));
+  EXPECT_THAT(result2, HasStatusMessage(testing::HasSubstr("Cached remote module failed to load")));
 
   std::filesystem::remove(cached_path);
 }
@@ -927,9 +922,8 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
   auto result2 =
       factory.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
                                   /*init_manager=*/std::nullopt);
-  EXPECT_THAT(result2, Not(IsOk()));
-  EXPECT_THAT(result2.status().message(),
-              testing::HasSubstr("Remote module sources require an init manager"));
+  EXPECT_THAT(result2, HasStatusMessage(
+                           testing::HasSubstr("Remote module sources require an init manager")));
 }
 
 TEST_F(DynamicModuleFilterConfigTest, InvalidLocalFile) {

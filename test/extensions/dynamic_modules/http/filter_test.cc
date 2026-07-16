@@ -26,8 +26,7 @@ namespace HttpFilters {
 
 namespace {
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 // Test ObjectFactory used by the Rust SDK typed filter state test. Creates a StringAccessorImpl
 // from the provided bytes.
@@ -116,9 +115,8 @@ TEST_P(DynamicModuleHttpLanguageTests, ConfigInitializationFailure) {
   auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
       "config_init_failure", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
       *stats_store.createScope(""), context);
-  EXPECT_THAT(filter_config_or_status, Not(IsOk()));
-  EXPECT_THAT(filter_config_or_status.status().message(),
-              testing::HasSubstr("Failed to initialize dynamic module"));
+  EXPECT_THAT(filter_config_or_status,
+              HasStatusMessage(testing::HasSubstr("Failed to initialize dynamic module")));
 }
 
 TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {

@@ -13,6 +13,7 @@ namespace DynamicModules {
 namespace HttpFilters {
 
 using ::Envoy::StatusHelpers::HasStatusCode;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
@@ -130,9 +131,8 @@ filter_config:
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createRouteSpecificFilterConfig(
       proto_config, context.server_factory_context_, context.messageValidationVisitor());
-  EXPECT_THAT(result, Not(IsOk()));
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_http_filter_per_route_config_new"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_http_filter_per_route_config_new")));
 }
 
 TEST(DynamicModuleConfigFactory, LoadOKPerRouteWithStruct) {
@@ -487,9 +487,8 @@ filter_config:
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
     auto result = factory.createFilterFactoryFromProto(proto_config, "", init_fail_context);
-    EXPECT_THAT(result, Not(IsOk()));
-    EXPECT_THAT(result.status().message(),
-                testing::HasSubstr("Failed to initialize dynamic module"));
+    EXPECT_THAT(result,
+                HasStatusMessage(testing::HasSubstr("Failed to initialize dynamic module")));
     auto& server_scope = init_fail_context.server_factory_context_.scope();
     EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "foo"));
     EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "foo"));

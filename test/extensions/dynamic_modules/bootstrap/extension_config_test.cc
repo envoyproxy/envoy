@@ -15,8 +15,6 @@ namespace Bootstrap {
 namespace DynamicModules {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
 
 class ExtensionConfigTest : public testing::Test {
 protected:
@@ -70,9 +68,8 @@ TEST_F(ExtensionConfigTest, MissingConfigDestroy) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_config_destroy"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_config_destroy")));
 }
 
 TEST_F(ExtensionConfigTest, MissingExtensionNew) {
@@ -83,9 +80,8 @@ TEST_F(ExtensionConfigTest, MissingExtensionNew) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_new"));
+  EXPECT_THAT(config, HasStatusMessage(
+                          testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_new")));
 }
 
 TEST_F(ExtensionConfigTest, MissingServerInitialized) {
@@ -96,9 +92,8 @@ TEST_F(ExtensionConfigTest, MissingServerInitialized) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_server_initialized"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_server_initialized")));
 }
 
 TEST_F(ExtensionConfigTest, MissingWorkerThreadInitialized) {
@@ -109,10 +104,9 @@ TEST_F(ExtensionConfigTest, MissingWorkerThreadInitialized) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(
-      config.status().message(),
-      testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized"));
+  EXPECT_THAT(config,
+              HasStatusMessage(testing::HasSubstr(
+                  "envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized")));
 }
 
 TEST_F(ExtensionConfigTest, MissingExtensionDestroy) {
@@ -123,9 +117,8 @@ TEST_F(ExtensionConfigTest, MissingExtensionDestroy) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_destroy"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_destroy")));
 }
 
 TEST_F(ExtensionConfigTest, MissingConstructor) {
@@ -138,9 +131,8 @@ TEST_F(ExtensionConfigTest, MissingConstructor) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_config_new"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_config_new")));
 }
 
 TEST_F(ExtensionConfigTest, MissingDrainStarted) {
@@ -151,9 +143,8 @@ TEST_F(ExtensionConfigTest, MissingDrainStarted) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_drain_started"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_drain_started")));
 }
 
 TEST_F(ExtensionConfigTest, MissingShutdown) {
@@ -164,9 +155,8 @@ TEST_F(ExtensionConfigTest, MissingShutdown) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_shutdown"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_shutdown")));
 }
 
 TEST_F(ExtensionConfigTest, MissingConfigScheduled) {
@@ -179,9 +169,8 @@ TEST_F(ExtensionConfigTest, MissingConfigScheduled) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_config_scheduled"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_config_scheduled")));
 }
 
 TEST_F(ExtensionConfigTest, MissingHttpCalloutDone) {
@@ -194,9 +183,8 @@ TEST_F(ExtensionConfigTest, MissingHttpCalloutDone) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_http_callout_done"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_http_callout_done")));
 }
 
 TEST_F(ExtensionConfigTest, MissingTimerFired) {
@@ -209,9 +197,8 @@ TEST_F(ExtensionConfigTest, MissingTimerFired) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_timer_fired"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_timer_fired")));
 }
 
 TEST_F(ExtensionConfigTest, MissingFileChanged) {
@@ -224,9 +211,8 @@ TEST_F(ExtensionConfigTest, MissingFileChanged) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_file_changed"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_file_changed")));
 }
 
 TEST_F(ExtensionConfigTest, MissingAdminRequest) {
@@ -239,9 +225,8 @@ TEST_F(ExtensionConfigTest, MissingAdminRequest) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_admin_request"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_admin_request")));
 }
 
 TEST_F(ExtensionConfigTest, MissingClusterAddOrUpdate) {
@@ -254,10 +239,8 @@ TEST_F(ExtensionConfigTest, MissingClusterAddOrUpdate) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(
-      config.status().message(),
-      testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update")));
 }
 
 TEST_F(ExtensionConfigTest, MissingClusterRemoval) {
@@ -270,9 +253,8 @@ TEST_F(ExtensionConfigTest, MissingClusterRemoval) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_cluster_removal"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_cluster_removal")));
 }
 
 TEST_F(ExtensionConfigTest, MissingListenerAddOrUpdate) {
@@ -285,10 +267,8 @@ TEST_F(ExtensionConfigTest, MissingListenerAddOrUpdate) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(
-      config.status().message(),
-      testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update")));
 }
 
 TEST_F(ExtensionConfigTest, MissingListenerRemoval) {
@@ -301,9 +281,8 @@ TEST_F(ExtensionConfigTest, MissingListenerRemoval) {
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
-  EXPECT_THAT(config, Not(IsOk()));
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_listener_removal"));
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "envoy_dynamic_module_on_bootstrap_extension_listener_removal")));
 }
 
 TEST_F(ExtensionConfigTest, ClusterAccessRequiresServerInitialized) {
