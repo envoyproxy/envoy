@@ -14,6 +14,7 @@ namespace HttpFilters {
 namespace Mcp {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -49,7 +50,7 @@ TEST_F(McpFilterConfigTest, CreateRouteSpecificConfig) {
   auto config_or = factory_->createRouteSpecificFilterConfig(
       proto_config, server_context, ProtobufMessage::getNullValidationVisitor());
 
-  EXPECT_THAT(config_or, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::NotNull()));
+  EXPECT_THAT(config_or, IsOkAndHolds(::testing::NotNull()));
 }
 
 // Test creating filter with server context

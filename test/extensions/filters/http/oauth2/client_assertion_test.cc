@@ -66,6 +66,7 @@ const char RsaPrivateKeyPem[] = "-----BEGIN PRIVATE KEY-----\n"
                                 "-----END PRIVATE KEY-----";
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::NiceMock;
 using testing::Return;
 
@@ -238,7 +239,7 @@ TEST_F(ClientAssertionTest, TwoAssertionsHaveDifferentJti) {
                               std::chrono::seconds(60), test_time_, random_);
   ASSERT_OK(result1);
   // The two JWTs should differ because jti is different.
-  ASSERT_THAT(result2, ::Envoy::StatusHelpers::IsOkAndHolds(::testing::Ne(result1.value())));
+  ASSERT_THAT(result2, IsOkAndHolds(::testing::Ne(result1.value())));
 
   // Verify the jti values in the payloads.
   std::vector<std::string> parts1 = absl::StrSplit(result1.value(), '.');
