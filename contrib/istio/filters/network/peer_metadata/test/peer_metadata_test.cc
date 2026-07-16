@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -21,6 +22,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 
 #include "test/mocks/local_info/mocks.h"
@@ -29,6 +31,7 @@
 #include "test/mocks/upstream/host.h"
 
 #include "absl/strings/str_cat.h"
+#include "contrib/istio/filters/common/source/peer_metadata_registry.h"
 #include "contrib/istio/filters/network/peer_metadata/source/peer_metadata.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -44,26 +47,64 @@ constexpr absl::string_view defaultIdentity = "spiffe://cluster.local/ns/default
 constexpr absl::string_view defaultBaggage =
     "k8s.deployment.name=server,service.name=server-service,service.version=v2,k8s.namespace.name="
     "default,k8s.cluster.name=cluster";
+constexpr absl::string_view defaultConnectionId = "1234";
 
 using ::testing::Const;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
 
-bool parsePeerMetadataHeader(const std::string& data, PeerMetadataHeader& header) {
-  if (data.size() < sizeof(header)) {
-    return false;
+// In-memory PeerMetadataRegistry used by tests to stand in for the thread-local
+// registry that hands peer metadata from the listener-side filter to the
+// upstream (cluster-side) filter.
+class TestPeerMetadataRegistry : public Filters::Common::PeerMetadataShared::PeerMetadataRegistry {
+public:
+  void setValue(absl::string_view key, const std::string& value) override {
+    store_[std::string(key)] = value;
   }
-  std::memcpy(&header, data.data(), sizeof(header));
-  return true;
+
+  std::optional<std::string> getValue(absl::string_view key) const override {
+    const auto it = store_.find(std::string(key));
+    if (it == store_.end()) {
+      return std::nullopt;
+    }
+    return it->second;
+  }
+
+  void removeValue(absl::string_view key) override { store_.erase(std::string(key)); }
+
+private:
+  std::map<std::string, std::string> store_;
+};
+
+// Serializes peer metadata the same way the listener-side filter stores it in
+// the registry: a google.protobuf.Struct packed into an Any.
+std::string encodePeerMetadata(absl::string_view baggage, absl::string_view identity) {
+  std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
+      Istio::Common::convertBaggageToWorkloadMetadata(baggage, identity);
+  Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
+  Protobuf::Any wrapped;
+  std::ignore = wrapped.PackFrom(data);
+  return wrapped.SerializeAsString();
 }
 
-bool parsePeerMetadata(const std::string& data, PeerMetadataHeader& header, Protobuf::Any& any) {
-  if (!parsePeerMetadataHeader(data, header)) {
-    return false;
+// Decodes a value stored in the registry back into a WorkloadMetadataObject.
+std::optional<Istio::Common::WorkloadMetadataObject>
+decodePeerMetadata(const std::string& serialized) {
+  Protobuf::Any any;
+  if (!any.ParseFromString(serialized)) {
+    return std::nullopt;
   }
-  return any.ParseFromArray(data.data() + sizeof(header), data.size() - sizeof(header));
+  Protobuf::Struct data;
+  if (!any.UnpackTo(&data)) {
+    return std::nullopt;
+  }
+  std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
+      Istio::Common::convertStructToWorkloadMetadata(data);
+  if (!metadata) {
+    return std::nullopt;
+  }
+  return *metadata;
 }
 
 Config configWithBaggageKey(absl::string_view baggage_key) {
@@ -124,9 +165,16 @@ public:
     ON_CALL(Const(write_filter_callbacks_.connection_), streamInfo())
         .WillByDefault(ReturnRef(stream_info_));
 
-    filter_ = std::make_unique<Filter>(config, local_info_);
+    filter_ = std::make_unique<Filter>(config, local_info_, registry_);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_filter_callbacks_);
+  }
+
+  void setConnectionId(absl::string_view id) {
+    stream_info_.filterState()->setData(
+        Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey,
+        std::make_shared<Router::StringAccessorImpl>(id),
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   ::envoy::config::core::v3::Node node_metadata_;
@@ -135,6 +183,8 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_filter_callbacks_;
   std::vector<std::string> sans_;
+  std::shared_ptr<TestPeerMetadataRegistry> registry_ =
+      std::make_shared<TestPeerMetadataRegistry>();
   std::unique_ptr<Filter> filter_;
 };
 
@@ -174,30 +224,18 @@ TEST_F(PeerMetadataFilterTest, TestPeerMetadataDiscoveredAndPropagated) {
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
 
-  std::string injected;
-  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
-      .WillRepeatedly(Invoke([&injected](Buffer::Instance& buffer, bool) {
-        injected = std::string(static_cast<const char*>(buffer.linearize(buffer.length())),
-                               buffer.length());
-      }));
+  setConnectionId(defaultConnectionId);
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
   Buffer::OwnedImpl data;
   EXPECT_EQ(filter_->onWrite(data, /*end_stream*/ false), Network::FilterStatus::Continue);
-  EXPECT_FALSE(injected.empty());
 
-  PeerMetadataHeader header;
-  Protobuf::Any any;
-  EXPECT_TRUE(parsePeerMetadata(injected, header, any));
-  EXPECT_EQ(header.magic, PeerMetadataHeader::magic_number);
-  EXPECT_GT(header.data_size, 0);
+  const auto stored = registry_->getValue(defaultConnectionId);
+  ASSERT_TRUE(stored.has_value());
 
-  Protobuf::Struct metadata;
-  EXPECT_TRUE(any.UnpackTo(&metadata));
-
-  std::unique_ptr<Istio::Common::WorkloadMetadataObject> workload =
-      Istio::Common::convertStructToWorkloadMetadata(metadata);
+  const auto workload = decodePeerMetadata(*stored);
+  ASSERT_TRUE(workload.has_value());
   EXPECT_EQ(workload->baggage(), baggage);
   EXPECT_EQ(workload->identity(), identity);
 }
@@ -211,23 +249,14 @@ TEST_F(PeerMetadataFilterTest, TestNoFiltersStateFromTcpProxy) {
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
 
-  std::string injected;
-  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
-      .WillRepeatedly(Invoke([&injected](Buffer::Instance& buffer, bool) {
-        injected = std::string(static_cast<const char*>(buffer.linearize(buffer.length())),
-                               buffer.length());
-      }));
+  setConnectionId(defaultConnectionId);
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
   Buffer::OwnedImpl data;
   EXPECT_EQ(filter_->onWrite(data, /*end_stream*/ false), Network::FilterStatus::Continue);
-  EXPECT_FALSE(injected.empty());
 
-  PeerMetadataHeader header;
-  EXPECT_TRUE(parsePeerMetadataHeader(injected, header));
-  EXPECT_EQ(header.magic, PeerMetadataHeader::magic_number);
-  EXPECT_EQ(header.data_size, 0);
+  EXPECT_FALSE(registry_->getValue(defaultConnectionId).has_value());
 }
 
 TEST_F(PeerMetadataFilterTest, TestNoBaggageHeaderFromTcpProxy) {
@@ -243,23 +272,14 @@ TEST_F(PeerMetadataFilterTest, TestNoBaggageHeaderFromTcpProxy) {
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
 
-  std::string injected;
-  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
-      .WillRepeatedly(Invoke([&injected](Buffer::Instance& buffer, bool) {
-        injected = std::string(static_cast<const char*>(buffer.linearize(buffer.length())),
-                               buffer.length());
-      }));
+  setConnectionId(defaultConnectionId);
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
   Buffer::OwnedImpl data;
   EXPECT_EQ(filter_->onWrite(data, /*end_stream*/ false), Network::FilterStatus::Continue);
-  EXPECT_FALSE(injected.empty());
 
-  PeerMetadataHeader header;
-  EXPECT_TRUE(parsePeerMetadataHeader(injected, header));
-  EXPECT_EQ(header.magic, PeerMetadataHeader::magic_number);
-  EXPECT_EQ(header.data_size, 0);
+  EXPECT_FALSE(registry_->getValue(defaultConnectionId).has_value());
 }
 
 TEST_F(PeerMetadataFilterTest, TestDisablePeerDiscovery) {
@@ -275,21 +295,15 @@ TEST_F(PeerMetadataFilterTest, TestDisablePeerDiscovery) {
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
 
+  setConnectionId(defaultConnectionId);
   disablePeerDiscovery();
-
-  std::string injected;
-  ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
-      .WillByDefault(Invoke([&injected](Buffer::Instance& buffer, bool) {
-        injected = std::string(static_cast<const char*>(buffer.linearize(buffer.length())),
-                               buffer.length());
-      }));
-  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false)).Times(0);
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
   Buffer::OwnedImpl data;
   EXPECT_EQ(filter_->onWrite(data, /*end_stream*/ false), Network::FilterStatus::Continue);
-  EXPECT_TRUE(injected.empty());
+
+  EXPECT_FALSE(registry_->getValue(defaultConnectionId).has_value());
 }
 
 std::shared_ptr<NiceMock<Upstream::MockHostDescription>>
@@ -308,26 +322,6 @@ std::shared_ptr<NiceMock<Upstream::MockHostDescription>> makeIpv4Host(absl::stri
   return host;
 }
 
-std::string encodePeerMetadataHeaderOnly(const PeerMetadataHeader& header) {
-  return std::string(absl::string_view(reinterpret_cast<const char*>(&header), sizeof(header)));
-}
-
-std::string encodeMetadataOnly(absl::string_view baggage, absl::string_view identity) {
-  std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
-      Istio::Common::convertBaggageToWorkloadMetadata(baggage, identity);
-  Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
-  Protobuf::Any wrapped;
-  std::ignore = wrapped.PackFrom(data);
-  return wrapped.SerializeAsString();
-}
-
-std::string encodePeerMetadata(absl::string_view baggage, absl::string_view identity) {
-  std::string metadata = encodeMetadataOnly(baggage, identity);
-  PeerMetadataHeader header{PeerMetadataHeader::magic_number,
-                            static_cast<uint32_t>(metadata.size())};
-  return encodePeerMetadataHeaderOnly(header) + metadata;
-}
-
 class PeerMetadataUpstreamFilterTest : public ::testing::Test {
 public:
   void initialize() {
@@ -336,8 +330,15 @@ public:
 
     host_metadata_ = std::make_shared<::envoy::config::core::v3::Metadata>();
 
-    filter_ = std::make_unique<UpstreamFilter>();
+    filter_ = std::make_unique<UpstreamFilter>(registry_);
     filter_->initializeReadFilterCallbacks(callbacks_);
+  }
+
+  void setConnectionId(absl::string_view id) {
+    stream_info_.filterState()->setData(
+        Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey,
+        std::make_shared<Router::StringAccessorImpl>(id),
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   ::envoy::config::core::v3::Metadata& hostMetadata() { return *host_metadata_; }
@@ -379,22 +380,29 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> callbacks_;
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_;
   std::shared_ptr<::envoy::config::core::v3::Metadata> host_metadata_;
+  std::shared_ptr<TestPeerMetadataRegistry> registry_ =
+      std::make_shared<TestPeerMetadataRegistry>();
   std::unique_ptr<UpstreamFilter> filter_;
 };
 
 TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
   initialize();
   setUpstreamHost(makeInternalListenerHost("connect_originate"));
+  setConnectionId(defaultConnectionId);
+  registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
+  const std::string payload{"application data"};
   Buffer::OwnedImpl data;
-  data.add(encodePeerMetadata(defaultBaggage, defaultIdentity));
+  data.add(payload);
   EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  EXPECT_EQ(data.length(), 0);
+  // The registry entry is consumed once read.
+  EXPECT_FALSE(registry_->getValue(defaultConnectionId).has_value());
+
   const auto peer_info = peerInfoFromFilterState();
-  EXPECT_TRUE(peer_info.has_value());
+  ASSERT_TRUE(peer_info.has_value());
   EXPECT_EQ(peer_info->identity(), defaultIdentity);
   EXPECT_EQ(peer_info->baggage(), defaultBaggage);
 }
@@ -402,14 +410,18 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
 TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForUnknownInternalListeners) {
   initialize();
   setUpstreamHost(makeInternalListenerHost("not_connect_originate"));
+  setConnectionId(defaultConnectionId);
+  registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
-  std::string peer_metadata = encodePeerMetadata(defaultBaggage, defaultIdentity);
+  const std::string payload{"application data"};
   Buffer::OwnedImpl data;
-  data.add(peer_metadata);
+  data.add(payload);
   EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
-  EXPECT_EQ(data.length(), peer_metadata.size());
+
+  // Internal listener is unknown, so the registry entry is left untouched.
+  EXPECT_TRUE(registry_->getValue(defaultConnectionId).has_value());
   const auto peer_info = peerInfoFromFilterState();
   EXPECT_FALSE(peer_info.has_value());
 }
@@ -417,14 +429,18 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForUnknownInte
 TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForExternalHosts) {
   initialize();
   setUpstreamHost(makeIpv4Host("192.168.0.1"));
+  setConnectionId(defaultConnectionId);
+  registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
-  std::string peer_metadata = encodePeerMetadata(defaultBaggage, defaultIdentity);
+  const std::string payload{"application data"};
   Buffer::OwnedImpl data;
-  data.add(peer_metadata);
+  data.add(payload);
   EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
-  EXPECT_EQ(data.length(), peer_metadata.size());
+
+  EXPECT_EQ(data.length(), payload.size());
+  EXPECT_TRUE(registry_->getValue(defaultConnectionId).has_value());
   const auto peer_info = peerInfoFromFilterState();
   EXPECT_FALSE(peer_info.has_value());
 }
@@ -438,14 +454,17 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
   (*fields)[FilterNames::get().DisableDiscoveryField].set_bool_value(true);
   (*hostMetadata().mutable_filter_metadata())[FilterNames::get().Name].MergeFrom(metadata);
 
+  setConnectionId(defaultConnectionId);
+  registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
+
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
-  std::string peer_metadata = encodePeerMetadata(defaultBaggage, defaultIdentity);
+  const std::string payload{"application data"};
   Buffer::OwnedImpl data;
-  data.add(peer_metadata);
+  data.add(payload);
   EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  EXPECT_EQ(data.length(), peer_metadata.size());
+  EXPECT_TRUE(registry_->getValue(defaultConnectionId).has_value());
   const auto peer_info = peerInfoFromFilterState();
   EXPECT_FALSE(peer_info.has_value());
 }
@@ -459,30 +478,17 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
   (*fields2)[FilterNames::get().DisableDiscoveryField].set_bool_value(true);
   (*clusterMetadata().mutable_filter_metadata())[FilterNames::get().Name].MergeFrom(metadata2);
 
-  EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
-
-  std::string peer_metadata = encodePeerMetadata(defaultBaggage, defaultIdentity);
-  Buffer::OwnedImpl data;
-  data.add(peer_metadata);
-  EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
-
-  EXPECT_EQ(data.length(), peer_metadata.size());
-  const auto peer_info = peerInfoFromFilterState();
-  EXPECT_FALSE(peer_info.has_value());
-}
-
-TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenMalformed) {
-  initialize();
-  setUpstreamHost(makeInternalListenerHost("connect_originate"));
+  setConnectionId(defaultConnectionId);
+  registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
-  std::string malformed{"well hello there, my friend!"};
+  const std::string payload{"application data"};
   Buffer::OwnedImpl data;
-  data.add(malformed);
+  data.add(payload);
   EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  EXPECT_EQ(data.length(), malformed.size());
+  EXPECT_TRUE(registry_->getValue(defaultConnectionId).has_value());
   const auto peer_info = peerInfoFromFilterState();
   EXPECT_FALSE(peer_info.has_value());
 }
