@@ -17,8 +17,6 @@ namespace Cache {
 namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
 
 class CacheFilterFactoryTest : public ::testing::Test {
 protected:
@@ -60,9 +58,8 @@ TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
   std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::cache::v3::CacheConfig());
   auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_THAT(status_or, Not(IsOk()));
-  EXPECT_THAT(status_or.status().message(),
-              testing::HasSubstr("Didn't find a registered implementation for type"));
+  EXPECT_THAT(status_or, HasStatusMessage(testing::HasSubstr(
+                             "Didn't find a registered implementation for type")));
 }
 
 } // namespace
