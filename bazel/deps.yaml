@@ -1273,7 +1273,7 @@ proxy_wasm_rust_sdk:
   project_name: "WebAssembly for Proxies (Rust SDK)"
   project_desc: "WebAssembly for Proxies (Rust SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk"
-  release_date: "2025-10-01"
+  release_date: "2026-05-20"
   use_category:
   - test_only
   license: "Apache-2.0"
