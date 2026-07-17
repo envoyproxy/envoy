@@ -36,6 +36,12 @@ struct Watch {
   // Whether the most recent update contained any resources this watch cares about.
   // If true, a new update that also contains no resources can skip this watch.
   bool state_of_the_world_empty_{true};
+  // Glob patterns this watch accepts via accept() (the "*" wildcard and/or
+  // "<prefix>/*" suffix globs). These affect routing only and never the subscription; a watch that
+  // holds any of them is never treated as a catch-all (empty-interest) wildcard watch. This is the
+  // forward index; the WatchMap keeps the reverse index in accept_wildcard_watches_ and
+  // accept_prefix_watches_ (mirroring resource_names_ <-> watch_interest_).
+  absl::flat_hash_set<std::string> accept_patterns_;
 };
 
 // NOTE: Users are responsible for eventually calling removeWatch() on the Watch* returned
@@ -72,10 +78,10 @@ struct Watch {
 // the resource from the cache.
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
-  WatchMap(const bool use_namespace_matching, const std::string& type_url,
-           CustomConfigValidators* config_validators, EdsResourcesCacheOptRef eds_resources_cache)
-      : use_namespace_matching_(use_namespace_matching), type_url_(type_url),
-        config_validators_(config_validators), eds_resources_cache_(eds_resources_cache) {
+  WatchMap(const std::string& type_url, CustomConfigValidators* config_validators,
+           EdsResourcesCacheOptRef eds_resources_cache)
+      : type_url_(type_url), config_validators_(config_validators),
+        eds_resources_cache_(eds_resources_cache) {
     // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
     ASSERT(!eds_resources_cache_.has_value() ||
            (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()));
@@ -93,6 +99,30 @@ public:
   //    Y will be in removed_.
   AddedRemoved updateWatchInterest(Watch* watch,
                                    const absl::flat_hash_set<std::string>& update_to_these_names);
+
+  // Additive counterpart to updateWatchInterest(): adds 'resources_to_add' to the watch's interest
+  // without disturbing the names it already watches. Returns, in added_, the names that are new
+  // across the entire subscription (the caller should subscribe to these); removed_ is always
+  // empty. A name of the form "<prefix>/*" registers a suffix-glob interest: the watch will then
+  // receive every resource named "<prefix>/<id>". This is how a watch can accept resources that
+  // were not named at addWatch() time (e.g. on-demand or VHDS virtual hosts).
+  AddedRemoved appendWatchInterest(Watch* watch,
+                                   const absl::flat_hash_set<std::string>& resources_to_add);
+
+  // Declares the routing-acceptance patterns for the given watch (replacing any previously declared
+  // patterns). These are evaluated FIRST and take precedence: a watch that has declared any accept
+  // pattern is routed only the resources matching 'patterns' (plus the concrete names it watches),
+  // and is never treated as a catch-all wildcard watch -- even if its resource_names_ is empty or
+  // contains "*". This lets a watch subscribe to the wildcard on the wire while routing only a
+  // subset (e.g. VHDS virtual hosts under a route configuration). To keep wildcard routing, include
+  // "*" in the patterns.
+  //
+  // Each pattern must be the wildcard "*" (accept every resource) or a "<prefix>/*" glob (accept
+  // every resource named "<prefix>/..."). Unlike updateWatchInterest()/appendWatchInterest(), this
+  // affects routing ONLY: the patterns are held in dedicated structures, are never added to
+  // watch_interest_, and never contribute to the subscription sent to the management server.
+  // Passing an empty set clears the previously declared patterns and restores default routing.
+  void accept(Watch* watch, const absl::flat_hash_set<std::string>& patterns);
 
   // Expects that the watch to be removed has already had all of its resource names removed via
   // updateWatchInterest().
@@ -120,6 +150,17 @@ public:
 
 private:
   void removeDeferredWatches();
+
+  // Erases the watch from every routing structure (wildcard, glob, and named interest).
+  void forgetWatch(Watch* watch);
+  void forgetAccept(Watch* watch);
+
+  // Returns true if 'watch' is still referenced by any watch_interest_ entry. Used only by the
+  // removeWatch() debug assertion that enforces the drain-first contract.
+  bool watchTrackedInInterest(Watch* watch);
+
+  // Updates wildcard_watches_ based on the current state of the given watch.
+  void updateWildcardWatches(Watch* watch);
 
   // Given a list of names that are new to an individual watch, returns those names that are in fact
   // new to the entire subscription.
@@ -149,7 +190,14 @@ private:
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
 
-  const bool use_namespace_matching_;
+  // Glob interest registered via accept(). Unlike wildcard_watches_/watch_interest_
+  // above, these affect routing only and never contribute to the subscription. Parallel to
+  // wildcard_watches_: watches that accept every resource (registered with "*").
+  absl::flat_hash_set<Watch*> accept_wildcard_watches_;
+  // Parallel to watch_interest_: maps a name prefix P (from a "P/*" pattern) to the watches that
+  // accept every resource named "P/...".
+  absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> accept_prefix_watches_;
+
   const std::string type_url_;
   CustomConfigValidators* config_validators_;
   EdsResourcesCacheOptRef eds_resources_cache_;

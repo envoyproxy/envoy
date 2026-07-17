@@ -30,19 +30,80 @@ Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
   return watch_ptr;
 }
 
+void WatchMap::forgetWatch(Watch* watch) {
+  wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
+  forgetAccept(watch);
+  watches_.erase(watch);
+}
+
+bool WatchMap::watchTrackedInInterest(Watch* watch) {
+  for (const auto& [name, watches] : watch_interest_) {
+    if (watches.contains(watch)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void WatchMap::forgetAccept(Watch* watch) {
+  // Remove this watch from the glob reverse-index, using its own record of accepted patterns.
+  for (absl::string_view pattern : watch->accept_patterns_) {
+    if (pattern == Wildcard) {
+      accept_wildcard_watches_.erase(watch);
+      continue;
+    }
+    // "<prefix>/*" -- keyed by "<prefix>".
+    auto it = accept_prefix_watches_.find(pattern.substr(0, pattern.size() - 2));
+    if (it != accept_prefix_watches_.end()) {
+      it->second.erase(watch);
+      if (it->second.empty()) {
+        accept_prefix_watches_.erase(it);
+      }
+    }
+  }
+}
+
+void WatchMap::updateWildcardWatches(Watch* watch) {
+  // accept() patterns are evaluated FIRST and take precedence: a watch that has declared any
+  // accept() pattern is routed by those patterns (plus its concrete names) only, so it is never a
+  // catch-all wildcard watch here -- even if its resource_names_ is empty or contains "*". This is
+  // what lets a watch subscribe to the wildcard on the wire while routing only a subset (e.g.
+  // VHDS). To keep wildcard routing while using accept(), the caller includes "*" in the accept()
+  // patterns, which is tracked separately in accept_wildcard_watches_.
+  if (!watch->accept_patterns_.empty()) {
+    wildcard_watches_.erase(watch);
+    return;
+  }
+  // No accept() filter: the watched set defines routing. An explicit "*" or an empty watched set
+  // makes the watch a catch-all wildcard; otherwise it is routed only its specific resource names.
+  if (watch->resource_names_.contains(Wildcard) || watch->resource_names_.empty()) {
+    wildcard_watches_.insert(watch);
+  } else {
+    wildcard_watches_.erase(watch);
+  }
+}
+
 void WatchMap::removeWatch(Watch* watch) {
+  // Contract: the caller must first empty this watch's resource-name interest via
+  // updateWatchInterest(watch, {}) so that the per-name reference counts in watch_interest_ are
+  // decremented and any resulting server-side unsubscribe is emitted (see findRemovals()). Removal
+  // here only cleans the membership structures (wildcard_watches_, the accept_*
+  // indices, watches_); it deliberately does not touch watch_interest_. If the watch is still
+  // referenced by any watch_interest_ entry, a resource name was leaked (and the server never told
+  // to unsubscribe it), so fail loudly in debug builds.
+  ASSERT(!watchTrackedInInterest(watch),
+         "removeWatch() called before the watch's resource names were drained via "
+         "updateWatchInterest(watch, {})");
   if (deferred_removed_during_update_ != nullptr) {
     deferred_removed_during_update_->insert(watch);
   } else {
-    wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
-    watches_.erase(watch);
+    forgetWatch(watch);
   }
 }
 
 void WatchMap::removeDeferredWatches() {
-  for (auto& watch : *deferred_removed_during_update_) {
-    wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
-    watches_.erase(watch);
+  for (auto* watch : *deferred_removed_during_update_) {
+    forgetWatch(watch);
   }
   deferred_removed_during_update_ = nullptr;
 }
@@ -50,12 +111,6 @@ void WatchMap::removeDeferredWatches() {
 AddedRemoved
 WatchMap::updateWatchInterest(Watch* watch,
                               const absl::flat_hash_set<std::string>& update_to_these_names) {
-  if (update_to_these_names.empty() || update_to_these_names.contains(Wildcard)) {
-    wildcard_watches_.insert(watch);
-  } else {
-    wildcard_watches_.erase(watch);
-  }
-
   absl::flat_hash_set<std::string> newly_added_to_watch;
   SetUtil::setDifference(update_to_these_names, watch->resource_names_, newly_added_to_watch);
 
@@ -63,6 +118,7 @@ WatchMap::updateWatchInterest(Watch* watch,
   SetUtil::setDifference(watch->resource_names_, update_to_these_names, newly_removed_from_watch);
 
   watch->resource_names_ = update_to_these_names;
+  updateWildcardWatches(watch);
 
   // First resources are added and only then removed, so a watch won't be removed
   // if its interest has been replaced (rather than completely removed).
@@ -80,10 +136,56 @@ WatchMap::updateWatchInterest(Watch* watch,
   return {std::move(added_resources), std::move(removed_resources)};
 }
 
+AddedRemoved
+WatchMap::appendWatchInterest(Watch* watch,
+                              const absl::flat_hash_set<std::string>& resources_to_add) {
+  absl::flat_hash_set<std::string> newly_added_to_watch;
+  for (const auto& name : resources_to_add) {
+    if (watch->resource_names_.insert(name).second) {
+      newly_added_to_watch.insert(name);
+    }
+  }
+
+  updateWildcardWatches(watch);
+
+  absl::flat_hash_set<std::string> added_resources = findAdditions(newly_added_to_watch, watch);
+  return {std::move(added_resources), {}};
+}
+
+void WatchMap::accept(Watch* watch, const absl::flat_hash_set<std::string>& patterns) {
+  // Forget any previous other-resource interest, so we can precisely update the reverse-index.
+  forgetAccept(watch);
+  watch->accept_patterns_.clear();
+
+  for (absl::string_view pattern : patterns) {
+    if (pattern == Wildcard) {
+      accept_wildcard_watches_.insert(watch);
+    } else if (absl::EndsWith(pattern, "/*")) {
+      // A "<prefix>/*" glob: accept every resource named "<prefix>/...". Keyed by "<prefix>".
+      accept_prefix_watches_[pattern.substr(0, pattern.size() - 2)].insert(watch);
+    } else {
+      IS_ENVOY_BUG("accept() requires the '*' wildcard or a '<prefix>/*' glob");
+      continue;
+    }
+    // Record the pattern on the watch itself (forward index), so it can be cleaned up precisely.
+    watch->accept_patterns_.insert(std::string(pattern));
+  }
+
+  updateWildcardWatches(watch);
+}
+
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
-  absl::flat_hash_set<Watch*> ret;
-  if (!use_namespace_matching_) {
-    ret = wildcard_watches_;
+  absl::flat_hash_set<Watch*> ret = wildcard_watches_;
+  // Watches that accepted every other resource via accept("*").
+  ret.insert(accept_wildcard_watches_.begin(), accept_wildcard_watches_.end());
+  // Watches that accepted this resource's prefix via accept("<prefix>/*").
+  if (!accept_prefix_watches_.empty()) {
+    const std::string prefix = namespaceFromName(resource_name);
+    if (!prefix.empty()) {
+      if (auto it = accept_prefix_watches_.find(prefix); it != accept_prefix_watches_.end()) {
+        ret.insert(it->second.begin(), it->second.end());
+      }
+    }
   }
   const bool is_xdstp = XdsResourceIdentifier::hasXdsTpScheme(resource_name);
   xds::core::v3::ResourceName xdstp_resource;
@@ -105,9 +207,7 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
   // only happen for glob collections. TODO(htuch): It should be possible to have much more
   // efficient matchers here.
   if (watches_interested == watch_interest_.end()) {
-    if (use_namespace_matching_) {
-      watches_interested = watch_interest_.find(namespaceFromName(resource_name));
-    } else if (is_xdstp) {
+    if (is_xdstp) {
       // Replace resource name component with glob for purpose of matching.
       const auto pos = xdstp_resource.id().find_last_of('/');
       xdstp_resource.set_id(pos == std::string::npos ? "*"

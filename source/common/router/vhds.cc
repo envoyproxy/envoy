@@ -73,15 +73,20 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       init_target_(fmt::format("VhdsConfigSubscription {}",
                                config_update_info_->protobufConfigurationCast().name()),
                    [this]() {
-                     subscription_->start(
-                         {config_update_info_->protobufConfigurationCast().name()});
+                     // Start with no concrete subscription; virtual hosts are fetched on demand.
+                     // Accept every resource under this route configuration's namespace, so that
+                     // on-demand virtual hosts -- whose resource names are
+                     // "<route_config_name>/<vhost>" -- are routed back to this subscription's
+                     // watch without being subscribed on the wire.
+                     subscription_->accept(
+                         {config_update_info_->protobufConfigurationCast().name() + "/*"});
+                     subscription_->start({});
                    }),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name"),
       route_config_provider_(route_config_provider) {
   const auto resource_name = resource_type_helper_.getResourceName();
   Envoy::Config::SubscriptionOptions options;
-  options.use_namespace_matching_ = true;
   absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfigurationCast().vhds().config_source(),
