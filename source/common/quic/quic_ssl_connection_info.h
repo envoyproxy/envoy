@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/common/empty_string.h"
-#include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/tls/connection_info_impl_base.h"
 
 #include "quiche/quic/core/quic_session.h"
@@ -26,25 +25,25 @@ public:
 
   uint16_t ciphersuiteId() const override {
     auto* crypto_stream = session_.GetCryptoStream();
-    QUICHE_DCHECK(crypto_stream != nullptr);
+    ASSERT(crypto_stream != nullptr);
     return crypto_stream->CiphersuiteId();
   }
 
   std::string ciphersuiteString() const override {
     auto* crypto_stream = session_.GetCryptoStream();
-    QUICHE_DCHECK(crypto_stream != nullptr);
+    ASSERT(crypto_stream != nullptr);
     return std::string(crypto_stream->CiphersuiteString());
   }
 
   uint16_t tlsGroupId() const override {
     auto* crypto_stream = session_.GetCryptoStream();
-    QUICHE_DCHECK(crypto_stream != nullptr);
+    ASSERT(crypto_stream != nullptr);
     return crypto_stream->TlsGroupId();
   }
 
   absl::string_view tlsGroupString() const override {
     auto* crypto_stream = session_.GetCryptoStream();
-    QUICHE_DCHECK(crypto_stream != nullptr);
+    ASSERT(crypto_stream != nullptr);
     return crypto_stream->TlsGroupString();
   }
 
@@ -56,7 +55,7 @@ public:
   const std::string& alpn() const override {
     if (!alpn_.has_value()) {
       auto* crypto_stream = session_.GetCryptoStream();
-      QUICHE_DCHECK(crypto_stream != nullptr);
+      ASSERT(crypto_stream != nullptr);
       alpn_ = std::string(crypto_stream->Alpn());
     }
     return *alpn_;
@@ -65,7 +64,7 @@ public:
   const std::string& sni() const override {
     if (!sni_.has_value()) {
       auto* crypto_stream = session_.GetCryptoStream();
-      QUICHE_DCHECK(crypto_stream != nullptr);
+      ASSERT(crypto_stream != nullptr);
       sni_ = std::string(crypto_stream->Sni());
     }
     return *sni_;
