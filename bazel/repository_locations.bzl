@@ -306,8 +306,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
     ),
     dd_trace_cpp = dict(
-        version = "2.1.0",
-        sha256 = "8152fb69e61518a5b55ecb96edcbb19585f8950b6f070ac98ebd0b6dd6177492",
+        version = "2.1.1",
+        sha256 = "3e8d2a12c434b766ac92c1fcec07f49b92b8a12902f97e6c54839a65abe44649",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
     ),
