@@ -46,7 +46,7 @@ public:
 
 protected:
   // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
-  // QUIC's SSL object uses the CRYPTO_BUFFER-based method, so the default X509-based peer
+  // The QUIC SSL object uses the CRYPTO_BUFFER-based method, so the default X509-based peer
   // certificate getters are not usable on it. Convert the CRYPTO_BUFFER peer chain to X509 once
   // and serve the base class accessors from the converted chain.
   bssl::UniquePtr<X509> peerCertificate() const override;
