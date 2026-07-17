@@ -636,7 +636,7 @@ cel_spec:
   project_name: "Common Expression Language (CEL) spec"
   project_desc: "Common Expression Language (CEL) spec and conformance tests"
   project_url: "https://opensource.google/projects/cel"
-  release_date: "2025-11-10"
+  release_date: "2026-05-08"
   use_category:
   - dataplane_ext
   extensions:

@@ -571,8 +571,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "gurl-{version}",
     ),
     cel_spec = dict(
-        version = "0.25.1",
-        sha256 = "13583c5a312861648449845b709722676a3c9b43396b6b8e9cbe4538feb74ad2",
+        version = "0.25.2",
+        sha256 = "6bd7bbf973c6cd56136e7a5ec8efe61b7656fc52813350bc2807224551f515e7",
         strip_prefix = "cel-spec-{version}",
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
