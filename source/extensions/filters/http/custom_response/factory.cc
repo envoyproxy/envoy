@@ -7,16 +7,28 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
+absl::StatusOr<::Envoy::Http::FilterFactoryCb> CustomResponseFilterFactory::createFilterFactory(
+    const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
+    const std::string& stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context) {
+  Stats::StatNameManagedStorage prefix(stats_prefix, context.scope().symbolTable());
+  auto config_ptr = std::make_shared<FilterConfig>(config, context, prefix.statName());
+  return [config_ptr](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) mutable -> void {
+    callbacks.addStreamFilter(std::make_shared<CustomResponseFilter>(config_ptr));
+  };
+}
+
 absl::StatusOr<::Envoy::Http::FilterFactoryCb>
 CustomResponseFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     const std::string& stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-  Stats::StatNameManagedStorage prefix(stats_prefix, context.scope().symbolTable());
-  auto config_ptr =
-      std::make_shared<FilterConfig>(config, context.serverFactoryContext(), prefix.statName());
-  return [config_ptr](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) mutable -> void {
-    callbacks.addStreamFilter(std::make_shared<CustomResponseFilter>(config_ptr));
-  };
+  return createFilterFactory(config, stats_prefix, context.serverFactoryContext());
+}
+
+absl::StatusOr<::Envoy::Http::FilterFactoryCb>
+CustomResponseFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
+    const std::string& stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(config, stats_prefix, context);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
