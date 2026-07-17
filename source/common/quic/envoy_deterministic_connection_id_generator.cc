@@ -93,8 +93,7 @@ EnvoyDeterministicConnectionIdGeneratorFactory::createCompatibleLinuxBpfSocketOp
       absl::string_view(reinterpret_cast<char*>(&prog_), sizeof(prog_)));
 #else
   UNREFERENCED_PARAMETER(concurrency);
-  return absl::UnimplementedError(
-      "envoy.quic.deterministic_connection_id_generator is not implemented on this platform");
+  return absl::UnimplementedError("BPF packet routing is not implemented on this platform");
 #endif
 }
 
