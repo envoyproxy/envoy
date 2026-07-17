@@ -126,7 +126,8 @@ public:
   // Helper to initialize the real config for delegation
   void initializeRealConfig(const ProtoApiScrubberConfig& proto_config,
                             Server::Configuration::FactoryContext& context) {
-    auto config_or_status = ProtoApiScrubberFilterConfig::create(proto_config, context);
+    auto config_or_status = ProtoApiScrubberFilterConfig::create(
+        proto_config, context.serverFactoryContext(), context.scope());
     ASSERT_TRUE(config_or_status.ok());
     real_config_ = config_or_status.value();
   }

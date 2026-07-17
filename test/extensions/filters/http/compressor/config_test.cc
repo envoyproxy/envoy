@@ -6,6 +6,7 @@
 #include "source/extensions/filters/http/compressor/config.h"
 
 #include "test/extensions/filters/http/compressor/mock_compressor_library.pb.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -18,6 +19,7 @@ namespace HttpFilters {
 namespace Compressor {
 namespace {
 
+using testing::_;
 using testing::NiceMock;
 
 const ::test::mock_compressor_library::Unregistered _mock_compressor_library_dummy;
@@ -145,6 +147,31 @@ TEST(CompressorFilterFactoryTests, PerRouteWithGenericFactoryContext) {
   auto cfg_or = factory.createRouteSpecificFilterConfig(per_route, context,
                                                         context.messageValidationVisitor());
   EXPECT_TRUE(cfg_or.status().ok());
+}
+
+TEST(CompressorFilterFactoryTests, CreateFilterWithServerContext) {
+  const std::string yaml_string = R"EOF(
+  compressor_library:
+    name: test.mock.noop
+    typed_config:
+      "@type": type.googleapis.com/test.mock_compressor_library.Registered
+  )EOF";
+
+  envoy::extensions::filters::http::compressor::v3::Compressor proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  CompressorFilterFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  TestNoopCompressorLibraryFactory factory_impl;
+  Envoy::Registry::InjectFactory<
+      Envoy::Compression::Compressor::NamedCompressorLibraryConfigFactory>
+      reg(factory_impl);
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
 }
 
 TEST(CompressorFilterFactoryTests, EmptyPerRouteConfig) {
