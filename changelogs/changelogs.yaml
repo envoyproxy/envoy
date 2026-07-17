@@ -92,6 +92,8 @@ areas:
     title: redis_proxy
   resource_monitors:
     title: resource_monitors
+  reverse_tunnel:
+    title: reverse_tunnel
   router:
     title: router
   set_metadata_filter:

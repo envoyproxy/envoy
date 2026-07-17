@@ -93,10 +93,83 @@ message Validation {
   string dynamic_metadata_namespace = 4 [(validate.rules).string = {max_len: 255}];
 }
 
+// Inline authentication of the reverse tunnel handshake against a verifiable JWT.
+// When configured on the :ref:`ReverseTunnel
+// <envoy_v3_api_msg_extensions.filters.network.reverse_tunnel.v3.ReverseTunnel>` filter, the bearer
+// token carried in the handshake request is verified **before** the connection is accepted and its
+// socket registered for reuse. A missing or invalid token rejects the handshake with HTTP
+// ``401 Unauthorized`` (unless ``allow_missing_or_failed`` is set), so a forged or expired token can
+// never produce a usable reverse tunnel.
+//
+// On success, the verified claims are emitted as dynamic metadata under
+// ``claims_metadata_namespace`` so the existing :ref:`Validation
+// <envoy_v3_api_msg_extensions.filters.network.reverse_tunnel.v3.Validation>` block can bind a
+// claimed handshake identifier to a verified claim, e.g.::
+//
+//    tenant_id_format: "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:tenant)%"
+//
+// forces the ``x-envoy-reverse-tunnel-tenant-id`` header to equal the verified ``tenant`` claim.
+//
+// .. note::
+//   Experimental, minimal implementation: only inline ``local_jwks`` (synchronous verification) is
+//   supported; asynchronous ``remote_jwks`` fetching is a planned follow-up. The configuration is
+//   deliberately scoped rather than reusing
+//   :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`, whose
+//   remote-fetch, request-param/cookie extraction and upstream-forwarding fields are not meaningful
+//   for an L4 pre-registration handshake; the security-relevant semantics below mirror ``jwt_authn``.
+//
+// .. attention::
+//   Verifying the token proves only that the caller *holds* a valid token; it does **not** by itself
+//   prove the caller is the node/cluster/tenant it claims. To authenticate the claimed identity,
+//   reference a verified claim from the :ref:`validation
+//   <envoy_v3_api_msg_extensions.filters.network.reverse_tunnel.v3.Validation>` block, e.g.
+//   ``tenant_id_format: "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:tenant)%"``.
+//   Without such a binding, a token minted for one tenant can open a tunnel claiming another. Tokens
+//   without an ``exp`` claim are rejected. All top-level claims are published as dynamic metadata
+//   (see ``claims_metadata_namespace``), so do not put secrets in the token.
+// [#next-free-field: 8]
+message JwtHandshakeValidation {
+  // Required. Expected token issuer; the JWT ``iss`` claim must equal this value. A
+  // ``jwt_validation`` block with an empty ``issuer`` is rejected at config load, so a validly
+  // signed token from an unexpected issuer is never accepted.
+  string issuer = 1 [(validate.rules).string = {max_len: 1024}];
+
+  // Allowed audiences. If non-empty, the JWT must carry at least one of these in its ``aud`` claim;
+  // matching is normalized (scheme and trailing slash) exactly as in ``jwt_authn``. If empty, the
+  // audience is not checked.
+  repeated string audiences = 2;
+
+  // Inline JWKS used to verify the token signature. Only inline sources
+  // (``inline_string`` / ``inline_bytes`` / ``filename``) are supported; the JWKS is loaded once at
+  // config time and verification is fully synchronous.
+  config.core.v3.DataSource local_jwks = 3 [(validate.rules).message = {required: true}];
+
+  // Name of the header carrying the token. Defaults to ``authorization``, and a leading ``Bearer ``
+  // prefix is stripped when present.
+  string token_header = 4 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
+
+  // Namespace under which verified claims are emitted as dynamic metadata. Defaults to
+  // ``envoy.filters.network.reverse_tunnel.jwt``. Each top-level JWT claim is written as a field in
+  // this namespace so it can be referenced via ``%DYNAMIC_METADATA(namespace:claim)%`` in the
+  // ``validation`` block.
+  string claims_metadata_namespace = 5 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
+
+  // If ``true``, a missing or invalid token does **not** reject the handshake (verified claims are
+  // simply not published). Useful for a staged rollout / audit mode: rejections that *would* have
+  // occurred are counted by the ``jwt_would_deny`` stat without closing the connection. Defaults to
+  // ``false`` (enforce: a missing or invalid token is rejected with ``401`` and counted by
+  // ``jwt_denied``).
+  bool allow_missing_or_failed = 6;
+
+  // Clock skew, in seconds, allowed when checking the ``exp`` and ``nbf`` time constraints. Mirrors
+  // ``jwt_authn``'s field of the same name. Defaults to 60 seconds when unset (``0``).
+  uint32 clock_skew_seconds = 7;
+}
+
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -145,6 +218,13 @@ message ReverseTunnel {
   // This avoids the cross-worker lock in pickLeastLoadedSocketManager.
   // Default: false (rebalancing enabled).
   bool skip_rebalancing = 8;
+
+  // Optional inline JWT authentication for the handshake. When set, the bearer token carried in the
+  // handshake request is verified before the connection is accepted or its socket registered. This
+  // runs on the real accepted socket, before registration, so it does not interfere with socket
+  // reuse. See :ref:`JwtHandshakeValidation
+  // <envoy_v3_api_msg_extensions.filters.network.reverse_tunnel.v3.JwtHandshakeValidation>`.
+  JwtHandshakeValidation jwt_validation = 10;
 
   // Enforces the per-node concurrent connection cap (``max_connections_per_node``, configured on
   // the ``UpstreamReverseConnectionSocketInterface`` bootstrap extension) for tunnels accepted by

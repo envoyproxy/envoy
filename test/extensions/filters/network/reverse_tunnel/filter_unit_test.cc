@@ -2485,6 +2485,304 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest, ConnectionLimitScopedPerTenan
   EXPECT_TRUE(cfg->validateConnectionLimit("node", "tenant-b"));
 }
 
+// ---------------------------------------------------------------------------
+// Inline JWT handshake authentication (experimental `jwt_validation`).
+// ---------------------------------------------------------------------------
+
+// RS256 JWKS and matching pre-signed tokens, shared with the jwt_authn test fixtures. The tokens
+// carry: iss=https://example.com, sub=test@example.com, aud=example_service. GoodToken expires in
+// 2033 (currently valid); ExpiredToken expired in 2008.
+constexpr absl::string_view kTestJwks = R"EOF(
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "alg": "RS256",
+      "use": "sig",
+      "kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",
+      "n": "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
+      "e": "AQAB"
+    },
+    {
+      "kty": "RSA",
+      "n": "u1SU1LfVLPHCozMxH2Mo4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0_IzW7yWR7QkrmBL7jTKEn5u-qKhbwKfBstIs-bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyehkd3qqGElvW_VDL5AaWTg0nLVkjRo9z-40RQzuVaE8AkAFmxZzow3x-VJYKdjykkJ0iT9wCS0DRTXu269V264Vf_3jvredZiKRkgwlL9xNAwxXFg0x_XFw005UWVRIkdgcKWTjpBP2dPwVZ4WWC-9aGVd-Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbcmw",
+      "e": "AQAB",
+      "alg": "RS256",
+      "use": "sig"
+    }
+  ]
+}
+)EOF";
+
+constexpr absl::string_view kIssuer = "https://example.com";
+
+// {"iss":"https://example.com","sub":"test@example.com","exp":2001001001,"aud":"example_service"}
+constexpr absl::string_view kGoodToken =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
+    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
+    "XVkIjoiZXhhbXBsZV9zZXJ2aWNlIn0.cuui_Syud76B0tqvjESE8IZbX7vzG6xA-M"
+    "Daof1qEFNIoCFT_YQPkseLSUSR2Od3TJcNKk-dKjvUEL1JW3kGnyC1dBx4f3-Xxro"
+    "yL23UbR2eS8TuxO9ZcNCGkjfvH5O4mDb6cVkFHRDEolGhA7XwNiuVgkGJ5Wkrvshi"
+    "h6nqKXcPNaRx9lOaRWg2PkE6ySNoyju7rNfunXYtVxPuUIkl0KMq3WXWRb_cb8a_Z"
+    "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
+    "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
+
+// Same claims but exp=1205005587 (2008-03-08), i.e. expired.
+constexpr absl::string_view kExpiredToken =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
+    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MTIwNTAwNTU4NywiY"
+    "XVkIjoiZXhhbXBsZV9zZXJ2aWNlIn0.izDa6aHNgbsbeRzucE0baXIP7SXOrgopYQ"
+    "ALLFAsKq_N0GvOyqpAZA9nwCAhqCkeKWcL-9gbQe3XJa0KN3FPa2NbW4ChenIjmf2"
+    "QYXOuOQaDu9QRTdHEY2Y4mRy6DiTZAsBHWGA71_cLX-rzTSO_8aC8eIqdHo898oJw"
+    "3E8ISKdryYjayb9X3wtF6KLgNomoD9_nqtOkliuLElD8grO0qHKI1xQurGZNaoeyi"
+    "V1AdwgX_5n3SmQTacVN0WcSgk6YJRZG6VE8PjxZP9bEameBmbSB0810giKRpdTU1-"
+    "RJtjq6aCSTD4CYXtW38T5uko4V-S4zifK3BXeituUTebkgoA";
+
+// {"iss":"https://example.com","sub":"test@example.com","iat":1533175942} — no `exp`.
+constexpr absl::string_view kNonExpiringToken =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
+    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImlhdCI6MTUzMzE3NTk0Mn0.OSh-"
+    "AcY9dCUibXiIZzPlTdEsYH8xP3QkCJDesO3LVu4ndgTrxDnNuR3I4_oV4tjtirmLZD3sx"
+    "96wmLiIhOyqj3nipIdf_aQWcmET0XoRqGixOKse5FlHyU_VC1Jj9AlMvSz9zyCvKxMyP0"
+    "CeA-bhI_Qs-I9vBPK8pd-EUOespUqWMQwNdtrOdXLcvF8EA5BV5G2qRGzCU0QJaW0Dpyj"
+    "YF7ZCswRGorc2oMt5duXSp3-L1b9dDrnLwroxUrmQIZz9qvfwdDR-guyYSjKVQu5NJAyy"
+    "sd8XKNzmHqJ2fYhRjc5s7l5nIWTDyBXSdPKQ8cBnfFKoxaRhmMBjdEn9RB7r6A";
+
+class ReverseTunnelJwtTest : public ReverseTunnelFilterUnitTest {
+protected:
+  // Configures inline JWT auth on `cfg` with the shared test JWKS.
+  void setJwt(envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& cfg,
+              absl::string_view issuer, const std::vector<std::string>& audiences = {},
+              bool allow_missing_or_failed = false) {
+    auto* jwt = cfg.mutable_jwt_validation();
+    jwt->mutable_local_jwks()->set_inline_string(std::string(kTestJwks));
+    jwt->set_issuer(std::string(issuer));
+    for (const auto& audience : audiences) {
+      jwt->add_audiences(audience);
+    }
+    jwt->set_allow_missing_or_failed(allow_missing_or_failed);
+  }
+
+  // Builds a handshake request with optional authorization header value.
+  std::string makeJwtRequest(const std::string& node, const std::string& cluster,
+                             const std::string& tenant, const std::string& authorization) {
+    std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+    req += "Host: localhost\r\n";
+    req += makeRtHeaders(node, cluster, tenant);
+    if (!authorization.empty()) {
+      req += "authorization: " + authorization + "\r\n";
+    }
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
+  }
+
+  // Builds a filter from `cfg`, drives `request_str` through it, and returns the response bytes.
+  std::string
+  runHandshake(const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& cfg,
+               const std::string& request_str) {
+    auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+    EXPECT_TRUE(config_or_error.ok());
+    auto local_config = config_or_error.value();
+    ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+    filter.initializeReadFilterCallbacks(callbacks_);
+
+    std::string written;
+    EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+        .WillRepeatedly(testing::Invoke([&written](Buffer::Instance& data, bool) {
+          written.append(data.toString());
+          data.drain(data.length());
+        }));
+    Buffer::OwnedImpl request(request_str);
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+    return written;
+  }
+
+  uint64_t counter(absl::string_view name) {
+    auto* c = TestUtility::findCounter(stats_store_, std::string(name));
+    return c == nullptr ? 0 : c->value();
+  }
+
+  // Drives a handshake carrying `authorization` and asserts it is rejected before registration:
+  // 401, counted by jwt_denied, and no socket registered (accepted stays 0).
+  void expectRejectedBeforeRegistration(
+      const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& cfg,
+      const std::string& authorization) {
+    const std::string written = runHandshake(cfg, makeJwtRequest("n", "c", "t", authorization));
+    EXPECT_THAT(written, testing::HasSubstr("401 Unauthorized"));
+    EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_denied"));
+    EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+  }
+};
+
+// A valid token is accepted and the handshake completes.
+TEST_F(ReverseTunnelJwtTest, ValidTokenAccepted) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.jwt_denied"));
+}
+
+// SECURITY-CRITICAL: a missing token is rejected before the socket is registered. `accepted == 0`
+// (asserted by the helper) proves the flow returned before processAcceptedConnection.
+TEST_F(ReverseTunnelJwtTest, MissingTokenRejectedBeforeRegistration) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  expectRejectedBeforeRegistration(cfg, /*authorization=*/"");
+}
+
+// An expired token is rejected (time constraint).
+TEST_F(ReverseTunnelJwtTest, ExpiredTokenRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  expectRejectedBeforeRegistration(cfg, absl::StrCat("Bearer ", kExpiredToken));
+}
+
+// A structurally malformed token is rejected (parse failure).
+TEST_F(ReverseTunnelJwtTest, MalformedTokenRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  expectRejectedBeforeRegistration(cfg, "Bearer not.a.valid.jwt");
+}
+
+// A token from an unexpected issuer is rejected (issuer mismatch).
+TEST_F(ReverseTunnelJwtTest, WrongIssuerRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, "https://attacker.example.com");
+  expectRejectedBeforeRegistration(cfg, absl::StrCat("Bearer ", kGoodToken));
+}
+
+// A token whose audience is not allowed is rejected; the correct audience is accepted.
+TEST_F(ReverseTunnelJwtTest, AudienceEnforced) {
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setJwt(cfg, kIssuer, {"other_service"});
+    const std::string written =
+        runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+    EXPECT_THAT(written, testing::HasSubstr("401 Unauthorized"));
+  }
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setJwt(cfg, kIssuer, {"example_service"});
+    const std::string written =
+        runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+    EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  }
+}
+
+// The claimed identifier must equal the verified claim it is bound to (Option A + B composed):
+// node_id_format references the verified `sub` claim published to dynamic metadata.
+TEST_F(ReverseTunnelJwtTest, VerifiedClaimBindsIdentifier) {
+  // Matching node-id (== verified `sub`) is accepted.
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setJwt(cfg, kIssuer);
+    cfg.mutable_validation()->set_node_id_format(
+        "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:sub)%");
+    const std::string written = runHandshake(
+        cfg, makeJwtRequest("test@example.com", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+    EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  }
+  // A node-id that does not match the verified `sub` claim is rejected with 403.
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setJwt(cfg, kIssuer);
+    cfg.mutable_validation()->set_node_id_format(
+        "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:sub)%");
+    const std::string written = runHandshake(
+        cfg, makeJwtRequest("attacker", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+    EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+    EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+  }
+}
+
+// A bare token (no "Bearer " prefix) is also accepted.
+TEST_F(ReverseTunnelJwtTest, BareTokenWithoutBearerPrefixAccepted) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", std::string(kGoodToken)));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+}
+
+// The token is read from the configured header rather than `authorization`.
+TEST_F(ReverseTunnelJwtTest, CustomTokenHeaderAccepted) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  cfg.mutable_jwt_validation()->set_token_header("x-jwt-assertion");
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += makeRtHeaders("n", "c", "t");
+  req += absl::StrCat("x-jwt-assertion: Bearer ", kGoodToken, "\r\n");
+  req += "Content-Length: 0\r\n\r\n";
+  const std::string written = runHandshake(cfg, req);
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+}
+
+// In audit mode (allow_missing_or_failed), a missing token does not reject the handshake, but the
+// would-be denial is counted.
+TEST_F(ReverseTunnelJwtTest, AuditModeAllowsMissingToken) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer, {}, /*allow_missing_or_failed=*/true);
+  const std::string written = runHandshake(cfg, makeJwtRequest("n", "c", "t", ""));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.jwt_denied"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_would_deny"));
+}
+
+// Audit mode also allows (but counts) a token that is present but invalid.
+TEST_F(ReverseTunnelJwtTest, AuditModeCountsWouldDenyOnInvalidToken) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer, {}, /*allow_missing_or_failed=*/true);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kExpiredToken)));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.jwt_denied"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_would_deny"));
+}
+
+// A well-formed token with correct iss/aud but a signature not from the JWKS is rejected.
+TEST_F(ReverseTunnelJwtTest, ForgedSignatureRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  // Flip the last base64url char of the signature so it fails verification.
+  std::string forged(kGoodToken);
+  forged.back() = (forged.back() == 'A') ? 'B' : 'A';
+  expectRejectedBeforeRegistration(cfg, absl::StrCat("Bearer ", forged));
+}
+
+// A validly-signed token without an `exp` claim is rejected (would otherwise never expire).
+TEST_F(ReverseTunnelJwtTest, TokenWithoutExpirationRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  expectRejectedBeforeRegistration(cfg, absl::StrCat("Bearer ", kNonExpiringToken));
+}
+
+// A jwt_validation block without an issuer is rejected at config load.
+TEST_F(ReverseTunnelJwtTest, IssuerRequiredAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validation();
+  jwt->mutable_local_jwks()->set_inline_string(std::string(kTestJwks));
+  // issuer intentionally left empty.
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+// An unparseable JWKS is rejected at config load, not at handshake time.
+TEST_F(ReverseTunnelJwtTest, InvalidJwksRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validation();
+  jwt->mutable_local_jwks()->set_inline_string("this is not a jwks");
+  jwt->set_issuer(std::string(kIssuer));
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
 } // namespace
 } // namespace ReverseTunnel
 } // namespace NetworkFilters
