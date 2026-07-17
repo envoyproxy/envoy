@@ -53,8 +53,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     rules_fuzzing = dict(
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
-        version = "0.7.0",
-        sha256 = "87adb1357bb5a932fa0de6fed0fc37412490a0c96f5259855008f208cf53a74f",
+        version = "0.8.0",
+        sha256 = "7d13a78e9edb1f63093adec75e16c47e2b975382b8911fc53b72f2355fcd0a16",
         strip_prefix = "rules_fuzzing-{version}",
         urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/v{version}.tar.gz"],
     ),
