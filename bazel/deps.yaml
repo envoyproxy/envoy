@@ -355,7 +355,7 @@ ipp_crypto:
   project_name: "libipp-crypto"
   project_desc: "Intel® Integrated Performance Primitives Cryptography"
   project_url: "https://github.com/intel/cryptography-primitives"
-  release_date: "2025-10-01"
+  release_date: "2026-05-28"
   use_category:
   - dataplane_ext
   extensions:
