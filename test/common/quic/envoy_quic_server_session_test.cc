@@ -1195,14 +1195,16 @@ TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
   EXPECT_FALSE(envoy_quic_session_.ssl()->validFromPeerCertificate().has_value());
   EXPECT_FALSE(envoy_quic_session_.ssl()->expirationPeerCertificate().has_value());
 
-  // Call overridden methods to ensure coverage.
-  envoy_quic_session_.ssl()->ciphersuiteId();
-  envoy_quic_session_.ssl()->ciphersuiteString();
-  envoy_quic_session_.ssl()->tlsGroupId();
-  envoy_quic_session_.ssl()->tlsGroupString();
-  envoy_quic_session_.ssl()->tlsVersion();
-  envoy_quic_session_.ssl()->alpn();
-  envoy_quic_session_.ssl()->sni();
+  // Call overridden methods and assert they match underlying crypto stream.
+  auto* crypto_stream = envoy_quic_session_.GetCryptoStream();
+  ASSERT(crypto_stream != nullptr);
+  EXPECT_EQ(crypto_stream->CiphersuiteId(), envoy_quic_session_.ssl()->ciphersuiteId());
+  EXPECT_EQ(crypto_stream->CiphersuiteString(), envoy_quic_session_.ssl()->ciphersuiteString());
+  EXPECT_EQ(crypto_stream->TlsGroupId(), envoy_quic_session_.ssl()->tlsGroupId());
+  EXPECT_EQ(crypto_stream->TlsGroupString(), envoy_quic_session_.ssl()->tlsGroupString());
+  EXPECT_EQ("TLSv1.3", envoy_quic_session_.ssl()->tlsVersion());
+  EXPECT_EQ(crypto_stream->Alpn(), envoy_quic_session_.ssl()->alpn());
+  EXPECT_EQ(crypto_stream->Sni(), envoy_quic_session_.ssl()->sni());
 }
 
 TEST_F(EnvoyQuicServerSessionTest, DisableQpack) {

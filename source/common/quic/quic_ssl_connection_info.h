@@ -48,8 +48,8 @@ public:
   }
 
   const std::string& tlsVersion() const override {
-    static const auto* version = new std::string("TLSv1.3");
-    return *version;
+    static const std::string version("TLSv1.3");
+    return version;
   }
 
   const std::string& alpn() const override {
