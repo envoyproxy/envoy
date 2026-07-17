@@ -69,6 +69,35 @@ response_rules:
   callback(filter_callback);
 }
 
+TEST(Factory, CreateFilterWithServerContext) {
+  const std::string yaml_request = R"(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'unknown'
+      preserve_existing_metadata_value: true
+  )";
+
+  JsonToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml_request, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  auto callback =
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", server_context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  callback(filter_callback);
+}
+
 TEST(Factory, NoOnPresentOnMissing) {
   const std::string yaml_request = R"(
 request_rules:
