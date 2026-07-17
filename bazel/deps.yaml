@@ -43,7 +43,7 @@ bazel_gazelle:
   project_name: "Gazelle"
   project_desc: "Bazel BUILD file generator for Go projects"
   project_url: "https://github.com/bazelbuild/bazel-gazelle"
-  release_date: "2025-11-07"
+  release_date: "2026-06-04"
   use_category:
   - build
   license: "Apache-2.0"
