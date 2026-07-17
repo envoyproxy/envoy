@@ -1122,6 +1122,8 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowWithHeaderManipulation) {
   upstream_headers_ =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
   EXPECT_TRUE(upstream_headers_ != nullptr);
+  // Wait for the shadow upstream to actually process the request before accessing the headers.
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", Ge(1));
   mirror_headers_ =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())->lastRequestHeaders();
   EXPECT_TRUE(mirror_headers_ != nullptr);
