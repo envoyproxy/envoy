@@ -198,15 +198,47 @@ TEST_F(QuicSslConnectionInfoTest, PreHandshakeQueryRecomputedAfterHandshake) {
             ssl_info_->uriSanPeerCertificate());
 }
 
-// When the client presents its full chain, the issuer accessors are served from the second
-// element of the presented chain.
-TEST_F(QuicSslConnectionInfoTest, IssuerFromPresentedChain) {
+// The issuer accessors are served from the chain built during verification (set via
+// setValidatedCertChain), not from the peer-presented chain.
+TEST_F(QuicSslConnectionInfoTest, ValidatedIssuerFromValidatedChain) {
+  createSslPair(/*with_client_cert=*/true);
+  completeHandshake();
+
+  std::vector<bssl::UniquePtr<X509>> validated_chain;
+  validated_chain.push_back(
+      Extensions::TransportSockets::Tls::readCertFromFile(testDataPath("san_uri_cert.pem")));
+  validated_chain.push_back(
+      Extensions::TransportSockets::Tls::readCertFromFile(testDataPath("ca_cert.pem")));
+  ASSERT_NE(validated_chain[0], nullptr);
+  ASSERT_NE(validated_chain[1], nullptr);
+  ssl_info_->setValidatedCertChain(validated_chain);
+
+  EXPECT_EQ(TEST_CA_CERT_256_HASH, ssl_info_->sha256PeerCertificateIssuerDigest());
+  EXPECT_EQ(TEST_CA_CERT_SERIAL, ssl_info_->serialNumberPeerCertificateIssuer());
+}
+
+// Security regression test: a peer that presents extra certificates does NOT influence the
+// validated-issuer accessors. Without a validated chain the issuer is unknown, even though the
+// peer sent a full chain in the handshake. This prevents a peer from controlling what is reported
+// as the certificate issuer (used in RBAC and access logs).
+TEST_F(QuicSslConnectionInfoTest, ValidatedIssuerIgnoresPresentedChain) {
   createSslPair(/*with_client_cert=*/true, /*client_extra_chain=*/"ca_cert.pem");
   completeHandshake();
 
+  // The peer presented a two-cert chain...
   EXPECT_EQ(2, ssl_info_->pemEncodedPeerCertificateChain().size());
-  EXPECT_EQ(TEST_CA_CERT_256_HASH, ssl_info_->sha256PeerCertificateIssuerDigest());
-  EXPECT_EQ(TEST_CA_CERT_SERIAL, ssl_info_->serialNumberPeerCertificateIssuer());
+  // ...but no validated chain was set, so the issuer accessors report nothing.
+  EXPECT_TRUE(ssl_info_->sha256PeerCertificateIssuerDigest().empty());
+  EXPECT_TRUE(ssl_info_->serialNumberPeerCertificateIssuer().empty());
+
+  // A validated chain containing only the leaf still yields no issuer.
+  std::vector<bssl::UniquePtr<X509>> leaf_only;
+  leaf_only.push_back(
+      Extensions::TransportSockets::Tls::readCertFromFile(testDataPath("san_uri_cert.pem")));
+  ASSERT_NE(leaf_only[0], nullptr);
+  ssl_info_->setValidatedCertChain(leaf_only);
+  EXPECT_TRUE(ssl_info_->sha256PeerCertificateIssuerDigest().empty());
+  EXPECT_TRUE(ssl_info_->serialNumberPeerCertificateIssuer().empty());
 }
 
 // peerCertificateValidated() only flips when the handshake reports successful validation.

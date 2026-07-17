@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "source/common/common/empty_string.h"
 #include "source/common/tls/connection_info_impl_base.h"
 
@@ -38,6 +40,10 @@ public:
 
   void onCertValidated() { cert_validated_ = true; };
 
+  // Stores the certificate chain built during verification (leaf first, issuers following). Used
+  // to serve the validated-issuer accessors. The certificates are up-ref'd into this object.
+  void setValidatedCertChain(const std::vector<bssl::UniquePtr<X509>>& chain);
+
 protected:
   // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
   // QUIC's SSL object uses the CRYPTO_BUFFER-based method, so the default X509-based peer
@@ -53,6 +59,10 @@ private:
   // and cached. Null if conversion hasn't happened, was queried before the handshake delivered
   // the peer chain, or failed.
   mutable bssl::UniquePtr<STACK_OF(X509)> peer_cert_chain_;
+  // The certificate chain built during verification (leaf first, issuers following). Distinct from
+  // peer_cert_chain_, which is the unverified list the peer sent. The validated-issuer accessors
+  // are served from this so a peer cannot control what is reported as the issuer.
+  std::vector<bssl::UniquePtr<X509>> validated_cert_chain_;
 };
 
 } // namespace Quic

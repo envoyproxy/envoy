@@ -40,13 +40,21 @@ STACK_OF(X509)* QuicSslConnectionInfo::peerCertificateChain() const {
 }
 
 X509* QuicSslConnectionInfo::validatedPeerIssuer() const {
-  // The whole presented chain is validated for QUIC connections, so the leaf's direct issuer is
-  // the second element of the chain when present.
-  STACK_OF(X509)* chain = peerCertificateChain();
-  if (chain == nullptr || sk_X509_num(chain) < 2) {
+  // Serve the issuer from the chain built during verification, never from the unverified list the
+  // peer sent (which the peer fully controls). The direct issuer of the leaf is the second element
+  // of the validated chain when present.
+  if (validated_cert_chain_.size() < 2) {
     return nullptr;
   }
-  return sk_X509_value(chain, 1);
+  return validated_cert_chain_[1].get();
+}
+
+void QuicSslConnectionInfo::setValidatedCertChain(const std::vector<bssl::UniquePtr<X509>>& chain) {
+  validated_cert_chain_.clear();
+  validated_cert_chain_.reserve(chain.size());
+  for (const auto& cert : chain) {
+    validated_cert_chain_.push_back(bssl::UpRef(cert.get()));
+  }
 }
 
 } // namespace Quic
