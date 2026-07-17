@@ -288,8 +288,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://codeload.github.com/VectorCamp/vectorscan/tar.gz/refs/tags/vectorscan/{version}"],
     ),
     opentelemetry_cpp = dict(
-        version = "1.26.0",
-        sha256 = "8a878777a18a013e0ee6604629d1b5f29b162354c14489ad1dccd370f14ac372",
+        version = "1.27.0",
+        sha256 = "d09c2e8dd95bbc1d6ee493a89f32a4736879948d0eb59ad58c855022d1f55cc1",
         strip_prefix = "opentelemetry-cpp-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-cpp/archive/refs/tags/v{version}.tar.gz"],
     ),
