@@ -357,6 +357,19 @@ TEST_F(ReverseConnectionUtilityTest, AddJitterStaysWithinUpperBound) {
   EXPECT_LT(result, 11500);
 }
 
+TEST_F(ReverseConnectionUtilityTest, DiffMsReturnsCorrectDuration) {
+  MonotonicTime start(std::chrono::milliseconds(1000));
+  MonotonicTime end(std::chrono::milliseconds(1500));
+
+  EXPECT_EQ(ReverseConnectionUtility::diffMs(start, end), 500);
+}
+
+TEST_F(ReverseConnectionUtilityTest, DiffMsZeroDuration) {
+  MonotonicTime t(std::chrono::milliseconds(42));
+
+  EXPECT_EQ(ReverseConnectionUtility::diffMs(t, t), 0);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

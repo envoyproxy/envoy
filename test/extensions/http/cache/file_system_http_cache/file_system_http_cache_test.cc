@@ -78,7 +78,7 @@ public:
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
     TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
     ConfigProto cfg;
-    EXPECT_TRUE(MessageUtil::unpackTo(cache_config.typed_config(), cfg).ok());
+    EXPECT_OK(MessageUtil::unpackTo(cache_config.typed_config(), cfg));
     cfg.set_cache_path(cache_path_);
     return cfg;
   }

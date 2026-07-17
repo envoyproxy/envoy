@@ -100,7 +100,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   http1_parse_connection_ = http1_client_codec_.get();
 
   // Add a tiny read filter to feed bytes into the codec for response parsing.
-  connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
+  connection_->addReadFilter(read_filter_);
 
   // Build HTTP handshake headers with identifiers.
   absl::string_view tenant_id = src_tenant_id;
@@ -266,6 +266,16 @@ ReverseTunnelInitiatorExtension* RCConnectionWrapper::getDownstreamExtension() c
   return parent_.getDownstreamExtension();
 }
 
+Network::ClientConnectionPtr RCConnectionWrapper::releaseConnection() {
+  if (!connection_) {
+    return nullptr;
+  }
+
+  connection_->removeConnectionCallbacks(*this);
+  connection_->removeReadFilter(read_filter_);
+  return std::move(connection_);
+}
+
 void RCConnectionWrapper::onHandshakeSuccess() {
   std::string message = "reverse connection accepted";
   ENVOY_LOG(debug, "handshake succeeded: {}", message);
@@ -314,9 +324,10 @@ void RCConnectionWrapper::shutdown() {
             static_cast<int>(state));
 
   connection_->removeConnectionCallbacks(*this);
-  connection_.reset();
-  ENVOY_LOG(debug, "RCConnectionWrapper: Connection cleared after shutdown");
-  ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown completed");
+  connection_->removeReadFilter(read_filter_);
+
+  // Defer the deletion of the connection and the codec.
+  connection_->dispatcher().deferredDelete(std::move(connection_));
 }
 
 } // namespace ReverseConnection

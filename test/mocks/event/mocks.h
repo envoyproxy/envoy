@@ -114,9 +114,14 @@ public:
     return SignalEventPtr{listenForSignal_(signal_num, cb)};
   }
 
+  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer) override {
+    return Evwatch::ObserverHandlePtr{registerEvwatchObserver_(observer.get())};
+  }
+
   // Event::Dispatcher
   MOCK_METHOD(void, registerWatchdog,
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
+  MOCK_METHOD(Evwatch::ObserverHandle*, registerEvwatchObserver_, (Evwatch::Observer * observer));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const std::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));

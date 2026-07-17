@@ -4958,11 +4958,8 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherRejectAll) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          reject_all: true
+    stats_matcher:
+      reject_all: true
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4989,13 +4986,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherInclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          inclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_cx"
+    stats_matcher:
+      inclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_cx"
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -5023,13 +5017,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherExclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          exclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_rq"
+    stats_matcher:
+      exclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_rq"
     load_assignment:
         endpoints:
           - lb_endpoints:

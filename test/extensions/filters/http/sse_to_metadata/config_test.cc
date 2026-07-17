@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/sse_to_metadata/filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -39,7 +40,7 @@ TEST(SseToMetadataConfigTest, ValidConfig) {
 
   SseToMetadataConfig factory;
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
+  EXPECT_OK(cb_or);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
@@ -80,7 +81,7 @@ TEST(SseToMetadataConfigTest, MultipleMetadataDescriptors) {
 
   SseToMetadataConfig factory;
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
+  EXPECT_OK(cb_or);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
@@ -119,7 +120,7 @@ TEST(SseToMetadataConfigTest, MultipleRules) {
 
   SseToMetadataConfig factory;
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
+  EXPECT_OK(cb_or);
 }
 
 TEST(SseToMetadataConfigTest, EmptyConfig) {
@@ -210,7 +211,7 @@ TEST(SseToMetadataConfigTest, EmptyNamespaceDefaultsToFilterName) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SseToMetadataConfig factory;
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
+  EXPECT_OK(cb_or);
 }
 
 TEST(SseToMetadataConfigTest, InvalidConfigMissingKey) {
