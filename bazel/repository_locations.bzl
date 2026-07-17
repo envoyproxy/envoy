@@ -210,8 +210,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
     ),
     rules_proto_grpc = dict(
-        version = "4.6.0",
-        sha256 = "2a0860a336ae836b54671cbbe0710eec17c64ef70c4c5a88ccfd47ea6e3739bd",
+        version = "5.8.0",
+        sha256 = "a3f5e589e78ddcf8e8007cd1c8e1ee2df4d51e9da4e67b1861f06ff21905e926",
         strip_prefix = "rules_proto_grpc-{version}",
         urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/releases/download/{version}/rules_proto_grpc-{version}.tar.gz"],
     ),

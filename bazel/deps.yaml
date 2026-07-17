@@ -1357,7 +1357,7 @@ rules_proto_grpc:
   project_name: "Protobuf and gRPC rules for Bazel"
   project_desc: "Bazel rules for building Protobuf and gRPC code and libraries from proto_library targets"
   project_url: "https://github.com/rules-proto-grpc/rules_proto_grpc"
-  release_date: "2023-12-14"
+  release_date: "2025-10-23"
   use_category:
   - dataplane_ext
   extensions:
