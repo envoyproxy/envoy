@@ -96,7 +96,7 @@ message Validation {
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -145,4 +145,11 @@ message ReverseTunnel {
   // This avoids the cross-worker lock in pickLeastLoadedSocketManager.
   // Default: false (rebalancing enabled).
   bool skip_rebalancing = 8;
+
+  // Enforces the per-node concurrent connection cap (``max_connections_per_node``, configured on
+  // the ``UpstreamReverseConnectionSocketInterface`` bootstrap extension) for tunnels accepted by
+  // this filter. The cap is checked on the accepting worker but the connection is counted on the
+  // worker it is finally rebalanced to, so it is best-effort unless ``skip_rebalancing`` is ``true``.
+  // Default: false.
+  bool enable_connection_limit = 9;
 }

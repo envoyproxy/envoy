@@ -33,7 +33,7 @@ bazel_features:
   project_name: "Bazel features"
   project_desc: "Support Bazel feature detection from starlark"
   project_url: "https://github.com/bazel-contrib/bazel_features"
-  release_date: "2026-04-02"
+  release_date: "2026-07-06"
   use_category:
   - build
   license: "Apache-2.0"
@@ -123,7 +123,7 @@ liburing:
   project_name: "liburing"
   project_desc: "C helpers to set up and tear down io_uring instances"
   project_url: "https://github.com/axboe/liburing"
-  release_date: "2026-02-07"
+  release_date: "2026-06-29"
   use_category:
   - dataplane_core
   - controlplane
@@ -164,7 +164,7 @@ c_ares:
   project_name: "c-ares"
   project_desc: "C library for asynchronous DNS requests"
   project_url: "https://c-ares.haxx.se/"
-  release_date: "2025-12-08"
+  release_date: "2026-07-07"
   use_category:
   - dataplane_core
   - controlplane
@@ -224,7 +224,7 @@ fmt:
   project_name: "fmt"
   project_desc: "{fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams"
   project_url: "https://fmt.dev"
-  release_date: "2025-10-29"
+  release_date: "2026-06-16"
   use_category:
   - dataplane_core
   - controlplane
@@ -310,7 +310,7 @@ perfetto:
   project_name: "Perfetto"
   project_desc: "Perfetto Tracing SDK"
   project_url: "https://perfetto.dev/"
-  release_date: "2026-03-02"
+  release_date: "2026-07-07"
   use_category:
   - dataplane_core
   - controlplane
@@ -321,7 +321,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-07-09"
+  release_date: "2026-07-15"
   use_category:
   - controlplane
   - dataplane_core
@@ -866,7 +866,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-04-21"
+  release_date: "2026-07-09"
   use_category:
   - build
   - dataplane_core
@@ -879,7 +879,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-04-21"
+  release_date: "2026-07-09"
   use_category:
   - build
   - dataplane_core
@@ -957,7 +957,7 @@ fips_cmake_src:
   project_name: "CMake (source)"
   project_desc: "CMake built from source for ppc64le FIPS builds"
   project_url: "https://cmake.org/"
-  release_date: "2026-04-21"
+  release_date: "2026-07-09"
   use_category:
   - build
   - dataplane_core
@@ -1223,7 +1223,7 @@ platforms:
   project_name: "platforms"
   project_desc: "Constraint values for specifying platforms and toolchains"
   project_url: "https://github.com/bazelbuild/platforms"
-  release_date: "2025-05-27"
+  release_date: "2026-05-01"
   use_category:
   - build
   license: "Apache-2.0"
@@ -1283,7 +1283,7 @@ rules_cc:
   project_name: "C++ rules for Bazel"
   project_desc: "Bazel rules for the C++ language"
   project_url: "https://github.com/bazelbuild/rules_cc"
-  release_date: "2026-02-18"
+  release_date: "2026-07-07"
   use_category:
   - build
   - controlplane
@@ -1319,7 +1319,7 @@ rules_java:
   project_name: "Java rules for Bazel"
   project_desc: "Bazel rules for the Java language"
   project_url: "https://github.com/bazelbuild/rules_java/"
-  release_date: "2026-02-24"
+  release_date: "2026-07-15"
   use_category:
   - build
   - dataplane_core
@@ -1369,7 +1369,7 @@ rules_python:
   project_name: "Python rules for Bazel"
   project_desc: "Bazel rules for the Python language"
   project_url: "https://github.com/bazelbuild/rules_python"
-  release_date: "2026-03-04"
+  release_date: "2026-07-04"
   use_category:
   - build
   - controlplane
@@ -1447,7 +1447,7 @@ thrift:
   project_name: "Apache Thrift"
   project_desc: "Apache Thrift Python library"
   project_url: "https://thrift.apache.org/"
-  release_date: "2026-04-27"
+  release_date: "2026-07-11"
   use_category:
   - test_only
   cpe: "cpe:2.3:a:apache:thrift:*"

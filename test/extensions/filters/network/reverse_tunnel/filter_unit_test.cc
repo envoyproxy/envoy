@@ -241,6 +241,22 @@ public:
     return req;
   }
 
+  // Builds a mock connection socket with the given fd for populating the upstream socket manager
+  // directly in connection-limit tests (the remote port is derived from the fd to keep keys
+  // distinct).
+  Network::ConnectionSocketPtr createUpstreamSocket(int fd) {
+    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    EXPECT_CALL(*io_handle, fdDoNotUse()).WillRepeatedly(Return(fd));
+    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*io_handle));
+    socket->io_handle_ = std::move(io_handle);
+    socket->connection_info_provider_->setLocalAddress(
+        Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080));
+    socket->connection_info_provider_->setRemoteAddress(
+        Network::Utility::parseInternetAddressNoThrow("127.0.0.1", fd));
+    return socket;
+  }
+
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config_;
   ReverseTunnelFilterConfigSharedPtr config_;
   std::unique_ptr<ReverseTunnelFilter> filter_;
@@ -2395,6 +2411,78 @@ TEST_F(ReverseTunnelFilterUnitTest, FilterConfigLoadsSkipRebalancing) {
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
   ASSERT_TRUE(config_or_error.ok());
   EXPECT_TRUE(config_or_error.value()->skipRebalancing());
+}
+
+// enable_connection_limit defaults to false, so the limit check is a no-op and never consults the
+// socket manager; it allows even when no upstream socket interface is wired up.
+TEST_F(ReverseTunnelFilterUnitTest, ConnectionLimitDisabledByDefaultAllows) {
+  EXPECT_EQ(config_->validateConnectionLimit("any-node", ""), true);
+}
+
+// When the filter opts into the connection limit, the bootstrap extension's per-node cap rejects
+// new connections once the live count reaches the limit, and counts are independent across nodes.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ConnectionLimitEnforcedPerNode) {
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto cfg = config_or_error.value();
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  // The cap lives on the bootstrap extension; the socket manager mirrors it per worker.
+  socket_manager->setMaxConnectionsPerNode(2);
+
+  const std::string node = "node-cap";
+
+  // No live connections yet: under the cap.
+  EXPECT_TRUE(cfg->validateConnectionLimit(node, ""));
+
+  // One live connection: still under the cap (1 < 2).
+  socket_manager->addConnectionSocket(node, "cluster", createUpstreamSocket(1001),
+                                      std::chrono::seconds(30));
+  EXPECT_TRUE(cfg->validateConnectionLimit(node, ""));
+
+  // Two live connections: at the cap (2 is not < 2) -> rejected.
+  socket_manager->addConnectionSocket(node, "cluster", createUpstreamSocket(1002),
+                                      std::chrono::seconds(30));
+  EXPECT_FALSE(cfg->validateConnectionLimit(node, ""));
+
+  // A different node is unaffected by node-cap's count.
+  EXPECT_TRUE(cfg->validateConnectionLimit("other-node", ""));
+}
+
+// When the connection limit is enabled but the upstream socket manager is unavailable, the check
+// fails closed (rejects).
+TEST_F(ReverseTunnelFilterUnitTest, ConnectionLimitFailsClosedWithoutSocketManager) {
+  // Wire up a live extension but no thread-local registry, so getLocalRegistry() returns nullptr
+  // and the limit cannot be verified.
+  setupUpstreamExtension();
+
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  EXPECT_FALSE(config_or_error.value()->validateConnectionLimit("node", ""));
+}
+
+// With tenant isolation enabled the cap is scoped per tenant: hitting the cap for one tenant does
+// not block a different tenant on the same node.
+TEST_F(ReverseTunnelFilterWithTenantIsolationTest, ConnectionLimitScopedPerTenant) {
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto cfg = config_or_error.value();
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  ASSERT_TRUE(socket_manager->tenantIsolationEnabled());
+  socket_manager->setMaxConnectionsPerNode(1);
+
+  // One live connection for tenant-a brings it to the cap.
+  socket_manager->addConnectionSocket("node", "cluster", createUpstreamSocket(2001),
+                                      std::chrono::seconds(30), false, "tenant-a");
+
+  EXPECT_FALSE(cfg->validateConnectionLimit("node", "tenant-a"));
+  EXPECT_TRUE(cfg->validateConnectionLimit("node", "tenant-b"));
 }
 
 } // namespace

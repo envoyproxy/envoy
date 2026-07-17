@@ -24,6 +24,7 @@ envoy_cc_library(
     deps = [
         ":deferred_deletable",
         ":dispatcher_thread_deletable",
+        ":evwatch_interface",
         ":file_event_interface",
         ":scaled_timer",
         ":schedulable_cb_interface",

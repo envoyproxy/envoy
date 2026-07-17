@@ -8,6 +8,7 @@
 #include "test/extensions/filters/http/compressor/mock_compressor_library.pb.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -94,7 +95,7 @@ TEST(CompressorFilterFactoryTests, RegisteredCompressorLibraryConfig) {
       Envoy::Compression::Compressor::NamedCompressorLibraryConfigFactory>
       reg(factory_impl);
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.status().ok());
+  EXPECT_OK(cb_or.status());
 }
 
 // Factory that accesses GenericFactoryContext methods.
@@ -144,7 +145,7 @@ TEST(CompressorFilterFactoryTests, PerRouteWithGenericFactoryContext) {
 
   auto cfg_or = factory.createRouteSpecificFilterConfig(per_route, context,
                                                         context.messageValidationVisitor());
-  EXPECT_TRUE(cfg_or.status().ok());
+  EXPECT_OK(cfg_or.status());
 }
 
 TEST(CompressorFilterFactoryTests, EmptyPerRouteConfig) {
@@ -166,7 +167,7 @@ TEST(CompressorFilterFactoryTests, PerRouteWithGenericContextBuilds) {
   CompressorFilterFactory factory;
   auto cfg_or = factory.createRouteSpecificFilterConfig(per_route, context,
                                                         context.messageValidationVisitor());
-  EXPECT_TRUE(cfg_or.status().ok());
+  EXPECT_OK(cfg_or.status());
   // No further assertions; this exercises the GenericFactoryContext path.
 }
 
