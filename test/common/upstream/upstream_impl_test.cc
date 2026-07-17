@@ -1922,6 +1922,19 @@ TEST_F(HostImplTest, Weight) {
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(), host->weight());
 }
 
+TEST_F(HostImplTest, ConsecutiveEagerPreconnectFloorFailures) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+  EXPECT_EQ(0, host->consecutiveEagerPreconnectFloorFailures());
+
+  host->incConsecutiveEagerPreconnectFloorFailures();
+  host->incConsecutiveEagerPreconnectFloorFailures();
+  EXPECT_EQ(2, host->consecutiveEagerPreconnectFloorFailures());
+
+  host->resetConsecutiveEagerPreconnectFloorFailures();
+  EXPECT_EQ(0, host->consecutiveEagerPreconnectFloorFailures());
+}
+
 TEST_F(HostImplTest, HostLbPolicyData) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);

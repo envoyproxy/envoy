@@ -412,6 +412,16 @@ public:
   void setLastHealthCheckHttpStatus(uint64_t status) override {
     last_hc_http_status_.store(status, std::memory_order_relaxed);
   }
+  uint32_t consecutiveEagerPreconnectFloorFailures() const override {
+    return consecutive_eager_preconnect_floor_failures_.load(std::memory_order_relaxed);
+  }
+  void incConsecutiveEagerPreconnectFloorFailures() const override {
+    consecutive_eager_preconnect_floor_failures_.fetch_add(1, std::memory_order_relaxed);
+  }
+  void resetConsecutiveEagerPreconnectFloorFailures() const override {
+    consecutive_eager_preconnect_floor_failures_.store(0, std::memory_order_relaxed);
+  }
+
   std::optional<uint64_t> lastHealthCheckHttpStatus() const override {
     const uint64_t status = last_hc_http_status_.load(std::memory_order_relaxed);
     return status == 0 ? std::nullopt : std::make_optional(status);
@@ -517,6 +527,7 @@ private:
       envoy::config::core::v3::HealthStatus::UNKNOWN};
   // 0 indicates no status has been set.
   std::atomic<uint64_t> last_hc_http_status_{0};
+  mutable std::atomic<uint32_t> consecutive_eager_preconnect_floor_failures_{0};
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImplBase>& parent) : parent_(parent) {
@@ -904,6 +915,10 @@ public:
   float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
   bool shouldPreconnect(const Host& host) const override;
+  uint32_t eagerPreconnectFloor() const override { return eager_preconnect_floor_; }
+  uint32_t eagerPreconnectFloorFailureThreshold() const override {
+    return eager_preconnect_floor_failure_threshold_;
+  }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -1115,6 +1130,8 @@ private:
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
   const std::unique_ptr<const Matchers::MetadataMatcher> preconnect_enabled_matcher_;
+  const uint32_t eager_preconnect_floor_;
+  const uint32_t eager_preconnect_floor_failure_threshold_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
   mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;

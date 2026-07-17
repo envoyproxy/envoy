@@ -1218,6 +1218,10 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.preconnect_policy().preconnect_enabled_metadata(),
                     factory_context.serverFactoryContext())
               : nullptr),
+      eager_preconnect_floor_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(), eager_preconnect_floor, 0)),
+      eager_preconnect_floor_failure_threshold_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.preconnect_policy(), eager_preconnect_floor_failure_threshold, 3)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       traffic_stats_(generateStats(
           stats_scope_, factory_context.serverFactoryContext().clusterManager().clusterStatNames(),
@@ -1340,6 +1344,15 @@ ClusterInfoImpl::ClusterInfoImpl(
     creation_status =
         absl::InvalidArgumentError("Only one of max_requests_per_connection from Cluster or "
                                    "HttpProtocolOptions can be specified");
+    return;
+  }
+
+  // eager_preconnect_floor warms and refills a set of upstream connections per host.
+  // Not compatible with connection_pool_per_downstream_connection, where each pool is bound
+  // to a single downstream connection and torn down when it closes.
+  if (connection_pool_per_downstream_connection_ && eager_preconnect_floor_ > 0) {
+    creation_status = absl::InvalidArgumentError("eager_preconnect_floor is incompatible with "
+                                                 "connection_pool_per_downstream_connection");
     return;
   }
 

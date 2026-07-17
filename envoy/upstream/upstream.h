@@ -354,6 +354,23 @@ public:
    * 0 if no response has been recorded.
    */
   virtual std::optional<uint64_t> lastHealthCheckHttpStatus() const PURE;
+
+  /**
+   * @return number of consecutive connection failures while an eager preconnect floor is
+   * configured. Used to pause floor maintenance for an unreachable host. Stored on the Host so it
+   * survives per-worker connection-pool teardown and recreation.
+   */
+  virtual uint32_t consecutiveEagerPreconnectFloorFailures() const PURE;
+
+  /**
+   * Increment consecutive eager-preconnect-floor connection failures.
+   */
+  virtual void incConsecutiveEagerPreconnectFloorFailures() const PURE;
+
+  /**
+   * Reset consecutive eager-preconnect-floor connection failures.
+   */
+  virtual void resetConsecutiveEagerPreconnectFloorFailures() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -1084,6 +1101,21 @@ public:
    * preconnect_enabled_metadata matcher. Does not affect on-demand connections for requests.
    */
   virtual bool shouldPreconnect(const Host& host) const PURE;
+
+  /**
+   * @return the eager preconnect floor: the minimum number of connections to maintain per healthy
+   * upstream host. When non-zero, Envoy proactively opens new connections and refills closed ones
+   * so that the floor of connections exists regardless of requests.
+   */
+  virtual uint32_t eagerPreconnectFloor() const PURE;
+
+  /**
+   * @return number of consecutive connection failures to a host, after which eager-preconnect-floor
+   * maintenance for that host is paused. The pause clears as soon as one connection establishes,
+   * typically driven by on-demand request traffic. Only used when eagerPreconnectFloor() is set.
+   * Defaults to 3.
+   */
+  virtual uint32_t eagerPreconnectFloorFailureThreshold() const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.
