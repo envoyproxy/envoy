@@ -1,5 +1,6 @@
 #include "source/common/network/utility.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <list>
@@ -803,11 +804,14 @@ ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
 #if defined(__linux__)
 absl::Status Utility::validateNetworkNamespace(absl::string_view netns) {
   Api::OsSysCalls& posix = Api::OsSysCallsSingleton::get();
-  const std::string netns_path(netns);
-  auto open_result = posix.open(netns_path.c_str(), O_RDONLY);
+  // Build a null-terminated path without a heap allocation for the common (short) case.
+  absl::FixedArray<char, 256> netns_path(netns.size() + 1);
+  std::copy(netns.begin(), netns.end(), netns_path.begin());
+  netns_path[netns.size()] = '\0';
+  auto open_result = posix.open(netns_path.data(), O_RDONLY);
   if (open_result.return_value_ < 0) {
     return absl::InvalidArgumentError(fmt::format("failed to open network namespace file {}: {}",
-                                                  netns_path, errorDetails(open_result.errno_)));
+                                                  netns, errorDetails(open_result.errno_)));
   }
   posix.close(open_result.return_value_);
   return absl::OkStatus();
