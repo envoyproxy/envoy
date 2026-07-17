@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::NiceMock;
 using ::testing::Not;
@@ -23,6 +24,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
+
+MATCHER_P(ChainHasNumProviders, num_providers, "") {
+  return arg->getNumProviders() == static_cast<size_t>(num_providers);
+}
 
 class DefaultCredentialsProviderChainTest : public testing::Test {
 public:
@@ -354,8 +359,7 @@ TEST_F(CustomCredentialsProviderChainTest, InstanceProfileOnly) {
   credential_provider_config.mutable_instance_profile_credential_provider();
   auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
       customCredentialsProviderChain(context_, "region", credential_provider_config);
-  EXPECT_OK(chain);
-  EXPECT_EQ(1, chain.value()->getNumProviders());
+  EXPECT_THAT(chain, IsOkAndHolds(ChainHasNumProviders(1)));
 }
 
 TEST_F(CustomCredentialsProviderChainTest, InstanceProfileAndEnvironmentOnly) {
@@ -365,8 +369,7 @@ TEST_F(CustomCredentialsProviderChainTest, InstanceProfileAndEnvironmentOnly) {
   credential_provider_config.mutable_environment_credential_provider();
   auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
       customCredentialsProviderChain(context_, "region", credential_provider_config);
-  EXPECT_OK(chain);
-  EXPECT_EQ(2, chain.value()->getNumProviders());
+  EXPECT_THAT(chain, IsOkAndHolds(ChainHasNumProviders(2)));
 }
 
 TEST_F(CustomCredentialsProviderChainTest, WebIdentityOnly) {
@@ -378,8 +381,7 @@ TEST_F(CustomCredentialsProviderChainTest, WebIdentityOnly) {
       ->set_environment_variable("TEST");
   auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
       customCredentialsProviderChain(context_, "region", credential_provider_config);
-  EXPECT_OK(chain);
-  EXPECT_EQ(1, chain.value()->getNumProviders());
+  EXPECT_THAT(chain, IsOkAndHolds(ChainHasNumProviders(1)));
 }
 
 TEST_F(CustomCredentialsProviderChainTest, CredentialFileOnly) {
@@ -388,8 +390,7 @@ TEST_F(CustomCredentialsProviderChainTest, CredentialFileOnly) {
   credential_provider_config.mutable_credentials_file_provider();
   auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
       customCredentialsProviderChain(context_, "region", credential_provider_config);
-  EXPECT_OK(chain);
-  EXPECT_EQ(1, chain.value()->getNumProviders());
+  EXPECT_THAT(chain, IsOkAndHolds(ChainHasNumProviders(1)));
 }
 
 TEST_F(CustomCredentialsProviderChainTest, ContainerOnly) {
@@ -400,8 +401,7 @@ TEST_F(CustomCredentialsProviderChainTest, ContainerOnly) {
   credential_provider_config.mutable_container_credential_provider();
   auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
       customCredentialsProviderChain(context_, "region", credential_provider_config);
-  EXPECT_OK(chain);
-  EXPECT_EQ(1, chain.value()->getNumProviders());
+  EXPECT_THAT(chain, IsOkAndHolds(ChainHasNumProviders(1)));
 }
 
 TEST_F(CustomCredentialsProviderChainTest, AssumeRoleOnly) {
@@ -414,8 +414,7 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleOnly) {
 
   auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
       customCredentialsProviderChain(context_, "us-east-1", credential_provider_config);
-  EXPECT_OK(chain);
-  EXPECT_EQ(1, chain.value()->getNumProviders());
+  EXPECT_THAT(chain, IsOkAndHolds(ChainHasNumProviders(1)));
 }
 
 TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithEnvironment) {
@@ -429,8 +428,7 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithEnvironment) {
 
   auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
       customCredentialsProviderChain(context_, "us-east-1", credential_provider_config);
-  EXPECT_OK(chain);
-  EXPECT_EQ(2, chain.value()->getNumProviders());
+  EXPECT_THAT(chain, IsOkAndHolds(ChainHasNumProviders(2)));
 }
 
 TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithoutSessionName) {
@@ -576,8 +574,7 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleInnerChainSubscriptionsSetu
   auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
       customCredentialsProviderChain(context_, "us-east-1", credential_provider_config);
 
-  EXPECT_OK(chain);
-  EXPECT_EQ(1, chain.value()->getNumProviders());
+  EXPECT_THAT(chain, IsOkAndHolds(ChainHasNumProviders(1)));
 
   auto instance_profile_provider =
       context_.singletonManager()

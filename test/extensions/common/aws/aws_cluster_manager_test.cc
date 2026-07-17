@@ -8,6 +8,7 @@
 #include "gtest/gtest.h"
 
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -60,12 +61,9 @@ TEST_F(AwsClusterManagerTest, AddClusters) {
       "cluster_3",
       envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
       "uri_3");
-  EXPECT_OK(aws_cluster_manager->getUriFromClusterName("cluster_1"));
-  EXPECT_EQ(aws_cluster_manager->getUriFromClusterName("cluster_1").value(), "uri_1");
-  EXPECT_OK(aws_cluster_manager->getUriFromClusterName("cluster_2"));
-  EXPECT_EQ(aws_cluster_manager->getUriFromClusterName("cluster_2").value(), "uri_2");
-  EXPECT_OK(aws_cluster_manager->getUriFromClusterName("cluster_3"));
-  EXPECT_EQ(aws_cluster_manager->getUriFromClusterName("cluster_3").value(), "uri_3");
+  EXPECT_THAT(aws_cluster_manager->getUriFromClusterName("cluster_1"), IsOkAndHolds("uri_1"));
+  EXPECT_THAT(aws_cluster_manager->getUriFromClusterName("cluster_2"), IsOkAndHolds("uri_2"));
+  EXPECT_THAT(aws_cluster_manager->getUriFromClusterName("cluster_3"), IsOkAndHolds("uri_3"));
   // Adding an extra with the same cluster name has no effect
   status = aws_cluster_manager->addManagedCluster(
       "cluster_1",
