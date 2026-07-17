@@ -6,6 +6,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -118,6 +119,19 @@ public:
         .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) {
           TestActiveClient::incrementActiveStreams(client);
         }));
+  }
+
+  // Establishes one connection and drains it to idle (connected, then its single stream closes),
+  // leaving the pool with one ready client and no active streams. The client is clients_.back().
+  void establishIdleConnection() {
+    EXPECT_CALL(pool_, instantiateActiveClient);
+    pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+    ASSERT_FALSE(clients_.empty());
+    EXPECT_CALL(pool_, onPoolReady);
+    clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+    clients_.back()->active_streams_ = 0;
+    pool_.onStreamClosed(*clients_.back(), false);
+    dispatcher_.clearDeferredDeleteList();
   }
 
 #define CHECK_STATE(active, pending, capacity)                                                     \
@@ -533,6 +547,31 @@ TEST_F(ConnPoolImplDispatcherBaseTest, NoAvailableStreams) {
   pool_.destructAllConnections();
 }
 
+// Destroying all connections purges pending streams when eager preconnect floor is enabled.
+TEST_F(ConnPoolImplDispatcherBaseTest, FloorTeardownPurgesStrandedPendingStreams) {
+  // Enable eager preconnect floor.
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+
+  // Strand a pending stream.
+  stream_limit_ = 1;
+  newConnectingClient();
+  clients_.back()->capacity_override_ = 0;
+  pool_.decrConnectingAndConnectedStreamCapacity(stream_limit_, *clients_.back());
+
+  EXPECT_CALL(pool_, onPoolReady).Times(0);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::Busy, clients_.back()->state());
+
+  // Tear down: no replacement connection is created, and the stranded pending stream is purged.
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(0);
+  EXPECT_CALL(pool_,
+              onPoolFailure(_, _, ConnectionPool::PoolFailureReason::LocalConnectionFailure, _));
+  pool_.destructAllConnections();
+
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+}
+
 // Verify that not fully connected active client calls
 // idle callbacks upon destruction.
 TEST_F(ConnPoolImplBaseTest, PoolIdleNotConnected) {
@@ -785,6 +824,228 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflowLegacy) {
   EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
 
   closeStreamAndDrainClient();
+}
+
+// Closing an established connection that drops the pool below the floor refills it.
+TEST_F(ConnPoolImplBaseTest, FloorRefillOnEstablishedClose) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  establishIdleConnection();
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+
+  // The remote close drops the pool below the floor, so a replacement is opened.
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+  EXPECT_EQ(0, host_->consecutiveEagerPreconnectFloorFailures());
+
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+// With the runtime guard disabled, eager preconnect floor not refilled.
+TEST_F(ConnPoolImplBaseTest, FloorRefillDisabledByRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.eager_preconnect_floor", "false"}});
+
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  establishIdleConnection();
+
+  // The remote close drops the pool below the floor, but no replacement is opened.
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(0);
+  clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+// Closing a connection while the pool stays at the floor does not open a replacement.
+TEST_F(ConnPoolImplBaseTest, FloorRefillNoOpWhenSatisfied) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
+
+  // Preconnect creates two connections for a single new stream (ratio 1.5).
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(2);
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  ASSERT_EQ(2, clients_.size());
+
+  // Deliver connection events to both clients, making the first one pick the pending stream.
+  EXPECT_CALL(pool_, onPoolReady);
+  clients_[0]->onEvent(Network::ConnectionEvent::Connected);
+  clients_[1]->onEvent(Network::ConnectionEvent::Connected);
+
+  // Drop the stream.
+  clients_[0]->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_[0], false);
+  dispatcher_.clearDeferredDeleteList();
+
+  // Closing one of the two connections leaves the pool at the floor, so nothing is opened.
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(0);
+  clients_[0]->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+// A connect failure (the client closes before completing its handshake) does not open a
+// replacement.
+TEST_F(ConnPoolImplBaseTest, FloorRefillSkippedOnConnectFailure) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+  ON_CALL(*cluster_, eagerPreconnectFloorFailureThreshold).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  // Create a connecting client for a new stream; it has not completed its handshake.
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  ASSERT_EQ(1, clients_.size());
+  EXPECT_EQ(ActiveClient::State::Connecting, clients_.back()->state());
+
+  // The connect fails before the handshake completes and the floor is not refilled.
+  EXPECT_CALL(pool_, onPoolFailure);
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(0);
+  clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+  EXPECT_EQ(1, host_->consecutiveEagerPreconnectFloorFailures());
+
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+// A paused floor maintenance is cleared on a successful on-demand connection.
+TEST_F(ConnPoolImplBaseTest, FloorResumesAndRefillsAfterConnectSucceeds) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(2));
+  ON_CALL(*cluster_, eagerPreconnectFloorFailureThreshold).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  // Pause floor maintenance for the host.
+  host_->incConsecutiveEagerPreconnectFloorFailures();
+  ASSERT_EQ(1, host_->consecutiveEagerPreconnectFloorFailures());
+
+  // A real pending stream is still served.
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  ASSERT_EQ(1, clients_.size());
+  EXPECT_EQ(ActiveClient::State::Connecting, clients_.back()->state());
+
+  // Floor maintenance is resumed.
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(0, host_->consecutiveEagerPreconnectFloorFailures());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+
+  clients_.front()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.front(), false);
+  dispatcher_.clearDeferredDeleteList();
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+// Floor maintenance is blocked when the connection circuit breaker is full.
+TEST_F(ConnPoolImplBaseTest, FloorPreconnectRateLimitedForcesFirstThenBlocks) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(2));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+  // Zero the connection budget so canCreateConnection() is always false.
+  cluster_->resetResourceManager(0, 1024, 1024, 1, 1);
+
+  // Pool is empty: the rate-limited floor preconnect is force-created to avoid starving pending
+  // streams, and is attributed as started even though the circuit breaker is full.
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_FALSE(pool_.maybePreconnectImpl(0));
+  ASSERT_EQ(1, clients_.size());
+  EXPECT_EQ(ActiveClient::State::Connecting, clients_.back()->state());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_overflow_.value());
+
+  // Pool is now non-empty and still at the limit: the next floor preconnect is declined and
+  // blocked.
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(0);
+  EXPECT_FALSE(pool_.maybePreconnectImpl(0));
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+  EXPECT_EQ(2, cluster_->traffic_stats_->upstream_cx_overflow_.value());
+
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+// Load shedding blocks preconnects temporarily.
+TEST_F(ConnPoolImplBaseTest, FloorPreconnectBlockedWhenLoadShed) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  new NiceMock<Event::MockSchedulableCallback>(&dispatcher);
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  NiceMock<Server::MockLoadShedPoint> load_shed_point;
+  ON_CALL(overload_manager, getLoadShedPoint(testing::_)).WillByDefault(Return(&load_shed_point));
+  // Shed load on the first attempt, then stop shedding on the second.
+  EXPECT_CALL(load_shed_point, shouldShedLoad()).WillOnce(Return(true)).WillOnce(Return(false));
+  TestConnPoolImplBase pool(host_, Upstream::ResourcePriority::Default, dispatcher, nullptr,
+                            nullptr, state_, overload_manager);
+  ON_CALL(pool, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
+    auto ret = std::make_unique<NiceMock<TestActiveClient>>(
+        pool, stream_limit_, concurrent_streams_, /*supports_early_data=*/false);
+    clients_.push_back(ret.get());
+    ret->real_host_description_ = descr_;
+    return ret;
+  }));
+
+  // First preconnect is blocked.
+  EXPECT_FALSE(pool.maybePreconnectImpl(0));
+  EXPECT_TRUE(clients_.empty());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_overflow_.value());
+
+  // Second preconnect proceeds.
+  EXPECT_CALL(pool, instantiateActiveClient);
+  EXPECT_TRUE(pool.maybePreconnectImpl(0));
+  ASSERT_EQ(1, clients_.size());
+  EXPECT_EQ(ActiveClient::State::Connecting, clients_.back()->state());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+
+  pool.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+// When a connection cannot be created metrics report it as blocked.
+TEST_F(ConnPoolImplBaseTest, FloorPreconnectBlockedWhenCreateFails) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  EXPECT_CALL(pool_, instantiateActiveClient).WillOnce(InvokeWithoutArgs([]() -> ActiveClientPtr {
+    return nullptr;
+  }));
+  EXPECT_FALSE(pool_.maybePreconnectImpl(0));
+
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_overflow_.value());
+}
+
+// Tearing down all connections drops the pool below the floor but does not trigger a refill.
+TEST_F(ConnPoolImplBaseTest, FloorNoRefillWhileDestroying) {
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+
+  establishIdleConnection();
+
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(0);
+  pool_.destructAllConnections();
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
 }
 
 } // namespace ConnectionPool

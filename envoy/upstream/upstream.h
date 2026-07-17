@@ -772,7 +772,9 @@ public:
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \
   COUNTER(upstream_cx_pool_overflow)                                                               \
+  COUNTER(upstream_cx_preconnect_blocked)                                                          \
   COUNTER(upstream_cx_preconnect_skipped)                                                          \
+  COUNTER(upstream_cx_preconnect_started)                                                          \
   COUNTER(upstream_cx_protocol_error)                                                              \
   COUNTER(upstream_cx_rx_bytes_total)                                                              \
   COUNTER(upstream_cx_total)                                                                       \

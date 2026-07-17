@@ -9,6 +9,8 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
+#include "absl/cleanup/cleanup.h"
+
 namespace Envoy {
 namespace ConnectionPool {
 namespace {
@@ -81,6 +83,9 @@ void ConnPoolImplBase::deleteIsPendingImpl() {
 }
 
 void ConnPoolImplBase::destructAllConnections() {
+  is_destroying_all_connections_ = true;
+  absl::Cleanup clear_destroying_flag = [this]() { is_destroying_all_connections_ = false; };
+
   for (auto* list : {&ready_clients_, &busy_clients_, &connecting_clients_, &early_data_clients_}) {
     while (!list->empty()) {
       list->front()->close();
@@ -123,7 +128,16 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
   }
 
   bool result = false;
-  if (global_preconnect_ratio != 0) {
+
+  // Maintain eager preconnect floor, if enabled.
+  if (const uint32_t min_connections = effectiveEagerPreconnectFloor();
+      min_connections > 0 && host_->consecutiveEagerPreconnectFloorFailures() <
+                                 host_->cluster().eagerPreconnectFloorFailureThreshold()) {
+    result = openOrOpeningConnections() < min_connections;
+  }
+
+  // Determine if we are trying to prefetch for global preconnect or local preconnect.
+  if (!result && global_preconnect_ratio != 0) {
     // If global preconnecting is on, and this connection is within the global
     // preconnect limit, preconnect.
     // For global preconnect, we anticipate an incoming stream to this pool, since it is
@@ -139,7 +153,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
               result, pending_streams_.size(), num_active_streams_,
               connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
               global_preconnect_ratio);
-  } else {
+  } else if (!result) {
     // Ensure this local pool has adequate connections for the given load.
     //
     // Local preconnect does not need to anticipate a stream. It is called as
@@ -400,7 +414,46 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
 
 bool ConnPoolImplBase::maybePreconnectImpl(float global_preconnect_ratio) {
   ASSERT(!deferred_deleting_, dumpState());
-  return tryCreateNewConnection(global_preconnect_ratio) == ConnectionResult::CreatedNewConnection;
+  auto& traffic_stats = *host_->cluster().trafficStats();
+  // Attribute this anticipatory attempt: _started counts a connection opened; _blocked counts one
+  // refused (create failed, load shed, or circuit breaker open). ShouldNotConnect is neither (no
+  // preconnect was warranted).
+  switch (tryCreateNewConnection(global_preconnect_ratio)) {
+  case ConnectionResult::CreatedNewConnection:
+    traffic_stats.upstream_cx_preconnect_started_.inc();
+    return true;
+  case ConnectionResult::CreatedButRateLimited:
+    // A connection was opened, but the pool is now rate limited, so no further preconnect follows.
+    traffic_stats.upstream_cx_preconnect_started_.inc();
+    break;
+  case ConnectionResult::FailedToCreateConnection:
+  case ConnectionResult::LoadShed:
+  case ConnectionResult::NoConnectionRateLimited:
+    traffic_stats.upstream_cx_preconnect_blocked_.inc();
+    break;
+  case ConnectionResult::ShouldNotConnect:
+    break;
+  }
+  return false;
+}
+
+uint32_t ConnPoolImplBase::effectiveEagerPreconnectFloor() const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.eager_preconnect_floor")) {
+    return 0;
+  }
+  return host_->cluster().eagerPreconnectFloor();
+}
+
+void ConnPoolImplBase::refillEagerPreconnectFloor() {
+  if (is_draining_for_deletion_ || is_destroying_all_connections_) {
+    return;
+  }
+  const uint32_t min_connections = effectiveEagerPreconnectFloor();
+  while (openOrOpeningConnections() < min_connections) {
+    if (!maybePreconnectImpl(0)) {
+      break;
+    }
+  }
 }
 
 void ConnPoolImplBase::scheduleOnUpstreamReady() {
@@ -573,6 +626,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
   case Network::ConnectionEvent::LocalClose: {
+    // Prevent eager preconnect floor from recreating connections during pool teardown.
+    const bool suppress_new_connections_on_destroy =
+        is_destroying_all_connections_ && effectiveEagerPreconnectFloor() > 0;
     if (client.connect_timer_) {
       ASSERT(!client.has_handshake_completed_);
       client.connect_timer_->disableTimer();
@@ -595,7 +651,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       client.has_handshake_completed_ = true;
       host_->cluster().trafficStats()->upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
-
+      if (effectiveEagerPreconnectFloor() > 0) {
+        host_->incConsecutiveEagerPreconnectFloorFailures();
+      }
       onConnectFailed(client);
       // Purge pending streams only if this client doesn't contribute to the local connecting
       // stream capacity. In other words, the rest clients  would be able to handle all the
@@ -617,7 +675,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       //       if retry logic submits a new stream to the pool, we don't fail it inline.
       purgePendingStreams(client.real_host_description_, failure_reason, reason);
       // See if we should preconnect based on active connections.
-      if (!is_draining_for_deletion_) {
+      if (!is_draining_for_deletion_ && !suppress_new_connections_on_destroy) {
         tryCreateNewConnections();
       }
     }
@@ -640,6 +698,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
 
+    // Maintain eager preconnect floor, if enabled.
+    refillEagerPreconnectFloor();
+
     // Check if the pool transitioned to idle state after removing closed client
     // from one of the client tracking lists.
     // There is no need to check if other connections are idle in a draining pool
@@ -654,7 +715,18 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
     // If we have pending streams and we just lost a connection we should make a new one.
     if (!pending_streams_.empty()) {
-      tryCreateNewConnections();
+      if (!suppress_new_connections_on_destroy) {
+        tryCreateNewConnections();
+      } else {
+        // Tearing down via destructAllConnections() with the eager preconnect floor enabled: we
+        // will not create replacement connections, so fail the orphaned pending streams directly
+        // rather than stranding them.
+        const ConnectionPool::PoolFailureReason reason =
+            (event == Network::ConnectionEvent::RemoteClose)
+                ? ConnectionPool::PoolFailureReason::RemoteConnectionFailure
+                : ConnectionPool::PoolFailureReason::LocalConnectionFailure;
+        purgePendingStreams(client.real_host_description_, failure_reason, reason);
+      }
     }
     break;
   }
@@ -668,6 +740,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.has_handshake_completed_ = true;
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
+
+    host_->resetConsecutiveEagerPreconnectFloorFailures();
     if (client.state() == ActiveClient::State::Connecting ||
         client.state() == ActiveClient::State::ReadyForEarlyData) {
       transitionActiveClientState(client,
@@ -692,6 +766,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     if (client.readyForStream()) {
       onUpstreamReady();
     }
+    refillEagerPreconnectFloor();
     checkForIdleAndCloseIdleConnsIfDraining();
     break;
   }
