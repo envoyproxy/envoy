@@ -100,23 +100,24 @@ UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
   return *target_socket_manager;
 }
 
-void UpstreamSocketManager::handoffSocketToWorker(const std::string& node_id,
-                                                  const std::string& cluster_id,
-                                                  Network::ConnectionSocketPtr socket,
-                                                  const std::chrono::seconds& ping_interval,
-                                                  absl::string_view tenant_id) {
+void UpstreamSocketManager::handoffSocketToWorker(
+    const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr socket,
+    const std::chrono::seconds& ping_interval, absl::string_view tenant_id,
+    absl::string_view initiator_worker_id, absl::string_view initiator_connection_id) {
   dispatcher_.post([this, node_id, cluster_id, ping_interval, tenant_id = std::string(tenant_id),
+                    initiator_worker_id = std::string(initiator_worker_id),
+                    initiator_connection_id = std::string(initiator_connection_id),
                     socket = std::move(socket)]() mutable -> void {
     this->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
-                              true /* rebalanced */, tenant_id);
+                              true /* rebalanced */, tenant_id, initiator_worker_id,
+                              initiator_connection_id);
   });
 }
 
-void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
-                                                const std::string& cluster_id,
-                                                Network::ConnectionSocketPtr socket,
-                                                const std::chrono::seconds& ping_interval,
-                                                bool rebalanced, absl::string_view tenant_id) {
+void UpstreamSocketManager::addConnectionSocket(
+    const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr socket,
+    const std::chrono::seconds& ping_interval, bool rebalanced, absl::string_view tenant_id,
+    absl::string_view initiator_worker_id, absl::string_view initiator_connection_id) {
   const std::string scoped_node_id =
       maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, node_id);
   const std::string scoped_cluster_id =
@@ -132,7 +133,7 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
                 "{} cluster: {}",
                 node_id, cluster_id);
       target_manager.handoffSocketToWorker(node_id, cluster_id, std::move(socket), ping_interval,
-                                           tenant_id);
+                                           tenant_id, initiator_worker_id, initiator_connection_id);
       return;
     }
   }
@@ -165,18 +166,15 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   fd_to_node_map_[fd] = scoped_node_id;
   fd_to_cluster_map_[fd] = scoped_cluster_id;
   fd_to_lifecycle_info_[fd] =
-      ReverseTunnelLifecycleInfo{node_id,
-                                 cluster_id,
-                                 std::string(tenant_id),
-                                 socket->connectionInfoProvider().localAddress(),
-                                 socket->connectionInfoProvider().remoteAddress(),
-                                 dispatcher_.name(),
-                                 fd,
-                                 false,
-                                 false,
-                                 false,
-                                 false,
-                                 ""};
+      ReverseTunnelLifecycleInfo{.node_id = node_id,
+                                 .cluster_id = cluster_id,
+                                 .tenant_id = std::string(tenant_id),
+                                 .local_address = socket->connectionInfoProvider().localAddress(),
+                                 .remote_address = socket->connectionInfoProvider().remoteAddress(),
+                                 .worker = dispatcher_.name(),
+                                 .initiator_worker_id = std::string(initiator_worker_id),
+                                 .initiator_connection_id = std::string(initiator_connection_id),
+                                 .fd = fd};
   node_to_active_fd_count_[scoped_node_id]++;
 
   // Create per-connection timeout timer for ping responses.

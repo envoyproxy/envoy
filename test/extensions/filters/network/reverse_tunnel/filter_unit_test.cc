@@ -187,6 +187,22 @@ public:
     return headers;
   }
 
+  // Helper to craft an HTTP request that also carries the initiator worker-id and connection-id
+  // handshake headers.
+  std::string makeHttpRequestWithInitiatorIds(const std::string& method, const std::string& path,
+                                              const std::string& node, const std::string& cluster,
+                                              const std::string& tenant,
+                                              const std::string& initiator_worker_id,
+                                              const std::string& initiator_connection_id) {
+    std::string req = fmt::format("{} {} HTTP/1.1\r\n", method, path);
+    req += "Host: localhost\r\n";
+    req += makeRtHeaders(node, cluster, tenant);
+    req += "x-envoy-reverse-tunnel-worker-id: " + initiator_worker_id + "\r\n";
+    req += "x-envoy-reverse-tunnel-connection-id: " + initiator_connection_id + "\r\n";
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
+  }
+
   // Helper to craft HTTP request with initiation time header.
   std::string makeHttpRequestWithInitiationTime(const std::string& method, const std::string& path,
                                                 const std::string& node, const std::string& cluster,
@@ -1646,6 +1662,48 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
   Buffer::OwnedImpl request(makeHttpRequestWithInitiationTime(
       "GET", "/reverse_connections/request", node_id, cluster_id, tenant_id, initiation_time_ms));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+}
+
+// The initiator worker-id and connection-id headers are parsed and threaded into the accepted
+// socket's lifecycle info, so lifecycle access logs can surface them.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionPropagatesInitiatorIds) {
+  const std::string node_id = "node-ids";
+  const std::string cluster_id = "cluster";
+  const std::string tenant_id = "tenant";
+  const int duped_fd = 100;
+
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
+
+  EXPECT_CALL(*dup_io_handle, resetFileEvents());
+  EXPECT_CALL(*dup_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(duped_fd));
+  EXPECT_CALL(*dup_io_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_io_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+
+  static Network::ConnectionSocketPtr stored_mock_socket_ids;
+  static std::unique_ptr<Network::MockIoHandle> stored_io_handle_ids;
+  stored_io_handle_ids = std::move(mock_io_handle);
+  stored_mock_socket_ids = std::move(mock_socket);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_mock_socket_ids));
+
+  Buffer::OwnedImpl request(makeHttpRequestWithInitiatorIds(
+      "GET", "/reverse_connections/request", node_id, cluster_id, tenant_id, "worker_9", "314159"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+
+  const auto* lifecycle =
+      upstream_thread_local_registry_->socketManager()->getLifecycleInfo(duped_fd);
+  ASSERT_NE(lifecycle, nullptr);
+  EXPECT_EQ(lifecycle->initiator_worker_id, "worker_9");
+  EXPECT_EQ(lifecycle->initiator_connection_id, "314159");
 }
 
 TEST_F(ReverseTunnelFilterWithUpstreamTest,

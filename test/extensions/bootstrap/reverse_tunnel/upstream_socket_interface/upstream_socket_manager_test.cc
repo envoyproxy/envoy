@@ -351,6 +351,32 @@ TEST_F(TestUpstreamSocketManager, SetupLogPreservesOriginalIdentifiersWithTenant
   extension_->setTestOnlyAccessLogs({});
 }
 
+TEST_F(TestUpstreamSocketManager, SetupLogSurfacesInitiatorWorkerAndConnectionIds) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  const int fd = 124;
+  auto socket = createMockSocket(fd, "10.0.0.1:8080", "10.0.0.2:9090");
+
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(metadata.fields().at("initiator_worker_id").string_value(), "worker_7");
+        EXPECT_EQ(metadata.fields().at("initiator_connection_id").string_value(), "9001");
+        EXPECT_EQ(filterStateString(stream_info, kFilterStateInitiatorWorkerId), "worker_7");
+        EXPECT_EQ(filterStateString(stream_info, kFilterStateInitiatorConnectionId), "9001");
+      }))
+      .RetiresOnSaturation();
+
+  socket_manager_->addConnectionSocket("node-a", "cluster-a", std::move(socket),
+                                       std::chrono::seconds(30), false, "tenant-a",
+                                       /*initiator_worker_id=*/"worker_7",
+                                       /*initiator_connection_id=*/"9001");
+
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+  extension_->setTestOnlyAccessLogs({});
+}
+
 TEST_F(TestUpstreamSocketManager, SyntheticLifecycleLogDoesNotSetConnectionId) {
   auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
   extension_->setTestOnlyAccessLogs({access_log});
