@@ -13,10 +13,11 @@ namespace Extensions {
 namespace InternalRedirect {
 
 class FilterStatePredicateFactory : public Router::InternalRedirectPredicateFactory {
+  using ProtoConfig = envoy::extensions::internal_redirect::filter_state::v3::FilterStateConfig;
+
 public:
   Router::InternalRedirectPredicateSharedPtr
   createInternalRedirectPredicate(const Protobuf::Message& config, absl::string_view) override {
-    using ProtoConfig = envoy::extensions::internal_redirect::filter_state::v3::FilterStateConfig;
     const auto& filter_state_config = MessageUtil::downcastAndValidate<const ProtoConfig&>(
         config, ProtobufMessage::getStrictValidationVisitor());
 
