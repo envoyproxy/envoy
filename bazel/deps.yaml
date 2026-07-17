@@ -1406,7 +1406,7 @@ rules_shell:
   project_name: "Shell script rules for Bazel"
   project_desc: "Bazel rules for shell scripts"
   project_url: "https://github.com/bazelbuild/rules_shell"
-  release_date: "2026-03-23"
+  release_date: "2026-04-15"
   use_category:
   - build
   - dataplane_core
