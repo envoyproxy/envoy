@@ -227,8 +227,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/unicode-org/icu/releases/download/release-{version}/icu4c-{version}-sources.zip"],
     ),
     ipp_crypto = dict(
-        version = "1.3.0",
-        sha256 = "a1d87cb3b90fe4718609e4e9dd8343fd4531bb815e69bad901ac6b46f98b3b53",
+        version = "2.2.0",
+        sha256 = "d43503c479dd3292173b55aa6777161461e45621c0003169ea1a3b29aba897ed",
         strip_prefix = "cryptography-primitives-{version}",
         urls = ["https://github.com/intel/cryptography-primitives/archive/refs/tags/v{version}.tar.gz"],
     ),
