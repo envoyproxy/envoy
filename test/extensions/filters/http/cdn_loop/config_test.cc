@@ -6,6 +6,7 @@
 #include "source/extensions/filters/http/cdn_loop/filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,6 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CdnLoop {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::HasSubstr;
 
 TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
@@ -51,8 +53,7 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnId) {
   CdnLoopFilterFactory factory;
 
   auto status_or = factory.createFilterFactoryFromProto(config, "stats", context);
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_THAT(status_or.status().message(), HasSubstr("is not a valid CDN identifier"));
+  EXPECT_THAT(status_or, HasStatusMessage(HasSubstr("is not a valid CDN identifier")));
 }
 
 TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
@@ -63,8 +64,7 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
   CdnLoopFilterFactory factory;
 
   auto status_or = factory.createFilterFactoryFromProto(config, "stats", context);
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_THAT(status_or.status().message(), HasSubstr("is not a valid CDN identifier"));
+  EXPECT_THAT(status_or, HasStatusMessage(HasSubstr("is not a valid CDN identifier")));
 }
 
 TEST(CdnLoopFilterFactoryTest, InvalidParsedCdnIdNotInput) {
@@ -75,8 +75,7 @@ TEST(CdnLoopFilterFactoryTest, InvalidParsedCdnIdNotInput) {
   CdnLoopFilterFactory factory;
 
   auto status_or = factory.createFilterFactoryFromProto(config, "stats", context);
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_THAT(status_or.status().message(), HasSubstr("is not a valid CDN identifier"));
+  EXPECT_THAT(status_or, HasStatusMessage(HasSubstr("is not a valid CDN identifier")));
 }
 
 } // namespace CdnLoop

@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -17,6 +18,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 using HeaderToMetadataProtoConfig =
     envoy::extensions::filters::http::header_to_metadata::v3::Config;
 
@@ -28,7 +31,7 @@ void testForbiddenConfig(const std::string& yaml) {
   HeaderToMetadataConfig factory;
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_FALSE(status_or.ok());
+  EXPECT_THAT(status_or, Not(IsOk()));
 }
 
 // Tests that empty (metadata) keys are rejected.
