@@ -49,12 +49,8 @@ public:
   }
 
   const std::string& tlsVersion() const override {
-    if (!tls_version_.has_value()) {
-      auto* crypto_stream = session_.GetCryptoStream();
-      QUICHE_DCHECK(crypto_stream != nullptr);
-      tls_version_ = GetTlsVersionFromString(crypto_stream->TlsVersion());
-    }
-    return *tls_version_;
+    static const auto* version = new std::string("TLSv1.3");
+    return *version;
   }
 
   const std::string& alpn() const override {
@@ -111,7 +107,6 @@ private:
   bool cert_validated_{false};
   mutable std::optional<std::string> alpn_;
   mutable std::optional<std::string> sni_;
-  mutable std::optional<std::string> tls_version_;
 };
 
 } // namespace Quic

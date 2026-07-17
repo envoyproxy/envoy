@@ -224,7 +224,5 @@ quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte);
 // Register TLS certificate compression algorithms (RFC 8879) for QUIC.
 void registerCertCompression(SSL_CTX* ssl_ctx);
 
-std::string GetTlsVersionFromString(absl::string_view quiche_version);
-
 } // namespace Quic
 } // namespace Envoy
