@@ -62,6 +62,13 @@ TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
 }
 
 TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeUsed) {
+  // A small backoff max_interval must not become an implicit per-try timeout (issue #38847), so
+  // recreate the client with a backoff config and expect no per-try timeout on the parsed policy.
+  auto* retry_back_off = config.mutable_retry_policy()->mutable_retry_back_off();
+  retry_back_off->mutable_base_interval()->set_seconds(1);
+  retry_back_off->mutable_max_interval()->set_seconds(2);
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
+
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
@@ -77,6 +84,7 @@ TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeUsed) {
             http_callbacks = &callbacks;
             EXPECT_NE(opts.parsed_retry_policy, nullptr);
             EXPECT_EQ(opts.parsed_retry_policy->numRetries(), 3);
+            EXPECT_EQ(opts.parsed_retry_policy->perTryTimeout(), std::chrono::milliseconds(0));
             return &http_stream;
           }));
 
