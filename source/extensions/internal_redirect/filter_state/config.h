@@ -29,9 +29,6 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoConfig>();
   }
-
-private:
-  using ProtoConfig = envoy::extensions::internal_redirect::filter_state::v3::FilterStateConfig;
 };
 
 } // namespace InternalRedirect

@@ -328,10 +328,7 @@ TEST_F(ConfigTest, SetBoolValueInvalid) {
       text_format_source:
         inline_string: "invalid"
   )YAML"});
-  update();
-  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
-  ASSERT_NE(nullptr, value);
-  EXPECT_FALSE(value->value());
+  EXPECT_THROW_WITH_MESSAGE(update(), EnvoyException, "Invalid boolean value: 'invalid'");
 }
 
 } // namespace
