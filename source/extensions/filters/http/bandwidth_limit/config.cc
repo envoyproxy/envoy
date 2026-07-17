@@ -12,17 +12,28 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BandwidthLimitFilter {
 
-absl::StatusOr<Http::FilterFactoryCb> BandwidthLimitFilterConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> BandwidthLimitFilterConfig::createFilterFactory(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
-
-  absl::StatusOr<FilterConfigSharedPtr> filter_config = FilterConfig::create(
-      proto_config, context.scope(), server_context.runtime(), server_context.timeSource());
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
+  absl::StatusOr<FilterConfigSharedPtr> filter_config =
+      FilterConfig::create(proto_config, scope, context.runtime(), context.timeSource());
   RETURN_IF_NOT_OK_REF(filter_config.status());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<BandwidthLimiter>(*filter_config));
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> BandwidthLimitFilterConfig::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto_config, context.serverFactoryContext(), context.scope());
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+BandwidthLimitFilterConfig::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto_config, context, context.scope());
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

@@ -34,6 +34,18 @@ TEST_F(A2aFilterConfigFactoryTest, CreateFilterFactory) {
   cb.value()(filter_callback);
 }
 
+TEST_F(A2aFilterConfigFactoryTest, CreateFilterWithServerContext) {
+  envoy::extensions::filters::http::a2a::v3::A2a config;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  Http::FilterFactoryCb cb =
+      factory_.createHttpFilterFactoryFromProto(config, "stats", server_context).value();
+
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 } // namespace
 } // namespace A2a
 } // namespace HttpFilters
