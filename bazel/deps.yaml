@@ -1307,7 +1307,7 @@ rules_fuzzing:
   project_name: "Fuzzing Rules for Bazel"
   project_desc: "Bazel rules for fuzz tests"
   project_url: "https://github.com/bazelbuild/rules_fuzzing"
-  release_date: "2025-12-08"
+  release_date: "2026-04-16"
   use_category:
   - test_only
   implied_untracked_deps:
