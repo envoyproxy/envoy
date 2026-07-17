@@ -98,6 +98,11 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
       std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
+Evwatch::ObserverHandlePtr DispatcherImpl::registerEvwatchObserver(Evwatch::ObserverPtr observer) {
+  ASSERT(isThreadSafe());
+  return base_scheduler_.registerEvwatchObserver(std::move(observer));
+}
+
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const std::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");

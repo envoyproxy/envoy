@@ -728,7 +728,7 @@ void FakeUpstream::initializeServer() {
   dispatcher_->post([this]() -> void {
     EXPECT_OK(
         listener_.udp_listener_config_.listenerFactory().doFinalPreWorkerInit(socket_factories_));
-    EXPECT_TRUE(socket_factories_[0]->doFinalPreWorkerInit().ok());
+    EXPECT_OK(socket_factories_[0]->doFinalPreWorkerInit());
     handler_->addListener(std::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
   });

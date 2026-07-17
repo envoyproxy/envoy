@@ -44,8 +44,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/prometheus/client_model/archive/v{version}.tar.gz"],
     ),
     rules_buf = dict(
-        version = "0.5.2",
-        sha256 = "19d845cedf32c0e74a01af8d0bd904872bddc7905f087318d00b332aa36d3929",
+        version = "0.5.4",
+        sha256 = "e1feef4c326e342d8a4e56dc1cea68d33c80376331ec687bccd97ee5547969db",
         strip_prefix = "rules_buf-{version}",
         urls = ["https://github.com/bufbuild/rules_buf/archive/refs/tags/v{version}.tar.gz"],
     ),
