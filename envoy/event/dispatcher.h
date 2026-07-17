@@ -162,10 +162,15 @@ public:
    * Registers an Evwatch observer with this dispatcher.
    * This should only be called on the dispatcher's thread.
    * @param observer supplies the observer to register.
-   * @return Evwatch::ObserverHandlePtr handle that automatically unregisters the observer when
-   * destroyed.
    */
-  virtual Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer) PURE;
+  virtual void registerEvwatchObserver(Evwatch::ObserverPtr observer) PURE;
+
+  /**
+   * Unregisters an Evwatch observer from this dispatcher.
+   * This should only be called on the dispatcher's thread.
+   * @param observer supplies the observer to unregister.
+   */
+  virtual void unregisterEvwatchObserver(Evwatch::Observer* observer) PURE;
 
   /**
    * Returns a time-source to use with this dispatcher.

@@ -1536,7 +1536,8 @@ TEST(EvwatchObserverTest, RegisterEvwatchObserver) {
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
 
-  EXPECT_EQ(nullptr, dispatcher->registerEvwatchObserver(nullptr));
+  dispatcher->registerEvwatchObserver(nullptr);
+  dispatcher->unregisterEvwatchObserver(nullptr);
 
   auto observer = std::make_unique<NiceMock<MockEvwatchObserver>>();
   auto* observer_ptr = observer.get();
@@ -1544,14 +1545,13 @@ TEST(EvwatchObserverTest, RegisterEvwatchObserver) {
   EXPECT_CALL(*observer_ptr, onPrepare(_, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(*observer_ptr, onCheck(_)).Times(testing::AtLeast(1));
 
-  auto handle = dispatcher->registerEvwatchObserver(std::move(observer));
-  EXPECT_NE(nullptr, handle);
+  dispatcher->registerEvwatchObserver(std::move(observer));
 
   auto cb = dispatcher->createSchedulableCallback([]() {});
   cb->scheduleCallbackCurrentIteration();
   dispatcher->run(Dispatcher::RunType::NonBlock);
 
-  handle.reset();
+  dispatcher->unregisterEvwatchObserver(observer_ptr);
 }
 
 } // namespace
