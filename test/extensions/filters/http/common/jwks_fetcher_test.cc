@@ -208,6 +208,8 @@ TEST_F(JwksFetcherTest, TestSpanPassedDown) {
                  const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_TRUE(options.parent_span_ == &this->parent_span_);
             EXPECT_TRUE(options.child_span_name_ == "JWT Remote PubKey Fetch");
+            // Sampled is left unset so the fetch span inherits the parent's sampling decision.
+            EXPECT_FALSE(options.sampled_.has_value());
             return nullptr;
           }));
 
