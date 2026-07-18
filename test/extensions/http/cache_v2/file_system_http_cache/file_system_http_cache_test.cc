@@ -75,7 +75,10 @@ public:
         .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   }
 
-  void initCache() { cache_ = *http_cache_factory_->getCache(cacheConfig(testConfig()), context_); }
+  void initCache() {
+    cache_ =
+        *http_cache_factory_->getCache(cacheConfig(testConfig()), context_.server_factory_context_);
+  }
 
   void waitForEvictionThreadIdle() { cache()->cache_eviction_thread_.waitForIdle(); }
 
@@ -124,7 +127,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   cfg.mutable_max_cache_size_bytes()->set_value(max_size);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_1_contents, true);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_2_contents, true);
-  cache_ = *http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  cache_ = *http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_);
   waitForEvictionThreadIdle();
   EXPECT_EQ(cache()->stats().size_limit_bytes_.value(), max_size);
   EXPECT_EQ(cache()->stats().size_limit_count_.value(), max_count);
@@ -142,7 +145,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
   // TODO(#24994): replace this with backdating the files when that's possible.
   sleep(1); // NO_CHECK_FORMAT(real_time)
-  cache_ = *http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  cache_ = *http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_);
   waitForEvictionThreadIdle();
   EXPECT_EQ(cache()->stats().eviction_runs_.value(), 0);
   EXPECT_EQ(cache()->stats().size_bytes_.value(), file_contents.size() * 2);
@@ -174,7 +177,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
   // TODO(#24994): replace this with backdating the files when that's possible.
   sleep(1); // NO_CHECK_FORMAT(real_time)
-  cache_ = *http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  cache_ = *http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_);
   waitForEvictionThreadIdle();
   EXPECT_EQ(cache()->stats().eviction_runs_.value(), 0);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
@@ -234,20 +237,22 @@ TEST_F(FileSystemHttpCacheTest,
        InvalidArgumentOnTryingToCreateCachesWithDistinctConfigsOnSamePath) {
   ConfigProto cfg = testConfig();
   cfg.mutable_manager_config()->mutable_thread_pool()->set_thread_count(2);
-  EXPECT_THAT(http_cache_factory_->getCache(cacheConfig(cfg), context_),
+  EXPECT_THAT(http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_),
               HasStatusCode(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(FileSystemHttpCacheTest, IdenticalCacheConfigReturnsSameCacheInstance) {
   ConfigProto cfg = testConfig();
-  auto second_cache = http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  auto second_cache =
+      http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_);
   EXPECT_EQ(cache_, *second_cache);
 }
 
 TEST_F(FileSystemHttpCacheTest, CacheConfigsWithDifferentPathsReturnDistinctCacheInstances) {
   ConfigProto cfg = testConfig();
   cfg.set_cache_path("/tmp");
-  auto second_cache = http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  auto second_cache =
+      http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_);
   EXPECT_NE(cache_, *second_cache);
 }
 
@@ -911,7 +916,7 @@ TEST(Registration, GetCacheFromFactory) {
   ON_CALL(factory_context.server_factory_context_.api_, threadFactory())
       .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
-  auto status_or_cache = factory->getCache(cache_config, factory_context);
+  auto status_or_cache = factory->getCache(cache_config, factory_context.server_factory_context_);
   ASSERT_OK(status_or_cache);
   EXPECT_EQ((*status_or_cache)->cacheInfo().name_,
             "envoy.extensions.http.cache_v2.file_system_http_cache");

@@ -128,8 +128,9 @@ void ActiveLookupContext::getTrailers(GetTrailersCallback&& cb) {
   entry_->wantTrailers(dispatcher(), std::move(cb));
 }
 
-std::shared_ptr<CacheSessions> CacheSessions::create(Server::Configuration::FactoryContext& context,
-                                                     std::unique_ptr<HttpCache> cache) {
+std::shared_ptr<CacheSessions>
+CacheSessions::create(Server::Configuration::ServerFactoryContext& context,
+                      std::unique_ptr<HttpCache> cache) {
   return std::make_shared<CacheSessionsImpl>(context, std::move(cache));
 }
 
