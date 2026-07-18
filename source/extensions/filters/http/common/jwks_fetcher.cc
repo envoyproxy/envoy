@@ -64,6 +64,9 @@ public:
                        .setTimeout(std::chrono::milliseconds(
                            DurationUtil::durationToMilliseconds(remote_jwks_.http_uri().timeout())))
                        .setParentSpan(parent_span)
+                       // Leave sampled unset so the JWKS fetch span honors the parent span's
+                       // sampling decision instead of always being sampled.
+                       .setSampled(absl::nullopt)
                        .setChildSpanName("JWT Remote PubKey Fetch");
 
     if (retry_policy_ != nullptr) {
