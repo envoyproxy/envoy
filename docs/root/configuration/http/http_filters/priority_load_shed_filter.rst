@@ -13,29 +13,28 @@ Priority Load Shed
 The priority load shed filter maps an integer value from a request header into configured value
 buckets and checks a corresponding overload manager load shed point for that bucket.
 
+By convention, lower priority values represent higher importance (e.g., 0 = most critical,
+shed last), but the filter does not enforce any direction. The actual shedding behavior is
+determined by the load shed points configured in the overload manager for each bucket.
+
 Bucket ranges use half-open interval semantics ``[start, end)``:
 
 * ``start`` is included in the bucket.
 * ``end`` is excluded from the bucket.
 
-A request is rejected only when all of the following are true:
+A request is shed when all of the following are true:
 
 * the configured header is present, its first value parses as a non-negative integer, and the
-  parsed value matches a configured bucket; or ``default_load_shed_point`` is configured and used
-  for a missing, invalid, or unmatched value,
-* neither ``reject_on_missing_header`` nor ``reject_on_invalid_header`` is triggered,
-* the selected load shed point exists, and
-* that load shed point indicates load should be shed.
+  parsed value matches a configured bucket (or ``default_load_shed_point`` is configured and used
+  as a fallback for a missing, invalid, or unmatched value), and
+* the selected load shed point indicates load should be shed.
 
-Otherwise the request continues through the filter chain.
+If the header is missing, invalid, or the value does not match any bucket and no
+``default_load_shed_point`` is configured, the request is rejected with ``400 Bad Request``.
 
-If strict validation is desired, set:
-
-* ``reject_on_missing_header: true`` to return ``400 Bad Request`` for missing header.
-* ``reject_on_invalid_header: true`` to return ``400 Bad Request`` for empty, non-numeric, or
-  negative header value.
-
-These strict flags take precedence over ``default_load_shed_point``.
+All referenced load shed points (both in buckets and ``default_load_shed_point``) must be
+configured in the overload manager. If a referenced point does not exist, the configuration
+is rejected at load time.
 
 Example configuration
 ---------------------
@@ -79,8 +78,6 @@ Example configuration
                 - value_range: { start: 16, end: 32 }
                   load_shed_point: envoy.load_shed_points.priority.low
                 default_load_shed_point: envoy.load_shed_points.priority.low
-                reject_on_missing_header: false
-                reject_on_invalid_header: false
             - name: envoy.filters.http.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -99,6 +96,5 @@ namespace.
   header_missing, Counter, Requests where the configured header was not present
   header_invalid, Counter, Requests where the first header value was invalid
   bucket_unmatched, Counter, Requests where parsed value did not match any bucket
-  bucket_unresolved_point, Counter, Requests where selected bucket/default point was unresolved
   passed, Counter, Requests allowed to continue because selected load shed point did not shed
   shed, Counter, Requests rejected because selected load shed point shed load

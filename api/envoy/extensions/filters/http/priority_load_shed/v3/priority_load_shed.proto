@@ -21,7 +21,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // shed last), but the filter does not enforce any direction. The actual shedding behavior is
 // determined by the load shed points configured in the overload manager for each bucket.
 // Requests with a missing header, invalid value, or a value that does not match any configured
-// bucket are rejected with a ``400`` status code.
+// bucket are rejected with a ``400`` status code unless ``default_load_shed_point`` is configured,
+// in which case those requests are evaluated against the default load shed point instead.
 message PriorityLoadShed {
   message Bucket {
     // Numeric range of header values in half-open interval semantics [start, end).
