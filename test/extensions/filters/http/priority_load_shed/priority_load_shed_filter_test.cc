@@ -192,8 +192,10 @@ default_load_shed_point: "envoy.load_shed_points.priority.default"
   auto config_or = PriorityLoadShedFilterConfig::create(config, overload_manager_, "prefix.",
                                                         *stats_store_.rootScope());
   EXPECT_FALSE(config_or.ok());
-  EXPECT_THAT(absl::StrCat(config_or.status()),
-              HasSubstr("default load shed point 'envoy.load_shed_points.priority.default' is not configured"));
+  EXPECT_THAT(
+      absl::StrCat(config_or.status()),
+      HasSubstr(
+          "default load shed point 'envoy.load_shed_points.priority.default' is not configured"));
 }
 
 TEST_F(PriorityLoadShedFilterTest, NegativeHeaderRejectsWithoutDefault) {
@@ -414,6 +416,11 @@ buckets:
 }
 
 TEST_F(PriorityLoadShedFilterTest, RejectsOverlappingRangesOnCreate) {
+  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.high"))
+      .WillOnce(Return(&high_priority_bucket_));
+  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
+      .WillOnce(Return(&low_priority_bucket_));
+
   ProtoConfig config;
   TestUtility::loadFromYaml(R"EOF(
 header_name: "x-message-priority"
