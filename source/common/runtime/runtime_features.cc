@@ -236,6 +236,13 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 // See: `https://github.com/envoyproxy/envoy/issues/45212` for more details.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 
+// When enabled, the match_delegate (ExtensionWithMatcher) filter creates the wrapped filter
+// lazily, only once the match tree resolves to a non-skip result for the stream. This avoids the
+// per-stream cost of constructing a filter that ends up skipped, and gates the wrapped filter's
+// access loggers so they no longer run for skipped streams. Opt-in while it is validated; flip to
+// true (RUNTIME_GUARD) after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_match_delegate_lazy_creation);
+
 // Flag to remove legacy route formatter support in header parser
 // Flip to true after two release periods.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
