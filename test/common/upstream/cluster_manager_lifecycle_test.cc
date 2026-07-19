@@ -1003,6 +1003,88 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+class EagerPreconnectFloorLifecycleTest : public ClusterManagerLifecycleTest {
+protected:
+  void setUpClusterWithPreconnectFloor(uint32_t floor,
+                                       std::initializer_list<Host::HealthFlag> initial_host_flags,
+                                       std::shared_ptr<MockClusterMockPrioritySet>& cluster,
+                                       HostSharedPtr& host, MockHealthChecker& health_checker,
+                                       Outlier::MockDetector& outlier_detector) {
+    const std::string json = fmt::sprintf(
+        "{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("eager_preconnect_floor_cluster")}));
+    cluster = std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+    cluster->info_->name_ = "eager_preconnect_floor_cluster";
+    ON_CALL(*cluster->info_, eagerPreconnectFloor()).WillByDefault(Return(floor));
+
+    host = makeTestHost(cluster->info_, "tcp://127.0.0.1:80");
+    for (const auto flag : initial_host_flags) {
+      host->healthFlagSet(flag);
+    }
+    cluster->prioritySet().getMockHostSet(0)->hosts_ = {host};
+    ON_CALL(*cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+
+    ON_CALL(*cluster, healthChecker()).WillByDefault(Return(&health_checker));
+    ON_CALL(*cluster, outlierDetector()).WillByDefault(Return(&outlier_detector));
+
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+        .WillOnce(Return(std::make_pair(cluster, nullptr)));
+    EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+    EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+    EXPECT_CALL(*cluster, initialize(_))
+        .WillOnce(Invoke(
+            [cluster](std::function<void()> initialize_callback) { initialize_callback(); }));
+    create(parseBootstrapFromV3Json(json));
+
+    // Instantiate the cluster on this worker.
+    ASSERT_NE(nullptr, cluster_manager_->getThreadLocalCluster("eager_preconnect_floor_cluster"));
+  }
+
+
+  NiceMock<Http::ConnectionPool::MockInstance>* useAsHttp(const HostSharedPtr& host) {
+    auto* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
+    cluster_manager_->getThreadLocalCluster("eager_preconnect_floor_cluster")
+        ->httpConnPool(host, ResourcePriority::Default, std::nullopt, nullptr);
+    return pool;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(EagerPreconnectFloorLifecycleTest, EagerPreconnectFloorLifecycleTest,
+                         testing::Bool());
+
+// When a healthy host is added after the pool type is in use, the cluster manager opens
+// a bootstrap connection for the new host.
+TEST_P(EagerPreconnectFloorLifecycleTest, BootstrappedOnHostAdded) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  // Cluster has one unhealthy host, which will not be bootstrapped.
+  setUpClusterWithPreconnectFloor(2, {Host::HealthFlag::FAILED_ACTIVE_HC}, cluster, host,
+                                  health_checker, outlier_detector);
+
+  auto* existing_pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+  auto* added_pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
+      .WillOnce(Return(existing_pool))
+      .WillOnce(Return(added_pool));
+  // Only the newly added host is bootstrapped.
+  EXPECT_CALL(*existing_pool, maybePreconnect(_)).Times(0);
+  EXPECT_CALL(*added_pool, maybePreconnect(_)).WillOnce(Return(true));
+
+  // Mark the cluster as used for HTTP.
+  cluster_manager_->getThreadLocalCluster("eager_preconnect_floor_cluster")
+      ->httpConnPool(host, ResourcePriority::Default, std::nullopt, nullptr);
+
+  // Add a healthy host.
+  HostSharedPtr added_host = makeTestHost(cluster->info_, "tcp://127.0.0.1:81");
+  cluster->prioritySet().getMockHostSet(0)->hosts_ = {host, added_host};
+  cluster->prioritySet().getMockHostSet(0)->runCallbacks({added_host}, {});
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
 // Test that we drain or close all HTTP or TCP connection pool connections when there is a host
 // health failure and 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' set to true.
 TEST_P(ClusterManagerLifecycleTest,

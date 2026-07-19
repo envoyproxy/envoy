@@ -234,6 +234,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
