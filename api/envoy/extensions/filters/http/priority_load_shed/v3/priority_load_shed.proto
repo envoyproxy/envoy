@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.priority_load_shed]
 
 // By convention, lower priority values represent higher importance (e.g., 0 = most critical,
-// shed last), but the filter does not enforce any direction. The actual shedding behavior is
+// shed last), but the filter does not enforce any ordering. The actual shedding behavior is
 // determined by the load shed points configured in the overload manager for each bucket.
 // Requests with a missing header, invalid value, or a value that does not match any configured
 // bucket are rejected with a ``400`` status code unless ``default_load_shed_point`` is configured,

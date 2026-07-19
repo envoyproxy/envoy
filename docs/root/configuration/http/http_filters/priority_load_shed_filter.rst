@@ -13,9 +13,8 @@ Priority Load Shed
 The priority load shed filter maps an integer value from a request header into configured value
 buckets and checks a corresponding overload manager load shed point for that bucket.
 
-By convention, lower priority values represent higher importance (e.g., 0 = most critical,
-shed last), but the filter does not enforce any direction. The actual shedding behavior is
-determined by the load shed points configured in the overload manager for each bucket.
+The filter maps header values to buckets without interpreting their relative importance.
+Each bucket's shedding behavior is independently controlled by its configured load shed point.
 
 Bucket ranges use half-open interval semantics ``[start, end)``:
 
