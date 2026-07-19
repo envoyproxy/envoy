@@ -81,7 +81,7 @@ uint64_t RpingInterceptor::scatterToSlices(absl::string_view src, Buffer::RawSli
   uint64_t written = 0;
   for (uint64_t i = 0; i < num_slice && written < src.size(); i++) {
     const uint64_t n = std::min<uint64_t>(slices[i].len_, src.size() - written);
-    memcpy(slices[i].mem_, src.data() + written, n);
+    memcpy(slices[i].mem_, src.data() + written, n); // NOLINT(safe-memcpy)
     written += n;
   }
   ASSERT(written == src.size());
