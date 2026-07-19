@@ -27,3 +27,19 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/priority_load_shed/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "priority_load_shed_integration_test",
+    size = "large",
+    srcs = ["priority_load_shed_integration_test.cc"],
+    extension_names = ["envoy.filters.http.priority_load_shed"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/priority_load_shed:config",
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/integration:base_overload_integration_test_lib",
+        "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
