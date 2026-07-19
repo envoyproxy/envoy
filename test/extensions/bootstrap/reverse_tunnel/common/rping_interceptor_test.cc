@@ -228,8 +228,7 @@ TEST_F(RpingInterceptorTest, PingPlusDataViaReadv) {
   const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
   const std::string payload = " value";
   const std::string combined = rping + payload;
-  ASSERT_EQ(write(fds[1], combined.data(), combined.size()),
-            static_cast<ssize_t>(combined.size()));
+  ASSERT_EQ(write(fds[1], combined.data(), combined.size()), static_cast<ssize_t>(combined.size()));
 
   char buf[64];
   const auto result = readvInto(*interceptor, buf, sizeof(buf));
@@ -328,8 +327,7 @@ TEST_F(RpingInterceptorTest, CoalescedRpingPlusDataDrainsViaReadv) {
   const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
   const std::string data = "HELLO";
   const std::string combined = rping + data;
-  ASSERT_EQ(write(fds[1], combined.data(), combined.size()),
-            static_cast<ssize_t>(combined.size()));
+  ASSERT_EQ(write(fds[1], combined.data(), combined.size()), static_cast<ssize_t>(combined.size()));
 
   // Mirror the TLS BIO reading one record-header's worth at a time.
   char buf[5];
