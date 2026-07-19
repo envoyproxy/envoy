@@ -173,24 +173,27 @@ default_load_shed_point: "envoy.load_shed_points.priority.default"
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.passed").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, InvalidHeaderBypassesWithUnresolvedDefaultLoadShedPoint) {
+TEST_F(PriorityLoadShedFilterTest, RejectsUnresolvedDefaultLoadShedPointOnCreate) {
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
       .WillOnce(Return(&low_priority_bucket_));
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.default"))
       .WillOnce(Return(nullptr));
-  initializeFilter(R"EOF(
+
+  ProtoConfig config;
+  TestUtility::loadFromYaml(R"EOF(
 header_name: "x-message-priority"
 buckets:
 - value_range: { start: 16, end: 32 }
   load_shed_point: "envoy.load_shed_points.priority.low"
 default_load_shed_point: "envoy.load_shed_points.priority.default"
-)EOF");
+)EOF",
+                            config);
 
-  auto headers = defaultHeaders();
-  headers.addCopy("x-message-priority", "not-an-integer");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
-  EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_invalid").value());
-  EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.bucket_unresolved_point").value());
+  auto config_or = PriorityLoadShedFilterConfig::create(config, overload_manager_, "prefix.",
+                                                        *stats_store_.rootScope());
+  EXPECT_FALSE(config_or.ok());
+  EXPECT_THAT(absl::StrCat(config_or.status()),
+              HasSubstr("default load shed point 'envoy.load_shed_points.priority.default' is not configured"));
 }
 
 TEST_F(PriorityLoadShedFilterTest, NegativeHeaderRejectsWithoutDefault) {
@@ -343,38 +346,24 @@ default_load_shed_point: "envoy.load_shed_points.priority.default"
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.passed").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, UnmatchedValueBypassesWithUnresolvedDefaultLoadShedPoint) {
+TEST_F(PriorityLoadShedFilterTest, RejectsUnresolvedBucketLoadShedPointOnCreate) {
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
-      .WillOnce(Return(&low_priority_bucket_));
-  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.default"))
       .WillOnce(Return(nullptr));
-  initializeFilter(R"EOF(
+
+  ProtoConfig config;
+  TestUtility::loadFromYaml(R"EOF(
 header_name: "x-message-priority"
 buckets:
 - value_range: { start: 16, end: 32 }
   load_shed_point: "envoy.load_shed_points.priority.low"
-default_load_shed_point: "envoy.load_shed_points.priority.default"
-)EOF");
+)EOF",
+                            config);
 
-  auto headers = defaultHeaders();
-  headers.addCopy("x-message-priority", "5");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
-  EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.bucket_unmatched").value());
-  EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.bucket_unresolved_point").value());
-}
-
-TEST_F(PriorityLoadShedFilterTest, UnresolvedPointBypasses) {
-  initializeFilter(R"EOF(
-header_name: "x-message-priority"
-buckets:
-- value_range: { start: 16, end: 32 }
-  load_shed_point: "envoy.load_shed_points.priority.low"
-)EOF");
-
-  auto headers = defaultHeaders();
-  headers.addCopy("x-message-priority", "20");
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
-  EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.bucket_unresolved_point").value());
+  auto config_or = PriorityLoadShedFilterConfig::create(config, overload_manager_, "prefix.",
+                                                        *stats_store_.rootScope());
+  EXPECT_FALSE(config_or.ok());
+  EXPECT_THAT(absl::StrCat(config_or.status()),
+              HasSubstr("load shed point 'envoy.load_shed_points.priority.low' is not configured"));
 }
 
 TEST_F(PriorityLoadShedFilterTest, PassingBucketContinues) {

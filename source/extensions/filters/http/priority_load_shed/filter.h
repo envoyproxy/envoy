@@ -25,7 +25,6 @@ namespace PriorityLoadShed {
   COUNTER(header_missing)                                                                          \
   COUNTER(header_invalid)                                                                          \
   COUNTER(bucket_unmatched)                                                                        \
-  COUNTER(bucket_unresolved_point)                                                                 \
   COUNTER(passed)                                                                                  \
   COUNTER(shed)
 

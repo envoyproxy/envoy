@@ -56,8 +56,10 @@ PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
     Server::LoadShedPoint* load_shed_point =
         load_shed_point_provider.getLoadShedPoint(bucket_config.load_shed_point());
     if (load_shed_point == nullptr) {
-      ENVOY_LOG(warn, "load shed point '{}' is not configured; matched requests will bypass",
-                bucket_config.load_shed_point());
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("load shed point '{}' is not configured in the overload manager",
+                      bucket_config.load_shed_point()));
+      return;
     }
 
     buckets_.push_back(
@@ -81,9 +83,10 @@ PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
     default_load_shed_point_ =
         load_shed_point_provider.getLoadShedPoint(default_load_shed_point_name_);
     if (default_load_shed_point_ == nullptr) {
-      ENVOY_LOG(warn,
-                "default load shed point '{}' is not configured; fallback requests will bypass",
-                default_load_shed_point_name_);
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("default load shed point '{}' is not configured in the overload manager",
+                      default_load_shed_point_name_));
+      return;
     }
   }
 }
@@ -149,11 +152,6 @@ Http::FilterHeadersStatus PriorityLoadShedFilter::decodeHeaders(Http::RequestHea
         load_shed_point = config_->defaultLoadShedPoint();
       }
     }
-  }
-
-  if (load_shed_point == nullptr) {
-    config_->stats().bucket_unresolved_point_.inc();
-    return Http::FilterHeadersStatus::Continue;
   }
 
   if (!load_shed_point->shouldShedLoad()) {
