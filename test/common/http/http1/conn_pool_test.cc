@@ -388,26 +388,6 @@ TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
 }
 
 /**
- * Added for code coverage when envoy.reloadable_features.abort_when_accessing_dead_decoder is false
- */
-TEST_F(Http1ConnPoolImplTest, RequestAndResponseWithoutDecoderHandle) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.reloadable_features.use_response_decoder_handle", "false"}});
-
-  InSequence s;
-  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
-  r1.startRequest();
-  conn_pool_->expectEnableUpstreamReady();
-  r1.completeResponse(false);
-
-  // Cause the connection to go away.
-  EXPECT_CALL(*conn_pool_, onClientDestroy());
-  conn_pool_->expectAndRunUpstreamReady();
-  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-  dispatcher_.clearDeferredDeleteList();
-}
-
-/**
  * Tests a request that generates a new connection, completes, and then a second request that uses
  * the same connection.
  */

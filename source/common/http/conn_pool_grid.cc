@@ -47,13 +47,10 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
                                                      ConnectionPool::Callbacks& callbacks,
                                                      const Instance::StreamOptions& options)
-    : grid_(grid), decoder_(decoder), inner_callbacks_(&callbacks),
-      next_attempt_timer_(
-          grid_.dispatcher_.createTimer([this]() -> void { onNextAttemptTimer(); })),
+    : grid_(grid), inner_callbacks_(&callbacks), next_attempt_timer_(grid_.dispatcher_.createTimer(
+                                                     [this]() -> void { onNextAttemptTimer(); })),
       stream_options_(options) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
-    decoder_handle_ = decoder.createResponseDecoderHandle();
-  }
+  decoder_handle_ = decoder.createResponseDecoderHandle();
 
   if (!stream_options_.can_use_http3_) {
     // If alternate protocols are explicitly disabled, there must have been a failed request over
@@ -75,21 +72,21 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttem
 ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
   ASSERT(!parent_.grid_.isPoolHttp3(pool()) || parent_.stream_options_.can_use_http3_);
-  Http::ResponseDecoder& decoder = parent_.decoder_;
-  if (parent_.decoder_handle_ != nullptr) {
-    if (OptRef<ResponseDecoder> opt_ref = parent_.decoder_handle_->get(); opt_ref.has_value()) {
-      decoder = opt_ref.value().get();
-    } else {
-      const std::string error_msg = "parent_.decoder_ use after free detected.";
-      IS_ENVOY_BUG(error_msg);
-      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
-                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
-                     error_msg);
-      return StreamCreationResult::ImmediateResult;
-    }
+  // The decoder handle is always created when the wrapper callbacks are constructed. It tracks the
+  // liveness of the original response decoder, which may have already died (e.g. if TCP won over
+  // QUIC and completed the stream).
+  ASSERT(parent_.decoder_handle_ != nullptr);
+  OptRef<ResponseDecoder> decoder = parent_.decoder_handle_->get();
+  if (!decoder.has_value()) {
+    const std::string error_msg = "response decoder use after free detected.";
+    IS_ENVOY_BUG(error_msg);
+    RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                   error_msg);
+    return StreamCreationResult::ImmediateResult;
   }
 
-  auto* cancellable = pool().newStream(decoder, *this, parent_.stream_options_);
+  auto* cancellable = pool().newStream(decoder.value().get(), *this, parent_.stream_options_);
   if (cancellable == nullptr) {
     return StreamCreationResult::ImmediateResult;
   }
