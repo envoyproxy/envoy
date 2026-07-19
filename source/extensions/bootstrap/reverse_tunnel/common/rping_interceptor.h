@@ -40,7 +40,7 @@ private:
   bool processing_read_{false};
 
   // Partial RPING prefix carried across readv() calls until the keepalive completes; <=4 bytes.
-  absl::InlinedVector<char, 5> staged_;
+  absl::InlinedVector<char, 5> partial_ping_;
 };
 
 } // namespace ReverseConnection
