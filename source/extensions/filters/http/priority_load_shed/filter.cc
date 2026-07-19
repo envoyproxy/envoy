@@ -21,75 +21,73 @@ absl::StatusOr<std::shared_ptr<PriorityLoadShedFilterConfig>>
 PriorityLoadShedFilterConfig::create(const ProtoConfig& config,
                                      Server::LoadShedPointProvider& load_shed_point_provider,
                                      const std::string& stats_prefix, Stats::Scope& scope) {
-  absl::Status creation_status = absl::OkStatus();
-  auto config_ptr = std::shared_ptr<PriorityLoadShedFilterConfig>(new PriorityLoadShedFilterConfig(
-      config, load_shed_point_provider, stats_prefix, scope, creation_status));
-  if (!creation_status.ok()) {
-    return creation_status;
-  }
-  return config_ptr;
-}
-
-PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
-    const ProtoConfig& config, Server::LoadShedPointProvider& load_shed_point_provider,
-    const std::string& stats_prefix, Stats::Scope& scope, absl::Status& creation_status)
-    : header_name_(config.header_name()), stats_(generateStats(stats_prefix, scope)) {
   if (config.header_name().empty()) {
-    creation_status = absl::InvalidArgumentError("header_name must be non-empty");
-    return;
+    return absl::InvalidArgumentError("header_name must be non-empty");
   }
 
   if (config.buckets().empty()) {
-    creation_status = absl::InvalidArgumentError("at least one bucket must be configured");
-    return;
+    return absl::InvalidArgumentError("at least one bucket must be configured");
   }
 
-  buckets_.reserve(config.buckets().size());
+  std::vector<Bucket> buckets;
+  buckets.reserve(config.buckets().size());
   for (const auto& bucket_config : config.buckets()) {
     const auto& range = bucket_config.value_range();
     if (range.start() < 0 || range.end() <= range.start()) {
-      creation_status = absl::InvalidArgumentError(
+      return absl::InvalidArgumentError(
           fmt::format("invalid bucket range [{}, {})", range.start(), range.end()));
-      return;
     }
 
     Server::LoadShedPoint* load_shed_point =
         load_shed_point_provider.getLoadShedPoint(bucket_config.load_shed_point());
     if (load_shed_point == nullptr) {
-      creation_status = absl::InvalidArgumentError(
+      return absl::InvalidArgumentError(
           fmt::format("load shed point '{}' is not configured in the overload manager",
                       bucket_config.load_shed_point()));
-      return;
     }
 
-    buckets_.push_back(
+    buckets.push_back(
         Bucket{range.start(), range.end(), bucket_config.load_shed_point(), load_shed_point});
   }
 
-  std::sort(buckets_.begin(), buckets_.end(),
+  std::sort(buckets.begin(), buckets.end(),
             [](const Bucket& lhs, const Bucket& rhs) { return lhs.start < rhs.start; });
 
-  for (size_t i = 1; i < buckets_.size(); ++i) {
-    if (buckets_[i - 1].end > buckets_[i].start) {
-      creation_status = absl::InvalidArgumentError(
-          fmt::format("bucket ranges overlap: [{}, {}) and [{}, {})", buckets_[i - 1].start,
-                      buckets_[i - 1].end, buckets_[i].start, buckets_[i].end));
-      return;
+  for (size_t i = 1; i < buckets.size(); ++i) {
+    if (buckets[i - 1].end > buckets[i].start) {
+      return absl::InvalidArgumentError(
+          fmt::format("bucket ranges overlap: [{}, {}) and [{}, {})", buckets[i - 1].start,
+                      buckets[i - 1].end, buckets[i].start, buckets[i].end));
     }
   }
 
+  std::string default_load_shed_point_name;
+  Server::LoadShedPoint* default_load_shed_point = nullptr;
   if (!config.default_load_shed_point().empty()) {
-    default_load_shed_point_name_ = config.default_load_shed_point();
-    default_load_shed_point_ =
-        load_shed_point_provider.getLoadShedPoint(default_load_shed_point_name_);
-    if (default_load_shed_point_ == nullptr) {
-      creation_status = absl::InvalidArgumentError(
+    default_load_shed_point_name = config.default_load_shed_point();
+    default_load_shed_point =
+        load_shed_point_provider.getLoadShedPoint(default_load_shed_point_name);
+    if (default_load_shed_point == nullptr) {
+      return absl::InvalidArgumentError(
           fmt::format("default load shed point '{}' is not configured in the overload manager",
-                      default_load_shed_point_name_));
-      return;
+                      default_load_shed_point_name));
     }
   }
+
+  return std::shared_ptr<PriorityLoadShedFilterConfig>(new PriorityLoadShedFilterConfig(
+      Http::LowerCaseString(config.header_name()), std::move(buckets),
+      std::move(default_load_shed_point_name), default_load_shed_point,
+      stats_prefix, scope));
 }
+
+PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
+    Http::LowerCaseString header_name, std::vector<Bucket> buckets,
+    std::string default_load_shed_point_name, Server::LoadShedPoint* default_load_shed_point,
+    const std::string& stats_prefix, Stats::Scope& scope)
+    : header_name_(std::move(header_name)), buckets_(std::move(buckets)),
+      default_load_shed_point_name_(std::move(default_load_shed_point_name)),
+      default_load_shed_point_(default_load_shed_point),
+      stats_(generateStats(stats_prefix, scope)) {}
 
 const PriorityLoadShedFilterConfig::Bucket*
 PriorityLoadShedFilterConfig::findBucket(int32_t value) const {

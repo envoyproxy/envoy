@@ -9,7 +9,6 @@
 #include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -32,7 +31,7 @@ struct PriorityLoadShedStats {
   ALL_PRIORITY_LOAD_SHED_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class PriorityLoadShedFilterConfig : public Logger::Loggable<Logger::Id::config> {
+class PriorityLoadShedFilterConfig {
 public:
   using ProtoConfig = envoy::extensions::filters::http::priority_load_shed::v3::PriorityLoadShed;
 
@@ -54,10 +53,10 @@ public:
   PriorityLoadShedStats& stats() { return stats_; }
 
 private:
-  PriorityLoadShedFilterConfig(const ProtoConfig& config,
-                               Server::LoadShedPointProvider& load_shed_point_provider,
-                               const std::string& stats_prefix, Stats::Scope& scope,
-                               absl::Status& creation_status);
+  PriorityLoadShedFilterConfig(Http::LowerCaseString header_name, std::vector<Bucket> buckets,
+                               std::string default_load_shed_point_name,
+                               Server::LoadShedPoint* default_load_shed_point,
+                               const std::string& stats_prefix, Stats::Scope& scope);
 
   static PriorityLoadShedStats generateStats(const std::string& stats_prefix, Stats::Scope& scope);
 
