@@ -47,9 +47,9 @@ PriorityLoadShedFilterConfig::create(const ProtoConfig& config,
 
   for (size_t i = 1; i < buckets.size(); ++i) {
     if (buckets[i - 1].end > buckets[i].start) {
-      return absl::InvalidArgumentError(
-          fmt::format("bucket ranges overlap: [{}, {}) and [{}, {})", buckets[i - 1].start,
-                      buckets[i - 1].end, buckets[i].start, buckets[i].end));
+      return absl::InvalidArgumentError(fmt::format("bucket ranges overlap: [{}, {}) and [{}, {})",
+                                                    buckets[i - 1].start, buckets[i - 1].end,
+                                                    buckets[i].start, buckets[i].end));
     }
   }
 
@@ -68,8 +68,7 @@ PriorityLoadShedFilterConfig::create(const ProtoConfig& config,
 
   return std::shared_ptr<PriorityLoadShedFilterConfig>(new PriorityLoadShedFilterConfig(
       Http::LowerCaseString(config.header_name()), std::move(buckets),
-      std::move(default_load_shed_point_name), default_load_shed_point,
-      stats_prefix, scope));
+      std::move(default_load_shed_point_name), default_load_shed_point, stats_prefix, scope));
 }
 
 PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
