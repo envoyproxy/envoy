@@ -960,6 +960,7 @@ private:
                                              bool avoid_cds_removal = false);
   absl::Status onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
+  void postThreadLocalHealthRecovery(const HostSharedPtr& host);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
   static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,

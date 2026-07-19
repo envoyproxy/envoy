@@ -764,14 +764,12 @@ message Cluster {
     // Minimum number of connections to maintain per healthy upstream host. When non-zero,
     // Envoy proactively opens new connections and refills closed ones so that the floor of connections
     // exists regardless of requests.
-    // [#not-implemented-hide:]
     google.protobuf.UInt32Value eager_preconnect_floor = 4;
 
     // Number of consecutive connection failures to a host, after which floor maintenance for that
     // host is paused. The pause clears as soon as one connection establishes, typically driven by
     // on-demand request traffic. Only used when ``eager_preconnect_floor`` is set.
     // Defaults to 3.
-    // [#not-implemented-hide:]
     google.protobuf.UInt32Value eager_preconnect_floor_failure_threshold = 5
         [(validate.rules).uint32 = {gte: 1}];
   }

@@ -396,6 +396,123 @@ TEST_P(EagerPreconnectFloorEdsIntegrationTest, DrainsHostRemovedViaEds) {
 }
 
 // ---------------------------------------------------------------------------
+// Health-state recovery: a host filled after it recovers to healthy.
+// ---------------------------------------------------------------------------
+
+// Active-health-check fixture. Runs on the non-HTTP/3 matrix (the HC codec is HTTP1/HTTP2 and
+// recovery is upstream-protocol-agnostic).
+class EagerPreconnectFloorHealthCheckIntegrationTest : public EagerPreconnectFloorIntegrationTest {
+protected:
+  void initializeWithActiveHealthCheck(uint32_t min_connections) {
+    setMinConnections(min_connections);
+    const auto codec = (GetParam().upstream_protocol == Http::CodecType::HTTP1)
+                           ? envoy::type::v3::CodecClientType::HTTP1
+                           : envoy::type::v3::CodecClientType::HTTP2;
+    config_helper_.addConfigModifier([codec](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      auto* hc = cluster->add_health_checks();
+      hc->mutable_timeout()->set_seconds(30);
+      hc->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+      hc->mutable_no_traffic_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+      hc->mutable_unhealthy_threshold()->set_value(1);
+      hc->mutable_healthy_threshold()->set_value(1);
+      hc->mutable_http_health_check()->set_path("/healthcheck");
+      hc->mutable_http_health_check()->set_codec_client_type(codec);
+    });
+    // A cluster with active HC blocks init until the first check completes, but we answer that
+    // probe after initialize(). Defer listener finalization to avoid deadlock.
+    defer_listener_finalization_ = true;
+    initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, EagerPreconnectFloorHealthCheckIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// A host guarded by an active health check is filled only after both (a) it is healthy and (b) the
+// worker has served traffic.
+TEST_P(EagerPreconnectFloorHealthCheckIntegrationTest, FillsHostOnHealthCheckRecovery) {
+  concurrency_ = 1;
+  autonomous_upstream_ = true;
+  initializeWithActiveHealthCheck(/*min_connections=*/2);
+
+  // The active HC passes and the host becomes healthy.
+  test_server_->waitForGauge(clusterStat("membership_healthy"), Eq(1));
+
+  // A healthy host is not filled until the worker has served traffic.
+  EXPECT_EQ(0, counterValue("upstream_cx_preconnect_started"));
+
+  // Listener finalization was deferred (active HC blocks init); register ports now, then serve a request.
+  registerTestServerPorts({"http"});
+  serveOneRequest();
+
+  // The floor is filled by the floor-fill path and/or the pool's own floor enforcement.
+  test_server_->waitForGauge(clusterStat("upstream_cx_active"), Ge(2));
+  EXPECT_EQ(0, counterValue("upstream_cx_preconnect_blocked"));
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Outlier-detection fixture. Uses simulated time so ejection can expire within the test.
+// TestUsingSimulatedTime must be the first base class. Runs on the non-HTTP/3 matrix.
+class EagerPreconnectFloorOutlierIntegrationTest : public Event::TestUsingSimulatedTime,
+                                                   public EagerPreconnectFloorIntegrationTest {
+protected:
+  void initializeWithOutlierDetection(uint32_t min_connections) {
+    setMinConnections(min_connections);
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      // Route away from a "panic" (ejected) host so ejection is enforced.
+      cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
+      auto* od = cluster->mutable_outlier_detection();
+      od->mutable_consecutive_5xx()->set_value(1);
+      od->mutable_enforcing_consecutive_5xx()->set_value(100);
+      od->mutable_max_ejection_percent()->set_value(100);
+      od->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+      od->mutable_base_ejection_time()->CopyFrom(Protobuf::util::TimeUtil::SecondsToDuration(10));
+      od->mutable_max_ejection_time()->CopyFrom(Protobuf::util::TimeUtil::SecondsToDuration(10));
+    });
+    autonomous_upstream_ = true;
+    initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, EagerPreconnectFloorOutlierIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// An outlier-ejected host has its connections drained. When the ejection expires, the host returns
+// to healthy and the recovery hook re-fills the floor.
+TEST_P(EagerPreconnectFloorOutlierIntegrationTest, FillsHostOnOutlierRecovery) {
+  concurrency_ = 1;
+  initializeWithOutlierDetection(/*min_connections=*/2);
+
+  // Drive one 5xx to eject the single host via consecutive-5xx.
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestResponseHeaderMapImpl{{":status", "500"}}));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  codec_client_->close();
+
+  test_server_->waitForGauge(clusterStat("outlier_detection.ejections_active"), Eq(1));
+  const uint64_t filled_after_eject = counterValue("upstream_cx_preconnect_started");
+
+  // Let the ejection expire. The detector un-ejects and the recovery hook re-fills the floor.
+  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  test_server_->waitForGauge(clusterStat("outlier_detection.ejections_active"), Eq(0));
+  test_server_->waitForCounter(clusterStat("upstream_cx_preconnect_started"),
+                               Gt(filled_after_eject));
+  EXPECT_EQ(0, counterValue("upstream_cx_preconnect_blocked"));
+}
+
+// ---------------------------------------------------------------------------
 // Budget & limits: floor maintenance respects circuit breakers, load shedding, and
 // gives up on unreachable hosts.
 // ---------------------------------------------------------------------------

@@ -911,9 +911,13 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   if (new_cluster->healthChecker() != nullptr) {
     new_cluster->healthChecker()->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state, HealthState) {
-          if (changed_state == HealthTransition::Changed &&
-              host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+          if (changed_state != HealthTransition::Changed) {
+            return;
+          }
+          if (host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
             postThreadLocalHealthFailure(host);
+          } else if (host->coarseHealth() == Host::Health::Healthy) {
+            postThreadLocalHealthRecovery(host);
           }
         });
   }
@@ -925,6 +929,8 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                         "host {} in cluster {} was ejected by the outlier detector",
                         host->address()->asStringView(), host->cluster().name());
         postThreadLocalHealthFailure(host);
+      } else if (host->coarseHealth() == Host::Health::Healthy) {
+        postThreadLocalHealthRecovery(host);
       }
     });
   }
@@ -1477,6 +1483,25 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::withThreadLocalCluster(
     return;
   }
   fn(*it->second);
+}
+
+void ClusterManagerImpl::postThreadLocalHealthRecovery(const HostSharedPtr& host) {
+  // Health recovery is only relevant for eager preconnect floor today.
+  if (host->cluster().eagerPreconnectFloor() == 0) {
+    return;
+  }
+  host->resetConsecutiveEagerPreconnectFloorFailures();
+  const std::string cluster_name(host->cluster().name());
+  tls_.runOnAllThreads([cluster_name, host](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    if (!cluster_manager.has_value()) {
+      return;
+    }
+    ThreadLocalClusterManagerImpl::withThreadLocalCluster(
+        *cluster_manager, cluster_name,
+        [&host](ThreadLocalClusterManagerImpl::ClusterEntry& entry) {
+          entry.maybeBootstrapPreconnectFloorForHost(host);
+        });
+  });
 }
 
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
