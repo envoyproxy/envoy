@@ -383,31 +383,6 @@ buckets:
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.passed").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, RejectsEmptyHeaderNameOnCreate) {
-  ProtoConfig config;
-  // Set buckets but leave header_name empty to bypass proto validation and hit the code check.
-  auto* bucket = config.add_buckets();
-  bucket->mutable_value_range()->set_start(0);
-  bucket->mutable_value_range()->set_end(16);
-  bucket->set_load_shed_point("envoy.load_shed_points.priority.high");
-
-  auto config_or = PriorityLoadShedFilterConfig::create(config, overload_manager_, "prefix.",
-                                                        *stats_store_.rootScope());
-  EXPECT_FALSE(config_or.ok());
-  EXPECT_THAT(absl::StrCat(config_or.status()), HasSubstr("header_name must be non-empty"));
-}
-
-TEST_F(PriorityLoadShedFilterTest, RejectsEmptyBucketsOnCreate) {
-  ProtoConfig config;
-  config.set_header_name("x-message-priority");
-
-  auto config_or = PriorityLoadShedFilterConfig::create(config, overload_manager_, "prefix.",
-                                                        *stats_store_.rootScope());
-  EXPECT_FALSE(config_or.ok());
-  EXPECT_THAT(absl::StrCat(config_or.status()),
-              HasSubstr("at least one bucket must be configured"));
-}
-
 TEST_F(PriorityLoadShedFilterTest, RejectsNegativeRangeStartOnCreate) {
   ProtoConfig config;
   config.set_header_name("x-message-priority");

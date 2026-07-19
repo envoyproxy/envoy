@@ -21,14 +21,6 @@ absl::StatusOr<std::shared_ptr<PriorityLoadShedFilterConfig>>
 PriorityLoadShedFilterConfig::create(const ProtoConfig& config,
                                      Server::LoadShedPointProvider& load_shed_point_provider,
                                      const std::string& stats_prefix, Stats::Scope& scope) {
-  if (config.header_name().empty()) {
-    return absl::InvalidArgumentError("header_name must be non-empty");
-  }
-
-  if (config.buckets().empty()) {
-    return absl::InvalidArgumentError("at least one bucket must be configured");
-  }
-
   std::vector<Bucket> buckets;
   buckets.reserve(config.buckets().size());
   for (const auto& bucket_config : config.buckets()) {
