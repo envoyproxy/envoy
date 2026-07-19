@@ -2,6 +2,7 @@
 #include "source/extensions/filters/http/json_to_metadata/filter.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -10,6 +11,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JsonToMetadata {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(Factory, Basic) {
   const std::string yaml_request = R"(
@@ -217,10 +220,11 @@ TEST(Factory, NoRuleInRouteConfig) {
                     .createRouteSpecificFilterConfig(*proto_config, context,
                                                      ProtobufMessage::getNullValidationVisitor())
                     .status();
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(),
-            "json_to_metadata_filter: Per route configs must at least specify one of request_rules "
-            "or response_rules.");
+  EXPECT_THAT(
+      status,
+      HasStatusMessage(
+          "json_to_metadata_filter: Per route configs must at least specify one of request_rules "
+          "or response_rules."));
 }
 
 TEST(Factory, PerRouteConfig) {
