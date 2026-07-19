@@ -30,13 +30,13 @@ Api::IoCallUint64Result RpingInterceptor::applyRpingToBuffer(Buffer::Instance& b
   if (ping_echo_active_ && result.err_ == nullptr && result.return_value_ > 0) {
     const uint64_t expected = ReverseConnectionUtility::PING_MESSAGE.size();
 
-    // Compare up to the expected size using a zero-copy view.
+    // Classify the front of the buffer using a zero-copy view of up to the expected size.
     const uint64_t len = std::min<uint64_t>(buffer.length(), expected);
     const char* data = static_cast<const char*>(buffer.linearize(len));
     absl::string_view peek_sv{data, static_cast<size_t>(len)};
 
-    // Check if we have a complete RPING message.
-    if (len == expected && ReverseConnectionUtility::isPingMessage(peek_sv)) {
+    switch (ReverseConnectionUtility::classifyRpingPrefix(peek_sv)) {
+    case ReverseConnectionUtility::RpingPrefixMatch::Complete: {
       // Found a complete RPING. Echo and drain it from the buffer.
       buffer.drain(expected);
       onPingMessage();
@@ -58,26 +58,19 @@ Api::IoCallUint64Result RpingInterceptor::applyRpingToBuffer(Buffer::Instance& b
           (result.return_value_ >= expected) ? (result.return_value_ - expected) : 0;
       return Api::IoCallUint64Result{adjusted, Api::IoError::none()};
     }
-
-    // If partial data could be the start of RPING (only when fewer than expected bytes).
-    if (len < expected) {
-      const absl::string_view rping_prefix =
-          ReverseConnectionUtility::PING_MESSAGE.substr(0, static_cast<size_t>(len));
-      if (peek_sv == rping_prefix) {
-        ENVOY_LOG(trace,
-                  "RpingInterceptor: partial RPING received ({} bytes), waiting "
-                  "for more.",
-                  len);
-        return result; // Wait for more data.
-      }
+    case ReverseConnectionUtility::RpingPrefixMatch::PartialPrefix:
+      ENVOY_LOG(trace, "RpingInterceptor: partial RPING received ({} bytes), waiting for more.",
+                len);
+      return result; // Wait for more data.
+    case ReverseConnectionUtility::RpingPrefixMatch::NotRping:
+      // Data is not RPING (complete or partial). Disable echo permanently.
+      ENVOY_LOG(trace,
+                "RpingInterceptor: received application data ({} bytes), "
+                "disabling RPING echo for FD: {}",
+                len, fd_);
+      ping_echo_active_ = false;
+      break;
     }
-
-    // Data is not RPING (complete or partial). Disable echo permanently.
-    ENVOY_LOG(trace,
-              "RpingInterceptor: received application data ({} bytes), "
-              "disabling RPING echo for FD: {}",
-              len, fd_);
-    ping_echo_active_ = false;
   }
 
   return result;
@@ -100,10 +93,6 @@ Api::IoCallUint64Result RpingInterceptor::readv(uint64_t max_length, Buffer::Raw
   // Passthrough when there is nothing to strip: inside read()'s dispatch, or once echo has
   // latched off with no partial keepalive staged.
   if (processing_read_ || (!ping_echo_active_ && staged_.empty())) {
-    ENVOY_LOG(trace,
-              "RpingInterceptor: readv passthrough FD: {} (processing_read={}, ping_echo_active={}, "
-              "staged={})",
-              fd_, processing_read_, ping_echo_active_, staged_.size());
     return IoSocketHandleImpl::readv(max_length, slices, num_slice);
   }
 
@@ -120,10 +109,6 @@ Api::IoCallUint64Result RpingInterceptor::readv(uint64_t max_length, Buffer::Raw
     return IoSocketHandleImpl::readv(max_length, slices, num_slice);
   }
 
-  ENVOY_LOG(trace,
-            "RpingInterceptor: readv enter FD: {} capacity: {} max_length: {} staged: {} bytes",
-            fd_, capacity, max_length, staged_.size());
-
   // Under edge-triggered epoll, keep reading past a consumed RPING until the kernel is drained
   // (short read or EAGAIN); otherwise data coalesced behind it (e.g. a ClientHello) is stranded
   // with no further read event.
@@ -139,16 +124,10 @@ Api::IoCallUint64Result RpingInterceptor::readv(uint64_t max_length, Buffer::Raw
 
     if (fresh.err_ != nullptr) {
       // Would-block/error: staged_ is preserved for the next call.
-      ENVOY_LOG(trace,
-                "RpingInterceptor: readv FD: {} underlying read not ok (would_block={}), keeping {} "
-                "staged bytes",
-                fd_, fresh.wouldBlock(), staged_.size());
       return fresh;
     }
     if (fresh.return_value_ == 0) {
       // EOF. A staged partial keepalive can never complete; drop it and report shutdown.
-      ENVOY_LOG(trace, "RpingInterceptor: readv FD: {} EOF, discarding {} staged bytes", fd_,
-                staged_.size());
       staged_.clear();
       return Api::IoCallUint64Result{0, Api::IoError::none()};
     }
@@ -157,59 +136,37 @@ Api::IoCallUint64Result RpingInterceptor::readv(uint64_t max_length, Buffer::Raw
     assembled.reserve(staged_.size() + fresh.return_value_);
     assembled.append(staged_.data(), staged_.size());
     assembled.append(tmp.data(), static_cast<size_t>(fresh.return_value_));
-    ENVOY_LOG(trace, "RpingInterceptor: readv FD: {} read {} fresh bytes, {} assembled with staged",
-              fd_, fresh.return_value_, assembled.size());
 
-    const uint64_t len = std::min<uint64_t>(assembled.size(), expected);
-    absl::string_view peek_sv{assembled.data(), static_cast<size_t>(len)};
-
-    // Complete RPING at the front: echo it and drop it.
-    if (len == expected && ReverseConnectionUtility::isPingMessage(peek_sv)) {
-      ENVOY_LOG(trace, "RpingInterceptor: readv FD: {} stripped complete RPING keepalive", fd_);
+    switch (ReverseConnectionUtility::classifyRpingPrefix(assembled)) {
+    case ReverseConnectionUtility::RpingPrefixMatch::Complete: {
+      // Complete RPING at the front: echo it and drop it.
       onPingMessage();
       staged_.clear();
 
       absl::string_view remainder{assembled.data() + expected, assembled.size() - expected};
       if (remainder.empty()) {
         // Loop to drain any data coalesced behind the RPING before returning EAGAIN.
-        ENVOY_LOG(trace,
-                  "RpingInterceptor: readv FD: {} RPING alone, looping to drain any coalesced data",
-                  fd_);
         continue;
       }
-      ENVOY_LOG(trace,
-                "RpingInterceptor: readv FD: {} delivering {} application bytes after RPING, "
-                "disabling echo",
-                fd_, remainder.size());
       ping_echo_active_ = false;
       const uint64_t written = scatterToSlices(remainder, slices, num_slice);
       return Api::IoCallUint64Result{written, Api::IoError::none()};
     }
-
-    // Proper RPING prefix: the short read means the kernel is drained. Stage it and return EAGAIN;
-    // the rest arrives as a fresh readable event.
-    if (len < expected) {
-      const absl::string_view rping_prefix =
-          ReverseConnectionUtility::PING_MESSAGE.substr(0, static_cast<size_t>(len));
-      if (peek_sv == rping_prefix) {
-        ENVOY_LOG(trace,
-                  "RpingInterceptor: readv FD: {} partial RPING prefix ({} bytes), staging and "
-                  "returning would-block",
-                  fd_, len);
-        staged_.assign(assembled.begin(), assembled.end());
-        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
-      }
+    case ReverseConnectionUtility::RpingPrefixMatch::PartialPrefix:
+      // Proper RPING prefix: the short read means the kernel is drained. Stage it and return
+      // EAGAIN; the rest arrives as a fresh readable event.
+      staged_.assign(assembled.begin(), assembled.end());
+      return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+    case ReverseConnectionUtility::RpingPrefixMatch::NotRping: {
+      // Not RPING: echo latches off and all bytes pass through in order.
+      ping_echo_active_ = false;
+      staged_.clear();
+      const uint64_t written = scatterToSlices(assembled, slices, num_slice);
+      return Api::IoCallUint64Result{written, Api::IoError::none()};
     }
-
-    // Not RPING: echo latches off and all bytes pass through in order.
-    ENVOY_LOG(trace,
-              "RpingInterceptor: readv FD: {} non-RPING data ({} bytes), disabling echo and "
-              "passing through",
-              fd_, assembled.size());
-    ping_echo_active_ = false;
-    staged_.clear();
-    const uint64_t written = scatterToSlices(assembled, slices, num_slice);
-    return Api::IoCallUint64Result{written, Api::IoError::none()};
+    }
+    // Unreachable: every classification case above returns or continues.
+    PANIC("unexpected RPING classification");
   }
 }
 

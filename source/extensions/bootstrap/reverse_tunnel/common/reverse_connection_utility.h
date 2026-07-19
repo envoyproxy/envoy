@@ -40,6 +40,20 @@ public:
 
   static bool isPingMessage(absl::string_view data);
 
+  // Classification of the front bytes of a read against the RPING keepalive marker.
+  enum class RpingPrefixMatch {
+    // The first PING_MESSAGE.size() bytes are a complete RPING keepalive.
+    Complete,
+    // Fewer than PING_MESSAGE.size() bytes, all matching the RPING prefix so far.
+    PartialPrefix,
+    // Neither a complete RPING nor a viable prefix of one.
+    NotRping,
+  };
+
+  // Classifies `data` against RPING. Only the first PING_MESSAGE.size() bytes are considered;
+  // trailing application bytes are ignored. Empty input is a (trivial) PartialPrefix.
+  static RpingPrefixMatch classifyRpingPrefix(absl::string_view data);
+
   static Buffer::InstancePtr createPingResponse();
 
   static bool sendPingResponse(Network::Connection& connection);
