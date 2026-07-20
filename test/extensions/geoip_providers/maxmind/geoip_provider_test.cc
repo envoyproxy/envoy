@@ -147,9 +147,7 @@ public:
 
   void initializeProvider(const std::string& yaml,
                           std::optional<ConditionalInitializer>& conditional) {
-    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
-    EXPECT_CALL(context_, serverFactoryContext())
-        .WillRepeatedly(ReturnRef(server_factory_context_));
+    EXPECT_CALL(server_factory_context_, scope()).WillRepeatedly(ReturnRef(*scope_));
     EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
     EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
         .WillRepeatedly(Invoke([this, &conditional] {
@@ -173,7 +171,8 @@ public:
         .WillRepeatedly(ReturnRef(dispatcher_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
-    provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
+    provider_ =
+        provider_factory_->createGeoipProviderDriver(config, "prefix.", server_factory_context_);
   }
 
   void expectStats(const absl::string_view& db_type, const uint32_t total_count = 1,
