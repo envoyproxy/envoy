@@ -49,10 +49,12 @@ X509* QuicSslConnectionInfo::validatedPeerIssuer() const {
   return validated_cert_chain_[1].get();
 }
 
-void QuicSslConnectionInfo::setValidatedCertChain(const std::vector<bssl::UniquePtr<X509>>& chain) {
+void QuicSslConnectionInfo::onCertValidated(
+    const std::vector<bssl::UniquePtr<X509>>& validated_chain) {
+  cert_validated_ = true;
   validated_cert_chain_.clear();
-  validated_cert_chain_.reserve(chain.size());
-  for (const auto& cert : chain) {
+  validated_cert_chain_.reserve(validated_chain.size());
+  for (const auto& cert : validated_chain) {
     validated_cert_chain_.push_back(bssl::UpRef(cert.get()));
   }
 }

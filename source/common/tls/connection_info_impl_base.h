@@ -81,9 +81,11 @@ protected:
   // method and override this accordingly.
   virtual bssl::UniquePtr<X509> peerCertificate() const;
 
-  // Returns the full peer certificate chain including the leaf, or nullptr if not presented. The
-  // returned stack is not owned by the caller and is valid for the lifetime of this object. See
-  // peerCertificate() for why this is virtual.
+  // Returns the full peer certificate chain including the leaf, or nullptr if not presented.
+  // This is the list of certificates as presented by the peer, NOT the chain built during
+  // validation; see validatedPeerCertChain() for the latter. The returned stack is not owned by
+  // the caller and is valid for the lifetime of this object. See peerCertificate() for why this
+  // is virtual.
   virtual STACK_OF(X509)* peerCertificateChain() const;
 
 private:

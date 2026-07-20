@@ -198,8 +198,8 @@ TEST_F(QuicSslConnectionInfoTest, PreHandshakeQueryRecomputedAfterHandshake) {
             ssl_info_->uriSanPeerCertificate());
 }
 
-// The issuer accessors are served from the chain built during verification (set via
-// setValidatedCertChain), not from the peer-presented chain.
+// The issuer accessors are served from the chain built during verification (passed to
+// onCertValidated()), not from the peer-presented chain.
 TEST_F(QuicSslConnectionInfoTest, ValidatedIssuerFromValidatedChain) {
   createSslPair(/*with_client_cert=*/true);
   completeHandshake();
@@ -211,10 +211,17 @@ TEST_F(QuicSslConnectionInfoTest, ValidatedIssuerFromValidatedChain) {
       Extensions::TransportSockets::Tls::readCertFromFile(testDataPath("ca_cert.pem")));
   ASSERT_NE(validated_chain[0], nullptr);
   ASSERT_NE(validated_chain[1], nullptr);
-  ssl_info_->setValidatedCertChain(validated_chain);
+  ssl_info_->onCertValidated(validated_chain);
 
+  EXPECT_TRUE(ssl_info_->peerCertificateValidated());
   EXPECT_EQ(TEST_CA_CERT_256_HASH, ssl_info_->sha256PeerCertificateIssuerDigest());
   EXPECT_EQ(TEST_CA_CERT_SERIAL, ssl_info_->serialNumberPeerCertificateIssuer());
+
+  // The validated chain is exposed through validatedPeerCertChain() and the PEM accessor built
+  // on it.
+  ASSERT_TRUE(ssl_info_->validatedPeerCertChain().has_value());
+  EXPECT_EQ(2, ssl_info_->validatedPeerCertChain()->size());
+  EXPECT_EQ(2, ssl_info_->pemEncodedValidatedPeerCertificateChain().size());
 }
 
 // Security regression test: a peer that presents extra certificates does NOT influence the
@@ -227,16 +234,19 @@ TEST_F(QuicSslConnectionInfoTest, ValidatedIssuerIgnoresPresentedChain) {
 
   // The peer presented a two-cert chain...
   EXPECT_EQ(2, ssl_info_->pemEncodedPeerCertificateChain().size());
-  // ...but no validated chain was set, so the issuer accessors report nothing.
+  // ...but no validated chain was set, so the issuer and validated-chain accessors report
+  // nothing.
   EXPECT_TRUE(ssl_info_->sha256PeerCertificateIssuerDigest().empty());
   EXPECT_TRUE(ssl_info_->serialNumberPeerCertificateIssuer().empty());
+  EXPECT_FALSE(ssl_info_->validatedPeerCertChain().has_value());
+  EXPECT_TRUE(ssl_info_->pemEncodedValidatedPeerCertificateChain().empty());
 
   // A validated chain containing only the leaf still yields no issuer.
   std::vector<bssl::UniquePtr<X509>> leaf_only;
   leaf_only.push_back(
       Extensions::TransportSockets::Tls::readCertFromFile(testDataPath("san_uri_cert.pem")));
   ASSERT_NE(leaf_only[0], nullptr);
-  ssl_info_->setValidatedCertChain(leaf_only);
+  ssl_info_->onCertValidated(leaf_only);
   EXPECT_TRUE(ssl_info_->sha256PeerCertificateIssuerDigest().empty());
   EXPECT_TRUE(ssl_info_->serialNumberPeerCertificateIssuer().empty());
 }

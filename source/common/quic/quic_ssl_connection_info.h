@@ -38,11 +38,18 @@ public:
   absl::Span<const std::string> othernameSansLocalCertificate() const override { return {}; }
   absl::Span<const std::string> oidsLocalCertificate() const override { return {}; }
 
-  void onCertValidated() { cert_validated_ = true; };
+  // Marks the peer certificate as validated and stores the certificate chain built during
+  // verification (leaf first, issuers following), which serves the validated-issuer and
+  // validated-chain accessors. The certificates are up-ref'd into this object.
+  void onCertValidated(const std::vector<bssl::UniquePtr<X509>>& validated_chain = {});
 
-  // Stores the certificate chain built during verification (leaf first, issuers following). Used
-  // to serve the validated-issuer accessors. The certificates are up-ref'd into this object.
-  void setValidatedCertChain(const std::vector<bssl::UniquePtr<X509>>& chain);
+  // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
+  OptRef<const std::vector<bssl::UniquePtr<X509>>> validatedPeerCertChain() const override {
+    if (validated_cert_chain_.empty()) {
+      return std::nullopt;
+    }
+    return validated_cert_chain_;
+  }
 
 protected:
   // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
