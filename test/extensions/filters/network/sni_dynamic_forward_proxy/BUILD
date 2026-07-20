@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:basic_resource_limit_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

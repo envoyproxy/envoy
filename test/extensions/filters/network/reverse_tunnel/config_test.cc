@@ -1,8 +1,12 @@
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
 #include "source/extensions/filters/network/reverse_tunnel/config.h"
+#include "source/extensions/filters/network/reverse_tunnel/reverse_tunnel_filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -16,6 +20,23 @@ namespace ReverseTunnel {
 namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
+
+Cleanup setExtension(const envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::
+                         v3::UpstreamReverseConnectionSocketInterface& config,
+                     Server::Configuration::ServerFactoryContext& context) {
+  auto* acceptor =
+      const_cast<Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor*>(getAcceptor());
+  RELEASE_ASSERT(acceptor != nullptr, "upstream reverse_tunnel socket interface must be linked");
+  auto* prev = acceptor->extension_;
+  auto* extension = new Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension(
+      *acceptor, context, config);
+  acceptor->extension_ = extension;
+
+  return Cleanup([acceptor, prev, extension] {
+    acceptor->extension_ = prev;
+    delete extension;
+  });
+}
 
 TEST(ReverseTunnelFilterConfigFactoryTest, ValidConfiguration) {
   ReverseTunnelFilterConfigFactory factory;
@@ -365,6 +386,54 @@ TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationSkipRebalancingEnabled) 
   proto_config.set_skip_rebalancing(true);
   proto_config.set_request_path("/request");
   proto_config.set_request_method(envoy::config::core::v3::POST);
+
+  ReverseTunnelFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_OK(result);
+  Network::FilterFactoryCb cb = result.value();
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitRejectedWithoutBootstrapExtension) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  proto_config.set_enable_connection_limit(true);
+
+  ReverseTunnelFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("enable_connection_limit")));
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitRejectedWhenCapIsSetToZero) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  proto_config.set_enable_connection_limit(true);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface extension_config;
+  extension_config.set_max_connections_per_node(0);
+  auto cleanup = setExtension(extension_config, server_context);
+
+  ReverseTunnelFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("max_connections_per_node")));
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitAcceptedWhenCapIsGreaterThanZero) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  proto_config.set_enable_connection_limit(true);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface extension_config;
+  extension_config.set_max_connections_per_node(1);
+  auto cleanup = setExtension(extension_config, server_context);
 
   ReverseTunnelFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;

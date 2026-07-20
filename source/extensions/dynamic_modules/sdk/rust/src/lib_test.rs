@@ -4941,6 +4941,24 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_filter_st
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
   _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,

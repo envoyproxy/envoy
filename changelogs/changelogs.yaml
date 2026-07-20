@@ -114,6 +114,8 @@ areas:
     title: tracing
   wasm:
     title: wasm
+  watchdog:
+    title: watchdog
   dns:
     title: dns
   proxy_protocol:
