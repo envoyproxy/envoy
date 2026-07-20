@@ -93,13 +93,13 @@ public:
   // lifetime of the cluster.
   const uint32_t total_workers_;
 
-  // Per-Envoy seed used by EQUAL_PARTITIONS to rotate the starting host
-  // index. The LB applies ``start = (envoy_seed % N + worker_id * K) % N``
-  // so different Envoys rotate the partition assignment. This spreads
-  // "which worker IDs are pinned to which host" across the fleet so a brief
-  // bad host during a backend deploy does not land on the exact same
-  // worker IDs on every box. Within a single Envoy, disjointness is
-  // preserved. Derived from the bootstrap node id at config-load time.
+  // Process-local random seed used by EQUAL_PARTITIONS to rotate the starting
+  // host index. The LB applies
+  // ``start = (envoy_seed % N + worker_id * K) % N`` so different Envoy
+  // processes rotate the partition assignment. This spreads "which worker
+  // IDs are pinned to which host" across the fleet so a brief bad host during
+  // a backend deploy does not land on the exact same worker IDs on every box.
+  // Within a single Envoy, disjointness is preserved.
   const uint64_t envoy_seed_;
 
   // Sequential per-cluster worker-ID counter. Each per-worker LB instance

@@ -229,13 +229,12 @@ void PerWorkerSubsetLoadBalancer::rebuildEqualPartitionAssignment(
   // Worker i starts at ``(envoy_seed + i * k) mod N`` and takes k consecutive
   // hosts wrapping around. With ``K = ceil(N/W)`` and ``worker_id`` in
   // ``[0, W)``, partitions are non-overlapping aside from up to
-  // ``W*K - N`` wrap-around double-assignments. The ``envoy_seed`` term
-  // rotates the starting position per Envoy instance (derived from the
-  // bootstrap node id) so the "which worker IDs are pinned to host X"
-  // mapping varies across the fleet -- a briefly bad host during a backend
-  // deploy hits different worker IDs on different Envoys instead of
-  // synchronizing on the same ones everywhere. Within a single Envoy,
-  // disjointness is preserved.
+  // ``W*K - N`` wrap-around double-assignments. The process-local random
+  // ``envoy_seed`` rotates the starting position so the "which worker IDs are
+  // pinned to host X" mapping varies across the fleet -- a briefly bad host
+  // during a backend deploy hits different worker IDs on different Envoys
+  // instead of synchronizing on the same ones everywhere. Within a single
+  // Envoy, disjointness is preserved.
   //
   // We partition over the sorted ALL-hosts list (stable positions across
   // health changes) and then filter to healthy. This is deliberate: a host

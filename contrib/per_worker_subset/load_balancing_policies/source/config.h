@@ -1,6 +1,5 @@
 #pragma once
 
-#include <functional>
 #include <thread>
 
 #include "envoy/upstream/load_balancer.h"
@@ -60,14 +59,11 @@ public:
       return absl::InvalidArgumentError(
           "per_worker_subset: fallback_threshold must be in [0, 100]");
     }
-    // Per-Envoy seed for EQUAL_PARTITIONS' starting-offset rotation. Hash
-    // the bootstrap node id once at config-load; the LB applies
-    // ``start = (envoy_seed % N + worker_id * K) % N`` so different Envoys
-    // (different node ids) rotate the partition assignment. Empty / unset
-    // node id hashes to a stable constant; degenerate case behaves like the
-    // pre-existing no-offset path.
-    const uint64_t envoy_seed =
-        std::hash<std::string>{}(std::string(context.localInfo().node().id()));
+    // Process-local random seed for EQUAL_PARTITIONS' starting-offset
+    // rotation. Bootstrap node IDs are optional and therefore cannot provide
+    // a reliable per-Envoy identity. Stability across restarts is unnecessary:
+    // the seed only decorrelates worker-to-host assignments across processes.
+    const uint64_t envoy_seed = context.api().randomGenerator().random();
     return Upstream::LoadBalancerConfigPtr{
         new TypedPerWorkerSubsetLbConfig(*typed, resolveTotalWorkers(context), envoy_seed)};
   }

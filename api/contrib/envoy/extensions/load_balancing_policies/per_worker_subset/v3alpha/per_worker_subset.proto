@@ -52,11 +52,11 @@ message PerWorkerSubset {
   enum PartitioningStrategy {
     // Deterministic, non-overlapping slice of ``ceil(N/W)`` hosts from a
     // stable address-sorted ordering, where ``N`` is the cluster's host
-    // count and ``W`` is the worker count. The starting offset is rotated
-    // per-Envoy via a hash of the bootstrap node id so the partition is
-    // not byte-identical across the fleet. The slices cover all hosts,
-    // with up to ``W*K - N`` wrap-around assignments when ``N`` is not
-    // divisible by ``W``.
+    // count and ``W`` is the worker count. A process-local random starting
+    // offset rotates the assignment so the partition is not byte-identical
+    // across the fleet. Stability across Envoy restarts is not required.
+    // The slices cover all hosts, with up to ``W*K - N`` wrap-around
+    // assignments when ``N`` is not divisible by ``W``.
     //
     // Health-only updates do not change slice boundaries: partitioning is
     // performed over the all-hosts list, then each worker filters its fixed

@@ -24,3 +24,12 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//contrib/per_worker_subset/load_balancing_policies/source:config",
+        "//test/mocks/server:server_factory_context_mocks",
+    ],
+)
