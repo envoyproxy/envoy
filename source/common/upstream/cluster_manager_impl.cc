@@ -41,6 +41,7 @@
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/connection_aware_lb_context.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/load_stats_reporter_impl.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
@@ -1585,7 +1586,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::markPoolTypeUsed(
     ConnectionPoolType type) {
-  if (cluster_info_->eagerPreconnectFloor() == 0 || used_pool_types_.has(type)) {
+  if ((cluster_info_->eagerPreconnectFloor() == 0 &&
+       !cluster_info_->connectionAwareLoadBalancingEnabled()) ||
+      used_pool_types_.has(type)) {
     return;
   }
   used_pool_types_.mark(type);
@@ -1621,8 +1624,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::
   });
 }
 
-bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::hostEligibleForPreconnectFloor(
-    const HostConstSharedPtr& host) const {
+bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::
+    hostEligibleForPreconnectFloor(const HostConstSharedPtr& host) const {
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.eager_preconnect_floor")) {
     return false;
   }
@@ -1726,6 +1729,14 @@ bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::hostHasRea
     }
   }
   return false;
+}
+
+bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::hostHasReadyConnection(
+    const Host& host) const {
+  // The connection pool map is keyed by HostConstSharedPtr, but the load balancer hands
+  // us the host by reference during selection. Construct a non-owning aliased shared_ptr
+  // that points at `host`.
+  return hostHasReadyConnection(HostConstSharedPtr(HostConstSharedPtr(), &host));
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools(
@@ -2361,7 +2372,9 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
   }
 
   if (!override_result.strict) {
-    Upstream::HostSelectionResponse host_selection = lb_->chooseHost(context);
+    const bool connection_aware = cluster_info_->connectionAwareLoadBalancingEnabled();
+    Upstream::HostSelectionResponse host_selection =
+        connection_aware ? chooseHostConnectionAware(context) : lb_->chooseHost(context);
     if (host_selection.host || host_selection.cancelable) {
       return host_selection;
     }
@@ -2383,6 +2396,35 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
     }
   }
   return response;
+}
+
+HostSelectionResponse
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHostConnectionAware(
+    LoadBalancerContext* context) {
+  HostMapConstSharedPtr host_map = priority_set_.crossPriorityHostMap();
+
+  ConnectionAwareLbContext wrapper(
+      context, [this](const Host& host) { return !hostHasReadyConnection(host); },
+      [this, host_map](const Host& host) {
+        // The LB hands us the rejected host by reference, but floor bootstrap (and the async post
+        // it schedules) needs an owning shared_ptr; recover it from the cross-priority host map.
+        const auto host_iterator = host_map->find(host.address()->asString());
+        ASSERT(host_iterator != host_map->end());
+        maybeBootstrapPreconnectFloorForHost(host_iterator->second);
+      },
+      cluster_info_->connectionAwareLbHostSelectionRetryMaxAttempts());
+
+  HostSelectionResponse selection = lb_->chooseHost(&wrapper);
+  if (selection.host == nullptr) {
+    return selection;
+  }
+
+  if (hostHasReadyConnection(*selection.host)) {
+    cluster_info_->trafficStats()->upstream_cx_lb_selected_warm_.inc();
+  } else {
+    cluster_info_->trafficStats()->upstream_cx_lb_selected_cold_.inc();
+  }
+  return selection;
 }
 
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(

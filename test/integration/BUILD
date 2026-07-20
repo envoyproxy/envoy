@@ -268,6 +268,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "connection_aware_lb_integration_test",
+    size = "large",
+    srcs = ["connection_aware_lb_integration_test.cc"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/config:utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "eds_integration_test",
     size = "large",
     srcs = ["eds_integration_test.cc"],

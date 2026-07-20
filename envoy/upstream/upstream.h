@@ -753,6 +753,8 @@ public:
   COUNTER(original_dst_host_invalid)                                                               \
   COUNTER(retry_or_shadow_abandoned)                                                               \
   COUNTER(upstream_cx_close_notify)                                                                \
+  COUNTER(upstream_cx_lb_selected_warm)                                                            \
+  COUNTER(upstream_cx_lb_selected_cold)                                                            \
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
   COUNTER(upstream_cx_connect_timeout)                                                             \
@@ -1110,6 +1112,20 @@ public:
    * so that the floor of connections exists regardless of requests.
    */
   virtual uint32_t eagerPreconnectFloor() const PURE;
+
+  /**
+   * @return true if connection-aware load balancing is enabled. When enabled, host selection
+   * prefers hosts that already have at least one established connection on the current worker
+   * thread.
+   */
+  virtual bool connectionAwareLoadBalancingEnabled() const PURE;
+
+  /**
+   * @return the maximum number of times to reattempt host selection in order to find a host with a
+   * ready connection. Each reattempt also primes the rejected cold host when eagerPreconnectFloor()
+   * is set. Only used when connectionAwareLoadBalancingEnabled() is true. Defaults to 2.
+   */
+  virtual uint32_t connectionAwareLbHostSelectionRetryMaxAttempts() const PURE;
 
   /**
    * @return number of consecutive connection failures to a host, after which eager-preconnect-floor

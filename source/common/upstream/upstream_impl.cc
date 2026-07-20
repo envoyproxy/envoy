@@ -1220,6 +1220,9 @@ ClusterInfoImpl::ClusterInfoImpl(
               : nullptr),
       eager_preconnect_floor_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(), eager_preconnect_floor, 0)),
+      connection_aware_load_balancing_enabled_(config.has_connection_aware_load_balancing()),
+      connection_aware_lb_host_selection_retry_max_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.connection_aware_load_balancing(), host_selection_retry_max_attempts, 2)),
       eager_preconnect_floor_failure_threshold_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.preconnect_policy(), eager_preconnect_floor_failure_threshold, 3)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
@@ -1347,12 +1350,15 @@ ClusterInfoImpl::ClusterInfoImpl(
     return;
   }
 
-  // eager_preconnect_floor warms and refills a set of upstream connections per host.
-  // Not compatible with connection_pool_per_downstream_connection, where each pool is bound
-  // to a single downstream connection and torn down when it closes.
-  if (connection_pool_per_downstream_connection_ && eager_preconnect_floor_ > 0) {
-    creation_status = absl::InvalidArgumentError("eager_preconnect_floor is incompatible with "
-                                                 "connection_pool_per_downstream_connection");
+  // eager_preconnect_floor warms and refills a set of upstream connections per host, and
+  // connection-aware load balancing inspects/primes connections across requests. Neither is
+  // compatible with connection_pool_per_downstream_connection, where each pool is bound to a
+  // single downstream connection and torn down when it closes.
+  if (connection_pool_per_downstream_connection_ &&
+      (eager_preconnect_floor_ > 0 || connection_aware_load_balancing_enabled_)) {
+    creation_status = absl::InvalidArgumentError(
+        "eager_preconnect_floor and connection_aware_load_balancing are incompatible with "
+        "connection_pool_per_downstream_connection");
     return;
   }
 

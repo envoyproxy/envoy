@@ -680,6 +680,9 @@ private:
       void maybeBootstrapPreconnectFloorForHost(const HostConstSharedPtr& host);
 
     private:
+      // Selects a host, preferring hosts with a ready connection on this worker.
+      HostSelectionResponse chooseHostConnectionAware(LoadBalancerContext* context);
+
       Http::ConnectionPool::Instance*
       httpConnPoolImpl(HostConstSharedPtr host, ResourcePriority priority,
                        std::optional<Http::Protocol> downstream_protocol,
@@ -693,6 +696,7 @@ private:
                                                    const HostConstSharedPtr& host,
                                                    LoadBalancerContext* context);
       bool hostHasReadyConnection(const HostConstSharedPtr& host) const;
+      bool hostHasReadyConnection(const Host& host) const;
       bool hostHasReadyConnectionOfType(ConnectionPoolType type,
                                         const HostConstSharedPtr& host) const;
 

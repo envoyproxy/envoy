@@ -239,6 +239,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "connection_aware_load_balancing_test",
+    srcs = ["connection_aware_load_balancing_test.cc"],
+    deps = [
+        ":cluster_manager_impl_test_common",
+        "//source/common/upstream:connection_aware_lb_context_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//test/mocks/upstream:cluster_update_callbacks_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:priority_set_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "cluster_update_tracker_test",
     srcs = ["cluster_update_tracker_test.cc"],
     rbe_pool = "6gig",

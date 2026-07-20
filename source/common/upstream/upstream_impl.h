@@ -916,6 +916,12 @@ public:
   float peekaheadRatio() const override { return peekahead_ratio_; }
   bool shouldPreconnect(const Host& host) const override;
   uint32_t eagerPreconnectFloor() const override { return eager_preconnect_floor_; }
+  bool connectionAwareLoadBalancingEnabled() const override {
+    return connection_aware_load_balancing_enabled_;
+  }
+  uint32_t connectionAwareLbHostSelectionRetryMaxAttempts() const override {
+    return connection_aware_lb_host_selection_retry_max_attempts_;
+  }
   uint32_t eagerPreconnectFloorFailureThreshold() const override {
     return eager_preconnect_floor_failure_threshold_;
   }
@@ -1131,6 +1137,8 @@ private:
   const float peekahead_ratio_;
   const std::unique_ptr<const Matchers::MetadataMatcher> preconnect_enabled_matcher_;
   const uint32_t eager_preconnect_floor_;
+  const bool connection_aware_load_balancing_enabled_;
+  const uint32_t connection_aware_lb_host_selection_retry_max_attempts_;
   const uint32_t eager_preconnect_floor_failure_threshold_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;

@@ -83,6 +83,7 @@ envoy_cc_library(
     deps = [
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
+        ":connection_aware_lb_context_lib",
         ":host_utility_lib",
         ":load_balancer_context_base_lib",
         ":load_stats_reporter_lib",
@@ -261,6 +262,16 @@ envoy_cc_library(
     hdrs = ["load_balancer_context_base.h"],
     deps = [
         "//envoy/upstream:load_balancer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_aware_lb_context_lib",
+    hdrs = ["connection_aware_lb_context.h"],
+    deps = [
+        ":load_balancer_context_base_lib",
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:upstream_interface",
     ],
 )
 

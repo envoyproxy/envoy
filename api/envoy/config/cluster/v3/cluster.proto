@@ -48,7 +48,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 62]
+// [#next-free-field: 63]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -774,6 +774,17 @@ message Cluster {
         [(validate.rules).uint32 = {gte: 1}];
   }
 
+  // Configuration for connection-aware load balancing. When this field is set, host selection
+  // prefers hosts that already have at least one established upstream connection on
+  // the current worker thread. Most useful in combination with
+  // ``preconnect_policy.eager_preconnect_floor``, which proactively opens connections.
+  message ConnectionAwareLbConfig {
+    // The maximum number of times to reattempt host selection in order to find a host with a ready
+    // connection. Each reattempt also primes the rejected cold host when
+    // ``preconnect_policy.eager_preconnect_floor`` is enabled. Defaults to 2.
+    google.protobuf.UInt32Value host_selection_retry_max_attempts = 1;
+  }
+
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -1328,6 +1339,10 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // Configuration for connection-aware load balancing. See ``ConnectionAwareLbConfig``
+  // for details.
+  ConnectionAwareLbConfig connection_aware_load_balancing = 62;
 }
 
 // Extensible load balancing policy configuration.

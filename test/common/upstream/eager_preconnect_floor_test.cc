@@ -111,9 +111,35 @@ TEST_F(ClusterManagerImplTest, EagerPreconnectFloorIncompatibleWithPoolPerDownst
           value: 1
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "eager_preconnect_floor is incompatible with connection_pool_per_downstream_connection");
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "eager_preconnect_floor and connection_aware_load_balancing are "
+                            "incompatible with connection_pool_per_downstream_connection");
+}
+
+TEST_F(ClusterManagerImplTest, ConnectionAwareLbIncompatibleWithPoolPerDownstreamConnection) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.25s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      connection_pool_per_downstream_connection: true
+      connection_aware_load_balancing: {}
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "eager_preconnect_floor and connection_aware_load_balancing are "
+                            "incompatible with connection_pool_per_downstream_connection");
 }
 
 TEST_F(EagerPreconnectFloorTest, RefillsAfterPoolErased) {
@@ -155,7 +181,8 @@ TEST_F(EagerPreconnectFloorTest, RefillsAfterPoolErased) {
 
   create(parseBootstrapFromV3Yaml(yaml));
 
-  // Preconnect floor is established only after the cluster is used as HTTP, so nothing is allocated at init.
+  // Preconnect floor is established only after the cluster is used as HTTP, so nothing is allocated
+  // at init.
   ASSERT_EQ(0, pools_allocated) << "no floor maintenance before the cluster is used as HTTP";
 
   // First HTTP use creates a pool and opens a bootstrap connection.
@@ -297,7 +324,8 @@ TEST_F(EagerPreconnectFloorTest, SkippedWhenFloorUnset) {
   const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   ASSERT_EQ(1, hosts.size());
 
-  // Preconnect floor is not configured, even though the guard is on, so no bootstrap connection is opened.
+  // Preconnect floor is not configured, even though the guard is on, so no bootstrap connection is
+  // opened.
   EXPECT_CALL(*pool, maybePreconnect(_)).Times(0);
   cluster->httpConnPool(hosts[0], ResourcePriority::Default, std::nullopt, nullptr);
 
@@ -608,7 +636,8 @@ TEST_F(EagerPreconnectFloorTest, TcpFloorFillSkippedWhenTcpPoolReady) {
   const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   ASSERT_EQ(1, hosts.size());
 
-  // The pool the request creates already reports a ready connection, so no bootstrap connection is opened.
+  // The pool the request creates already reports a ready connection, so no bootstrap connection is
+  // opened.
   EXPECT_CALL(*tcp_pool, maybePreconnect(_)).Times(0);
   cluster->tcpConnPool(hosts[0], ResourcePriority::Default, nullptr);
 
@@ -688,7 +717,8 @@ TEST_F(EagerPreconnectFloorTest, TcpRefillsAfterPoolErased) {
 
   create(parseBootstrapFromV3Yaml(yaml));
 
-  // Preconnect floor is established only after the cluster is used as TCP, so nothing is allocated at init.
+  // Preconnect floor is established only after the cluster is used as TCP, so nothing is allocated
+  // at init.
   ASSERT_EQ(0, pools_allocated) << "no floor maintenance before the cluster is used as TCP";
 
   // First TCP use creates a pool and opens a bootstrap connection.
