@@ -232,6 +232,11 @@ typed_config:
     client_config_ = std::make_unique<ConfigHelper>(version_, pristine);
     setNode(*client_config_, "client-v1", "client-ns", "client-cluster", "client-svc",
             "client-app");
+    // The network peer_metadata registry normally allocates an Envoy ThreadLocal slot. In this
+    // two-Envoy-in-one-process fixture that extra client-side slot shifts the internal-listener
+    // TLS slot index out of alignment with the server, aborting the server on connection creation.
+    // Disable the slot on the client (it uses a thread_local fallback instead).
+    client_config_->addRuntimeOverride("istio.peer_metadata.use_thread_local_slot", "false");
     client_config_->addConfigModifier([server_port, loopback, connect_request_baggage](
                                           envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* sr = bootstrap.mutable_static_resources();
@@ -253,6 +258,25 @@ name: envoy.filters.network.istio_stats
 typed_config:
   "@type": type.googleapis.com/stats.PluginConfig
   tcp_reporting_duration: 1s
+)EOF",
+                                *ofc->add_filters());
+      // Seed a stable per-connection key used by the network peer_metadata filters to
+      // hand the discovered upstream (server) peer metadata from the connect_originate
+      // listener filter to the encap upstream filter via the thread-local registry.
+      // Shared TRANSITIVE so the same value reaches both the encap upstream connection
+      // and, through the internal_upstream transport, the connect_originate downstream
+      // connection -- letting both filters agree on the registry key.
+      TestUtility::loadFromYaml(R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: envoy.peer_metadata.downstream_connection_id
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "%CONNECTION_ID%"
+    shared_with_upstream: TRANSITIVE
 )EOF",
                                 *ofc->add_filters());
       TcpProxy out_tcp;
@@ -306,6 +330,14 @@ load_assignment:
           envoy_internal_address:
             server_listener_name: connect_originate
             endpoint_id: hbone
+transport_socket:
+  name: envoy.transport_sockets.internal_upstream
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
+    transport_socket:
+      name: envoy.transport_sockets.raw_buffer
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
 )EOF",
                                 *encap);
 
