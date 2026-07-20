@@ -1256,8 +1256,9 @@ ip_tags:
   IpTaggingFilterFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  ASSERT_OK_AND_ASSIGN(Http::FilterFactoryCb cb, factory.createHttpFilterFactoryFromProto(
-                                                     proto_config, "prefix.", server_context));
+  auto cb_or = factory.createHttpFilterFactoryFromProto(proto_config, "prefix.", server_context);
+  ASSERT_OK(cb_or);
+  auto cb = std::move(cb_or.value());
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
