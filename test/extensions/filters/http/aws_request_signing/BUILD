@@ -31,6 +31,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/aws_request_signing:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/aws_request_signing/v3:pkg_cc_proto",
     ],
 )
