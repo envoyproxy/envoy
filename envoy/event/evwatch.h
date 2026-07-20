@@ -32,10 +32,13 @@ public:
    * @param check_time monotonic time at check.
    */
   virtual void onCheck(MonotonicTime check_time) = 0;
-};
 
-using ObserverPtr = std::unique_ptr<Observer>;
-using ObserverWeakPtr = std::weak_ptr<Observer>;
+  /**
+   * Called on the dispatcher thread when the observer is unregistered from the dispatcher
+   * or when the dispatcher loop is shutting down.
+   */
+  virtual void onClose() {}
+};
 
 } // namespace Evwatch
 } // namespace Event

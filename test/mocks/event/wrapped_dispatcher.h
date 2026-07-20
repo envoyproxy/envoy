@@ -25,11 +25,11 @@ public:
     impl_.registerWatchdog(watchdog, min_touch_interval);
   }
 
-  void registerEvwatchObserver(Evwatch::ObserverPtr observer) override {
-    impl_.registerEvwatchObserver(std::move(observer));
+  void registerEvwatchObserver(Evwatch::Observer& observer) override {
+    impl_.registerEvwatchObserver(observer);
   }
 
-  void unregisterEvwatchObserver(Evwatch::Observer* observer) override {
+  void unregisterEvwatchObserver(Evwatch::Observer& observer) override {
     impl_.unregisterEvwatchObserver(observer);
   }
 

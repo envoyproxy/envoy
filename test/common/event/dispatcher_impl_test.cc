@@ -1531,27 +1531,25 @@ TEST(EvwatchObserverTest, RegisterEvwatchObserver) {
     MOCK_METHOD(void, onPrepare,
                 (MonotonicTime prepare_time, std::optional<MonotonicTime::duration> timeout));
     MOCK_METHOD(void, onCheck, (MonotonicTime check_time));
+    MOCK_METHOD(void, onClose, ());
   };
 
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
 
-  dispatcher->registerEvwatchObserver(nullptr);
-  dispatcher->unregisterEvwatchObserver(nullptr);
+  NiceMock<MockEvwatchObserver> observer;
 
-  auto observer = std::make_unique<NiceMock<MockEvwatchObserver>>();
-  auto* observer_ptr = observer.get();
+  EXPECT_CALL(observer, onPrepare(_, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer, onCheck(_)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer, onClose());
 
-  EXPECT_CALL(*observer_ptr, onPrepare(_, _)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*observer_ptr, onCheck(_)).Times(testing::AtLeast(1));
-
-  dispatcher->registerEvwatchObserver(std::move(observer));
+  dispatcher->registerEvwatchObserver(observer);
 
   auto cb = dispatcher->createSchedulableCallback([]() {});
   cb->scheduleCallbackCurrentIteration();
   dispatcher->run(Dispatcher::RunType::NonBlock);
 
-  dispatcher->unregisterEvwatchObserver(observer_ptr);
+  dispatcher->unregisterEvwatchObserver(observer);
 }
 
 } // namespace

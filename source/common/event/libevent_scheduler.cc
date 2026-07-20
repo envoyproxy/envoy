@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "source/common/common/assert.h"
+#include "source/common/event/evwatch_observer_manager_impl.h"
 #include "source/common/event/schedulable_cb_impl.h"
 #include "source/common/event/timer_impl.h"
 
@@ -36,6 +37,30 @@ LibeventScheduler::LibeventScheduler(TimeSource& time_source) : time_source_(tim
 
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
+
+  evwatch_manager_ = std::make_unique<EvwatchObserverManagerImpl>(*libevent_, time_source_);
+}
+
+LibeventScheduler::LibeventScheduler(TimeSource& time_source,
+                                     EvwatchObserverManagerPtr evwatch_manager)
+    : LibeventScheduler(time_source) {
+  if (evwatch_manager != nullptr) {
+    evwatch_manager_ = std::move(evwatch_manager);
+  }
+}
+
+LibeventScheduler::~LibeventScheduler() = default;
+
+void LibeventScheduler::registerEvwatchObserver(Evwatch::Observer& observer) {
+  if (evwatch_manager_ != nullptr) {
+    evwatch_manager_->registerObserver(observer);
+  }
+}
+
+void LibeventScheduler::unregisterEvwatchObserver(Evwatch::Observer& observer) {
+  if (evwatch_manager_ != nullptr) {
+    evwatch_manager_->unregisterObserver(observer);
+  }
 }
 
 TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatcher) {
@@ -143,65 +168,6 @@ void LibeventScheduler::onCheckForStats(evwatch*, const evwatch_check_cb_info*, 
       recordTimeval(self->stats_->poll_delay_us_, delay);
     }
   }
-}
-
-void LibeventScheduler::onPrepareForObserver(evwatch*, const evwatch_prepare_cb_info* info,
-                                             void* arg) {
-  auto self = static_cast<LibeventScheduler*>(arg);
-  if (self->evwatch_observers_.empty()) {
-    return;
-  }
-  timeval timeout;
-  const bool timeout_set = evwatch_prepare_get_timeout(info, &timeout);
-  const std::optional<MonotonicTime::duration> timeout_duration =
-      timeout_set
-          ? std::optional<MonotonicTime::duration>(std::chrono::seconds(timeout.tv_sec) +
-                                                   std::chrono::microseconds(timeout.tv_usec))
-          : std::nullopt;
-
-  const MonotonicTime prepare_time = self->time_source_.monotonicTime();
-
-  for (const auto& observer : self->evwatch_observers_) {
-    if (observer != nullptr) {
-      observer->onPrepare(prepare_time, timeout_duration);
-    }
-  }
-}
-
-void LibeventScheduler::onCheckForObserver(evwatch*, const evwatch_check_cb_info*, void* arg) {
-  auto self = static_cast<LibeventScheduler*>(arg);
-  if (self->evwatch_observers_.empty()) {
-    return;
-  }
-  const MonotonicTime check_time = self->time_source_.monotonicTime();
-
-  for (const auto& observer : self->evwatch_observers_) {
-    if (observer != nullptr) {
-      observer->onCheck(check_time);
-    }
-  }
-}
-
-void LibeventScheduler::registerEvwatchObserver(Evwatch::ObserverPtr observer) {
-  if (observer == nullptr) {
-    return;
-  }
-  if (!evwatch_observers_registered_) {
-    evwatch_observers_registered_ = true;
-    evwatch_prepare_new(libevent_.get(), &onPrepareForObserver, this);
-    evwatch_check_new(libevent_.get(), &onCheckForObserver, this);
-  }
-  evwatch_observers_.push_back(std::move(observer));
-}
-
-void LibeventScheduler::unregisterEvwatchObserver(Evwatch::Observer* observer) {
-  if (observer == nullptr) {
-    return;
-  }
-  evwatch_observers_.erase(
-      std::remove_if(evwatch_observers_.begin(), evwatch_observers_.end(),
-                     [observer](const auto& obs) { return obs.get() == observer; }),
-      evwatch_observers_.end());
 }
 
 } // namespace Event

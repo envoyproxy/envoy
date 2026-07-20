@@ -33,39 +33,34 @@ public:
   MOCK_METHOD(void, onPrepare,
               (MonotonicTime prepare_time, std::optional<MonotonicTime::duration> timeout));
   MOCK_METHOD(void, onCheck, (MonotonicTime check_time));
+  MOCK_METHOD(void, onClose, ());
 };
 
 TEST_F(LibeventSchedulerTest, RegisterAndUnregisterObservers) {
-  auto observer1 = std::make_unique<StrictMock<MockEvwatchObserver>>();
-  auto observer2 = std::make_unique<StrictMock<MockEvwatchObserver>>();
-  auto* observer1_ptr = observer1.get();
-  auto* observer2_ptr = observer2.get();
+  StrictMock<MockEvwatchObserver> observer1;
+  StrictMock<MockEvwatchObserver> observer2;
 
-  EXPECT_CALL(*observer1_ptr, onPrepare(_, _)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*observer1_ptr, onCheck(_)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*observer2_ptr, onPrepare(_, _)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*observer2_ptr, onCheck(_)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer1, onPrepare(_, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer1, onCheck(_)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer1, onClose());
+  EXPECT_CALL(observer2, onPrepare(_, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer2, onCheck(_)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer2, onClose());
 
-  scheduler_.registerEvwatchObserver(std::move(observer1));
-  scheduler_.registerEvwatchObserver(std::move(observer2));
+  scheduler_.registerEvwatchObserver(observer1);
+  scheduler_.registerEvwatchObserver(observer2);
 
   cycleScheduler();
 
   // Unregister observer1; observer2 continues
-  scheduler_.unregisterEvwatchObserver(observer1_ptr);
+  scheduler_.unregisterEvwatchObserver(observer1);
   cycleScheduler();
 
   // Unregister observer2
-  scheduler_.unregisterEvwatchObserver(observer2_ptr);
+  scheduler_.unregisterEvwatchObserver(observer2);
   cycleScheduler();
 
   // Cycle again when evwatch_observers_ is empty
-  cycleScheduler();
-}
-
-TEST_F(LibeventSchedulerTest, RegisterNullObserver) {
-  scheduler_.registerEvwatchObserver(nullptr);
-  scheduler_.unregisterEvwatchObserver(nullptr);
   cycleScheduler();
 }
 
@@ -75,26 +70,54 @@ public:
   MOCK_METHOD(MonotonicTime, monotonicTime, (), (override));
 };
 
+TEST_F(LibeventSchedulerTest, OnCloseCalledDuringSchedulerDestruction) {
+  StrictMock<MockTimeSource> time_source;
+  StrictMock<MockEvwatchObserver> observer;
+
+  EXPECT_CALL(observer, onClose());
+
+  {
+    LibeventScheduler scheduler(time_source);
+    scheduler.registerEvwatchObserver(observer);
+  }
+}
+
 TEST_F(LibeventSchedulerTest, CustomTimeSourceUsedForObserverCallbacks) {
   StrictMock<MockTimeSource> time_source;
   LibeventScheduler scheduler(time_source);
 
-  auto observer = std::make_unique<StrictMock<MockEvwatchObserver>>();
-  auto* observer_ptr = observer.get();
+  StrictMock<MockEvwatchObserver> observer;
 
   const MonotonicTime mock_time = MonotonicTime(std::chrono::nanoseconds(123456789));
 
   EXPECT_CALL(time_source, monotonicTime()).Times(2).WillRepeatedly(testing::Return(mock_time));
-  EXPECT_CALL(*observer_ptr, onPrepare(mock_time, _));
-  EXPECT_CALL(*observer_ptr, onCheck(mock_time));
+  EXPECT_CALL(observer, onPrepare(mock_time, _));
+  EXPECT_CALL(observer, onCheck(mock_time));
+  EXPECT_CALL(observer, onClose());
 
-  scheduler.registerEvwatchObserver(std::move(observer));
+  scheduler.registerEvwatchObserver(observer);
 
   auto cb = scheduler.createSchedulableCallback([]() {});
   cb->scheduleCallbackCurrentIteration();
   scheduler.run(Dispatcher::RunType::NonBlock);
 
-  scheduler.unregisterEvwatchObserver(observer_ptr);
+  scheduler.unregisterEvwatchObserver(observer);
+}
+
+TEST_F(LibeventSchedulerTest, EvwatchObserverManagerDelegation) {
+  StrictMock<MockTimeSource> time_source;
+  auto evwatch_manager = std::make_unique<StrictMock<MockEvwatchObserverManager>>();
+  auto* mock_manager = evwatch_manager.get();
+
+  StrictMock<MockEvwatchObserver> observer;
+
+  EXPECT_CALL(*mock_manager, registerObserver(testing::Ref(observer)));
+  EXPECT_CALL(*mock_manager, unregisterObserver(testing::Ref(observer)));
+
+  LibeventScheduler scheduler(time_source, std::move(evwatch_manager));
+
+  scheduler.registerEvwatchObserver(observer);
+  scheduler.unregisterEvwatchObserver(observer);
 }
 
 } // namespace
