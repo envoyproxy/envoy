@@ -487,7 +487,6 @@ void EnvoyQuicServerStream::OnClose() {
   stats_gatherer_ = nullptr;
 }
 
-
 void EnvoyQuicServerStream::OnCanWrite() {
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   quic::QuicSpdyServerStreamBase::OnCanWrite();
