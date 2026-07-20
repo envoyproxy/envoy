@@ -3,6 +3,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -11,6 +12,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace LocalRateLimitFilter {
+
+using StatusHelpers::HasStatus;
+using StatusHelpers::IsOk;
 
 TEST(Factory, GlobalEmptyConfig) {
   const std::string yaml = R"(
@@ -103,11 +107,10 @@ stat_prefix: test
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW(factory
-                   .createRouteSpecificFilterConfig(*proto_config, context,
-                                                    ProtobufMessage::getNullValidationVisitor())
-                   .value(),
-               EnvoyException);
+  EXPECT_THAT(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                      ProtobufMessage::getNullValidationVisitor()),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "local rate limit token bucket must be set for per filter configs"));
 }
 
 TEST(Factory, FillTimerTooLow) {
@@ -263,11 +266,9 @@ response_headers_to_add:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_THROW(factory
-                   .createRouteSpecificFilterConfig(*proto_config, context,
-                                                    ProtobufMessage::getNullValidationVisitor())
-                   .value(),
-               EnvoyException);
+  EXPECT_THAT(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                      ProtobufMessage::getNullValidationVisitor()),
+              Not(IsOk()));
 }
 
 TEST(Factory, LocalClusterRateLimitAndLocalRateLimitPerDownstreamConnection) {
@@ -297,14 +298,11 @@ local_rate_limit_per_downstream_connection: true
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory
-          .createRouteSpecificFilterConfig(*proto_config, context,
-                                           ProtobufMessage::getNullValidationVisitor())
-          .value(),
-      EnvoyException,
-      "local_cluster_rate_limit is set and local_rate_limit_per_downstream_connection is set to "
-      "true");
+  auto config_or = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_THAT(config_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   "local_cluster_rate_limit is set and "
+                                   "local_rate_limit_per_downstream_connection is set to true"));
 }
 
 TEST(Factory, LocalClusterRateLimitAndWithoutLocalClusterName) {
@@ -333,12 +331,11 @@ local_cluster_rate_limit: {}
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory
-          .createRouteSpecificFilterConfig(*proto_config, context,
-                                           ProtobufMessage::getNullValidationVisitor())
-          .value(),
-      EnvoyException, "local_cluster_rate_limit is set but no local cluster name is present");
+  auto config_or = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_THAT(config_or,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "local_cluster_rate_limit is set but no local cluster name is present"));
 }
 
 TEST(Factory, LocalClusterRateLimitAndWithoutLocalCluster) {
@@ -368,12 +365,11 @@ local_cluster_rate_limit: {}
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   context.cluster_manager_.local_cluster_name_ = "local_cluster";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory
-          .createRouteSpecificFilterConfig(*proto_config, context,
-                                           ProtobufMessage::getNullValidationVisitor())
-          .value(),
-      EnvoyException, "local_cluster_rate_limit is set but no local cluster is present");
+  auto config_or = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_THAT(config_or,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "local_cluster_rate_limit is set but no local cluster is present"));
 }
 
 TEST(Factory, LocalClusterRateLimit) {

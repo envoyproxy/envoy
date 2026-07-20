@@ -121,7 +121,7 @@ class MockHttpCacheFactory : public HttpCacheFactory {
 public:
   MOCK_METHOD(absl::StatusOr<std::shared_ptr<CacheSessions>>, getCache,
               (const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-               Server::Configuration::FactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context));
 };
 
 class MockUpstreamRequest : public UpstreamRequest {

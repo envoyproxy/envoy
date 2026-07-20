@@ -1,6 +1,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/server/admin/stats_params.h"
 
+#include "test/common/stats/stat_test_utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -77,6 +79,52 @@ TEST(StatsParamsTest, ParseParamsFilter) {
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
     EXPECT_NE(nullptr, params.re2_filter_);
+  }
+}
+
+TEST(StatsParamsTest, ParseParamsInvertFilter) {
+  Buffer::OwnedImpl response;
+
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
+    EXPECT_NE(params.re2_filter_, nullptr);
+    EXPECT_FALSE(params.filter_inverted_);
+  }
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo&invert_filter", response));
+    EXPECT_NE(params.re2_filter_, nullptr);
+    EXPECT_TRUE(params.filter_inverted_);
+  }
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::BadRequest, params.parse("?invert_filter", response));
+  }
+}
+
+TEST(StatsParamsTest, ShouldShowMetric) {
+  Buffer::OwnedImpl response;
+  Stats::TestUtil::TestStore store;
+  auto& foo = store.counter("cluster.foo.total");
+  auto& bar = store.counter("cluster.bar.total");
+
+  {
+    StatsParams params;
+    EXPECT_TRUE(params.shouldShowMetric(foo));
+    EXPECT_TRUE(params.shouldShowMetric(bar));
+  }
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
+    EXPECT_TRUE(params.shouldShowMetric(foo));
+    EXPECT_FALSE(params.shouldShowMetric(bar));
+  }
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo&invert_filter", response));
+    EXPECT_FALSE(params.shouldShowMetric(foo));
+    EXPECT_TRUE(params.shouldShowMetric(bar));
   }
 }
 
