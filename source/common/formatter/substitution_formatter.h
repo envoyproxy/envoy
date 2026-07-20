@@ -19,6 +19,7 @@
 #include "source/common/json/json_streamer.h"
 #include "source/common/json/json_utility.h"
 
+#include "absl/status/statusor.h"
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -109,17 +110,20 @@ public:
   using CommandParsers = std::vector<CommandParserPtr>;
   using Formatter = FormatterProviderPtr;
   using Formatters = std::vector<Formatter>;
+  using ParsedFormatElement = absl::variant<std::string, Formatters>;
 
-  JsonFormatterImpl(const Protobuf::Struct& struct_format, bool omit_empty_values,
-                    const CommandParsers& commands = {});
+  static absl::StatusOr<std::unique_ptr<JsonFormatterImpl>>
+  create(const Protobuf::Struct& struct_format, bool omit_empty_values,
+         const CommandParsers& commands = {});
+
+  JsonFormatterImpl(bool omit_empty_values, std::vector<ParsedFormatElement>&& parsed_elements);
 
   // Formatter
   std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
 
 private:
   const bool omit_empty_values_;
-  using ParsedFormatElement = absl::variant<std::string, Formatters>;
-  std::vector<ParsedFormatElement> parsed_elements_;
+  const std::vector<ParsedFormatElement> parsed_elements_;
 };
 
 } // namespace Formatter

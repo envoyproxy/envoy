@@ -11,19 +11,20 @@ namespace HttpFilters {
 namespace GrpcJsonReverseTranscoder {
 
 class GrpcJsonReverseTranscoderFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::grpc_json_reverse_transcoder::
-                                     v3::GrpcJsonReverseTranscoder> {
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+              GrpcJsonReverseTranscoder> {
 public:
   GrpcJsonReverseTranscoderFactory()
-      : FactoryBase("envoy.filters.http.grpc_json_reverse_transcoder") {}
+      : ExceptionFreeFactoryBase("envoy.filters.http.grpc_json_reverse_transcoder") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
           GrpcJsonReverseTranscoder& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
           GrpcJsonReverseTranscoder& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& context) override;

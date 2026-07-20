@@ -300,6 +300,22 @@ pub trait ClusterLbContext {
   /// the current host-selection callback, whichever comes first.
   fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
+  /// Stores a `Router::StringAccessor` filter state on the request under `key`, so a later filter,
+  /// the access log (`%FILTER_STATE(key:PLAIN)%`), or another consumer can read it back on the
+  /// same request. The value is stored with FilterChain life span. If the key does not exist it is
+  /// created.
+  ///
+  /// Returns true on success, false if the request has no stream info.
+  fn set_filter_state_bytes(&self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Stores a typed filter state on the request under `key` via the key's registered
+  /// `ObjectFactory`, so a built-in Envoy filter that reads the key as a typed object can consume
+  /// it. The value is stored with FilterChain life span.
+  ///
+  /// Returns true on success, false if the request has no stream info, no `ObjectFactory` is
+  /// registered for the key, or the factory fails to create the object.
+  fn set_filter_state_typed(&self, key: &[u8], value: &[u8]) -> bool;
+
   /// Returns the value of a per-host stat for the given host pointer. The module must ensure
   /// `host` still belongs to the cluster's host set. Returns 0 if the host pointer is null.
   fn get_host_stat(
@@ -307,6 +323,20 @@ pub trait ClusterLbContext {
     host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
     stat: abi::envoy_dynamic_module_type_host_stat,
   ) -> u64;
+
+  /// Sets a number value on the request's dynamic metadata under `namespace` and `key`,
+  /// overwriting any existing value. The value is observable in the access log via
+  /// `%DYNAMIC_METADATA(namespace:key)%`.
+  ///
+  /// Returns `true` if the value was set, `false` if the request has no stream info.
+  fn set_dynamic_metadata_number(&self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Sets a string value on the request's dynamic metadata under `namespace` and `key`,
+  /// overwriting any existing value. The value is observable in the access log via
+  /// `%DYNAMIC_METADATA(namespace:key)%`.
+  ///
+  /// Returns `true` if the value was set, `false` if the request has no stream info.
+  fn set_dynamic_metadata_string(&self, namespace: &str, key: &str, value: &str) -> bool;
 
   /// Creates a per-worker timer on this request's worker dispatcher.
   ///
@@ -2242,6 +2272,26 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
     }
   }
 
+  fn set_filter_state_bytes(&self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+        self.raw_context,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_filter_state_typed(&self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+        self.raw_context,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
   // `host` is an opaque Envoy handle passed back to Envoy, never dereferenced in Rust.
   #[allow(clippy::not_unsafe_ptr_arg_deref)]
   fn get_host_stat(
@@ -2254,6 +2304,28 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
         self.raw_context,
         host,
         stat,
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_number(&self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_string(&self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
       )
     }
   }

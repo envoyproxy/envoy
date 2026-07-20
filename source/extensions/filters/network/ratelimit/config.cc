@@ -17,7 +17,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Network::FilterFactoryCb> RateLimitConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::ratelimit::v3::RateLimit& proto_config,
     Server::Configuration::FactoryContext& context) {
 
@@ -30,14 +30,15 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 
-  THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
+  RETURN_IF_NOT_OK(
+      Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service()));
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
       Grpc::GrpcServiceConfigWithHashKey(proto_config.rate_limit_service().grpc_service());
   return [config_with_hash_key, &context, timeout,
           filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(
-        filter_config,
-        Filters::Common::RateLimit::rateLimitClient(context, config_with_hash_key, timeout)));
+        filter_config, Filters::Common::RateLimit::rateLimitClient(context.serverFactoryContext(),
+                                                                   config_with_hash_key, timeout)));
   };
 }
 

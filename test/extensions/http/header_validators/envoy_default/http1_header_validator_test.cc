@@ -125,6 +125,13 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestContentLength) {
   request_headers.setContentLength("100");
   EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
 
+  request_headers.setContentLength("100,100");
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
+
+  request_headers.setContentLength("100,101");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+
   request_headers.setContentLength("10a2");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
                              UhvResponseCodeDetail::get().InvalidContentLength);
@@ -391,6 +398,13 @@ TEST_F(Http1HeaderValidatorTest, ResponseContentLengthNoTransferEncoding) {
   // The transform method should keep content-length
   EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
   EXPECT_EQ(headers.getContentLengthValue(), "10");
+
+  headers.setContentLength("10,10");
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+
+  headers.setContentLength("10,11");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectRegNameMissingPort) {

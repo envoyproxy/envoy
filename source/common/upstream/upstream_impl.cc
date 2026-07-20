@@ -448,11 +448,14 @@ generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
   auto& stats = server_context.serverScope().store();
   Stats::StatsMatcherSharedPtr scope_matcher;
 
-  // Check for a per-cluster stats matcher in typed_filter_metadata under the specific key. If
-  // present, unpack it as StatsMatcher and use it to restrict which stats are created for this
-  // cluster's scope.
-  const auto& typed_meta = config.metadata().typed_filter_metadata();
-  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+  if (config.has_stats_matcher()) {
+    scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(config.stats_matcher(),
+                                                              stats.symbolTable(), server_context);
+  } else if (auto it = config.metadata().typed_filter_metadata().find(StatsMatcherMetadataKey);
+             it != config.metadata().typed_filter_metadata().end()) {
+    // Check for a per-cluster stats matcher in typed_filter_metadata under the specific key. If
+    // present, unpack it as StatsMatcher and use it to restrict which stats are created for this
+    // cluster's scope.
     envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
     if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
       MessageUtil::validate(stats_matcher_proto, server_context.messageValidationVisitor());
@@ -749,6 +752,15 @@ Host::CreateConnectionData HostImplBase::createConnection(
         address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
+  }
+
+  // `createClientConnection` can return nullptr, for example when binding the upstream connection
+  // to a configured network namespace fails (e.g. the namespace was removed at runtime). Returning
+  // a null connection lets the caller (connection pools) treat this as a connection failure rather
+  // than crashing on a null dereference below.
+  if (connection == nullptr) {
+    ENVOY_LOG(debug, "Failed to create upstream connection to host {}", address->asString());
+    return {nullptr, host};
   }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
@@ -2424,8 +2436,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     if (active_health_check_flag_changed) {
       hosts_with_active_health_check_flag_changed.emplace(existing_host->first);
     }
-    const bool skip_inplace_host_update =
-        health_check_address_changed || locality_changed || active_health_check_flag_changed;
+    const bool endpoint_hostname_changed =
+        (existing_host_found && host->hostname() != existing_host->second->hostname());
+    const bool health_check_hostname_changed =
+        (existing_host_found && health_checker_ != nullptr &&
+         host->hostnameForHealthChecks() != existing_host->second->hostnameForHealthChecks());
+    const bool hostname_changed = endpoint_hostname_changed || health_check_hostname_changed;
+    const bool skip_inplace_host_update = health_check_address_changed || locality_changed ||
+                                          active_health_check_flag_changed || hostname_changed;
 
     // When there is a match and we decided to do in-place update, we potentially update the
     // host's health check flag and metadata. Afterwards, the host is pushed back into the
