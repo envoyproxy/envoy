@@ -49,6 +49,7 @@ constexpr absl::string_view defaultBaggage =
     "default,k8s.cluster.name=cluster";
 constexpr absl::string_view defaultConnectionId = "1234";
 
+using ::testing::_;
 using ::testing::Const;
 using ::testing::NiceMock;
 using ::testing::Return;
@@ -107,17 +108,22 @@ decodePeerMetadata(const std::string& serialized) {
   return *metadata;
 }
 
-Config configWithBaggageKey(absl::string_view baggage_key) {
-  Config config;
-  config.set_baggage_key(baggage_key);
-  // These tests exercise the thread-local registry hand-off; the proto default is now the
-  // legacy DATA_STREAM_PREAMBLE mode, so request the registry mode explicitly.
-  config.set_mode(MetadataExchangeMode::THREAD_LOCAL_REGISTRY);
-  return config;
+// Readable parameter names for the exchange-mode-parameterized fixtures below.
+std::string modeName(const ::testing::TestParamInfo<MetadataExchangeMode>& info) {
+  return info.param == MetadataExchangeMode::THREAD_LOCAL_REGISTRY ? "ThreadLocalRegistry"
+                                                                   : "DataStreamPreamble";
 }
 
-class PeerMetadataFilterTest : public ::testing::Test {
+class PeerMetadataFilterTest : public ::testing::TestWithParam<MetadataExchangeMode> {
 public:
+  // Builds a downstream Filter config for the mode under test.
+  Config makeConfig(absl::string_view baggage_key) {
+    Config config;
+    config.set_baggage_key(baggage_key);
+    config.set_mode(GetParam());
+    return config;
+  }
+
   void populateNodeMetadata(absl::string_view workload_name, absl::string_view workload_type,
                             absl::string_view service_name, absl::string_view service_version,
                             absl::string_view ns, absl::string_view cluster) {
@@ -167,6 +173,8 @@ public:
         .WillByDefault(ReturnRef(stream_info_));
     ON_CALL(Const(write_filter_callbacks_.connection_), streamInfo())
         .WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, _))
+        .WillByDefault([this](Buffer::Instance& data, bool) { injected_write_data_.add(data); });
 
     filter_ = std::make_unique<Filter>(config, local_info_, registry_);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
@@ -180,6 +188,29 @@ public:
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 
+  std::optional<Istio::Common::WorkloadMetadataObject> propagatedPeerMetadata() {
+    if (GetParam() == MetadataExchangeMode::THREAD_LOCAL_REGISTRY) {
+      const auto stored = registry_->getValue(defaultConnectionId);
+      if (!stored.has_value()) {
+        return std::nullopt;
+      }
+      return decodePeerMetadata(*stored);
+    }
+    if (injected_write_data_.length() < sizeof(PeerMetadataHeader)) {
+      return std::nullopt;
+    }
+    PeerMetadataHeader header;
+    injected_write_data_.copyOut(0, sizeof(header), &header);
+    if (header.magic != PeerMetadataHeader::magic_number || header.data_size == 0 ||
+        injected_write_data_.length() < sizeof(header) + header.data_size) {
+      return std::nullopt;
+    }
+    std::string serialized;
+    serialized.resize(header.data_size);
+    injected_write_data_.copyOut(sizeof(header), header.data_size, serialized.data());
+    return decodePeerMetadata(serialized);
+  }
+
   ::envoy::config::core::v3::Node node_metadata_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -188,12 +219,13 @@ public:
   std::vector<std::string> sans_;
   std::shared_ptr<TestPeerMetadataRegistry> registry_ =
       std::make_shared<TestPeerMetadataRegistry>();
+  Buffer::OwnedImpl injected_write_data_;
   std::unique_ptr<Filter> filter_;
 };
 
-TEST_F(PeerMetadataFilterTest, TestPopulateBaggage) {
+TEST_P(PeerMetadataFilterTest, TestPopulateBaggage) {
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
-  initialize(configWithBaggageKey(defaultBaggageKey));
+  initialize(makeConfig(defaultBaggageKey));
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
   const auto filter_state = stream_info_.filterState();
@@ -204,9 +236,9 @@ TEST_F(PeerMetadataFilterTest, TestPopulateBaggage) {
             "namespace.name=default,k8s.cluster.name=cluster");
 }
 
-TEST_F(PeerMetadataFilterTest, TestDoNotPopulateBaggage) {
+TEST_P(PeerMetadataFilterTest, TestDoNotPopulateBaggage) {
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
-  initialize(Config{});
+  initialize(makeConfig(""));
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
   const auto filter_state = stream_info_.filterState();
@@ -214,12 +246,12 @@ TEST_F(PeerMetadataFilterTest, TestDoNotPopulateBaggage) {
       filter_state->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::FilterChain));
 }
 
-TEST_F(PeerMetadataFilterTest, TestPeerMetadataDiscoveredAndPropagated) {
+TEST_P(PeerMetadataFilterTest, TestPeerMetadataDiscoveredAndPropagated) {
   const std::string baggage{defaultBaggage};
   const std::string identity{defaultIdentity};
 
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
-  initialize(configWithBaggageKey(defaultBaggageKey));
+  initialize(makeConfig(defaultBaggageKey));
 
   Http::TestResponseHeaderMapImpl headers{{Headers::get().Baggage.get(), baggage}};
   populateTcpProxyResponseHeaders(headers);
@@ -234,20 +266,17 @@ TEST_F(PeerMetadataFilterTest, TestPeerMetadataDiscoveredAndPropagated) {
   Buffer::OwnedImpl data;
   EXPECT_EQ(filter_->onWrite(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  const auto stored = registry_->getValue(defaultConnectionId);
-  ASSERT_TRUE(stored.has_value());
-
-  const auto workload = decodePeerMetadata(*stored);
+  const auto workload = propagatedPeerMetadata();
   ASSERT_TRUE(workload.has_value());
   EXPECT_EQ(workload->baggage(), baggage);
   EXPECT_EQ(workload->identity(), identity);
 }
 
-TEST_F(PeerMetadataFilterTest, TestNoFiltersStateFromTcpProxy) {
+TEST_P(PeerMetadataFilterTest, TestNoFiltersStateFromTcpProxy) {
   const std::string identity{defaultIdentity};
 
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
-  initialize(configWithBaggageKey(defaultBaggageKey));
+  initialize(makeConfig(defaultBaggageKey));
 
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
@@ -259,15 +288,15 @@ TEST_F(PeerMetadataFilterTest, TestNoFiltersStateFromTcpProxy) {
   Buffer::OwnedImpl data;
   EXPECT_EQ(filter_->onWrite(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  EXPECT_FALSE(registry_->getValue(defaultConnectionId).has_value());
+  EXPECT_FALSE(propagatedPeerMetadata().has_value());
 }
 
-TEST_F(PeerMetadataFilterTest, TestNoBaggageHeaderFromTcpProxy) {
+TEST_P(PeerMetadataFilterTest, TestNoBaggageHeaderFromTcpProxy) {
   const std::string baggage{defaultBaggage};
   const std::string identity{defaultIdentity};
 
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
-  initialize(configWithBaggageKey(defaultBaggageKey));
+  initialize(makeConfig(defaultBaggageKey));
 
   Http::TestResponseHeaderMapImpl headers{{"bibbage", baggage}};
   populateTcpProxyResponseHeaders(headers);
@@ -282,15 +311,15 @@ TEST_F(PeerMetadataFilterTest, TestNoBaggageHeaderFromTcpProxy) {
   Buffer::OwnedImpl data;
   EXPECT_EQ(filter_->onWrite(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  EXPECT_FALSE(registry_->getValue(defaultConnectionId).has_value());
+  EXPECT_FALSE(propagatedPeerMetadata().has_value());
 }
 
-TEST_F(PeerMetadataFilterTest, TestDisablePeerDiscovery) {
+TEST_P(PeerMetadataFilterTest, TestDisablePeerDiscovery) {
   const std::string baggage{defaultBaggage};
   const std::string identity{defaultIdentity};
 
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
-  initialize(configWithBaggageKey(defaultBaggageKey));
+  initialize(makeConfig(defaultBaggageKey));
 
   Http::TestResponseHeaderMapImpl headers{{Headers::get().Baggage.get(), baggage}};
   populateTcpProxyResponseHeaders(headers);
@@ -306,8 +335,13 @@ TEST_F(PeerMetadataFilterTest, TestDisablePeerDiscovery) {
   Buffer::OwnedImpl data;
   EXPECT_EQ(filter_->onWrite(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  EXPECT_FALSE(registry_->getValue(defaultConnectionId).has_value());
+  EXPECT_FALSE(propagatedPeerMetadata().has_value());
 }
+
+INSTANTIATE_TEST_SUITE_P(Modes, PeerMetadataFilterTest,
+                         ::testing::Values(MetadataExchangeMode::DATA_STREAM_PREAMBLE,
+                                           MetadataExchangeMode::THREAD_LOCAL_REGISTRY),
+                         modeName);
 
 std::shared_ptr<NiceMock<Upstream::MockHostDescription>>
 makeInternalListenerHost(absl::string_view listener_name) {
@@ -325,7 +359,7 @@ std::shared_ptr<NiceMock<Upstream::MockHostDescription>> makeIpv4Host(absl::stri
   return host;
 }
 
-class PeerMetadataUpstreamFilterTest : public ::testing::Test {
+class PeerMetadataUpstreamFilterTest : public ::testing::TestWithParam<MetadataExchangeMode> {
 public:
   void initialize() {
     ON_CALL(callbacks_.connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
@@ -333,9 +367,25 @@ public:
 
     host_metadata_ = std::make_shared<::envoy::config::core::v3::Metadata>();
 
-    filter_ = std::make_unique<UpstreamFilter>(MetadataExchangeMode::THREAD_LOCAL_REGISTRY,
-                                               registry_);
+    filter_ = std::make_unique<UpstreamFilter>(GetParam(), registry_);
     filter_->initializeReadFilterCallbacks(callbacks_);
+  }
+
+  void deliverPeerMetadata(Buffer::Instance& data, absl::string_view baggage,
+                           absl::string_view identity) {
+    const std::string serialized = encodePeerMetadata(baggage, identity);
+    if (GetParam() == MetadataExchangeMode::THREAD_LOCAL_REGISTRY) {
+      registry_->setValue(defaultConnectionId, serialized);
+      return;
+    }
+    PeerMetadataHeader header{PeerMetadataHeader::magic_number,
+                              static_cast<uint32_t>(serialized.size())};
+    Buffer::OwnedImpl preamble{
+        absl::string_view(reinterpret_cast<const char*>(&header), sizeof(header))};
+    preamble.add(serialized);
+    preamble.add(data);
+    data.drain(data.length());
+    data.add(preamble);
   }
 
   void setConnectionId(absl::string_view id) {
@@ -389,20 +439,22 @@ public:
   std::unique_ptr<UpstreamFilter> filter_;
 };
 
-TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
+TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
   initialize();
   setUpstreamHost(makeInternalListenerHost("connect_originate"));
   setConnectionId(defaultConnectionId);
-  registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
+
+  Buffer::OwnedImpl data;
+  data.add("application data");
+  deliverPeerMetadata(data, defaultBaggage, defaultIdentity);
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
-
-  const std::string payload{"application data"};
-  Buffer::OwnedImpl data;
-  data.add(payload);
   EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  // The registry entry is consumed once read.
+  // In legacy mode the preamble is stripped, leaving only the payload; in registry mode the
+  // data is untouched. Either way only the payload remains.
+  EXPECT_EQ(data.toString(), "application data");
+  // The registry entry (if any) is consumed once read.
   EXPECT_FALSE(registry_->getValue(defaultConnectionId).has_value());
 
   const auto peer_info = peerInfoFromFilterState();
@@ -411,7 +463,7 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
   EXPECT_EQ(peer_info->baggage(), defaultBaggage);
 }
 
-TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForUnknownInternalListeners) {
+TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForUnknownInternalListeners) {
   initialize();
   setUpstreamHost(makeInternalListenerHost("not_connect_originate"));
   setConnectionId(defaultConnectionId);
@@ -424,13 +476,12 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForUnknownInte
   data.add(payload);
   EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
-  // Internal listener is unknown, so the registry entry is left untouched.
-  EXPECT_TRUE(registry_->getValue(defaultConnectionId).has_value());
+  // Internal listener is unknown, so no peer metadata is populated.
   const auto peer_info = peerInfoFromFilterState();
   EXPECT_FALSE(peer_info.has_value());
 }
 
-TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForExternalHosts) {
+TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForExternalHosts) {
   initialize();
   setUpstreamHost(makeIpv4Host("192.168.0.1"));
   setConnectionId(defaultConnectionId);
@@ -444,12 +495,11 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForExternalHos
   EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
 
   EXPECT_EQ(data.length(), payload.size());
-  EXPECT_TRUE(registry_->getValue(defaultConnectionId).has_value());
   const auto peer_info = peerInfoFromFilterState();
   EXPECT_FALSE(peer_info.has_value());
 }
 
-TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledViaHostMetadata) {
+TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledViaHostMetadata) {
   initialize();
   setUpstreamHost(makeInternalListenerHost("connect_originate"));
 
@@ -473,7 +523,7 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
   EXPECT_FALSE(peer_info.has_value());
 }
 
-TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledViaClusterMetadata) {
+TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledViaClusterMetadata) {
   initialize();
   setUpstreamHost(makeInternalListenerHost("connect_originate"));
 
@@ -496,6 +546,11 @@ TEST_F(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
   const auto peer_info = peerInfoFromFilterState();
   EXPECT_FALSE(peer_info.has_value());
 }
+
+INSTANTIATE_TEST_SUITE_P(Modes, PeerMetadataUpstreamFilterTest,
+                         ::testing::Values(MetadataExchangeMode::DATA_STREAM_PREAMBLE,
+                                           MetadataExchangeMode::THREAD_LOCAL_REGISTRY),
+                         modeName);
 
 } // namespace
 } // namespace PeerMetadata

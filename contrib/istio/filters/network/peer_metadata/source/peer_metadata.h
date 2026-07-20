@@ -94,7 +94,8 @@ namespace PeerMetadata {
 
 using Config = ::envoy::extensions::network_filters::peer_metadata::Config;
 using UpstreamConfig = ::envoy::extensions::network_filters::peer_metadata::UpstreamConfig;
-using MetadataExchangeMode = ::envoy::extensions::network_filters::peer_metadata::MetadataExchangeMode;
+using MetadataExchangeMode =
+    ::envoy::extensions::network_filters::peer_metadata::MetadataExchangeMode;
 using CelStatePrototype = ::Envoy::Extensions::Filters::Common::Expr::CelStatePrototype;
 
 struct HeaderValues {
