@@ -78,6 +78,16 @@ message PerWorkerSubset {
 
   // Within-subset host selection. Applies on top of either partitioning
   // strategy.
+  //
+  // This contrib implementation intentionally exposes a small set of
+  // validated strategies rather than accepting an arbitrary nested load
+  // balancing policy. The inner policy operates on a synthetic
+  // single-priority, single-locality ``PrioritySet``, and not every Envoy
+  // load balancer is compatible with that constrained model.
+  // ``SIMPLE_ROUND_ROBIN`` also provides a low-overhead option that avoids
+  // constructing an inner stock load balancer per worker. A composable
+  // nested policy can be reconsidered if this extension moves into the core
+  // load-balancer set.
   enum HostSelectionStrategy {
     // proto3-default sentinel. Rejected by the factory at config-load
     // time; operators must pick an explicit strategy. Exists so callers
@@ -92,8 +102,10 @@ message PerWorkerSubset {
 
     // Envoy's stock RoundRobin load balancer constructed against the
     // worker's subset via a synthetic PrioritySet. Honors per-host weights
-    // (EDF scheduling), ``slow_start_config``, and locality-weighted LB.
-    // Recommended default for tiers opting in.
+    // (EDF scheduling) and ``slow_start_config``. The synthetic PrioritySet
+    // presents the subset as one locality, so locality-weighted balancing is
+    // intentionally not supported within the worker subset. Recommended
+    // default for tiers opting in.
     ENVOY_ROUND_ROBIN = 2;
 
     // Power-of-two-choices over active request counts (the algorithm
