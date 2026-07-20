@@ -26,6 +26,19 @@ protected:
   Http::MockFilterChainFactoryCallbacks filter_callback_;
 };
 
+TEST_F(CacheFilterFactoryTest, BasicWithServerFactoryContext) {
+  std::ignore = config_.mutable_typed_config()->PackFrom(
+      envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config());
+  Http::FilterFactoryCb cb =
+      factory_.createHttpFilterFactoryFromProto(config_, "stats", context_.serverFactoryContext())
+          .value();
+  Http::StreamFilterSharedPtr filter;
+  EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
+  cb(filter_callback_);
+  ASSERT(filter);
+  ASSERT(dynamic_cast<CacheFilter*>(filter.get()));
+}
+
 TEST_F(CacheFilterFactoryTest, Basic) {
   std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config());
@@ -72,7 +85,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<Key>(); }
   absl::StatusOr<std::shared_ptr<CacheSessions>>
   getCache(const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config&,
-           Server::Configuration::FactoryContext&) override {
+           Server::Configuration::ServerFactoryContext&) override {
     return absl::InvalidArgumentError("intentional fail");
   }
 };
