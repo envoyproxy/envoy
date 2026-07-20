@@ -135,12 +135,15 @@ public:
   }
 
 private:
-  void rebuildSubset();
-  // RANDOM_PARTITIONS samples ``subset_size`` hosts from ``healthy_candidates``
-  // by default; if there are not enough healthy hosts, falls back to sampling
-  // from ``all_candidates`` (per-worker fallback).
+  void rebuildSubset(bool membership_changed);
+  // Reconcile RANDOM_PARTITIONS' stable assignment after a membership update:
+  // retain sampled hosts that still exist and fill only vacancies. On initial
+  // construction this samples the complete assignment.
+  void reconcileRandomPartition(const Upstream::HostVector& healthy_candidates,
+                                const Upstream::HostVector& all_candidates);
+  // Filter the stable random assignment to healthy hosts and apply the
+  // per-worker fallback threshold without resampling it.
   void rebuildRandomPartition(const Upstream::HostVector& healthy_candidates,
-                              const Upstream::HostVector& all_candidates,
                               std::vector<Upstream::HostConstSharedPtr>& out);
   // EQUAL_PARTITIONS partitions over ``all_candidates`` (stable slice
   // positions across health changes), filters to healthy, and falls back to
@@ -188,6 +191,11 @@ private:
 
   // Per-Envoy seed for EQUAL_PARTITIONS -- see TypedPerWorkerSubsetLbConfig.
   const uint64_t envoy_seed_;
+
+  // Stable host assignment for RANDOM_PARTITIONS. Health-only updates filter
+  // this assignment but never resample it; membership updates retain surviving
+  // hosts and fill only vacancies.
+  std::vector<Upstream::HostConstSharedPtr> random_partition_;
 
   std::shared_ptr<const std::vector<Upstream::HostConstSharedPtr>> subset_;
   std::atomic<uint64_t> next_index_{0};

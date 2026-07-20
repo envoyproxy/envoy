@@ -22,9 +22,8 @@ PerWorkerSubsetLoadBalancer::PerWorkerSubsetLoadBalancer(
     uint32_t fallback_threshold, uint64_t envoy_seed,
     const envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig&
         slow_start_config)
-    : priority_set_(priority_set),
-      stats_(stats), per_worker_subset_stats_{ALL_PER_WORKER_SUBSET_STATS(
-                         POOL_COUNTER_PREFIX(scope, ""))},
+    : priority_set_(priority_set), stats_(stats),
+      per_worker_subset_stats_{ALL_PER_WORKER_SUBSET_STATS(POOL_COUNTER_PREFIX(scope, ""))},
       runtime_(runtime), random_(random), time_source_(time_source), subset_size_(subset_size),
       strategy_(strategy), host_selection_strategy_(host_selection_strategy), worker_id_(worker_id),
       total_workers_(total_workers), fallback_threshold_(fallback_threshold),
@@ -74,7 +73,7 @@ PerWorkerSubsetLoadBalancer::PerWorkerSubsetLoadBalancer(
     break;
   }
 
-  rebuildSubset();
+  rebuildSubset(/*membership_changed=*/true);
   // ``PriorityUpdateCb`` (not ``MemberUpdateCb``) -- fires on every
   // priority-set update including health-flag transitions that do not move
   // hosts in/out of membership. This matches what stock LBs (RoundRobin,
@@ -82,13 +81,14 @@ PerWorkerSubsetLoadBalancer::PerWorkerSubsetLoadBalancer(
   // changes from active health checks and outlier detection, not just EDS
   // adds/removes.
   member_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t /*priority*/, const Upstream::HostVector&, const Upstream::HostVector&) {
-        rebuildSubset();
+      [this](uint32_t /*priority*/, const Upstream::HostVector& hosts_added,
+             const Upstream::HostVector& hosts_removed) {
+        rebuildSubset(/*membership_changed=*/!hosts_added.empty() || !hosts_removed.empty());
         return absl::OkStatus();
       });
 }
 
-void PerWorkerSubsetLoadBalancer::rebuildSubset() {
+void PerWorkerSubsetLoadBalancer::rebuildSubset(bool membership_changed) {
   per_worker_subset_stats_.lb_per_worker_subset_rebuilds_.inc();
   if (priority_set_.hostSetsPerPriority().empty()) {
     subset_ = std::make_shared<std::vector<Upstream::HostConstSharedPtr>>();
@@ -117,7 +117,10 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset() {
   if (strategy_ == PartitioningStrategy::EqualPartitions) {
     rebuildEqualPartition(all, picked);
   } else {
-    rebuildRandomPartition(host_set->healthyHosts(), all, picked);
+    if (membership_changed) {
+      reconcileRandomPartition(host_set->healthyHosts(), all);
+    }
+    rebuildRandomPartition(host_set->healthyHosts(), picked);
   }
 
   ENVOY_LOG(debug, "per_worker_subset: worker={} strategy={} intra={} K={} from N={}", worker_id_,
@@ -129,27 +132,80 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset() {
   publishSubsetToSyntheticPrioritySet(*subset_);
 }
 
-void PerWorkerSubsetLoadBalancer::rebuildRandomPartition(
-    const Upstream::HostVector& healthy_candidates, const Upstream::HostVector& all_candidates,
-    std::vector<Upstream::HostConstSharedPtr>& out) {
-  // Sample from healthy by default. Per-worker fallback: if there are not
-  // enough healthy hosts to fill the requested ``subset_size``, fall back
-  // to sampling from all hosts.
-  const Upstream::HostVector& pool_src =
-      (healthy_candidates.size() >= subset_size_) ? healthy_candidates : all_candidates;
-  if (&pool_src == &all_candidates) {
-    per_worker_subset_stats_.lb_per_worker_subset_slice_fallback_.inc();
-    if (healthy_candidates.empty()) {
-      per_worker_subset_stats_.lb_per_worker_subset_slice_empty_healthy_.inc();
+void PerWorkerSubsetLoadBalancer::reconcileRandomPartition(
+    const Upstream::HostVector& healthy_candidates, const Upstream::HostVector& all_candidates) {
+  // ``healthy_candidates`` and ``all_candidates`` are read-only views of the
+  // worker's current priority-0 cluster-wide host lists; this function does
+  // not create or modify global host state. It uses those lists to reconcile
+  // this worker's persistent random assignment, retaining assigned hosts that
+  // still exist and filling only membership-created vacancies.
+  // ``rebuildRandomPartition()`` subsequently derives the worker's effective
+  // selectable subset from that stable assignment and the latest global
+  // healthy-host view.
+  const size_t target = std::min<size_t>(subset_size_, all_candidates.size());
+  absl::flat_hash_set<Upstream::HostConstSharedPtr> current_hosts(all_candidates.begin(),
+                                                                  all_candidates.end());
+  absl::flat_hash_set<Upstream::HostConstSharedPtr> retained;
+  std::vector<Upstream::HostConstSharedPtr> next;
+  next.reserve(target);
+  for (const auto& host : random_partition_) {
+    if (next.size() == target) {
+      break;
+    }
+    if (current_hosts.contains(host)) {
+      next.push_back(host);
+      retained.insert(host);
     }
   }
-  std::vector<Upstream::HostConstSharedPtr> pool(pool_src.begin(), pool_src.end());
-  const size_t target = std::min<size_t>(subset_size_, pool.size());
-  out.reserve(target);
-  for (size_t i = 0; i < target; ++i) {
+
+  // Prefer healthy hosts when enough are available, matching initial random
+  // partition behavior. If the cluster cannot supply K healthy hosts, sample
+  // from all hosts and let the per-worker fallback logic below decide which
+  // view to publish.
+  const Upstream::HostVector& pool_src =
+      (healthy_candidates.size() >= target) ? healthy_candidates : all_candidates;
+  std::vector<Upstream::HostConstSharedPtr> pool;
+  pool.reserve(pool_src.size());
+  for (const auto& host : pool_src) {
+    if (!retained.contains(host)) {
+      pool.push_back(host);
+    }
+  }
+
+  for (size_t i = 0; next.size() < target; ++i) {
     const size_t j = i + (random_.random() % (pool.size() - i));
     std::swap(pool[i], pool[j]);
-    out.push_back(pool[i]);
+    next.push_back(pool[i]);
+  }
+  random_partition_ = std::move(next);
+}
+
+void PerWorkerSubsetLoadBalancer::rebuildRandomPartition(
+    const Upstream::HostVector& healthy_candidates,
+    std::vector<Upstream::HostConstSharedPtr>& out) {
+  absl::flat_hash_set<Upstream::HostConstSharedPtr> healthy(healthy_candidates.begin(),
+                                                            healthy_candidates.end());
+  std::vector<Upstream::HostConstSharedPtr> healthy_partition;
+  healthy_partition.reserve(random_partition_.size());
+  for (const auto& host : random_partition_) {
+    if (healthy.contains(host)) {
+      healthy_partition.push_back(host);
+    }
+  }
+
+  const bool slice_in_fallback =
+      healthy_partition.empty() ||
+      (fallback_threshold_ > 0 &&
+       static_cast<uint64_t>(healthy_partition.size()) * 100ULL <
+           static_cast<uint64_t>(fallback_threshold_) * random_partition_.size());
+  if (slice_in_fallback) {
+    per_worker_subset_stats_.lb_per_worker_subset_slice_fallback_.inc();
+    if (healthy_partition.empty()) {
+      per_worker_subset_stats_.lb_per_worker_subset_slice_empty_healthy_.inc();
+    }
+    out = random_partition_;
+  } else {
+    out = std::move(healthy_partition);
   }
 }
 

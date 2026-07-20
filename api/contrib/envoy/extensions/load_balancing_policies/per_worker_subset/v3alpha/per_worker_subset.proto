@@ -54,16 +54,25 @@ message PerWorkerSubset {
     // stable address-sorted ordering, where ``N`` is the cluster's host
     // count and ``W`` is the worker count. The starting offset is rotated
     // per-Envoy via a hash of the bootstrap node id so the partition is
-    // not byte-identical across the fleet. Subset shape is even
-    // (``W*K = N`` with no wasted coverage). ``subset_size`` is treated
-    // as a subsetting-disable threshold (see ``subset_size`` below).
-    // This is the default.
+    // not byte-identical across the fleet. The slices cover all hosts,
+    // with up to ``W*K - N`` wrap-around assignments when ``N`` is not
+    // divisible by ``W``.
+    //
+    // Health-only updates do not change slice boundaries: partitioning is
+    // performed over the all-hosts list, then each worker filters its fixed
+    // slice by health. A host becoming unhealthy therefore affects only
+    // workers whose slice contains that host. Membership updates may change
+    // ``N`` or ``K`` and can repartition workers. ``subset_size`` is treated
+    // as a subsetting-disable threshold (see ``subset_size`` below). This is
+    // the default.
     EQUAL_PARTITIONS = 0;
 
     // Each worker independently samples ``subset_size`` hosts uniformly at
-    // random from the cluster's healthy hosts (without replacement).
-    // Probabilistic coverage; varies across boxes; re-samples on each
-    // membership update. ``subset_size`` must be ``> 0`` in this mode.
+    // random without replacement. The sampled membership is retained across
+    // health-only updates so a health transition does not rotate unrelated
+    // connections. Membership updates retain sampled hosts that still exist
+    // and fill only vacancies created by removed hosts. ``subset_size`` must
+    // be ``> 0`` in this mode.
     RANDOM_PARTITIONS = 1;
   }
 

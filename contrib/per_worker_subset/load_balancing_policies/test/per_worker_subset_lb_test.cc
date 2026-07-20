@@ -6,6 +6,7 @@
 
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/random_generator.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -48,7 +49,7 @@ public:
   }
 
   NiceMock<Upstream::MockPrioritySet> priority_set_;
-  NiceMock<Upstream::MockHostSet>& host_set_ = *priority_set_.getMockHostSet(0);
+  Upstream::MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   Stats::IsolatedStoreImpl stats_;
   Upstream::ClusterLbStatNames stat_names_{stats_.symbolTable()};
   Upstream::ClusterLbStats lb_stats_{stat_names_, *stats_.rootScope()};
@@ -130,7 +131,8 @@ TEST_F(PerWorkerSubsetLoadBalancerTest, AllUnhealthyFallsBackToFullHostList) {
   EXPECT_EQ(seen.size(), 4);
 }
 
-// RANDOM_PARTITIONS membership update re-samples.
+// RANDOM_PARTITIONS membership update retains surviving sampled hosts and
+// fills vacancies from the new membership.
 TEST_F(PerWorkerSubsetLoadBalancerTest, RandomPartitionsMembershipUpdateRebuildsSubset) {
   makeHosts(10);
   PerWorkerSubsetLoadBalancer lb(
@@ -155,6 +157,51 @@ TEST_F(PerWorkerSubsetLoadBalancerTest, RandomPartitionsMembershipUpdateRebuilds
     EXPECT_TRUE(std::find(hosts_.begin(), hosts_.end(), h) != hosts_.end());
   }
   EXPECT_EQ(seen_after.size(), 4);
+}
+
+TEST_F(PerWorkerSubsetLoadBalancerTest, RandomPartitionsRetainsAssignmentAcrossHealthUpdates) {
+  makeHosts(10);
+  PerWorkerSubsetLoadBalancer lb(
+      priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
+      /*subset_size=*/4, PartitioningStrategy::RandomPartitions,
+      HostSelectionStrategy::SimpleRoundRobin, /*worker_id=*/0, total_workers_,
+      /*fallback_threshold=*/50, /*envoy_seed=*/0, /*slow_start_config=*/{});
+
+  std::set<Upstream::HostConstSharedPtr> initial;
+  for (int i = 0; i < 50; ++i) {
+    initial.insert(lb.chooseHost(nullptr).host);
+  }
+  ASSERT_EQ(initial.size(), 4);
+
+  const auto unhealthy = *initial.begin();
+  const auto unhealthy_it = std::find(hosts_.begin(), hosts_.end(), unhealthy);
+  ASSERT_NE(unhealthy_it, hosts_.end());
+  auto& unhealthy_mock = static_cast<NiceMock<Upstream::MockHost>&>(**unhealthy_it);
+  ON_CALL(unhealthy_mock, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+  host_set_.healthy_hosts_.erase(
+      std::remove(host_set_.healthy_hosts_.begin(), host_set_.healthy_hosts_.end(), unhealthy),
+      host_set_.healthy_hosts_.end());
+  priority_set_.runUpdateCallbacks(/*priority=*/0, /*added=*/{}, /*removed=*/{});
+
+  std::set<Upstream::HostConstSharedPtr> while_unhealthy;
+  for (int i = 0; i < 50; ++i) {
+    while_unhealthy.insert(lb.chooseHost(nullptr).host);
+  }
+  EXPECT_EQ(while_unhealthy.size(), 3);
+  EXPECT_EQ(while_unhealthy.count(unhealthy), 0);
+  for (const auto& host : while_unhealthy) {
+    EXPECT_EQ(initial.count(host), 1);
+  }
+
+  ON_CALL(unhealthy_mock, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+  host_set_.healthy_hosts_.push_back(std::const_pointer_cast<Upstream::Host>(unhealthy));
+  priority_set_.runUpdateCallbacks(/*priority=*/0, /*added=*/{}, /*removed=*/{});
+
+  std::set<Upstream::HostConstSharedPtr> after_recovery;
+  for (int i = 0; i < 50; ++i) {
+    after_recovery.insert(lb.chooseHost(nullptr).host);
+  }
+  EXPECT_EQ(after_recovery, initial);
 }
 
 // EQUAL_PARTITIONS auto-computes ``K = ceil(N/W)``. With ``N=64`` and ``W=8``,
