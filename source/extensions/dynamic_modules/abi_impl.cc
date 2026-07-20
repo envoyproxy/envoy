@@ -784,6 +784,22 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_context_get_
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
     envoy_dynamic_module_type_cluster_host_envoy_ptr, envoy_dynamic_module_type_host_stat) {

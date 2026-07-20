@@ -97,6 +97,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "callbacks_handler_lib",
+    hdrs = ["callbacks_handler.h"],
+    deps = [
+        ":assert_lib",
+        "//envoy/common:optref_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cleanup_lib",
     hdrs = ["cleanup.h"],
     deps = [
@@ -172,7 +181,10 @@ envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
-    deps = [":utility_lib"],
+    deps = [
+        ":utility_lib",
+        "@abseil-cpp//absl/types:span",
+    ],
 )
 
 envoy_cc_library(

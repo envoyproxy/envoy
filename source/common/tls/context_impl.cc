@@ -390,6 +390,12 @@ ContextImpl::ContextImpl(
         return;
       }
       break;
+    case ProtoPolicy::CNSA1_202603:
+      creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa1_202603);
+      if (!creation_status.ok()) {
+        return;
+      }
+      break;
     default:
       creation_status = absl::InvalidArgumentError("Unknown compliance policy");
       return;

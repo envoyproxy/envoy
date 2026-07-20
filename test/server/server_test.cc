@@ -37,6 +37,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -1056,8 +1057,7 @@ TEST_P(ServerInstanceImplTest, ValidationDefault) {
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").message(),
       "Protobuf message (foo) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_TRUE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
+  EXPECT_OK(server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -1067,11 +1067,9 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
   options_.service_node_name_ = "some_node_name";
   options_.allow_unknown_static_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_TRUE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
+  EXPECT_OK(server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_TRUE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
+  EXPECT_OK(server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -1101,8 +1099,7 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
   options_.allow_unknown_static_fields_ = true;
   options_.reject_unknown_dynamic_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_TRUE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
+  EXPECT_OK(server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
   EXPECT_EQ(server_->messageValidationContext()
                 .dynamicValidationVisitor()
@@ -1824,7 +1821,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
-    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+    EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
     EXPECT_EQ(log.logger_name, "misc");
   }));

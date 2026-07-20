@@ -509,6 +509,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIGUSR
 SIMD
 SIO
 SSE
@@ -762,6 +763,7 @@ conns
 const
 constexpr
 constructible
+cooldown
 copyable
 coroutine
 coroutines
@@ -1552,6 +1554,7 @@ testcase
 testcases
 testdata
 testee
+tgkill
 threadsafe
 thru
 timespan

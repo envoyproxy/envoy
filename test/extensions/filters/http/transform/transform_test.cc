@@ -109,7 +109,8 @@ protected:
     TestUtility::loadFromYaml(yaml_config, config);
     config_.reset();
     absl::Status status;
-    config_ = std::make_shared<FilterConfig>(config, "test", factory_context_, status);
+    config_ = std::make_shared<FilterConfig>(
+        config, "test", factory_context_.serverFactoryContext(), factory_context_.scope(), status);
     ASSERT_OK(status) << "Filter config creation failed";
 
     if (!route_yaml_config.empty()) {

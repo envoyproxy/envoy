@@ -67,7 +67,8 @@ public:
                             absl::string_view domain_name,
                             std::chrono::milliseconds send_reports_interval,
                             ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
-                            Envoy::Event::Dispatcher& main_dispatcher);
+                            Envoy::Event::Dispatcher& main_dispatcher,
+                            absl::Status& creation_status);
   ~GlobalRateLimitClientImpl() override = default;
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
@@ -188,16 +189,19 @@ private:
  * Create a shared rate limit client. It should be shared to each worker
  * thread via TLS.
  */
-inline std::unique_ptr<GlobalRateLimitClientImpl>
+inline absl::StatusOr<std::unique_ptr<GlobalRateLimitClientImpl>>
 createGlobalRateLimitClientImpl(Server::Configuration::FactoryContext& context,
                                 absl::string_view domain_name,
                                 std::chrono::milliseconds send_reports_interval,
                                 ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
   Envoy::Event::Dispatcher& main_dispatcher = context.serverFactoryContext().mainThreadDispatcher();
-  return std::make_unique<GlobalRateLimitClientImpl>(config_with_hash_key, context, domain_name,
-                                                     send_reports_interval, buckets_tls,
-                                                     main_dispatcher);
+  absl::Status creation_status = absl::OkStatus();
+  auto client = std::make_unique<GlobalRateLimitClientImpl>(
+      config_with_hash_key, context, domain_name, send_reports_interval, buckets_tls,
+      main_dispatcher, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return client;
 }
 
 } // namespace RateLimitQuota

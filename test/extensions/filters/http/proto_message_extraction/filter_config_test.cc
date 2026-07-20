@@ -8,6 +8,7 @@
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +20,8 @@ namespace HttpFilters {
 namespace ProtoMessageExtraction {
 
 namespace {
+
+using StatusHelpers::HasStatus;
 
 using ::envoy::extensions::filters::http::proto_message_extraction::v3::
     ProtoMessageExtractionConfig;
@@ -41,6 +44,18 @@ protected:
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(str, &proto_config_));
   }
 
+  // Builds the filter config from proto_config_, returning the creation status and setting
+  // filter_config_ on success.
+  absl::Status makeConfig() {
+    absl::Status creation_status = absl::OkStatus();
+    auto filter_config = std::make_unique<FilterConfig>(
+        proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_, creation_status);
+    if (creation_status.ok()) {
+      filter_config_ = std::move(filter_config);
+    }
+    return creation_status;
+  }
+
   Api::ApiPtr api_;
   ProtoMessageExtractionConfig proto_config_;
   std::unique_ptr<FilterConfig> filter_config_;
@@ -54,8 +69,7 @@ TEST_F(FilterConfigTestOk, DescriptorInline) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -75,8 +89,7 @@ TEST_F(FilterConfigTestOk, ExtractDirectiveUnspecified) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -96,8 +109,7 @@ TEST_F(FilterConfigTestOk, ExtractModeUnspecified) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -106,8 +118,7 @@ TEST_F(FilterConfigTestOk, DescriptorFromFile) {
   parseConfigProto();
   *proto_config_.mutable_data_source()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -135,8 +146,7 @@ TEST_F(FilterConfigTestOk, AllSupportedTypes) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -197,8 +207,7 @@ TEST_F(FilterConfigTestOk, RepeatedField) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -216,8 +225,7 @@ TEST_F(FilterConfigTestOk, ExtractRepeatedCardinality) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -238,8 +246,7 @@ TEST_F(FilterConfigTestOk, ExtractRepeatedCardinalityNestedField) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.ListApiKeys"), nullptr);
 }
@@ -264,8 +271,7 @@ TEST_F(FilterConfigTestOk, ExtractRedact) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_TRUE(makeConfig().ok());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -274,20 +280,18 @@ using FilterConfigTestException = FilterConfigTestBase;
 TEST_F(FilterConfigTestException, ErrorParsingDescriptorInline) {
   parseConfigProto();
   *proto_config_.mutable_data_source()->mutable_inline_bytes() = "123";
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException, testing::HasSubstr("unable to parse proto descriptor from inline bytes:"));
+  EXPECT_THAT(makeConfig(),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::HasSubstr("unable to parse proto descriptor from inline bytes:")));
 }
 
 TEST_F(FilterConfigTestException, ErrorParsingDescriptorFromFile) {
   parseConfigProto();
   *proto_config_.mutable_data_source()->mutable_filename() =
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem");
-  EXPECT_THAT_THROWS_MESSAGE(std::make_unique<FilterConfig>(
-                                 proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_),
-                             EnvoyException,
-                             testing::HasSubstr("unable to parse proto descriptor from file"));
+  EXPECT_THAT(makeConfig(),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::HasSubstr("unable to parse proto descriptor from file")));
 }
 
 TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceType) {
@@ -296,11 +300,10 @@ TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceType) {
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException,
-      testing::HasSubstr("unsupported DataSource case `3` for configuring `descriptor_set`"));
+  EXPECT_THAT(makeConfig(),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::HasSubstr(
+                            "unsupported DataSource case `3` for configuring `descriptor_set`")));
 }
 
 TEST_F(FilterConfigTestException, GrpcMethodNotFoundInProtoDescriptor) {
@@ -316,12 +319,11 @@ TEST_F(FilterConfigTestException, GrpcMethodNotFoundInProtoDescriptor) {
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
 
-  EXPECT_THAT_THROWS_MESSAGE(std::make_unique<FilterConfig>(
-                                 proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_),
-                             EnvoyException,
-                             testing::HasSubstr("couldn't find the gRPC method "
-                                                "`not-found-in-proto-descriptor` defined in "
-                                                "the proto descriptor"));
+  EXPECT_THAT(makeConfig(),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        testing::HasSubstr("couldn't find the gRPC method "
+                                           "`not-found-in-proto-descriptor` defined in "
+                                           "the proto descriptor")));
 }
 
 TEST_F(FilterConfigTestException, UndefinedPathInRequest) {
@@ -337,12 +339,12 @@ TEST_F(FilterConfigTestException, UndefinedPathInRequest) {
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException,
-      testing::HasSubstr(
-          R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.CreateApiKeyRequest' message)"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.CreateApiKeyRequest' message)")));
 }
 
 TEST_F(FilterConfigTestException, UndefinedPathInResponse) {
@@ -361,12 +363,12 @@ TEST_F(FilterConfigTestException, UndefinedPathInResponse) {
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException,
-      testing::HasSubstr(
-          R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.ApiKey' message)"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.ApiKey' message)")));
 }
 
 TEST_F(FilterConfigTestException, UnsupportedTypeBool) {
@@ -382,12 +384,12 @@ TEST_F(FilterConfigTestException, UnsupportedTypeBool) {
   *proto_config_.mutable_data_source()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException,
-      testing::HasSubstr(
-          R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'bool' must be numerical/string)"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'bool' must be numerical/string)")));
 }
 
 TEST_F(FilterConfigTestException, UnsupportedTypeMessage) {
@@ -408,12 +410,12 @@ TEST_F(FilterConfigTestException, UnsupportedTypeMessage) {
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException,
-      testing::HasSubstr(
-          R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'message' must be numerical/string)"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'message' must be numerical/string)")));
 }
 
 TEST_F(FilterConfigTestException, RedactNonLeafField) {
@@ -430,12 +432,12 @@ TEST_F(FilterConfigTestException, RedactNonLeafField) {
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException,
-      testing::HasSubstr(
-          R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'key' must be numerical/string or timestamp type)"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'key' must be numerical/string or timestamp type)")));
 }
 
 TEST_F(FilterConfigTestException, RequestExtractRepeatedCardinality) {
@@ -452,12 +454,12 @@ TEST_F(FilterConfigTestException, RequestExtractRepeatedCardinality) {
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException,
-      testing::HasSubstr(
-          R"(method `apikeys.ApiKeys.CreateApiKey`: EXTRACT_REPEATED_CARDINALITY is not supported for request fields.)"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              R"(method `apikeys.ApiKeys.CreateApiKey`: EXTRACT_REPEATED_CARDINALITY is not supported for request fields.)")));
 }
 
 TEST_F(FilterConfigTestException, MultipleResponseExtractRepeatedCardinality) {
@@ -475,12 +477,12 @@ TEST_F(FilterConfigTestException, MultipleResponseExtractRepeatedCardinality) {
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
-                                     *api_),
-      EnvoyException,
-      testing::HasSubstr(
-          R"(method `apikeys.ApiKeys.CreateApiKey`: only one field can be tagged with EXTRACT_REPEATED_CARDINALITY for response.)"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              R"(method `apikeys.ApiKeys.CreateApiKey`: only one field can be tagged with EXTRACT_REPEATED_CARDINALITY for response.)")));
 }
 
 TEST(FilterFactoryCreatorTest, Constructor) {
