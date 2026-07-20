@@ -141,10 +141,9 @@ private:
   // construction this samples the complete assignment.
   void reconcileRandomPartition(const Upstream::HostVector& healthy_candidates,
                                 const Upstream::HostVector& all_candidates);
-  // Filter the stable random assignment to healthy hosts and apply the
-  // per-worker fallback threshold without resampling it.
-  void rebuildRandomPartition(const Upstream::HostVector& healthy_candidates,
-                              std::vector<Upstream::HostConstSharedPtr>& out);
+  // Apply the shared health/degraded/fallback policy to the stable random
+  // assignment without resampling it.
+  void rebuildRandomPartition(std::vector<Upstream::HostConstSharedPtr>& out);
   // Recompute EQUAL_PARTITIONS' stable K-host assignment after a membership
   // update. This is the only path that copies and address-sorts all N hosts.
   void rebuildEqualPartitionAssignment(const Upstream::HostVector& all_candidates);
@@ -152,6 +151,12 @@ private:
   // per-worker fallback threshold. Health-only updates call only this O(K)
   // path.
   void rebuildEqualPartition(std::vector<Upstream::HostConstSharedPtr>& out);
+  // Apply the common healthy -> degraded -> full-assignment selection policy.
+  // Healthy hosts are preferred; degraded hosts are added only when healthy
+  // capacity does not meet the per-worker threshold. Unhealthy hosts are
+  // included only in the final panic-style fallback.
+  void filterAssignmentByHealth(const std::vector<Upstream::HostConstSharedPtr>& assignment,
+                                std::vector<Upstream::HostConstSharedPtr>& out);
 
   // Simple in-extension pick: ``next_index_ % K`` round-robin against the
   // worker's subset. Used when ``host_selection_strategy_`` is
@@ -184,11 +189,11 @@ private:
   // EQUAL_PARTITIONS to compute ``K = ceil(N/W)``.
   const uint32_t total_workers_;
 
-  // Per-worker healthy threshold (percent points). When healthy hosts in a
-  // worker's slice fall below this fraction of K, that worker falls back
-  // to including unhealthy hosts in its subset. Range ``[0, 100]``; 0
-  // disables the percent check (only the unconditional empty-healthy
-  // branch still forces fallback).
+  // Per-worker fallback threshold (percent points). Healthy hosts are
+  // preferred; degraded hosts are added when healthy capacity is below the
+  // threshold. Unhealthy hosts are included only when healthy plus degraded
+  // capacity still falls short. Range ``[0, 100]``; 0 disables the percent
+  // check while preserving healthy -> degraded -> full-slice preference.
   const uint32_t fallback_threshold_;
 
   // Per-Envoy seed for EQUAL_PARTITIONS -- see TypedPerWorkerSubsetLbConfig.

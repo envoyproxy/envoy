@@ -141,17 +141,20 @@ message PerWorkerSubset {
   // rejected by the factory's ``loadConfig`` with ``InvalidArgumentError``.
   HostSelectionStrategy host_selection_strategy = 3 [(validate.rules).enum = {defined_only: true}];
 
-  // Per-worker healthy-fraction threshold (percent points, ``[0, 100]``).
+  // Per-worker fallback threshold (percent points, ``[0, 100]``).
   // When the healthy hosts in a worker's slice drop below this fraction of
-  // K, that worker falls back to using the full slice (including
-  // unhealthy hosts). Per-worker: workers fall back independently based
-  // on their own slice's health.
+  // K, degraded hosts are added before considering unhealthy hosts. The
+  // worker uses the full slice (including unhealthy hosts) only when
+  // healthy plus degraded capacity still does not meet the threshold.
+  // Per-worker: workers fall back independently based on their own slice's
+  // health.
   //
   // * Unset: defaults to 50.
-  // * Set to 0: disables the percent check (only the unconditional
-  //   empty-healthy branch still forces fallback).
-  // * Set to 100: always fall back as soon as any host in the slice is
-  //   unhealthy.
+  // * Set to 0: disables the percent check; healthy hosts are used when
+  //   present, otherwise degraded hosts, then the full slice.
+  // * Set to 100: degraded hosts are added as soon as healthy hosts alone
+  //   cannot fill the slice; the full slice is used if healthy plus degraded
+  //   still cannot fill it.
   // * Values ``> 100``: rejected by the factory.
   //
   // Independent of the cluster's

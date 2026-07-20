@@ -119,6 +119,10 @@ TEST_F(PerWorkerSubsetLoadBalancerTest, EmptyClusterReturnsNullptr) {
 TEST_F(PerWorkerSubsetLoadBalancerTest, AllUnhealthyFallsBackToFullHostList) {
   makeHosts(8);
   host_set_.healthy_hosts_.clear();
+  for (const auto& host : hosts_) {
+    ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*host), coarseHealth())
+        .WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+  }
   PerWorkerSubsetLoadBalancer lb(
       priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
       /*subset_size=*/4, PartitioningStrategy::RandomPartitions,
@@ -230,6 +234,74 @@ TEST_F(PerWorkerSubsetLoadBalancerTest, EqualPartitionsHealthUpdateDoesNotResort
     seen.insert(lb.chooseHost(nullptr).host);
   }
   EXPECT_EQ(seen.size(), 8);
+}
+
+TEST_F(PerWorkerSubsetLoadBalancerTest, HealthyHostsExcludeDegradedWhenThresholdIsMet) {
+  makeHosts(4);
+  ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[2]), coarseHealth())
+      .WillByDefault(Return(Upstream::Host::Health::Degraded));
+  ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[3]), coarseHealth())
+      .WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+
+  PerWorkerSubsetLoadBalancer lb(
+      priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
+      /*subset_size=*/0, PartitioningStrategy::EqualPartitions,
+      HostSelectionStrategy::SimpleRoundRobin, /*worker_id=*/0, total_workers_,
+      /*fallback_threshold=*/50, /*envoy_seed=*/0, /*slow_start_config=*/{});
+
+  std::set<Upstream::HostConstSharedPtr> seen;
+  for (int i = 0; i < 20; ++i) {
+    seen.insert(lb.chooseHost(nullptr).host);
+  }
+  EXPECT_EQ(seen, (std::set<Upstream::HostConstSharedPtr>{hosts_[0], hosts_[1]}));
+}
+
+TEST_F(PerWorkerSubsetLoadBalancerTest, DegradedHostsPreventUnhealthyFallback) {
+  makeHosts(4);
+  ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[1]), coarseHealth())
+      .WillByDefault(Return(Upstream::Host::Health::Degraded));
+  ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[2]), coarseHealth())
+      .WillByDefault(Return(Upstream::Host::Health::Degraded));
+  ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[3]), coarseHealth())
+      .WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+
+  PerWorkerSubsetLoadBalancer lb(
+      priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
+      /*subset_size=*/0, PartitioningStrategy::EqualPartitions,
+      HostSelectionStrategy::SimpleRoundRobin, /*worker_id=*/0, total_workers_,
+      /*fallback_threshold=*/75, /*envoy_seed=*/0, /*slow_start_config=*/{});
+
+  std::set<Upstream::HostConstSharedPtr> seen;
+  for (int i = 0; i < 20; ++i) {
+    seen.insert(lb.chooseHost(nullptr).host);
+  }
+  EXPECT_EQ(seen, (std::set<Upstream::HostConstSharedPtr>{hosts_[0], hosts_[1], hosts_[2]}));
+  EXPECT_EQ(stats_.counterFromString("lb_per_worker_subset_slice_fallback").value(), 0);
+}
+
+TEST_F(PerWorkerSubsetLoadBalancerTest, UsesDegradedHostsWhenNoHealthyHostsRemain) {
+  makeHosts(4);
+  for (size_t i = 0; i < 2; ++i) {
+    ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[i]), coarseHealth())
+        .WillByDefault(Return(Upstream::Host::Health::Degraded));
+  }
+  for (size_t i = 2; i < 4; ++i) {
+    ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[i]), coarseHealth())
+        .WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+  }
+
+  PerWorkerSubsetLoadBalancer lb(
+      priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
+      /*subset_size=*/0, PartitioningStrategy::EqualPartitions,
+      HostSelectionStrategy::SimpleRoundRobin, /*worker_id=*/0, total_workers_,
+      /*fallback_threshold=*/50, /*envoy_seed=*/0, /*slow_start_config=*/{});
+
+  std::set<Upstream::HostConstSharedPtr> seen;
+  for (int i = 0; i < 20; ++i) {
+    seen.insert(lb.chooseHost(nullptr).host);
+  }
+  EXPECT_EQ(seen, (std::set<Upstream::HostConstSharedPtr>{hosts_[0], hosts_[1]}));
+  EXPECT_EQ(stats_.counterFromString("lb_per_worker_subset_slice_fallback").value(), 0);
 }
 
 // EQUAL_PARTITIONS auto-computes ``K = ceil(N/W)``. With ``N=64`` and ``W=8``,
@@ -539,9 +611,13 @@ TEST_F(PerWorkerSubsetLoadBalancerTest, EqualPartitionsEnvoyRoundRobinSingleHost
 // the requested ``subset_size``, fall back to sampling from all hosts.
 TEST_F(PerWorkerSubsetLoadBalancerTest, RandomPartitionsFallsBackWhenHealthyTooFew) {
   makeHosts(100);
-  // 40 healthy, but subset_size=60 -- can't fill 60 from 40 healthy, so the
-  // per-worker fallback samples from the full 100-host pool.
-  host_set_.healthy_hosts_.assign(hosts_.begin(), hosts_.begin() + 40);
+  // 10 healthy, but subset_size=60 -- no possible sample can meet the 50%
+  // per-worker threshold, so fallback uses the full assigned partition.
+  host_set_.healthy_hosts_.assign(hosts_.begin(), hosts_.begin() + 10);
+  for (size_t i = 10; i < hosts_.size(); ++i) {
+    ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[i]), coarseHealth())
+        .WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+  }
   PerWorkerSubsetLoadBalancer lb(
       priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
       /*subset_size=*/60, PartitioningStrategy::RandomPartitions,
@@ -571,6 +647,10 @@ TEST_F(PerWorkerSubsetLoadBalancerTest, NoFallbackWhenHealthyAboveThreshold) {
   // 80 of 100 healthy -> 80% >= 50% -> no fallback. Subset comes from
   // ``healthy[0..79]`` only; unhealthy hosts must never be picked.
   host_set_.healthy_hosts_.assign(hosts_.begin(), hosts_.begin() + 80);
+  for (size_t i = 80; i < hosts_.size(); ++i) {
+    ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[i]), coarseHealth())
+        .WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+  }
   PerWorkerSubsetLoadBalancer lb(
       priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
       /*subset_size=*/8, PartitioningStrategy::RandomPartitions,

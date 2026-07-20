@@ -127,7 +127,7 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset(bool membership_changed) {
     if (membership_changed) {
       reconcileRandomPartition(host_set->healthyHosts(), all);
     }
-    rebuildRandomPartition(host_set->healthyHosts(), picked);
+    rebuildRandomPartition(picked);
   }
 
   ENVOY_LOG(debug, "per_worker_subset: worker={} strategy={} intra={} K={} from N={}", worker_id_,
@@ -188,32 +188,8 @@ void PerWorkerSubsetLoadBalancer::reconcileRandomPartition(
 }
 
 void PerWorkerSubsetLoadBalancer::rebuildRandomPartition(
-    const Upstream::HostVector& healthy_candidates,
     std::vector<Upstream::HostConstSharedPtr>& out) {
-  absl::flat_hash_set<Upstream::HostConstSharedPtr> healthy(healthy_candidates.begin(),
-                                                            healthy_candidates.end());
-  std::vector<Upstream::HostConstSharedPtr> healthy_partition;
-  healthy_partition.reserve(random_partition_.size());
-  for (const auto& host : random_partition_) {
-    if (healthy.contains(host)) {
-      healthy_partition.push_back(host);
-    }
-  }
-
-  const bool slice_in_fallback =
-      healthy_partition.empty() ||
-      (fallback_threshold_ > 0 &&
-       static_cast<uint64_t>(healthy_partition.size()) * 100ULL <
-           static_cast<uint64_t>(fallback_threshold_) * random_partition_.size());
-  if (slice_in_fallback) {
-    per_worker_subset_stats_.lb_per_worker_subset_slice_fallback_.inc();
-    if (healthy_partition.empty()) {
-      per_worker_subset_stats_.lb_per_worker_subset_slice_empty_healthy_.inc();
-    }
-    out = random_partition_;
-  } else {
-    out = std::move(healthy_partition);
-  }
+  filterAssignmentByHealth(random_partition_, out);
 }
 
 void PerWorkerSubsetLoadBalancer::rebuildEqualPartitionAssignment(
@@ -279,35 +255,57 @@ void PerWorkerSubsetLoadBalancer::rebuildEqualPartitionAssignment(
 
 void PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
     std::vector<Upstream::HostConstSharedPtr>& out) {
-  // Per-worker fallback check. Filter the slice to healthy hosts; if the
-  // healthy count is below this worker's threshold, fall back to using the
-  // full slice (including unhealthy) -- same intent as stock LB fallback
-  // but scoped to a single worker's slice rather than the whole cluster.
-  // ``fallback_threshold_`` is in percent points ``[0, 100]``; 0 disables
-  // the percent check and the LB stays with whatever healthy hosts are
-  // in the slice (unless zero healthy, which still forces fallback).
-  std::vector<Upstream::HostConstSharedPtr> healthy_slice;
-  healthy_slice.reserve(equal_partition_.size());
-  for (const auto& host : equal_partition_) {
-    if (host->coarseHealth() == Upstream::Host::Health::Healthy) {
-      healthy_slice.push_back(host);
+  filterAssignmentByHealth(equal_partition_, out);
+}
+
+void PerWorkerSubsetLoadBalancer::filterAssignmentByHealth(
+    const std::vector<Upstream::HostConstSharedPtr>& assignment,
+    std::vector<Upstream::HostConstSharedPtr>& out) {
+  if (assignment.empty()) {
+    out.clear();
+    return;
+  }
+
+  std::vector<Upstream::HostConstSharedPtr> healthy;
+  std::vector<Upstream::HostConstSharedPtr> degraded;
+  healthy.reserve(assignment.size());
+  degraded.reserve(assignment.size());
+  for (const auto& host : assignment) {
+    switch (host->coarseHealth()) {
+    case Upstream::Host::Health::Healthy:
+      healthy.push_back(host);
+      break;
+    case Upstream::Host::Health::Degraded:
+      degraded.push_back(host);
+      break;
+    case Upstream::Host::Health::Unhealthy:
+      break;
     }
   }
 
-  const size_t k = equal_partition_.size();
-  const bool slice_in_fallback =
-      healthy_slice.empty() ||
-      (fallback_threshold_ > 0 && (static_cast<uint64_t>(healthy_slice.size()) * 100ULL) <
-                                      (static_cast<uint64_t>(fallback_threshold_) * k));
-  if (slice_in_fallback) {
-    per_worker_subset_stats_.lb_per_worker_subset_slice_fallback_.inc();
-    if (healthy_slice.empty()) {
-      per_worker_subset_stats_.lb_per_worker_subset_slice_empty_healthy_.inc();
-    }
-    out = equal_partition_;
-  } else {
-    out = std::move(healthy_slice);
+  const auto meets_threshold = [this, assignment_size = assignment.size()](size_t count) {
+    return fallback_threshold_ == 0
+               ? count > 0
+               : static_cast<uint64_t>(count) * 100ULL >=
+                     static_cast<uint64_t>(fallback_threshold_) * assignment_size;
+  };
+  if (meets_threshold(healthy.size())) {
+    out = std::move(healthy);
+    return;
   }
+
+  const bool no_healthy_hosts = healthy.empty();
+  healthy.insert(healthy.end(), degraded.begin(), degraded.end());
+  if (meets_threshold(healthy.size())) {
+    out = std::move(healthy);
+    return;
+  }
+
+  per_worker_subset_stats_.lb_per_worker_subset_slice_fallback_.inc();
+  if (no_healthy_hosts) {
+    per_worker_subset_stats_.lb_per_worker_subset_slice_empty_healthy_.inc();
+  }
+  out = assignment;
 }
 
 void PerWorkerSubsetLoadBalancer::publishSubsetToSyntheticPrioritySet(
