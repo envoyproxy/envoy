@@ -181,7 +181,7 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
 
 void Filter::storeInRegistry(const Envoy::Protobuf::Any& peer_metadata) {
   if (registry_ == nullptr || read_callbacks_ == nullptr) {
-    ENVOY_LOG(error, "No instance for registry or callbacks");
+    ENVOY_LOG(debug, "No instance for registry or callbacks");
     return;
   }
   const auto* connection_id =
