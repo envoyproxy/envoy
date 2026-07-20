@@ -39,7 +39,8 @@ public:
     config_ = std::make_shared<ZooKeeperFilterConfig>(
         stat_prefix_, 1048576, enable_per_opcode_request_bytes_metrics,
         enable_per_opcode_response_bytes_metrics, enable_per_opcode_decoder_error_metrics,
-        enable_latency_threshold_metrics, default_latency_threshold, latency_threshold_overrides,
+        enable_latency_threshold_metrics, default_latency_threshold,
+        ZooKeeperFilterConfig::parseLatencyThresholdOverrides(latency_threshold_overrides).value(),
         scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);

@@ -1847,6 +1847,13 @@ envoy.wasm.runtime.wasmtime:
   # is updated to capture additional Wasm runtimes".
   security_posture: unknown
   status: alpha
+envoy.watchdog.backtrace_action:
+  categories:
+  - envoy.guarddog_actions
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.watchdog.backtrace_action.v3.BacktraceActionConfig
 envoy.watchdog.profile_action:
   categories:
   - envoy.guarddog_actions

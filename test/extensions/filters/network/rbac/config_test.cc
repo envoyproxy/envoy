@@ -13,6 +13,7 @@
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -22,7 +23,7 @@ namespace RBACFilter {
 namespace {
 
 const std::string header = R"EOF(
-{ "header": {"name": "key", "exact_match": "value"} }
+{ "header": {"name": "key", "string_match": { "exact": "value" }} }
 )EOF";
 
 constexpr absl::string_view header_key = "key";
@@ -49,13 +50,15 @@ private:
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
     RoleBasedAccessControlNetworkFilterConfigFactory factory;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context).IgnoreError(),
-                 Envoy::EnvoyException);
+    auto rules_result = factory.createFilterFactoryFromProto(config, context);
+    EXPECT_FALSE(rules_result.ok());
+    EXPECT_THAT(rules_result.status().message(), HasSubstr("Found header"));
 
     config.clear_rules();
     (*config.mutable_shadow_rules()->mutable_policies())["foo"] = policy_proto;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context).IgnoreError(),
-                 Envoy::EnvoyException);
+    auto shadow_rules_result = factory.createFilterFactoryFromProto(config, context);
+    EXPECT_FALSE(shadow_rules_result.ok());
+    EXPECT_THAT(shadow_rules_result.status().message(), HasSubstr("Found header"));
   }
 
   void checkMatcher(const std::string& matcher_yaml) {
