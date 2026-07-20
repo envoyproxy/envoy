@@ -48,6 +48,9 @@ private:
   void fetch();
   // Handle fetch done.
   void handleFetchDone();
+  // Whether the filter chain (or its listener/server) owning this fetcher is draining.
+  // This is used to stop the async fetch loop while waiting in the draining state.
+  bool isFilterChainDraining() const;
 
   // Override the functions from Common::JwksFetcher::JwksReceiver
   void onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) override;

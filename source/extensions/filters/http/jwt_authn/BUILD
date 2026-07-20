@@ -36,6 +36,7 @@ envoy_cc_library(
     hdrs = ["jwks_async_fetcher.h"],
     deps = [
         ":stats_lib",
+        "//envoy/network:drain_decision_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/init:target_lib",
