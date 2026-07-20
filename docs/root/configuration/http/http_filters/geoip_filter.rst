@@ -8,6 +8,9 @@ Upon a successful lookup request will be enriched with the configured geolocatio
 In case the configured geolocation headers are present in the incoming request, they will be overriden by the filter.
 Geolocation filter emits stats for the number of the successful lookups and the number of total lookups.
 English language is used for the geolocation lookups, the result of the lookup will be UTF-8 encoded.
+When configured via :ref:`geo_field_keys <envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys>`,
+the ``lat`` and ``lon`` keys are populated from the city database ``location.latitude`` and ``location.longitude`` fields
+as decimal-degree strings (e.g. ``58.4167``), which is useful for plotting client locations on a map.
 Please note that Geolocation filter and providers are not yet supported on Windows.
 
 Configuration

@@ -1,6 +1,7 @@
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -12,6 +13,8 @@ namespace Maxmind {
 namespace {
 static constexpr const char* MMDB_CITY_LOOKUP_ARGS[] = {"city", "names", "en"};
 static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "iso_code"};
+static constexpr const char* MMDB_LAT_LOOKUP_ARGS[] = {"location", "latitude"};
+static constexpr const char* MMDB_LON_LOOKUP_ARGS[] = {"location", "longitude"};
 static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "iso_code"};
 static constexpr const char* MMDB_ASN_LOOKUP_ARGS[] = {"autonomous_system_number"};
 static constexpr const char* MMDB_ASN_ORG_LOOKUP_ARGS[] = {"autonomous_system_organization"};
@@ -51,6 +54,8 @@ GeoipProviderConfig::GeoipProviderConfig(
     country_header_ = getOptionalString(keys.country());
     city_header_ = getOptionalString(keys.city());
     region_header_ = getOptionalString(keys.region());
+    lat_header_ = getOptionalString(keys.lat());
+    lon_header_ = getOptionalString(keys.lon());
     asn_header_ = getOptionalString(keys.asn());
     asn_org_header_ = getOptionalString(keys.asn_org());
     anon_header_ = getOptionalString(keys.anon());
@@ -210,6 +215,8 @@ void GeoipProvider::lookupInCityDb(
       !config_->isCountryDbPathSet() && config_->isLookupEnabledForHeader(config_->countryHeader());
   if (config_->isLookupEnabledForHeader(config_->cityHeader()) ||
       config_->isLookupEnabledForHeader(config_->regionHeader()) ||
+      config_->isLookupEnabledForHeader(config_->latHeader()) ||
+      config_->isLookupEnabledForHeader(config_->lonHeader()) ||
       should_lookup_country_from_city_db) {
     int mmdb_error;
     auto city_db_ptr = getCityDb();
@@ -237,6 +244,14 @@ void GeoipProvider::lookupInCityDb(
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->regionHeader().value(), MMDB_REGION_LOOKUP_ARGS[0],
                                   MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->latHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->latHeader().value(),
+                                  MMDB_LAT_LOOKUP_ARGS[0], MMDB_LAT_LOOKUP_ARGS[1]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->lonHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->lonHeader().value(),
+                                  MMDB_LON_LOOKUP_ARGS[0], MMDB_LON_LOOKUP_ARGS[1]);
         }
         // Country lookup from City DB only when Country DB is not configured.
         if (should_lookup_country_from_city_db) {
@@ -585,6 +600,10 @@ void GeoipProvider::populateGeoLookupResult(
     } else if (entry_data.has_data && entry_data.type == MMDB_DATA_TYPE_UINT32 &&
                entry_data.uint32 > 0) {
       result_value = std::to_string(entry_data.uint32);
+    } else if (entry_data.has_data && entry_data.type == MMDB_DATA_TYPE_DOUBLE) {
+      // Used for coordinate fields (latitude/longitude). ``fmt`` renders the shortest
+      // representation that round-trips to the stored double (e.g. "58.4167").
+      result_value = fmt::format("{}", entry_data.double_value);
     } else if (entry_data.has_data && entry_data.type == MMDB_DATA_TYPE_BOOLEAN) {
       result_value = entry_data.boolean ? "true" : "false";
     }

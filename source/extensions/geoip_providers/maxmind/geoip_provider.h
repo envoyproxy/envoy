@@ -34,6 +34,8 @@ public:
   const std::optional<std::string>& countryHeader() const { return country_header_; }
   const std::optional<std::string>& cityHeader() const { return city_header_; }
   const std::optional<std::string>& regionHeader() const { return region_header_; }
+  const std::optional<std::string>& latHeader() const { return lat_header_; }
+  const std::optional<std::string>& lonHeader() const { return lon_header_; }
   const std::optional<std::string>& asnHeader() const { return asn_header_; }
   const std::optional<std::string>& asnOrgHeader() const { return asn_org_header_; }
 
@@ -91,6 +93,8 @@ private:
   std::optional<std::string> country_header_;
   std::optional<std::string> city_header_;
   std::optional<std::string> region_header_;
+  std::optional<std::string> lat_header_;
+  std::optional<std::string> lon_header_;
   std::optional<std::string> asn_header_;
   std::optional<std::string> asn_org_header_;
 

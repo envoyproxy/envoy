@@ -228,6 +228,8 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndAsnDbsSuccessfulLookup) {
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
+        lat: "x-geo-lat"
+        lon: "x-geo-lon"
         asn: "x-geo-asn"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
     asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
@@ -240,17 +242,45 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndAsnDbsSuccessfulLookup) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(4, captured_lookup_response_.size());
+  EXPECT_EQ(6, captured_lookup_response_.size());
   const auto& city_it = captured_lookup_response_.find("x-geo-city");
   EXPECT_EQ("Linköping", city_it->second);
   const auto& region_it = captured_lookup_response_.find("x-geo-region");
   EXPECT_EQ("E", region_it->second);
   const auto& country_it = captured_lookup_response_.find("x-geo-country");
   EXPECT_EQ("SE", country_it->second);
+  const auto& lat_it = captured_lookup_response_.find("x-geo-lat");
+  EXPECT_EQ("58.4167", lat_it->second);
+  const auto& lon_it = captured_lookup_response_.find("x-geo-lon");
+  EXPECT_EQ("15.6167", lon_it->second);
   const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
   EXPECT_EQ("29518", asn_it->second);
   expectStats("city_db");
   expectStats("asn_db");
+}
+
+TEST_F(GeoipProviderTest, ValidConfigCityDbLatLonOnlySuccessfulLookup) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        lat: "x-geo-lat"
+        lon: "x-geo-lon"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(2, captured_lookup_response_.size());
+  const auto& lat_it = captured_lookup_response_.find("x-geo-lat");
+  EXPECT_EQ("58.4167", lat_it->second);
+  const auto& lon_it = captured_lookup_response_.find("x-geo-lon");
+  EXPECT_EQ("15.6167", lon_it->second);
+  expectStats("city_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
