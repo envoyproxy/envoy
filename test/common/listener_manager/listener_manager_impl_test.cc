@@ -6620,6 +6620,22 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
   EXPECT_EQ(0, manager_->listeners().size());
 }
 
+// A UDP listener with bind_to_port set to false has no bound socket, so applying socket options to
+// it used to dereference a null io handle and crash Envoy. Verify the config is rejected instead.
+TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerWithBindToPortFalse) {
+  auto listener = createIPv4Listener("UdpListener");
+  listener.mutable_address()->mutable_socket_address()->set_protocol(
+      envoy::config::core::v3::SocketAddress::UDP);
+  // Connection-less (non-QUIC) UDP listeners must not specify filter chains.
+  listener.clear_filter_chains();
+  listener.mutable_bind_to_port()->set_value(false);
+
+  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(listener), EnvoyException,
+                            "UDP listeners do not support bind_to_port set to false; a UDP socket "
+                            "must be bound to receive datagrams.");
+  EXPECT_EQ(0, manager_->listeners().size());
+}
+
 // Envoy throws exceptions for UDP listener with dynamic filter config.
 TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerWithDynamicFilterConfig) {
   auto listener = createIPv4Listener("UdpListener");

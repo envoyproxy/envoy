@@ -693,6 +693,11 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
   if (socket_type_ != Network::Socket::Type::Datagram) {
     return absl::OkStatus();
   }
+  if (!bind_to_port_) {
+    return absl::InvalidArgumentError(
+        "UDP listeners do not support bind_to_port set to false; a UDP socket must be bound to "
+        "receive datagrams.");
+  }
   if (!reuse_port_ && concurrency > 1) {
     return absl::InvalidArgumentError(
         "Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
