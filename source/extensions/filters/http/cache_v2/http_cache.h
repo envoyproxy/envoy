@@ -147,11 +147,11 @@ public:
   // Returns a CacheSessions initialized with an HttpCache that will remain
   // valid indefinitely (at least as long as the calling CacheFilter).
   //
-  // Pass factory context to allow HttpCache to use async client, stats scope
+  // Pass the server factory context to allow HttpCache to use async client, stats scope
   // etc.
   virtual absl::StatusOr<std::shared_ptr<CacheSessions>>
   getCache(const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-           Server::Configuration::FactoryContext& context) PURE;
+           Server::Configuration::ServerFactoryContext& context) PURE;
 
 private:
   const std::string name_;

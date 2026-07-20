@@ -84,6 +84,8 @@ public:
 
   const std::string& serverDescription() const { return proto_config_.server_info().description(); }
 
+  bool clearRouteCache() const { return clear_route_cache_; }
+
 private:
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
@@ -103,6 +105,7 @@ private:
   std::string fallback_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
+  bool clear_route_cache_;
 };
 
 class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,

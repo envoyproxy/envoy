@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/health_check/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -93,9 +94,8 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
-                  .status()
-                  .ok());
+  EXPECT_OK(
+      factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context).status());
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
@@ -125,10 +125,9 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto)
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
-  EXPECT_TRUE(
+  EXPECT_OK(
       healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
-          .status()
-          .ok());
+          .status());
 }
 
 TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
@@ -143,10 +142,9 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
-  EXPECT_TRUE(
+  EXPECT_OK(
       healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
-          .status()
-          .ok());
+          .status());
 }
 
 void testHealthCheckHeaderMatch(

@@ -15,6 +15,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -23,6 +24,17 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
+
+inline const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor* getAcceptor() {
+  auto* base_interface =
+      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+  if (base_interface == nullptr) {
+    return nullptr;
+  }
+
+  return dynamic_cast<const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor*>(
+      base_interface);
+}
 
 /**
  * Configuration for the reverse tunnel network filter.
@@ -47,6 +59,10 @@ public:
     return node_id_formatter_ != nullptr || cluster_id_formatter_ != nullptr ||
            tenant_id_formatter_ != nullptr;
   }
+
+  // Returns true if accepting another reverse connection for this node/tenant stays within the
+  // configured per-worker connection cap (or no cap is configured).
+  bool validateConnectionLimit(absl::string_view node_id, absl::string_view tenant_id) const;
 
   // Validates the extracted node_id, cluster_id, and tenant_id against expected values.
   // Returns true if validation passes or no validation is configured.
@@ -94,6 +110,10 @@ private:
   const bool use_http_upgrade_{false};
 
   const bool skip_rebalancing_{false};
+
+  // Whether this filter enforces the per-node concurrent connection cap (owned by the upstream
+  // socket interface bootstrap extension) before completing a reverse tunnel handshake.
+  const bool enable_connection_limit_{false};
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

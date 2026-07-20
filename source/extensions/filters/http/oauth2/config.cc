@@ -132,15 +132,16 @@ createFilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Con
 }
 } // namespace
 
-absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
-  auto& cluster_manager = context.serverFactoryContext().clusterManager();
+absl::StatusOr<Http::FilterFactoryCb>
+OAuth2Config::createFilterFactory(const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+                                  const std::string& stats_prefix,
+                                  Server::Configuration::ServerFactoryContext& context,
+                                  Stats::Scope& scope, OptRef<Init::Manager> init_manager) {
+  auto& cluster_manager = context.clusterManager();
   FilterConfigSharedPtr config = nullptr;
   if (proto.has_config()) {
-    auto config_or_error = createFilterConfig(proto.config(), server_context, context.initManager(),
-                                              context.scope(), stats_prefix);
+    auto config_or_error =
+        createFilterConfig(proto.config(), context, init_manager, scope, stats_prefix);
     if (!config_or_error.ok()) {
       return config_or_error.status();
     }
@@ -161,9 +162,21 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
               return std::make_shared<OAuth2CookieValidator>(
                   time_source, active_config.cookieNames(), active_config.cookieDomain());
             },
-            context.serverFactoryContext().timeSource(),
-            context.serverFactoryContext().api().randomGenerator()));
+            context.timeSource(), context.api().randomGenerator()));
       };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto, stats_prefix, context.serverFactoryContext(), context.scope(),
+                             context.initManager());
+}
+
+absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto, stats_prefix, context, context.scope(), {});
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

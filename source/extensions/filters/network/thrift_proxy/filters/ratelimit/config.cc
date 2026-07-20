@@ -38,8 +38,8 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   return [config_with_hash_key, &context, timeout,
           config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Filter>(
-        config,
-        Filters::Common::RateLimit::rateLimitClient(context, config_with_hash_key, timeout)));
+        config, Filters::Common::RateLimit::rateLimitClient(context.serverFactoryContext(),
+                                                            config_with_hash_key, timeout)));
   };
 }
 

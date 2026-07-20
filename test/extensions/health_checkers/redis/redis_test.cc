@@ -225,8 +225,9 @@ public:
          Stats::Scope&, const std::string& username, const std::string& password, bool,
          std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
          std::optional<
-             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>)
-      override {
+             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
+         Extensions::NetworkFilters::Common::Redis::RespProtocolVersion,
+         OptRef<Stats::Counter>) override {
     EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};

@@ -23,9 +23,8 @@ protected:
   Http::MockFilterChainFactoryCallbacks filter_callback_;
 };
 
-TEST_F(CacheFilterFactoryTest, Basic) {
-  std::ignore = config_.mutable_typed_config()->PackFrom(
-      envoy::extensions::http::cache::simple_http_cache::v3::SimpleHttpCacheConfig());
+TEST_F(CacheFilterFactoryTest, Disabled) {
+  config_.mutable_disabled()->set_value(true);
   Http::FilterFactoryCb cb =
       factory_.createFilterFactoryFromProto(config_, "stats", context_).value();
   Http::StreamFilterSharedPtr filter;
@@ -35,10 +34,11 @@ TEST_F(CacheFilterFactoryTest, Basic) {
   ASSERT(dynamic_cast<CacheFilter*>(filter.get()));
 }
 
-TEST_F(CacheFilterFactoryTest, Disabled) {
+TEST_F(CacheFilterFactoryTest, DisabledWithServerFactoryContext) {
   config_.mutable_disabled()->set_value(true);
   Http::FilterFactoryCb cb =
-      factory_.createFilterFactoryFromProto(config_, "stats", context_).value();
+      factory_.createHttpFilterFactoryFromProto(config_, "stats", context_.server_factory_context_)
+          .value();
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
   cb(filter_callback_);
