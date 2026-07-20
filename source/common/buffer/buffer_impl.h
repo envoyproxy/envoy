@@ -750,8 +750,8 @@ private:
     }
 
     /**
-     * Recycle a storage block back to the thread-local freelist if it matches the default size
-     * and the freelist has capacity.
+     * Recycles a storage block back to the thread-local freelist if it matches the default size
+     * and the freelist has capacity. Otherwise, frees `storage`.
      */
     static void recycle(Slice::StoragePtr storage, size_t size) {
       if (size == Slice::default_slice_size_ && free_list_.size() < free_list_max_) {
