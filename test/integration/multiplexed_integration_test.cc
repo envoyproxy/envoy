@@ -2455,6 +2455,149 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
 }
 
+TEST_P(Http2FrameIntegrationTest, UpstreamResponseTrailersWithoutEndStream) {
+  beginSession();
+
+  // Downstream → Envoy: header-only GET (END_STREAM|END_HEADERS).
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+
+  // Envoy → upstream: grab the raw upstream TCP connection.
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+
+  // Wait until Envoy has actually written its preface + SETTINGS + request
+  // HEADERS to the upstream so the client codec stream-1 exists and is
+  // half_closed_local (we sent a header-only GET).
+  std::string observed;
+  ASSERT_TRUE(upstream->waitForData(FakeRawConnection::waitForAtLeastBytes(40), &observed));
+
+  // Craft the malicious upstream response, all in one write so the client
+  // codec processes it in a single dispatch():
+  //   1. SETTINGS (server preface)
+  //   2. SETTINGS ACK
+  //   3. HEADERS stream=1 :status=200, END_HEADERS only (no END_STREAM)
+  //   4. HEADERS stream=1 trailer "x: y", END_HEADERS only (no END_STREAM)
+  //      ← oghttp2 delivers this as RESPONSE_TRAILER without fin; Envoy's
+  //        onHeaders() sees flags & END_STREAM == 0 and fires
+  //        ASSERT(stream->remote_end_stream_).
+  //   5. HEADERS stream=1 trailer again, END_HEADERS|END_STREAM — in a
+  //      release build (ASSERT compiled out) step 4 ran decodeTrailers()
+  //      and freed the ActiveRequest; this third HEADERS dereferences the
+  //      dangling response_decoder_.
+  std::string buf;
+  absl::StrAppend(&buf, std::string(Http2Frame::makeEmptySettingsFrame()));
+  absl::StrAppend(&buf,
+                  std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack)));
+
+  // Response headers: :status 200, END_HEADERS only.
+  absl::StrAppend(&buf, std::string(Http2Frame::makeHeadersFrameWithStatus(
+                            "200", 1, Http2Frame::HeadersFlags::EndHeaders)));
+
+  // Trailers WITHOUT END_STREAM: a single regular header, END_HEADERS only.
+  {
+    Http2Frame trailers =
+        Http2Frame::makeEmptyHeadersFrame(1, Http2Frame::HeadersFlags::EndHeaders);
+    trailers.appendHeaderWithoutIndexing(Http2Frame::Header("x", "y"));
+    trailers.adjustPayloadSize();
+    absl::StrAppend(&buf, std::string(trailers));
+  }
+
+  // Third HEADERS (release-build UAF amplifier).
+  {
+    Http2Frame extra = Http2Frame::makeEmptyHeadersFrame(
+        1, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+               Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+    extra.appendHeaderWithoutIndexing(Http2Frame::Header("x", "z"));
+    extra.adjustPayloadSize();
+    absl::StrAppend(&buf, std::string(extra));
+  }
+
+  ASSERT_TRUE(upstream->write(buf));
+
+  // We expect HEADERS (response headers) first.
+  Http2Frame response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+
+  // Then we expect RST_STREAM.
+  Http2Frame reset = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, reset.type());
+
+  tcp_client_->close();
+
+  if (upstream->connected()) {
+    ASSERT_TRUE(upstream->close());
+  }
+}
+
+TEST_P(Http2FrameIntegrationTest, UpstreamResponseTrailersWithoutEndStream_DataFrameAmplifier) {
+  beginSession();
+
+  // Downstream → Envoy: header-only GET (END_STREAM|END_HEADERS).
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+
+  // Envoy → upstream: grab the raw upstream TCP connection.
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+
+  // Wait until Envoy has actually written its preface + SETTINGS + request
+  // HEADERS to the upstream so the client codec stream-1 exists and is
+  // half_closed_local (we sent a header-only GET).
+  std::string observed;
+  ASSERT_TRUE(upstream->waitForData(FakeRawConnection::waitForAtLeastBytes(40), &observed));
+
+  // Craft the malicious upstream response, all in one write so the client
+  // codec processes it in a single dispatch():
+  //   1. SETTINGS (server preface)
+  //   2. SETTINGS ACK
+  //   3. HEADERS stream=1 :status=200, END_HEADERS only (no END_STREAM)
+  //   4. HEADERS stream=1 trailer "x: y", END_HEADERS only (no END_STREAM)
+  //      ← oghttp2 delivers this as RESPONSE_TRAILER without fin; Envoy's
+  //        onHeaders() sees flags & END_STREAM == 0 and fires
+  //        ASSERT(stream->remote_end_stream_).
+  //   5. DATA stream=1 empty, END_STREAM — in a release build (ASSERT
+  //      compiled out) step 4 ran decodeTrailers() and freed the ActiveRequest;
+  //      this DATA frame dereferences the dangling response_decoder_.
+  std::string buf;
+  absl::StrAppend(&buf, std::string(Http2Frame::makeEmptySettingsFrame()));
+  absl::StrAppend(&buf,
+                  std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack)));
+
+  // Response headers: :status 200, END_HEADERS only.
+  absl::StrAppend(&buf, std::string(Http2Frame::makeHeadersFrameWithStatus(
+                            "200", 1, Http2Frame::HeadersFlags::EndHeaders)));
+
+  // Trailers WITHOUT END_STREAM: a single regular header, END_HEADERS only.
+  {
+    Http2Frame trailers =
+        Http2Frame::makeEmptyHeadersFrame(1, Http2Frame::HeadersFlags::EndHeaders);
+    trailers.appendHeaderWithoutIndexing(Http2Frame::Header("x", "y"));
+    trailers.adjustPayloadSize();
+    absl::StrAppend(&buf, std::string(trailers));
+  }
+
+  // Third frame (release-build UAF amplifier): empty DATA frame with END_STREAM.
+  {
+    Http2Frame extra = Http2Frame::makeEmptyDataFrame(1, Http2Frame::DataFlags::EndStream);
+    absl::StrAppend(&buf, std::string(extra));
+  }
+
+  ASSERT_TRUE(upstream->write(buf));
+
+  // We expect HEADERS (response headers) first.
+  Http2Frame response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+
+  // Then we expect RST_STREAM.
+  Http2Frame reset = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, reset.type());
+
+  tcp_client_->close();
+
+  if (upstream->connected()) {
+    ASSERT_TRUE(upstream->close());
+  }
+}
+
 TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   // Configure max concurrent streams to 2.
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

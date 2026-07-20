@@ -869,6 +869,10 @@ def _simdutf():
 def _quiche():
     external_http_archive(
         name = "quiche",
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel/external:oghttp2_trailer_fix.patch",
+        ],
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
         repo_mapping = {
