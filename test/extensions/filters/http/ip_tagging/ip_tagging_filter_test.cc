@@ -21,8 +21,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using ::Envoy::StatusHelpers::HasStatus;
+using ::testing::HasSubstr;
 using testing::Return;
 
 namespace Envoy {
@@ -263,22 +263,19 @@ public:
         .WillByDefault(Return(true));
   }
 
-  void initializeFilter(const std::string& yaml,
-                        std::optional<std::string> expected_error = std::nullopt) {
+  absl::Status initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     auto config_or =
         IpTaggingFilterConfig::create(config, "prefix.", *singleton_manager_, *scope_, runtime_,
                                       *api_, tls_, *dispatcher_, validation_visitor_);
-    if (expected_error.has_value()) {
-      EXPECT_THAT(config_or, Not(IsOk()));
-      EXPECT_TRUE(absl::StrContains(absl::StrCat(config_or.status()), expected_error.value()));
-      return;
+    if (!config_or.ok()) {
+      return config_or.status();
     }
-    EXPECT_OK(config_or);
     config_ = std::move(config_or.value());
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
+    return absl::OkStatus();
   }
 
   ~IpTaggingFilterTest() override {
@@ -310,8 +307,10 @@ ip_tag_header:
   header: x-envoy-optional-header
   action: SANITIZE
 )EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: HTTP IP Tagging Filter requires either ip_tags "
-                                "or ip_tags_datasource to be specified.");
+  EXPECT_THAT(initializeFilter(config_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("HTTP IP Tagging Filter requires either ip_tags "
+                                  "or ip_tags_datasource to be specified.")));
 }
 
 TEST_F(IpTaggingFilterTest, BothIpTagsAndIpTagsFileConfigured) {
@@ -327,9 +326,9 @@ ip_tags:
 ip_tags_datasource:
   filename: /test/tags.yaml
 )EOF";
-  initializeFilter(
-      config_yaml,
-      "INVALID_ARGUMENT: Only one of ip_tags or ip_tags_datasource can be configured.");
+  EXPECT_THAT(initializeFilter(config_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Only one of ip_tags or ip_tags_datasource can be configured.")));
 }
 
 TEST_F(IpTaggingFilterTest, EmptyIpTagsFile) {
@@ -340,9 +339,10 @@ ip_tags_datasource:
 )EOF";
   std::string file = TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/empty_file.yaml");
-  initializeFilter(
-      config_yaml,
-      absl::StrCat("INVALID_ARGUMENT: unable to create data source 'file ", file, " is empty'"));
+  EXPECT_THAT(initializeFilter(config_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr(absl::StrCat("unable to create data source 'file ", file,
+                                               " is empty'"))));
 }
 
 TEST_F(IpTaggingFilterTest, EmptyFilenameInDatasourceConfigured) {
@@ -351,8 +351,9 @@ request_type: internal
 ip_tags_datasource:
   filename:
 )EOF";
-  initializeFilter(config_yaml,
-                   "INVALID_ARGUMENT: Cannot load tags from empty filename in datasource.");
+  EXPECT_THAT(initializeFilter(config_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Cannot load tags from empty filename in datasource.")));
 }
 
 TEST_F(IpTaggingFilterTest, UnsupportedFormatForIpTagsFile) {
@@ -361,8 +362,10 @@ request_type: internal
 ip_tags_datasource:
     filename: /test/tags.csv
 )EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: Unsupported file format, unable to parse ip "
-                                "tags from file /test/tags.csv");
+  EXPECT_THAT(initializeFilter(config_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Unsupported file format, unable to parse ip tags from file "
+                                  "/test/tags.csv")));
 }
 
 TEST_F(IpTaggingFilterTest, InvalidYamlFile) {
@@ -371,9 +374,10 @@ TEST_F(IpTaggingFilterTest, InvalidYamlFile) {
  ip_tags_datasource:
    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.yaml"
  )EOF";
-  initializeFilter(
-      config_yaml,
-      "INVALID_ARGUMENT: unable to create data source 'Unable to convert YAML as JSON: ip_tags");
+  EXPECT_THAT(initializeFilter(config_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("unable to create data source 'Unable to convert YAML as JSON: "
+                                  "ip_tags")));
 }
 
 TEST_F(IpTaggingFilterTest, InvalidJsonFile) {
@@ -382,7 +386,8 @@ TEST_F(IpTaggingFilterTest, InvalidJsonFile) {
  ip_tags_datasource:
    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.json"
  )EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: unable to create data source");
+  EXPECT_THAT(initializeFilter(config_yaml), HasStatus(absl::StatusCode::kInvalidArgument,
+                                                       HasSubstr("unable to create data source")));
 }
 
 TEST_F(IpTaggingFilterTest, InvalidCidr) {
@@ -393,10 +398,10 @@ ip_tags:
     ip_list:
       - {address_prefix: 12345.12345.12345.12345, prefix_len: 999999}
 )EOF";
-  initializeFilter(
-      external_request_yaml,
-      "INVALID_ARGUMENT: invalid ip/mask combo '12345.12345.12345.12345/999999' (format is "
-      "<ip>/<# mask bits>)");
+  EXPECT_THAT(initializeFilter(external_request_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("invalid ip/mask combo '12345.12345.12345.12345/999999' (format "
+                                  "is <ip>/<# mask bits>)")));
 }
 
 TEST_F(IpTaggingFilterTest, InvalidCidrInYamlFile) {
@@ -405,9 +410,10 @@ request_type: external
 ip_tags_datasource:
   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_invalid_cidr.yaml"
 )EOF";
-  initializeFilter(config_yaml,
-                   "INVALID_ARGUMENT: unable to create data source 'invalid ip/mask combo "
-                   "'12345.12345.12345.12345/999999'");
+  EXPECT_THAT(initializeFilter(config_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("unable to create data source 'invalid ip/mask combo "
+                                  "'12345.12345.12345.12345/999999'")));
 }
 
 TEST_F(IpTaggingFilterTest, InvalidCidrInJsonFile) {
@@ -416,9 +422,10 @@ request_type: external
 ip_tags_datasource:
   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_invalid_cidr.json"
 )EOF";
-  initializeFilter(config_yaml,
-                   "INVALID_ARGUMENT: unable to create data source 'invalid ip/mask combo "
-                   "'12345.12345.12345.12345/999999'");
+  EXPECT_THAT(initializeFilter(config_yaml),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("unable to create data source 'invalid ip/mask combo "
+                                  "'12345.12345.12345.12345/999999'")));
 }
 
 TEST_F(IpTaggingFilterTest, RecreatesProviderWhenWeakPtrExpired) {
@@ -510,7 +517,7 @@ TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath)
 class InternalRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_F(InternalRequestIpTaggingFilterTest, InternalRequestNoCrashWhenTrieIsNull) {
-  initializeFilter(internal_request_config);
+  ASSERT_OK(initializeFilter(internal_request_config));
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
@@ -539,7 +546,7 @@ TEST_F(InternalRequestIpTaggingFilterTest, InternalRequestNoCrashWhenTrieIsNull)
 
 TEST_P(InternalRequestIpTaggingFilterTest, InternalRequest) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
@@ -573,7 +580,7 @@ class ExternalRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(ExternalRequestIpTaggingFilterTest, ExternalRequest) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   EXPECT_EQ(FilterRequestType::EXTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers;
 
@@ -607,7 +614,7 @@ class BothRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(BothRequestIpTaggingFilterTest, BothRequest) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   EXPECT_EQ(FilterRequestType::BOTH, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
@@ -641,7 +648,7 @@ class NoHitsIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(NoHitsIpTaggingFilterTest, NoHits) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -669,7 +676,7 @@ class AppendEntryFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(AppendEntryFilterTest, AppendEntry) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"},
                                                  {"x-envoy-ip-tags", "test"}};
 
@@ -696,7 +703,7 @@ class ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest : public IpTaggingFi
 TEST_P(ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest,
        ReplaceAlternateHeaderWhenActionIsDefaulted) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-envoy-internal", "true"},
       {"x-envoy-optional-header", "foo"}, // foo will be removed
@@ -727,7 +734,7 @@ class ReplaceAlternateHeaderFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(ReplaceAlternateHeaderFilterTest, ReplaceAlternateHeader) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-envoy-internal", "true"}, {"x-envoy-optional-header", "foo"}}; // foo will be removed
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -755,7 +762,7 @@ class ClearAlternateHeaderWhenUnmatchedAndSanitizedFilterTest : public IpTagging
 TEST_P(ClearAlternateHeaderWhenUnmatchedAndSanitizedFilterTest,
        ClearAlternateHeaderWhenUnmatchedAndSanitized) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"},
                                                  {"x-envoy-optional-header", "foo"}}; // header
                                                                                       // will
@@ -785,7 +792,7 @@ class AppendForwardAlternateHeaderFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(AppendForwardAlternateHeaderFilterTest, AppendForwardAlternateHeader) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"},
                                                  {"x-envoy-optional-header", "foo"}};
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -814,7 +821,7 @@ class RetainAlternateHeaderWhenUnmatchedAndAppendForwardedFilterTest : public Ip
 TEST_P(RetainAlternateHeaderWhenUnmatchedAndAppendForwardedFilterTest,
        RetainAlternateHeaderWhenUnmatchedAndAppendForwarded) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"},
                                                  {"x-envoy-optional-header", "foo"}};
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -841,7 +848,7 @@ class NestedPrefixesFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(NestedPrefixesFilterTest, NestedPrefixes) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"},
                                                  {"x-envoy-ip-tags", "test"}};
 
@@ -876,7 +883,7 @@ class Ipv6AddressTest : public IpTaggingFilterTest {};
 
 TEST_P(Ipv6AddressTest, Ipv6Address) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers;
 
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -900,7 +907,7 @@ class RuntimeDisabledTest : public IpTaggingFilterTest {};
 
 TEST_P(RuntimeDisabledTest, RuntimeDisabled) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ip_tagging.http_filter_enabled", 100))
@@ -921,7 +928,7 @@ class ClearRouteCacheTest : public IpTaggingFilterTest {};
 
 TEST_P(ClearRouteCacheTest, ClearRouteCache) {
   const std::string config = GetParam();
-  initializeFilter(config);
+  ASSERT_OK(initializeFilter(config));
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -979,7 +986,7 @@ ip_tags:
       - {address_prefix: 1.2.3.5, prefix_len: 32}
  )EOF",
       true);
-  initializeFilter(yaml);
+  ASSERT_OK(initializeFilter(yaml));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
@@ -1071,7 +1078,7 @@ ip_tags:
 ip_tags
  )EOF",
       true);
-  initializeFilter(yaml);
+  ASSERT_OK(initializeFilter(yaml));
 
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
@@ -1165,7 +1172,7 @@ ip_tags:
       - {address_prefix: 1.2.3.5, prefix_len: 32}
  )EOF",
       true);
-  initializeFilter(yaml);
+  ASSERT_OK(initializeFilter(yaml));
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   IpTaggingFilterPeer::synchronizer(filter_).enable();
   std::string sync_point_name = "_trie_lookup_complete";
