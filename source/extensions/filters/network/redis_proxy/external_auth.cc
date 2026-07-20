@@ -28,6 +28,7 @@ void GrpcExternalAuthClient::cancel() {
   ASSERT(callback_ != nullptr);
   ASSERT(pending_request_ != nullptr);
   request_->cancel();
+  request_ = nullptr;
   callback_ = nullptr;
   pending_request_ = nullptr;
 }
@@ -53,8 +54,16 @@ void GrpcExternalAuthClient::authenticateExternal(AuthenticateCallback& callback
   req.set_password(password);
 
   ENVOY_LOG(trace, "Sending request for external Redis authentication...");
-  request_ =
+  // send() can fail synchronously: onFailure() then runs inline (releasing this in-flight state
+  // and possibly re-entering authenticateExternal() for a resumed held request) before send()
+  // returns nullptr. Assigning that nullptr to request_ unconditionally would clobber the handle
+  // a reentrant call just published, so publish only while this invocation is still the active
+  // registration.
+  auto* request =
       async_client_->send(service_method_, req, *this, Tracing::NullSpan::instance(), options);
+  if (callback_ == &callback && pending_request_ == &pending_request) {
+    request_ = request;
+  }
 }
 
 // Callback method called when the request is successful.
@@ -81,9 +90,17 @@ void GrpcExternalAuthClient::onSuccess(
     auth_response->message = response->message();
   }
 
-  callback_->onAuthenticateExternal(*pending_request_, std::move(auth_response));
+  // Snapshot then null the in-flight state BEFORE invoking the callback. The callback can
+  // dispatch a held AUTH or HELLO N AUTH ... that synchronously calls authenticateExternal()
+  // again (HELLO AUTH external-auth held-queue resume); that re-entry asserts callback_ ==
+  // nullptr and pending_request_ == nullptr, so we have to release them first. request_ is
+  // cleared too: this round trip is complete, so the handle is dead.
+  auto* callback = callback_;
+  auto* pending_request = pending_request_;
   callback_ = nullptr;
   pending_request_ = nullptr;
+  request_ = nullptr;
+  callback->onAuthenticateExternal(*pending_request, std::move(auth_response));
 }
 
 // Callback method called when the request fails.
@@ -97,9 +114,16 @@ void GrpcExternalAuthClient::onFailure(Grpc::Status::GrpcStatus status, const st
       std::make_unique<AuthenticateResponse>(AuthenticateResponse{});
   auth_response->status = AuthenticationRequestStatus::Error;
   auth_response->message = message;
-  callback_->onAuthenticateExternal(*pending_request_, std::move(auth_response));
+  // Same release-then-invoke ordering as onSuccess — the callback may re-enter
+  // authenticateExternal() to start a second round trip on behalf of a resumed held request.
+  // This also runs when send() fails inline (before it returns nullptr); authenticateExternal
+  // guards its request_ assignment against that reentrant call.
+  auto* callback = callback_;
+  auto* pending_request = pending_request_;
   callback_ = nullptr;
   pending_request_ = nullptr;
+  request_ = nullptr;
+  callback->onAuthenticateExternal(*pending_request, std::move(auth_response));
 }
 
 } // namespace ExternalAuth
