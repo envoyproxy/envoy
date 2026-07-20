@@ -20,7 +20,6 @@
 #include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/functional/any_invocable.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -55,17 +54,16 @@ public:
   void onWorkerThreadInitialized() override;
 
   /**
-   * Defer starting reverse connections until the hot-restart parent (if any) has been asked to
-   * stop accepting new connections. This avoids a freshly-forked child dialing into a loopback
-   * listener whose accept queue is still shared with the draining parent, which would otherwise
-   * let the child's tunnel be serviced by the old process during the handoff window.
+   * @return whether the reverse-tunnel initiator may start dialing, i.e. whether the hot-restart
+   * parent (if any) has been asked to stop accepting new connections. Deferring the first dial
+   * until then avoids a freshly-forked child dialing into a loopback listener whose accept queue is
+   * still shared with the draining parent, which would otherwise let the child's tunnel be serviced
+   * by the old process during the handoff window.
    *
-   * If there is no parent (fresh start), hot restart is disabled, or the request has already been
-   * sent, @p callback runs synchronously. Otherwise it runs later, on the main thread, when the
-   * parent is asked to stop accepting; callers that must act on a worker dispatcher should post.
-   * @param callback the action to run once the parent has been asked to stop accepting.
+   * Returns true when there is no parent (fresh start), hot restart is disabled, or the server is
+   * not yet initialized. Safe to call from a worker thread.
    */
-  void runWhenParentStopsAccepting(absl::AnyInvocable<void()> callback);
+  bool parentStoppedAccepting();
 
   /**
    * @return reference to the stat prefix string.

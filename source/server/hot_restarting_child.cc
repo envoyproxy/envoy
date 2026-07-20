@@ -173,29 +173,8 @@ void HotRestartingChild::drainParentListeners() {
   }
 
   // Whether or not there was a parent to notify, the parent (if any) has now been asked to stop
-  // accepting new connections. Fire and clear the registered callbacks, and latch the flag so any
-  // later registration fires immediately.
-  std::vector<absl::AnyInvocable<void()>> actions;
-  {
-    absl::MutexLock lock(registry_mu_);
-    parent_stop_accepting_requested_ = true;
-    actions.swap(on_parent_stop_accepting_requested_);
-  }
-  for (auto& action : actions) {
-    std::move(action)();
-  }
-}
-
-void HotRestartingChild::registerParentStopAcceptingCallback(absl::AnyInvocable<void()> callback) {
-  {
-    absl::MutexLock lock(registry_mu_);
-    if (!parent_stop_accepting_requested_) {
-      on_parent_stop_accepting_requested_.push_back(std::move(callback));
-      return;
-    }
-  }
-  // Already requested (or no parent): fire immediately.
-  std::move(callback)();
+  // accepting new connections. Latch the flag so a subsequent query observes it.
+  parent_stop_accepting_requested_.store(true);
 }
 
 void HotRestartingChild::registerUdpForwardingListener(

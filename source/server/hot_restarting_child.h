@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "envoy/network/parent_drained_callback_registrar.h"
 #include "envoy/server/instance.h"
 
@@ -59,7 +61,7 @@ public:
                                      absl::AnyInvocable<void()> action) override;
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
-  void registerParentStopAcceptingCallback(absl::AnyInvocable<void()> callback);
+  bool parentStopAcceptingRequested() const { return parent_stop_accepting_requested_.load(); }
   std::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
   void sendParentTerminateRequest();
   void mergeParentStats(Stats::Store& stats_store,
@@ -89,12 +91,9 @@ private:
   std::unordered_multimap<std::string, absl::AnyInvocable<void()>>
       on_drained_actions_ ABSL_GUARDED_BY(registry_mu_);
   // Whether this child has already asked the parent to stop accepting new connections, i.e. whether
-  // drainParentListeners() has sent the drain-listeners request. Initialized true when there is no
-  // parent so callbacks fire immediately.
-  bool parent_stop_accepting_requested_ ABSL_GUARDED_BY(registry_mu_);
-  // Callbacks to run once the parent has been asked to stop accepting new connections.
-  std::vector<absl::AnyInvocable<void()>>
-      on_parent_stop_accepting_requested_ ABSL_GUARDED_BY(registry_mu_);
+  // drainParentListeners() has sent the drain-listeners request. Set on the main thread and polled
+  // from worker threads, so it is atomic. Initialized true when there is no parent.
+  std::atomic<bool> parent_stop_accepting_requested_;
   Event::FileEventPtr socket_event_udp_forwarding_;
   UdpForwardingContext udp_forwarding_context_;
 };

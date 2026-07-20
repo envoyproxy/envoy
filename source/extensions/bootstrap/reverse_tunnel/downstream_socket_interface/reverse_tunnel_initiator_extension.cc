@@ -123,14 +123,12 @@ void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance& serv
   server_ = &server;
 }
 
-void ReverseTunnelInitiatorExtension::runWhenParentStopsAccepting(
-    absl::AnyInvocable<void()> callback) {
+bool ReverseTunnelInitiatorExtension::parentStoppedAccepting() {
   if (server_ == nullptr) {
-    // Should not happen once the server is initialized; be safe and run now.
-    std::move(callback)();
-    return;
+    // Not yet initialized (or some unit tests): no parent to wait for, so don't defer dialing.
+    return true;
   }
-  server_->hotRestart().registerParentStopAcceptingCallback(std::move(callback));
+  return server_->hotRestart().parentStoppedAccepting();
 }
 
 void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {

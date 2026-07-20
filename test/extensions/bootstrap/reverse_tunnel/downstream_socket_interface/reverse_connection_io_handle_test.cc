@@ -18,6 +18,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
@@ -2625,6 +2626,32 @@ TEST_F(ReverseConnectionIOHandleTest, MaintainReverseConnectionsMissingSrcNodeId
   io_handle_ = createTestIOHandle(cfg);
   EXPECT_NE(io_handle_, nullptr);
   maintainReverseConnections();
+}
+
+// While the hot-restart parent is still accepting, maintainReverseConnections() must not dial and
+// should re-arm the retry timer for a short re-check instead.
+TEST_F(ReverseConnectionIOHandleTest, MaintainReverseConnectionsDefersWhileParentAccepting) {
+  setupThreadLocalSlot();
+
+  // Give the extension a server whose hot restart reports the parent still accepting.
+  NiceMock<Server::MockInstance> server;
+  EXPECT_CALL(server.hot_restart_, parentStoppedAccepting()).WillRepeatedly(Return(false));
+  extension_->onServerInitialized(server);
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  // Create the retry timer via initializeFileEvent; the initial maintenance pass must defer, so the
+  // timer is enabled with the short re-check interval and no cluster dial is attempted.
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
 }
 
 // Test maintainClusterConnections early return when cluster is not found.

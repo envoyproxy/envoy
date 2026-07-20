@@ -16,7 +16,6 @@
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
 
-#include "absl/functional/any_invocable.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -50,21 +49,21 @@ public:
   virtual void drainParentListeners() PURE;
 
   /**
-   * Register a callback to run once this (child) instance has requested that the parent stop
-   * accepting new connections, i.e. when drainParentListeners() sends the drain-listeners request.
-   * That request is fire-and-forget, so this fires at send time, not on confirmation that the
-   * parent's listeners are closed. If there is no parent (fresh start, or the request has already
-   * been sent) the callback runs immediately.
+   * @return whether this (child) instance has already asked the parent to stop accepting new
+   * connections, i.e. whether drainParentListeners() has sent the drain-listeners request. Returns
+   * true when there is no parent (fresh start) or hot restart is disabled. The drain request is
+   * fire-and-forget, so this reflects that the request was sent, not that the parent's listeners
+   * are confirmed closed.
    *
    * This is deliberately distinct from parentDrainedCallbackRegistrar(): that fires only once the
    * parent is fully drained at the parent-shutdown deadline (potentially minutes later), whereas
-   * this fires as soon as the parent is asked to stop accepting. A child uses this to begin work
+   * this flips as soon as the parent is asked to stop accepting. A child polls this to gate work
    * that must not race the parent's still-open listeners -- e.g. a reverse-tunnel initiator dialing
    * a loopback listener whose accept queue both epochs share during the handoff.
    *
-   * The callback runs on the main thread; callers that need to act on another dispatcher must post.
+   * Safe to call from any thread.
    */
-  virtual void registerParentStopAcceptingCallback(absl::AnyInvocable<void()> callback) PURE;
+  virtual bool parentStoppedAccepting() PURE;
 
   /**
    * Retrieve a listening socket on the specified address from the parent process. The socket will

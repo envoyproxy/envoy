@@ -46,6 +46,10 @@ constexpr uint32_t kMaxBackoffExponent = 32;
 constexpr uint64_t kReconnectJitterPercent = 15;
 // Steady-state maintenance re-check interval.
 constexpr uint64_t kMaintainIntervalMs = 10000;
+// Short re-check interval used while a hot-restart child is waiting to be allowed to dial (i.e.
+// until it has asked the parent to stop accepting). The handoff window is brief, so poll frequently
+// to bound the added latency before the child stands up its own tunnel.
+constexpr uint64_t kParentStopAcceptingRecheckMs = 100;
 } // namespace
 
 // ReverseConnectionIOHandle implementation
@@ -63,8 +67,6 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
 
 ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
   ENVOY_LOG_MISC(debug, "Destroying ReverseConnectionIOHandle - performing cleanup.");
-  // Invalidate any pending deferred-start callback so it becomes a no-op if it fires after this.
-  alive_.reset();
   cleanup();
 }
 
@@ -195,7 +197,7 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
       ENVOY_LOG(debug, "Reverse connection timer triggered on worker thread");
       maintainReverseConnections();
     });
-    startReverseConnectionsWhenParentStopsAccepting();
+    maintainReverseConnections();
   }
 
   is_reverse_conn_started_ = true;
@@ -940,33 +942,20 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
             increment ? "Incremented" : "Decremented", host_address, cluster_name, state_suffix);
 }
 
-void ReverseConnectionIOHandle::startReverseConnectionsWhenParentStopsAccepting() {
+void ReverseConnectionIOHandle::maintainReverseConnections() {
+  // During a hot restart, don't dial until we've asked the parent to stop accepting new
+  // connections; otherwise the child's connection can be accepted by the still-listening parent
+  // through a shared loopback listener and be reset when the parent exits. Re-check shortly. With
+  // no extension (some unit tests), no parent, or hot restart disabled, this dials immediately.
   auto* extension = getDownstreamExtension();
-  if (extension == nullptr) {
-    // No extension (e.g. some unit tests): preserve the original immediate-start behavior.
-    maintainReverseConnections();
+  if (extension != nullptr && !extension->parentStoppedAccepting()) {
+    ENVOY_LOG(debug, "reverse_tunnel: parent still accepting; deferring reverse connection dial");
+    if (rev_conn_retry_timer_) {
+      rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(kParentStopAcceptingRecheckMs));
+    }
     return;
   }
 
-  // Defer the first dial until the hot-restart parent has been asked to stop accepting. The
-  // callback fires on the main thread (or synchronously if there is no parent), so bounce back to
-  // this worker's dispatcher before touching worker-thread state. Guard against this io handle
-  // being destroyed before the callback runs.
-  Event::Dispatcher* worker_dispatcher = worker_dispatcher_;
-  std::weak_ptr<bool> alive = alive_;
-  extension->runWhenParentStopsAccepting([this, worker_dispatcher, alive]() {
-    worker_dispatcher->post([this, alive]() {
-      if (alive.lock() == nullptr) {
-        return;
-      }
-      ENVOY_LOG(info,
-                "reverse_tunnel: parent asked to stop accepting; starting reverse connections");
-      maintainReverseConnections();
-    });
-  });
-}
-
-void ReverseConnectionIOHandle::maintainReverseConnections() {
   // Validate required configuration parameters at the top level.
   if (config_.src_node_id.empty()) {
     ENVOY_LOG(error, "Source node ID is required but empty - cannot maintain reverse connections");

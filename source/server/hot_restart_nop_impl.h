@@ -17,10 +17,8 @@ class HotRestartNopImpl : public Server::HotRestart {
 public:
   // Server::HotRestart
   void drainParentListeners() override {}
-  void registerParentStopAcceptingCallback(absl::AnyInvocable<void()> callback) override {
-    // No parent when hot restart is disabled; the callback can run immediately.
-    std::move(callback)();
-  }
+  // No parent when hot restart is disabled, so there is nothing to wait for.
+  bool parentStoppedAccepting() override { return true; }
   int duplicateParentListenSocket(const std::string&, uint32_t, absl::string_view) override {
     return -1;
   }

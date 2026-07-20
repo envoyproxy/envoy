@@ -251,26 +251,19 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
   extension_->onServerInitialized(server_);
 }
 
-TEST_F(ReverseTunnelInitiatorExtensionTest, RunWhenParentStopsAcceptingForwardsToHotRestart) {
+TEST_F(ReverseTunnelInitiatorExtensionTest, ParentStoppedAcceptingForwardsToHotRestart) {
   extension_->onServerInitialized(server_);
-  // After the server is captured, the request is forwarded to the hot restart registrar rather
-  // than run inline.
-  absl::AnyInvocable<void()> captured;
-  EXPECT_CALL(server_.hot_restart_, registerParentStopAcceptingCallback(_))
-      .WillOnce([&captured](absl::AnyInvocable<void()> cb) { captured = std::move(cb); });
-  bool ran = false;
-  extension_->runWhenParentStopsAccepting([&ran]() { ran = true; });
-  EXPECT_FALSE(ran);
-  ASSERT_TRUE(static_cast<bool>(captured));
-  std::move(captured)();
-  EXPECT_TRUE(ran);
+  // Once the server is captured, the query is forwarded to the hot restart implementation.
+  EXPECT_CALL(server_.hot_restart_, parentStoppedAccepting())
+      .WillOnce(Return(false))
+      .WillOnce(Return(true));
+  EXPECT_FALSE(extension_->parentStoppedAccepting());
+  EXPECT_TRUE(extension_->parentStoppedAccepting());
 }
 
-TEST_F(ReverseTunnelInitiatorExtensionTest, RunWhenParentStopsAcceptingRunsInlineWithoutServer) {
-  // Before onServerInitialized(), there is no server to reach hotRestart(); the callback runs now.
-  bool ran = false;
-  extension_->runWhenParentStopsAccepting([&ran]() { ran = true; });
-  EXPECT_TRUE(ran);
+TEST_F(ReverseTunnelInitiatorExtensionTest, ParentStoppedAcceptingTrueWithoutServer) {
+  // Before onServerInitialized(), there is no server to reach hotRestart(); nothing to wait for.
+  EXPECT_TRUE(extension_->parentStoppedAccepting());
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnWorkerThreadInitialized) {
