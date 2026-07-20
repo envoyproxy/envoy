@@ -23,7 +23,8 @@ PYTHON_MINOR_VERSION = _python_minor_version(PYTHON_VERSION)
 def envoy_dependencies_extra(
         glibc_version = GLIBC_VERSION,
         python_version = PYTHON_VERSION,
-        ignore_root_user_error = False):
+        ignore_root_user_error = False,
+        use_host_tools = False):
     compatibility_proxy_repo()
     java_compatibility_proxy_repo()
     bazel_toolchain_dependencies()
@@ -39,7 +40,11 @@ def envoy_dependencies_extra(
         name = "python%s" % _python_minor_version(python_version),
         python_version = python_version,
         ignore_root_user_error = ignore_root_user_error,
+        register_toolchains = not use_host_tools,
     )
+
+    if use_host_tools:
+        native.register_toolchains("@rules_python//python:autodetecting_toolchain")
 
     aspect_bazel_lib_dependencies()
 
