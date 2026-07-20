@@ -10,6 +10,21 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test(
+    name = "oghttp2_session_trailers_test",
+    srcs = envoy_select_enable_http3(["oghttp2_session_trailers_test.cc"]),
+    copts = quiche_copts,
+    rbe_pool = "6gig",
+    tags = ["quiche"],
+    deps = envoy_select_enable_http3([
+        "@quiche//:http2_adapter_mock_http2_visitor",
+        "@quiche//:http2_adapter_oghttp2_adapter",
+        "@quiche//:http2_adapter_test_frame_sequence",
+        "@quiche//:http2_adapter_test_utils",
+        "@quiche//:quiche_common_platform_test",
+    ]),
+)
+
 # QUICHE test sources compiled under Envoy's real envoy_cc_test macro, which
 # injects the correct test main, PCH, sanitizer configuration, and gmock
 # strictness settings. The test sources are exposed as filegroups in
