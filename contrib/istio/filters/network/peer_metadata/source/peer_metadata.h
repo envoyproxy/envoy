@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
@@ -93,6 +94,7 @@ namespace PeerMetadata {
 
 using Config = ::envoy::extensions::network_filters::peer_metadata::Config;
 using UpstreamConfig = ::envoy::extensions::network_filters::peer_metadata::UpstreamConfig;
+using MetadataExchangeMode = ::envoy::extensions::network_filters::peer_metadata::MetadataExchangeMode;
 using CelStatePrototype = ::Envoy::Extensions::Filters::Common::Expr::CelStatePrototype;
 
 struct HeaderValues {
@@ -112,6 +114,15 @@ enum class PeerMetadataState {
   WaitingForData,
   PassThrough,
 };
+
+// Wire header for the DATA_STREAM_PREAMBLE (legacy) exchange mode: a magic
+// number followed by the serialized peer metadata size, injected ahead of the
+// real data by the downstream filter and stripped by the upstream filter.
+PACKED_STRUCT(struct PeerMetadataHeader {
+  uint32_t magic;
+  static const uint32_t magic_number;
+  uint32_t data_size;
+});
 
 /**
  * This is a regular network filter that will be installed in the
@@ -140,7 +151,12 @@ private:
   void populateBaggage();
   bool disableDiscovery() const;
   std::optional<Envoy::Protobuf::Any> discoverPeerMetadata();
+  // THREAD_LOCAL_REGISTRY mode: store discovered peer metadata in the registry.
   void storeInRegistry(const Envoy::Protobuf::Any& peer_metadata);
+  // DATA_STREAM_PREAMBLE (legacy) mode: inject the peer metadata (or an empty
+  // marker) as a preamble into the downstream data stream.
+  void propagatePeerMetadata(const Envoy::Protobuf::Any& peer_metadata);
+  void propagateNoPeerMetadata();
 
   PeerMetadataState state_ = PeerMetadataState::WaitingForData;
   Network::WriteFilterCallbacks* write_callbacks_{};
@@ -159,8 +175,8 @@ private:
  */
 class UpstreamFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit UpstreamFilter(
-      Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry);
+  UpstreamFilter(MetadataExchangeMode mode,
+                 Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override;
@@ -169,7 +185,12 @@ public:
 
 private:
   bool disableDiscovery() const;
+  // THREAD_LOCAL_REGISTRY mode: look up peer metadata stored by the paired
+  // downstream filter under this connection's ID.
   bool tryRegistryLookup();
+  // DATA_STREAM_PREAMBLE (legacy) mode: parse and strip the peer metadata
+  // preamble from the upstream data stream.
+  bool consumePeerMetadata(Buffer::Instance& buffer, bool end_stream);
 
   static const CelStatePrototype& peerInfoPrototype();
 
@@ -177,6 +198,7 @@ private:
   void populateNoPeerMetadata();
 
   PeerMetadataState state_ = PeerMetadataState::WaitingForData;
+  MetadataExchangeMode mode_;
   Network::ReadFilterCallbacks* callbacks_{};
   Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry_;
 };

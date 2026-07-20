@@ -232,11 +232,6 @@ typed_config:
     client_config_ = std::make_unique<ConfigHelper>(version_, pristine);
     setNode(*client_config_, "client-v1", "client-ns", "client-cluster", "client-svc",
             "client-app");
-    // The network peer_metadata registry normally allocates an Envoy ThreadLocal slot. In this
-    // two-Envoy-in-one-process fixture that extra client-side slot shifts the internal-listener
-    // TLS slot index out of alignment with the server, aborting the server on connection creation.
-    // Disable the slot on the client (it uses a thread_local fallback instead).
-    client_config_->addRuntimeOverride("istio.peer_metadata.use_thread_local_slot", "false");
     client_config_->addConfigModifier([server_port, loopback, connect_request_baggage](
                                           envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* sr = bootstrap.mutable_static_resources();
@@ -299,6 +294,7 @@ filter_chains:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network_filters.peer_metadata.Config
       baggage_key: baggage
+      mode: DATA_STREAM_PREAMBLE
   - name: envoy.filters.network.tcp_proxy
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
@@ -321,6 +317,7 @@ filters:
 - name: envoy.filters.network.upstream.peer_metadata
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.network_filters.peer_metadata.UpstreamConfig
+    mode: DATA_STREAM_PREAMBLE
 load_assignment:
   cluster_name: encap
   endpoints:

@@ -4,6 +4,7 @@
 
 #include "envoy/stream_info/uint64_accessor.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
@@ -50,6 +51,8 @@ bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
 
 } // namespace
 
+const uint32_t PeerMetadataHeader::magic_number = 0xabcd1234;
+
 Filter::Filter(const Config& config, const LocalInfo::LocalInfo& local_info,
                Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry)
     : config_(config), baggage_(baggageValue(local_info)), registry_(std::move(registry)) {}
@@ -81,7 +84,15 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& buffer, bool) {
     // now. So we can check if the peer metadata is available or not, and if
     // no peer metadata available, we can give up waiting for it.
     std::optional<Envoy::Protobuf::Any> peer_metadata = discoverPeerMetadata();
-    if (peer_metadata) {
+    if (config_.mode() == MetadataExchangeMode::DATA_STREAM_PREAMBLE) {
+      // Legacy: push the peer metadata (or an empty marker) into the data stream.
+      if (peer_metadata) {
+        propagatePeerMetadata(*peer_metadata);
+      } else {
+        propagateNoPeerMetadata();
+      }
+    } else if (peer_metadata) {
+      // Default: hand off via the thread-local registry.
       storeInRegistry(*peer_metadata);
     }
     state_ = PeerMetadataState::PassThrough;
@@ -187,18 +198,58 @@ void Filter::storeInRegistry(const Envoy::Protobuf::Any& peer_metadata) {
   registry_->setValue(connection_id->asString(), serialized);
 }
 
-UpstreamFilter::UpstreamFilter(
-    Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry)
-    : registry_(std::move(registry)) {}
+void Filter::propagatePeerMetadata(const Envoy::Protobuf::Any& peer_metadata) {
+  ENVOY_LOG(trace, "Sending peer metadata downstream with the data stream");
+  ASSERT(write_callbacks_);
 
-Network::FilterStatus UpstreamFilter::onData(Buffer::Instance&, bool) {
+  if (state_ != PeerMetadataState::WaitingForData) {
+    // It's only safe and correct to send the peer metadata downstream with
+    // the data if we haven't done that already, otherwise the downstream
+    // could be very confused by the data they received.
+    ENVOY_LOG(trace, "Filter has already sent the peer metadata downstream");
+    return;
+  }
+
+  std::string data = peer_metadata.SerializeAsString();
+  PeerMetadataHeader header{PeerMetadataHeader::magic_number, static_cast<uint32_t>(data.size())};
+
+  Buffer::OwnedImpl buffer{
+      absl::string_view(reinterpret_cast<const char*>(&header), sizeof(header))};
+  buffer.add(data);
+  write_callbacks_->injectWriteDataToFilterChain(buffer, false);
+}
+
+void Filter::propagateNoPeerMetadata() {
+  ENVOY_LOG(trace, "Sending no peer metadata downstream with the data");
+  ASSERT(write_callbacks_);
+
+  PeerMetadataHeader header{PeerMetadataHeader::magic_number, 0};
+  Buffer::OwnedImpl buffer{
+      absl::string_view(reinterpret_cast<const char*>(&header), sizeof(header))};
+  write_callbacks_->injectWriteDataToFilterChain(buffer, false);
+}
+
+UpstreamFilter::UpstreamFilter(
+    MetadataExchangeMode mode,
+    Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry)
+    : mode_(mode), registry_(std::move(registry)) {}
+
+Network::FilterStatus UpstreamFilter::onData(Buffer::Instance& buffer, bool end_stream) {
   switch (state_) {
   case PeerMetadataState::WaitingForData:
     if (disableDiscovery()) {
       state_ = PeerMetadataState::PassThrough;
       break;
     }
-    if (tryRegistryLookup()) {
+    if (mode_ == MetadataExchangeMode::DATA_STREAM_PREAMBLE) {
+      // Legacy: parse and strip the peer metadata preamble from the data stream.
+      if (consumePeerMetadata(buffer, end_stream)) {
+        state_ = PeerMetadataState::PassThrough;
+      } else {
+        // Waiting for more data to complete the preamble.
+        return Network::FilterStatus::StopIteration;
+      }
+    } else if (tryRegistryLookup()) {
       state_ = PeerMetadataState::PassThrough;
     } else {
       ENVOY_LOG(trace, "No peer metadata available in registry");
@@ -308,6 +359,82 @@ bool UpstreamFilter::tryRegistryLookup() {
   return true;
 }
 
+bool UpstreamFilter::consumePeerMetadata(Buffer::Instance& buffer, bool end_stream) {
+  ENVOY_LOG(trace, "Trying to consume peer metadata from the data stream");
+  using namespace ::Istio::Common;
+
+  ASSERT(callbacks_);
+
+  if (state_ != PeerMetadataState::WaitingForData) {
+    ENVOY_LOG(trace, "The filter already consumed peer metadata from the data stream");
+    return true;
+  }
+
+  if (buffer.length() < sizeof(PeerMetadataHeader)) {
+    if (end_stream) {
+      ENVOY_LOG(trace, "Not enough data in the data stream for peer metadata header and no more "
+                       "data is coming");
+      populateNoPeerMetadata();
+      return true;
+    }
+    ENVOY_LOG(trace,
+              "Not enough data in the data stream for peer metadata header, waiting for more data");
+    return false;
+  }
+
+  PeerMetadataHeader header;
+  buffer.copyOut(0, sizeof(PeerMetadataHeader), &header);
+
+  if (header.magic != PeerMetadataHeader::magic_number) {
+    ENVOY_LOG(trace, "Magic number in the peer metadata header didn't match expected value");
+    populateNoPeerMetadata();
+    return true;
+  }
+
+  if (header.data_size == 0) {
+    ENVOY_LOG(trace, "Peer metadata is empty");
+    populateNoPeerMetadata();
+    buffer.drain(sizeof(PeerMetadataHeader));
+    return true;
+  }
+
+  const size_t peer_metadata_size = sizeof(PeerMetadataHeader) + header.data_size;
+
+  if (buffer.length() < peer_metadata_size) {
+    if (end_stream) {
+      ENVOY_LOG(trace,
+                "Not enough data in the data stream for peer metadata and no more data is coming");
+      populateNoPeerMetadata();
+      return true;
+    }
+    ENVOY_LOG(trace, "Not enough data in the data stream for peer metadata, waiting for more data");
+    return false;
+  }
+
+  absl::string_view data{static_cast<const char*>(buffer.linearize(peer_metadata_size)),
+                         peer_metadata_size};
+  data = data.substr(sizeof(PeerMetadataHeader));
+  Envoy::Protobuf::Any any;
+  if (!any.ParseFromArray(data.data(), data.size())) {
+    ENVOY_LOG(trace, "Failed to parse peer metadata proto from the data stream");
+    populateNoPeerMetadata();
+    return true;
+  }
+
+  Envoy::Protobuf::Struct peer_metadata;
+  if (!any.UnpackTo(&peer_metadata)) {
+    ENVOY_LOG(trace, "Failed to unpack peer metadata struct");
+    populateNoPeerMetadata();
+    return true;
+  }
+
+  std::unique_ptr<WorkloadMetadataObject> workload = convertStructToWorkloadMetadata(peer_metadata);
+  populatePeerMetadata(*workload);
+  buffer.drain(peer_metadata_size);
+  ENVOY_LOG(trace, "Successfully consumed peer metadata from the data stream");
+  return true;
+}
+
 const CelStatePrototype& UpstreamFilter::peerInfoPrototype() {
   static const CelStatePrototype* const prototype = new CelStatePrototype(
       true, CelStateType::Protobuf, "type.googleapis.com/google.protobuf.Struct",
@@ -351,7 +478,12 @@ ConfigFactory::ConfigFactory()
 absl::StatusOr<Network::FilterFactoryCb>
 ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
                                                  Server::Configuration::FactoryContext& context) {
-  auto registry = Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
+  // Only the thread-local registry mode allocates an Envoy TLS slot; the legacy
+  // data-stream mode needs no registry.
+  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry;
+  if (config.mode() == MetadataExchangeMode::THREAD_LOCAL_REGISTRY) {
+    registry = Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
+  }
   return [config, &context,
           registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
     const auto& local_info = context.serverFactoryContext().localInfo();
@@ -360,10 +492,15 @@ ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
 }
 
 Network::FilterFactoryCb UpstreamConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message&, Server::Configuration::UpstreamFactoryContext& context) {
-  auto registry = Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
-  return [registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<UpstreamFilter>(registry));
+    const Protobuf::Message& config, Server::Configuration::UpstreamFactoryContext& context) {
+  const auto& typed_config = dynamic_cast<const UpstreamConfig&>(config);
+  const MetadataExchangeMode mode = typed_config.mode();
+  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry;
+  if (mode == MetadataExchangeMode::THREAD_LOCAL_REGISTRY) {
+    registry = Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
+  }
+  return [mode, registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<UpstreamFilter>(mode, registry));
   };
 }
 

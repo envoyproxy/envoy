@@ -20,6 +20,7 @@ envoy_cc_contrib_extension(
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stream_info:uint64_accessor_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/singleton:const_singleton",

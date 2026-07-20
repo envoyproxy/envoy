@@ -110,6 +110,9 @@ decodePeerMetadata(const std::string& serialized) {
 Config configWithBaggageKey(absl::string_view baggage_key) {
   Config config;
   config.set_baggage_key(baggage_key);
+  // These tests exercise the thread-local registry hand-off; the proto default is now the
+  // legacy DATA_STREAM_PREAMBLE mode, so request the registry mode explicitly.
+  config.set_mode(MetadataExchangeMode::THREAD_LOCAL_REGISTRY);
   return config;
 }
 
@@ -330,7 +333,8 @@ public:
 
     host_metadata_ = std::make_shared<::envoy::config::core::v3::Metadata>();
 
-    filter_ = std::make_unique<UpstreamFilter>(registry_);
+    filter_ = std::make_unique<UpstreamFilter>(MetadataExchangeMode::THREAD_LOCAL_REGISTRY,
+                                               registry_);
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
