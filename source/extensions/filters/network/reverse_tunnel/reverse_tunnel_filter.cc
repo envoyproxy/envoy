@@ -307,6 +307,13 @@ bool ReverseTunnelFilterConfig::verifyHandshakeJwt(const Http::RequestHeaderMap&
     ENVOY_LOG(debug, "reverse_tunnel: jwt: missing token header '{}'", jwt_token_header_.get());
     return false;
   }
+  // Use the first value only, matching jwt_authn's header extractor. A well-formed initiator sends
+  // one token header; multiple values are anomalous and the extras are ignored. Logged at debug
+  // rather than warn so a hostile peer cannot amplify a per-handshake log line.
+  if (token_values.size() > 1) {
+    ENVOY_LOG(debug, "reverse_tunnel: jwt: {} values on token header '{}'; using the first",
+              token_values.size(), jwt_token_header_.get());
+  }
   absl::string_view token = token_values[0]->value().getStringView();
   // Strip a leading "Bearer " prefix when present (case-insensitive), matching jwt_authn.
   static constexpr absl::string_view bearer_prefix = "Bearer ";
@@ -354,7 +361,11 @@ bool ReverseTunnelFilterConfig::verifyHandshakeJwt(const Http::RequestHeaderMap&
   }
 
   // Success: publish verified claims as dynamic metadata so the validation block can bind a claimed
-  // handshake id to a verified claim via %DYNAMIC_METADATA(namespace:claim)%.
+  // handshake id to a verified claim via %DYNAMIC_METADATA(namespace:claim)%. This runs before
+  // validateIdentifiers(), so the claims are set even when validation subsequently fails and the
+  // handshake is rejected with 403. That is harmless: the metadata lives on this handshake's
+  // stream_info, which is discarded when the connection closes and is read only by that validation
+  // step — it is never registered or forwarded.
   stream_info.setDynamicMetadata(jwt_claims_namespace_, jwt.payload_pb_);
   ENVOY_LOG(debug, "reverse_tunnel: jwt: verified; claims published to namespace '{}'",
             jwt_claims_namespace_);

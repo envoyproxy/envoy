@@ -2699,6 +2699,34 @@ TEST_F(ReverseTunnelJwtTest, VerifiedClaimBindsIdentifier) {
   }
 }
 
+// The %REQ(...)% command in a validation format string resolves against the handshake request
+// headers, exercising the request-header context threaded into validateIdentifiers(). A node-id
+// that matches the referenced header is accepted; a mismatch is rejected with 403. Independent of
+// JWT: this is the Option A header-plumbing primitive that the JWT binding builds on. Before the
+// context carried request headers, %REQ(...)% rendered empty and both cases silently passed.
+TEST_F(ReverseTunnelJwtTest, ValidationReqCommandMatchesRequestHeader) {
+  // Builds a handshake whose node-id header is `node`, also carrying the x-expected-node-id header
+  // that node_id_format references.
+  auto make_request = [this](const std::string& node, const std::string& expected) {
+    std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+    req += "Host: localhost\r\n";
+    req += makeRtHeaders(node, "c", "t");
+    req += "x-expected-node-id: " + expected + "\r\n";
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
+  };
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.mutable_validation()->set_node_id_format("%REQ(x-expected-node-id)%");
+
+  // Node-id equals the referenced header -> accepted.
+  EXPECT_THAT(runHandshake(cfg, make_request("node-a", "node-a")), testing::HasSubstr("200 OK"));
+  // Node-id differs from the referenced header -> rejected with 403.
+  EXPECT_THAT(runHandshake(cfg, make_request("node-b", "node-a")),
+              testing::HasSubstr("403 Forbidden"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+}
+
 // A bare token (no "Bearer " prefix) is also accepted.
 TEST_F(ReverseTunnelJwtTest, BareTokenWithoutBearerPrefixAccepted) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
