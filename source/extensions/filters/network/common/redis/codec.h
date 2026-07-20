@@ -17,12 +17,80 @@ namespace Common {
 namespace Redis {
 
 /**
+ * RESP protocol version used by a connection.
+ */
+enum class RespProtocolVersion { Resp2, Resp3 };
+
+/**
+ * Maps the RESP wire version integer (the ``N`` of ``HELLO N``) to RespProtocolVersion. This is
+ * a total conversion, not a validator: every value other than 3 (including 0 and values a HELLO
+ * handler would reject) maps to Resp2. Callers are expected to pass versions already validated
+ * at the negotiation boundary.
+ */
+inline RespProtocolVersion toRespProtocolVersion(uint32_t version) {
+  return version == 3 ? RespProtocolVersion::Resp3 : RespProtocolVersion::Resp2;
+}
+
+inline uint32_t toWireRespVersion(RespProtocolVersion version) {
+  return version == RespProtocolVersion::Resp3 ? 3u : 2u;
+}
+
+// Replace every ASCII control byte (< 0x20 or DEL 0x7f) in ``input`` with a space, returning a
+// sanitized copy. RESP inline errors (``-<text>\r\n``) and the RESP2 down-converted form of a
+// RESP3 BlobError have no length prefix, so an embedded CR/LF would desynchronize the downstream
+// parser and other control bytes can inject terminal escapes / log delimiters once a client logs
+// the message; attacker-influenced error text (echoed commands/options, upstream BlobError
+// payloads) is therefore stripped. A single detection scan runs either way; when it finds no
+// control bytes (the common case) the input is returned as-is, skipping the rewrite pass and its
+// extra allocation.
+inline std::string sanitizeControlBytes(const std::string& input) {
+  const auto is_control = [](unsigned char c) { return c < 0x20 || c == 0x7f; };
+  bool needs_sanitize = false;
+  for (unsigned char c : input) {
+    if (is_control(c)) {
+      needs_sanitize = true;
+      break;
+    }
+  }
+  if (!needs_sanitize) {
+    return input;
+  }
+  std::string out;
+  out.reserve(input.size());
+  for (unsigned char c : input) {
+    out.push_back(is_control(c) ? ' ' : static_cast<char>(c));
+  }
+  return out;
+}
+
+/**
  * All RESP types as defined here: https://redis.io/topics/protocol with the exception of
  * CompositeArray. CompositeArray is an internal type that behaves like an Array type. Its first
  * element is a SimpleString or BulkString and the rest of the elements are portion of another
  * Array. This is created for performance.
+ *
+ * RESP3 types are defined here:
+ * https://github.com/redis/redis-specifications/blob/master/protocol/RESP3.md
  */
-enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array, CompositeArray };
+enum class RespType {
+  // RESP2 types
+  Null,
+  SimpleString,
+  BulkString,
+  Integer,
+  Error,
+  Array,
+  CompositeArray,
+  // RESP3 types
+  Boolean,        // #t\r\n or #f\r\n
+  Double,         // ,<floating-point-number>\r\n
+  BigNumber,      // (<big number>\r\n
+  BlobError,      // !<length>\r\n<error>\r\n
+  VerbatimString, // =<length>\r\n<encoding>:<data>\r\n
+  Map,            // %<count>\r\n (count key-value pairs, stored as 2*count array elements)
+  Set,            // ~<count>\r\n
+  Push,           // ><count>\r\n
+};
 
 /**
  * A variant implementation of a RESP value optimized for performance. A C++11 union is used for
@@ -119,10 +187,18 @@ public:
    */
   std::vector<RespValue>& asArray();
   const std::vector<RespValue>& asArray() const;
+  // Backed by ``string_``. Stored payload by type (no wire framing):
+  //   SimpleString / BulkString / Error / BlobError: the bytes.
+  //   BigNumber:       digits.
+  //   VerbatimString:  ``xxx:data`` (encoder strips the ``xxx:`` prefix on RESP2).
+  //   Double:          raw RESP3 Double payload — decoder → encoder pass-through preserves
+  //                    upstream bytes verbatim (a non-canonical-but-parseable representation
+  //                    survives intact).
   std::string& asString();
   const std::string& asString() const;
   int64_t& asInteger();
   int64_t asInteger() const;
+  bool asBoolean() const;
   CompositeArray& asCompositeArray();
   const CompositeArray& asCompositeArray() const;
 
@@ -133,7 +209,16 @@ public:
   RespType type() const { return type_; }
   void type(RespType type);
 
+  /**
+   * @return whether this value is an error reply: a RESP2 Error or a RESP3 BlobError. The two
+   *         differ only in framing (line vs length-prefixed), so reply-handling code should
+   *         treat them uniformly; testing only ``RespType::Error`` silently mishandles RESP3
+   *         blob errors.
+   */
+  bool isError() const { return type_ == RespType::Error || type_ == RespType::BlobError; }
+
 private:
+  // Double shares ``string_`` with BigNumber/VerbatimString — see ``asString()``.
   union {
     std::vector<RespValue> array_;
     std::string string_;
@@ -208,6 +293,24 @@ public:
    * @param out supplies the buffer to encode to.
    */
   virtual void encode(const RespValue& value, Buffer::Instance& out) PURE;
+
+  /**
+   * Set the RESP protocol version for encoding. Drives every RESP3-only type's
+   * conversion choice when the connection is RESP2:
+   *   Null           - RESP3 ``_\r\n``         vs RESP2 ``$-1\r\n``
+   *   Boolean        - RESP3 ``#t/#f\r\n``     vs RESP2 ``:1/:0\r\n``
+   *   Double         - RESP3 ``,<digits>\r\n`` vs RESP2 ``$<len>\r\n<digits>\r\n``
+   *   BigNumber      - RESP3 ``(<digits>\r\n`` vs RESP2 ``$<len>\r\n<digits>\r\n``
+   *   BlobError      - RESP3 ``!<len>\r\n...`` vs RESP2 ``-<sanitized>\r\n``
+   *   VerbatimString - RESP3 ``=<len>\r\n...`` vs RESP2 ``$<len>\r\n<data>\r\n``
+   *                                                       (format prefix stripped)
+   *   Map            - RESP3 ``%<N>\r\n``      vs RESP2 ``*<2N>\r\n`` (flat)
+   *   Set            - RESP3 ``~<N>\r\n``      vs RESP2 ``*<N>\r\n``
+   *   Push           - RESP3 ``><N>\r\n``      vs RESP2 ``*<N>\r\n``
+   * RESP2 base types (Array, BulkString, Integer, SimpleString, Error) are
+   * encoded identically in both versions and are unaffected by this setting.
+   */
+  virtual void setProtocolVersion(RespProtocolVersion) PURE;
 };
 
 using EncoderPtr = std::unique_ptr<Encoder>;

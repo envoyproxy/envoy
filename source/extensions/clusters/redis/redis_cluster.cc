@@ -364,6 +364,17 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     return;
   }
 
+  // current_request_ is cleared as soon as CLUSTER SLOTS completes, while the
+  // zone-discovery INFO requests it triggers are still in flight. Re-entering
+  // here in that window would start another zone discovery and overwrite
+  // zone_callbacks_, freeing the callbacks that the in-flight INFO requests
+  // still reference (use-after-free). Skip until zone discovery finishes.
+  if (pending_zone_requests_.load() > 0) {
+    ENVOY_LOG(debug, "redis cluster zone discovery is already in progress for '{}'",
+              parent_.info_->name());
+    return;
+  }
+
   // If hosts is empty, we haven't received a successful result from the CLUSTER SLOTS call
   // yet. So, pick a random discovery address from dns and make a request.
   Upstream::HostSharedPtr host;
@@ -386,7 +397,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     // redis cluster implementation
     client->client_ = client_factory_.create(
         host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
-        parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt);
+        parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt,
+        Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2, std::nullopt);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
@@ -746,7 +758,8 @@ void RedisCluster::RedisDiscoverySession::startZoneDiscovery(ClusterSlotsSharedP
       client->host_ = addr;
       client->client_ = client_factory_.create(
           host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
-          parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt);
+          parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt,
+          Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2, std::nullopt);
       client->client_->addConnectionCallbacks(*client);
     }
 

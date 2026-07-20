@@ -481,7 +481,7 @@ TEST(HttpExtProcConfigTest, FullDuplexStreamedValidation) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   // Invalid configuration: FULL_DUPLEX_STREAMED with SKIP trailers
   std::string invalid_yaml = R"EOF(
@@ -519,7 +519,7 @@ TEST(HttpExtProcConfigTest, FullDuplexStreamedValidation) {
   TestUtility::loadFromYaml(other_modes_yaml, *proto_config);
 
   auto other_result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(other_result.ok());
+  EXPECT_OK(other_result);
 }
 
 TEST(HttpExtProcConfigTest, StatusOnErrorConfig) {
