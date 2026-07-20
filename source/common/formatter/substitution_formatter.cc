@@ -463,5 +463,243 @@ std::string JsonFormatterImpl::format(const Context& context,
   return log_line;
 }
 
+// A JSON array node in the format template tree used by OmitEmptyJsonFormatterImpl.
+struct JsonFormatListNode;
+
+// A value within the format template tree used by OmitEmptyJsonFormatterImpl. The value is one of:
+// an omitted literal null, a pre-serialized constant scalar, a substitution command template, a
+// nested object, or a nested array.
+using JsonFormatValue =
+    absl::variant<absl::monostate,                      // Literal null or unset: always omitted.
+                  std::string,                          // Pre-serialized constant JSON scalar.
+                  std::vector<FormatterProviderPtr>,    // Substitution command template.
+                  std::unique_ptr<JsonFormatMapNode>,   // Nested object.
+                  std::unique_ptr<JsonFormatListNode>>; // Nested array.
+
+// A JSON object node in the format template tree used by OmitEmptyJsonFormatterImpl.
+struct JsonFormatMapNode {
+  // Fields are stored sorted by key to keep the output deterministic.
+  std::vector<std::pair<std::string, JsonFormatValue>> fields_;
+};
+
+struct JsonFormatListNode {
+  std::vector<JsonFormatValue> values_;
+};
+
+namespace {
+
+using ProtoDict = Protobuf::Map<std::string, Protobuf::Value>;
+
+absl::StatusOr<std::unique_ptr<JsonFormatMapNode>>
+buildJsonFormatMapNode(const ProtoDict& fields, const std::vector<CommandParserPtr>& commands);
+
+// Converts a single proto value from the JSON format configuration into a format template tree
+// value. Substitution commands are parsed into providers at configuration load time.
+absl::StatusOr<JsonFormatValue>
+buildJsonFormatValue(const Protobuf::Value& value, const std::vector<CommandParserPtr>& commands) {
+  switch (value.kind_case()) {
+  case Protobuf::Value::KIND_NOT_SET:
+  case Protobuf::Value::kNullValue:
+    // A literal null in the configuration is treated as an empty value and omitted.
+    return JsonFormatValue{absl::monostate{}};
+  case Protobuf::Value::kNumberValue: {
+    std::string constant;
+    JsonStringSerializer(constant).addNumber(value.number_value());
+    return JsonFormatValue{std::move(constant)};
+  }
+  case Protobuf::Value::kBoolValue: {
+    std::string constant;
+    JsonStringSerializer(constant).addBool(value.bool_value());
+    return JsonFormatValue{std::move(constant)};
+  }
+  case Protobuf::Value::kStringValue: {
+    absl::string_view string_format = value.string_value();
+    if (!absl::StrContains(string_format, '%')) {
+      // Constant string: sanitize and quote it once at configuration load time.
+      std::string constant;
+      JsonStringSerializer(constant).addString(string_format);
+      return JsonFormatValue{std::move(constant)};
+    }
+    // Substitution command template: parse it into providers.
+    absl::StatusOr<std::vector<FormatterProviderPtr>> providers_or =
+        SubstitutionFormatParser::parse(string_format, commands);
+    RETURN_IF_NOT_OK_REF(providers_or.status());
+    return JsonFormatValue{std::move(providers_or).value()};
+  }
+  case Protobuf::Value::kStructValue: {
+    absl::StatusOr<std::unique_ptr<JsonFormatMapNode>> node_or =
+        buildJsonFormatMapNode(value.struct_value().fields(), commands);
+    RETURN_IF_NOT_OK_REF(node_or.status());
+    return JsonFormatValue{std::move(node_or).value()};
+  }
+  case Protobuf::Value::kListValue: {
+    auto node = std::make_unique<JsonFormatListNode>();
+    node->values_.reserve(value.list_value().values().size());
+    for (const Protobuf::Value& element : value.list_value().values()) {
+      absl::StatusOr<JsonFormatValue> value_or = buildJsonFormatValue(element, commands);
+      RETURN_IF_NOT_OK_REF(value_or.status());
+      node->values_.push_back(std::move(value_or).value());
+    }
+    return JsonFormatValue{std::move(node)};
+  }
+  }
+  return JsonFormatValue{absl::monostate{}};
+}
+
+absl::StatusOr<std::unique_ptr<JsonFormatMapNode>>
+buildJsonFormatMapNode(const ProtoDict& fields, const std::vector<CommandParserPtr>& commands) {
+  std::vector<ProtoDict::const_iterator> sorted_fields;
+  sorted_fields.reserve(fields.size());
+  for (auto it = fields.begin(); it != fields.end(); ++it) {
+    sorted_fields.push_back(it);
+  }
+  // Sort the keys to make the output deterministic.
+  std::sort(sorted_fields.begin(), sorted_fields.end(),
+            [](const ProtoDict::const_iterator& a, const ProtoDict::const_iterator& b) {
+              return a->first < b->first;
+            });
+
+  auto node = std::make_unique<JsonFormatMapNode>();
+  node->fields_.reserve(sorted_fields.size());
+  for (const ProtoDict::const_iterator& field : sorted_fields) {
+    absl::StatusOr<JsonFormatValue> value_or = buildJsonFormatValue(field->second, commands);
+    RETURN_IF_NOT_OK_REF(value_or.status());
+    node->fields_.emplace_back(field->first, std::move(value_or).value());
+  }
+  return node;
+}
+
+bool serializeJsonFormatValue(const JsonFormatValue& value, const Context& context,
+                              const StreamInfo::StreamInfo& info, JsonStringSerializer& serializer,
+                              std::string& buffer, std::string& sanitize);
+
+// Serializes a map node into the output buffer. Returns true if the node produced output that
+// should be kept. When omit_empty_values collapses all fields, a non-root node returns false so
+// its parent omits it, while the root always emits at least an empty object.
+bool serializeJsonFormatMapNode(const JsonFormatMapNode& node, bool is_root, const Context& context,
+                                const StreamInfo::StreamInfo& info,
+                                JsonStringSerializer& serializer, std::string& buffer,
+                                std::string& sanitize) {
+  const size_t node_start = buffer.size();
+  serializer.addMapBeginDelimiter();
+  bool empty = true;
+  for (const auto& field : node.fields_) {
+    const size_t field_start = buffer.size();
+    if (!empty) {
+      serializer.addElementsDelimiter();
+    }
+    serializer.addString(field.first);
+    serializer.addKeyValueDelimiter();
+    if (!serializeJsonFormatValue(field.second, context, info, serializer, buffer, sanitize)) {
+      // The value was omitted; roll back the element delimiter, key and any partial output.
+      buffer.resize(field_start);
+      continue;
+    }
+    empty = false;
+  }
+  serializer.addMapEndDelimiter();
+  if (empty && !is_root) {
+    // A nested object with no retained fields is omitted entirely.
+    buffer.resize(node_start);
+    return false;
+  }
+  return true;
+}
+
+// Serializes a list node into the output buffer. Null elements are skipped, but the array itself
+// is always kept, so an array whose elements are all omitted is serialized as an empty array.
+bool serializeJsonFormatListNode(const JsonFormatListNode& node, const Context& context,
+                                 const StreamInfo::StreamInfo& info,
+                                 JsonStringSerializer& serializer, std::string& buffer,
+                                 std::string& sanitize) {
+  serializer.addArrayBeginDelimiter();
+  bool empty = true;
+  for (const JsonFormatValue& element : node.values_) {
+    const size_t element_start = buffer.size();
+    if (!empty) {
+      serializer.addElementsDelimiter();
+    }
+    if (!serializeJsonFormatValue(element, context, info, serializer, buffer, sanitize)) {
+      buffer.resize(element_start);
+      continue;
+    }
+    empty = false;
+  }
+  serializer.addArrayEndDelimiter();
+  return true;
+}
+
+bool serializeJsonFormatValue(const JsonFormatValue& value, const Context& context,
+                              const StreamInfo::StreamInfo& info, JsonStringSerializer& serializer,
+                              std::string& buffer, std::string& sanitize) {
+  // A literal null or unset value is always omitted.
+  if (absl::holds_alternative<absl::monostate>(value)) {
+    return false;
+  }
+  // A pre-serialized constant scalar is emitted directly.
+  if (absl::holds_alternative<std::string>(value)) {
+    serializer.addRawString(absl::get<std::string>(value));
+    return true;
+  }
+  // A nested object.
+  if (absl::holds_alternative<std::unique_ptr<JsonFormatMapNode>>(value)) {
+    return serializeJsonFormatMapNode(*absl::get<std::unique_ptr<JsonFormatMapNode>>(value),
+                                      /*is_root=*/false, context, info, serializer, buffer,
+                                      sanitize);
+  }
+  // A nested array.
+  if (absl::holds_alternative<std::unique_ptr<JsonFormatListNode>>(value)) {
+    return serializeJsonFormatListNode(*absl::get<std::unique_ptr<JsonFormatListNode>>(value),
+                                       context, info, serializer, buffer, sanitize);
+  }
+
+  // A substitution command template.
+  const auto& formatters = absl::get<std::vector<FormatterProviderPtr>>(value);
+  ASSERT(!formatters.empty());
+  if (formatters.size() == 1) {
+    // Single provider: preserve the value type and omit the key when the value is null.
+    const Protobuf::Value formatted = formatters[0]->formatValue(context, info);
+    if (formatted.kind_case() == Protobuf::Value::kNullValue ||
+        formatted.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+      return false;
+    }
+    Json::Utility::appendValueToString(formatted, buffer);
+    return true;
+  }
+
+  // Multiple providers force a string output which is always kept, even if empty. Missing values
+  // contribute an empty string because omit_empty_values is set.
+  stringValueToLogLine(formatters, context, info, buffer, sanitize, /*omit_empty_values=*/true);
+  return true;
+}
+
+} // namespace
+
+absl::StatusOr<std::unique_ptr<OmitEmptyJsonFormatterImpl>>
+OmitEmptyJsonFormatterImpl::create(const Protobuf::Struct& struct_format,
+                                   const CommandParsers& commands) {
+  absl::StatusOr<std::unique_ptr<JsonFormatMapNode>> root_or =
+      buildJsonFormatMapNode(struct_format.fields(), commands);
+  RETURN_IF_NOT_OK_REF(root_or.status());
+  return std::make_unique<OmitEmptyJsonFormatterImpl>(std::move(root_or).value());
+}
+
+OmitEmptyJsonFormatterImpl::OmitEmptyJsonFormatterImpl(std::unique_ptr<JsonFormatMapNode> root)
+    : root_(std::move(root)) {}
+
+OmitEmptyJsonFormatterImpl::~OmitEmptyJsonFormatterImpl() = default;
+
+std::string OmitEmptyJsonFormatterImpl::format(const Context& context,
+                                               const StreamInfo::StreamInfo& info) const {
+  std::string log_line;
+  log_line.reserve(2048);
+  std::string sanitize; // Helper to sanitize string values.
+  JsonStringSerializer serializer(log_line);
+  serializeJsonFormatMapNode(*root_, /*is_root=*/true, context, info, serializer, log_line,
+                             sanitize);
+  log_line.push_back('\n');
+  return log_line;
+}
+
 } // namespace Formatter
 } // namespace Envoy

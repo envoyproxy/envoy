@@ -103,8 +103,9 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
       return;
     }
     formatter_keep_empty = std::move(formatter_keep_empty_or).value();
+    // The omitting behavior is served by a dedicated tree-structured formatter.
     auto formatter_omit_empty_or =
-        Formatter::JsonFormatterImpl::create(struct_for_json_formatter, true);
+        Formatter::OmitEmptyJsonFormatterImpl::create(struct_for_json_formatter);
     if (!formatter_omit_empty_or.ok()) {
       ENVOY_LOG_MISC(debug, "JSON formatter failed: {}", formatter_omit_empty_or.status());
       return;
