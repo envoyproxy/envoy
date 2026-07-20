@@ -230,6 +230,111 @@ TEST_F(GenericCredentialInjectorPrefixTest, InjectCredentialWithCustomPrefix) {
   filter->onDestroy();
 }
 
+// Tests for stripping of trailing CR/LF from the credential, which commonly ends up in
+// file-based secrets and is not allowed in HTTP header values.
+class GenericCredentialInjectorTrimTest : public testing::Test {
+protected:
+  void setup(const std::string& secret, const std::string& header_value_prefix = "") {
+    secret_reader_ = std::make_shared<MockSecretReader>(secret);
+    auto extension =
+        std::make_shared<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
+            "Authorization", header_value_prefix, secret_reader_);
+    config_ = std::make_shared<FilterConfig>(extension, false, false, "stats", *stats_.rootScope());
+  }
+
+  std::shared_ptr<MockSecretReader> secret_reader_;
+  std::shared_ptr<FilterConfig> config_;
+  NiceMock<Stats::IsolatedStoreImpl> stats_;
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
+};
+
+TEST_F(GenericCredentialInjectorTrimTest, StripTrailingNewline) {
+  setup("myToken123\n");
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config_);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("myToken123", request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+TEST_F(GenericCredentialInjectorTrimTest, StripTrailingCrLf) {
+  setup("myToken123\r\n");
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config_);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("myToken123", request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+TEST_F(GenericCredentialInjectorTrimTest, StripMultipleTrailingNewlines) {
+  setup("myToken123\n\n");
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config_);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("myToken123", request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+TEST_F(GenericCredentialInjectorTrimTest, StripTrailingNewlineWithPrefix) {
+  setup("myToken123\n", "Bearer ");
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config_);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("Bearer myToken123", request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+// Only trailing CR/LF is stripped; other whitespace is preserved.
+TEST_F(GenericCredentialInjectorTrimTest, TrailingSpacePreserved) {
+  setup("myToken123 \n");
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config_);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("myToken123 ", request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+// A secret consisting only of CR/LF is treated as a missing credential.
+TEST_F(GenericCredentialInjectorTrimTest, NewlineOnlySecretTreatedAsMissing) {
+  setup("\n");
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config_);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Envoy::Http::Code code, absl::string_view body,
+                           std::function<void(Envoy::Http::ResponseHeaderMap & headers)>,
+                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           absl::string_view details) {
+        EXPECT_EQ(Envoy::Http::Code::Unauthorized, code);
+        EXPECT_EQ("Failed to inject credential.", body);
+        EXPECT_EQ(grpc_status, std::nullopt);
+        EXPECT_EQ(details, "failed_to_inject_credential");
+      }));
+  filter->decodeHeaders(request_headers, true);
+}
+
 } // namespace
 } // namespace CredentialInjector
 } // namespace HttpFilters
