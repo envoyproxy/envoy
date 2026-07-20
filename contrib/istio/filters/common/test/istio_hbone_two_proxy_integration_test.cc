@@ -255,25 +255,6 @@ typed_config:
   tcp_reporting_duration: 1s
 )EOF",
                                 *ofc->add_filters());
-      // Seed a stable per-connection key used by the network peer_metadata filters to
-      // hand the discovered upstream (server) peer metadata from the connect_originate
-      // listener filter to the encap upstream filter via the thread-local registry.
-      // Shared TRANSITIVE so the same value reaches both the encap upstream connection
-      // and, through the internal_upstream transport, the connect_originate downstream
-      // connection -- letting both filters agree on the registry key.
-      TestUtility::loadFromYaml(R"EOF(
-name: envoy.filters.network.set_filter_state
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
-  on_new_connection:
-  - object_key: envoy.peer_metadata.downstream_connection_id
-    factory_key: envoy.string
-    format_string:
-      text_format_source:
-        inline_string: "%CONNECTION_ID%"
-    shared_with_upstream: TRANSITIVE
-)EOF",
-                                *ofc->add_filters());
       TcpProxy out_tcp;
       out_tcp.set_stat_prefix("outbound_tcp");
       out_tcp.set_cluster("encap");
@@ -294,7 +275,6 @@ filter_chains:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network_filters.peer_metadata.Config
       baggage_key: baggage
-      mode: DATA_STREAM_PREAMBLE
   - name: envoy.filters.network.tcp_proxy
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
@@ -317,7 +297,6 @@ filters:
 - name: envoy.filters.network.upstream.peer_metadata
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.network_filters.peer_metadata.UpstreamConfig
-    mode: DATA_STREAM_PREAMBLE
 load_assignment:
   cluster_name: encap
   endpoints:
@@ -327,14 +306,6 @@ load_assignment:
           envoy_internal_address:
             server_listener_name: connect_originate
             endpoint_id: hbone
-transport_socket:
-  name: envoy.transport_sockets.internal_upstream
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
-    transport_socket:
-      name: envoy.transport_sockets.raw_buffer
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
 )EOF",
                                 *encap);
 
