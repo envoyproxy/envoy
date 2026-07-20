@@ -55,12 +55,15 @@ public:
     if (uses_tls) {
       EXPECT_CALL(server_context_.ssl_context_manager_, createSslClientContext(_, _));
     }
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
     // Below we return a nullptr handle which has no effect on the code under test but isn't
     // actually correct. It's possible this will have to change in the future.
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
-    auto cache = dns_cache_manager_->getCache(config.dns_cache_config()).value();
+    auto cache =
+        dns_cache_manager_
+            ->getCache(ProtobufMessage::getStrictValidationVisitor(), config.dns_cache_config())
+            .value();
     absl::Status creation_status = absl::OkStatus();
     cluster_.reset(new Cluster(cluster_config, std::move(cache), config, factory_context,
                                this->get(), creation_status));

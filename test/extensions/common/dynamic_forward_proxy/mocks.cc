@@ -24,7 +24,7 @@ MockLoadDnsCacheEntryHandle::MockLoadDnsCacheEntryHandle() = default;
 MockLoadDnsCacheEntryHandle::~MockLoadDnsCacheEntryHandle() { onDestroy(); }
 
 MockDnsCacheManager::MockDnsCacheManager() {
-  ON_CALL(*this, getCache(_)).WillByDefault(Return(dns_cache_));
+  ON_CALL(*this, getCache(_, _)).WillByDefault(Return(dns_cache_));
 }
 MockDnsCacheManager::~MockDnsCacheManager() = default;
 

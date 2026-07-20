@@ -15,6 +15,7 @@ namespace DynamicForwardProxy {
 SINGLETON_MANAGER_REGISTRATION(dns_cache_manager);
 
 absl::StatusOr<DnsCacheSharedPtr> DnsCacheManagerImpl::getCache(
+    ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
   const auto& existing_cache = caches_.find(config.name());
   if (existing_cache != caches_.end()) {
@@ -26,7 +27,8 @@ absl::StatusOr<DnsCacheSharedPtr> DnsCacheManagerImpl::getCache(
     return existing_cache->second.cache_;
   }
 
-  auto cache_or_status = DnsCacheImpl::createDnsCacheImpl(context_, config);
+  auto cache_or_status =
+      DnsCacheImpl::createDnsCacheImpl(server_context_, validation_visitor, config);
   RETURN_IF_NOT_OK_REF(cache_or_status.status());
   DnsCacheSharedPtr new_cache = std::move(cache_or_status.value());
   caches_.emplace(config.name(), ActiveCache{config, new_cache});
@@ -34,7 +36,7 @@ absl::StatusOr<DnsCacheSharedPtr> DnsCacheManagerImpl::getCache(
 }
 
 DnsCacheSharedPtr DnsCacheManagerImpl::lookUpCacheByName(absl::string_view cache_name) {
-  ASSERT(context_.serverFactoryContext().mainThreadDispatcher().isThreadSafe());
+  ASSERT(server_context_.mainThreadDispatcher().isThreadSafe());
   const auto& existing_cache = caches_.find(cache_name);
   if (existing_cache != caches_.end()) {
     return existing_cache->second.cache_;
@@ -44,9 +46,9 @@ DnsCacheSharedPtr DnsCacheManagerImpl::lookUpCacheByName(absl::string_view cache
 }
 
 DnsCacheManagerSharedPtr DnsCacheManagerFactoryImpl::get() {
-  return context_.serverFactoryContext().singletonManager().getTyped<DnsCacheManager>(
+  return server_context_.singletonManager().getTyped<DnsCacheManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(dns_cache_manager),
-      [this] { return std::make_shared<DnsCacheManagerImpl>(context_); });
+      [this] { return std::make_shared<DnsCacheManagerImpl>(server_context_); });
 }
 
 } // namespace DynamicForwardProxy

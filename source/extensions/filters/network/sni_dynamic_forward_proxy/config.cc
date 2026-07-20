@@ -20,12 +20,12 @@ SniDynamicForwardProxyNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
     const FilterConfig& proto_config, Server::Configuration::FactoryContext& context) {
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context);
+      context.serverFactoryContext());
 
   absl::Status status = absl::OkStatus();
-  ProxyFilterConfigSharedPtr filter_config(
-      std::make_shared<ProxyFilterConfig>(proto_config, cache_manager_factory,
-                                          context.serverFactoryContext().clusterManager(), status));
+  ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
+      proto_config, cache_manager_factory, context.serverFactoryContext().clusterManager(),
+      context.messageValidationVisitor(), status));
   RETURN_IF_NOT_OK_REF(status);
 
   return [filter_config](Network::FilterManager& filter_manager) -> void {

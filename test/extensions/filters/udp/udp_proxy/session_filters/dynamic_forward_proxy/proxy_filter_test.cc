@@ -61,7 +61,7 @@ public:
       config = proto_config.value();
     }
 
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
     filter_config_ = std::make_shared<ProxyFilterConfig>(config, *this, server_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);

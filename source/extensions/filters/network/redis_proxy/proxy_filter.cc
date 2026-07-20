@@ -43,7 +43,8 @@ ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
     Api::Api& api, TimeSource& time_source,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+    ProtobufMessage::ValidationVisitor& validation_visitor)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
@@ -52,8 +53,9 @@ ProxyFilterConfig::ProxyFilterConfig(
       external_auth_enabled_(config.has_external_auth_provider()),
       external_auth_expiration_enabled_(external_auth_enabled_ &&
                                         config.external_auth_provider().enable_auth_expiration()),
-      dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)),
-      time_source_(time_source), protocol_version_(toCodecRespVersion(config.protocol_version())) {
+      dns_cache_manager_(cache_manager_factory.get()),
+      dns_cache_(getCache(validation_visitor, config)), time_source_(time_source),
+      protocol_version_(toCodecRespVersion(config.protocol_version())) {
 
   if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
     ENVOY_LOG(warn, "redirections without DNS lookups enabled might cause client errors, set the "
@@ -80,9 +82,11 @@ ProxyFilterConfig::ProxyFilterConfig(
 }
 
 Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::getCache(
+    ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config) {
   if (config.settings().has_dns_cache_config()) {
-    auto cache_or_error = dns_cache_manager_->getCache(config.settings().dns_cache_config());
+    auto cache_or_error =
+        dns_cache_manager_->getCache(validation_visitor, config.settings().dns_cache_config());
     if (cache_or_error.status().ok()) {
       return cache_or_error.value();
     }

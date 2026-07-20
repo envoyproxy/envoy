@@ -20,6 +20,10 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+namespace ProtobufMessage {
+class ValidationVisitor;
+} // namespace ProtobufMessage
+
 namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
@@ -315,11 +319,16 @@ public:
 
   /**
    * Get a DNS cache.
+   * @param validation_visitor supplies the validation visitor. It is only used to construct a
+   *                           new cache on a cache miss and must remain valid for the duration
+   *                           of the call. The manager must not retain it, since it may have a
+   *                           shorter lifetime than the manager singleton.
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
    */
   virtual absl::StatusOr<DnsCacheSharedPtr>
-  getCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
+  getCache(ProtobufMessage::ValidationVisitor& validation_visitor,
+           const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
 
   /**
    * Look up an existing DNS cache by name.

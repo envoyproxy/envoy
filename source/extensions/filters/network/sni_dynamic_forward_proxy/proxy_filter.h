@@ -21,7 +21,8 @@ public:
   ProxyFilterConfig(
       const FilterConfig& proto_config,
       Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-      Upstream::ClusterManager& cluster_manager, absl::Status& creation_status);
+      Upstream::ClusterManager& cluster_manager,
+      ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status);
 
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
   uint32_t port() { return port_; }

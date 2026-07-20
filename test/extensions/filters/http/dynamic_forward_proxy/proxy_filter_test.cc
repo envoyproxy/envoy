@@ -63,13 +63,16 @@ public:
   }
 
   virtual void setupFilter() {
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
 
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
         *factory_context_.server_factory_context_.singleton_manager_);
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     filter_config_ = std::make_shared<ProxyFilterConfig>(
-        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        proto_config,
+        dns_cache_manager_
+            ->getCache(factory_context_.messageValidationVisitor(), proto_config.dns_cache_config())
+            .value(),
         this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
@@ -555,7 +558,7 @@ TEST_F(ProxyFilterTest, SubClusterInitTimeout) {
 class UpstreamResolvedHostFilterStateHelper : public ProxyFilterTest {
 public:
   void setupFilter() override {
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
 
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     proto_config.set_save_upstream_address(true);
@@ -564,7 +567,10 @@ public:
         factory_context_.serverFactoryContext().singletonManager());
 
     filter_config_ = std::make_shared<ProxyFilterConfig>(
-        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        proto_config,
+        dns_cache_manager_
+            ->getCache(factory_context_.messageValidationVisitor(), proto_config.dns_cache_config())
+            .value(),
         this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
@@ -722,13 +728,16 @@ public:
 class ProxySettingsProxyFilterTest : public ProxyFilterTest {
 public:
   void setupFilter() override {
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
 
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
         *factory_context_.server_factory_context_.singleton_manager_);
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     filter_config_ = std::make_shared<ProxyFilterConfig>(
-        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        proto_config,
+        dns_cache_manager_
+            ->getCache(factory_context_.messageValidationVisitor(), proto_config.dns_cache_config())
+            .value(),
         this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     mock_filter_ = std::make_unique<NiceMock<MockProxyFilter>>(filter_config_);
     // Set it up such that the filter has proxy settings enabled.
@@ -763,7 +772,7 @@ TEST_F(ProxySettingsProxyFilterTest, HttpWithProxySettings) {
 class ProxyFilterWithFilterStateHostTest : public ProxyFilterTest {
 public:
   void setupFilter() override {
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
 
     Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
         *factory_context_.server_factory_context_.singleton_manager_);
@@ -771,7 +780,10 @@ public:
     // Set allow_dynamic_host_from_filter_state to test filter state functionality
     proto_config.set_allow_dynamic_host_from_filter_state(true);
     filter_config_ = std::make_shared<ProxyFilterConfig>(
-        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        proto_config,
+        dns_cache_manager_
+            ->getCache(factory_context_.messageValidationVisitor(), proto_config.dns_cache_config())
+            .value(),
         this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
@@ -859,7 +871,7 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostPresent) {
 class ProxyFilterWithFilterStateHostDisabledTest : public ProxyFilterTest {
 public:
   void setupFilter() override {
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
 
     Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
         *factory_context_.server_factory_context_.singleton_manager_);
@@ -867,7 +879,10 @@ public:
     // Test default behavior where the flag is false, so filter state should not be checked.
     proto_config.set_allow_dynamic_host_from_filter_state(false);
     filter_config_ = std::make_shared<ProxyFilterConfig>(
-        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        proto_config,
+        dns_cache_manager_
+            ->getCache(factory_context_.messageValidationVisitor(), proto_config.dns_cache_config())
+            .value(),
         this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 

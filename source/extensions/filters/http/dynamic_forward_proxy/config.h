@@ -35,10 +35,12 @@ private:
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 
   // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
-  // (ServerFactoryContext) paths.
+  // (ServerFactoryContext) paths. The validation visitor is the caller's, so each path keeps
+  // its own validation policy.
   static absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
       const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-      Server::Configuration::ServerFactoryContext& context);
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 DECLARE_FACTORY(DynamicForwardProxyFilterFactory);

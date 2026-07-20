@@ -13,14 +13,16 @@ namespace DynamicForwardProxy {
 
 absl::StatusOr<Http::FilterFactoryCb> DynamicForwardProxyFilterFactory::createFilterFactory(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context, context.messageValidationVisitor());
+      context);
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       context.singletonManager());
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
       cache_manager_factory.get();
-  auto cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
+  auto cache_or_error =
+      cache_manager->getCache(validation_visitor, proto_config.dns_cache_config());
   if (!cache_or_error.status().ok()) {
     return cache_or_error.status();
   }
@@ -37,14 +39,15 @@ absl::StatusOr<Http::FilterFactoryCb>
 DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, context.serverFactoryContext());
+  return createFilterFactory(proto_config, context.serverFactoryContext(),
+                             context.messageValidationVisitor());
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
 DynamicForwardProxyFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {
-  return createFilterFactory(proto_config, context);
+  return createFilterFactory(proto_config, context, context.messageValidationVisitor());
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
