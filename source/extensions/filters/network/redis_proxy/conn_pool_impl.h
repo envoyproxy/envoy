@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -30,6 +31,7 @@
 #include "source/extensions/filters/network/redis_proxy/conn_pool.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,7 +45,8 @@ namespace ConnPool {
 #define REDIS_CLUSTER_STATS(COUNTER)                                                               \
   COUNTER(upstream_cx_drained)                                                                     \
   COUNTER(max_upstream_unknown_connections_reached)                                                \
-  COUNTER(connection_rate_limited)
+  COUNTER(connection_rate_limited)                                                                 \
+  COUNTER(upstream_resp3_hello_failure)
 
 struct RedisClusterStats {
   REDIS_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -69,7 +72,7 @@ public:
       std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator,
-      const std::string& local_zone = "");
+      const std::string& local_zone, Common::Redis::RespProtocolVersion protocol_version);
   uint16_t shardSize() override;
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
@@ -225,6 +228,8 @@ private:
         aws_iam_authenticator_;
     std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
     std::string client_zone_; // Zone from node.locality.zone
+    // Mirrors InstanceImpl::protocol_version_; drives upstream HELLO 3 emission.
+    Common::Redis::RespProtocolVersion upstream_protocol_version_;
   };
 
   const std::string& localZone() const { return local_zone_; }
@@ -244,6 +249,8 @@ private:
       aws_iam_authenticator_;
   std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
   const std::string local_zone_; // Zone from node.locality.zone
+  // Listener-level RESP version, mirrored into each ThreadLocalPool on slot creation.
+  const Common::Redis::RespProtocolVersion protocol_version_;
 };
 
 } // namespace ConnPool
