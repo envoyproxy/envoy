@@ -23,6 +23,17 @@ public:
                                     const std::string&,
                                     Server::Configuration::FactoryContext&) override;
 
+  absl::StatusOr<Http::FilterFactoryCb>
+  createHttpFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
+                                        const std::string&,
+                                        Server::Configuration::ServerFactoryContext&) override;
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const envoy::extensions::filters::http::oauth2::v3::OAuth2& config,
+                      const std::string& stats_prefix,
+                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+                      OptRef<Init::Manager> init_manager);
+
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute&,

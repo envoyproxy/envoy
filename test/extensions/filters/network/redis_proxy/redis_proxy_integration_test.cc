@@ -102,6 +102,29 @@ const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
             buffer_flush_timeout: 0.003s
 )EOF";
 
+// RESP3 listener: protocol_version: RESP3 forces both downstream and routed-upstream onto
+// RESP3. Pre-HELLO data commands are gated -NOPROTO; HELLO 3 must precede any data command.
+const std::string CONFIG_RESP3_LISTENER = CONFIG + R"EOF(
+          protocol_version: RESP3
+)EOF";
+
+// RESP3 listener with a downstream password configured, for HELLO 3 AUTH inline-auth coverage.
+// Uses the non-deprecated repeated ``downstream_auth_passwords`` so the config loads under the
+// compile_time_options build (``deprecated_features=disabled`` makes the singular
+// ``downstream_auth_password`` a fatal config rejection).
+const std::string CONFIG_RESP3_LISTENER_WITH_AUTH = CONFIG_RESP3_LISTENER + R"EOF(
+          downstream_auth_passwords:
+          - inline_string: somepassword
+)EOF";
+
+// RESP3 listener with a non-Primary read policy: every routed upstream must negotiate HELLO 3,
+// then READONLY, before any user command. read_policy is a ConnPoolSettings field (12-space
+// indent, inside settings); protocol_version is a RedisProxy field (10-space indent).
+const std::string CONFIG_RESP3_PREFER_REPLICA = CONFIG + R"EOF(
+            read_policy: PREFER_REPLICA
+          protocol_version: RESP3
+)EOF";
+
 // This is a configuration with custom commands.
 const std::string CONFIG_WITH_CUSTOM_COMMANDS = CONFIG + R"EOF(
           custom_commands:
@@ -222,6 +245,13 @@ const std::string CONFIG_WITH_MIRROR = CONFIG_WITH_ROUTES_BASE + R"EOF(
                     numerator: 50
                     denominator: HUNDRED
                   runtime_key: "bogus_key"
+)EOF";
+
+// RESP3 + mirror: the filter-level protocol_version applies to the primary and every mirror conn
+// pool, so each negotiates HELLO 3 independently. Appended at the RedisProxy field level
+// (10-space indent), a sibling of the mirror prefix_routes block above.
+const std::string CONFIG_RESP3_WITH_MIRROR = CONFIG_WITH_MIRROR + R"EOF(
+          protocol_version: RESP3
 )EOF";
 
 const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
@@ -629,6 +659,47 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
   return result.str();
 }
 
+// Canonical RESP3 HELLO reply emitted locally by the proxy. Pin exact bytes so
+// integration tests catch accidental buildHelloReply field/order drift.
+std::string resp3HelloMapReply() {
+  return "%7\r\n"
+         "$6\r\nserver\r\n$17\r\nenvoy-redis-proxy\r\n"
+         "$7\r\nversion\r\n$5\r\n6.0.0\r\n"
+         "$5\r\nproto\r\n:3\r\n"
+         "$2\r\nid\r\n:0\r\n"
+         "$4\r\nmode\r\n$10\r\nstandalone\r\n"
+         "$4\r\nrole\r\n$6\r\nmaster\r\n"
+         "$7\r\nmodules\r\n*0\r\n";
+}
+
+// Downstream RESP3 negotiation: HELLO 3, then consume the proxy's local HELLO map reply. The
+// size overload of waitForData returns an AssertionResult, so ASSERT_TRUE makes a short/missing
+// reply a fatal failure here (the string overload is void and cannot be asserted); ASSERT_EQ then
+// pins the exact bytes so a wrong HELLO reply aborts rather than flowing into the rest of the
+// test. Callers must wrap this in ASSERT_NO_FATAL_FAILURE so the fatal failure also stops the
+// calling test.
+void negotiateDownstreamResp3(IntegrationTcpClientPtr& redis_client) {
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"hello", "3"})));
+  const std::string hello_reply = resp3HelloMapReply();
+  ASSERT_TRUE(redis_client->waitForData(hello_reply.size()));
+  ASSERT_EQ(hello_reply, redis_client->data());
+  redis_client->clearData();
+}
+
+// Upstream RESP3 negotiation on a freshly-accepted raw upstream connection: assert the proxy sent
+// exactly HELLO 3, then reply with a minimal proto:3 map. Appends the HELLO bytes to the caller's
+// cumulative accumulator so the per-command ordering assertions stay visible in the test body.
+// The internal ASSERT_* only return from this helper, so callers must wrap the call in
+// ASSERT_NO_FATAL_FAILURE to propagate a fatal failure to the test.
+void expectUpstreamHello3AndReply(FakeRawConnectionPtr& conn, std::string& expected_upstream) {
+  const std::string hello = makeBulkStringArray({"HELLO", "3"});
+  std::string seen;
+  ASSERT_TRUE(conn->waitForData(hello.size(), &seen));
+  ASSERT_EQ(hello, seen);
+  ASSERT_TRUE(conn->write("%1\r\n$5\r\nproto\r\n:3\r\n"));
+  expected_upstream += hello;
+}
+
 class RedisProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public BaseIntegrationTest {
 public:
@@ -725,7 +796,8 @@ public:
   void roundtripToUpstreamStep(FakeUpstreamPtr& upstream, const std::string& request,
                                const std::string& response, IntegrationTcpClientPtr& redis_client,
                                FakeRawConnectionPtr& fake_upstream_connection,
-                               const std::string& auth_username, const std::string& auth_password);
+                               const std::string& auth_username, const std::string& auth_password,
+                               bool stage_auth_ack = false);
   /**
    * A upstream server expects the request on the upstream and respond with the response.
    * @param upstream a handle to the server that will respond to the request.
@@ -735,12 +807,17 @@ public:
    * server.
    * @param auth_username supplies the fake upstream's server username, if not an empty string.
    * @param auth_password supplies the fake upstream's server password, if not an empty string.
+   * @param stage_auth_ack when true, wait for AUTH bytes only, send +OK, then wait for the
+   *   user request bytes. Required by the AWS-IAM init pipeline which gates user requests in
+   *   ``held_user_requests_`` until the upstream AUTH ack arrives. The default false matches
+   *   the legacy synchronous-AUTH path that ships AUTH and the user request in one burst.
    */
   void expectUpstreamRequestResponse(FakeUpstreamPtr& upstream, const std::string& request,
                                      const std::string& response,
                                      FakeRawConnectionPtr& fake_upstream_connection,
                                      const std::string& auth_username = "",
-                                     const std::string& auth_password = "");
+                                     const std::string& auth_password = "",
+                                     bool stage_auth_ack = false);
 
   /**
    * Similar to ``roundtripToUpstreamStep`` but sends a request and then determines which upstream
@@ -807,6 +884,23 @@ public:
   RedisProxyWithBatchingIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_BATCHING, 2) {}
 };
 
+class RedisProxyResp3ListenerIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyResp3ListenerIntegrationTest() : RedisProxyIntegrationTest(CONFIG_RESP3_LISTENER, 2) {}
+};
+
+class RedisProxyResp3PreferReplicaIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyResp3PreferReplicaIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_RESP3_PREFER_REPLICA, 2) {}
+};
+
+class RedisProxyResp3ListenerWithAuthIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyResp3ListenerWithAuthIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_RESP3_LISTENER_WITH_AUTH, 2) {}
+};
+
 class RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest
     : public Event::TestUsingSimulatedTime,
       public RedisProxyIntegrationTest {
@@ -856,6 +950,12 @@ public:
 class RedisProxyWithMirrorsIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyWithMirrorsIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_MIRROR, 6) {}
+};
+
+class RedisProxyResp3WithMirrorsIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyResp3WithMirrorsIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_RESP3_WITH_MIRROR, 6) {}
 };
 
 class RedisProxyWithCommandStatsIntegrationTest : public RedisProxyIntegrationTest {
@@ -979,6 +1079,49 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithBatchingIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3ListenerIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3ListenerWithAuthIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3PreferReplicaIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3WithMirrorsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// HELLO 3 AUTH <user> <pass> against a RESP3 listener with a downstream password configured:
+// the inline AUTH authenticates the connection and the proxy answers locally with its HELLO Map.
+// No upstream is involved — auth and HELLO negotiation are handled entirely by the proxy. (Only a
+// password is configured, so the Redis 6 ACL synonym ``default`` is the expected username.)
+TEST_P(RedisProxyResp3ListenerWithAuthIntegrationTest, Hello3InlineAuthSucceeds) {
+  const std::string downstream_hello_reply = resp3HelloMapReply();
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(
+      redis_client->write(makeBulkStringArray({"hello", "3", "AUTH", "default", "somepassword"})));
+  redis_client->waitForData(downstream_hello_reply);
+  EXPECT_EQ(downstream_hello_reply, redis_client->data());
+  redis_client->close();
+}
+
+// HELLO 3 AUTH with the wrong password is rejected ``-WRONGPASS``; the connection is not promoted.
+TEST_P(RedisProxyResp3ListenerWithAuthIntegrationTest, Hello3InlineAuthWrongPasswordRejected) {
+  const std::string wrongpass = "-WRONGPASS invalid username-password pair\r\n";
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(
+      redis_client->write(makeBulkStringArray({"hello", "3", "AUTH", "default", "wrongpass"})));
+  redis_client->waitForData(wrongpass);
+  EXPECT_EQ(wrongpass, redis_client->data());
+  redis_client->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -1034,7 +1177,7 @@ void RedisProxyIntegrationTest::initialize() {
 void RedisProxyIntegrationTest::roundtripToUpstreamStep(
     FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
     IntegrationTcpClientPtr& redis_client, FakeRawConnectionPtr& fake_upstream_connection,
-    const std::string& auth_username, const std::string& auth_password) {
+    const std::string& auth_username, const std::string& auth_password, bool stage_auth_ack) {
   redis_client->clearData();
   if (fake_upstream_connection.get() != nullptr) {
     fake_upstream_connection->clearData();
@@ -1042,7 +1185,7 @@ void RedisProxyIntegrationTest::roundtripToUpstreamStep(
   ASSERT_TRUE(redis_client->write(request));
 
   expectUpstreamRequestResponse(upstream, request, response, fake_upstream_connection,
-                                auth_username, auth_password);
+                                auth_username, auth_password, stage_auth_ack);
 
   redis_client->waitForData(response);
   // The original response should be received by the fake Redis client.
@@ -1052,7 +1195,7 @@ void RedisProxyIntegrationTest::roundtripToUpstreamStep(
 void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
     FakeRawConnectionPtr& fake_upstream_connection, const std::string& auth_username,
-    const std::string& auth_password) {
+    const std::string& auth_password, bool stage_auth_ack) {
   std::string proxy_to_server;
   bool expect_auth_command = false;
   std::string ok = "+OK\r\n";
@@ -1066,15 +1209,27 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     std::string auth_command = (auth_username.empty())
                                    ? makeBulkStringArray({"auth", auth_password})
                                    : makeBulkStringArray({"auth", auth_username, auth_password});
-    EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
-                                                      &proxy_to_server));
-    // EXPECT_TRUE(fake_upstream_connection->waitForData(450,
-    //                                                   &proxy_to_server));
-    // The original request should be the same as the data received by the server.
-    EXPECT_EQ(auth_command + request, proxy_to_server);
-    // Send back an OK for the auth command.
-    EXPECT_TRUE(fake_upstream_connection->write(ok));
-
+    if (stage_auth_ack) {
+      // AWS-IAM init pipeline: AUTH lands first, the upstream client holds the user request
+      // in held_user_requests_ until +OK arrives, then drains. waitForData waits for an exact
+      // byte count, so we MUST split the wait into two phases — combining AUTH + request in a
+      // single waitForData would never see the buffer settle at the combined size before +OK
+      // is written, and after +OK it would never see exactly auth.size() either.
+      EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size(), &proxy_to_server));
+      EXPECT_EQ(auth_command, proxy_to_server);
+      EXPECT_TRUE(fake_upstream_connection->write(ok));
+      EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
+                                                        &proxy_to_server));
+      EXPECT_EQ(auth_command + request, proxy_to_server);
+    } else {
+      // Legacy synchronous-AUTH path: the upstream client snaps to Ready inline and ships
+      // AUTH and the user request together in a single burst, so a single waitForData on
+      // the combined size is the correct expectation.
+      EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
+                                                        &proxy_to_server));
+      EXPECT_EQ(auth_command + request, proxy_to_server);
+      EXPECT_TRUE(fake_upstream_connection->write(ok));
+    }
   } else {
     EXPECT_TRUE(fake_upstream_connection->waitForData(request.size(), &proxy_to_server));
     // The original request should be the same as the data received by the server.
@@ -1347,6 +1502,472 @@ TEST_P(RedisProxyIntegrationTest, HelloCommand) {
   simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
 }
 
+// RESP2 listener (the default) rejects explicit ``HELLO 3`` with ``-NOPROTO`` — the proxy
+// only allows the listener-configured version. simpleProxyResponse confirms no upstream
+// connection is created since the response is generated locally before any dispatch.
+TEST_P(RedisProxyIntegrationTest, Resp2ListenerRejectsHello3) {
+  const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "3"}), error_response);
+}
+
+// RESP2 listener, HELLO 2: the proxy builds the HELLO reply as a RESP3 Map internally, then the
+// encoder DOWN-CONVERTS it to a flat RESP2 array for the RESP2-negotiated downstream — the ``%7``
+// Map becomes ``*14`` with the seven key/value pairs flattened (proto is reported as ``:2``). Pins
+// the Map->array RESP2 down-conversion end-to-end on the local HELLO reply path.
+TEST_P(RedisProxyIntegrationTest, Resp2ListenerHello2RepliesFlatArray) {
+  const std::string hello2_flat_reply = "*14\r\n"
+                                        "$6\r\nserver\r\n$17\r\nenvoy-redis-proxy\r\n"
+                                        "$7\r\nversion\r\n$5\r\n6.0.0\r\n"
+                                        "$5\r\nproto\r\n:2\r\n"
+                                        "$2\r\nid\r\n:0\r\n"
+                                        "$4\r\nmode\r\n$10\r\nstandalone\r\n"
+                                        "$4\r\nrole\r\n$6\r\nmaster\r\n"
+                                        "$7\r\nmodules\r\n*0\r\n";
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"hello", "2"})));
+  redis_client->waitForData(hello2_flat_reply);
+  EXPECT_EQ(hello2_flat_reply, redis_client->data());
+  redis_client->close();
+}
+
+// RESP3 listener rejects any data command sent before a successful ``HELLO 3`` handshake
+// with ``-NOPROTO``. The gate runs in ``ProxyFilter::processRespValue`` before reaching the
+// splitter or conn pool, so the response is generated locally. The proxy-filter unit suite
+// (``RedisProxyFilterResp3Test.GetBeforeHelloRejectedNoproto``) asserts ``Times(0)`` on the
+// splitter to pin "no upstream dispatch"; this integration covers the wire-level error
+// shape.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, GetBeforeHelloRejectedNoproto) {
+  const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"get", "foo"}), error_response);
+  // The pre-HELLO gate increments ``downstream_rq_noproto`` as it rejects the data command. The
+  // unit suite covers the gate logic; this pins the wired stat end-to-end.
+  test_server_->waitForCounter("redis.redis_stats.downstream_rq_noproto", testing::Eq(1));
+}
+
+// RESP3 listener positive path — full HELLO 3 + GET round trip:
+//   * downstream HELLO 3 → proxy answers locally with the HELLO Map (proto=3);
+//   * downstream GET foo → proxy opens an upstream connection and sends HELLO 3 first
+//     (the upstream init pipeline);
+//   * upstream replies with a HELLO Map containing proto=3, which the proxy's
+//     ``isHello3SuccessResponse`` check accepts;
+//   * proxy then ships the held GET foo to upstream;
+//   * upstream replies ``$5\r\nhello\r\n`` and the proxy forwards it to the downstream client.
+// The proxy HELLO Map bytes mirror ``buildHelloReply(3)`` in command_splitter_impl.cc; the
+// upstream HELLO Map only needs ``proto:3`` to be accepted by Hello3InitCallbacks.
+TEST_P(RedisProxyResp3ListenerIntegrationTest,
+       Hello3ThenGetFullRoundtripWithUpstreamHelloNegotiation) {
+  initialize();
+
+  // Proxy's local HELLO 3 reply (see resp3HelloMapReply / buildHelloReply).
+  const std::string downstream_hello_reply = resp3HelloMapReply();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  // Step 1: downstream HELLO 3 -> proxy local Map reply.
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"hello", "3"})));
+  redis_client->waitForData(downstream_hello_reply);
+  EXPECT_EQ(downstream_hello_reply, redis_client->data());
+  redis_client->clearData();
+
+  // Step 2: downstream GET foo -> opens upstream, which the proxy first hits with HELLO 3.
+  const std::string get_request = makeBulkStringArray({"get", "foo"});
+  ASSERT_TRUE(redis_client->write(get_request));
+
+  // Stage A: upstream sees HELLO 3 first (held-user-request gate behind HELLO).
+  const std::string upstream_hello_request = makeBulkStringArray({"HELLO", "3"});
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string proxy_to_server;
+  EXPECT_TRUE(
+      fake_upstream_connection->waitForData(upstream_hello_request.size(), &proxy_to_server));
+  EXPECT_EQ(upstream_hello_request, proxy_to_server);
+
+  // Minimal valid HELLO 3 reply: a single-pair Map with proto=3 (proxy's
+  // isHello3SuccessResponse only looks for that key).
+  const std::string upstream_hello_reply = "%1\r\n$5\r\nproto\r\n:3\r\n";
+  EXPECT_TRUE(fake_upstream_connection->write(upstream_hello_reply));
+
+  // Stage B: held GET foo flushes to upstream after HELLO 3 succeeds.
+  proxy_to_server.clear();
+  EXPECT_TRUE(fake_upstream_connection->waitForData(
+      upstream_hello_request.size() + get_request.size(), &proxy_to_server));
+  EXPECT_EQ(upstream_hello_request + get_request, proxy_to_server);
+
+  // Stage C: upstream replies; proxy forwards to client.
+  const std::string get_reply = "$5\r\nhello\r\n";
+  EXPECT_TRUE(fake_upstream_connection->write(get_reply));
+  redis_client->waitForData(get_reply);
+  EXPECT_EQ(get_reply, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// RESP3 typed-payload fidelity: after HELLO 3 negotiation, upstream replies carrying RESP3
+// Double, Map, and Set frames must each reach the downstream client byte-identical. The proxy
+// decodes and re-encodes in RESP3 (no cross-version down-conversion), and the Double payload
+// bytes are preserved verbatim. Pins the end-to-end fidelity the codec unit tests assert in
+// isolation.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, Resp3TypedPayloadPassthrough) {
+  initialize();
+
+  // Full proxy-local HELLO 3 reply (see Hello3ThenGetFullRoundtrip... above). Wait for ALL of
+  // it before clearing so trailing bytes cannot bleed into the first upstream reply assertion.
+  const std::string downstream_hello_reply = resp3HelloMapReply();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  // Negotiate downstream RESP3 (consume the proxy's full local HELLO Map reply).
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"hello", "3"})));
+  redis_client->waitForData(downstream_hello_reply);
+  redis_client->clearData();
+
+  // First command opens the upstream and triggers the proxy's upstream HELLO 3 negotiation.
+  const std::string upstream_hello_request = makeBulkStringArray({"HELLO", "3"});
+  const std::string zscore_request = makeBulkStringArray({"zscore", "k", "m"});
+  ASSERT_TRUE(redis_client->write(zscore_request));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string proxy_to_server;
+  // Wait for the proxy's upstream HELLO 3 to land BEFORE replying — the fake raw connection
+  // accumulates received bytes and matches them FIFO, so writing a reply before the request has
+  // been forwarded would race that matching. Every wait below targets the cumulative byte total.
+  EXPECT_TRUE(
+      fake_upstream_connection->waitForData(upstream_hello_request.size(), &proxy_to_server));
+  EXPECT_EQ(upstream_hello_request, proxy_to_server);
+  // HELLO 3 answered: this unblocks the held ``ZSCORE``, which now flushes to the upstream.
+  EXPECT_TRUE(fake_upstream_connection->write("%1\r\n$5\r\nproto\r\n:3\r\n"));
+  std::string expected_upstream = upstream_hello_request + zscore_request;
+  EXPECT_TRUE(fake_upstream_connection->waitForData(expected_upstream.size(), &proxy_to_server));
+  EXPECT_EQ(expected_upstream, proxy_to_server);
+
+  // For each typed RESP3 frame: upstream writes it, the downstream client must receive the
+  // exact bytes. The Double uses a non-canonical form with a trailing zero (``3.140``) that a
+  // parse-then-reformat round-trip would collapse to ``3.14`` — preserving it proves the proxy
+  // ships the raw payload through unchanged. Each request/reply is fully drained before the next
+  // so the assertions stay deterministic.
+  auto roundtrip = [&](const std::string& request, const std::string& reply) {
+    if (!request.empty()) {
+      ASSERT_TRUE(redis_client->write(request));
+      expected_upstream += request;
+      EXPECT_TRUE(
+          fake_upstream_connection->waitForData(expected_upstream.size(), &proxy_to_server));
+      EXPECT_EQ(expected_upstream, proxy_to_server);
+    }
+    EXPECT_TRUE(fake_upstream_connection->write(reply));
+    redis_client->waitForData(reply);
+    EXPECT_EQ(reply, redis_client->data());
+    redis_client->clearData();
+  };
+
+  // All three commands are issued over the single upstream connection the test drives above, so
+  // the cumulative per-connection byte assertions stay deterministic.
+  //
+  // Double reply to the already-dispatched ``ZSCORE`` (request empty — already on the wire).
+  roundtrip("", ",3.140\r\n");
+  // Map reply (``HGETALL``).
+  roundtrip(makeBulkStringArray({"hgetall", "k"}), "%1\r\n$1\r\nf\r\n$1\r\nv\r\n");
+  // Set reply (``SMEMBERS``).
+  roundtrip(makeBulkStringArray({"smembers", "k"}), "~2\r\n$1\r\na\r\n$1\r\nb\r\n");
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// Upstream HELLO 3 failure surfaces as an ``upstream_resp3_hello_failure`` stat increment. On a
+// RESP3 listener every routed upstream connection negotiates ``HELLO 3``; an upstream that
+// answers with ``proto`` != 3 (here a Redis 6-style ``proto:2`` Map) fails negotiation. Docs and
+// the proto comment describe this stat as the operational signal for a misconfigured upstream,
+// so pin it end-to-end.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, UpstreamHello3FailureIncrementsStat) {
+  initialize();
+
+  // Full proxy-local HELLO 3 reply — wait for ALL of it before clearing so trailing bytes
+  // cannot bleed into the held GET's error reply assertion below.
+  const std::string downstream_hello_reply = resp3HelloMapReply();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  // Negotiate downstream RESP3 (the proxy answers HELLO 3 locally with its Map).
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"hello", "3"})));
+  redis_client->waitForData(downstream_hello_reply);
+  redis_client->clearData();
+
+  // A data command opens the upstream; the proxy sends HELLO 3 first.
+  const std::string upstream_hello_request = makeBulkStringArray({"HELLO", "3"});
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"get", "k"})));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string proxy_to_server;
+  EXPECT_TRUE(
+      fake_upstream_connection->waitForData(upstream_hello_request.size(), &proxy_to_server));
+  EXPECT_EQ(upstream_hello_request, proxy_to_server);
+
+  // Upstream answers HELLO 3 with proto=2 — negotiation fails. The proxy then, in order:
+  //   (1) increments upstream_resp3_hello_failure,
+  //   (2) fails the held GET downstream with ``-upstream failure``,
+  //   (3) closes the failed upstream connection (ClientImpl::onInitFailure -> connection close).
+  EXPECT_TRUE(fake_upstream_connection->write("%1\r\n$5\r\nproto\r\n:2\r\n"));
+
+  // (1) The failure counter must increment.
+  test_server_->waitForCounter("cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure",
+                               testing::Ge(1));
+
+  // (2) Downstream-visible behavior: the held GET fails — the proxy returns ``-upstream failure``.
+  const std::string upstream_failure_reply = "-upstream failure\r\n";
+  redis_client->waitForData(upstream_failure_reply);
+  EXPECT_EQ(upstream_failure_reply, redis_client->data());
+
+  // (3) Wait for the proxy to tear the failed upstream connection down, making the teardown
+  // ordering explicit instead of leaving the connection dangling until test exit.
+  EXPECT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  redis_client->close();
+}
+
+// RESP3 server-initiated Push frames (``>N``) from the upstream are not replies; the proxy's
+// upstream client drops them (ClientImpl::onRespValue) without forwarding to the downstream or
+// disturbing the request pipeline. Wire-level companion to the client_impl_test Push unit tests:
+// an upstream Push interleaved before a GET reply must not reach the client, and the GET reply
+// must still arrive intact.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, UpstreamPushFrameDroppedBeforeReply) {
+  initialize();
+
+  const std::string downstream_hello_reply = resp3HelloMapReply();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  // Negotiate downstream RESP3.
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"hello", "3"})));
+  redis_client->waitForData(downstream_hello_reply);
+  redis_client->clearData();
+
+  // GET opens the upstream; the proxy negotiates HELLO 3 first.
+  const std::string upstream_hello_request = makeBulkStringArray({"HELLO", "3"});
+  const std::string get_request = makeBulkStringArray({"get", "k"});
+  ASSERT_TRUE(redis_client->write(get_request));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string proxy_to_server;
+  EXPECT_TRUE(
+      fake_upstream_connection->waitForData(upstream_hello_request.size(), &proxy_to_server));
+  EXPECT_EQ(upstream_hello_request, proxy_to_server);
+  EXPECT_TRUE(fake_upstream_connection->write("%1\r\n$5\r\nproto\r\n:3\r\n"));
+
+  // The held GET flushes once HELLO 3 succeeds.
+  proxy_to_server.clear();
+  EXPECT_TRUE(fake_upstream_connection->waitForData(
+      upstream_hello_request.size() + get_request.size(), &proxy_to_server));
+  EXPECT_EQ(upstream_hello_request + get_request, proxy_to_server);
+
+  // Upstream emits a server-initiated Push frame and THEN the real GET reply in a single write.
+  // The proxy must drop the Push and forward only the GET reply.
+  const std::string get_reply = "$5\r\nhello\r\n";
+  EXPECT_TRUE(fake_upstream_connection->write(">1\r\n$4\r\nping\r\n" + get_reply));
+
+  // Downstream sees exactly the GET reply — the Push never arrives, and the FIFO is intact.
+  redis_client->waitForData(get_reply);
+  EXPECT_EQ(get_reply, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// RESP3 listener also rejects bare ``HELLO`` (no version argument) on a fresh connection.
+// Bare HELLO inherits the connection's current downstream RESP version (default 2 on a fresh
+// connection); the exact-match check against the listener's required RESP3 fails. After a
+// successful ``HELLO 3`` the connection would be on version 3 and bare HELLO would be
+// accepted — covered by the splitter unit tests.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, BareHelloOnFreshConnectionRejectedNoproto) {
+  const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello"}), error_response);
+}
+
+// RESP3 listener rejects an explicit ``HELLO 2`` (and any version that is not the listener's
+// required version) with ``-NOPROTO``. Symmetric to the RESP2-listener-rejects-HELLO3 test.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, Hello2OnResp3ListenerRejectedNoproto) {
+  const std::string error_response = "-NOPROTO unsupported protocol version\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "2"}), error_response);
+}
+
+// RESP3 + non-Primary read policy: a routed upstream must negotiate HELLO 3, then READONLY,
+// before the held user command flushes. Pins the wire-level init order (HELLO 3 -> READONLY ->
+// GET); the unit test covers only the state machine.
+TEST_P(RedisProxyResp3PreferReplicaIntegrationTest,
+       Resp3NonPrimaryReadPolicySendsReadonlyBeforeUserCommand) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_NO_FATAL_FAILURE(negotiateDownstreamResp3(redis_client));
+
+  // The first data command opens the upstream and is held behind init.
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"get", "k"})));
+
+  FakeRawConnectionPtr conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn));
+
+  std::string seen;
+  std::string expected;
+  ASSERT_NO_FATAL_FAILURE(expectUpstreamHello3AndReply(conn, expected));
+
+  // READONLY follows HELLO 3 success. The GET must NOT be on the wire yet — the exact-size wait
+  // would fail if it had raced ahead of READONLY.
+  expected += makeBulkStringArray({"readonly"});
+  ASSERT_TRUE(conn->waitForData(expected.size(), &seen));
+  ASSERT_EQ(expected, seen);
+  ASSERT_TRUE(conn->write("+OK\r\n"));
+
+  // READONLY acked: the held GET flushes.
+  expected += makeBulkStringArray({"get", "k"});
+  ASSERT_TRUE(conn->waitForData(expected.size(), &seen));
+  ASSERT_EQ(expected, seen);
+  ASSERT_TRUE(conn->write("$3\r\nbar\r\n"));
+
+  redis_client->waitForData("$3\r\nbar\r\n");
+  EXPECT_EQ("$3\r\nbar\r\n", redis_client->data());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure")
+                   ->value());
+
+  EXPECT_TRUE(conn->close());
+  redis_client->close();
+}
+
+// RESP3 + transaction: the dedicated transaction client must negotiate HELLO 3 with the upstream
+// before MULTI...EXEC reaches Redis. The conn-pool unit test confirms the transaction path is
+// constructed with Resp3; this pins the real wire ordering end-to-end.
+TEST_P(RedisProxyResp3ListenerIntegrationTest, Resp3TransactionNegotiatesHello3BeforeMultiExec) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_NO_FATAL_FAILURE(negotiateDownstreamResp3(redis_client));
+
+  const std::string txn = makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "k", "v"}) +
+                          makeBulkStringArray({"get", "k"}) + makeBulkStringArray({"exec"});
+  // A value, never a const-ref bound to a temporary.
+  const std::string response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$1\r\nv\r\n";
+  ASSERT_TRUE(redis_client->write(txn));
+
+  FakeRawConnectionPtr conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn));
+
+  std::string seen;
+  std::string expected;
+  // Only HELLO 3 is on the wire so far — no transaction command precedes negotiation success.
+  ASSERT_NO_FATAL_FAILURE(expectUpstreamHello3AndReply(conn, expected));
+
+  // HELLO 3 acked: the held MULTI...EXEC flush in order on the same upstream connection.
+  expected += txn;
+  ASSERT_TRUE(conn->waitForData(expected.size(), &seen));
+  ASSERT_EQ(expected, seen);
+  ASSERT_TRUE(conn->write(response));
+
+  redis_client->waitForData(response);
+  EXPECT_EQ(response, redis_client->data());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure")
+                   ->value());
+
+  EXPECT_TRUE(conn->close());
+  redis_client->close();
+}
+
+// RESP3 + transaction HELLO 3 FAILURE: the dedicated transaction client owns its upstream
+// connection, a different ownership path than the pooled-client failure covered by
+// UpstreamHello3FailureIncrementsStat. When that client's HELLO 3 is answered with proto=2,
+// negotiation must fail cleanly: the failure counter increments, the held MULTI...EXEC is failed
+// downstream, and the transaction client's connection is torn down (no half-open transaction).
+TEST_P(RedisProxyResp3ListenerIntegrationTest, Resp3TransactionHello3FailureFailsHeldMultiExec) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_NO_FATAL_FAILURE(negotiateDownstreamResp3(redis_client));
+
+  const std::string txn = makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "k", "v"}) +
+                          makeBulkStringArray({"exec"});
+  ASSERT_TRUE(redis_client->write(txn));
+
+  // The transaction opens a dedicated upstream connection; HELLO 3 is sent before any MULTI byte.
+  FakeRawConnectionPtr conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn));
+  const std::string upstream_hello = makeBulkStringArray({"HELLO", "3"});
+  std::string seen;
+  ASSERT_TRUE(conn->waitForData(upstream_hello.size(), &seen));
+  ASSERT_EQ(upstream_hello, seen);
+
+  // Answer HELLO 3 with proto=2 → negotiation fails on the transaction client.
+  ASSERT_TRUE(conn->write("%1\r\n$5\r\nproto\r\n:2\r\n"));
+
+  // The failure counter increments and the held transaction fails downstream rather than
+  // reaching Redis (a half-open transaction must not survive). MULTI was already answered
+  // locally with +OK to open the transaction; the queued SET and the EXEC then each fail with
+  // ``-upstream failure`` when the transaction client's HELLO 3 negotiation fails — so the
+  // full downstream reply is the local MULTI ack followed by two upstream-failure errors.
+  test_server_->waitForCounter("cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure",
+                               testing::Ge(1));
+  const std::string expected_reply = "+OK\r\n-upstream failure\r\n-upstream failure\r\n";
+  redis_client->waitForData(expected_reply);
+  EXPECT_EQ(expected_reply, redis_client->data());
+
+  // The transaction client's connection is torn down; no MULTI/SET/EXEC byte ever reached the
+  // upstream (only HELLO 3 did).
+  EXPECT_TRUE(conn->waitForDisconnect());
+
+  redis_client->close();
+}
+// RESP3 + mirror: the filter-level protocol_version applies to the mirror conn pools too, so the
+// primary AND every mirror upstream negotiate HELLO 3 before the mirrored write. Pins that a
+// mirror does not silently stay on RESP2 and that the mirrored SET never precedes its HELLO 3.
+TEST_P(RedisProxyResp3WithMirrorsIntegrationTest,
+       Resp3MirroredWriteNegotiatesHello3OnPrimaryAndMirror) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_NO_FATAL_FAILURE(negotiateDownstreamResp3(redis_client));
+
+  const std::string set = makeBulkStringArray({"set", "mirror_key", "value"});
+  ASSERT_TRUE(redis_client->write(set));
+
+  // Primary cluster_0 ([0]) and mirror clusters cluster_1 ([2]) / cluster_2 ([4]) each open their
+  // own upstream and independently negotiate HELLO 3 before the SET. Distinct mirror replies make
+  // the "mirror reply is ignored" assertion meaningful.
+  std::array<FakeRawConnectionPtr, 3> conns;
+  auto negotiate_leg = [&](size_t slot, int upstream_index, const std::string& reply) {
+    ASSERT_TRUE(fake_upstreams_[upstream_index]->waitForRawConnection(conns[slot]));
+    std::string seen;
+    std::string expected;
+    ASSERT_NO_FATAL_FAILURE(expectUpstreamHello3AndReply(conns[slot], expected));
+    expected += set; // the mirrored SET must not appear before this leg's HELLO 3.
+    ASSERT_TRUE(conns[slot]->waitForData(expected.size(), &seen));
+    ASSERT_EQ(expected, seen);
+    ASSERT_TRUE(conns[slot]->write(reply));
+  };
+  ASSERT_NO_FATAL_FAILURE(negotiate_leg(0, 0, "+OK\r\n"));        // primary cluster_0
+  ASSERT_NO_FATAL_FAILURE(negotiate_leg(1, 2, "$4\r\nbar1\r\n")); // mirror cluster_1 (ignored)
+  ASSERT_NO_FATAL_FAILURE(negotiate_leg(2, 4, "$4\r\nbar2\r\n")); // mirror cluster_2 (ignored)
+
+  // Only the primary's reply reaches downstream.
+  redis_client->waitForData("+OK\r\n");
+  EXPECT_EQ("+OK\r\n", redis_client->data());
+
+  // HELLO 3 succeeded on every conn pool (primary + both mirrors).
+  for (const char* stat : {
+           "cluster.cluster_0.redis_cluster.upstream_resp3_hello_failure",
+           "cluster.cluster_1.redis_cluster.upstream_resp3_hello_failure",
+           "cluster.cluster_2.redis_cluster.upstream_resp3_hello_failure",
+       }) {
+    EXPECT_EQ(0, test_server_->counter(stat)->value());
+  }
+
+  for (auto& conn : conns) {
+    EXPECT_TRUE(conn->close());
+  }
+  redis_client->close();
+}
+
 // This test sends an invalid Redis command from a fake
 // downstream client to the envoy proxy. Envoy will respond
 // with an invalid request error.
@@ -1560,7 +2181,7 @@ TEST_P(RedisProxyWithBatchingIntegrationTest, SimpleBatching) {
   initialize();
 
   const std::string& request = makeBulkStringArray({"get", "foo"});
-  const std::string& response = "$3\r\nbar\r\n";
+  const std::string response = "$3\r\nbar\r\n";
 
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client_1 = makeTcpConnection(lookupPort("redis_proxy"));
@@ -1737,7 +2358,9 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
 
-  // roundtrip to cluster_0 (catch_all route)
+  // roundtrip to cluster_0 (catch_all route). The IAM init pipeline holds the user request
+  // until the upstream AUTH +OK arrives, so the helper must stage the AUTH ack — see
+  // expectUpstreamRequestResponse's stage_auth_ack branch for the rationale.
   roundtripToUpstreamStep(
       fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n", redis_client,
       fake_upstream_connection[0], "cluster_0_username",
@@ -1745,7 +2368,8 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
       "?Action=connect&User=cluster_0_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
       "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
       "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-      "b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host");
+      "b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host",
+      /*stage_auth_ack=*/true);
 
   // roundtrip to cluster_1 (prefix "foo:" route)
   roundtripToUpstreamStep(
@@ -1755,7 +2379,8 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
       "?Action=connect&User=cluster_1_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
       "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
       "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-      "8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host");
+      "8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host",
+      /*stage_auth_ack=*/true);
 
   // roundtrip to cluster_2 (prefix "baz:" route)
   roundtripToUpstreamStep(
@@ -1765,7 +2390,8 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
       "?Action=connect&User=cluster_2_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
       "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
       "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-      "0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host");
+      "0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host",
+      /*stage_auth_ack=*/true);
 
   EXPECT_TRUE(fake_upstream_connection[0]->close());
   EXPECT_TRUE(fake_upstream_connection[1]->close());
@@ -1863,7 +2489,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
 
   std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
   const std::string& request = makeBulkStringArray({"get", "toto"});
-  const std::string& response = "$3\r\nbar\r\n";
+  const std::string response = "$3\r\nbar\r\n";
   // roundtrip to cluster_0 (catch_all route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   ASSERT_TRUE(redis_client->write(request));
@@ -1895,7 +2521,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredTransaction) {
   std::string request = makeBulkStringArray({"MULTI"}) +
                         makeBulkStringArray({"set", "foo", "bar"}) +
                         makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
-  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+  const std::string response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
 
   // roundtrip to cluster_0 (catch_all route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -1925,7 +2551,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
 
   std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
   const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
-  const std::string& set_response = ":1\r\n";
+  const std::string set_response = ":1\r\n";
 
   // roundtrip to cluster_0 (write_only route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -1952,7 +2578,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
 
   FakeRawConnectionPtr cluster_0_connection;
   const std::string& get_request = makeBulkStringArray({"get", "write_only:toto"});
-  const std::string& get_response = "$3\r\nbar\r\n";
+  const std::string get_response = "$3\r\nbar\r\n";
 
   // roundtrip to cluster_0 (write_only route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -1979,7 +2605,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
   // When random_value is < 50, the percentage:* will be mirrored, random() default is 0
   const std::string& request = makeBulkStringArray({"get", "percentage:toto"});
-  const std::string& response = "$3\r\nbar\r\n";
+  const std::string response = "$3\r\nbar\r\n";
   // roundtrip to cluster_0 (catch_all route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   ASSERT_TRUE(redis_client->write(request));
@@ -2012,7 +2638,7 @@ TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
 
 TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
   const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
-  const std::string& set_response = ":1\r\n";
+  const std::string set_response = ":1\r\n";
   initialize();
   simpleRequestAndResponse(set_request, set_response);
 
@@ -2223,7 +2849,7 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
   std::string transaction_commands =
       makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"}) +
       makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
-  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+  const std::string response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   ASSERT_TRUE(redis_client->write(transaction_commands));
 
@@ -2260,7 +2886,7 @@ TEST_P(RedisProxyWithCustomCommandsIntegrationTest, PipelinedTransactionWithCust
   redis_client->close();
 }
 
-// TODO: Add full transaction test.
+// TODO: Add full transaction semantics coverage (DISCARD/WATCH/abort/error paths).
 
 TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSentExternal) {
   initialize();

@@ -102,6 +102,31 @@ TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
   EXPECT_TRUE(route_config != nullptr);
 }
 
+TEST(ApiKeyAuthFilterFactoryTest, CreateFilterWithServerContext) {
+  const std::string yaml = R"(
+  credentials:
+  - key: key1
+    client: user1
+  - key: key2
+    client: user2
+  key_sources:
+  - header: "Authorization"
+  )";
+
+  ApiKeyAuthProto proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  ApiKeyAuthFilterFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
 } // namespace
 } // namespace ApiKeyAuth
 } // namespace HttpFilters

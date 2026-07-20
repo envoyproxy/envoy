@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -712,7 +713,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   expectReloadStats("city_db", 1, 0);
   captured_lookup_response_.clear();
@@ -754,7 +755,7 @@ TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   expectReloadStats("city_db", 1, 0);
   expectStats("city_db", 0, 0, 0, 1753263760);
@@ -1057,7 +1058,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   expectReloadStats(test_case.db_type_, 1, 0);
   captured_lookup_response_.clear();
@@ -1113,7 +1114,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloadedInFlightReadsNotAffected) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   GeoipProviderPeer::synchronizer(provider_).signal(lookup_sync_point_name);
   t0.join();
@@ -1189,7 +1190,7 @@ TEST_P(MmdbReloadErrorImplTest, MmdbReloadErrorUsesPreviousDb) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   // On reload error the old db instance should be used for subsequent lookup requests.
   expectReloadStats(test_case.db_type_, 0, 1);
