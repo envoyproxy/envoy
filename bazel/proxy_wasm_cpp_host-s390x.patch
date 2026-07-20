@@ -1,0 +1,12 @@
+--- a/include/proxy-wasm/wasm.h
++++ b/include/proxy-wasm/wasm.h
+@@ -444,7 +444,8 @@
+ }
+
+ template <typename T> inline bool WasmBase::setDatatype(uint64_t ptr, const T &t) {
+-  return wasm_vm_->setMemory(ptr, sizeof(T), &t);
++  T value = htowasm(t, wasm_vm_->usesWasmByteOrder());
++  return wasm_vm_->setMemory(ptr, sizeof(T), &value);
+ }
+
+ } // namespace proxy_wasm

@@ -905,6 +905,7 @@ def _proxy_wasm_cpp_host():
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_host.patch",
+            "@envoy//bazel:proxy_wasm_cpp_host-s390x.patch",
         ],
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
