@@ -278,7 +278,7 @@ TEST_F(Asn1UtilityTest, ParseGeneralizedTimeWrongFormatErrorTest) {
   CBS cbs;
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, invalid_time, CBS_ASN1_GENERALIZEDTIME));
   EXPECT_THAT(Asn1Utility::parseGeneralizedTime(cbs),
-              HasStatusMessage("Input is not a well-formed ASN.1 GENERALIZEDTIME"));
+              HasStatusMessage("Error parsing string of GENERALIZEDTIME format"));
 }
 
 TEST_F(Asn1UtilityTest, ParseGeneralizedTimeTest) {
