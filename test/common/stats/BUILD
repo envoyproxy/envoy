@@ -464,3 +464,15 @@ envoy_cc_test(
         "//source/common/stats:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "prefix_utility_test",
+    srcs = ["prefix_utility_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/config:well_known_names",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:prefix_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

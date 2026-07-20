@@ -154,6 +154,13 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
+    name = "callbacks_handler_test",
+    srcs = ["callbacks_handler_test.cc"],
+    rbe_pool = "6gig",
+    deps = ["//source/common/common:callbacks_handler_lib"],
+)
+
+envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
     rbe_pool = "6gig",

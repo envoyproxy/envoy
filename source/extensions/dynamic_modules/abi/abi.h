@@ -10712,6 +10712,40 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes is called by the module
+ * to set the bytes value of the request's filter state with the given key. This lets a
+ * dynamic-module cluster publish a value that a later filter, the access log, or another producer
+ * reads back on the same request (stored as a ``Router::StringAccessor``). If the filter state is
+ * not accessible, this returns false. If the key does not exist, it will be created. The value is
+ * stored with FilterChain life span so it is available at access-log flush on the same request.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
+ * @return true if the operation is successful, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed is called by the module
+ * to set the typed filter state with the given key. Unlike set_filter_state_bytes which stores a
+ * raw ``Router::StringAccessor``, this uses the registered ``ObjectFactory`` for the key to create
+ * a properly typed filter state object via ``createFromBytes``, so a built-in Envoy filter that
+ * reads the key as a typed object can consume it. The value is stored with FilterChain life span.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if the request has no stream info, no
+ * ObjectFactory is registered for the key, or the factory fails to create the object.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_context_get_host_stat returns the value of a per-host
  * stat identified by the stat enum for the given host pointer. The module must ensure
  * host_envoy_ptr still belongs to the cluster's host set.
@@ -10725,6 +10759,40 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
     envoy_dynamic_module_type_host_stat stat);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number sets the number
+ * value of the request's dynamic metadata under the given namespace and key, overwriting any
+ * existing value. This lets a dynamic-module cluster annotate the current request so the value is
+ * observable in the access log via %DYNAMIC_METADATA(namespace:key)%.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the number value to set.
+ * @return true if the value was set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string sets the string
+ * value of the request's dynamic metadata under the given namespace and key, overwriting any
+ * existing value. This lets a dynamic-module cluster annotate the current request so the value is
+ * observable in the access log via %DYNAMIC_METADATA(namespace:key)%.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the string value to set.
+ * @return true if the value was set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module

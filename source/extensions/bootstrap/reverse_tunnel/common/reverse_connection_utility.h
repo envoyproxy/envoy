@@ -73,6 +73,8 @@ public:
   static uint64_t addJitter(uint64_t interval_ms, uint64_t jitter_percent,
                             Random::RandomGenerator& random);
 
+  static uint64_t diffMs(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end);
+
 private:
   ReverseConnectionUtility() = delete;
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "source/common/common/empty_string.h"
@@ -23,6 +24,53 @@ public:
     ASSERT(session_.GetCryptoStream() != nullptr);
     ASSERT(session_.GetCryptoStream()->GetSsl() != nullptr);
     return session_.GetCryptoStream()->GetSsl();
+  }
+
+  uint16_t ciphersuiteId() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    ASSERT(crypto_stream != nullptr);
+    return crypto_stream->CiphersuiteId();
+  }
+
+  std::string ciphersuiteString() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    ASSERT(crypto_stream != nullptr);
+    return std::string(crypto_stream->CiphersuiteString());
+  }
+
+  uint16_t tlsGroupId() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    ASSERT(crypto_stream != nullptr);
+    return crypto_stream->TlsGroupId();
+  }
+
+  absl::string_view tlsGroupString() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    ASSERT(crypto_stream != nullptr);
+    return crypto_stream->TlsGroupString();
+  }
+
+  const std::string& tlsVersion() const override {
+    static const std::string version("TLSv1.3");
+    return version;
+  }
+
+  const std::string& alpn() const override {
+    if (!alpn_.has_value()) {
+      auto* crypto_stream = session_.GetCryptoStream();
+      ASSERT(crypto_stream != nullptr);
+      alpn_ = std::string(crypto_stream->Alpn());
+    }
+    return *alpn_;
+  }
+
+  const std::string& sni() const override {
+    if (!sni_.has_value()) {
+      auto* crypto_stream = session_.GetCryptoStream();
+      ASSERT(crypto_stream != nullptr);
+      sni_ = std::string(crypto_stream->Sni());
+    }
+    return *sni_;
   }
 
   X509* validatedPeerIssuer() const override;
@@ -70,6 +118,8 @@ private:
   // peer_cert_chain_, which is the unverified list the peer sent. The validated-issuer accessors
   // are served from this so a peer cannot control what is reported as the issuer.
   std::vector<bssl::UniquePtr<X509>> validated_cert_chain_;
+  mutable std::optional<std::string> alpn_;
+  mutable std::optional<std::string> sni_;
 };
 
 } // namespace Quic

@@ -150,6 +150,7 @@ envoy_cc_library(
         ":timer_lib",
         "//bazel/foreign_cc:event",
         "//envoy/event:dispatcher_interface",
+        "//envoy/event:evwatch_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
     ],

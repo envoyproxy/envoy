@@ -20,6 +20,7 @@ envoy_cc_test(
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -54,6 +55,7 @@ envoy_cc_test(
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -70,6 +72,7 @@ envoy_cc_test(
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
