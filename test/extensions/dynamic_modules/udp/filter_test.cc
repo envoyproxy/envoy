@@ -4,6 +4,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -16,7 +17,7 @@ public:
   void SetUp() override {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter
         proto_config;
@@ -62,7 +63,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, ConfigMissingSymbols) {
   // Use the no_op module which lacks UDP symbols.
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   proto_config.set_filter_name("test_filter");
@@ -81,7 +82,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, NullInModuleFilter) {
   // Create a separate config that returns null from on_filter_new.
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   proto_config.set_filter_name("test_filter");
@@ -146,7 +147,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MultipleReceiveErrors) {
 TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithEmptyName) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   proto_config.set_filter_name("");
@@ -160,7 +161,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithEmptyName) {
 TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithNoConfig) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   proto_config.set_filter_name("test");
@@ -216,7 +217,7 @@ public:
   void SetUp() override {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("udp_stop_iteration", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter
         proto_config;
@@ -247,7 +248,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingConfigDestroy) {
   Stats::IsolatedStoreImpl stats;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_config_destroy", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   proto_config.set_filter_name("test");
@@ -266,7 +267,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterNew) {
   Stats::IsolatedStoreImpl stats;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_new", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   proto_config.set_filter_name("test");
@@ -284,7 +285,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingOnData) {
   Stats::IsolatedStoreImpl stats;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_on_data", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   proto_config.set_filter_name("test");
@@ -302,7 +303,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterDestroy) {
   Stats::IsolatedStoreImpl stats;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_destroy", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   proto_config.set_filter_name("test");

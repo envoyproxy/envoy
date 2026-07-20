@@ -25,6 +25,16 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
+  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
+  // (ServerFactoryContext) paths. The FilterConfig stats are scoped to the given scope.
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
+      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

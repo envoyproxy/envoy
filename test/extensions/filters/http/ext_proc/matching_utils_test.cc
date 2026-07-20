@@ -4,6 +4,7 @@
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +20,8 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::TestResponseTrailerMapImpl;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 #ifdef USE_CEL_PARSER
 
@@ -31,7 +34,7 @@ protected:
     absl::Status creation_status = absl::OkStatus();
     expression_manager_ = std::make_unique<ExpressionManager>(
         builder, context_.local_info_, request_matchers, response_matchers, creation_status);
-    EXPECT_TRUE(creation_status.ok());
+    EXPECT_OK(creation_status);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -50,7 +53,7 @@ TEST_F(ExpressionManagerTest, InvalidExpression) {
   absl::Status creation_status = absl::OkStatus();
   ExpressionManager test_manager(builder, context_.local_info_, request_matchers, {},
                                  creation_status);
-  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status, Not(IsOk()));
 }
 
 TEST_F(ExpressionManagerTest, RepeatedMatchers) {
@@ -61,7 +64,7 @@ TEST_F(ExpressionManagerTest, RepeatedMatchers) {
   absl::Status creation_status = absl::OkStatus();
   ExpressionManager test_manager(builder, context_.local_info_, request_matchers, {},
                                  creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
   EXPECT_TRUE(test_manager.hasRequestExpr());
 }
 

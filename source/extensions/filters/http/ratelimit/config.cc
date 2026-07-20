@@ -17,16 +17,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
-absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactory(
     const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
-
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
   ASSERT(!proto_config.domain().empty());
   absl::Status status = absl::OkStatus();
-  FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, server_context.localInfo(),
-                                                       context.scope(), server_context.runtime(),
-                                                       server_context, status));
+  FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, context.localInfo(), scope,
+                                                       context.runtime(), context, status));
   RETURN_IF_NOT_OK_REF(status);
   // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
   const uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
@@ -44,6 +41,18 @@ absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactory
         filter_config,
         Filters::Common::RateLimit::rateLimitClient(context, config_with_hash_key, timeout)));
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto_config, context.serverFactoryContext(), context.scope());
+}
+
+absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto_config, context, context.scope());
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

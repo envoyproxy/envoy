@@ -107,7 +107,7 @@ rules_buf:
   project_name: "Bazel rules for Buf"
   project_desc: "Bazel rules for Buf"
   project_url: "https://github.com/bufbuild/rules_buf"
-  release_date: "2025-08-22"
+  release_date: "2026-04-30"
   use_category:
   - api
   license: "Apache-2.0"
