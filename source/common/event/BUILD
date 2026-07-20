@@ -146,6 +146,7 @@ envoy_cc_library(
     hdrs = ["evwatch_observer_manager_impl.h"],
     deps = [
         "//bazel/foreign_cc:event",
+        "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
         "//envoy/event:evwatch_interface",
     ],
