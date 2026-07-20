@@ -6303,18 +6303,13 @@ TEST_P(RouterShadowingTest, ShadowRequestInheritsDynamicMetadata) {
 
   // Connection-level metadata provides a base value that request-level metadata overrides, and a
   // value that is only present at connection level.
-  envoy::config::core::v3::Metadata connection_metadata;
-  Config::Metadata::mutableMetadataValue(connection_metadata,
-                                         Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("v1");
-  Config::Metadata::mutableMetadataValue(connection_metadata,
-                                         Config::MetadataFilters::get().ENVOY_LB, "from_connection")
-      .set_string_value("yes");
-  router_->downstream_connection_.stream_info_.metadata_ = connection_metadata;
-
-  Config::Metadata::mutableMetadataValue(callbacks_.streamInfo().dynamicMetadata(),
-                                         Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("v2");
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v1
+    from_connection: "yes"
+)EOF");
+  setRequestMetadata({{"version", "v2"}});
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -6334,7 +6329,7 @@ TEST_P(RouterShadowingTest, ShadowRequestInheritsDynamicMetadata) {
       .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
                            const Http::AsyncClient::RequestOptions& options) {
         const auto it =
-            options.metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
+            options.metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
         EXPECT_NE(it, options.metadata.filter_metadata().end());
         const auto& fields = it->second.fields();
         // Request-level value wins over connection-level value.
@@ -6361,9 +6356,7 @@ TEST_P(RouterShadowingTest, ShadowRequestDoesNotInheritDynamicMetadataWhenDisabl
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
-  Config::Metadata::mutableMetadataValue(callbacks_.streamInfo().dynamicMetadata(),
-                                         Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("v2");
+  setRequestMetadata({{"version", "v2"}});
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
