@@ -448,11 +448,14 @@ generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
   auto& stats = server_context.serverScope().store();
   Stats::StatsMatcherSharedPtr scope_matcher;
 
-  // Check for a per-cluster stats matcher in typed_filter_metadata under the specific key. If
-  // present, unpack it as StatsMatcher and use it to restrict which stats are created for this
-  // cluster's scope.
-  const auto& typed_meta = config.metadata().typed_filter_metadata();
-  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+  if (config.has_stats_matcher()) {
+    scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(config.stats_matcher(),
+                                                              stats.symbolTable(), server_context);
+  } else if (auto it = config.metadata().typed_filter_metadata().find(StatsMatcherMetadataKey);
+             it != config.metadata().typed_filter_metadata().end()) {
+    // Check for a per-cluster stats matcher in typed_filter_metadata under the specific key. If
+    // present, unpack it as StatsMatcher and use it to restrict which stats are created for this
+    // cluster's scope.
     envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
     if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
       MessageUtil::validate(stats_matcher_proto, server_context.messageValidationVisitor());

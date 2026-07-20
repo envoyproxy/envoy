@@ -416,6 +416,7 @@ EXTENSIONS = {
     # Watchdog actions
     #
 
+    "envoy.watchdog.backtrace_action":                  "//source/extensions/watchdog/backtrace_action:config",
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
 
     #

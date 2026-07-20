@@ -91,9 +91,9 @@ void UpstreamProxyProtocolSocket::generateHeaderV1() {
 }
 
 namespace {
-std::string toHex(const Buffer::Instance& buffer) {
-  std::string bufferStr = buffer.toString();
-  return Hex::encode(reinterpret_cast<uint8_t*>(bufferStr.data()), bufferStr.length());
+std::string toHex(Buffer::Instance& buffer) {
+  const uint8_t* data = static_cast<const uint8_t*>(buffer.linearize(buffer.length()));
+  return Hex::encode(absl::Span(data, buffer.length()));
 }
 } // namespace
 
