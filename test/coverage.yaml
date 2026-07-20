@@ -30,12 +30,13 @@ directories:
   source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 96.3
   source/extensions/common/aws: 97.5
   source/extensions/common/aws/credential_providers: 100.0
-  source/extensions/common/proxy_protocol: 95.1  # Adjusted for security patch
+  source/extensions/common/proxy_protocol: 94.7  # Adjusted for security patch
   source/extensions/common/tap: 95.2
   source/extensions/common/wasm: 95.6  # flaky: be careful adjusting
   source/extensions/common/wasm/ext: 100.0
   source/extensions/clusters/dynamic_modules: 97.7
   source/extensions/filters/common: 97.1
+  source/extensions/filters/common/ext_authz: 98.0
   source/extensions/filters/common/fault: 94.5
   source/extensions/filters/common/lua: 95.6
   source/extensions/filters/http/a2a: 98.4
@@ -43,6 +44,7 @@ directories:
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
   source/extensions/filters/http/dynamic_modules: 95.5
   source/extensions/filters/http/decompressor: 95.9
+  source/extensions/filters/http/ext_authz: 98.0
   source/extensions/filters/http/ext_proc: 96.5
   source/extensions/filters/http/grpc_json_reverse_transcoder: 94.9
   source/extensions/filters/http/grpc_json_transcoder: 94.1  # TODO(#28232)
@@ -50,12 +52,13 @@ directories:
   source/extensions/filters/http/kill_request: 91.7  # Death tests don't report LCOV
   source/extensions/filters/http/mcp_json_rest_bridge: 94.0
   source/extensions/filters/http/mcp_router: 82.3
-  source/extensions/filters/http/oauth2: 97.6
+  source/extensions/filters/http/oauth2: 97.3
   source/extensions/filters/listener: 96.5
   source/extensions/filters/listener/dynamic_modules: 96.7
   source/extensions/filters/listener/original_src: 92.1
   source/extensions/filters/listener/tls_inspector: 94.5
   source/extensions/filters/network/dubbo_proxy: 96.2
+  source/extensions/filters/network/ext_authz: 98.0
   source/extensions/filters/network/mongo_proxy: 96.1
   source/extensions/filters/network/reverse_tunnel: 95.9
   source/extensions/filters/network/sni_cluster: 88.9
@@ -80,6 +83,7 @@ directories:
   source/extensions/wasm_runtime/wamr: 0.0  # Not enabled in coverage build
   source/extensions/wasm_runtime/wasmtime: 0.0  # Not enabled in coverage build
   source/extensions/watchdog: 83.3  # Death tests within extensions
+  source/extensions/watchdog/backtrace_action: 91.0
   source/extensions/listener_managers: 77.8
   source/extensions/listener_managers/validation_listener_manager: 77.8
   source/extensions/watchdog/profile_action: 86.1

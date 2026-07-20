@@ -464,7 +464,7 @@ void NetworkExtProcFilter::recordCallCompletion(Grpc::Status::GrpcStatus status,
         call_start_time.value());
 
     logging_info_->recordGrpcCall(duration, status, is_read_direction);
-    call_start_time = absl::nullopt;
+    call_start_time = std::nullopt;
   }
 }
 
@@ -478,8 +478,8 @@ void NetworkExtProcFilter::closeStream() {
   // Clear pending flags
   read_pending_ = false;
   write_pending_ = false;
-  write_call_start_time_ = absl::nullopt;
-  read_call_start_time_ = absl::nullopt;
+  write_call_start_time_ = std::nullopt;
+  read_call_start_time_ = std::nullopt;
 
   // Ensure that any pending close-disabling is balanced and re-enabled.
   // If the sidestream is closed early (e.g. with close_stream_to_ext_proc_server, timeout,

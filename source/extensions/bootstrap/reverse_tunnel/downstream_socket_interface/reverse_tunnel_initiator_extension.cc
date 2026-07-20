@@ -1,13 +1,19 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,9 +23,109 @@ namespace ReverseConnection {
 // Static warning flag for reverse tunnel detailed stats activation.
 static bool reverse_tunnel_detailed_stats_warning_logged = false;
 
+namespace {
+// Default cap on the per-host reconnect backoff when ``max_reconnect_backoff`` is unset.
+constexpr uint64_t kDefaultMaxReconnectBackoffMs = 30000;
+} // namespace
+
+ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
+    Server::Configuration::ServerFactoryContext& context,
+    const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+        DownstreamReverseConnectionSocketInterface& config)
+    : context_(context), config_(config) {
+  stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator");
+  // Configure detailed stats flag (defaults to false).
+  enable_detailed_stats_ = config.enable_detailed_stats();
+  max_reconnect_backoff_ms_ =
+      PROTOBUF_GET_MS_OR_DEFAULT(config, max_reconnect_backoff, kDefaultMaxReconnectBackoffMs);
+  if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
+    handshake_request_path_ = config.http_handshake().request_path();
+  } else {
+    handshake_request_path_ =
+        std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+  }
+  if (config.has_http_handshake()) {
+    additional_headers_ = {config.http_handshake().additional_headers().begin(),
+                           config.http_handshake().additional_headers().end()};
+    use_http_upgrade_ = config.http_handshake().use_http_upgrade();
+    // The formatters that evaluate these headers are built in onServerInitialized(), once the
+    // worker threads are registered with the ThreadLocal system that provider-backed formatters
+    // depend on.
+  }
+  // Instantiate access loggers from config.
+  Server::GenericFactoryContextImpl generic_context(context, context.scope(),
+                                                    context.messageValidationVisitor());
+  for (const auto& log_config : config.access_log()) {
+    access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, generic_context));
+  }
+
+  ENVOY_LOG(debug,
+            "ReverseTunnelInitiatorExtension: creating downstream reverse connection "
+            "socket interface with stat_prefix: {}, access_logs: {}",
+            stat_prefix_, access_logs_.size());
+}
+
+void ReverseTunnelInitiatorExtension::emitAccessLog(
+    TimeSource& time_source, const std::string& event, const std::string& node_id,
+    const std::string& cluster_id, const std::string& tenant_id,
+    const std::string& upstream_cluster, const std::string& host_address,
+    const std::string& connection_key, const std::string& error_message) {
+  if (access_logs_.empty()) {
+    return;
+  }
+
+  // Create an ephemeral StreamInfo for this log entry.
+  StreamInfo::StreamInfoImpl stream_info(time_source, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Populate dynamic metadata with reverse tunnel identifiers and event info.
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  fields["event"].set_string_value(event);
+  fields["node_id"].set_string_value(node_id);
+  fields["cluster_id"].set_string_value(cluster_id);
+  fields["tenant_id"].set_string_value(tenant_id);
+  fields["upstream_cluster"].set_string_value(upstream_cluster);
+  fields["host_address"].set_string_value(host_address);
+  fields["connection_key"].set_string_value(connection_key);
+  fields["error"].set_string_value(error_message);
+  stream_info.setDynamicMetadata("envoy.reverse_tunnel.initiator", metadata);
+
+  const Formatter::Context log_context{
+      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::NotSet};
+  for (const auto& access_log : access_logs_) {
+    access_log->log(log_context, stream_info);
+  }
+}
+
 // ReverseTunnelInitiatorExtension implementation
 void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance&) {
   ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::onServerInitialized");
+
+  // Provider-backed formatters (e.g. %FILE_CONTENT%, and secret/SDS-backed formatters) resolve
+  // their value through a provider whose data lives in a ThreadLocal slot. That slot is populated
+  // via ThreadLocal::Slot::set(), which only reaches worker threads already registered with the
+  // ThreadLocal system and is not replayed for threads that register later. onServerInitialized()
+  // runs after the ListenerManager has registered the worker threads, so building the formatters
+  // here lets the provider's set() reach every worker thread that later assembles a handshake
+  // request. Built any earlier, the slot would be populated only on the main thread and the
+  // formatter would resolve to an empty value on the workers.
+  if (config_.has_http_handshake() && !config_.http_handshake().formatters().empty()) {
+    Server::GenericFactoryContextImpl formatter_context(context_,
+                                                        context_.messageValidationVisitor());
+    auto command_parsers = returnOrThrow(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+        config_.http_handshake().formatters(), formatter_context));
+    auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+    handshake_headers->reserve(additional_headers_.size());
+    for (const auto& header : additional_headers_) {
+      auto value_formatter = returnOrThrow(
+          Formatter::FormatterImpl::create(header.header().value(), true, command_parsers));
+      handshake_headers->push_back(HandshakeHeader{Http::LowerCaseString(header.header().key()),
+                                                   header.append_action(),
+                                                   std::move(value_formatter)});
+    }
+    handshake_headers_ = std::move(handshake_headers);
+  }
 }
 
 void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {

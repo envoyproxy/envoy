@@ -26,7 +26,12 @@ DynamicModuleStatsSinkConfig::~DynamicModuleStatsSinkConfig() {
 
 envoy_dynamic_module_type_metrics_result
 DynamicModuleStatsSinkConfig::defineGauge(absl::string_view name, size_t* gauge_id_out) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Defining a gauge mutates shared storage, so reject calls from other threads.
+  if (!Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_config_define_gauge must be called on "
+                 "the main thread");
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   // Acquire-load pairs with the release-store in newDynamicModuleStatsSinkConfig(). See the header
   // for the memory-order contract.
   if (stat_creation_frozen_.load(std::memory_order_acquire)) {
@@ -42,7 +47,12 @@ DynamicModuleStatsSinkConfig::defineGauge(absl::string_view name, size_t* gauge_
 
 envoy_dynamic_module_type_metrics_result DynamicModuleStatsSinkConfig::setGauge(size_t gauge_id,
                                                                                 uint64_t value) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Setting a gauge writes shared state, so reject calls from other threads.
+  if (!Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_config_set_gauge must be called on the "
+                 "main thread");
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
   if (gauge_id == 0 || gauge_id > gauges_.size()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }

@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -62,6 +64,16 @@ TEST_F(ClientTest, InitializationAndTimeBothFillTheBucket) {
   EXPECT_EQ(950, client.consume(950));
 }
 
+TEST_F(ClientTest, AllowsRatesAboveNanosecondsPerSecondWithoutOverflow) {
+  const uint64_t max_tokens = std::numeric_limits<uint64_t>::max() / 1000000000UL + 1;
+  std::shared_ptr<Bucket> bucket = Bucket::create(max_tokens, time_system_);
+  Client client(bucket, "foo", 1);
+
+  const uint64_t tokens_per_interval = max_tokens * 50 / 1000;
+  EXPECT_EQ(max_tokens - tokens_per_interval, client.consume(max_tokens));
+  EXPECT_EQ(tokens_per_interval, client.consume(max_tokens));
+}
+
 TEST_F(ClientTest, CompetingRequestsGetAppropriateShares) {
   Client client0(bucket_, "baz", 1);
   Client client1(bucket_, "foo", 2);
@@ -89,7 +101,7 @@ TEST_F(ClientTest, DeletingARequestCancelsItsShare) {
   Client client0(bucket_, "baz", 1);
   Client client1(bucket_, "foo", 2);
   Client client2(bucket_, "foo", 2);
-  absl::optional<Client> client3(std::in_place, bucket_, "bar", 8);
+  std::optional<Client> client3(std::in_place, bucket_, "bar", 8);
   // Empty the loose bucket for baz.
   EXPECT_EQ(950, client0.consume(950));
   // Put everyone else in the queue.
@@ -160,7 +172,7 @@ TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
     std::thread thread;
     uint64_t consumed = 0;
     bool acting = true;
-    absl::optional<Client> client;
+    std::optional<Client> client;
   } threads[10];
   for (auto& thread : threads) {
     thread.client.emplace(bucket_, "foo", 1);

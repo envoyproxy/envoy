@@ -55,6 +55,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/cache_v2:cache_entry_utils_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 
@@ -147,6 +148,7 @@ envoy_extension_cc_test(
         "//source/extensions/http/cache_v2/simple_http_cache:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/cache_v2/simple_http_cache/v3:pkg_cc_proto",
     ],

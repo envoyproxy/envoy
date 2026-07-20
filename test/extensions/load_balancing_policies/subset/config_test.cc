@@ -6,6 +6,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -45,7 +46,7 @@ TEST(SubsetConfigTest, SubsetConfigTest) {
               "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.random.v3.Random
     )EOF";
   TestUtility::loadFromYaml(config_yaml, *config_msg);
-  config.mutable_typed_config()->PackFrom(*config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(*config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.subset", factory.name());
@@ -57,7 +58,7 @@ TEST(SubsetConfigTest, SubsetConfigTest) {
                      context.api_.random_, context.time_system_);
   EXPECT_NE(nullptr, thread_aware_lb);
 
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   auto thread_local_lb_factory = thread_aware_lb->factory();
   EXPECT_NE(nullptr, thread_local_lb_factory);
@@ -94,7 +95,7 @@ TEST(SubsetConfigTest, SubsetConfigTestWithUnknownSubsetLoadBalancingPolicy) {
             name: envoy.load_balancing_policies.unknown
     )EOF";
   TestUtility::loadFromYaml(config_yaml, *config_msg);
-  config.mutable_typed_config()->PackFrom(*config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(*config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.subset", factory.name());

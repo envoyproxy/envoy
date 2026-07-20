@@ -33,7 +33,7 @@ public:
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
-  absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
+  std::optional<Http::Protocol> protocol() const override { return std::nullopt; }
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, "", event);
   }
@@ -68,7 +68,7 @@ public:
   bool supportsEarlyData() const override { return supports_early_data_; }
   uint32_t active_streams_{};
 
-  absl::optional<uint64_t> capacity_override_;
+  std::optional<uint64_t> capacity_override_;
 
 private:
   bool supports_early_data_;
@@ -236,7 +236,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
   uint32_t max_connection_duration_ = 5000;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_opt_{max_connection_duration_};
+  std::optional<std::chrono::milliseconds> max_connection_duration_opt_{max_connection_duration_};
   uint32_t stream_limit_ = 100;
   uint32_t concurrent_streams_ = 1;
   Upstream::ClusterConnectivityState state_;
@@ -364,7 +364,7 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerNull) {
   // Force a null max connection duration optional.
   // newActiveClientAndStream() will expect the connection duration timer to remain null.
-  max_connection_duration_opt_ = absl::nullopt;
+  max_connection_duration_opt_ = std::nullopt;
   newActiveClientAndStream();
   closeStreamAndDrainClient();
 }

@@ -102,8 +102,8 @@ protected:
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
   std::string root_ca_cert_;
   const std::string leaf_cert_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
-      absl::nullopt};
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
+      std::nullopt};
   NiceMock<Stats::MockStore> store_;
   Server::Configuration::MockServerFactoryContext factory_context_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;

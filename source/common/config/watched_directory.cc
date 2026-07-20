@@ -16,8 +16,11 @@ WatchedDirectory::create(const envoy::config::core::v3::WatchedDirectory& config
 WatchedDirectory::WatchedDirectory(const envoy::config::core::v3::WatchedDirectory& config,
                                    Event::Dispatcher& dispatcher, absl::Status& creation_status) {
   watcher_ = dispatcher.createFilesystemWatcher();
-  SET_AND_RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(config.path(), "/"),
-                                              Filesystem::Watcher::Events::MovedTo,
+  auto events = Filesystem::Watcher::Events::MovedTo;
+  if (config.watch_modify()) {
+    events = events | Filesystem::Watcher::Events::Modified;
+  }
+  SET_AND_RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(config.path(), "/"), events,
                                               [this](uint32_t) {
                                                 // Check if callback is set before invoking to avoid
                                                 // crash if watch triggers before setCallback().

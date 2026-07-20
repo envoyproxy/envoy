@@ -423,16 +423,16 @@ envoy::config::cluster::v3::Cluster Utility::createInternalClusterStatic(
   auto* http_protocol_options =
       protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
   http_protocol_options->set_accept_http_10(true);
-  (*cluster.mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(protocol_options);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(protocol_options);
 
   // Add tls transport socket if cluster supports https over port 443.
   if (port == 443) {
     auto* socket = cluster.mutable_transport_socket();
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
     socket->set_name("envoy.transport_sockets.tls");
-    socket->mutable_typed_config()->PackFrom(tls_socket);
+    std::ignore = socket->mutable_typed_config()->PackFrom(tls_socket);
   }
 
   return cluster;

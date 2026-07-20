@@ -82,7 +82,7 @@ public:
 
     Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback;
-    const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+    const std::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
                 send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
@@ -367,7 +367,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const std::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
@@ -541,7 +541,7 @@ TEST_F(ZipkinDriverTest, CancelInflightRequestsOnDestruction) {
       request3(&cm_.thread_local_cluster_.async_client_),
       request4(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback{};
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const std::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   // Expect 4 separate report requests to be made.
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
@@ -598,7 +598,7 @@ TEST_F(ZipkinDriverTest, CancelInflightRequestsOnDestruction) {
 TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   setupValidDriver("HTTP_JSON");
 
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const std::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)));
 
@@ -1095,7 +1095,7 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersVerifyHeaders) {
 
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const std::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   // Set up expectations for the HTTP request with custom headers
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,

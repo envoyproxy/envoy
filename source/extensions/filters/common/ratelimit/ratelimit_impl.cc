@@ -20,7 +20,7 @@ namespace Common {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
+                               const std::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.ratelimit.v3.RateLimitService.ShouldRateLimit")) {}
@@ -154,16 +154,14 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
 }
 
-ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
+ClientPtr rateLimitClient(Server::Configuration::ServerFactoryContext& context,
                           const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                          const absl::optional<std::chrono::milliseconds>& timeout) {
+                          const std::optional<std::chrono::milliseconds>& timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   auto client_or_error =
-      context.serverFactoryContext()
-          .clusterManager()
-          .grpcAsyncClientManager()
-          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
+          config_with_hash_key, context.scope(), true);
   THROW_IF_NOT_OK_REF(client_or_error.status());
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(client_or_error.value(),
                                                                       timeout);

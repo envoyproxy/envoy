@@ -2,6 +2,7 @@
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "test/integration/base_integration_test.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -44,8 +45,7 @@ TEST_P(RegexEngineIntegrationTest, GoogleRE2) {
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_regex() = ".*";
 
-  EXPECT_TRUE(
-      Regex::Utility::parseRegex(matcher, test_server_->server().regexEngine()).status().ok());
+  EXPECT_OK(Regex::Utility::parseRegex(matcher, test_server_->server().regexEngine()).status());
 };
 
 } // namespace

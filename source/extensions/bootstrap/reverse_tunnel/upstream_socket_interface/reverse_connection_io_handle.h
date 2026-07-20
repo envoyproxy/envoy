@@ -6,12 +6,15 @@
 #include "envoy/network/socket.h"
 
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/stats/timespan_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/rping_interceptor.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
+
+class UpstreamSocketThreadLocal;
 
 /**
  * Custom IoHandle for upstream reverse connections that manages ConnectionSocket lifetime.
@@ -27,7 +30,8 @@ public:
    * @param cluster_name the name of the cluster this connection belongs to.
    */
   UpstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
-                                    const std::string& cluster_name);
+                                    const std::string& cluster_name,
+                                    UpstreamSocketThreadLocal& registry);
 
   ~UpstreamReverseConnectionIOHandle() override;
 
@@ -81,6 +85,9 @@ private:
   std::string cluster_name_;
   // The socket that this IOHandle owns and manages lifetime for.
   Network::ConnectionSocketPtr owned_socket_;
+
+  UpstreamSocketThreadLocal& registry_;
+  Stats::HistogramCompletableTimespanImpl cx_post_upgrade_lifetime_;
 };
 
 } // namespace ReverseConnection

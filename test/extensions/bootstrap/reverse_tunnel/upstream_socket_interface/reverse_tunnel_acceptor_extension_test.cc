@@ -12,6 +12,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -73,7 +74,7 @@ protected:
 
     auto* reporter_config = custom_config.mutable_reporter_config();
     reporter_config->set_name(MOCK_REPORTER);
-    reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
+    std::ignore = reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
 
     return custom_config;
   }
@@ -515,7 +516,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
   NiceMock<Network::MockIoHandle> mock_read_handle;
   EXPECT_CALL(mock_read_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
   EXPECT_CALL(mock_read_handle, read(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, absl::optional<uint64_t>) {
+      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add("XXXXX"); // 5 bytes, not RPING
         return Api::IoCallUint64Result{5, Api::IoError::none()};
       }));
@@ -617,14 +618,14 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
         EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                     testing::Eq(tenant_id)));
+                                                     testing::Eq(tenant_id), testing::_));
 
         return reporter;
       }));
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportConnection(node_id, cluster_id, tenant_id);
+  extension_->reportConnection(node_id, cluster_id, tenant_id, 0);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
@@ -822,6 +823,123 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionTenantIsolationPropagatedToS
   auto* socket_manager = registry->socketManager();
   ASSERT_NE(socket_manager, nullptr);
   EXPECT_TRUE(socket_manager->tenantIsolationEnabled());
+}
+
+// reachableTunnels() reconstructs the (tenant, cluster, node, count) tuples from the composite
+// gauges, aggregated across workers.
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnels) {
+  setupThreadLocalSlot();
+
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node2", "cluster2", true, false);
+
+  auto tunnels = extension_->reachableTunnels();
+  ASSERT_EQ(2, tunnels.size());
+
+  absl::flat_hash_map<std::string, ReverseTunnelAcceptorExtension::ReachableTunnel> by_node;
+  for (const auto& tunnel : tunnels) {
+    by_node[tunnel.node_id] = tunnel;
+  }
+
+  ASSERT_TRUE(by_node.contains("node1"));
+  EXPECT_EQ("cluster1", by_node["node1"].cluster_id);
+  EXPECT_EQ(2, by_node["node1"].connection_count);
+
+  ASSERT_TRUE(by_node.contains("node2"));
+  EXPECT_EQ("cluster2", by_node["node2"].cluster_id);
+  EXPECT_EQ(1, by_node["node2"].connection_count);
+}
+
+// A tunnel whose connection count drops to zero is no longer reported.
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnelsRemovedAtZero) {
+  setupThreadLocalSlot();
+
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  EXPECT_EQ(1, extension_->reachableTunnels().size());
+
+  extension_->updateConnectionStats("node1", "cluster1", false, false);
+  EXPECT_TRUE(extension_->reachableTunnels().empty());
+}
+
+// With tenant isolation, the reported node id is the tenant-scoped identifier (the host key).
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnelsTenantScoped) {
+  setupThreadLocalSlot();
+
+  const std::string node_id =
+      ReverseConnection::ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-a", "node1");
+  const std::string cluster_id =
+      ReverseConnection::ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-a",
+                                                                               "cluster1");
+  extension_->updateConnectionStats(node_id, cluster_id, true, true);
+
+  auto tunnels = extension_->reachableTunnels();
+  ASSERT_EQ(1, tunnels.size());
+  EXPECT_EQ("tenant-a:node1", tunnels[0].node_id);
+  EXPECT_EQ("tenant-a:cluster1", tunnels[0].cluster_id);
+  EXPECT_EQ(1, tunnels[0].connection_count);
+}
+
+// reachableTunnels() returns nothing when detailed stats are disabled (no composite gauges exist).
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnelsEmptyWithoutDetailedStats) {
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface no_stats_config;
+  no_stats_config.set_stat_prefix("reverse_connections");
+  no_stats_config.set_enable_detailed_stats(false);
+  auto no_stats_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, no_stats_config);
+
+  no_stats_extension->updateConnectionStats("node1", "cluster1", true, false);
+  EXPECT_TRUE(no_stats_extension->reachableTunnels().empty());
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, HistogramsCreatedInTLS) {
+  setupThreadLocalSlot();
+
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+
+  EXPECT_NE(registry->cx_upgrade_time_, nullptr);
+  EXPECT_NE(registry->cx_idle_expire_time_, nullptr);
+  EXPECT_NE(registry->cx_post_upgrade_lifetime_, nullptr);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateUpgradeTimeRecordsCorrectValue) {
+  setupThreadLocalSlot();
+
+  NiceMock<Stats::MockHistogram> mock_histogram;
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+  registry->cx_upgrade_time_ = &mock_histogram;
+
+  MonotonicTime start(std::chrono::milliseconds(100));
+  MonotonicTime end(std::chrono::milliseconds(200));
+
+  EXPECT_CALL(mock_histogram, recordValue(100));
+  extension_->updateUpgradeTime(start, end);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateIdleExpireTimeRecordsCorrectValue) {
+  setupThreadLocalSlot();
+
+  NiceMock<Stats::MockHistogram> mock_histogram;
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+  registry->cx_idle_expire_time_ = &mock_histogram;
+
+  MonotonicTime start(std::chrono::milliseconds(100));
+  MonotonicTime end(std::chrono::milliseconds(350));
+
+  EXPECT_CALL(mock_histogram, recordValue(250));
+  extension_->updateIdleExpireTime(start, end);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateMethodsNoOpWithoutTLS) {
+  MonotonicTime start(std::chrono::milliseconds(0));
+  MonotonicTime end(std::chrono::milliseconds(100));
+
+  extension_->updateUpgradeTime(start, end);
+  extension_->updateIdleExpireTime(start, end);
 }
 
 } // namespace ReverseConnection

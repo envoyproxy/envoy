@@ -165,7 +165,7 @@ public:
     stream_intentionally_closed_ = true;
   }
 
-  absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() const {
+  std::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() const {
     return last_close_status_;
   }
 
@@ -246,7 +246,7 @@ private:
            Grpc::Status::WellKnownGrpcStatus::Unavailable == status;
   }
 
-  void clearCloseStatus() { last_close_status_ = absl::nullopt; }
+  void clearCloseStatus() { last_close_status_ = std::nullopt; }
   bool isCloseStatusSet() { return last_close_status_.has_value(); }
 
   void setCloseStatus(Grpc::Status::GrpcStatus status, const std::string& message) {
@@ -278,7 +278,7 @@ private:
 
   // Records the initial message and timestamp of the most recent remote closes with the same
   // status.
-  absl::optional<Grpc::Status::GrpcStatus> last_close_status_;
+  std::optional<Grpc::Status::GrpcStatus> last_close_status_;
   std::string last_close_message_;
   MonotonicTime last_close_time_;
 

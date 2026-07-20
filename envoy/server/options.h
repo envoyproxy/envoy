@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/admin/v3/server_info.pb.h"
@@ -10,7 +11,6 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/tag.h"
 
-#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -158,6 +158,12 @@ public:
    * @return bool skip deprecated warning log messages?
    **/
   virtual bool skipDeprecatedLogs() const PURE;
+
+  /**
+   * @return bool whether to emit the entire stack trace in a single log entry
+   *         instead of one log call per frame. Useful for log aggregation systems.
+   */
+  virtual bool logStacktraceSingleEntry() const PURE;
 
   /**
    * @return const std::string& the admin address output file.

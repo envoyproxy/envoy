@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <ostream>
@@ -41,6 +42,18 @@ public:
   BackwardsTrace() = default;
 
   /**
+   * Construct a trace directly from raw frame pointers that were captured
+   * elsewhere. The number of frames copied is clamped to MaxStackDepth.
+   *
+   * @param frames Pointer to an array of captured frame addresses.
+   * @param depth Number of valid entries in @p frames.
+   */
+  BackwardsTrace(void* const* frames, int depth) {
+    stack_depth_ = std::min(depth, MaxStackDepth);
+    std::copy(frames, frames + stack_depth_, stack_trace_);
+  }
+
+  /**
    * Attempts to get the memory offsets of the current process, so the
    * stack trace addresses can be mapped to line numbers even after the
    * process is not running.
@@ -77,6 +90,20 @@ public:
   static bool logToStderr() { return log_to_stderr_; }
 
   /**
+   * Directs all stack trace output to be formatted as a single log line
+   * rather than one line per frame. This makes stack traces easier to
+   * consume in log aggregation systems.
+   *
+   * @param single_line Whether to log the entire stack trace on a single line.
+   */
+  static void setSingleLine(bool single_line);
+
+  /**
+   * @return whether stack traces are formatted as a single line.
+   */
+  static bool singleLine() { return single_line_; }
+
+  /**
    * Capture a stack trace.
    *
    * The trace will begin with the call to capture().
@@ -107,6 +134,24 @@ public:
   void logTrace() {
     if (log_to_stderr_) {
       printTrace(std::cerr);
+      return;
+    }
+
+    if (single_line_) {
+      std::string buf = fmt::format(
+          "Backtrace (use tools/stack_decode.py to get line numbers):\nEnvoy version: {}",
+          VersionInfo::version());
+      if (!addrMapping().empty()) {
+        fmt::format_to(std::back_inserter(buf), "\nAddress mapping: {}", addrMapping());
+      }
+      visitTrace([&buf](int index, const char* symbol, void* address) {
+        if (symbol != nullptr) {
+          fmt::format_to(std::back_inserter(buf), "\n#{}: {} [{}]", index, symbol, address);
+        } else {
+          fmt::format_to(std::back_inserter(buf), "\n#{}: [{}]", index, address);
+        }
+      });
+      ENVOY_LOG(critical, "{}", buf);
       return;
     }
 
@@ -141,6 +186,7 @@ public:
 
 private:
   static bool log_to_stderr_;
+  static bool single_line_;
 
   /**
    * Visit the previously captured stack trace.

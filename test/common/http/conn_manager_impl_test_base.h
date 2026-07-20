@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/http/date_provider_impl.h"
@@ -79,13 +81,13 @@ public:
   void setUpEncoderAndDecoder(bool request_with_data_and_trailers, bool decode_headers_stop_all);
 
   // Sends request headers, and stashes the new stream in decoder_;
-  void startRequest(bool end_stream = false, absl::optional<std::string> body = absl::nullopt);
+  void startRequest(bool end_stream = false, std::optional<std::string> body = std::nullopt);
 
   Event::MockTimer* setUpTimer();
   void sendRequestHeadersAndData();
   ResponseHeaderMap*
   sendResponseHeaders(ResponseHeaderMapPtr&& response_headers,
-                      absl::optional<StreamInfo::CoreResponseFlag> response_flag = absl::nullopt,
+                      std::optional<StreamInfo::CoreResponseFlag> response_flag = std::nullopt,
                       std::string response_code_details = "details");
   void expectOnDestroy(bool deferred = true);
   void doRemoteClose(bool deferred = true);
@@ -98,7 +100,7 @@ public:
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
     return flush_log_on_tunnel_successfully_established_;
   }
-  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+  const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return access_log_flush_interval_;
   }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
@@ -106,23 +108,48 @@ public:
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
+  std::chrono::milliseconds drainTimeout() const override {
+    std::chrono::milliseconds timeout(100);
+    if (drain_timeout_jitter_percentage_.has_value() &&
+        drain_timeout_jitter_percentage_.value() > 0) {
+      const uint64_t max_jitter_ms = static_cast<uint64_t>(
+          std::ceil(timeout.count() * (drain_timeout_jitter_percentage_.value() / 100.0)));
+      if (max_jitter_ms > 0) {
+        const uint64_t jitter_ms = random_.random() % max_jitter_ms;
+        timeout = std::chrono::milliseconds(static_cast<uint64_t>(timeout.count()) + jitter_ms);
+      }
+    }
+    return timeout;
+  }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() const override { return true; }
   bool preserveExternalRequestId() const override { return false; }
   bool alwaysSetRequestIdInResponse() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  std::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
-  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
+  std::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+    if (!max_connection_duration_.has_value()) {
+      return std::nullopt;
+    }
+    std::chrono::milliseconds duration = max_connection_duration_.value();
+    if (max_connection_duration_jitter_percentage_.has_value() &&
+        max_connection_duration_jitter_percentage_.value() > 0) {
+      const uint64_t max_jitter_ms = static_cast<uint64_t>(std::ceil(
+          duration.count() * (max_connection_duration_jitter_percentage_.value() / 100.0)));
+      if (max_jitter_ms > 0) {
+        const uint64_t jitter_ms = random_.random() % max_jitter_ms;
+        duration = std::chrono::milliseconds(static_cast<uint64_t>(duration.count()) + jitter_ms);
+      }
+    }
+    return duration;
   }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
-  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+  std::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
     return stream_flush_timeout_;
   }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -130,7 +157,7 @@ public:
     return request_headers_timeout_;
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+  std::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
   }
   bool use_srds_{};
@@ -157,7 +184,7 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
-  const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
+  const std::optional<std::string>& schemeToSet() const override { return scheme_; }
   bool shouldSchemeMatchUpstream() const override { return scheme_match_upstream_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -177,7 +204,7 @@ public:
     return forward_client_cert_matcher_;
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
-  const absl::optional<std::string>& userAgent() override { return user_agent_; }
+  const std::optional<std::string>& userAgent() override { return user_agent_; }
   Tracing::TracerSharedPtr tracer() override { return tracer_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
@@ -272,7 +299,7 @@ public:
   AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_ = false;
   bool flush_log_on_tunnel_successfully_established_ = false;
-  absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
+  std::optional<std::chrono::milliseconds> access_log_flush_interval_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   MockServerConnection* codec_;
   NiceMock<MockFilterChainFactory> filter_factory_;
@@ -283,7 +310,7 @@ public:
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
-  absl::optional<std::string> scheme_;
+  std::optional<std::string> scheme_;
   bool scheme_match_upstream_{false};
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   bool use_remote_address_{true};
@@ -292,20 +319,22 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Http::ClientCertFormat client_cert_format_{Http::ClientCertFormat::Text};
   Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
-  absl::optional<std::string> user_agent_;
+  std::optional<std::string> user_agent_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   uint32_t max_requests_per_connection_{};
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> max_connection_duration_;
+  std::optional<double> max_connection_duration_jitter_percentage_;
+  std::optional<double> drain_timeout_jitter_percentage_;
   bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
-  absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
+  std::optional<std::chrono::milliseconds> stream_flush_timeout_;
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds request_headers_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
-  absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  NiceMock<Random::MockRandomGenerator> random_;
+  std::optional<std::chrono::milliseconds> max_stream_duration_;
+  mutable NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   RequestDecoder* decoder_{};

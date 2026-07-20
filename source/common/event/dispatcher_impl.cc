@@ -69,7 +69,7 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
     : name_(name), thread_factory_(thread_factory), time_source_(time_source),
-      file_system_(file_system), buffer_factory_(watermark_factory),
+      file_system_(file_system), buffer_factory_(watermark_factory), base_scheduler_(time_source),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
@@ -98,8 +98,13 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
       std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
+Evwatch::ObserverHandlePtr DispatcherImpl::registerEvwatchObserver(Evwatch::ObserverPtr observer) {
+  ASSERT(isThreadSafe());
+  return base_scheduler_.registerEvwatchObserver(std::move(observer));
+}
+
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
-                                     const absl::optional<std::string>& prefix) {
+                                     const std::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
   post([this, &scope, effective_prefix] {

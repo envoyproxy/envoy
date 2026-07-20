@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -19,10 +20,10 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -45,13 +46,13 @@ public:
         should_select_another_host_(should_select_another_host) {}
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
   uint32_t hostSelectionRetryCount() const override { return retry_count_; };
   bool shouldSelectAnotherHost(const Host& host) override {
     return should_select_another_host_(host);
   }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
   uint32_t retry_count_;
   HostPredicate should_select_another_host_;
 };
@@ -74,7 +75,7 @@ public:
     lb_ = std::make_unique<RingHashLoadBalancer>(
         priority_set_, stats_, *stats_store_.rootScope(), context_.runtime_loader_,
         context_.api_.random_, 50, typed_config.lb_config_, typed_config.hash_policy_);
-    EXPECT_TRUE(lb_->initialize().ok());
+    EXPECT_OK(lb_->initialize());
   }
 
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
@@ -1167,12 +1168,12 @@ TEST(RingHashCoalesceDisabledTest, FallbackPathExercised) {
   envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config;
   absl::Status creation_status;
   TypedRingHashLbConfig typed_config(config, context.regex_engine_, creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
 
   auto lb = std::make_unique<RingHashLoadBalancer>(
       priority_set, stats, *stats_store.rootScope(), context.runtime_loader_, context.api_.random_,
       50, typed_config.lb_config_, typed_config.hash_policy_);
-  EXPECT_TRUE(lb->initialize().ok());
+  EXPECT_OK(lb->initialize());
 
   MockHostSet& host_set = *priority_set.getMockHostSet(0);
   host_set.hosts_ = {makeTestHost(info, "tcp://127.0.0.1:80")};
@@ -1200,7 +1201,7 @@ public:
         updateHostsParams(hosts_p0, hosts_per_locality_p0,
                           std::make_shared<const HealthyHostVector>(*hosts_p0),
                           hosts_per_locality_p0),
-        {}, *hosts_p0, {}, absl::nullopt, absl::nullopt);
+        {}, *hosts_p0, {}, std::nullopt, std::nullopt);
 
     // Grow hostSetsPerPriority() to include P1 before initialize() is called.
     HostVectorSharedPtr hosts_p1 = std::make_shared<HostVector>();
@@ -1211,9 +1212,9 @@ public:
         updateHostsParams(hosts_p1, hosts_per_locality_p1,
                           std::make_shared<const HealthyHostVector>(*hosts_p1),
                           hosts_per_locality_p1),
-        {}, *hosts_p1, {}, absl::nullopt, absl::nullopt);
+        {}, *hosts_p1, {}, std::nullopt, std::nullopt);
 
-    EXPECT_TRUE(lb_.initialize().ok());
+    EXPECT_OK(lb_.initialize());
   }
 
   std::shared_ptr<MockClusterInfo> info_;
@@ -1237,7 +1238,7 @@ TEST(RingHashMidBatchInitializeCrashTest, NoOobOnNewPriority) {
   envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config;
   absl::Status creation_status;
   TypedRingHashLbConfig typed_config(config, context.regex_engine_, creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
 
   RingHashLoadBalancer lb(priority_set, stats, *stats_store.rootScope(), context.runtime_loader_,
                           context.api_.random_, 50, typed_config.lb_config_,
@@ -1249,6 +1250,31 @@ TEST(RingHashMidBatchInitializeCrashTest, NoOobOnNewPriority) {
   LoadBalancerParams lb_params{worker_priority_set, {}};
   auto worker_lb = lb.factory()->create(lb_params);
   EXPECT_NE(nullptr, worker_lb);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/44349.
+// Null entries in PriorityState (from non-contiguous priority levels) must not segfault.
+TEST_P(RingHashLoadBalancerTest, ValidateEndpointsSkipsNullPriorityEntries) {
+  PriorityState priorities;
+
+  auto hosts_p0 = std::make_unique<HostVector>();
+  hosts_p0->push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
+  priorities.emplace_back(std::move(hosts_p0), LocalityWeightsMap{});
+
+  // Gaps at priorities 1-4 (null host lists, as produced by non-contiguous EDS assignments).
+  for (int i = 0; i < 4; ++i) {
+    priorities.emplace_back(nullptr, LocalityWeightsMap{});
+  }
+
+  auto hosts_p5 = std::make_unique<HostVector>();
+  hosts_p5->push_back(makeTestHost(info_, "tcp://127.0.0.1:81"));
+  priorities.emplace_back(std::move(hosts_p5), LocalityWeightsMap{});
+
+  absl::Status creation_status;
+  TypedRingHashLbConfig typed_config(config_, context_.regex_engine_, creation_status);
+  ASSERT_OK(creation_status);
+
+  EXPECT_OK(typed_config.validateEndpoints(priorities));
 }
 
 } // namespace

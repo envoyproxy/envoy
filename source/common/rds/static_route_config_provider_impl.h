@@ -23,7 +23,7 @@ public:
 
   // Router::RouteConfigProvider
   ConfigConstSharedPtr config() const override { return config_; }
-  const absl::optional<ConfigInfo>& configInfo() const override { return config_info_; }
+  const std::optional<ConfigInfo>& configInfo() const override { return config_info_; }
   SystemTime lastUpdated() const override { return last_updated_; }
   absl::Status onConfigUpdate() override { return absl::OkStatus(); }
 
@@ -31,7 +31,7 @@ private:
   ProtobufTypes::MessagePtr route_config_proto_;
   ConfigConstSharedPtr config_;
   SystemTime last_updated_;
-  absl::optional<ConfigInfo> config_info_;
+  std::optional<ConfigInfo> config_info_;
   RouteConfigProviderManager& route_config_provider_manager_;
 };
 

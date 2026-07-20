@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
 #include "source/extensions/stat_sinks/dynamic_modules/sink.h"
@@ -7,6 +9,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -17,6 +20,7 @@ namespace StatSinks {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -43,11 +47,11 @@ public:
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"),
         /*do_not_close=*/false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
 
     auto config = newDynamicModuleStatsSinkConfig("test_sink", "test_config",
                                                   std::move(dynamic_module.value()), context_);
-    ASSERT_TRUE(config.ok()) << config.status().message();
+    ASSERT_OK(config);
     config_ = std::move(config.value());
   }
 
@@ -179,8 +183,8 @@ TEST_F(DynamicModuleStatsSinkTest, FlushPassesSnapshotContext) {
   g_recorder = nullptr;
 }
 
-// onHistogramComplete must bind the histogram name to a local std::string so the
-// buffer stays valid for the module call, since Metric::name() returns by value.
+// onHistogramComplete serializes the histogram name into a thread-local buffer before handing it
+// to the module, so repeated calls reuse the buffer and still report the full name.
 TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompletePassesNameAndValue) {
   CallRecorder recorder;
   g_recorder = &recorder;
@@ -243,10 +247,10 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, DefineGaugeAfterFrozenIsRejected) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
   auto config = newDynamicModuleStatsSinkConfig("test_sink", "test_config",
                                                 std::move(dynamic_module.value()), context_);
-  ASSERT_TRUE(config.ok()) << config.status().message();
+  ASSERT_OK(config);
 
   size_t id = 0;
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
@@ -274,6 +278,44 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SetGaugeInvalidIdIsRejected) {
 
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, config->setGauge(0, 1));
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, config->setGauge(2, 1));
+}
+
+// defineGauge fails closed when invoked off the main thread, so a misbehaving module cannot mutate
+// the gauge storage from a worker thread.
+TEST_F(DynamicModuleStatsSinkGaugeTest, DefineGaugeOffMainThreadFailsClosed) {
+  auto config = makeConfig();
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          size_t id = 0;
+          EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+                    config->defineGauge("off_thread", &id));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_stat_sink_config_define_gauge must be called on the main "
+      "thread");
+  EXPECT_EQ(nullptr, TestUtility::findGauge(context_.store_, "off_thread"));
+}
+
+// setGauge fails closed when invoked off the main thread, leaving the gauge value untouched.
+TEST_F(DynamicModuleStatsSinkGaugeTest, SetGaugeOffMainThreadFailsClosed) {
+  auto config = makeConfig();
+  size_t id = 0;
+  ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success, config->defineGauge("g", &id));
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+                    config->setGauge(id, 99));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_stat_sink_config_set_gauge must be called on the main thread");
+  auto gauge = TestUtility::findGauge(context_.store_, "g");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(0u, gauge->value());
 }
 
 // onScheduled is a no-op when the module does not implement the scheduled hook.
@@ -377,14 +419,12 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionMissingSymbol) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_missing_config_new", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
       "test_sink", "test_config", std::move(dynamic_module.value()), context);
-  EXPECT_FALSE(config_or_error.ok());
-  EXPECT_THAT(std::string(config_or_error.status().message()),
-              testing::ContainsRegex("config_new"));
+  EXPECT_THAT(config_or_error, HasStatusMessage(testing::ContainsRegex("config_new")));
 }
 
 // When on_stat_sink_config_new returns null, newDynamicModuleStatsSinkConfig
@@ -393,14 +433,13 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionModuleReturnsNull) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_config_new_fail", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
       "test_sink", "test_config", std::move(dynamic_module.value()), context);
-  EXPECT_FALSE(config_or_error.ok());
-  EXPECT_THAT(std::string(config_or_error.status().message()),
-              testing::HasSubstr("Failed to initialize dynamic module stats sink config"));
+  EXPECT_THAT(config_or_error, HasStatusMessage(testing::HasSubstr(
+                                   "Failed to initialize dynamic module stats sink config")));
 }
 
 } // namespace

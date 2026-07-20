@@ -7,6 +7,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -52,7 +53,7 @@ TEST_F(FilterChainTest, CreateFilterChain) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
@@ -87,7 +88,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
@@ -160,7 +161,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   Http::StreamDecoderFilterSharedPtr missing_config_filter;
@@ -188,7 +189,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -238,7 +239,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -279,7 +280,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
     auto* filter = websocket_config->add_filters();
     filter->set_name("envoy.filters.http.router");
     envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
   auto foo_config = hcm_config.add_upgrade_configs();
@@ -288,26 +289,26 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
     auto* filter = foo_config->add_filters();
     filter->set_name("encoder-decoder-buffer-filter");
     test::integration::filters::EncoderDecoderBufferFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
   {
     auto* filter = foo_config->add_filters();
     filter->set_name("encoder-decoder-buffer-filter");
     test::integration::filters::EncoderDecoderBufferFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
   {
     auto* filter = foo_config->add_filters();
     filter->set_name("envoy.filters.http.router");
     envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   {
     NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
@@ -339,7 +340,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
     auto* filter = websocket_config->add_filters();
     filter->set_name("envoy.filters.http.router");
     envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
   auto foo_config = hcm_config.add_upgrade_configs();
@@ -348,13 +349,13 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
     auto* filter = foo_config->add_filters();
     filter->set_name("envoy.filters.http.router");
     envoy::extensions::filters::http::router::v3::Router config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
   {
     auto* filter = foo_config->add_filters();
     filter->set_name("encoder-decoder-buffer-filter");
     test::integration::filters::EncoderDecoderBufferFilterConfig config;
-    filter->mutable_typed_config()->PackFrom(config);
+    std::ignore = filter->mutable_typed_config()->PackFrom(config);
   }
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,

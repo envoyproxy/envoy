@@ -34,7 +34,10 @@ GradientControllerConfig makeConfig(const std::string& yaml_config,
                                     NiceMock<Runtime::MockLoader>& runtime) {
   envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig proto;
   TestUtility::loadFromYamlAndValidate(yaml_config, proto);
-  return GradientControllerConfig{proto, runtime};
+  absl::Status creation_status = absl::OkStatus();
+  GradientControllerConfig config{proto, runtime, creation_status};
+  EXPECT_TRUE(creation_status.ok());
+  return config;
 }
 
 class GradientControllerConfigTest : public testing::Test {
@@ -158,9 +161,13 @@ TEST_F(GradientControllerConfigTest, MissingMinRTTValues) {
     min_concurrency: 8
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      makeConfig(yaml, runtime_), EnvoyException,
-      "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set");
+  envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig proto;
+  TestUtility::loadFromYamlAndValidate(yaml, proto);
+  absl::Status creation_status = absl::OkStatus();
+  GradientControllerConfig config{proto, runtime_, creation_status};
+  EXPECT_FALSE(creation_status.ok());
+  EXPECT_EQ(creation_status.message(),
+            "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set");
 }
 
 TEST_F(GradientControllerConfigTest, Clamping) {

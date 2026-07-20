@@ -4,6 +4,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -29,7 +31,6 @@
 #include "source/common/http/http2/protocol_constraints.h"
 #include "source/common/http/status.h"
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 #ifdef ENVOY_NGHTTP2
@@ -75,12 +76,12 @@ public:
   explicit ReceivedSettingsImpl(absl::Span<const http2::adapter::Http2Setting> settings);
 
   // ReceivedSettings
-  const absl::optional<uint32_t>& maxConcurrentStreams() const override {
+  const std::optional<uint32_t>& maxConcurrentStreams() const override {
     return concurrent_stream_limit_;
   }
 
 private:
-  absl::optional<uint32_t> concurrent_stream_limit_;
+  std::optional<uint32_t> concurrent_stream_limit_;
 };
 
 class Utility {
@@ -153,7 +154,8 @@ public:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                  Random::RandomGenerator& random_generator,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                 const uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 const uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 OptRef<Runtime::Loader> runtime = std::nullopt);
 
   ~ConnectionImpl() override;
 
@@ -332,7 +334,7 @@ protected:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     Stream& getStream() override { return *this; }
     void encodeMetadata(const MetadataMapVector& metadata_map_vector) override;
-    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return std::nullopt; }
 
     // Http::Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
@@ -346,9 +348,9 @@ protected:
     absl::string_view responseDetails() override { return details_; }
     Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
-    absl::optional<uint32_t> codecStreamId() const override {
+    std::optional<uint32_t> codecStreamId() const override {
       if (stream_id_ == -1) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       return stream_id_;
     }
@@ -436,10 +438,10 @@ protected:
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
-    absl::optional<StreamResetReason> deferred_reset_;
+    std::optional<StreamResetReason> deferred_reset_;
     // Holds the reset reason for this stream. Useful if we have buffered data
     // to determine whether we should continue processing that data.
-    absl::optional<StreamResetReason> reset_reason_;
+    std::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
     uint32_t cookie_count_;
     bool local_end_stream_sent_ : 1 = false;
@@ -452,6 +454,7 @@ protected:
     bool reset_due_to_messaging_error_ : 1 = false;
     // Latch whether this stream is operating with this flag.
     bool extend_stream_lifetime_flag_ : 1 = false;
+    bool histograms_recorded_ : 1 = false;
     absl::string_view details_;
 
     /**
@@ -656,6 +659,7 @@ protected:
   const StreamImpl* getStreamUnchecked(int32_t stream_id) const;
   StreamImpl* getStreamUnchecked(int32_t stream_id);
   int saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value);
+  void recordHistogramsForStream(StreamImpl& stream);
 
   /**
    * Copies any frames pending internally by nghttp2 into outbound buffer.
@@ -696,8 +700,8 @@ protected:
    * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
    * HttpConnectionManager.
    */
-  virtual absl::optional<int> checkHeaderNameForUnderscores(absl::string_view /* header_name */) {
-    return absl::nullopt;
+  virtual std::optional<int> checkHeaderNameForUnderscores(absl::string_view /* header_name */) {
+    return std::nullopt;
   }
 
   /**
@@ -724,7 +728,7 @@ protected:
 
   // Tracks the stream id of the current stream we're processing.
   // This should only be set while we're in the context of dispatching to nghttp2.
-  absl::optional<int32_t> current_stream_id_;
+  std::optional<int32_t> current_stream_id_;
   std::unique_ptr<http2::adapter::Http2VisitorInterface> visitor_;
   std::unique_ptr<http2::adapter::Http2Adapter> adapter_;
 
@@ -736,6 +740,8 @@ protected:
   bool allow_metadata_;
   uint64_t max_metadata_size_;
   const bool stream_error_on_invalid_http_messaging_;
+  const bool record_http2_histograms_;
+  const uint64_t max_cookie_size_bytes_{0};
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and
@@ -862,14 +868,15 @@ public:
                        const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action,
-                       Server::OverloadManager& overload_manager);
+                       Server::OverloadManager& overload_manager,
+                       OptRef<Runtime::Loader> runtime = std::nullopt);
 
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(int32_t stream_id) override;
   int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
-  absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
+  std::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
   StreamResetReason getMessagingErrorResetReason() const override {
     return StreamResetReason::LocalReset;
   }

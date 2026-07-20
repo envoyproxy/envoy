@@ -4,8 +4,10 @@
 #include "source/extensions/filters/http/cache_v2/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -13,6 +15,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CacheV2 {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 class CacheFilterFactoryTest : public ::testing::Test {
 protected:
@@ -22,8 +26,21 @@ protected:
   Http::MockFilterChainFactoryCallbacks filter_callback_;
 };
 
+TEST_F(CacheFilterFactoryTest, BasicWithServerFactoryContext) {
+  std::ignore = config_.mutable_typed_config()->PackFrom(
+      envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config());
+  Http::FilterFactoryCb cb =
+      factory_.createHttpFilterFactoryFromProto(config_, "stats", context_.serverFactoryContext())
+          .value();
+  Http::StreamFilterSharedPtr filter;
+  EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
+  cb(filter_callback_);
+  ASSERT(filter);
+  ASSERT(dynamic_cast<CacheFilter*>(filter.get()));
+}
+
 TEST_F(CacheFilterFactoryTest, Basic) {
-  config_.mutable_typed_config()->PackFrom(
+  std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config());
   Http::FilterFactoryCb cb =
       factory_.createFilterFactoryFromProto(config_, "stats", context_).value();
@@ -46,17 +63,18 @@ TEST_F(CacheFilterFactoryTest, Disabled) {
 }
 
 TEST_F(CacheFilterFactoryTest, NoTypedConfig) {
-  EXPECT_THROW(
-      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
-      EnvoyException);
+  auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   "at least one of typed_config or disabled must be set"));
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
-  config_.mutable_typed_config()->PackFrom(
+  std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::cache_v2::v3::CacheV2Config());
-  EXPECT_THROW(
-      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
-      EnvoyException);
+  auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   "Didn't find a registered implementation for type: "
+                                   "'envoy.extensions.filters.http.cache_v2.v3.CacheV2Config'"));
 }
 
 class FailToCreateCacheFactory : public HttpCacheFactory {
@@ -67,7 +85,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<Key>(); }
   absl::StatusOr<std::shared_ptr<CacheSessions>>
   getCache(const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config&,
-           Server::Configuration::FactoryContext&) override {
+           Server::Configuration::ServerFactoryContext&) override {
     return absl::InvalidArgumentError("intentional fail");
   }
 };
@@ -75,10 +93,11 @@ public:
 static Registry::RegisterFactory<FailToCreateCacheFactory, HttpCacheFactory> register_;
 
 TEST_F(CacheFilterFactoryTest, FactoryFailsToCreateCache) {
-  config_.mutable_typed_config()->PackFrom(Key());
-  EXPECT_THROW(
-      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
-      EnvoyException);
+  std::ignore = config_.mutable_typed_config()->PackFrom(Key());
+  auto status_or = factory_.createFilterFactoryFromProto(config_, "stats", context_);
+  EXPECT_THAT(status_or,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Couldn't initialize cache: INVALID_ARGUMENT: intentional fail"));
 }
 
 } // namespace
