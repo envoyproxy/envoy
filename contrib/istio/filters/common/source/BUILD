@@ -72,6 +72,6 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/protobuf",
-        "@abseil-cpp' instead://absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
