@@ -522,6 +522,11 @@ modify different aspects of the server:
   By default, the regular expression is evaluated using the
   `Google RE2 <https://github.com/google/re2>`_ engine.
 
+  .. http:get:: /stats?filter=regex&invert_filter
+
+  Inverts the ``filter`` regex, returning stats whose names do not match.
+  Requires ``filter``.
+
   .. http:get:: /stats?histogram_buckets=cumulative
 
   Changes histogram output to display cumulative buckets with upper bounds (e.g. B0.5, B1, B5, ...).

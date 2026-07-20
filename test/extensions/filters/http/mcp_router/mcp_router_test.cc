@@ -68,7 +68,8 @@ TEST_F(McpRouterConfigTest, MultipleBackendsEnablesMultiplexing) {
   server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
   server2->mutable_mcp_cluster()->set_path("/mcp/calc");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   EXPECT_EQ(config.backends().size(), 2);
   EXPECT_TRUE(config.isMultiplexing());
@@ -95,7 +96,8 @@ TEST_F(McpRouterConfigTest, SingleBackendSetsDefaultName) {
   server->set_name("tools");
   server->mutable_mcp_cluster()->set_cluster("tools_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   EXPECT_EQ(config.backends().size(), 1);
   EXPECT_FALSE(config.isMultiplexing());
@@ -110,7 +112,8 @@ TEST_F(McpRouterConfigTest, DefaultPathWhenNotSpecified) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   const McpBackendConfig* backend = config.findBackend("test");
   ASSERT_NE(backend, nullptr);
@@ -125,7 +128,8 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
@@ -139,8 +143,8 @@ TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
   server->mutable_mcp_cluster()->mutable_timeout()->set_seconds(10);
 
   envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
-  auto base_config = std::make_shared<McpRouterConfigImpl>(base_proto, "test.", *store_.rootScope(),
-                                                           factory_context_);
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
 
   McpRouterClusterConfigImpl cluster_config(proto_config, base_config);
 
@@ -330,7 +334,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityDisabledByDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_FALSE(config.hasSessionIdentity());
   EXPECT_FALSE(config.shouldEnforceValidation());
 }
@@ -345,7 +350,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithHeaderSource) {
   auto* identity = proto_config.mutable_session_identity();
   identity->mutable_identity()->mutable_header()->set_name("x-user-id");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<HeaderSubjectSource>(config.subjectSource()));
   EXPECT_FALSE(config.shouldEnforceValidation()); // DISABLED by default
@@ -364,7 +370,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithMetadataSource) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<MetadataSubjectSource>(config.subjectSource()));
 }
@@ -382,7 +389,8 @@ TEST_F(McpRouterConfigTest, MetadataKeyPathParsed) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   const auto& source = absl::get<MetadataSubjectSource>(config.subjectSource());
   EXPECT_EQ(source.filter, "jwt");
   ASSERT_EQ(source.path_keys.size(), 2);
@@ -402,7 +410,8 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   identity->mutable_validation()->set_mode(
       envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE);
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(config.shouldEnforceValidation());
   EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
@@ -420,7 +429,8 @@ protected:
   McpRouterConfigSharedPtr
   createConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config) {
     return std::make_shared<McpRouterConfigImpl>(proto_config, std::string("test."),
-                                                 *store_.rootScope(), factory_context_);
+                                                 *store_.rootScope(),
+                                                 factory_context_.server_factory_context_);
   }
 
   void setDynamicMetadata(const std::string& filter_name, const std::string& key,
@@ -854,7 +864,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_FALSE(config.lazyInitialization());
 }
 
@@ -865,7 +876,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationEnabled) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
   proto_config.set_lazy_initialization(true);
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.lazyInitialization());
 }
 
@@ -873,8 +885,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationEnabled) {
 TEST_F(McpRouterConfigTest, ClusterConfigDelegatesLazyInit) {
   envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
   base_proto.set_lazy_initialization(true);
-  auto base_config = std::make_shared<McpRouterConfigImpl>(base_proto, "test.", *store_.rootScope(),
-                                                           factory_context_);
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
 
   envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig cluster_proto;
   auto* server = cluster_proto.add_servers();

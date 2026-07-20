@@ -124,8 +124,9 @@ public:
          Stats::Scope&, const std::string&, const std::string&, bool,
          std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
          std::optional<
-             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>)
-      override {
+             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
+         Extensions::NetworkFilters::Common::Redis::RespProtocolVersion,
+         OptRef<Stats::Counter>) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};
@@ -1799,6 +1800,57 @@ TEST_F(RedisClusterTest, ZoneDiscoveryMakeRequestReturnsNull) {
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_TRUE(
       cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->locality().zone().empty());
+}
+
+// A refresh (periodic resolve timer, DNS update) that arrives after CLUSTER
+// SLOTS completes but before the zone-discovery INFO replies return must not
+// start a second resolution. current_request_ is already null in that window,
+// so without gating on pending_zone_requests_ the refresh starts another zone
+// discovery and overwrites zone_callbacks_, freeing the callbacks that the
+// in-flight INFO requests still reference (use-after-free).
+TEST_F(RedisClusterTest, ZoneDiscoveryRefreshWhileInfoInFlightIsSkipped) {
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes();
+
+  // Zone discovery is in flight (two INFO requests outstanding). A refresh in
+  // this window must not issue another CLUSTER SLOTS request.
+  EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
+      .Times(0);
+  EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
+      .Times(0);
+  // The session resolve timer is one-shot and stays disabled while the INFO
+  // requests are outstanding. A refresh reaches this window only because the
+  // refresh manager re-arms the timer to fire immediately (see registerCluster
+  // in the RedisCluster constructor, which calls enableTimer(0ms)). Reproduce
+  // that here: re-arm the timer, then fire it. This consumes the pending
+  // enableTimer expectation set up by setupZoneDiscoveryWithTwoNodes.
+  resolve_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
+  resolve_timer_->invokeCallback();
+
+  // Completing zone discovery re-arms the resolve timer again.
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+
+  // The original in-flight INFO callbacks are still valid and complete normally.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_1(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_1->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_1->asString() = "# Server\navailability_zone:us-east-1a\n";
+  auto zone_cb_1 = std::next(client_->client_callbacks_.begin());
+  (*zone_cb_1)->onResponse(std::move(info_resp_1));
+
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_2(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_2->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_2->asString() = "# Server\navailability_zone:us-east-1b\n";
+  zone_client->client_callbacks_.front()->onResponse(std::move(info_resp_2));
+
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  for (const auto& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    if (host->address()->asString() == "127.0.0.1:22120") {
+      EXPECT_EQ("us-east-1a", host->locality().zone());
+    } else {
+      EXPECT_EQ("us-east-1b", host->locality().zone());
+    }
+  }
 }
 
 } // namespace Redis

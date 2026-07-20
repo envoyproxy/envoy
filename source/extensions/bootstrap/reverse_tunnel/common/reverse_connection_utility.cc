@@ -151,6 +151,13 @@ void ReverseConnectionUtility::applySslQuietClose(Network::Connection& connectio
   }
 }
 
+uint64_t ReverseConnectionUtility::diffMs(const Envoy::MonotonicTime& start,
+                                          const Envoy::MonotonicTime& end) {
+  ASSERT(start <= end, "Invalid the start of the period must be before the end");
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return ms.count();
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
