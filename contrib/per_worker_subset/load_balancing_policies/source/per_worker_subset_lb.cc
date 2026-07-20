@@ -100,6 +100,10 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset(bool membership_changed) {
 
   auto new_subset = std::make_shared<std::vector<Upstream::HostConstSharedPtr>>();
   if (all.empty()) {
+    if (membership_changed) {
+      equal_partition_.clear();
+      random_partition_.clear();
+    }
     subset_ = std::move(new_subset);
     publishSubsetToSyntheticPrioritySet(*subset_);
     return;
@@ -115,7 +119,10 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset(bool membership_changed) {
   // that a cluster-wide check would produce.
   std::vector<Upstream::HostConstSharedPtr> picked;
   if (strategy_ == PartitioningStrategy::EqualPartitions) {
-    rebuildEqualPartition(all, picked);
+    if (membership_changed) {
+      rebuildEqualPartitionAssignment(all);
+    }
+    rebuildEqualPartition(picked);
   } else {
     if (membership_changed) {
       reconcileRandomPartition(host_set->healthyHosts(), all);
@@ -209,8 +216,8 @@ void PerWorkerSubsetLoadBalancer::rebuildRandomPartition(
   }
 }
 
-void PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
-    const Upstream::HostVector& candidates, std::vector<Upstream::HostConstSharedPtr>& out) {
+void PerWorkerSubsetLoadBalancer::rebuildEqualPartitionAssignment(
+    const Upstream::HostVector& candidates) {
   std::vector<Upstream::HostConstSharedPtr> sorted(candidates.begin(), candidates.end());
   std::sort(sorted.begin(), sorted.end(),
             [](const Upstream::HostConstSharedPtr& a, const Upstream::HostConstSharedPtr& b) {
@@ -219,6 +226,7 @@ void PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
 
   const size_t n = sorted.size();
   if (n == 0) {
+    equal_partition_.clear();
     return;
   }
 
@@ -262,12 +270,15 @@ void PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
   const size_t envoy_offset = static_cast<size_t>(envoy_seed_ % n);
   const size_t start = (envoy_offset + static_cast<size_t>(worker_id_) * k) % n;
 
-  std::vector<Upstream::HostConstSharedPtr> slice;
-  slice.reserve(k);
+  equal_partition_.clear();
+  equal_partition_.reserve(k);
   for (size_t i = 0; i < k; ++i) {
-    slice.push_back(sorted[(start + i) % n]);
+    equal_partition_.push_back(sorted[(start + i) % n]);
   }
+}
 
+void PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
+    std::vector<Upstream::HostConstSharedPtr>& out) {
   // Per-worker fallback check. Filter the slice to healthy hosts; if the
   // healthy count is below this worker's threshold, fall back to using the
   // full slice (including unhealthy) -- same intent as stock LB fallback
@@ -276,13 +287,14 @@ void PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
   // the percent check and the LB stays with whatever healthy hosts are
   // in the slice (unless zero healthy, which still forces fallback).
   std::vector<Upstream::HostConstSharedPtr> healthy_slice;
-  healthy_slice.reserve(k);
-  for (const auto& host : slice) {
+  healthy_slice.reserve(equal_partition_.size());
+  for (const auto& host : equal_partition_) {
     if (host->coarseHealth() == Upstream::Host::Health::Healthy) {
       healthy_slice.push_back(host);
     }
   }
 
+  const size_t k = equal_partition_.size();
   const bool slice_in_fallback =
       healthy_slice.empty() ||
       (fallback_threshold_ > 0 && (static_cast<uint64_t>(healthy_slice.size()) * 100ULL) <
@@ -292,7 +304,7 @@ void PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
     if (healthy_slice.empty()) {
       per_worker_subset_stats_.lb_per_worker_subset_slice_empty_healthy_.inc();
     }
-    out = std::move(slice);
+    out = equal_partition_;
   } else {
     out = std::move(healthy_slice);
   }

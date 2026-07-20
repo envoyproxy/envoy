@@ -145,11 +145,13 @@ private:
   // per-worker fallback threshold without resampling it.
   void rebuildRandomPartition(const Upstream::HostVector& healthy_candidates,
                               std::vector<Upstream::HostConstSharedPtr>& out);
-  // EQUAL_PARTITIONS partitions over ``all_candidates`` (stable slice
-  // positions across health changes), filters to healthy, and falls back to
-  // the full slice if this worker's slice has too few healthy hosts.
-  void rebuildEqualPartition(const Upstream::HostVector& all_candidates,
-                             std::vector<Upstream::HostConstSharedPtr>& out);
+  // Recompute EQUAL_PARTITIONS' stable K-host assignment after a membership
+  // update. This is the only path that copies and address-sorts all N hosts.
+  void rebuildEqualPartitionAssignment(const Upstream::HostVector& all_candidates);
+  // Filter the cached equal assignment to healthy hosts and apply the
+  // per-worker fallback threshold. Health-only updates call only this O(K)
+  // path.
+  void rebuildEqualPartition(std::vector<Upstream::HostConstSharedPtr>& out);
 
   // Simple in-extension pick: ``next_index_ % K`` round-robin against the
   // worker's subset. Used when ``host_selection_strategy_`` is
@@ -191,6 +193,11 @@ private:
 
   // Per-Envoy seed for EQUAL_PARTITIONS -- see TypedPerWorkerSubsetLbConfig.
   const uint64_t envoy_seed_;
+
+  // Stable K-host assignment for EQUAL_PARTITIONS. Membership updates
+  // recompute it; health-only updates filter it without copying or sorting
+  // the cluster-wide N-host list.
+  std::vector<Upstream::HostConstSharedPtr> equal_partition_;
 
   // Stable host assignment for RANDOM_PARTITIONS. Health-only updates filter
   // this assignment but never resample it; membership updates retain surviving

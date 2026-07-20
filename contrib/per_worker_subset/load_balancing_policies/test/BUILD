@@ -14,6 +14,7 @@ envoy_cc_test(
     deps = [
         "//contrib/per_worker_subset/load_balancing_policies/source:per_worker_subset_lb_lib",
         "//source/common/common:random_generator_lib",
+        "//source/common/network:address_lib",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",

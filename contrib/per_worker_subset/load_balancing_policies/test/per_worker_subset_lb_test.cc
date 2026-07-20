@@ -7,6 +7,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/random_generator.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -34,6 +35,8 @@ public:
     hosts_.clear();
     for (size_t i = 0; i < n; ++i) {
       auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+      auto address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10000 + i);
+      ON_CALL(*host, address()).WillByDefault(Return(address));
       // MockHost's ``coarseHealth()`` defaults to ``Health::Unhealthy``
       // (enum value 0). Force it to Healthy so the synthetic priority set
       // (used by the inner stock LBs in EnvoyRoundRobin and EnvoyP2C modes)
@@ -202,6 +205,31 @@ TEST_F(PerWorkerSubsetLoadBalancerTest, RandomPartitionsRetainsAssignmentAcrossH
     after_recovery.insert(lb.chooseHost(nullptr).host);
   }
   EXPECT_EQ(after_recovery, initial);
+}
+
+TEST_F(PerWorkerSubsetLoadBalancerTest, EqualPartitionsHealthUpdateDoesNotResortAllHosts) {
+  makeHosts(64);
+  total_workers_ = 8;
+  PerWorkerSubsetLoadBalancer lb(
+      priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
+      /*subset_size=*/0, PartitioningStrategy::EqualPartitions,
+      HostSelectionStrategy::SimpleRoundRobin, /*worker_id=*/0, total_workers_,
+      /*fallback_threshold=*/50, /*envoy_seed=*/0, /*slow_start_config=*/{});
+
+  for (const auto& host : hosts_) {
+    EXPECT_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*host), address()).Times(0);
+  }
+
+  // A health-only update carries no membership delta. It must filter only
+  // this worker's cached K-host assignment, not copy and address-sort all N
+  // cluster hosts again.
+  priority_set_.runUpdateCallbacks(/*priority=*/0, /*added=*/{}, /*removed=*/{});
+
+  std::set<Upstream::HostConstSharedPtr> seen;
+  for (int i = 0; i < 50; ++i) {
+    seen.insert(lb.chooseHost(nullptr).host);
+  }
+  EXPECT_EQ(seen.size(), 8);
 }
 
 // EQUAL_PARTITIONS auto-computes ``K = ceil(N/W)``. With ``N=64`` and ``W=8``,
