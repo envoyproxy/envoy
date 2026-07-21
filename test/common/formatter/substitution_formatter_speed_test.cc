@@ -29,6 +29,30 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter() {
   return Envoy::Formatter::JsonFormatterImpl::create(struct_format, false).value();
 }
 
+// Builds a JSON format configuration where roughly half of the fields resolve to null (they read
+// request headers that are absent), so that the cost of the omit_empty_values handling is
+// exercised.
+Protobuf::Struct makeJsonStructWithEmptyValues() {
+  Protobuf::Struct struct_format;
+  const std::string format_yaml = R"EOF(
+    remote_address: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
+    protocol: '%PROTOCOL%'
+    response_code: '%RESPONSE_CODE%'
+    bytes_sent: '%BYTES_SENT%'
+    duration: '%DURATION%'
+    method: '%REQ(:METHOD)%'
+    referer: '%REQ(REFERER)%'
+    user-agent: '%REQ(USER-AGENT)%'
+    forwarded_for: '%REQ(X-FORWARDED-FOR)%'
+    request_id: '%REQ(X-REQUEST-ID)%'
+    nested:
+      authority: '%REQ(:AUTHORITY)%'
+      original_path: '%REQ(X-ENVOY-ORIGINAL-PATH)%'
+  )EOF";
+  TestUtility::loadFromYaml(format_yaml, struct_format);
+  return struct_format;
+}
+
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo(TimeSource& time_source) {
   auto stream_info = std::make_unique<Envoy::TestStreamInfo>(time_source);
   stream_info->downstream_connection_info_provider_->setRemoteAddress(
@@ -124,6 +148,44 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   benchmark::DoNotOptimize(output_bytes);
 }
 BENCHMARK(BM_JsonAccessLogFormatter);
+
+// Measures the pre-serialized JSON formatter (omit_empty_values disabled) on a configuration that
+// contains many null-valued fields. This is the baseline for the omit_empty_values comparison.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_JsonAccessLogFormatterKeepEmptyValues(benchmark::State& state) {
+  testing::NiceMock<MockTimeSystem> time_system;
+
+  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
+  Protobuf::Struct struct_format = makeJsonStructWithEmptyValues();
+  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter =
+      Envoy::Formatter::JsonFormatterImpl::create(struct_format, false).value();
+
+  size_t output_bytes = 0;
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    output_bytes += json_formatter->format({}, *stream_info).length();
+  }
+  benchmark::DoNotOptimize(output_bytes);
+}
+BENCHMARK(BM_JsonAccessLogFormatterKeepEmptyValues);
+
+// Measures the tree-structured JSON formatter (omit_empty_values enabled) on the same configuration
+// as BM_JsonAccessLogFormatterKeepEmptyValues, so the two benchmarks can be compared directly.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_JsonAccessLogFormatterOmitEmptyValues(benchmark::State& state) {
+  testing::NiceMock<MockTimeSystem> time_system;
+
+  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
+  Protobuf::Struct struct_format = makeJsonStructWithEmptyValues();
+  std::unique_ptr<Envoy::Formatter::OmitEmptyJsonFormatterImpl> json_formatter =
+      Envoy::Formatter::OmitEmptyJsonFormatterImpl::create(struct_format).value();
+
+  size_t output_bytes = 0;
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    output_bytes += json_formatter->format({}, *stream_info).length();
+  }
+  benchmark::DoNotOptimize(output_bytes);
+}
+BENCHMARK(BM_JsonAccessLogFormatterOmitEmptyValues);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_FormatterCommandParsing(benchmark::State& state) {
