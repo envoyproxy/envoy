@@ -383,7 +383,6 @@ TEST_P(McpJsonRestBridgeIntegrationTest, UnsupportedMcpProtocolVersionHeader) {
           R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Unsupported protocol version"}})json"));
 }
 
-
 TEST_P(McpJsonRestBridgeIntegrationTest, MissingIdField) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
