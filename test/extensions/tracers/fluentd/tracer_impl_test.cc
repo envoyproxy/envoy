@@ -16,7 +16,7 @@
 #include "gtest/gtest.h"
 #include "msgpack.hpp"
 
-using StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::Return;
 
 namespace Envoy {
