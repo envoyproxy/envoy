@@ -160,6 +160,14 @@ public:
     result = fcds_connection_->waitForNewStream(*dispatcher_, fcds_stream_);
     RELEASE_ASSERT(result, result.message());
     fcds_stream_->startGrpcStream();
+    if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+        this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+      RELEASE_ASSERT(fcds_stream_->waitForGrpcMessage(*dispatcher_, request), "");
+    } else {
+      envoy::service::discovery::v3::DiscoveryRequest request;
+      RELEASE_ASSERT(fcds_stream_->waitForGrpcMessage(*dispatcher_, request), "");
+    }
   }
 
   void waitXdsStream() { waitXdsStream({listener_config_}); }
@@ -561,6 +569,14 @@ public:
     result = rds_connection_->waitForNewStream(*dispatcher_, rds_stream_);
     RELEASE_ASSERT(result, result.message());
     rds_stream_->startGrpcStream();
+    if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+        this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+      RELEASE_ASSERT(rds_stream_->waitForGrpcMessage(*dispatcher_, request), "");
+    } else {
+      envoy::service::discovery::v3::DiscoveryRequest request;
+      RELEASE_ASSERT(rds_stream_->waitForGrpcMessage(*dispatcher_, request), "");
+    }
   }
 
   void sendRdsResponse(const std::string& route_config_name, const std::string& cluster_name,
