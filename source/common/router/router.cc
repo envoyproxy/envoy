@@ -901,15 +901,12 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     active_shadow_policies.clear();
   }
 
-  // Collect the downstream request's dynamic ``envoy.lb`` metadata once for all shadow policies so
-  // that subset load balancing on the shadow cluster honors dynamically-set selectors. Stays empty
-  // unless there is metadata to forward, so the common (no-shadow) path constructs nothing.
+  // Forward the downstream request's dynamic ``envoy.lb`` metadata so subset load balancing on the
+  // shadow cluster honors dynamically-set selectors, matching the main request path.
   std::optional<envoy::config::core::v3::Metadata> shadow_metadata;
   if (!active_shadow_policies.empty() &&
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata")) {
-    // Only store metadata worth forwarding, so the empty case stays nullopt and shadow streams skip
-    // the per-stream copy/move below.
     if (auto metadata = shadowDynamicMetadata(); !metadata.filter_metadata().empty()) {
       shadow_metadata = std::move(metadata);
     }
@@ -956,9 +953,7 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
             .setFilterConfig(config_)
             .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
 
-    // Forward the downstream request's dynamic ``envoy.lb`` metadata so the shadow cluster's subset
-    // load balancer selects the same host subset as the main request. The last policy can move the
-    // metadata since no later policy needs it.
+    // The last policy can move the metadata since no later policy needs it.
     if (shadow_metadata.has_value()) {
       if (last_policy) {
         options.setMetadata(std::move(*shadow_metadata));
@@ -1306,10 +1301,8 @@ std::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& po
 envoy::config::core::v3::Metadata Filter::shadowDynamicMetadata() const {
   envoy::config::core::v3::Metadata metadata;
 
-  // Precedence matches the main request path in metadataMatchCriteria(): connection metadata is
-  // applied first and then the request metadata is merged on top so request-level values win.
-  // Unlike metadataMatchCriteria(), which can reference the source metadata by OptRef, this builds
-  // a standalone proto to forward to the shadow stream, so the values must be copied here.
+  // Precedence matches metadataMatchCriteria(): connection metadata first, then request metadata
+  // merged on top so request-level values win.
   const auto* downstream_conn = downstreamConnection();
   if (downstream_conn != nullptr) {
     const auto& connection_fm = downstream_conn->streamInfo().dynamicMetadata().filter_metadata();

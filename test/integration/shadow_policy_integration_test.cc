@@ -78,18 +78,11 @@ public:
         });
   }
 
-  // Sets up the shadow cluster (cluster_1) with a ``version`` subset selector and two endpoints in
-  // distinct subsets so that the chosen subset is observable by which upstream receives the
-  // request:
+  // Two cluster_1 endpoints in distinct ``version`` subsets make the chosen subset observable by
+  // upstream index. Requires setUpstreamCount(3): cluster_0(1) + cluster_1(2).
   //   - cluster_1 endpoint[0] (``version: v1``) -> fake_upstreams_[1]
   //   - cluster_1 endpoint[1] (``version: v2``) -> fake_upstreams_[2]
-  // The route carries a static ``metadata_match`` of ``version: v1`` while a header-to-metadata
-  // filter sets dynamic ``envoy.lb`` ``version: v2``. cluster_0 (the main target) has no subset
-  // config, so the main request always lands on fake_upstreams_[0] regardless of subset selection.
-  // Requires setUpstreamCount(3): cluster_0(1 endpoint) + cluster_1(2 endpoints).
   void setupDynamicMetadataSubsetConfig() {
-    // Map the ``x-version`` request header into the ``envoy.lb`` dynamic metadata namespace used by
-    // the subset load balancer.
     config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.header_to_metadata
 typed_config:
@@ -101,8 +94,6 @@ typed_config:
         key: version
         type: STRING
 )EOF");
-    // Static route-level subset selector (``version: v1``). Dynamic metadata (``version: v2``) is
-    // expected to override this on both the main and, when the guard is enabled, the shadow path.
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) -> void {
@@ -1149,11 +1140,9 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestMetadataLoadbalancing) {
   sendRequestAndValidateResponse();
 }
 
-// Verifies that dynamically-set ``envoy.lb`` metadata (produced by the header-to-metadata filter)
-// is honored by the subset load balancer for shadowed requests. The dynamic ``version: v2``
-// overrides the static route ``version: v1``, so the shadow must land on cluster_1's ``v2``
-// endpoint (fake_upstreams_[2]), not its ``v1`` endpoint (fake_upstreams_[1]). Without the fix the
-// shadow would only see the static ``v1`` and hit fake_upstreams_[1] instead.
+// Dynamic ``envoy.lb`` metadata (``version: v2``) overrides the static route ``version: v1`` for
+// shadowed requests, so the shadow lands on cluster_1's ``v2`` endpoint (fake_upstreams_[2]) rather
+// than its ``v1`` endpoint (fake_upstreams_[1]).
 TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancing) {
   setUpstreamCount(3);
   initialConfigSetup("cluster_1", "");
@@ -1184,10 +1173,8 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancing)
   cleanupUpstreamAndDownstream();
 }
 
-// Companion to the test above that disables the runtime guard. With the guard off, the shadow
-// inherits only the static route ``metadata_match`` (``version: v1``), so it lands on cluster_1's
-// ``v1`` endpoint (fake_upstreams_[1]) rather than the ``v2`` endpoint, documenting the behavior
-// the guard controls.
+// With the guard off, the shadow inherits only the static ``version: v1`` and lands on
+// fake_upstreams_[1] rather than the dynamic ``v2`` endpoint (fake_upstreams_[2]).
 TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancingDisabled) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata", "false");

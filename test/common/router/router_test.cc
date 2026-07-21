@@ -6301,8 +6301,6 @@ TEST_P(RouterShadowingTest, ShadowRequestInheritsDynamicMetadata) {
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
-  // Connection-level metadata provides a base value that request-level metadata overrides, and a
-  // value that is only present at connection level.
   setConnectionMetadata(R"EOF(
 filter_metadata:
   envoy.lb:
@@ -6332,9 +6330,8 @@ filter_metadata:
             options.metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
         EXPECT_NE(it, options.metadata.filter_metadata().end());
         const auto& fields = it->second.fields();
-        // Request-level value wins over connection-level value.
+        // Request-level value wins; connection-only value is preserved.
         EXPECT_EQ("v2", fields.at("version").string_value());
-        // Connection-level-only value is preserved.
         EXPECT_EQ("yes", fields.at("from_connection").string_value());
         return &foo_request;
       }));
@@ -6347,8 +6344,7 @@ filter_metadata:
   router_->onDestroy();
 }
 
-// When the runtime guard is disabled, the shadow stream should not receive any forwarded
-// ``envoy.lb`` dynamic metadata, preserving the legacy behavior.
+// With the guard disabled, the shadow stream receives no forwarded ``envoy.lb`` metadata.
 TEST_P(RouterShadowingTest, ShadowRequestDoesNotInheritDynamicMetadataWhenDisabled) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata", "false"}});
@@ -6387,8 +6383,7 @@ TEST_P(RouterShadowingTest, ShadowRequestDoesNotInheritDynamicMetadataWhenDisabl
   router_->onDestroy();
 }
 
-// Only connection-level ``envoy.lb`` metadata is present (no request-level). The shadow stream
-// should still inherit it.
+// Connection-level ``envoy.lb`` metadata alone (no request-level) is still inherited.
 TEST_P(RouterShadowingTest, ShadowRequestInheritsConnectionOnlyDynamicMetadata) {
   ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
@@ -6435,9 +6430,8 @@ filter_metadata:
   router_->onDestroy();
 }
 
-// With multiple active shadow policies, every policy should receive the same forwarded metadata.
-// This guards the optimization that moves the metadata into the last policy's options: the earlier
-// (non-last) policies must still see a full copy.
+// Every policy receives the same forwarded metadata. Guards the move-into-last-policy optimization:
+// non-last policies must still see a full copy.
 TEST_P(RouterShadowingTest, ShadowRequestForwardsDynamicMetadataToAllPolicies) {
   if (!streaming_shadow_) {
     GTEST_SKIP();
