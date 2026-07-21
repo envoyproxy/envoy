@@ -511,5 +511,6 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/kae/ @Misakokoro @UNOWNED
 /contrib/istio @kyessenov @wbpcode @keithmattix @krinkinmu @zirain
 /contrib/reverse_tunnel_reporter @agrawroh @aakugan @basundhara-c
+/contrib/rfc9440_client_cert/ @somiljain2006
 
 /compat/openssl/ @tedjpoole @envoyproxy/envoy-openssl-sync
