@@ -37,7 +37,7 @@ TEST(CsrfFilterConfigTest, ServerContextOnlyFactory) {
   CsrfFilterFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  auto cb = factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  auto cb = factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   EXPECT_NE(cb, nullptr);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;

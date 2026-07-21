@@ -33,6 +33,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/thrift_to_metadata:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

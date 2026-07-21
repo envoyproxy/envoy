@@ -57,8 +57,8 @@ TEST_F(McpFilterConfigTest, CreateFilterWithServerContext) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  Http::FilterFactoryCb cb = factory_->createFilterFactoryFromProtoWithServerContext(
-      proto_config, "stats", server_context);
+  Http::FilterFactoryCb cb =
+      factory_->createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));

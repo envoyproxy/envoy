@@ -8,6 +8,8 @@
 
 #include "source/extensions/tracers/opentelemetry/samplers/dynatrace/stream_summary.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -37,7 +39,7 @@ TEST(StreamSummaryTest, TestEmpty) {
   auto top_k = summary.getTopK();
   EXPECT_EQ(top_k.size(), 0);
   EXPECT_EQ(top_k.begin(), top_k.end());
-  EXPECT_TRUE(summary.validate().ok());
+  EXPECT_OK(summary.validate());
 }
 
 // Test adding values, capacity not exceeded
@@ -52,7 +54,7 @@ TEST(StreamSummaryTest, TestSimple) {
   summary.offer('a');
   summary.offer('d');
 
-  EXPECT_TRUE(summary.validate().ok());
+  EXPECT_OK(summary.validate());
   EXPECT_EQ(summary.getN(), 8);
 
   auto top_k = summary.getTopK();
@@ -67,7 +69,7 @@ TEST(StreamSummaryTest, TestSimple) {
 // Test adding values, capacity exceeded
 TEST(StreamSummaryTest, TestExceedCapacity) {
   StreamSummary<char> summary(3);
-  EXPECT_TRUE(summary.validate().ok());
+  EXPECT_OK(summary.validate());
   summary.offer('d');
   summary.offer('a');
   summary.offer('b');
@@ -78,7 +80,7 @@ TEST(StreamSummaryTest, TestExceedCapacity) {
   summary.offer('c'); // 'd' will be dropped
   summary.offer('b');
   summary.offer('c');
-  EXPECT_TRUE(summary.validate().ok());
+  EXPECT_OK(summary.validate());
 
   {
     auto top_k = summary.getTopK();

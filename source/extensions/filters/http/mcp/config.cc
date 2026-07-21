@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
-Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
@@ -21,7 +21,7 @@ Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> McpFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
 

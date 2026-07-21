@@ -1362,6 +1362,7 @@ protected:
 
 using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
+class AdminEndpointProvider;
 class HealthChecker;
 
 /**
@@ -1437,6 +1438,12 @@ public:
    * Set up the drop_category value for the thread local cluster.
    */
   virtual void setDropCategory(absl::string_view drop_category) PURE;
+
+  /**
+   * @return the cluster's admin endpoint provider, used to render synthetic, display-only entries
+   *         on the admin /clusters page, or nullptr if the cluster has none. Defaults to nullptr.
+   */
+  virtual const AdminEndpointProvider* adminEndpointProvider() const { return nullptr; }
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
@@ -1460,3 +1467,22 @@ template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_vie
 };
 
 } // namespace fmt
+
+namespace std {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) const -> decltype(ctx.out()) {
+    absl::string_view out = !host.hostname().empty() ? host.hostname()
+                            : host.address()         ? host.address()->asStringView()
+                                                     : "<empty>";
+    return std::formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace std

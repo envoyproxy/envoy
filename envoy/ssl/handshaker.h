@@ -180,7 +180,7 @@ public:
   virtual SslCtxCb sslctxCb(HandshakerFactoryContext& handshaker_factory_context) const PURE;
 };
 
-// A handle tracking the certificate selection request. This can be used to supply additonal data
+// A handle tracking the certificate selection request. This can be used to supply additional data
 // to attach to the TLS sockets, and to detect when a request is cancelled.
 class SelectionHandle {
 public:
