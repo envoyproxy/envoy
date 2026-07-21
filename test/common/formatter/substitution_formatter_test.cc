@@ -45,12 +45,14 @@ namespace {
 
 using StatusHelpers::HasStatus;
 using testing::Const;
+using testing::ContainsRegex;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::StartsWith;
 
 // Helper class to test StreamInfoFormatter.
 class StreamInfoFormatter : public FormatterProvider {
@@ -3464,9 +3466,9 @@ TEST(SubstitutionFormatterTest, QueryParametersFormatter) {
   formatter_context.setRequestHeaders(request_header);
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%").IgnoreError(), EnvoyException,
-        "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed"));
   }
 
   {
@@ -5633,15 +5635,16 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
 
 TEST(SubstitutionFormatterTest, PathTest) {
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PATH(A)%").IgnoreError(),
-                              EnvoyException,
-                              "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%PATH(A)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed"));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse("%PATH(NQ:B)%").IgnoreError(), EnvoyException,
-        "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed");
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse("%PATH(NQ:B)%"),
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed"));
   }
 
   {
@@ -5943,54 +5946,56 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
 
   // Invalid JSON.
   {
-    EXPECT_THROW_WITH_REGEX(SubstitutionFormatParser::parse("%COALESCE(not json)%").IgnoreError(),
-                            EnvoyException, "COALESCE: failed to parse JSON configuration.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE(not json)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse JSON configuration")));
   }
 
   // Missing operators field.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)").IgnoreError(),
-        EnvoyException, "COALESCE: JSON configuration must contain 'operators' array");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE: JSON configuration must contain 'operators' array"));
   }
 
   // Empty operators array.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)").IgnoreError(),
-        EnvoyException, "COALESCE: 'operators' array must not be empty");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE: 'operators' array must not be empty"));
   }
 
   // Invalid operator which is not a string or object.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)").IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse operator at index 0")));
   }
 
   // Missing command field in operator object.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse operator at index 0")));
   }
 
   // Unknown command.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*unknown command.*");
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)"),
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            ContainsRegex("COALESCE: failed to parse operator at index 0.*unknown command.*")));
   }
 
   // Invalid not positive max_length.
   {
-    EXPECT_THROW_WITH_REGEX(
+    EXPECT_THAT(
         SubstitutionFormatParser::parse(
-            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*max_length.*positive.*");
+            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)"),
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  ContainsRegex(
+                      "COALESCE: failed to parse operator at index 0.*max_length.*positive.*")));
   }
 }
 
