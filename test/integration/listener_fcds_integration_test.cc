@@ -253,10 +253,10 @@ TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
     sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
   };
   initialize();
-  registerTestServerPorts({listener_name_});
 
   // Wait for the listener to be active and listening on workers.
   test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
 
   // Verify dynamic filter chain serves HTTP 200 correctly.
   IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
@@ -294,10 +294,10 @@ TEST_P(ListenerFcdsIntegrationTest, TwoListenersSharedFilterChain) {
     sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
   };
   initialize();
-  registerTestServerPorts({listener_name_, "testing-listener-1"});
 
   // Wait for BOTH listeners to be active and listening.
   test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  registerTestServerPorts({listener_name_, "testing-listener-1"});
 
   // Verify both listeners serve HTTP 200 correctly.
   Http::TestRequestHeaderMapImpl request_headers{
@@ -361,9 +361,9 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
     sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
   };
   initialize();
-  registerTestServerPorts({listener_name_});
 
   test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
 
   // Make an active connection.
   IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
@@ -408,10 +408,10 @@ TEST_P(ListenerFcdsIntegrationTest, LdsUpdateWithFcds) {
     sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
   };
   initialize();
-  registerTestServerPorts({listener_name_});
 
   // Wait for the listener to be active and listening on workers.
   test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
 
   // Verify dynamic filter chain serves HTTP 200 correctly.
   IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
@@ -645,10 +645,10 @@ TEST_P(ListenerFcdsRdsIntegrationTest, FcdsRdsWarming) {
   };
 
   initialize();
-  registerTestServerPorts({listener_name_});
 
   // Wait for the listener to be active and listening on workers.
   test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
 
   // Verify traffic works (routed to cluster_0 backend).
   IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
