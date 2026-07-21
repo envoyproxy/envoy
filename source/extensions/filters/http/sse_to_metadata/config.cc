@@ -11,11 +11,19 @@ namespace SseToMetadata {
 
 absl::StatusOr<Http::FilterFactoryCb> SseToMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  // This filter only uses the server factory context, so delegate to the server-context variant.
+  return createHttpFilterFactoryFromProtoTyped(proto_config, stats_prefix,
+                                               context.serverFactoryContext());
+}
+
+absl::StatusOr<Http::FilterFactoryCb> SseToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
 
   // Create shared config (which instantiates the parser from TypedExtensionConfig)
   // Note: content_parser is validated as required by proto validation rules
-  auto config = std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext());
+  auto config = std::make_shared<FilterConfig>(proto_config, context);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamEncoderFilter(std::make_shared<Filter>(config));

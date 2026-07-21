@@ -1196,6 +1196,20 @@ void DownstreamFilterManager::sendDirectLocalReply(
     const std::optional<Grpc::Status::GrpcStatus> grpc_status) {
   // Make sure we won't end up with nested watermark calls from the body buffer.
   state_.encoder_filters_streaming_ = true;
+  const bool flush_saved_response_metadata = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.direct_local_reply_flush_saved_response_metadata");
+  const auto encode_saved_metadata_and_end_stream = [this]() -> void {
+    encodeSavedResponseMetadataToCodec();
+    if (state_.saw_downstream_reset_) {
+      return;
+    }
+    Buffer::OwnedImpl empty_data;
+    filter_manager_callbacks_.encodeData(empty_data, true);
+    if (state_.saw_downstream_reset_) {
+      return;
+    }
+    maybeEndEncode(true);
+  };
   Http::Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
@@ -1215,20 +1229,32 @@ void DownstreamFilterManager::sendDirectLocalReply(
             // access logs.
             filter_manager_callbacks_.setResponseHeaders(std::move(response_headers));
 
+            const bool end_stream_after_metadata =
+                flush_saved_response_metadata && end_stream && hasSavedResponseMetadata();
             state_.non_100_response_headers_encoded_ = true;
             filter_manager_callbacks_.encodeHeaders(*filter_manager_callbacks_.responseHeaders(),
-                                                    end_stream);
+                                                    end_stream && !end_stream_after_metadata);
             if (state_.saw_downstream_reset_) {
               return;
             }
-            maybeEndEncode(end_stream);
+            if (end_stream_after_metadata) {
+              encode_saved_metadata_and_end_stream();
+            } else {
+              maybeEndEncode(end_stream);
+            }
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
-            filter_manager_callbacks_.encodeData(data, end_stream);
+            const bool end_stream_after_metadata =
+                flush_saved_response_metadata && end_stream && hasSavedResponseMetadata();
+            filter_manager_callbacks_.encodeData(data, end_stream && !end_stream_after_metadata);
             if (state_.saw_downstream_reset_) {
               return;
             }
-            maybeEndEncode(end_stream);
+            if (end_stream_after_metadata) {
+              encode_saved_metadata_and_end_stream();
+            } else {
+              maybeEndEncode(end_stream);
+            }
           }},
       Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
 }
@@ -1425,6 +1451,39 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
   // Now encode metadata via the codec.
   if (!metadata_map_ptr->empty()) {
     filter_manager_callbacks_.encodeMetadata(std::move(metadata_map_ptr));
+  }
+}
+
+bool FilterManager::hasSavedResponseMetadata() const {
+  for (const auto& entry : encoder_filters_.entries_) {
+    if (entry->saved_response_metadata_ == nullptr) {
+      continue;
+    }
+    for (const auto& metadata_map : *entry->saved_response_metadata_) {
+      if (metadata_map != nullptr && !metadata_map->empty()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+void FilterManager::encodeSavedResponseMetadataToCodec() {
+  // A direct local reply skips the remaining encoder filters, so saved metadata must also bypass
+  // filter iteration and be flushed straight to the codec before the stream is ended.
+  for (auto& entry : encoder_filters_.entries_) {
+    if (entry->saved_response_metadata_ == nullptr) {
+      continue;
+    }
+    for (auto& metadata_map : *entry->saved_response_metadata_) {
+      if (metadata_map != nullptr && !metadata_map->empty()) {
+        filter_manager_callbacks_.encodeMetadata(std::move(metadata_map));
+        if (state_.saw_downstream_reset_) {
+          return;
+        }
+      }
+    }
+    entry->saved_response_metadata_->clear();
   }
 }
 
@@ -1909,6 +1968,14 @@ void ActiveStreamEncoderFilter::handleMetadataAfterHeadersCallback() {
   if (parent_.state_.recreated_stream_) {
     // The stream has been recreated. In this case, there's no reason to encode saved metadata.
     getSavedResponseMetadata()->clear();
+    return;
+  }
+  if (parent_.state_.encoder_filter_chain_aborted_) {
+    // A local reply has stopped encoder iteration. Saved response metadata is either flushed
+    // directly to the codec by the local reply path or discarded when that path is disabled.
+    if (saved_response_metadata_ != nullptr) {
+      getSavedResponseMetadata()->clear();
+    }
     return;
   }
 

@@ -6,6 +6,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -52,7 +53,7 @@ protected:
     absl::Status creation_status = absl::OkStatus();
     filter_config_ = std::make_shared<FilterConfig>(
         proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_, creation_status);
-    ASSERT_TRUE(creation_status.ok());
+    ASSERT_OK(creation_status);
     filter_ = std::make_unique<Filter>(filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
   }

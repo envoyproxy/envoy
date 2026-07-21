@@ -66,7 +66,7 @@ TEST_F(FilterConfigTestOk, DescriptorInline) {
       api_->fileSystem()
           .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  ASSERT_TRUE(makeConfig().ok());
+  ASSERT_OK(makeConfig());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -75,7 +75,7 @@ TEST_F(FilterConfigTestOk, DescriptorFromFile) {
   parseConfigProto();
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
-  ASSERT_TRUE(makeConfig().ok());
+  ASSERT_OK(makeConfig());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -144,7 +144,7 @@ extractions_by_method: {
 })pb");
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
-  ASSERT_TRUE(makeConfig().ok());
+  ASSERT_OK(makeConfig());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
@@ -218,7 +218,7 @@ extractions_by_method: {
 })pb");
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
-  ASSERT_TRUE(makeConfig().ok());
+  ASSERT_OK(makeConfig());
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }

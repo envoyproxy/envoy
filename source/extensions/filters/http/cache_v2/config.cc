@@ -9,9 +9,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CacheV2 {
 
-absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactory(
     const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-    const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context) {
   std::shared_ptr<CacheSessions> cache;
   if (!config.disabled().value()) {
     if (!config.has_typed_config()) {
@@ -33,11 +33,22 @@ absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFro
     }
     cache = *std::move(status_or_cache);
   }
-  return
-      [config = std::make_shared<CacheFilterConfig>(config, cache, context.serverFactoryContext())](
-          Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));
-      };
+  return [config = std::make_shared<CacheFilterConfig>(config, cache, context)](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));
+  };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
+    const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(config, context.serverFactoryContext());
+}
+
+absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
+    const std::string& /*stats_prefix*/, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(config, context);
 }
 
 REGISTER_FACTORY(CacheFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);

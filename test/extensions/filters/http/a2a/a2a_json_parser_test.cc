@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/a2a/a2a_json_parser.h"
 
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -9,6 +10,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace A2a {
 namespace {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 class A2aJsonParserTest : public ::testing::Test {
 protected:
@@ -41,8 +45,8 @@ TEST_F(A2aJsonParserTest, ParseSimpleMessageSend) {
   })";
 
   // Parse the JSON string.
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
 
   // Verify overall validity and method.
   EXPECT_TRUE(parser_.isValidA2aRequest());
@@ -202,8 +206,8 @@ TEST_F(A2aJsonParserTest, ParseMessageSend) {
   })";
 
   // Parse the JSON string.
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
 
   // Verify overall validity and method.
   EXPECT_TRUE(parser_.isValidA2aRequest());
@@ -433,9 +437,9 @@ TEST_F(A2aJsonParserTest, ParseMessageSendMultiChunks) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(part1).ok());
-  ASSERT_TRUE(parser_.parse(part2).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(part1));
+  ASSERT_OK(parser_.parse(part2));
+  ASSERT_OK(parser_.finishParse());
 
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "message/send");
@@ -476,8 +480,8 @@ TEST_F(A2aJsonParserTest, ParseTasksGet) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/get");
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "124");
@@ -525,8 +529,8 @@ TEST_F(A2aJsonParserTest, ParseTasksList) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/list");
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "125");
@@ -606,8 +610,8 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigSet) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/set");
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "126");
@@ -692,8 +696,8 @@ TEST_F(A2aJsonParserTest, ParseUnrecognizedMethod) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "unknown/method");
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "123");
@@ -712,8 +716,8 @@ TEST_F(A2aJsonParserTest, InvalidJson) {
 
   // The parse call itself will succeed since it is streaming and waiting for more data,
   // but finishParse should definitely fail.
-  ASSERT_TRUE(parser_.parse(json).ok());
-  EXPECT_FALSE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  EXPECT_THAT(parser_.finishParse(), Not(IsOk()));
 }
 
 TEST_F(A2aJsonParserTest, MissingJsonRpc) {
@@ -723,8 +727,8 @@ TEST_F(A2aJsonParserTest, MissingJsonRpc) {
     "params": {}
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   // Should return false because 'jsonrpc' field is missing from extracted metadata
   EXPECT_FALSE(parser_.isValidA2aRequest());
 }
@@ -744,8 +748,8 @@ TEST_F(A2aJsonParserTest, ParseTasksListMissingOptionalFields) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/list");
   EXPECT_EQ(
@@ -770,8 +774,8 @@ TEST_F(A2aJsonParserTest, GetTaskRequest) {
     }
   }
 })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/get");
   EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 102);
@@ -811,8 +815,8 @@ TEST_F(A2aJsonParserTest, CancelTaskRequest) {
     }
   }
 })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/cancel");
   EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 103);
@@ -845,8 +849,8 @@ TEST_F(A2aJsonParserTest, ResubscribeTaskRequest) {
     }
   }
 })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/resubscribe");
   EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 106);
@@ -886,8 +890,8 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigGet) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/get");
   EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 130);
@@ -927,8 +931,8 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigList) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/list");
   EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 131);
@@ -967,8 +971,8 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigDelete) {
     }
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/delete");
   EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 132);
@@ -993,8 +997,8 @@ TEST_F(A2aJsonParserTest, ParseAgentGetAuthenticatedExtendedCard) {
     "params": {}
   })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "agent/getAuthenticatedExtendedCard");
   EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 133);
@@ -1016,8 +1020,8 @@ TEST_F(A2aJsonParserTest, GetNestedValue) {
       }
     }
   })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
 
   // Valid paths
@@ -1038,8 +1042,8 @@ TEST_F(A2aJsonParserTest, Reset) {
   const std::string json2 =
       R"({"jsonrpc": "2.0", "method": "tasks/cancel", "id": "2", "params": {"id": "task2"}})";
 
-  ASSERT_TRUE(parser_.parse(json1).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json1));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/get");
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "1");
@@ -1048,8 +1052,8 @@ TEST_F(A2aJsonParserTest, Reset) {
   EXPECT_FALSE(parser_.isValidA2aRequest());
   EXPECT_TRUE(parser_.metadata().fields().empty());
 
-  ASSERT_TRUE(parser_.parse(json2).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json2));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/cancel");
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "2");
@@ -1081,8 +1085,8 @@ TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
   }
 })";
 
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_TRUE(parser_.metadata().fields().contains("jsonrpc"));
   EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
@@ -1123,8 +1127,8 @@ TEST_F(A2aJsonParserTest, GetTaskErrorResponse) {
         "data": null
     }
     })";
-  ASSERT_TRUE(parser_.parse(json).ok());
-  ASSERT_TRUE(parser_.finishParse().ok());
+  ASSERT_OK(parser_.parse(json));
+  ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_TRUE(parser_.metadata().fields().contains("jsonrpc"));
   EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");

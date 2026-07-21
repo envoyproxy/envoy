@@ -1198,6 +1198,17 @@ TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
   EXPECT_TRUE(envoy_quic_session_.ssl()->dnsSansLocalCertificate().empty());
   EXPECT_FALSE(envoy_quic_session_.ssl()->validFromPeerCertificate().has_value());
   EXPECT_FALSE(envoy_quic_session_.ssl()->expirationPeerCertificate().has_value());
+
+  // Call overridden methods and assert they match underlying crypto stream.
+  auto* crypto_stream = envoy_quic_session_.GetCryptoStream();
+  ASSERT(crypto_stream != nullptr);
+  EXPECT_EQ(crypto_stream->CiphersuiteId(), envoy_quic_session_.ssl()->ciphersuiteId());
+  EXPECT_EQ(crypto_stream->CiphersuiteString(), envoy_quic_session_.ssl()->ciphersuiteString());
+  EXPECT_EQ(crypto_stream->TlsGroupId(), envoy_quic_session_.ssl()->tlsGroupId());
+  EXPECT_EQ(crypto_stream->TlsGroupString(), envoy_quic_session_.ssl()->tlsGroupString());
+  EXPECT_EQ("TLSv1.3", envoy_quic_session_.ssl()->tlsVersion());
+  EXPECT_EQ(crypto_stream->Alpn(), envoy_quic_session_.ssl()->alpn());
+  EXPECT_EQ(crypto_stream->Sni(), envoy_quic_session_.ssl()->sni());
 }
 
 TEST_F(EnvoyQuicServerSessionTest, DisableQpack) {
@@ -1423,6 +1434,22 @@ class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessio
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
   EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), std::nullopt);
   EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), std::nullopt);
+}
+
+TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, ResetSslAfterHandshakeEnabledViaRuntime) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_enable_reset_ssl_after_handshake", "true"}});
+
+  // In this suite, envoy_quic_session_ is NOT initialized in SetUp.
+  // So we can initialize it now, and it will pick up the runtime flag!
+
+  envoy_quic_session_.Initialize();
+
+  EXPECT_TRUE(envoy_quic_session_.connection()->connected());
+
+  // The suite's TearDown will handle the rest of initialization and cleanup for
+  // envoy_quic_session_.
 }
 
 } // namespace Quic

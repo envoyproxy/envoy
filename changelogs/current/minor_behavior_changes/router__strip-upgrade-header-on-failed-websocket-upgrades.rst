@@ -1,1 +1,0 @@
-Envoy can now strip ``Upgrade`` and ``Connection: upgrade`` headers from responses of failed WebSocket upgrade requests. This is disabled by default and can be enabled by setting runtime guard ``envoy.reloadable_features.strip_upgrade_header_on_failed_websocket_upgrades`` to ``true``.

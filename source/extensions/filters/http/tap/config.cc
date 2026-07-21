@@ -7,6 +7,7 @@
 
 #include "source/extensions/filters/http/tap/tap_config_impl.h"
 #include "source/extensions/filters/http/tap/tap_filter.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,8 +16,9 @@ namespace TapFilter {
 
 class HttpTapConfigFactoryImpl : public Extensions::Common::Tap::TapConfigFactory {
 public:
-  HttpTapConfigFactoryImpl(Server::Configuration::FactoryContext& context)
-      : factory_context_(context) {}
+  HttpTapConfigFactoryImpl(Server::Configuration::ServerFactoryContext& context,
+                           ProtobufMessage::ValidationVisitor& validation_visitor)
+      : factory_context_(context, validation_visitor) {}
   // TapConfigFactory
   Extensions::Common::Tap::TapConfigSharedPtr
   createConfigFromProto(const envoy::config::tap::v3::TapConfig& proto_config,
@@ -26,23 +28,37 @@ public:
   }
 
 private:
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::GenericFactoryContextImpl factory_context_;
 };
 
-absl::StatusOr<Http::FilterFactoryCb> TapFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> TapFilterFactory::createFilterFactory(
     const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
-
-  FilterConfigSharedPtr filter_config(new FilterConfigImpl(
-      proto_config, stats_prefix, std::make_unique<HttpTapConfigFactoryImpl>(context),
-      context.scope(), server_context.admin(), server_context.singletonManager(),
-      server_context.threadLocal(), server_context.mainThreadDispatcher()));
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
+    Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor) {
+  FilterConfigSharedPtr filter_config(
+      new FilterConfigImpl(proto_config, stats_prefix,
+                           std::make_unique<HttpTapConfigFactoryImpl>(context, validation_visitor),
+                           scope, context.admin(), context.singletonManager(),
+                           context.threadLocal(), context.mainThreadDispatcher()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> TapFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto_config, stats_prefix, context.serverFactoryContext(),
+                             context.scope(), context.messageValidationVisitor());
+}
+
+absl::StatusOr<Http::FilterFactoryCb> TapFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto_config, stats_prefix, context, context.scope(),
+                             context.messageValidationVisitor());
 }
 
 /**
