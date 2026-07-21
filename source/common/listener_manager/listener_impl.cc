@@ -727,9 +727,11 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
           "connection_balance_config is configured for QUIC listener which "
           "doesn't work with connection balancer.");
     }
+    absl::Status listener_factory_creation_status = absl::OkStatus();
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_, *listener_factory_context_);
+        validation_visitor_, *listener_factory_context_, listener_factory_creation_status);
+    RETURN_IF_NOT_OK_REF(listener_factory_creation_status);
 
     if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
       auto* quic_packet_writer_factory_factory =
@@ -821,6 +823,12 @@ void ListenerImpl::buildListenSocketOptions(
                 /*mapped_v6*/ addresses_[i]->ip()->version() == Network::Address::IpVersion::v6 &&
                 !addresses_[i]->ip()->ipv6()->v6only()));
       }
+
+      // Additional factory specific options.
+      ASSERT(udp_listener_config_->listener_factory_ != nullptr,
+             "buildUdpListenerFactory() must run first");
+      addListenSocketOptions(listen_socket_options_list_[i],
+                             udp_listener_config_->listener_factory_->socketOptions());
     }
   }
 }

@@ -326,6 +326,11 @@ public:
   virtual bool isTransportConnectionless() const PURE;
 
   /**
+   * @return socket options specific to this factory that should be applied to all sockets.
+   */
+  virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
+
+  /**
    * Perform any initialization that must occur immediately prior to using the listen socket on
    * workers, and which requires access to listen sockets. For creating and posting eBPF programs to
    * each reuseport group.

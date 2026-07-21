@@ -34,7 +34,7 @@ public:
    * Create a socket option with BPF program to consistently route QUIC packets to the right listen
    * socket. Linux only, absl::UnimplementedError on other platforms.
    * @param concurrency the total number of worker threads.
-   * @returns the socket option or an error status.
+   * @returns the non null socket option or an error status.
    */
   virtual absl::StatusOr<Network::Socket::OptionConstSharedPtr>
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) PURE;

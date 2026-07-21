@@ -125,7 +125,8 @@ public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                            Server::Configuration::ListenerFactoryContext& context);
+                            Server::Configuration::ListenerFactoryContext& context,
+                            absl::Status& creation_status);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -134,6 +135,7 @@ public:
                           Network::SocketSharedPtr&& listen_socket_ptr,
                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
+  const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
   absl::Status doFinalPreWorkerInit(absl::Span<const Network::ListenSocketFactoryPtr>) override;
 
   static void setDisableKernelBpfPacketRoutingForTest(bool val) {

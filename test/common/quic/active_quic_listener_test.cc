@@ -140,10 +140,6 @@ public:
   static const QuicConnectionIdWorkerSelector& workerSelector(ActiveQuicListenerFactory& factory) {
     return factory.worker_selector_;
   }
-  static const Network::Socket::OptionsSharedPtr&
-  socketOptions(ActiveQuicListenerFactory& factory) {
-    return factory.options_;
-  }
 };
 
 class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -229,8 +225,12 @@ protected:
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<TestActiveQuicListenerFactory>(
-        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, context_);
+    absl::Status creation_status = absl::OkStatus();
+    auto factory = std::make_unique<TestActiveQuicListenerFactory>(
+        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, context_,
+        creation_status);
+    EXPECT_OK(creation_status);
+    return factory;
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -765,8 +765,12 @@ class ActiveQuicListenerFactoryTest : public testing::Test {
 protected:
   std::unique_ptr<ActiveQuicListenerFactory>
   createQuicListenerFactory(envoy::config::listener::v3::QuicProtocolOptions options) {
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
-                                                       validation_visitor_, listener_context_);
+    absl::Status creation_status = absl::OkStatus();
+    auto factory = std::make_unique<ActiveQuicListenerFactory>(
+        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, listener_context_,
+        creation_status);
+    EXPECT_OK(creation_status);
+    return factory;
   }
 
   Stats::SymbolTable symbol_table_;
@@ -814,8 +818,12 @@ protected:
         options.mutable_connection_id_generator_config()->mutable_typed_config()->PackFrom(
             test::common::config::DummyConfig());
 
-    return std::make_unique<ActiveQuicListenerFactory>(options, concurrency, quic_stat_names_,
-                                                       validation_visitor_, listener_context_);
+    absl::Status creation_status = absl::OkStatus();
+    auto factory = std::make_unique<ActiveQuicListenerFactory>(
+        options, concurrency, quic_stat_names_, validation_visitor_, listener_context_,
+        creation_status);
+    EXPECT_OK(creation_status);
+    return factory;
   }
 
   StrictMock<MockEnvoyQuicConnectionIdGeneratorFactory>*
@@ -870,7 +878,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, FactoryCreatedPreWorke
                           { ASSERT_OK(factory_->doFinalPreWorkerInit(socket_factories_)); });
 
   EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), cid_generator_factory);
-  const auto& options = ActiveQuicListenerFactoryPeer::socketOptions(*factory_);
+  const auto& options = factory_->socketOptions();
   ASSERT_EQ(options->size(), 1u);
   EXPECT_EQ((*options)[0].get(), mock_option.get());
   EXPECT_TRUE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
@@ -886,7 +894,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, UnimplementedLogsWarn)
   EXPECT_LOG_CONTAINS("warn", "Efficient routing of QUIC packets",
                       { ASSERT_OK(factory_->doFinalPreWorkerInit(socket_factories_)); });
 
-  EXPECT_TRUE(ActiveQuicListenerFactoryPeer::socketOptions(*factory_)->empty());
+  EXPECT_TRUE(factory_->socketOptions()->empty());
   EXPECT_FALSE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
 }
 
