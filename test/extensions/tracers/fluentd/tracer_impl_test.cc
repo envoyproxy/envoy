@@ -16,8 +16,7 @@
 #include "gtest/gtest.h"
 #include "msgpack.hpp"
 
-using ::Envoy::StatusHelpers::IsOk;
-using ::testing::Not;
+using StatusHelpers::HasStatusMessage;
 using testing::Return;
 
 namespace Envoy {
@@ -432,7 +431,6 @@ TEST_F(FluentdTracerCacheImplTest, CreateTwoTracersSameHash) {
 }
 
 // Adapted from OpenTelemetry Span context extractor tests @alexanderellis @yanavlasov
-using StatusHelpers::HasStatusMessage;
 
 constexpr absl::string_view version = "00";
 constexpr absl::string_view trace_id = "00000000000000000000000000000001";
@@ -474,7 +472,6 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithoutHeader) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("No propagation header found"));
 }
 
@@ -485,7 +482,6 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithTooLongHeader) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
 }
 
@@ -496,7 +492,6 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithTooShortHeader) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
 }
 
@@ -507,7 +502,6 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHyphenation) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
 }
 
@@ -518,7 +512,6 @@ TEST(SpanContextExtractorTest, ThrowExceptionWithInvalidHyphenation) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent hyphenation"));
 }
 
@@ -532,7 +525,6 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidSizes) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent field sizes"));
 }
 
@@ -544,7 +536,6 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHex) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("Invalid header hex"));
 }
 
@@ -556,7 +547,6 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithAllZeroTraceId) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("Invalid trace id"));
 }
 
@@ -568,7 +558,6 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithAllZeroParentId) {
 
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("Invalid parent id"));
 }
 
@@ -598,7 +587,6 @@ TEST(SpanContextExtractorTest, IgnoreTracestateWithoutTraceparent) {
   SpanContextExtractor span_context_extractor(request_headers);
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_THAT(span_context, Not(IsOk()));
   EXPECT_THAT(span_context, HasStatusMessage("No propagation header found"));
 }
 
