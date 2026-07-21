@@ -6,6 +6,7 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -20,6 +21,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 TEST(HttpJwtAuthnFilterConfigTest, FindByMatch) {
   const char config[] = R"(
@@ -39,7 +42,9 @@ rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(
@@ -73,7 +78,9 @@ rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(
@@ -103,8 +110,10 @@ requirement_map:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
-                            "Wrong requirement_name: rr. It should be one of [r1]");
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         "Wrong requirement_name: rr. It should be one of [r1]"));
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, FindByMatchRequirementName) {
@@ -136,7 +145,9 @@ requirement_map:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
 
   EXPECT_TRUE(filter_conf->findVerifier(
@@ -170,7 +181,9 @@ rules:
 
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config, proto_config);
-  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
 
   // Even though filter_conf is now de-allocated, using a reference to it might still work, as its
   // memory was not cleared. This leads to a false positive in this test when run normally. The
@@ -209,7 +222,9 @@ filter_state_rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
 
   // Empty filter_state
   StreamInfo::FilterStateImpl filter_state1(StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -261,7 +276,9 @@ requirement_map:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
 
   PerRouteConfig per_route;
   const Verifier* verifier;
@@ -314,8 +331,10 @@ providers:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
-                             HasSubstr("Duration out-of-range"));
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kOutOfRange, HasSubstr("Duration out-of-range")));
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksInvalidUri) {
@@ -333,8 +352,10 @@ providers:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
-                             HasSubstr("invalid URI"));
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("invalid URI")));
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksValidUri) {
@@ -352,7 +373,9 @@ providers:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  FilterConfigImpl(proto_config, "", context);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_TRUE(creation_status.ok());
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksAsyncFetchRefetchDurationVeryBig) {
@@ -372,8 +395,10 @@ providers:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
-                             HasSubstr("Duration out-of-range"));
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kOutOfRange, HasSubstr("Duration out-of-range")));
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksWithRetryPolicy) {
@@ -397,7 +422,9 @@ providers:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
   auto* jwks_data = filter_conf->getJwksCache().findByIssuer("issuer1");
   EXPECT_NE(nullptr, jwks_data);
   EXPECT_NE(nullptr, jwks_data->retryPolicy());
@@ -424,9 +451,12 @@ providers:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THAT_THROWS_MESSAGE(
-      FilterConfigImpl(proto_config, "", context), EnvoyException,
-      HasSubstr("max_interval must be greater than or equal to the base_interval"));
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter(proto_config, "", context, creation_status);
+  EXPECT_THAT(
+      creation_status,
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                HasSubstr("max_interval must be greater than or equal to the base_interval")));
 }
 
 } // namespace

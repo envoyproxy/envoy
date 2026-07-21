@@ -10,13 +10,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
-class GrpcWebFilterConfig
-    : public Common::FactoryBase<envoy::extensions::filters::http::grpc_web::v3::GrpcWeb> {
+class GrpcWebFilterConfig : public Common::ExceptionFreeFactoryBase<
+                                envoy::extensions::filters::http::grpc_web::v3::GrpcWeb> {
 public:
-  GrpcWebFilterConfig() : FactoryBase("envoy.filters.http.grpc_web") {}
+  GrpcWebFilterConfig() : ExceptionFreeFactoryBase("envoy.filters.http.grpc_web") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_web::v3::GrpcWeb& proto_config,
       const std::string& stats_prefix,
       Server::Configuration::FactoryContext& factory_context) override;
