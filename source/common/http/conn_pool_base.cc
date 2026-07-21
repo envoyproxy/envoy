@@ -138,11 +138,9 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
         std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_);
 
     // Compute raw signed capacity to determine debt (the negative portion not tracked in pool).
-    int64_t new_raw_capacity =
-        static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
+    int64_t new_raw_capacity = static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
     new_raw_capacity = std::min<int64_t>(remaining_streams_, new_raw_capacity);
-    uint32_t new_pool_contribution =
-        static_cast<uint32_t>(std::max<int64_t>(0, new_raw_capacity));
+    uint32_t new_pool_contribution = static_cast<uint32_t>(std::max<int64_t>(0, new_raw_capacity));
 
     if (state() == ActiveClient::State::Ready && new_raw_capacity <= 0) {
       parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);

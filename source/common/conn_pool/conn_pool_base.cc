@@ -24,9 +24,8 @@ uint64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clie
 std::string ConnPoolImplBase::dumpState() const { return fmt::format("State: {}", *this); }
 
 void ConnPoolImplBase::assertCapacityCountsAreCorrect() {
-  SLOW_ASSERT(connecting_stream_capacity_ ==
-                  currentUnusedCapacity(connecting_clients_) +
-                      currentUnusedCapacity(early_data_clients_),
+  SLOW_ASSERT(connecting_stream_capacity_ == currentUnusedCapacity(connecting_clients_) +
+                                                 currentUnusedCapacity(early_data_clients_),
               dumpState());
 
   // Busy clients always have currentUnusedCapacity() == 0 (clamped), so their contribution
@@ -34,8 +33,8 @@ void ConnPoolImplBase::assertCapacityCountsAreCorrect() {
   // the sum of ready clients' unused capacity.
   SLOW_ASSERT(
       connecting_and_connected_stream_capacity_ ==
-          (connecting_stream_capacity_ +
-           currentUnusedCapacity(ready_clients_) + currentUnusedCapacity(busy_clients_)),
+          (connecting_stream_capacity_ + currentUnusedCapacity(ready_clients_) +
+           currentUnusedCapacity(busy_clients_)),
       fmt::format(
           "{} currentUnusedCapacity(ready_clients_) {}, currentUnusedCapacity(busy_clients_) {}",
           *this, currentUnusedCapacity(ready_clients_), currentUnusedCapacity(busy_clients_)));
@@ -46,8 +45,7 @@ void ConnPoolImplBase::assertCapacityCountsAreCorrect() {
     ENVOY_BUG(connecting_and_connected_stream_capacity_ == connecting_stream_capacity_,
               dumpState());
   } else {
-    ENVOY_BUG(connecting_and_connected_stream_capacity_ > connecting_stream_capacity_,
-              dumpState());
+    ENVOY_BUG(connecting_and_connected_stream_capacity_ > connecting_stream_capacity_, dumpState());
   }
 }
 
