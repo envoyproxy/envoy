@@ -5,8 +5,6 @@ package envoy.extensions.quic.connection_id_generator.quic_lb.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
