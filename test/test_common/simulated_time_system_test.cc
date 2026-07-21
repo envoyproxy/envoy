@@ -18,7 +18,8 @@ namespace {
 class SimulatedTimeSystemTest : public testing::Test {
 protected:
   SimulatedTimeSystemTest()
-      : scheduler_(time_system_.createScheduler(base_scheduler_, base_scheduler_)),
+      : base_scheduler_(time_system_),
+        scheduler_(time_system_.createScheduler(base_scheduler_, base_scheduler_)),
         start_monotonic_time_(time_system_.monotonicTime()),
         start_system_time_(time_system_.systemTime()) {}
 
@@ -57,8 +58,8 @@ protected:
   }
 
   Event::MockDispatcher dispatcher_;
-  LibeventScheduler base_scheduler_;
   SimulatedTimeSystem time_system_;
+  LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
   std::string output_;
   std::vector<TimerPtr> timers_;

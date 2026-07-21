@@ -39,6 +39,7 @@ envoy_cc_test(
         "//test/mocks/upstream:priority_set_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -50,6 +51,7 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/rust:cluster_dynamic_metadata_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],

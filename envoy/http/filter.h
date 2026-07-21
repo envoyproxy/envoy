@@ -840,6 +840,30 @@ public:
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 
   /**
+   * This routine can be called by a filter to subscribe to watermark events on the upstream request
+   * path, i.e. the aggregate back-pressure raised toward the request source via
+   * onDecoderFilterAboveWriteBufferHighWatermark() (notably by the router's UpstreamRequest when
+   * the upstream cannot accept the request body fast enough).
+   *
+   * A filter that produces request data of its own (e.g. by replaying a buffered body via
+   * injectDecodedDataToFilterChain()) should subscribe so it can pause production while the
+   * upstream is backed up, since the connection-manager's read-disable of the downstream codec does
+   * not stop such a filter.
+   *
+   * Immediately after subscribing, the filter will get a high watermark callback for each
+   * outstanding high watermark.
+   */
+  virtual void addUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& callbacks) PURE;
+
+  /**
+   * This routine can be called by a filter to stop subscribing to upstream request watermark
+   * events.
+   *
+   * It is not safe to call this from under the stack of an UpstreamWatermarkCallbacks callback.
+   */
+  virtual void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& callbacks) PURE;
+
+  /**
    * @return the account, if any, used by this stream.
    */
   virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;

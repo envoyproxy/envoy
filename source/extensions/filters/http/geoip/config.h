@@ -22,6 +22,20 @@ public:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
+private:
+  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
+  // (ServerFactoryContext) paths. A GenericFactoryContext is used so the filter's scope and
+  // validation visitor stay correct for each path, while the provider driver is created with the
+  // server factory context.
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
+                      const std::string& stat_prefix,
+                      Server::Configuration::GenericFactoryContext& context);
 };
 
 } // namespace Geoip

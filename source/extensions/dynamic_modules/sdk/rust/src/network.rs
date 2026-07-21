@@ -272,6 +272,30 @@ pub trait EnvoyNetworkFilter {
   /// Returns None if SNI is not available.
   fn get_requested_server_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
+  /// Get the value of the attribute with the given ID as a string.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_string<'a>(
+    &'a self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the value of the attribute with the given ID as an integer.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64>;
+
+  /// Get the value of the attribute with the given ID as a boolean.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool>;
+
   /// Get the direct remote (client) address and port without considering proxy protocol.
   /// Returns None if the address is not available or not an IP address.
   fn get_direct_remote_address<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, u32)>;
@@ -478,6 +502,9 @@ pub trait EnvoyNetworkFilter {
 
   /// Check if an upstream host has been selected for this connection.
   fn has_upstream_host(&self) -> bool;
+
+  /// Get the upstream connection ID, or 0 if not available.
+  fn get_upstream_connection_id(&self) -> u64;
 
   /// Signal to the filter manager to enable secure transport mode in upstream connection.
   /// This is done when upstream connection's transport socket is of startTLS type.
@@ -1090,6 +1117,66 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     };
     if success && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_string(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_attribute_string(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64> {
+    let mut result: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_attribute_int(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool> {
+    let mut result: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
     } else {
       None
     }
@@ -1711,6 +1798,12 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
 
   fn has_upstream_host(&self) -> bool {
     unsafe { abi::envoy_dynamic_module_callback_network_filter_has_upstream_host(self.raw) }
+  }
+
+  fn get_upstream_connection_id(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(self.raw)
+    }
   }
 
   fn start_upstream_secure_transport(&mut self) -> bool {

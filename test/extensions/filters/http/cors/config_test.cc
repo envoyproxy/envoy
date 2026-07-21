@@ -29,7 +29,7 @@ TEST(CorsFilterConfigTest, CorsFilterWithServerContext) {
   CorsFilterFactory factory;
   envoy::extensions::filters::http::cors::v3::Cors config;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

@@ -37,6 +37,7 @@ func init() {
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
 		"http_struct_config":           &HttpStructConfigFactory{},
 		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
+		"log_level":                    &LogLevelConfigFactory{},
 	})
 }
 
@@ -1475,5 +1476,39 @@ func (f *ListMetadataCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap
 		}
 	}
 
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// LogLevel
+// -----------------------------------------------------------------------------
+
+type LogLevelConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *LogLevelConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &LogLevelFilterFactory{}, nil
+}
+
+type LogLevelFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *LogLevelFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &LogLevelFilter{handle: handle}
+}
+
+type LogLevelFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (p *LogLevelFilter) OnResponseHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	headers.Set("x-log-level", strconv.FormatUint(uint64(p.handle.GetLogLevel()), 10))
+	headers.Set("x-log-info-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelInfo)))
+	headers.Set("x-log-error-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelError)))
 	return shared.HeadersStatusContinue
 }

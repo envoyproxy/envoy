@@ -20,6 +20,7 @@
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/file_system_for_test.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/strings/str_replace.h"
@@ -103,22 +104,16 @@ void IntegrationTestServer::waitUntilListenersReady() {
 void IntegrationTestServer::setDynamicContextParam(absl::string_view resource_type_url,
                                                    absl::string_view key, absl::string_view value) {
   server().dispatcher().post([this, resource_type_url, key, value]() {
-    ASSERT_TRUE(server()
-                    .localInfo()
-                    .contextProvider()
-                    .setDynamicContextParam(resource_type_url, key, value)
-                    .ok());
+    ASSERT_OK(server().localInfo().contextProvider().setDynamicContextParam(resource_type_url, key,
+                                                                            value));
   });
 }
 
 void IntegrationTestServer::unsetDynamicContextParam(absl::string_view resource_type_url,
                                                      absl::string_view key) {
   server().dispatcher().post([this, resource_type_url, key]() {
-    ASSERT_TRUE(server()
-                    .localInfo()
-                    .contextProvider()
-                    .unsetDynamicContextParam(resource_type_url, key)
-                    .ok());
+    ASSERT_OK(
+        server().localInfo().contextProvider().unsetDynamicContextParam(resource_type_url, key));
   });
 }
 

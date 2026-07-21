@@ -22,14 +22,17 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::DoAll;
+using ::testing::Not;
 using testing::Return;
 using testing::SaveArg;
 
@@ -148,7 +151,7 @@ public:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -268,9 +271,9 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
 // Validate that onConfigUpdate() with empty cluster vector size ignores config.
 TEST_F(EdsTest, OnConfigUpdateEmpty) {
   initialize();
-  EXPECT_TRUE(eds_callbacks_->onConfigUpdate({}, "").ok());
+  EXPECT_OK(eds_callbacks_->onConfigUpdate({}, ""));
   Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(eds_callbacks_->onConfigUpdate({}, removed_resources, "").ok());
+  EXPECT_OK(eds_callbacks_->onConfigUpdate({}, removed_resources, ""));
   EXPECT_EQ(2UL, stats_.findCounterByString("cluster.name.update_empty").value().get().value());
   EXPECT_TRUE(initialized_);
 }
@@ -315,7 +318,7 @@ TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources, "cluster_name");
-  EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
+  EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
 
   EXPECT_TRUE(initialized_);
   EXPECT_EQ(1UL,
@@ -538,7 +541,7 @@ TEST_F(EdsTest, RejectBaseClassConstructorFailure) {
 
   // The most important passing criteria is that the above didn't crash.
 
-  EXPECT_FALSE(cluster_or_status.ok());
+  EXPECT_THAT(cluster_or_status, Not(IsOk()));
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
@@ -830,6 +833,109 @@ TEST_F(EdsTest, UseHostnameForHealthChecks) {
   EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "foo");
 }
 
+// Validate that a subsequent onConfigUpdate() that only changes the hostname for an endpoint with
+// an unchanged address recreates the host so the new hostname takes effect. The hostname is
+// immutable on a host, so it cannot be updated in place.
+TEST_F(EdsTest, HostnameUpdate) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostConstSharedPtr original_host =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ(original_host->hostname(), "foo");
+
+  endpoint->set_hostname("bar");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->hostname(), "bar");
+  // The host must have been recreated, not updated in place.
+  EXPECT_NE(original_host.get(), hosts[0].get());
+}
+
+// Validate that a change to the health check hostname override is applied on a subsequent
+// onConfigUpdate() by recreating the host. The cluster has an active health checker, so the health
+// check hostname is meaningful and a change to it must take effect.
+TEST_F(EdsTest, HealthCheckConfigHostnameUpdate) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->mutable_health_check_config()->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostConstSharedPtr original_host =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ(original_host->hostnameForHealthChecks(), "foo");
+
+  endpoint->mutable_health_check_config()->set_hostname("bar");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "bar");
+  EXPECT_NE(original_host.get(), hosts[0].get());
+}
+
+// Validate that re-pushing an identical assignment (unchanged hostname) reuses the existing host in
+// place, i.e. the hostname comparison does not over-trigger host recreation.
+TEST_F(EdsTest, HostnameUnchangedReusesHost) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostConstSharedPtr original_host =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+
+  // Re-push the same assignment; the host should be reused, not recreated.
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(original_host.get(), hosts[0].get());
+}
+
+// Validate that when the cluster has no active health checker, a change to the health check
+// hostname override does NOT recreate the host.
+TEST_F(EdsTest, HealthCheckConfigHostnameUpdateWithoutHealthCheckerReusesHost) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->mutable_health_check_config()->set_hostname("foo");
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostConstSharedPtr original_host =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ(original_host->hostnameForHealthChecks(), "foo");
+
+  endpoint->mutable_health_check_config()->set_hostname("bar");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  // No health checker is configured, so the host should be reused, not recreated.
+  EXPECT_EQ(original_host.get(), hosts[0].get());
+}
+
 TEST_F(EdsTest, UseAddressForHealthChecks) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
@@ -863,8 +969,8 @@ TEST_F(EdsTest, MalformedIPForHealthChecks) {
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException, "malformed IP address: foo.bar.com");
+      EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "")), EnvoyException,
+      "malformed IP address: foo.bar.com");
 }
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
@@ -2525,8 +2631,8 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException, "Unexpected non-zero priority for local cluster 'name'.");
+      EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "")), EnvoyException,
+      "Unexpected non-zero priority for local cluster 'name'.");
 
   // Try an update which only has endpoints with P=0. This should go through.
   cluster_load_assignment.clear_endpoints();
@@ -2818,8 +2924,7 @@ TEST_F(EdsTest, MalformedIP) {
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException,
+      EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "")), EnvoyException,
       "malformed IP address: foo.bar.com. Consider setting resolver_name or "
       "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
@@ -3106,14 +3211,14 @@ public:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(eds_callbacks_pre_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(eds_callbacks_pre_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
   void doOnConfigUpdateVerifyNoThrowPost(
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(eds_callbacks_post_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(eds_callbacks_post_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
   // Emulates a CDS update that creates a new cluster object with the same name,
   // that waits for EDS response.
@@ -3450,7 +3555,7 @@ public:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -3496,7 +3601,7 @@ TEST_F(XdstpConfigsEdsTest, DeltaOnConfigUpdateSuccess) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources, "cluster_name");
-  EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
+  EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
 
   EXPECT_TRUE(initialized_);
   EXPECT_EQ(1UL, stats_

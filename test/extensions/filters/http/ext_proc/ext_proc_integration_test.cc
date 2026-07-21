@@ -30,6 +30,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -61,6 +62,8 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::ProtocolConfiguration;
 using envoy::service::ext_proc::v3::TrailersResponse;
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
@@ -69,8 +72,11 @@ using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFacto
 using Http::LowerCaseString;
 using test::integration::filters::LoggingTestFilterConfig;
 using testing::_;
+using testing::AllOf;
+using testing::ContainsRegex;
 using testing::Ge;
 using testing::Not;
+using testing::ResultOf;
 using namespace std::chrono_literals;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
@@ -4959,49 +4965,51 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
 
   // Verify PLAIN format contains all processing phases.
   auto plain_value = json_log->getString("ext_proc_plain");
-  EXPECT_TRUE(plain_value.ok());
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("rh:[0-9]+:[0-9]+"));        // request header
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("rb:[0-9]+:[0-9]+:[0-9]+")); // request body
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("rt:[0-9]+:[0-9]+"));        // request trailer
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("sh:[0-9]+:[0-9]+"));        // response header
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("sb:[0-9]+:[0-9]+:[0-9]+")); // response body
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("st:[0-9]+:[0-9]+"));        // response trailer
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("bs:[0-9]+"));               // bytes sent
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("br:[0-9]+"));               // bytes received
+  EXPECT_THAT(plain_value,
+              IsOkAndHolds(AllOf(ContainsRegex("rh:[0-9]+:[0-9]+"),        // request header
+                                 ContainsRegex("rb:[0-9]+:[0-9]+:[0-9]+"), // request body
+                                 ContainsRegex("rt:[0-9]+:[0-9]+"),        // request trailer
+                                 ContainsRegex("sh:[0-9]+:[0-9]+"),        // response header
+                                 ContainsRegex("sb:[0-9]+:[0-9]+:[0-9]+"), // response body
+                                 ContainsRegex("st:[0-9]+:[0-9]+"),        // response trailer
+                                 ContainsRegex("bs:[0-9]+"),               // bytes sent
+                                 ContainsRegex("br:[0-9]+")                // bytes received
+                                 )));
 
   // Verify TYPED format is valid JSON.
   auto typed_obj = json_log->getObject("ext_proc_typed");
-  EXPECT_TRUE(typed_obj.ok());
+  ASSERT_THAT(typed_obj,
+              IsOkAndHolds(ResultOf(
+                  [](const Json::ObjectSharedPtr& object) { return object->asJsonString(); },
+                  AllOf(ContainsRegex("\"request_header_latency_us\""),
+                        ContainsRegex("\"request_header_call_status\""),
+                        ContainsRegex("\"request_header_processing_effect\""),
+                        ContainsRegex("\"request_body_call_count\""),
+                        ContainsRegex("\"request_body_total_latency_us\""),
+                        ContainsRegex("\"request_body_max_latency_us\""),
+                        ContainsRegex("\"request_body_last_call_status\""),
+                        ContainsRegex("\"request_body_processing_effect\""),
+                        ContainsRegex("\"request_trailer_latency_us\""),
+                        ContainsRegex("\"request_trailer_call_status\""),
+                        ContainsRegex("\"request_trailer_processing_effect\""),
+                        ContainsRegex("\"response_header_latency_us\""),
+                        ContainsRegex("\"response_header_call_status\""),
+                        ContainsRegex("\"response_header_processing_effect\""),
+                        ContainsRegex("\"response_body_call_count\""),
+                        ContainsRegex("\"response_body_total_latency_us\""),
+                        ContainsRegex("\"response_body_max_latency_us\""),
+                        ContainsRegex("\"response_body_last_call_status\""),
+                        ContainsRegex("\"response_body_processing_effect\""),
+                        ContainsRegex("\"response_trailer_latency_us\""),
+                        ContainsRegex("\"response_trailer_call_status\""),
+                        ContainsRegex("\"response_trailer_processing_effect\""),
+                        ContainsRegex("\"bytes_sent\""), ContainsRegex("\"bytes_received\"")))));
   auto typed_json_str = (*typed_obj)->asJsonString();
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_call_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_processing_effect\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_call_count\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_total_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_max_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_last_call_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_processing_effect\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_call_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_processing_effect\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_call_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_processing_effect\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_call_count\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_total_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_max_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_last_call_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_processing_effect\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_call_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_processing_effect\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_sent\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_received\""));
 
   // Test individual field extraction.
   auto validateField = [&](const std::string& field_name) {
     auto field_value = json_log->getString(field_name);
-    EXPECT_TRUE(field_value.ok()) << "Field " << field_name << " should be accessible";
+    EXPECT_OK(field_value) << "Field " << field_name << " should be accessible";
     if (field_value.ok()) {
       EXPECT_THAT(*field_value, testing::MatchesRegex("[0-9]+"))
           << "Field " << field_name << " should be numeric, got: " << *field_value;
@@ -5037,9 +5045,8 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   // Test non-existent field handling (coverage for getField fallback).
   // When a field doesn't exist, it's not included in the JSON output at all.
   auto non_existent = json_log->getString("field_non_existent");
-  EXPECT_FALSE(non_existent.ok()); // Should fail to find the key
-  EXPECT_THAT(non_existent.status().message(),
-              testing::HasSubstr("key 'field_non_existent' missing"));
+  EXPECT_THAT(non_existent,
+              HasStatusMessage(testing::HasSubstr("key 'field_non_existent' missing")));
 
   // Bytes are only populated for Envoy gRPC, not Google gRPC.
   auto bytes_sent = json_log->getString("field_bytes_sent");
