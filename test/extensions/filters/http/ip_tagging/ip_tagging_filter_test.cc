@@ -6,12 +6,14 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/extensions/filters/http/ip_tagging/config.h"
 #include "source/extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
@@ -20,6 +22,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
@@ -1225,6 +1229,29 @@ ip_tags:
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_old_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
   dispatcher_->exit();
+}
+
+// Test creating filter with server factory context (route/vhost level support).
+TEST_F(IpTaggingFilterTest, CreateFilterWithServerContext) {
+  const std::string config_yaml = R"EOF(
+request_type: internal
+ip_tags:
+  - ip_tag_name: internal_request
+    ip_list:
+      - {address_prefix: 1.2.3.5, prefix_len: 32}
+)EOF";
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(config_yaml), proto_config);
+
+  IpTaggingFilterFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "prefix.", server_context).value();
+
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
 }
 
 } // namespace

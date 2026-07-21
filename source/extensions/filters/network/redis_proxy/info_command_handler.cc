@@ -221,13 +221,23 @@ void InfoCmdAggregateResponseHandler::processAggregatedResponses(ClusterScopeCmd
       return;
     }
 
-    if (resp->type() != Common::Redis::RespType::BulkString) {
-      sendErrorResponse(request, "non-bulk-string response received from shard");
+    if (resp->type() != Common::Redis::RespType::BulkString &&
+        resp->type() != Common::Redis::RespType::VerbatimString) {
+      sendErrorResponse(request, "unexpected response type received from shard");
       return;
     }
 
-    // Parse response line by line
+    // Parse response line by line. A RESP3 upstream (negotiated when the listener pins
+    // ``protocol_version: RESP3``) returns INFO as a VerbatimString whose payload carries a
+    // 4-byte format prefix ("txt:"/"mkd:"); strip it so section parsing sees the first real
+    // line. The decoder guarantees the prefix is present (isValidResp3VerbatimString), so the
+    // size check below only defends against hand-synthesized values. The sibling aggregate
+    // handlers need no equivalent: an integer-sum reply stays an Integer under RESP3 and CONFIG
+    // GET's Map is already accepted by the array-merge handler.
     absl::string_view response_str = resp->asString();
+    if (resp->type() == Common::Redis::RespType::VerbatimString && response_str.size() >= 4) {
+      response_str.remove_prefix(4);
+    }
     std::string current_section;
 
     for (absl::string_view line : absl::StrSplit(response_str, '\n')) {

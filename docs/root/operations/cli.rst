@@ -189,6 +189,12 @@ following are the command line options that Envoy supports.
   The :ref:`hot restart wrapper <operations_hot_restarter>` sets the *RESTART_EPOCH* environment
   variable which should be passed to this option in most cases.
 
+.. option:: --log-stacktrace-single-entry
+
+  *(optional)* Emit the entire stack trace in a single log entry instead of one log call per frame.
+  Frames are still newline-delimited within the message. This is useful for log aggregation systems
+  where each log call produces a separate entry (e.g. JSON logging).
+
 .. option:: --enable-fine-grain-logging
 
   *(optional)* Enables fine-grain logger with file level log control and runtime update at administration

@@ -109,7 +109,8 @@ public:
               AccessLogSharedPtr access_log,
               const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
               const Network::DrainDecision& drain_decision, TimeSource& time_system,
-              bool emit_dynamic_metadata, const MongoStatsSharedPtr& stats);
+              bool emit_dynamic_metadata, const MongoStatsSharedPtr& stats,
+              uint32_t max_bson_depth);
   ~ProxyFilter() override;
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -197,6 +198,9 @@ private:
   TimeSource& time_source_;
   const bool emit_dynamic_metadata_;
   MongoStatsSharedPtr mongo_stats_;
+
+protected:
+  const uint32_t max_bson_depth_;
 };
 
 class ProdProxyFilter : public ProxyFilter {

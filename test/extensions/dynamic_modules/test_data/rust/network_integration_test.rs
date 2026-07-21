@@ -30,6 +30,7 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
     "buffer_limits" => Some(Box::new(BufferLimitsFilterConfig)),
     "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig)),
+    "read_attributes" => Some(Box::new(ReadAttributesFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -400,6 +401,38 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for UpstreamConnectionIdFilter 
     _end_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
     assert!(envoy_filter.get_upstream_connection_id() > 0);
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+}
+
+// =============================================================================
+// Read Attributes Test Filter
+// =============================================================================
+
+// Reads connection stream info attributes through the generic attribute getters and asserts they
+// resolve once the connection is established.
+struct ReadAttributesFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for ReadAttributesFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(ReadAttributesFilter)
+  }
+}
+
+struct ReadAttributesFilter;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for ReadAttributesFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    assert!(envoy_filter
+      .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress)
+      .is_some());
+    let connection_id = envoy_filter
+      .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId)
+      .unwrap_or(0);
+    assert!(connection_id > 0);
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 }

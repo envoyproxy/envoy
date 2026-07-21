@@ -408,6 +408,20 @@ macro_rules! envoy_log {
   };
 }
 
+/// Get the current effective log level of the dynamic modules logging stream. This can be used to
+/// align in-module verbosity with the level configured on the Envoy side, including changes applied
+/// at runtime via the admin API.
+pub fn get_log_level() -> abi::envoy_dynamic_module_type_log_level {
+  unsafe { abi::envoy_dynamic_module_callback_get_log_level() }
+}
+
+/// Check whether the given log level is enabled for the dynamic modules logging stream. This can be
+/// used to skip expensive work that is only needed when a message at the given level would actually
+/// be logged.
+pub fn is_log_enabled(level: abi::envoy_dynamic_module_type_log_level) -> bool {
+  unsafe { abi::envoy_dynamic_module_callback_log_enabled(level) }
+}
+
 /// Guard macro that ensures each factory `OnceLock` is registered by exactly one module.
 ///
 /// When the same module is re-initialized (for example, static modules loaded multiple times

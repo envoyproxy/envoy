@@ -52,7 +52,9 @@ class RedisConnPoolImplTest : public testing::Test, public Common::Redis::Client
 public:
   void setup(bool cluster_exists = true, bool hashtagging = true, uint32_t max_unknown_conns = 100,
              const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache = nullptr,
-             uint32_t redis_cx_rate_limit_per_sec = 100) {
+             uint32_t redis_cx_rate_limit_per_sec = 100,
+             Common::Redis::RespProtocolVersion protocol_version =
+                 Common::Redis::RespProtocolVersion::Resp2) {
     EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -99,7 +101,7 @@ public:
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_, redis_cx_rate_limit_per_sec),
         api_, store_.rootScope(), redis_command_stats, cluster_refresh_manager_, dns_cache,
-        std::nullopt, std::nullopt);
+        std::nullopt, std::nullopt, /*local_zone=*/"", protocol_version);
     conn_pool_impl->init();
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_ = auth_username_;
@@ -234,18 +236,35 @@ public:
     return conn_pool_impl->redis_cluster_stats_.connection_rate_limited_;
   }
 
+  Stats::Counter& upstreamResp3HelloFailure() {
+    InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
+    return conn_pool_impl->redis_cluster_stats_.upstream_resp3_hello_failure_;
+  }
+
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
          const Common::Redis::Client::ConfigSharedPtr&,
          const Common::Redis::RedisCommandStatsSharedPtr&, Stats::Scope&,
-         const std::string& username, const std::string& password, bool,
+         const std::string& username, const std::string& password, bool is_transaction_client,
          std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
-         std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>) override {
+         std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
+         Common::Redis::RespProtocolVersion upstream_protocol_version,
+         OptRef<Stats::Counter> upstream_resp3_hello_failure) override {
     EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
+    last_upstream_protocol_version_ = upstream_protocol_version;
+    last_upstream_resp3_hello_failure_ = upstream_resp3_hello_failure.ptr();
+    last_is_transaction_client_ = is_transaction_client;
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
+
+  // Captured args from the most recent create() call — used by the plumbing-pin tests below
+  // to assert the conn pool forwards the right values to the client factory.
+  Common::Redis::RespProtocolVersion last_upstream_protocol_version_{
+      Common::Redis::RespProtocolVersion::Resp2};
+  bool last_is_transaction_client_{false};
+  Stats::Counter* last_upstream_resp3_hello_failure_{nullptr};
 
   void testReadPolicy(
       envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ReadPolicy
@@ -1726,7 +1745,7 @@ TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
       cluster_name_, cm_, *this, tls_,
       Common::Redis::Client::createConnPoolSettings(20, true, true, 100, read_policy_), api_,
       store_.rootScope(), redis_command_stats, cluster_refresh_manager_, nullptr, std::nullopt,
-      std::nullopt);
+      std::nullopt, /*local_zone=*/"", Common::Redis::RespProtocolVersion::Resp2);
   conn_pool_->init();
 
   auto& local_pool = threadLocalPool();
@@ -1771,6 +1790,89 @@ TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   client2->client_callbacks_.back()->onResponse(std::make_unique<Common::Redis::RespValue>());
 
   EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+}
+
+// Plumbing pin (normal request path): the filter-level RESP version handed to InstanceImpl's
+// ctor must flow through ThreadLocalPool::upstream_protocol_version_ into
+// client_factory_.create() so ClientImpl can drive the RESP3 init pipeline. The test exercises
+// the full propagation — ctor → ThreadLocalPool → factory.create — rather than poking the TLS
+// pool's protocol field directly. Client-side HELLO 3 callback contracts (success, failure,
+// redirection) live in client_impl_test.cc; the conn pool's only obligation is forwarding.
+TEST_F(RedisConnPoolImplTest, ClientFactoryReceivesResp3OnNormalRequestPath) {
+  InSequence s;
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::Client::MockPoolRequest active_request;
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequest("hash_key", value, callbacks, transaction_);
+  EXPECT_NE(nullptr, request);
+
+  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3, last_upstream_protocol_version_);
+  EXPECT_FALSE(last_is_transaction_client_);
+  // The counter handed to the client factory must be the cluster's
+  // upstream_resp3_hello_failure counter (same object, not just non-null).
+  EXPECT_EQ(&upstreamResp3HelloFailure(), last_upstream_resp3_hello_failure_);
+
+  EXPECT_CALL(active_request, cancel());
+  EXPECT_CALL(callbacks, onFailure_());
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+}
+
+// Plumbing pin (transaction client path): conn_pool_impl.cc has a second
+// client_factory_.create() call inside makeRequestToHost when the request carries an active
+// Transaction. A copy-paste regression that left this path on the cluster-level proto enum or
+// hard-coded RESP2 would let upstream RESP3 silently break inside MULTI/EXEC; this test pins
+// the propagation against the same InstanceImpl ctor argument as the normal path above.
+TEST_F(RedisConnPoolImplTest, ClientFactoryReceivesResp3OnTransactionClientPath) {
+  InSequence s;
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::Client::MockPoolRequest active_request;
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  // Drive the transaction-client branch: active_ true, connection_established_ false, one slot.
+  Common::Redis::Client::Transaction transaction(nullptr);
+  transaction.start();
+  transaction.clients_.resize(1);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequest("hash_key", value, callbacks, transaction);
+  EXPECT_NE(nullptr, request);
+
+  EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3, last_upstream_protocol_version_);
+  EXPECT_TRUE(last_is_transaction_client_);
+  // The counter handed to the client factory must be the cluster's
+  // upstream_resp3_hello_failure counter (same object, not just non-null).
+  EXPECT_EQ(&upstreamResp3HelloFailure(), last_upstream_resp3_hello_failure_);
+
+  EXPECT_CALL(active_request, cancel());
+  EXPECT_CALL(callbacks, onFailure_());
+  // The transaction owns the created client; closing the transaction releases it cleanly.
+  transaction.close();
   tls_.shutdownThread();
 }
 

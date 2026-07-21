@@ -2033,6 +2033,30 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
+// The dispatcher can fail to create a client connection (e.g. when binding the upstream socket to
+// a configured network namespace fails at runtime). createConnection must surface the null
+// connection to the caller rather than crash on a null dereference.
+TEST_F(HostImplTest, CreateConnectionFailure) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "lyft.com", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN));
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(nullptr));
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  EXPECT_EQ(nullptr, connection_data.connection_);
+  EXPECT_EQ(host.get(), connection_data.host_description_.get());
+}
+
 TEST_F(HostImplTest, OrcaReportingAddressDefaultsToDataAddress) {
   MockClusterMockPrioritySet cluster;
   Network::Address::InstanceConstSharedPtr address =
@@ -4934,11 +4958,8 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherRejectAll) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          reject_all: true
+    stats_matcher:
+      reject_all: true
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4965,13 +4986,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherInclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          inclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_cx"
+    stats_matcher:
+      inclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_cx"
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4999,13 +5017,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherExclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          exclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_rq"
+    stats_matcher:
+      exclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_rq"
     load_assignment:
         endpoints:
           - lb_endpoints:

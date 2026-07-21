@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #ifdef ENVOY_ENABLE_QUIC
