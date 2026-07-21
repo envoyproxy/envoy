@@ -116,6 +116,7 @@ build:macos --@toolchains_llvm//toolchain/config:libunwind=false
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --linkopt=-fuse-ld=lld
+common:clang-common --cxxopt=-Wno-nullability-completeness
 common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
 common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
 
@@ -264,7 +265,7 @@ build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 build:asan --action_env=ENVOY_UBSAN_VPTR=1
 build:asan --copt=-fsanitize=vptr,function
 build:asan --linkopt=-fsanitize=vptr,function
-build:asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
+build:asan --linkopt='-L/opt/llvm/lib/clang/22/lib/x86_64-unknown-linux-gnu'
 
 # Basic ASAN/UBSAN that works for gcc or llvm
 build:asan-common --config=sanitizer
@@ -306,6 +307,7 @@ build:msan --test_tag_filters=-no_san
 build:msan --define ENVOY_CONFIG_MSAN=1
 build:msan --copt -fsanitize=memory
 build:msan --linkopt -fsanitize=memory
+build:msan --linkopt=-Wl,--allow-multiple-definition
 build:msan --copt -fsanitize-memory-track-origins=2
 build:msan --copt -DMEMORY_SANITIZER=1
 build:msan --test_env=MSAN_SYMBOLIZER_PATH
@@ -319,6 +321,7 @@ build:tsan --config=sanitizer
 build:tsan --define ENVOY_CONFIG_TSAN=1
 build:tsan --copt -fsanitize=thread
 build:tsan --linkopt -fsanitize=thread
+build:tsan --linkopt=-Wl,--allow-multiple-definition
 build:tsan --copt -DTHREAD_SANITIZER=1
 build:tsan --build_tag_filters=-no_san,-no_tsan
 build:tsan --test_tag_filters=-no_san,-no_tsan

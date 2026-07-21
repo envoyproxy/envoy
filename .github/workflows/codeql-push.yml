@@ -121,10 +121,9 @@ jobs:
        sudo apt-get -qq update --error-on=any
        sudo apt-get -qq install --yes \
            libtool libtinfo5 automake autoconf curl unzip
-       # Note: the llvm/clang version should match the version specifed in:
-       #  - bazel/repository_locations.bzl
+       # Note: the llvm/clang version should match the version specified in:
+       #  - bazel/toolchains.bzl
        #  - .github/workflows/codeql-daily.yml
-       #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
        #
        # IMPORTANT: the clang bundle MUST be unpacked outside $GITHUB_WORKSPACE (we use $RUNNER_TEMP).
        # The CodeQL C++ extractor treats anything under the source root as project code, so headers
@@ -132,10 +131,10 @@ jobs:
        # (e.g. cpp/new-free-mismatch in <vector>, alert #1881). Keeping it under $RUNNER_TEMP makes
        # CodeQL classify those headers as system headers — same as /usr/include/c++/** on a normal
        # build. Do NOT move this back into the checkout tree.
-       mkdir -p "${RUNNER_TEMP}/clang18.1.8"
-       cd "${RUNNER_TEMP}/clang18.1.8"
-       wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-       tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       mkdir -p "${RUNNER_TEMP}/clang22.1.8"
+       cd "${RUNNER_TEMP}/clang22.1.8"
+       wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
+       tar -xf LLVM-22.1.8-Linux-X64.tar.xz --strip-components 1
 
     - name: Build
       if: env.CPP_CHANGED == 'true'
@@ -143,7 +142,7 @@ jobs:
         bazel shutdown
         bazel build \
             -c fastbuild \
-            --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang18.1.8" \
+            --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang22.1.8" \
             --spawn_strategy=local \
             --discard_analysis_cache \
             --nouse_action_cache \
