@@ -353,7 +353,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   downstream_protocol_ = Http::CodecType::HTTP2;
 
   // Set a very short drain time so the test doesn't take long.
-  setDrainTime(std::chrono::seconds(1));
+  setDrainTime(std::chrono::seconds(5));
 
   on_server_init_function_ = [&]() {
     waitXdsStream();
