@@ -38,7 +38,7 @@ public:
      * re-entrant `clearCancelCallback()` (which the leaf's one-shot `finish()`
      * calls) operates on an already-empty slot rather than destroying the callback
      * while it is running.
-    */
+     */
     absl::AnyInvocable<void()> cb = std::move(on_cancel_);
     on_cancel_ = nullptr;
     if (cb) {
@@ -71,7 +71,7 @@ using CancellationStatePtr = std::shared_ptr<CancellationState>;
  * The unit of propagation down a `co_await` chain. It carries the following contextual
  * properties that each coroutine inherits from its caller:
  *   - the executor (where/how to resume): each chain of coroutine runs on the same
- *     thread / executor. 
+ *     thread / executor.
  *   - the cancellation state: a chain of coroutine should be cancelled at the leaf
  *     awaitable, so that the call stack can properly unwind and clean up.
  *
