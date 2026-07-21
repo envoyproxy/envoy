@@ -71,6 +71,7 @@ envoy_cc_library(
         "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
     ],
 )
 

@@ -31,6 +31,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/basic_auth:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/basic_auth/v3:pkg_cc_proto",
     ],
 )

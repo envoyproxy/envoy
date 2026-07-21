@@ -398,7 +398,7 @@ void Filter::createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
 
     uint8_t buf[MD5_DIGEST_LENGTH];
     MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
-    std::string md5 = Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH);
+    std::string md5 = Envoy::Hex::encode(absl::Span(buf, MD5_DIGEST_LENGTH));
     ENVOY_LOG(trace, "tls:createJA3Hash(), hash: {}", md5);
 
     cb_->socket().setJA3Hash(md5);

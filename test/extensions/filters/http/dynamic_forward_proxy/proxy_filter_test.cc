@@ -70,7 +70,7 @@ public:
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     filter_config_ = std::make_shared<ProxyFilterConfig>(
         proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
-        this->get(), cluster_store_factory, factory_context_);
+        this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -565,7 +565,7 @@ public:
 
     filter_config_ = std::make_shared<ProxyFilterConfig>(
         proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
-        this->get(), cluster_store_factory, factory_context_);
+        this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -729,7 +729,7 @@ public:
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     filter_config_ = std::make_shared<ProxyFilterConfig>(
         proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
-        this->get(), cluster_store_factory, factory_context_);
+        this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     mock_filter_ = std::make_unique<NiceMock<MockProxyFilter>>(filter_config_);
     // Set it up such that the filter has proxy settings enabled.
     ON_CALL(*mock_filter_, isProxying()).WillByDefault(Return(true));
@@ -772,7 +772,7 @@ public:
     proto_config.set_allow_dynamic_host_from_filter_state(true);
     filter_config_ = std::make_shared<ProxyFilterConfig>(
         proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
-        this->get(), cluster_store_factory, factory_context_);
+        this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -868,7 +868,7 @@ public:
     proto_config.set_allow_dynamic_host_from_filter_state(false);
     filter_config_ = std::make_shared<ProxyFilterConfig>(
         proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
-        this->get(), cluster_store_factory, factory_context_);
+        this->get(), cluster_store_factory, factory_context_.server_factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);

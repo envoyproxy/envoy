@@ -11,14 +11,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace DynamicForwardProxy {
 
-absl::StatusOr<Http::FilterFactoryCb>
-DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> DynamicForwardProxyFilterFactory::createFilterFactory(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context);
+      context, context.messageValidationVisitor());
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
-      context.serverFactoryContext().singletonManager());
+      context.singletonManager());
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
       cache_manager_factory.get();
   auto cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
@@ -32,6 +31,20 @@ DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<ProxyFilter>(filter_config));
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto_config, context.serverFactoryContext());
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+DynamicForwardProxyFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto_config, context);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

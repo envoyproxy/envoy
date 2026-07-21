@@ -38,7 +38,7 @@ TEST(GcpAuthnFilterConfigTest, DEPRECATED_FEATURE_TEST(GcpAuthnFilterWithCorrect
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
 
@@ -61,7 +61,7 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithNewProto) {
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(filter_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
 
