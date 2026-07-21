@@ -205,8 +205,11 @@ private:
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
-  mutable bool route_override_resolved_{false};
-  mutable const McpOverrideConfig* route_override_{nullptr};
+  // Route-specific config, latched during decodeData. Empty if it hasn't yet
+  // been latched; nullptr if there is no route-specific config. Lifetime is the
+  // same as the route's lifetime; must not be dereferenced if clearRouteCache
+  // has been called after this was latched.
+  mutable std::optional<const McpOverrideConfig*> route_override_{std::nullopt};
 };
 
 } // namespace Mcp

@@ -282,12 +282,11 @@ bool McpFilter::rejectDuplicateKeys() const {
 }
 
 const McpOverrideConfig* McpFilter::routeOverride() const {
-  if (!route_override_resolved_) {
+  if (!route_override_.has_value()) {
     route_override_ =
         Http::Utility::resolveMostSpecificPerFilterConfig<McpOverrideConfig>(decoder_callbacks_);
-    route_override_resolved_ = true;
   }
-  return route_override_;
+  return *route_override_;
 }
 
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -330,7 +329,9 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   }
 
   ENVOY_LOG(debug, "after the post check");
-  if (!is_mcp_request_ && shouldRejectRequest()) {
+  const auto* override_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpOverrideConfig>(decoder_callbacks_);
+  if (!is_mcp_request_ && shouldRejectRequest(override_config)) {
     config_->stats().requests_rejected_.inc();
     sendErrorReply("Only MCP traffic is allowed", Filters::Common::Mcp::Status::NoMcp);
     return Http::FilterHeadersStatus::StopIteration;
@@ -400,7 +401,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     }
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      if (truncated_by_limit && !shouldRejectRequest()) {
+      if (truncated_by_limit && !shouldRejectRequest(routeOverride())) {
         // PASS_THROUGH mode: size limit caused truncation, allow through.
         ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
         return completeParsing();
@@ -459,7 +460,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  if (!is_mcp_request_ && shouldRejectRequest()) {
+  if (!is_mcp_request_ && shouldRejectRequest(routeOverride())) {
     sendErrorReply("request must be a valid JSON-RPC 2.0 message for MCP",
                    Filters::Common::Mcp::Status::NotJsonRpc);
     return Http::FilterDataStatus::StopIterationNoBuffer;

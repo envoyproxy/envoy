@@ -244,7 +244,7 @@ TEST_F(McpFilterTest, PerRouteOverride) {
   auto route_config = std::make_shared<McpOverrideConfig>(override_config);
 
   EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
-      .WillOnce(Return(route_config.get()));
+      .WillRepeatedly(Return(route_config.get()));
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
 
