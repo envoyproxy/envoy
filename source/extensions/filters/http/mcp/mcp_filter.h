@@ -158,7 +158,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   // Traffic mode after applying any per-route override. Latched on first access in decodeHeaders;
   // we assume the route does not change during the request, so it is resolved only once.
-  absl::optional<envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode> traffic_mode_;
+  std::optional<envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode> traffic_mode_;
   uint32_t bytes_parsed_{0};
   bool parsing_complete_{false};
   bool is_exceeding_limit_{false};

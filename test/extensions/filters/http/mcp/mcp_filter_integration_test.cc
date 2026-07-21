@@ -539,8 +539,9 @@ TEST_P(McpFilterIntegrationTest, PerRouteOverrideToNoop) {
 
         envoy::extensions::filters::http::mcp::v3::McpOverride mcp_override;
         mcp_override.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::NOOP);
-        (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
-            mcp_override);
+        std::ignore =
+            (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
+                mcp_override);
       });
 
   initialize();
