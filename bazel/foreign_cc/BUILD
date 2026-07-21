@@ -339,8 +339,9 @@ envoy_cmake(
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
-        "EVENT__DISABLE_OPENSSL": "on",
-        "EVENT__DISABLE_MBEDTLS": "on",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "EVENT__DISABLE_OPENSSL": "ON",
+        "EVENT__DISABLE_MBEDTLS": "ON",
         "EVENT__DISABLE_REGRESS": "on",
         "EVENT__DISABLE_TESTS": "on",
         "EVENT__LIBRARY_TYPE": "STATIC",

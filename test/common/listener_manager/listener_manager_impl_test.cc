@@ -3636,12 +3636,9 @@ address:
   socket_address:
     address: "::1"
     port_value: 10000
-metadata:
-  typed_filter_metadata:
-    envoy.stats_matcher:
-      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-      exclusion_list:
-        patterns: []
+stats_matcher:
+  exclusion_list:
+    patterns: []
 filter_chains:
 - filters: []
   )EOF";
@@ -3658,11 +3655,8 @@ address:
   socket_address:
     address: "::1"
     port_value: 10000
-metadata:
-  typed_filter_metadata:
-    envoy.stats_matcher:
-      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-      reject_all: true
+stats_matcher:
+  reject_all: true
 filter_chains:
 - filters: []
   )EOF";
@@ -3683,13 +3677,10 @@ address:
   socket_address:
     address: "::1"
     port_value: 10000
-metadata:
-  typed_filter_metadata:
-    envoy.stats_matcher:
-      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-      inclusion_list:
-        patterns:
-          - prefix: "listener.test_prefix.foo"
+stats_matcher:
+  inclusion_list:
+    patterns:
+      - prefix: "listener.test_prefix.foo"
 filter_chains:
 - filters: []
   )EOF";
@@ -3711,13 +3702,10 @@ address:
   socket_address:
     address: "::1"
     port_value: 10000
-metadata:
-  typed_filter_metadata:
-    envoy.stats_matcher:
-      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-      exclusion_list:
-        patterns:
-          - prefix: "listener.test_prefix.bar"
+stats_matcher:
+  exclusion_list:
+    patterns:
+      - prefix: "listener.test_prefix.bar"
 filter_chains:
 - filters: []
   )EOF";

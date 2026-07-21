@@ -2,6 +2,7 @@
 #include "source/extensions/filters/http/json_to_metadata/filter.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -10,6 +11,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JsonToMetadata {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(Factory, Basic) {
   const std::string yaml_request = R"(
@@ -65,6 +68,35 @@ response_rules:
 
   TestUtility::loadFromYaml(yaml_response, *proto_config);
   callback = factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  callback(filter_callback);
+}
+
+TEST(Factory, CreateFilterWithServerContext) {
+  const std::string yaml_request = R"(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'unknown'
+      preserve_existing_metadata_value: true
+  )";
+
+  JsonToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml_request, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  auto callback =
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", server_context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   callback(filter_callback);
 }
@@ -188,10 +220,11 @@ TEST(Factory, NoRuleInRouteConfig) {
                     .createRouteSpecificFilterConfig(*proto_config, context,
                                                      ProtobufMessage::getNullValidationVisitor())
                     .status();
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(),
-            "json_to_metadata_filter: Per route configs must at least specify one of request_rules "
-            "or response_rules.");
+  EXPECT_THAT(
+      status,
+      HasStatusMessage(
+          "json_to_metadata_filter: Per route configs must at least specify one of request_rules "
+          "or response_rules."));
 }
 
 TEST(Factory, PerRouteConfig) {

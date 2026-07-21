@@ -46,6 +46,33 @@ TEST(OriginalSrcHttpConfigFactoryTest, TestCreateFactory) {
   EXPECT_NE(dynamic_cast<OriginalSrcFilter*>(added_filter.get()), nullptr);
 }
 
+TEST(OriginalSrcHttpConfigFactoryTest, CreateFilterWithServerContext) {
+  const std::string yaml = R"EOF(
+    mark: 5
+)EOF";
+
+  OriginalSrcConfigFactory factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(*proto_config, "", server_context).value();
+
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  Http::StreamDecoderFilterSharedPtr added_filter;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_))
+      .WillOnce(Invoke([&added_filter](Http::StreamDecoderFilterSharedPtr filter) {
+        added_filter = std::move(filter);
+      }));
+
+  cb(filter_callback);
+
+  // Make sure we actually create the correct type!
+  EXPECT_NE(dynamic_cast<OriginalSrcFilter*>(added_filter.get()), nullptr);
+}
+
 } // namespace
 } // namespace OriginalSrc
 } // namespace HttpFilters

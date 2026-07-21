@@ -17,6 +17,7 @@ envoy_cc_test_library(
         "//source/common/grpc:codec_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:stream_message_lib",
         "//test/proto:apikeys_proto_cc_proto",
+        "//test/test_common:status_utility_lib",
         "@proto-field-extraction//:all_libs",
     ],
 )
