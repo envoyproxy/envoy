@@ -1184,10 +1184,10 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancing)
   cleanupUpstreamAndDownstream();
 }
 
-// Companion to ShadowedRequestDynamicMetadataLoadbalancing that disables the runtime guard. With
-// the guard off, the shadow inherits only the static route ``metadata_match`` (``version: v1``),
-// so it lands on cluster_1's ``v1`` endpoint (fake_upstreams_[1]) rather than the ``v2`` endpoint,
-// documenting the behavior the guard controls.
+// Companion to the test above that disables the runtime guard. With the guard off, the shadow
+// inherits only the static route ``metadata_match`` (``version: v1``), so it lands on cluster_1's
+// ``v1`` endpoint (fake_upstreams_[1]) rather than the ``v2`` endpoint, documenting the behavior
+// the guard controls.
 TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancingDisabled) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata", "false");
