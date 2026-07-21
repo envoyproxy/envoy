@@ -91,7 +91,7 @@ protected:
     local_address_ = *Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":0"));
     peer_socket_ = std::make_unique<Network::UdpListenSocket>(test_address_, nullptr, true);
-    Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
+    Ssl::ClientContextSharedPtr context{new NiceMock<Ssl::MockClientContext>()};
     EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillOnce(Return(context));
     factory_ = *Quic::QuicClientTransportSocketFactory::create(
