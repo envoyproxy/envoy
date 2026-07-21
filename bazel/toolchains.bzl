@@ -2,7 +2,7 @@ load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LO
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
-_LLVM_VERSION_HERMETIC = "18.1.8"
+_LLVM_VERSION_HERMETIC = "22.1.8"
 LLVM_VERSION = LLVM_VERSION_LOCAL if LLVM_VERSION_LOCAL else _LLVM_VERSION_HERMETIC
 LLVM_MAJOR = LLVM_VERSION.split(".")[0]
 LLVM_MAJOR_MINOR = ".".join(LLVM_VERSION.split(".")[:2])
@@ -66,6 +66,11 @@ def envoy_toolchains():
     llvm_toolchain(
         name = "llvm_toolchain",
         llvm_version = LLVM_VERSION,
+        extra_llvm_distributions = {
+            "LLVM-22.1.8-Linux-ARM64.tar.xz": "805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34",
+            "LLVM-22.1.8-Linux-X64.tar.xz": "df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384",
+            "LLVM-22.1.8-macOS-ARM64.tar.xz": "f260f4f7c0d430828a81ae8a3826a1d63fc0963ec2459489308cc23b1f7eab4f",
+        },
         cxx_cross_lib = {} if LLVM_PATH else {
             "linux-aarch64": "@libcxx_libs_aarch64",
             "linux-x86_64": "@libcxx_libs_x86_64",
