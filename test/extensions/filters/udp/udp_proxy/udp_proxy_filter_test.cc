@@ -29,6 +29,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -252,7 +253,7 @@ public:
       }
 
       // Kick off the receive.
-      EXPECT_TRUE(file_event_cb_(Event::FileReadyType::Read).ok());
+      EXPECT_OK(file_event_cb_(Event::FileReadyType::Read));
     }
 
     UdpProxyFilterTest& parent_;
