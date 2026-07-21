@@ -70,6 +70,7 @@ HTTP filters
   router_filter
   set_filter_state
   set_metadata_filter
+  body_size_limit_filter
   sse_to_metadata_filter
   stateful_session_filter
   sxg_filter

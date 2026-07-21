@@ -766,6 +766,15 @@ envoy.filters.http.set_metadata:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.set_metadata.v3.Config
+envoy.filters.http.body_size_limit:
+  categories:
+  - envoy.filters.http
+  - envoy.filters.http.upstream
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  status_upstream: alpha
+  type_urls:
+  - envoy.extensions.filters.http.body_size_limit.v3.BodySizeLimit
 envoy.filters.http.tap:
   categories:
   - envoy.filters.http
