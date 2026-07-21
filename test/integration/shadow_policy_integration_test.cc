@@ -78,6 +78,87 @@ public:
         });
   }
 
+  // Sets up the shadow cluster (cluster_1) with a ``version`` subset selector and two endpoints in
+  // distinct subsets so that the chosen subset is observable by which upstream receives the
+  // request:
+  //   - cluster_1 endpoint[0] (``version: v1``) -> fake_upstreams_[1]
+  //   - cluster_1 endpoint[1] (``version: v2``) -> fake_upstreams_[2]
+  // The route carries a static ``metadata_match`` of ``version: v1`` while a header-to-metadata
+  // filter sets dynamic ``envoy.lb`` ``version: v2``. cluster_0 (the main target) has no subset
+  // config, so the main request always lands on fake_upstreams_[0] regardless of subset selection.
+  // Requires setUpstreamCount(3): cluster_0(1 endpoint) + cluster_1(2 endpoints).
+  void setupDynamicMetadataSubsetConfig() {
+    // Map the ``x-version`` request header into the ``envoy.lb`` dynamic metadata namespace used by
+    // the subset load balancer.
+    config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.header_to_metadata
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+  request_rules:
+    - header: x-version
+      on_header_present:
+        metadata_namespace: envoy.lb
+        key: version
+        type: STRING
+)EOF");
+    // Static route-level subset selector (``version: v1``). Dynamic metadata (``version: v2``) is
+    // expected to override this on both the main and, when the guard is enabled, the shadow path.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) -> void {
+          auto* metadata_match = hcm.mutable_route_config()
+                                     ->mutable_virtual_hosts(0)
+                                     ->mutable_routes(0)
+                                     ->mutable_route()
+                                     ->mutable_metadata_match();
+          TestUtility::loadFromYaml(R"EOF(
+            filterMetadata:
+              envoy.lb:
+                version: "v1"
+        )EOF",
+                                    *metadata_match);
+        });
+    config_helper_.addConfigModifier(
+        [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto* clusters = bootstrap.mutable_static_resources()->mutable_clusters();
+          for (auto& cluster : *clusters) {
+            // Only the shadow target uses subset LB; cluster_0 stays a plain single-endpoint
+            // cluster so the main request is unaffected by subset selection.
+            if (cluster.name() != "cluster_1") {
+              continue;
+            }
+            TestUtility::loadFromYaml(R"EOF(
+            fallback_policy: NO_FALLBACK
+            subsetSelectors:
+              - keys:
+                - "version"
+          )EOF",
+                                      *cluster.mutable_lb_subset_config());
+
+            auto* locality = cluster.mutable_load_assignment()->mutable_endpoints(0);
+            auto* endpoint_v1 = locality->mutable_lb_endpoints(0);
+            // Second endpoint reuses the same loopback address (port 0) so setPorts() assigns it
+            // the next fake upstream. Copy the address before setting metadata.
+            auto* endpoint_v2 = locality->add_lb_endpoints();
+            endpoint_v2->mutable_endpoint()->mutable_address()->CopyFrom(
+                endpoint_v1->endpoint().address());
+
+            TestUtility::loadFromYaml(R"EOF(
+                filterMetadata:
+                  envoy.lb:
+                    version: "v1"
+                )EOF",
+                                      *endpoint_v1->mutable_metadata());
+            TestUtility::loadFromYaml(R"EOF(
+                filterMetadata:
+                  envoy.lb:
+                    version: "v2"
+                )EOF",
+                                      *endpoint_v2->mutable_metadata());
+          }
+        });
+  }
+
   void sendRequestAndValidateResponse(int times_called = 1) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1068,131 +1149,74 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestMetadataLoadbalancing) {
   sendRequestAndValidateResponse();
 }
 
-// Verifies that dynamically-set ``envoy.lb`` metadata (here produced by the header-to-metadata
-// filter) is honored by the subset load balancer for shadowed requests, not just for the main
-// request. Both clusters use the ``NO_FALLBACK`` policy and a single endpoint that only matches
-// the ``version: default`` subset, so a shadow request is only routable if the dynamic subset
-// selector propagated to the shadow stream.
+// Verifies that dynamically-set ``envoy.lb`` metadata (produced by the header-to-metadata filter)
+// is honored by the subset load balancer for shadowed requests. The dynamic ``version: v2``
+// overrides the static route ``version: v1``, so the shadow must land on cluster_1's ``v2``
+// endpoint (fake_upstreams_[2]), not its ``v1`` endpoint (fake_upstreams_[1]). Without the fix the
+// shadow would only see the static ``v1`` and hit fake_upstreams_[1] instead.
 TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancing) {
+  setUpstreamCount(3);
   initialConfigSetup("cluster_1", "");
-  // Insert a header-to-metadata filter that maps the ``x-version`` request header into the
-  // ``envoy.lb`` dynamic metadata namespace used by the subset load balancer.
-  config_helper_.prependFilter(R"EOF(
-name: envoy.filters.http.header_to_metadata
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
-  request_rules:
-    - header: x-version
-      on_header_present:
-        metadata_namespace: envoy.lb
-        key: version
-        type: STRING
-)EOF");
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto clusters = bootstrap.mutable_static_resources()->mutable_clusters();
-    for (auto& cluster : *clusters) {
-      TestUtility::loadFromYaml(R"EOF(
-            fallback_policy: NO_FALLBACK
-            subsetSelectors:
-              - keys:
-                - "version"
-          )EOF",
-                                *cluster.mutable_lb_subset_config());
-
-      auto lb_endpoint =
-          cluster.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
-
-      TestUtility::loadFromYaml(R"EOF(
-                filterMetadata:
-                  envoy.lb:
-                    version: "default"
-                )EOF",
-                                *lb_endpoint->mutable_metadata());
-    }
-  });
+  setupDynamicMetadataSubsetConfig();
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
-  request_headers.addCopy("x-version", "default");
+  request_headers.addCopy("x-version", "v2");
 
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  // The main request must reach cluster_0.
   test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", 1);
-  // The shadow request must reach cluster_1, which is only possible if the dynamically-set
-  // ``version`` subset selector propagated to the shadow stream.
   test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", 1);
 
-  upstream_headers_ =
-      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
-  EXPECT_TRUE(upstream_headers_ != nullptr);
-  mirror_headers_ =
-      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())->lastRequestHeaders();
-  EXPECT_TRUE(mirror_headers_ != nullptr);
+  // Main request lands on cluster_0's upstream.
+  EXPECT_NE(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders());
+  // Shadow selected the ``v2`` subset: fake_upstreams_[2] receives it, fake_upstreams_[1] does not.
+  EXPECT_NE(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[2].get())->lastRequestHeaders());
+  EXPECT_EQ(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())->lastRequestHeaders());
 
   cleanupUpstreamAndDownstream();
 }
 
-// Companion to ShadowedRequestDynamicMetadataLoadbalancing that disables the runtime guard and
-// confirms the shadow request is not routable without the propagated dynamic subset selector,
+// Companion to ShadowedRequestDynamicMetadataLoadbalancing that disables the runtime guard. With
+// the guard off, the shadow inherits only the static route ``metadata_match`` (``version: v1``),
+// so it lands on cluster_1's ``v1`` endpoint (fake_upstreams_[1]) rather than the ``v2`` endpoint,
 // documenting the behavior the guard controls.
 TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancingDisabled) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata", "false");
+  setUpstreamCount(3);
   initialConfigSetup("cluster_1", "");
-  config_helper_.prependFilter(R"EOF(
-name: envoy.filters.http.header_to_metadata
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
-  request_rules:
-    - header: x-version
-      on_header_present:
-        metadata_namespace: envoy.lb
-        key: version
-        type: STRING
-)EOF");
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto clusters = bootstrap.mutable_static_resources()->mutable_clusters();
-    for (auto& cluster : *clusters) {
-      TestUtility::loadFromYaml(R"EOF(
-            fallback_policy: NO_FALLBACK
-            subsetSelectors:
-              - keys:
-                - "version"
-          )EOF",
-                                *cluster.mutable_lb_subset_config());
-
-      auto lb_endpoint =
-          cluster.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
-
-      TestUtility::loadFromYaml(R"EOF(
-                filterMetadata:
-                  envoy.lb:
-                    version: "default"
-                )EOF",
-                                *lb_endpoint->mutable_metadata());
-    }
-  });
+  setupDynamicMetadataSubsetConfig();
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
-  request_headers.addCopy("x-version", "default");
+  request_headers.addCopy("x-version", "v2");
 
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  // The main request still succeeds because the route resolves the dynamic subset selector.
+  // The main request still resolves the dynamic subset selector and succeeds.
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", 1);
 
-  // Without the guard, the shadow stream does not inherit the dynamic subset selector, so with
-  // NO_FALLBACK the shadow cluster cannot select a host and no request reaches cluster_1.
-  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value());
+  // Main request lands on cluster_0's upstream.
+  EXPECT_NE(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders());
+  // Shadow inherited only the static ``v1`` selector: fake_upstreams_[1] receives it,
+  // fake_upstreams_[2] (the dynamic ``v2`` subset) does not.
+  EXPECT_NE(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())->lastRequestHeaders());
+  EXPECT_EQ(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[2].get())->lastRequestHeaders());
 
   cleanupUpstreamAndDownstream();
 }
