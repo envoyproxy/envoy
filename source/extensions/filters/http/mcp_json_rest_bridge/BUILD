@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["mcp_json_rest_bridge_filter.h"],
     deps = [
         ":http_request_builder_lib",
+        ":sse_response_extractor_lib",
         ":trace_context_lib",
         "//envoy/common:optref_lib",
         "//envoy/http:filter_interface",
@@ -63,5 +64,17 @@ envoy_cc_library(
     deps = [
         "//source/common/tracing:tracing_validation_lib",
         "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "sse_response_extractor_lib",
+    srcs = ["sse_response_extractor.cc"],
+    hdrs = ["sse_response_extractor.h"],
+    deps = [
+        "//source/common/http/sse:sse_parser_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )

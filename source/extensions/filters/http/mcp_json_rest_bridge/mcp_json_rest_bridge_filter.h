@@ -14,6 +14,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/hash/hash.h"
@@ -161,7 +162,7 @@ class McpJsonRestBridgeFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
   explicit McpJsonRestBridgeFilter(McpJsonRestBridgeFilterConfigSharedPtr config)
-      : config_(config) {}
+      : sse_response_extractor_(config->maxResponseBodySize()), config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -205,6 +206,15 @@ private:
   // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
   void buildStreamingPrefixAndSuffix(bool is_error);
 
+  // Encodes incoming data chunks for streaming MCP tool calls.
+  Http::FilterDataStatus encodeStreamingData(Buffer::Instance& data, bool end_stream);
+
+  // Processes an SSE response chunk and returns the serialized JSON event payloads.
+  absl::StatusOr<std::string> processSseResponse(absl::string_view chunk, bool end_stream);
+
+  // Prepares the escaped/formatted payload string for streaming.
+  absl::StatusOr<std::string> prepareStreamingPayload(absl::string_view chunk, bool end_stream);
+
   enum class McpOperation {
     Unspecified = 0,
     // Received a configured MCP URL path but has not parsed the request body yet.
@@ -240,6 +250,11 @@ private:
   std::string streaming_json_prefix_;
   std::string streaming_json_suffix_;
   bool is_first_streaming_chunk_ = true;
+
+  // Whether the response is SSE.
+  bool is_sse_response_ = false;
+  bool is_first_sse_event_ = true;
+  SseResponseExtractor sse_response_extractor_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };

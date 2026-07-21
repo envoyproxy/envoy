@@ -257,6 +257,10 @@ message ToolConfig {
   // When enabled, the response body is streamed directly to the client without buffering. Each
   // chunk is JSON escaped as it arrives and wrapped with a pre-built JSON-RPC prefix and suffix.
   //
+  // For Server-Sent Events (SSE) responses (i.e. ``text/event-stream`` content type), Envoy parses
+  // the stream and wraps each extracted complete event payload into a distinct text content item
+  // within the JSON-RPC ``content`` array on the fly.
+  //
   // Streaming flow:
   //
   // .. code-block:: text
