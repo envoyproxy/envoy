@@ -708,8 +708,8 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
   // Attempt to create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
-                                     scope_, "test."),
+      std::ignore = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                   secret_reader, scope_, "test."),
       EnvoyException, "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config.");
 }
 
@@ -1403,13 +1403,13 @@ TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriValidatedOnlyWhenUsed) {
 
   // End_session_endpoint is not defined: the invalid formatter is never compiled,
   // so the config loads without throwing.
-  EXPECT_NO_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                 secret_reader, scope_, "test."));
+  EXPECT_NO_THROW(std::ignore = std::make_shared<FilterConfig>(
+                      p, factory_context_.server_factory_context_, secret_reader, scope_, "test."));
 
   // End_session_endpoint is set: the invalid formatter is compiled and the config fails to load.
   p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
-  EXPECT_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                              secret_reader, scope_, "test."),
+  EXPECT_THROW(std::ignore = std::make_shared<FilterConfig>(
+                   p, factory_context_.server_factory_context_, secret_reader, scope_, "test."),
                EnvoyException);
 }
 
