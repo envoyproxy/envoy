@@ -161,11 +161,7 @@ void GrpcClientImpl::sendRequest(
   // Already invoke `onFailure` asynchronously, no need to call it explicitly here.
 }
 
-void GrpcClientImpl::onSuccess(
-    std::unique_ptr<
-        envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-        response,
-    Tracing::Span& span) {
+void GrpcClientImpl::onSuccess(TraServiceResponsePtr&& response, Tracing::Span& span) {
 
   UNREFERENCED_PARAMETER(span);
   if (response->has_create_response()) {
@@ -189,10 +185,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   // callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::onReceiveMessage(
-    std::unique_ptr<
-        envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-        message) {
+void GrpcClientImpl::onReceiveMessage(TraServiceResponsePtr&& message) {
   callbacks_->complete(ResponseType::SubscribeResp, message->type(), message->subscribe_response());
   // callbacks_ = nullptr;
 }

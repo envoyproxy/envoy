@@ -364,7 +364,6 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 
   DecoderPtr decoder_;
-  absl::flat_hash_map<std::string, ActiveTransPtr> transactions_;
   Buffer::OwnedImpl request_buffer_;
   Random::RandomGenerator& random_generator_;
   TimeSource& time_source_;
@@ -375,6 +374,7 @@ private:
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   PendingList pending_list_;
+  absl::flat_hash_map<std::string, ActiveTransPtr> transactions_;
 };
 
 } // namespace SipProxy

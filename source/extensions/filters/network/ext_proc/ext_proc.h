@@ -12,6 +12,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/service/network_ext_proc/v3/network_external_processor.pb.h"
 
+#include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/network/ext_proc/client_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -223,7 +224,7 @@ public:
   void updateCloseCallbackStatus(bool enable, bool is_read);
 
   // ExternalProcessorCallbacks
-  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& res) override;
+  void onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& res) override;
   void onGrpcClose() override;
   void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void logStreamInfo() override {};

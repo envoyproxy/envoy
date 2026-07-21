@@ -125,6 +125,13 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestContentLength) {
   request_headers.setContentLength("100");
   EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
 
+  request_headers.setContentLength("100,100");
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
+
+  request_headers.setContentLength("100,101");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+
   request_headers.setContentLength("10a2");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
                              UhvResponseCodeDetail::get().InvalidContentLength);
@@ -391,6 +398,13 @@ TEST_F(Http1HeaderValidatorTest, ResponseContentLengthNoTransferEncoding) {
   // The transform method should keep content-length
   EXPECT_ACCEPT(uhv->transformResponseHeaders(headers));
   EXPECT_EQ(headers.getContentLengthValue(), "10");
+
+  headers.setContentLength("10,10");
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(headers));
+
+  headers.setContentLength("10,11");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectRegNameMissingPort) {
@@ -624,7 +638,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
                                                   {":authority", "envoy.com"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   // The transform method should normalize path
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   EXPECT_EQ(headers.getPathValue(), "/dir2");
@@ -634,7 +648,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"}, {":method", "GET"}, {":path", "/.."}, {":authority", "envoy.com"}};
   auto uhv = createH1(empty_config);
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   // Path normalization should fail
   EXPECT_REJECT_WITH_DETAILS(uhv->transformRequestHeaders(headers),
                              UhvResponseCodeDetail::get().InvalidUrl);
@@ -734,7 +748,7 @@ TEST_F(Http1HeaderValidatorTest, DropUnderscoreHeadersFromRequestTrailers) {
 TEST_F(Http1HeaderValidatorTest, ValidateResponseTrailerMap) {
   auto uhv = createH1Client(empty_config);
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
-  EXPECT_TRUE(uhv->validateResponseTrailers(response_trailer_map).ok());
+  EXPECT_ACCEPT(uhv->validateResponseTrailers(response_trailer_map));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {

@@ -914,9 +914,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       has_explicit_global_flush_timeout_(
           connection_manager.config_->streamFlushTimeout().has_value()),
       header_validator_(
-          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())),
-      trace_refresh_after_route_refresh_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.trace_refresh_after_route_refresh")) {
+          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())) {
   ASSERT(!connection_manager.config_->isRoutable() ||
              ((connection_manager.config_->routeConfigProvider() == nullptr &&
                connection_manager.config_->scopedRouteConfigProvider() != nullptr &&
@@ -1094,7 +1092,7 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
-  if (trace_refresh_after_route_refresh_ && connection_manager_tracing_config_.has_value()) {
+  if (connection_manager_tracing_config_.has_value()) {
     const Tracing::Decision tracing_decision =
         Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
     ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
@@ -1613,11 +1611,6 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   const Tracing::Decision tracing_decision =
       Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
 
-  if (!trace_refresh_after_route_refresh_) {
-    ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
-                                              connection_manager_.config_->tracingStats());
-  }
-
   Tracing::HttpTraceContext trace_context(*request_headers_);
   active_span_ = connection_manager_.tracer().startSpan(
       *this, trace_context, filter_manager_.streamInfo(), tracing_decision);
@@ -1833,10 +1826,6 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshTracing() {
-  if (!trace_refresh_after_route_refresh_) {
-    return;
-  }
-
   if (!connection_manager_tracing_config_.has_value() || active_span_ == nullptr ||
       request_headers_ == nullptr) {
     return;
@@ -2092,12 +2081,18 @@ void ConnectionManagerImpl::ActiveStream::onDecoderFilterBelowWriteBufferLowWate
     response_encoder_->getStream().readDisable(false);
   }
   connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
+  // Read-disabling the downstream codec only slows the original request source. Also notify any
+  // filter that produces request data of its own (e.g. replays a buffered body) so it can resume.
+  filter_manager_.callUpstreamLowWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStream::onDecoderFilterAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
   response_encoder_->getStream().readDisable(true);
   connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
+  // See onDecoderFilterBelowWriteBufferLowWatermark(): also fan the back-pressure out to filters
+  // that produce request data of their own and would otherwise ignore the read-disable.
+  filter_manager_.callUpstreamHighWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_reason,

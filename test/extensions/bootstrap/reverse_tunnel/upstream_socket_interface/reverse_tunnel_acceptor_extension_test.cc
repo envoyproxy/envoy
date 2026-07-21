@@ -12,6 +12,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -890,6 +891,55 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ReachableTunnelsEmptyWithoutDetailedS
 
   no_stats_extension->updateConnectionStats("node1", "cluster1", true, false);
   EXPECT_TRUE(no_stats_extension->reachableTunnels().empty());
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, HistogramsCreatedInTLS) {
+  setupThreadLocalSlot();
+
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+
+  EXPECT_NE(registry->cx_upgrade_time_, nullptr);
+  EXPECT_NE(registry->cx_idle_expire_time_, nullptr);
+  EXPECT_NE(registry->cx_post_upgrade_lifetime_, nullptr);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateUpgradeTimeRecordsCorrectValue) {
+  setupThreadLocalSlot();
+
+  NiceMock<Stats::MockHistogram> mock_histogram;
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+  registry->cx_upgrade_time_ = &mock_histogram;
+
+  MonotonicTime start(std::chrono::milliseconds(100));
+  MonotonicTime end(std::chrono::milliseconds(200));
+
+  EXPECT_CALL(mock_histogram, recordValue(100));
+  extension_->updateUpgradeTime(start, end);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateIdleExpireTimeRecordsCorrectValue) {
+  setupThreadLocalSlot();
+
+  NiceMock<Stats::MockHistogram> mock_histogram;
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+  registry->cx_idle_expire_time_ = &mock_histogram;
+
+  MonotonicTime start(std::chrono::milliseconds(100));
+  MonotonicTime end(std::chrono::milliseconds(350));
+
+  EXPECT_CALL(mock_histogram, recordValue(250));
+  extension_->updateIdleExpireTime(start, end);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateMethodsNoOpWithoutTLS) {
+  MonotonicTime start(std::chrono::milliseconds(0));
+  MonotonicTime end(std::chrono::milliseconds(100));
+
+  extension_->updateUpgradeTime(start, end);
+  extension_->updateIdleExpireTime(start, end);
 }
 
 } // namespace ReverseConnection

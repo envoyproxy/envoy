@@ -150,6 +150,48 @@ config:
   cb(filter_callback);
 }
 
+TEST(ConfigTest, CreateFilterWithServerContext) {
+  const std::string yaml = R"EOF(
+config:
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  server_context.cluster_manager_.initializeClusters({"foo"}, {});
+
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(server_context, secretManager()).WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", server_context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 TEST(ConfigTest, CreateFilterTlsClientAuthWithoutTokenSecret) {
   const std::string yaml = R"EOF(
 config:

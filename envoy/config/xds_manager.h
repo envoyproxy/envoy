@@ -39,7 +39,7 @@ public:
   /**
    * Initializes the ADS connections.
    * This should be called after the cluster-manager was created, and the
-   * primiary clusters were initialized.
+   * primary clusters were initialized.
    * @param bootstrap - the bootstrap config of Envoy.
    * @return Ok if the initialization was successful, or an error otherwise.
    */
