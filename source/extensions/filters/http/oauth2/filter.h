@@ -213,6 +213,7 @@ public:
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
   }
+  std::chrono::seconds cookieExpirationMargin() const { return cookie_expiration_margin_; }
   std::chrono::seconds getCsrfTokenExpiresIn() const { return csrf_token_expires_in_; }
   std::chrono::seconds getCodeVerifierTokenExpiresIn() const {
     return code_verifier_token_expires_in_;
@@ -288,6 +289,7 @@ private:
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
+  const std::chrono::seconds cookie_expiration_margin_;
   const std::chrono::seconds csrf_token_expires_in_;
   const std::chrono::seconds code_verifier_token_expires_in_;
   // Always initialized even for non-JWT auth types; minimal overhead (a string + 8 bytes).
@@ -463,10 +465,10 @@ private:
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers) const;
 
   std::string getEncodedToken() const;
-  std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
-                                            const std::chrono::seconds& expires_in) const;
-  std::string getExpiresTimeForIdToken(const std::string& id_token,
-                                       const std::chrono::seconds& expires_in) const;
+  std::chrono::seconds getExpiresTimeForRefreshToken(const std::string& refresh_token,
+                                                     const std::chrono::seconds& expires_in) const;
+  std::chrono::seconds getExpiresTimeForIdToken(const std::string& id_token,
+                                                const std::chrono::seconds& expires_in) const;
   std::string buildCookieTail(const FilterConfig::CookieSettings& settings,
                               absl::string_view expires_time) const;
   void setOAuthResponseCookies(Http::ResponseHeaderMap& headers,

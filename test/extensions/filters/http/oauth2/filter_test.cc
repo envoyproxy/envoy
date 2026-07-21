@@ -225,7 +225,7 @@ public:
       bool expires_partitioned = false, bool id_token_partitioned = false,
       bool refresh_token_partitioned = false, bool nonce_partitioned = false,
       bool code_verifier_partitioned = false,
-      bool use_access_token_expiry_for_id_token_cookie = false) {
+      bool use_access_token_expiry_for_id_token_cookie = false, int cookie_expiration_margin = 0) {
 
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
@@ -348,6 +348,9 @@ public:
 
     p.set_disable_token_encryption(disable_token_encryption);
     p.set_use_access_token_expiry_for_id_token_cookie(use_access_token_expiry_for_id_token_cookie);
+    if (cookie_expiration_margin != 0) {
+      p.mutable_cookie_expiration_margin()->set_seconds(cookie_expiration_margin);
+    }
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
@@ -357,6 +360,84 @@ public:
         p, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
 
     return c;
+  }
+
+  void expectAccessTokenSuccessWithCookieExpirationMargin(int cookie_expiration_margin,
+                                                          const std::string& oauth_hmac,
+                                                          int access_token_max_age,
+                                                          int oauth_expires,
+                                                          int refresh_token_max_age) {
+    init(getConfig(
+        true /* forward_bearer_token */, true /* use_refresh_token */,
+        ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+            OAuth2Config_AuthType_URL_ENCODED_BODY,
+        0 /* default_refresh_token_expires_in */, false /* preserve_authorization_header */,
+        false /* disable_id_token_set_cookie */, false /* set_cookie_domain */,
+        false /* disable_access_token_set_cookie */, false /* disable_refresh_token_set_cookie */,
+        ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+            CookieConfig_SameSite_DISABLED,
+        ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+            CookieConfig_SameSite_DISABLED,
+        ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+            CookieConfig_SameSite_DISABLED,
+        ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+            CookieConfig_SameSite_DISABLED,
+        ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+            CookieConfig_SameSite_DISABLED,
+        ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+            CookieConfig_SameSite_DISABLED,
+        ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+            CookieConfig_SameSite_DISABLED,
+        0 /* csrf_token_expires_in */, 0 /* code_verifier_token_expires_in */,
+        false /* disable_token_encryption */, "" /* bearer_token_path */, "" /* hmac_path */,
+        "" /* expires_path */, "" /* id_token_path */, "" /* refresh_token_path */,
+        "" /* nonce_path */, "" /* code_verifier_path */, false /* bearer_partitioned */,
+        false /* hmac_partitioned */, false /* expires_partitioned */,
+        false /* id_token_partitioned */, false /* refresh_token_partitioned */,
+        false /* nonce_partitioned */, false /* code_verifier_partitioned */,
+        false /* use_access_token_expiry_for_id_token_cookie */, cookie_expiration_margin));
+    test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+    };
+    filter_->decodeHeaders(request_headers, false);
+
+    const std::string access_token_max_age_string = std::to_string(access_token_max_age);
+    Http::TestRequestHeaderMapImpl expected_headers{
+        {Http::Headers::get().Status.get(), "302"},
+        {Http::Headers::get().SetCookie.get(),
+         "OauthHMAC=" + oauth_hmac + ";path=/;Max-Age=" + access_token_max_age_string +
+             ";secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "OauthExpires=" + std::to_string(oauth_expires) +
+             ";path=/;Max-Age=" + access_token_max_age_string + ";secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN +
+             ";path=/;Max-Age=" + access_token_max_age_string + ";secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "IdToken=" + TEST_ENCRYPTED_ID_TOKEN + ";path=/;Max-Age=" + access_token_max_age_string +
+             ";secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN +
+             ";path=/;Max-Age=" + std::to_string(refresh_token_max_age) + ";secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "OauthNonce.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+        {Http::Headers::get().SetCookie.get(),
+         "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+        {Http::Headers::get().SetCookie.get(),
+         "CodeVerifier.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+        {Http::Headers::get().SetCookie.get(),
+         "CodeVerifier=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+        {Http::Headers::get().Location.get(), ""},
+    };
+
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+    filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                     std::chrono::seconds(600));
   }
 
   // Builds a minimal valid config that forwards the ID token on the given header. When
@@ -375,15 +456,12 @@ public:
     p.set_stat_prefix("my_prefix");
     p.set_forward_bearer_token(forward_bearer_token);
     p.mutable_forward_id_token()->set_header(id_token_header);
-    // Disable refresh so the OAuth-failure path is exercised directly without a refresh attempt.
     p.mutable_use_refresh_token()->set_value(false);
 
-    // Allow requests under /allowfailed to continue upstream as unauthenticated when OAuth fails.
     auto* allow_failed_matcher = p.add_allow_failed_matcher();
     allow_failed_matcher->set_name(":path");
     allow_failed_matcher->mutable_string_match()->set_prefix("/allowfailed");
 
-    // OPTIONS requests bypass OAuth entirely via pass-through.
     auto* pass_through_matcher = p.add_pass_through_matcher();
     pass_through_matcher->set_name(":method");
     pass_through_matcher->mutable_string_match()->set_exact("OPTIONS");
@@ -3810,6 +3888,27 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
 
   filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
                                    std::chrono::seconds(600));
+}
+
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithCookieExpirationMargin) {
+  expectAccessTokenSuccessWithCookieExpirationMargin(
+      30 /* cookie_expiration_margin */,
+      "Af/it5FqmyP2BvV9vWAb1Ql4D85URbQZAj1214Lsn3I=", 570 /* access_token_max_age */,
+      1570 /* oauth_expires */, 604770 /* refresh_token_max_age */);
+}
+
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithCookieExpirationMarginEqualToTokenLifetime) {
+  expectAccessTokenSuccessWithCookieExpirationMargin(
+      600 /* cookie_expiration_margin */,
+      "edjlOKFmyLakEs7CiDg2pV3ZljY8bViQIb8CSkR87QM=", 0 /* access_token_max_age */,
+      1000 /* oauth_expires */, 604200 /* refresh_token_max_age */);
+}
+
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithCookieExpirationMarginGreaterThanTokenLifetime) {
+  expectAccessTokenSuccessWithCookieExpirationMargin(
+      601 /* cookie_expiration_margin */,
+      "edjlOKFmyLakEs7CiDg2pV3ZljY8bViQIb8CSkR87QM=", 0 /* access_token_max_age */,
+      1000 /* oauth_expires */, 604199 /* refresh_token_max_age */);
 }
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshToken) {

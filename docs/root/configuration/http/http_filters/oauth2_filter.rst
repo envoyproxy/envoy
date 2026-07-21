@@ -51,6 +51,11 @@ The OAuth filter's flow involves:
 * The filter sets ``IdToken`` and ``RefreshToken`` cookies if they are provided by Identity provider along with ``AccessToken``. These cookie names
   can be customized by setting :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>`.
 
+The OAuth2 cookies can be configured with a
+:ref:`cookie_expiration_margin <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.cookie_expiration_margin>`
+so that they expire before the corresponding tokens. This can be used to force refresh or
+re-authentication before forwarding a token that is close to expiration.
+
 When the authn server validates the client and returns an authorization token back to the OAuth filter,
 no matter what format that token is, if
 :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
@@ -118,6 +123,8 @@ The following is an example configuring the filter.
     - user
     - openid
     - email
+    # (Optional): expire OAuth cookies this much earlier than their corresponding tokens
+    cookie_expiration_margin: 30s
     # (Optional): set resource parameter for Authorization request
     resources:
     - oauth2-resource
