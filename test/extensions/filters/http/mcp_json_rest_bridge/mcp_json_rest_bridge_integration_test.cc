@@ -203,6 +203,187 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MissingMethod) {
           R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Missing method field"}})json"));
 }
 
+TEST_P(McpJsonRestBridgeIntegrationTest, MethodFieldNotString) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": 123
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_EQ(
+      nlohmann::json::parse(response->body()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method field is not a string"}})json"));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallInvalidParams) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": "not_an_object"
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_EQ(
+      nlohmann::json::parse(response->body()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Invalid params"}})json"));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallNonStringToolName) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": 123
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_EQ(
+      nlohmann::json::parse(response->body()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Tool name not found"}})json"));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallNonObjectArguments) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      tool_config:
+        tools:
+          - name: "create_api_key"
+            http_rule:
+              post: "/v1/{parent=projects/*}/keys"
+              body: "key"
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 321,
+    "method": "tools/call",
+    "params": {
+      "name": "create_api_key",
+      "arguments": "invalid_arguments"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_EQ(
+      nlohmann::json::parse(response->body()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":321,"error":{"code":-32602,"message":"Tool arguments must be an object"}})json"));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, UnsupportedMcpProtocolVersionHeader) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/list"
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "1999-01-01"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_EQ(
+      nlohmann::json::parse(response->body()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Unsupported protocol version"}})json"));
+}
+
+
 TEST_P(McpJsonRestBridgeIntegrationTest, MissingIdField) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
