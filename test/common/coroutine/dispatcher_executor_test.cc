@@ -47,7 +47,6 @@ TEST_F(DispatcherExecutorTest, ScheduleResumesThroughDispatcher) {
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
   EXPECT_TRUE(done);
-  EXPECT_TRUE(handle.done());
 }
 
 // TimerAwaitable completes when simulated time reaches the deadline.
@@ -66,7 +65,6 @@ TEST_F(DispatcherExecutorTest, TimerAwaitableFiresAfterDeadline) {
                                  Event::Dispatcher::RunType::NonBlock);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());
-  EXPECT_TRUE(handle.done());
 }
 
 // Cancelling a pending TimerAwaitable disarms the timer and unwinds fail-fast.

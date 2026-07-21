@@ -132,27 +132,23 @@ TEST(CancellationStateTest, ClearedCallbackDoesNotFire) {
 TEST(TaskTest, ReturnsStatusOrValueThroughLaunch) {
   ManualExecutor exec;
   std::optional<absl::StatusOr<int>> result;
-  DetachedHandle handle =
-      launch(returnsValue(42), exec, [&result](absl::StatusOr<int> value) { result = value; });
+  launch(returnsValue(42), exec, [&result](absl::StatusOr<int> value) { result = value; });
   EXPECT_FALSE(result.has_value()); // lazy: nothing runs until drained.
   exec.drain();
   ASSERT_TRUE(result.has_value());
   ASSERT_TRUE(result->ok());
   EXPECT_EQ(42, **result);
-  EXPECT_TRUE(handle.done());
 }
 
 TEST(TaskTest, ReturnsStatusThroughLaunch) {
   ManualExecutor exec;
   bool body_ran = false;
   std::optional<absl::Status> result;
-  DetachedHandle handle = launch(returnsOk(body_ran), exec,
-                                 [&result](absl::Status status) { result = std::move(status); });
+  launch(returnsOk(body_ran), exec, [&result](absl::Status status) { result = std::move(status); });
   exec.drain();
   EXPECT_TRUE(body_ran);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());
-  EXPECT_TRUE(handle.done());
 }
 
 TEST(TaskTest, DestroyingUnstartedTaskIsSafe) {
@@ -182,7 +178,6 @@ TEST(TaskTest, DeepChainPropagatesExecutorAndCancellation) {
   EXPECT_TRUE(controller.cancelled);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(absl::IsCancelled(*result));
-  EXPECT_TRUE(handle.done());
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +196,6 @@ TEST(LeafAwaitableTest, LeafCompletesWithValue) {
   controller.completeWith(absl::OkStatus());
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());
-  EXPECT_TRUE(handle.done());
 }
 
 TEST(LeafAwaitableTest, CancelledWhilePendingFiresOnCancelAndUnwinds) {
@@ -282,6 +276,59 @@ TEST(LaunchTest, CancelMidFlightRunsDestructorsAndStillCallsBack) {
   EXPECT_TRUE(cleaned_up);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(absl::IsCancelled(*result));
+}
+
+// The frame is self-owning, so destroying the handle from inside the done
+// callback (before the frame reaches final_suspend) must be safe.
+TEST(LaunchTest, DroppingHandleInsideOnDoneIsSafe) {
+  ManualExecutor exec;
+  bool ran = false;
+  bool called = false;
+  std::optional<DetachedHandle> handle_slot;
+  handle_slot = launch(returnsOk(ran), exec, [&](absl::Status status) {
+    EXPECT_TRUE(status.ok());
+    called = true;
+    handle_slot.reset(); // destroy the handle mid-callback
+  });
+  exec.drain();
+  EXPECT_TRUE(called);
+  EXPECT_FALSE(handle_slot.has_value());
+}
+
+// Dropping the handle before the coroutine completes does not cancel or destroy
+// it: the frame self-owns and runs to completion.
+TEST(LaunchTest, DroppingHandleBeforeCompletionRunsToCompletion) {
+  ManualExecutor exec;
+  bool ran = false;
+  std::optional<absl::Status> result;
+  {
+    DetachedHandle handle = launch(returnsOk(ran), exec,
+                                   [&result](absl::Status status) { result = std::move(status); });
+    // handle dropped here, before draining.
+  }
+  exec.drain();
+  EXPECT_TRUE(ran);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok()); // ran to completion, not cancelled.
+}
+
+// Dropping the handle while a leaf is still pending leaves the self-owned frame
+// alive; it still completes when the leaf fires.
+TEST(LaunchTest, HandleDroppedWhilePendingLeafStillCompletes) {
+  ManualExecutor exec;
+  LeafController controller;
+  std::optional<absl::Status> result;
+  {
+    DetachedHandle handle = launch(awaitLeaf(controller), exec,
+                                   [&result](absl::Status status) { result = std::move(status); });
+    exec.drain();
+    ASSERT_TRUE(controller.started); // suspended at the leaf
+    // handle dropped here, while the leaf is still pending.
+  }
+  EXPECT_FALSE(result.has_value());
+  controller.completeWith(absl::OkStatus());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
 }
 
 } // namespace

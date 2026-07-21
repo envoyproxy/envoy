@@ -4,7 +4,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "source/common/common/assert.h"
 #include "source/common/coroutine/context.h"
 #include "source/common/coroutine/executor.h"
 #include "source/common/coroutine/task.h"
@@ -15,73 +14,51 @@ namespace Envoy {
 namespace Coroutine {
 
 /**
- * Owns a root coroutine frame and exposes cancellation over it. This is handed
- * back from `launch()` so non-coroutine code can start a coroutine and receive a
- * callback signaling that the coroutine has finished. The handle can also be used
- * to cancel the coroutine. The done callback will be called even if the coroutine
- * is cancelled.
+ * A cancellation handle for a coroutine started by `launch()`.
  *
- * Only safe to destruct once the done callback is fired.
+ * The launched coroutine owns its own frame and self-destroys when it reaches
+ * `final_suspend` (see RootTask), so this handle does NOT own the frame -- it only
+ * holds a share of the cancellation state. That is what makes it safe to destroy
+ * at any time: dropping the handle does not cancel the coroutine (it keeps running
+ * to completion) and can never destroy a frame at the wrong moment.
+ *
+ * Call `cancel()` to request cancellation; the chain unwinds fail-fast and the
+ * done callback passed to `launch()` still fires (with an aborted status).
  */
 class DetachedHandle {
 public:
-  DetachedHandle(std::coroutine_handle<> root, CoroutineContextPtr context)
-      : root_(root), context_(std::move(context)) {}
+  explicit DetachedHandle(CancellationStatePtr cancel) : cancel_(std::move(cancel)) {}
 
-  // Move only.
-  DetachedHandle(DetachedHandle&& other) noexcept
-      : root_(std::exchange(other.root_, {})), context_(std::move(other.context_)) {}
-  DetachedHandle& operator=(DetachedHandle&& other) noexcept {
-    if (this != &other) {
-      reset();
-      root_ = std::exchange(other.root_, {});
-      context_ = std::move(other.context_);
-    }
-    return *this;
-  }
+  // Move-only handle semantics.
+  DetachedHandle(DetachedHandle&&) noexcept = default;
+  DetachedHandle& operator=(DetachedHandle&&) noexcept = default;
   DetachedHandle(const DetachedHandle&) = delete;
   DetachedHandle& operator=(const DetachedHandle&) = delete;
-  ~DetachedHandle() { reset(); }
 
   // Requests cancellation of the coroutine chain. Fires the pending leaf's cancel
   // callback, which resumes the chain with an aborted status; it then unwinds
-  // fail-fast to a normal `co_return`. Cancellation is advisory -- the frame is
-  // freed only when the coroutine reaches `final_suspend`.
+  // fail-fast to a normal `co_return`. The done callback still fires.
   void cancel() {
-    if (context_) {
-      context_->cancellation()->cancel();
+    if (cancel_) {
+      cancel_->cancel();
     }
   }
-
-  // Whether the coroutine has reached final_suspend.
-  bool done() const { return root_ && root_.done(); }
 
 private:
-  void reset() {
-    if (root_) {
-      // v1: destroying a not-yet-done frame is unsafe; the registry adopts that
-      // case later. In supported flows the chain resumes inline to completion
-      // before the owner is dropped.
-      ASSERT(root_.done());
-      root_.destroy();
-      root_ = {};
-    }
-  }
-
-  std::coroutine_handle<> root_;
-  CoroutineContextPtr context_;
+  CancellationStatePtr cancel_;
 };
 
 namespace Detail {
 
 /**
- * A special internal coroutine type that helps implementing the done callback. It
- * uses the same promise type of `Task`, but its frame handle is held by the
- * `DetachedHandle` returned from `launch()`.
+ * The internal root coroutine type. It awaits the user task and invokes the done
+ * callback (see awaitTaskAndCallOnDone), then self-destroys at final_suspend. It
+ * owns its own frame -- no external owner has to destroy it at the right moment,
+ * which is what lets DetachedHandle be dropped at any time.
  *
- * This exists so that we can implement the done callback as `on_done(co_await task)`,
- * so that we avoid polluting the PromiseBase's `final_suspend` with the on_done
- * callback.
+ * It exists so the done callback can be expressed as `on_done(co_await task)`,
+ * reusing the normal await machinery instead of a bespoke `final_suspend` in
+ * PromiseBase. Users only ever see `launch()` and `DetachedHandle`.
  */
 class RootTask {
 public:
@@ -89,18 +66,19 @@ public:
     RootTask get_return_object() {
       return RootTask{std::coroutine_handle<promise_type>::from_promise(*this)};
     }
-    // A root has no parent to transfer to, so it simply parks at final_suspend:
-    // the frame survives (done() == true) for the DetachedHandle to inspect and
-    // destroy. (Task uses FinalAwaiter instead, to symmetric-transfer back to its
-    // awaiting parent -- a root would just return control to the executor.)
-    std::suspend_always final_suspend() noexcept { return {}; }
+    // Self-owning: on_done has already run in the body, so completion is signaled
+    // before the frame goes away. suspend_never destroys the frame here, so no
+    // external owner ever has to. (Task uses FinalAwaiter instead, to
+    // symmetric-transfer back to its awaiting parent.)
+    std::suspend_never final_suspend() noexcept { return {}; }
     void return_void() noexcept {}
   };
 
   // Move-only frame carrier: it is constructed by get_return_object(), returned
-  // from awaitTaskAndCallOnDone(), and has its handle released into a DetachedHandle -- it is
-  // never copied or assigned. The move constructor keeps it move-only (and covers
-  // the coroutine return-object path); no assignment operator is needed.
+  // from awaitTaskAndCallOnDone(), and has its handle released (to be scheduled and
+  // then self-owned) -- it is never copied or assigned. The move constructor keeps
+  // it move-only (and covers the coroutine return-object path); no assignment
+  // operator is needed.
   RootTask(RootTask&& other) noexcept : handle_(std::exchange(other.handle_, {})) {}
   RootTask(const RootTask&) = delete;
   ~RootTask() {
@@ -130,14 +108,13 @@ RootTask awaitTaskAndCallOnDone(Task<T> task, OnDone on_done) {
   on_done(co_await std::move(task));
 }
 
-// Give the root its context, hand its frame to a DetachedHandle, and schedule the
-// (lazy) start.
+// Give the root its context and schedule its (lazy) start. The frame self-owns
+// from here; the returned handle only carries the cancellation state.
 inline DetachedHandle startRoot(RootTask root, Executor& exec) {
-  auto ctx = std::make_shared<CoroutineContext>(&exec, std::make_shared<CancellationState>());
-  root.promise().context_ = ctx;
-  std::coroutine_handle<> handle = root.release();
-  exec.schedule(handle);
-  return DetachedHandle(handle, std::move(ctx));
+  auto cancel = std::make_shared<CancellationState>();
+  root.promise().context_ = std::make_shared<CoroutineContext>(&exec, cancel);
+  exec.schedule(root.release());
+  return DetachedHandle(std::move(cancel));
 }
 
 } // namespace Detail
