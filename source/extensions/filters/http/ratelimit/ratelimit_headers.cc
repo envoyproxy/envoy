@@ -1,6 +1,8 @@
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
@@ -8,6 +10,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
 
 namespace Envoy {
@@ -98,6 +101,34 @@ void XRateLimitHeaderUtils::populateHeaders(
       min_remaining_limit_status->limit_remaining());
   headers.addReferenceKey(HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
                           min_remaining_limit_status->duration_until_reset().seconds());
+}
+
+void populateRetryAfterHeader(const Filters::Common::RateLimit::DescriptorStatusList& statuses,
+                              Http::ResponseHeaderMap& headers, bool enabled) {
+  if (!enabled) {
+    return;
+  }
+
+  using Response = envoy::service::ratelimit::v3::RateLimitResponse;
+  std::optional<int64_t> max_reset_seconds;
+
+  for (const auto& status : statuses) {
+    if (status.code() != Response::OVER_LIMIT) {
+      continue;
+    }
+
+    const int64_t reset_seconds = status.duration_until_reset().seconds();
+    if (!max_reset_seconds.has_value() || reset_seconds > *max_reset_seconds) {
+      max_reset_seconds = reset_seconds;
+    }
+  }
+
+  if (max_reset_seconds.has_value()) {
+    // Avoid telling clients to retry immediately, which could cause a tight loop of 429 responses.
+    const int64_t retry_after_seconds = std::max<int64_t>(1, *max_reset_seconds);
+    headers.setCopy(HttpFilters::Common::RateLimit::RetryAfterHeaders::get().RetryAfter,
+                    absl::StrCat(retry_after_seconds));
+  }
 }
 
 uint32_t XRateLimitHeaderUtils::convertRateLimitUnit(

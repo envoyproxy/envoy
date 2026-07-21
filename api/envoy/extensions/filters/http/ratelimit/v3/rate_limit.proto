@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
@@ -190,6 +190,14 @@ message RateLimit {
   // The namespace where dynamic metadata from rate limit response is saved.
   // If not set, the default is "envoy.filters.http.ratelimit".
   string metadata_namespace = 18;
+
+  // Specifies whether the filter emits a ``Retry-After`` header when it enforces an HTTP 429
+  // response. The value is the largest ``duration_until_reset`` among the over-limit descriptor
+  // statuses returned by the rate limit service, expressed in seconds and clamped to at least 1.
+  // The header is not emitted when no over-limit descriptor status is present.
+  //
+  // Disabled by default.
+  bool enable_retry_after_header = 19;
 }
 
 message RateLimitPerRoute {

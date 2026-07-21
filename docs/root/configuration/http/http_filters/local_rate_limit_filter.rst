@@ -26,6 +26,35 @@ Depending on the value of the config :ref:`local_rate_limit_per_downstream_conne
 the token bucket is either shared across all workers or on a per connection basis. This results in the local rate limits being applied either per Envoy process or per downstream connection.
 By default the rate limits are applied per Envoy process.
 
+Retry-After header
+------------------
+
+When :ref:`enable_retry_after_header
+<envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.enable_retry_after_header>`
+is enabled and the filter enforces a 429 response, the response includes ``Retry-After`` using the
+``delay-seconds`` form. The delay is the number of seconds until the next token is available in the
+bucket that rejected the request, clamped to at least one second.
+
+The header is not emitted for an upstream-generated 429 response, when rate limiting is not
+enforced, or when a custom status other than 429 is configured. The option is disabled by default.
+
+.. code-block:: yaml
+
+  stat_prefix: local_rate_limiter
+  token_bucket:
+    max_tokens: 100
+    tokens_per_fill: 100
+    fill_interval: 60s
+  filter_enabled:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  enable_retry_after_header: true
+
 Example configuration
 ---------------------
 

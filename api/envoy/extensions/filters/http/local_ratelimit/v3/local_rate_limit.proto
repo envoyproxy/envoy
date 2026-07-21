@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
 // [#extension: envoy.filters.http.local_ratelimit]
 
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -190,4 +190,11 @@ message LocalRateLimit {
   // values.
   // Minimum is 1. Default is 20.
   google.protobuf.UInt32Value max_dynamic_descriptors = 18 [(validate.rules).uint32 = {gte: 1}];
+
+  // Specifies whether the filter emits a ``Retry-After`` header when it enforces an HTTP 429
+  // response. The value is the number of seconds until the next token is available in the bucket
+  // that rejected the request, clamped to at least 1.
+  //
+  // Disabled by default.
+  bool enable_retry_after_header = 19;
 }

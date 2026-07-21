@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -13,6 +14,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,6 +65,7 @@ FilterConfig::FilterConfig(
       has_descriptors_(!config.descriptors().empty()),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
+      enable_retry_after_header_(config.enable_retry_after_header()),
       vh_rate_limits_(config.vh_rate_limits()),
       rate_limited_grpc_status_(
           config.rate_limited_as_resource_exhausted()
@@ -198,6 +202,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       [this](Http::HeaderMap& headers) {
         used_config_->responseHeadersParser().evaluateHeaders(headers,
                                                               decoder_callbacks_->streamInfo());
+        if (used_config_->enableRetryAfterHeader() &&
+            used_config_->status() == Http::Code::TooManyRequests &&
+            token_bucket_context_ != nullptr) {
+          // Clamp to at least one second to avoid telling clients to retry immediately, which could
+          // cause a tight loop of 429 responses.
+          const uint64_t retry_after_seconds =
+              std::max<uint64_t>(1, token_bucket_context_->resetSeconds());
+          headers.setCopy(HttpFilters::Common::RateLimit::RetryAfterHeaders::get().RetryAfter,
+                          absl::StrCat(retry_after_seconds));
+        }
       },
       used_config_->rateLimitedGrpcStatus(), "local_rate_limited");
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);

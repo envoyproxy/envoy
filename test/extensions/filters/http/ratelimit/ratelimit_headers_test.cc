@@ -18,6 +18,15 @@ namespace {
 
 using Envoy::RateLimit::buildDescriptorStatus;
 using Filters::Common::RateLimit::DescriptorStatusList;
+using RateLimitResponse = envoy::service::ratelimit::v3::RateLimitResponse;
+
+RateLimitResponse::DescriptorStatus descriptorStatus(RateLimitResponse::Code code,
+                                                     int64_t seconds_until_reset) {
+  RateLimitResponse::DescriptorStatus status;
+  status.set_code(code);
+  status.mutable_duration_until_reset()->set_seconds(seconds_until_reset);
+  return status;
+}
 
 struct RateLimitHeadersTestCase {
   Http::TestResponseHeaderMapImpl expected_headers;
@@ -217,6 +226,43 @@ TEST_P(RateLimitHeadersTest, TestUintConversions) {
   for (const auto& [unit_enum, expected_seconds] : unit_map) {
     EXPECT_EQ(XRateLimitHeaderUtils::convertRateLimitUnit(unit_enum), expected_seconds);
   }
+}
+
+TEST(RetryAfterHeaderTest, UsesLargestOverLimitReset) {
+  const DescriptorStatusList descriptor_statuses{
+      descriptorStatus(RateLimitResponse::OK, 999),
+      descriptorStatus(RateLimitResponse::OVER_LIMIT, 10),
+      descriptorStatus(RateLimitResponse::OVER_LIMIT, 60),
+  };
+  Http::TestResponseHeaderMapImpl headers{{"retry-after", "5"}};
+  // The OK status is ignored, and the largest over-limit reset is selected.
+  Http::TestResponseHeaderMapImpl expected_headers{{"retry-after", "60"}};
+
+  populateRetryAfterHeader(descriptor_statuses, headers, true);
+
+  EXPECT_THAT(&headers, HeaderMapEqual(&expected_headers));
+}
+
+TEST(RetryAfterHeaderTest, ClampsValueToOne) {
+  const DescriptorStatusList descriptor_statuses{
+      descriptorStatus(RateLimitResponse::OVER_LIMIT, 0),
+  };
+  Http::TestResponseHeaderMapImpl headers;
+  populateRetryAfterHeader(descriptor_statuses, headers, true);
+
+  // A zero-second reset is clamped to one second.
+  EXPECT_EQ("1", headers.get_("retry-after"));
+}
+
+TEST(RetryAfterHeaderTest, IgnoresStatusesThatAreNotOverLimit) {
+  const DescriptorStatusList descriptor_statuses{
+      descriptorStatus(RateLimitResponse::OK, 60),
+  };
+  Http::TestResponseHeaderMapImpl headers;
+
+  populateRetryAfterHeader(descriptor_statuses, headers, true);
+
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("retry-after")).empty());
 }
 
 } // namespace

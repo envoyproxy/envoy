@@ -21,6 +21,30 @@ set to true.
 If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` is
 set to true, a 500 response is returned.
 
+Retry-After header
+------------------
+
+When :ref:`enable_retry_after_header
+<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.enable_retry_after_header>` is
+enabled and the filter enforces a 429 response, the response includes ``Retry-After`` using the
+``delay-seconds`` form. The delay is the largest ``duration_until_reset`` among the over-limit
+descriptor statuses returned by the rate limit service, clamped to at least one second. This makes
+the delay long enough for every matched over-limit rule reported by the service to reset.
+
+The header is not emitted for an upstream-generated 429 response, when rate limiting is not
+enforced, when a custom status other than 429 is configured, or when the service does not return an
+over-limit descriptor status. The option is disabled by default.
+
+.. code-block:: yaml
+
+  domain: foo
+  enable_retry_after_header: true
+  rate_limit_service:
+    transport_api_version: V3
+    grpc_service:
+      envoy_grpc:
+        cluster_name: rate_limit_service
+
 .. _config_http_filters_rate_limit_composing_actions:
 
 Composing Actions
