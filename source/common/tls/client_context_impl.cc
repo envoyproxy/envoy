@@ -44,6 +44,14 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+namespace {
+
+void freeServerName(void*, void* ptr, CRYPTO_EX_DATA*, int, long, void*) {
+  delete static_cast<std::string*>(ptr);
+}
+
+} // namespace
+
 absl::StatusOr<std::unique_ptr<ClientContextImpl>>
 ClientContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                           Server::Configuration::CommonFactoryContext& factory_context) {
@@ -145,6 +153,14 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
     }
   }
 
+  if (max_session_keys_ > 0) {
+    // SSL_get_servername() is only documented for servers. Keep the client-requested SNI
+    // separately so the session callback does not depend on undocumented client behavior.
+    auto* server_name = new std::string(server_name_indication);
+    RELEASE_ASSERT(SSL_set_ex_data(ssl_con.get(), sslServerNameIndex(), server_name) == 1,
+                   "Failed to store upstream SNI on SSL object");
+  }
+
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
@@ -214,13 +230,23 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   return ssl_con;
 }
 
+int ClientContextImpl::sslServerNameIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, [] {
+    const int index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, freeServerName);
+    RELEASE_ASSERT(index >= 0, "Failed to get SSL user data index.");
+    return index;
+  }());
+}
+
 int ClientContextImpl::newSessionKey(SSL* ssl, SSL_SESSION* session) {
   // In case we ever store single-use session key (TLS 1.3),
   // we need to switch to using write/write locks.
   if (SSL_SESSION_should_be_single_use(session)) {
     session_keys_single_use_ = true;
   }
-  const char* server_name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+  const auto* server_name = static_cast<const std::string*>(
+      SSL_get_ex_data(ssl, sslServerNameIndex()));
+  RELEASE_ASSERT(server_name != nullptr, "Missing upstream SNI on SSL object");
   absl::WriterMutexLock l(session_keys_mu_);
   // Evict oldest entries.
   while (session_keys_.size() >= max_session_keys_) {
@@ -228,8 +254,7 @@ int ClientContextImpl::newSessionKey(SSL* ssl, SSL_SESSION* session) {
   }
   // Add new session key at the front of the queue, so that it's used first.
   session_keys_.push_front(
-      {server_name == nullptr ? std::string() : std::string(server_name),
-       bssl::UniquePtr<SSL_SESSION>(session)});
+      {*server_name, bssl::UniquePtr<SSL_SESSION>(session)});
   return 1; // Tell BoringSSL that we took ownership of the session.
 }
 

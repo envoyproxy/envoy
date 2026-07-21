@@ -69,6 +69,7 @@ private:
 
   friend class ClientContextConfigImplTest;
 
+  static int sslServerNameIndex();
   int newSessionKey(SSL* ssl, SSL_SESSION* session);
 
   const std::string server_name_indication_;
