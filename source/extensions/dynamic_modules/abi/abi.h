@@ -13929,6 +13929,69 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
     size_t value_buffer_capacity, size_t* value_size);
 
 /**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count returns the number of
+ * histograms in the metric snapshot.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @return the number of histograms.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram writes the name and returns the
+ * cumulative sample count and sum of a histogram at the given index. The name is written directly
+ * into a module-provided buffer, as described for the counter callback above. The per-bucket
+ * counts are read separately via the bucket callbacks below.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the histogram (0-based).
+ * @param name_buffer is the module-owned buffer that receives the histogram name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param sample_count_out is the output for the cumulative sample count.
+ * @param sample_sum_out is the output for the cumulative sample sum.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* sample_count_out,
+    double* sample_sum_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count returns the number
+ * of buckets for the histogram at the given index. The bucket layout is the one Envoy resolved
+ * for that histogram, so it already reflects any per-stat bucket configuration.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param histogram_index is the index of the histogram (0-based).
+ * @return the number of buckets, or 0 if histogram_index is out of range.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr,
+    size_t histogram_index);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket returns the upper bound
+ * and cumulative count of one bucket. The count is the number of samples less than or equal to
+ * the upper bound, matching the cumulative form Prometheus expects for a bucket boundary.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param histogram_index is the index of the histogram (0-based).
+ * @param bucket_index is the index of the bucket within the histogram (0-based).
+ * @param upper_bound_out is the output for the bucket upper bound (the Prometheus `le` value).
+ * @param cumulative_count_out is the output for the count of samples at or below the upper bound.
+ * @return true if both indices are valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr,
+    size_t histogram_index, size_t bucket_index, double* upper_bound_out,
+    uint64_t* cumulative_count_out);
+
+/**
  * envoy_dynamic_module_callback_stat_sink_config_define_gauge creates a gauge with the given name
  * that the module can update later via envoy_dynamic_module_callback_stat_sink_config_set_gauge.
  *

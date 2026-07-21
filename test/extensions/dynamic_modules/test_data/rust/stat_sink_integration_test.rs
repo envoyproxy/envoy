@@ -80,10 +80,31 @@ impl StatSink for TestStatSink {
     if found_uptime {
       envoy_log_info!("stat sink integration test: found gauge server.uptime");
     }
+    // Read every histogram's scalar values and its cumulative buckets, proving the histogram
+    // snapshot callbacks decode the name plus the resolved (upper_bound, cumulative_count) buckets.
+    // A monotonic bucket count with the last bucket equal to sample_count confirms the cumulative
+    // form matches what Envoy produces.
+    for index in 0..snapshot.histogram_count() {
+      if let Some(histogram) = snapshot.histogram(index, &mut name) {
+        let bucket_count = snapshot.histogram_bucket_count(index);
+        let last_cumulative = (0..bucket_count)
+          .filter_map(|bucket_index| snapshot.histogram_bucket(index, bucket_index))
+          .map(|bucket| bucket.cumulative_count)
+          .last()
+          .unwrap_or(0);
+        if bucket_count > 0 && last_cumulative == histogram.sample_count {
+          envoy_log_info!(
+            "stat sink integration test: histogram buckets cumulative for {}",
+            String::from_utf8_lossy(&name)
+          );
+        }
+      }
+    }
     envoy_log_info!(
-      "stat sink integration test: flush called counters={} gauges={}",
+      "stat sink integration test: flush called counters={} gauges={} histograms={}",
       snapshot.counter_count(),
-      snapshot.gauge_count()
+      snapshot.gauge_count(),
+      snapshot.histogram_count()
     );
     // Copy the snapshot so it outlives this call, then hand it to the worker thread to aggregate.
     if let Some(sender) = self.sender.lock().unwrap().as_ref() {

@@ -63,12 +63,14 @@ envoy_cc_test(
     srcs = ["abi_impl_test.cc"],
     deps = [
         ":test_util_lib",
+        "//source/common/stats:histogram_lib",
         "//source/extensions/dynamic_modules/abi",
         "//source/extensions/stat_sinks/dynamic_modules:abi_impl",
         "//source/extensions/stat_sinks/dynamic_modules:sink_config_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+        "@libcircllhist",
     ],
 )
 

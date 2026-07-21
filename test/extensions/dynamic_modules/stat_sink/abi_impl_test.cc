@@ -1,8 +1,11 @@
 #include <string>
 
+#include "source/common/stats/histogram_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
 #include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
+
+#include "circllhist.h"
 
 #include "test/extensions/dynamic_modules/stat_sink/test_util.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -373,6 +376,107 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutOutOfRange) {
   EXPECT_EQ(54321u, value_size);
   EXPECT_EQ('Z', name_buffer[0]);
   EXPECT_EQ('Y', value_buffer[0]);
+}
+
+// =============================================================================
+// Histogram callbacks
+// =============================================================================
+
+// Fixture that builds a histogram with known samples so its cumulative statistics (buckets, sum,
+// count) are populated the same way Envoy computes them for a flush.
+class DynamicModuleStatsSinkHistogramAbiTest : public DynamicModuleStatsSinkAbiTest {
+public:
+  DynamicModuleStatsSinkHistogramAbiTest() : histogram_(hist_alloc()) {}
+  ~DynamicModuleStatsSinkHistogramAbiTest() override { hist_free(histogram_); }
+
+  // Records samples and points the mock parent histogram's cumulative statistics at the resulting
+  // circllhist, then adds it to the snapshot under the given name.
+  void addHistogram(NiceMock<Stats::MockParentHistogram>& h, const std::string& name,
+                    const std::vector<uint64_t>& samples) {
+    for (uint64_t sample : samples) {
+      hist_insert_intscale(histogram_, sample, 0, 1);
+    }
+    stats_ = std::make_unique<Stats::HistogramStatisticsImpl>(histogram_);
+    h.name_ = name;
+    ON_CALL(h, cumulativeStatistics()).WillByDefault(ReturnRef(*stats_));
+    snapshot_.histograms_.push_back(h);
+  }
+
+  histogram_t* histogram_;
+  std::unique_ptr<Stats::HistogramStatisticsImpl> stats_;
+  NiceMock<Stats::MockParentHistogram> h0_;
+};
+
+TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramCountEmpty) {
+  EXPECT_EQ(0u,
+            envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(snapshotHandle()));
+}
+
+TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramValid) {
+  addHistogram(h0_, "latency", {1, 1, 3, 8});
+
+  EXPECT_EQ(1u,
+            envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(snapshotHandle()));
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  uint64_t sample_count = 0;
+  double sample_sum = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size, &sample_count,
+      &sample_sum));
+  EXPECT_EQ("latency", written(name_buffer, name_size, sizeof(name_buffer)));
+  EXPECT_EQ(4u, sample_count);
+  // circllhist returns an approximate sum, so allow a small relative tolerance around 1+1+3+8.
+  EXPECT_NEAR(13.0, sample_sum, 0.5);
+}
+
+TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramBucketsAreCumulative) {
+  addHistogram(h0_, "latency", {1, 1, 3, 8});
+
+  const size_t bucket_count =
+      envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(snapshotHandle(),
+                                                                                  0);
+  EXPECT_EQ(Stats::HistogramSettingsImpl::defaultBuckets().size(), bucket_count);
+
+  // Cumulative counts are monotonic non-decreasing and the last bucket holds every sample.
+  uint64_t previous = 0;
+  uint64_t last = 0;
+  for (size_t i = 0; i < bucket_count; i++) {
+    double upper_bound = -1;
+    uint64_t cumulative_count = 0;
+    ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+        snapshotHandle(), 0, i, &upper_bound, &cumulative_count));
+    EXPECT_EQ(Stats::HistogramSettingsImpl::defaultBuckets()[i], upper_bound);
+    EXPECT_GE(cumulative_count, previous);
+    previous = cumulative_count;
+    last = cumulative_count;
+  }
+  EXPECT_EQ(4u, last);
+}
+
+TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramOutOfRange) {
+  addHistogram(h0_, "latency", {1});
+
+  char name_buffer[256] = {'Z'};
+  size_t name_size = 12345;
+  uint64_t sample_count = 999;
+  double sample_sum = 9.0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+      snapshotHandle(), 1, name_buffer, sizeof(name_buffer), &name_size, &sample_count,
+      &sample_sum));
+  EXPECT_EQ(12345u, name_size);
+
+  // An out-of-range histogram index yields no buckets, and a bucket read fails without writing.
+  EXPECT_EQ(0u,
+            envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+                snapshotHandle(), 1));
+  double upper_bound = -1;
+  uint64_t cumulative_count = 42;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+      snapshotHandle(), 0, 99999, &upper_bound, &cumulative_count));
+  EXPECT_EQ(-1, upper_bound);
+  EXPECT_EQ(42u, cumulative_count);
 }
 
 // =============================================================================
