@@ -43,12 +43,17 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "evwatch_interface",
-    hdrs = [
-        "evwatch.h",
-        "evwatch_observer_manager.h",
-    ],
+    hdrs = ["evwatch.h"],
     deps = [
         "//envoy/common:time_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "evwatch_observer_manager_interface",
+    hdrs = ["evwatch_observer_manager.h"],
+    deps = [
+        ":evwatch_interface",
     ],
 )
 

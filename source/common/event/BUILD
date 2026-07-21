@@ -149,6 +149,7 @@ envoy_cc_library(
         "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
         "//envoy/event:evwatch_interface",
+        "//envoy/event:evwatch_observer_manager_interface",
     ],
 )
 
@@ -164,6 +165,7 @@ envoy_cc_library(
         "//bazel/foreign_cc:event",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:evwatch_interface",
+        "//envoy/event:evwatch_observer_manager_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
     ],
