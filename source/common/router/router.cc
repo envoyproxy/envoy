@@ -901,19 +901,19 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     active_shadow_policies.clear();
   }
 
-  // Compute the downstream request's dynamic ``envoy.lb`` metadata once for all shadow policies.
-  // Its value depends only on the downstream request/connection, not on the individual policy, so
-  // it is hoisted out of the loop below to avoid recomputing it per policy.
-  const bool inherit_dynamic_metadata =
-      !active_shadow_policies.empty() &&
+  // Collect the downstream request's dynamic ``envoy.lb`` metadata once for all shadow policies so
+  // that subset load balancing on the shadow cluster honors dynamically-set selectors. Stays empty
+  // unless there is metadata to forward, so the common (no-shadow) path constructs nothing.
+  std::optional<envoy::config::core::v3::Metadata> shadow_metadata;
+  if (!active_shadow_policies.empty() &&
       Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata");
-  envoy::config::core::v3::Metadata shadow_metadata;
-  if (inherit_dynamic_metadata) {
-    shadow_metadata = shadowDynamicMetadata();
+          "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata")) {
+    // Only store metadata worth forwarding, so the empty case stays nullopt and shadow streams skip
+    // the per-stream copy/move below.
+    if (auto metadata = shadowDynamicMetadata(); !metadata.filter_metadata().empty()) {
+      shadow_metadata = std::move(metadata);
+    }
   }
-  const bool has_shadow_metadata =
-      inherit_dynamic_metadata && !shadow_metadata.filter_metadata().empty();
 
   // Start the shadow streams.
   const size_t num_shadow_policies = active_shadow_policies.size();
@@ -924,8 +924,9 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     if (!shadow_cluster_name.has_value()) {
       continue;
     }
+    const bool last_policy = (i == num_shadow_policies - 1);
     std::unique_ptr<Http::RequestHeaderMapImpl> shadow_headers;
-    if (i == num_shadow_policies - 1) {
+    if (last_policy) {
       // For the last shadow policy, we can reuse the original headers to save a copy because
       // copy whole headers map is not cheap.
       shadow_headers = std::move(original_shadow_headers);
@@ -955,13 +956,15 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
             .setFilterConfig(config_)
             .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
 
-    // Forward the downstream request's dynamic ``envoy.lb`` metadata to the shadow stream so that
-    // subset load balancing selects the same host subset for shadowed traffic as it does for the
-    // main request. The async client route only exposes the static route-level ``metadata_match``,
-    // so without this dynamically-set subset selectors (for example from the header-to-metadata
-    // filter) would be ignored by the shadow cluster's load balancer.
-    if (has_shadow_metadata) {
-      options.setMetadata(shadow_metadata);
+    // Forward the downstream request's dynamic ``envoy.lb`` metadata so the shadow cluster's subset
+    // load balancer selects the same host subset as the main request. The last policy can move the
+    // metadata since no later policy needs it.
+    if (shadow_metadata.has_value()) {
+      if (last_policy) {
+        options.setMetadata(std::move(*shadow_metadata));
+      } else {
+        options.setMetadata(*shadow_metadata);
+      }
     }
 
     if (end_stream) {
@@ -1305,6 +1308,8 @@ envoy::config::core::v3::Metadata Filter::shadowDynamicMetadata() const {
 
   // Precedence matches the main request path in metadataMatchCriteria(): connection metadata is
   // applied first and then the request metadata is merged on top so request-level values win.
+  // Unlike metadataMatchCriteria(), which can reference the source metadata by OptRef, this builds
+  // a standalone proto to forward to the shadow stream, so the values must be copied here.
   const auto* downstream_conn = downstreamConnection();
   if (downstream_conn != nullptr) {
     const auto& connection_fm = downstream_conn->streamInfo().dynamicMetadata().filter_metadata();
