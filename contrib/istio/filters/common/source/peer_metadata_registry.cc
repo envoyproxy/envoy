@@ -60,10 +60,8 @@ private:
 
 SINGLETON_MANAGER_REGISTRATION(peer_metadata_registry);
 
-// Returns the process-wide registry, creating it on first use. This is only called by the filter
-// factories when the THREAD_LOCAL_REGISTRY exchange mode is configured; in the legacy
-// DATA_STREAM_PREAMBLE mode the factories pass a null registry to the filters instead, so no Envoy
-// thread-local slot is ever allocated.
+// Returns the process-wide registry, creating it on first use. The registry is pinned in the
+// singleton manager and allocates its Envoy thread-local slot on first creation.
 PeerMetadataRegistrySharedPtr getRegistry(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<PeerMetadataRegistry>(
       SINGLETON_MANAGER_REGISTERED_NAME(peer_metadata_registry),

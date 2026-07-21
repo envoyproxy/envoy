@@ -108,19 +108,25 @@ decodePeerMetadata(const std::string& serialized) {
   return *metadata;
 }
 
-// Readable parameter names for the exchange-mode-parameterized fixtures below.
-std::string modeName(const ::testing::TestParamInfo<MetadataExchangeMode>& info) {
-  return info.param == MetadataExchangeMode::THREAD_LOCAL_REGISTRY ? "ThreadLocalRegistry"
-                                                                   : "DataStreamPreamble";
+// Which hand-off path the parameterized fixtures exercise. With the mode field
+// removed, the path is selected at runtime by the presence (registry) or
+// absence (legacy data-stream preamble) of the downstream connection ID in
+// filter state.
+enum class ExchangePath { DataStreamPreamble, ThreadLocalRegistry };
+
+// Readable parameter names for the path-parameterized fixtures below.
+std::string modeName(const ::testing::TestParamInfo<ExchangePath>& info) {
+  return info.param == ExchangePath::ThreadLocalRegistry ? "ThreadLocalRegistry"
+                                                         : "DataStreamPreamble";
 }
 
-class PeerMetadataFilterTest : public ::testing::TestWithParam<MetadataExchangeMode> {
+class PeerMetadataFilterTest : public ::testing::TestWithParam<ExchangePath> {
 public:
-  // Builds a downstream Filter config for the mode under test.
+  // Builds a downstream Filter config. The exchange path is no longer selected
+  // by config; it is driven at runtime by connection-ID presence.
   Config makeConfig(absl::string_view baggage_key) {
     Config config;
     config.set_baggage_key(baggage_key);
-    config.set_mode(GetParam());
     return config;
   }
 
@@ -188,8 +194,16 @@ public:
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 
+  // Sets the downstream connection ID (registry key) only for the registry
+  // path; its absence selects the legacy data-stream preamble path.
+  void maybeSetConnectionId() {
+    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
+      setConnectionId(defaultConnectionId);
+    }
+  }
+
   std::optional<Istio::Common::WorkloadMetadataObject> propagatedPeerMetadata() {
-    if (GetParam() == MetadataExchangeMode::THREAD_LOCAL_REGISTRY) {
+    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
       const auto stored = registry_->getValue(defaultConnectionId);
       if (!stored.has_value()) {
         return std::nullopt;
@@ -259,7 +273,7 @@ TEST_P(PeerMetadataFilterTest, TestPeerMetadataDiscoveredAndPropagated) {
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
 
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
@@ -281,7 +295,7 @@ TEST_P(PeerMetadataFilterTest, TestNoFiltersStateFromTcpProxy) {
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
 
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
@@ -304,7 +318,7 @@ TEST_P(PeerMetadataFilterTest, TestNoBaggageHeaderFromTcpProxy) {
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
 
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
 
@@ -327,7 +341,7 @@ TEST_P(PeerMetadataFilterTest, TestDisablePeerDiscovery) {
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
 
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
   disablePeerDiscovery();
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
@@ -339,8 +353,8 @@ TEST_P(PeerMetadataFilterTest, TestDisablePeerDiscovery) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Modes, PeerMetadataFilterTest,
-                         ::testing::Values(MetadataExchangeMode::DATA_STREAM_PREAMBLE,
-                                           MetadataExchangeMode::THREAD_LOCAL_REGISTRY),
+                         ::testing::Values(ExchangePath::DataStreamPreamble,
+                                           ExchangePath::ThreadLocalRegistry),
                          modeName);
 
 std::shared_ptr<NiceMock<Upstream::MockHostDescription>>
@@ -359,7 +373,7 @@ std::shared_ptr<NiceMock<Upstream::MockHostDescription>> makeIpv4Host(absl::stri
   return host;
 }
 
-class PeerMetadataUpstreamFilterTest : public ::testing::TestWithParam<MetadataExchangeMode> {
+class PeerMetadataUpstreamFilterTest : public ::testing::TestWithParam<ExchangePath> {
 public:
   void initialize() {
     ON_CALL(callbacks_.connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
@@ -367,14 +381,14 @@ public:
 
     host_metadata_ = std::make_shared<::envoy::config::core::v3::Metadata>();
 
-    filter_ = std::make_unique<UpstreamFilter>(GetParam(), registry_);
+    filter_ = std::make_unique<UpstreamFilter>(registry_);
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
   void deliverPeerMetadata(Buffer::Instance& data, absl::string_view baggage,
                            absl::string_view identity) {
     const std::string serialized = encodePeerMetadata(baggage, identity);
-    if (GetParam() == MetadataExchangeMode::THREAD_LOCAL_REGISTRY) {
+    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
       registry_->setValue(defaultConnectionId, serialized);
       return;
     }
@@ -393,6 +407,14 @@ public:
         Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey,
         std::make_shared<Router::StringAccessorImpl>(id),
         StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  // Sets the downstream connection ID (registry key) only for the registry
+  // path; its absence selects the legacy data-stream preamble path.
+  void maybeSetConnectionId() {
+    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
+      setConnectionId(defaultConnectionId);
+    }
   }
 
   ::envoy::config::core::v3::Metadata& hostMetadata() { return *host_metadata_; }
@@ -442,7 +464,7 @@ public:
 TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
   initialize();
   setUpstreamHost(makeInternalListenerHost("connect_originate"));
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
 
   Buffer::OwnedImpl data;
   data.add("application data");
@@ -466,7 +488,7 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
 TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForUnknownInternalListeners) {
   initialize();
   setUpstreamHost(makeInternalListenerHost("not_connect_originate"));
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
   registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
@@ -484,7 +506,7 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForUnknownInte
 TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForExternalHosts) {
   initialize();
   setUpstreamHost(makeIpv4Host("192.168.0.1"));
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
   registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
@@ -508,7 +530,7 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
   (*fields)[FilterNames::get().DisableDiscoveryField].set_bool_value(true);
   (*hostMetadata().mutable_filter_metadata())[FilterNames::get().Name].MergeFrom(metadata);
 
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
   registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
@@ -532,7 +554,7 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
   (*fields2)[FilterNames::get().DisableDiscoveryField].set_bool_value(true);
   (*clusterMetadata().mutable_filter_metadata())[FilterNames::get().Name].MergeFrom(metadata2);
 
-  setConnectionId(defaultConnectionId);
+  maybeSetConnectionId();
   registry_->setValue(defaultConnectionId, encodePeerMetadata(defaultBaggage, defaultIdentity));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
@@ -548,8 +570,8 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
 }
 
 INSTANTIATE_TEST_SUITE_P(Modes, PeerMetadataUpstreamFilterTest,
-                         ::testing::Values(MetadataExchangeMode::DATA_STREAM_PREAMBLE,
-                                           MetadataExchangeMode::THREAD_LOCAL_REGISTRY),
+                         ::testing::Values(ExchangePath::DataStreamPreamble,
+                                           ExchangePath::ThreadLocalRegistry),
                          modeName);
 
 } // namespace

@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "envoy/runtime/runtime.h"
 #include "envoy/stream_info/uint64_accessor.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -49,6 +50,34 @@ bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
   return value.bool_value();
 }
 
+std::optional<std::string> getRegistryKey(const StreamInfo::FilterState& filter_state) {
+  const auto* connection_id = filter_state.getDataReadOnly<Router::StringAccessor>(
+      Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
+  if (connection_id == nullptr) {
+    return std::nullopt;
+  }
+  return std::string(connection_id->asString());
+}
+
+// Layered-runtime boolean key that, when true, disables the thread-local registry hand-off. The
+// registry allocates an Envoy thread-local slot, and Envoy's thread-local storage is backed by
+// process-static memory whose slots are indexed by a per-instance counter. Integration tests that
+// run multiple Envoy instances in a single process would therefore shift slot indices and corrupt
+// other extensions' thread-local data. Those tests use the legacy data-stream-preamble hand-off
+// (no downstream connection ID in filter state), so the registry is never needed and can be
+// disabled via this key (set through the bootstrap layered_runtime static layer).
+constexpr char DisableRegistryRuntimeKey[] = "envoy.contrib.peer_metadata.disable_tls_registry";
+
+// Returns the process-wide registry, or nullptr when disabled via the runtime key above so that no
+// Envoy thread-local slot is allocated.
+Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr
+maybeGetRegistry(Server::Configuration::ServerFactoryContext& context) {
+  if (context.runtime().snapshot().getBoolean(DisableRegistryRuntimeKey, false)) {
+    return nullptr;
+  }
+  return Filters::Common::PeerMetadataShared::getRegistry(context);
+}
+
 } // namespace
 
 const uint32_t PeerMetadataHeader::magic_number = 0xabcd1234;
@@ -83,9 +112,13 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& buffer, bool) {
     // for peer metadata anymore, if the upstream sent it, we'd have it by
     // now. So we can check if the peer metadata is available or not, and if
     // no peer metadata available, we can give up waiting for it.
+    ASSERT(read_callbacks_);
     std::optional<Envoy::Protobuf::Any> peer_metadata = discoverPeerMetadata();
-    if (config_.mode() == MetadataExchangeMode::DATA_STREAM_PREAMBLE) {
-      // Legacy: push the peer metadata (or an empty marker) into the data stream.
+    std::optional<std::string> registry_key =
+        getRegistryKey(*read_callbacks_->connection().streamInfo().filterState());
+    if (!registry_key) {
+      // Legacy fallback: push the peer metadata (or an empty marker) into the
+      // data stream.
       if (peer_metadata) {
         propagatePeerMetadata(*peer_metadata);
       } else {
@@ -93,7 +126,7 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& buffer, bool) {
       }
     } else if (peer_metadata) {
       // Default: hand off via the thread-local registry.
-      storeInRegistry(*peer_metadata);
+      storeInRegistry(*registry_key, *peer_metadata);
     }
     state_ = PeerMetadataState::PassThrough;
     break;
@@ -179,23 +212,13 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
   return wrapped;
 }
 
-void Filter::storeInRegistry(const Envoy::Protobuf::Any& peer_metadata) {
-  if (registry_ == nullptr || read_callbacks_ == nullptr) {
-    ENVOY_LOG(debug, "No instance for registry or callbacks");
-    return;
-  }
-  const auto* connection_id =
-      read_callbacks_->connection()
-          .streamInfo()
-          .filterState()
-          ->getDataReadOnly<Router::StringAccessor>(
-              Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
-  if (connection_id == nullptr) {
-    ENVOY_LOG(debug, "No upstream connection ID in filter state, cannot store in TLS registry");
+void Filter::storeInRegistry(absl::string_view key, const Envoy::Protobuf::Any& peer_metadata) {
+  if (registry_ == nullptr) {
+    ENVOY_LOG(debug, "No instance for registry");
     return;
   }
   std::string serialized = peer_metadata.SerializeAsString();
-  registry_->setValue(connection_id->asString(), serialized);
+  registry_->setValue(key, serialized);
 }
 
 void Filter::propagatePeerMetadata(const Envoy::Protobuf::Any& peer_metadata) {
@@ -230,26 +253,28 @@ void Filter::propagateNoPeerMetadata() {
 }
 
 UpstreamFilter::UpstreamFilter(
-    MetadataExchangeMode mode,
     Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry)
-    : mode_(mode), registry_(std::move(registry)) {}
+    : registry_(std::move(registry)) {}
 
 Network::FilterStatus UpstreamFilter::onData(Buffer::Instance& buffer, bool end_stream) {
   switch (state_) {
-  case PeerMetadataState::WaitingForData:
+  case PeerMetadataState::WaitingForData: {
     if (disableDiscovery()) {
       state_ = PeerMetadataState::PassThrough;
       break;
     }
-    if (mode_ == MetadataExchangeMode::DATA_STREAM_PREAMBLE) {
-      // Legacy: parse and strip the peer metadata preamble from the data stream.
+    std::optional<std::string> registry_key =
+        getRegistryKey(*callbacks_->connection().streamInfo().filterState());
+    if (!registry_key) {
+      // Legacy fallback: parse and strip the peer metadata preamble from the
+      // data stream.
       if (consumePeerMetadata(buffer, end_stream)) {
         state_ = PeerMetadataState::PassThrough;
       } else {
         // Waiting for more data to complete the preamble.
         return Network::FilterStatus::StopIteration;
       }
-    } else if (tryRegistryLookup()) {
+    } else if (tryRegistryLookup(*registry_key)) {
       state_ = PeerMetadataState::PassThrough;
     } else {
       ENVOY_LOG(trace, "No peer metadata available in registry");
@@ -257,6 +282,7 @@ Network::FilterStatus UpstreamFilter::onData(Buffer::Instance& buffer, bool end_
       state_ = PeerMetadataState::PassThrough;
     }
     break;
+  }
   default:
     break;
   }
@@ -315,28 +341,17 @@ bool UpstreamFilter::disableDiscovery() const {
   return false;
 }
 
-bool UpstreamFilter::tryRegistryLookup() {
-  if (registry_ == nullptr || callbacks_ == nullptr) {
+bool UpstreamFilter::tryRegistryLookup(absl::string_view key) {
+  if (registry_ == nullptr) {
     return false;
   }
-  // UpstreamFilter reads the downstream connection ID shared via transitive
-  // filter state and use it as the registry key, the listener-side Filter
-  // stores peer metadata under the same key.
-  const auto* connection_id =
-      callbacks_->connection().streamInfo().filterState()->getDataReadOnly<Router::StringAccessor>(
-          Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
-  if (connection_id == nullptr) {
-    ENVOY_LOG(debug, "No downstream connection ID in filter state");
-    return false;
-  }
-  absl::string_view conn_id = connection_id->asString();
-  auto value = registry_->getValue(conn_id);
+  auto value = registry_->getValue(key);
   if (!value.has_value()) {
-    ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", conn_id);
+    ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", key);
     return false;
   }
 
-  registry_->removeValue(conn_id);
+  registry_->removeValue(key);
 
   Envoy::Protobuf::Any any;
   if (!any.ParseFromString(*value)) {
@@ -478,12 +493,8 @@ ConfigFactory::ConfigFactory()
 absl::StatusOr<Network::FilterFactoryCb>
 ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
                                                  Server::Configuration::FactoryContext& context) {
-  // Only the thread-local registry mode allocates an Envoy TLS slot; the legacy
-  // data-stream mode needs no registry.
-  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry;
-  if (config.mode() == MetadataExchangeMode::THREAD_LOCAL_REGISTRY) {
-    registry = Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
-  }
+  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry =
+      maybeGetRegistry(context.serverFactoryContext());
   return [config, &context,
           registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
     const auto& local_info = context.serverFactoryContext().localInfo();
@@ -492,15 +503,11 @@ ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
 }
 
 Network::FilterFactoryCb UpstreamConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& config, Server::Configuration::UpstreamFactoryContext& context) {
-  const auto& typed_config = dynamic_cast<const UpstreamConfig&>(config);
-  const MetadataExchangeMode mode = typed_config.mode();
-  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry;
-  if (mode == MetadataExchangeMode::THREAD_LOCAL_REGISTRY) {
-    registry = Filters::Common::PeerMetadataShared::getRegistry(context.serverFactoryContext());
-  }
-  return [mode, registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<UpstreamFilter>(mode, registry));
+    const Protobuf::Message&, Server::Configuration::UpstreamFactoryContext& context) {
+  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry =
+      maybeGetRegistry(context.serverFactoryContext());
+  return [registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<UpstreamFilter>(registry));
   };
 }
 

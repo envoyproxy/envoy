@@ -18,6 +18,7 @@ envoy_cc_contrib_extension(
         "//envoy/local_info:local_info_interface",
         "//envoy/network:address_interface",
         "//envoy/network:filter_interface",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stream_info:uint64_accessor_interface",
         "//source/common/buffer:buffer_lib",
