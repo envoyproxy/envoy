@@ -6,8 +6,6 @@ import "envoy/type/v3/ratelimit_strategy.proto";
 
 import "google/protobuf/duration.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -16,7 +14,6 @@ option java_outer_classname = "RlqsProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/rate_limit_quota/v3;rate_limit_quotav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Rate Limit Quota Service (RLQS)]
 

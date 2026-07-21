@@ -37,7 +37,7 @@ using GrpcAsyncClient =
     Grpc::AsyncClient<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports,
                       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
 using RateLimitQuotaResponsePtr =
-    std::unique_ptr<envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
+    Grpc::ResponsePtr<envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
 
 // Callbacks to trigger when the main thread finishes executing a queued
 // operation. Primarily used for testing.

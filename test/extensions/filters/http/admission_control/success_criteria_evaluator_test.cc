@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/admission_control/admission_control.h"
 #include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -33,7 +34,7 @@ public:
       EXPECT_EQ(error_status_message.value(), evaluator_or.status().message());
       return;
     }
-    EXPECT_TRUE(evaluator_or.ok());
+    EXPECT_OK(evaluator_or);
     evaluator_ = std::move(evaluator_or.value());
   }
 

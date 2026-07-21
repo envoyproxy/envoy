@@ -884,7 +884,7 @@ typed_config:
   bool foundTestServer = false;
   bool foundTestCA = false;
   SSLContextPtr ctx = SSL_CTX_new(TLS_method());
-  ASSERT_TRUE(validator().addClientValidationContext(ctx.get(), false).ok());
+  ASSERT_OK(validator().addClientValidationContext(ctx.get(), false));
   for (const X509_NAME* name : SSL_CTX_get_client_CA_list(ctx.get())) {
     const int cn_index = X509_NAME_get_index_by_NID(name, NID_commonName, -1);
     EXPECT_TRUE(cn_index >= 0);
@@ -927,7 +927,7 @@ typed_config:
                        time_system));
 
   SSLContextPtr ctx = SSL_CTX_new(TLS_method());
-  ASSERT_TRUE(validator().addClientValidationContext(ctx.get(), false).ok());
+  ASSERT_OK(validator().addClientValidationContext(ctx.get(), false));
   // Depending on BoringSSL version, SSL_CTX_new may leave the list as nullptr or
   // as an empty stack; both satisfy the guarantee that no CA names are advertised.
   STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ctx.get());
@@ -956,7 +956,7 @@ typed_config:
                        time_system));
 
   SSLContextPtr ctx = SSL_CTX_new(TLS_method());
-  ASSERT_TRUE(validator().addClientValidationContext(ctx.get(), false).ok());
+  ASSERT_OK(validator().addClientValidationContext(ctx.get(), false));
   STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ctx.get());
   ASSERT_NE(ca_list, nullptr);
   EXPECT_GT(sk_X509_NAME_num(ca_list), 0);

@@ -15,7 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
 
-Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryHelper(
+absl::StatusOr<Http::FilterFactoryCb> HealthCheckFilterConfig::createFilterFactoryHelper(
     const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
     Stats::Scope& scope) {
@@ -30,7 +30,8 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryHelper(
   *header_match_data = Http::HeaderUtility::buildHeaderDataVector(proto_config.headers(), context);
 
   if (!pass_through_mode && cache_time_ms) {
-    throw EnvoyException("cache_time_ms must not be set when path_through_mode is disabled");
+    return absl::InvalidArgumentError(
+        "cache_time_ms must not be set when path_through_mode is disabled");
   }
 
   HealthCheckCacheManagerSharedPtr cache_manager;
@@ -44,7 +45,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryHelper(
     auto cluster_to_percentage = std::make_unique<ClusterMinHealthyPercentages>();
     for (const auto& item : proto_config.cluster_min_healthy_percentages()) {
       if (std::isnan(item.second.value())) {
-        throw EnvoyException(absl::StrCat(
+        return absl::InvalidArgumentError(absl::StrCat(
             "cluster_min_healthy_percentages contains a NaN value for cluster: ", item.first));
       }
       cluster_to_percentage->emplace(std::make_pair(item.first, item.second.value()));
@@ -61,7 +62,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryHelper(
   };
 }
 
-Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> HealthCheckFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   return createFilterFactoryHelper(proto_config, stats_prefix, context.serverFactoryContext(),
