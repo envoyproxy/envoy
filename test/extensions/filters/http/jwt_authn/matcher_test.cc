@@ -22,7 +22,9 @@ public:
   MatcherConstPtr createMatcher(const char* config) {
     RequirementRule rule;
     TestUtility::loadFromYaml(config, rule);
-    return Matcher::create(rule, context_);
+    auto matcher_or = Matcher::create(rule, context_);
+    EXPECT_TRUE(matcher_or.ok()) << matcher_or.status();
+    return std::move(matcher_or).value();
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -264,6 +266,9 @@ TEST_F(MatcherTest, TestMatchPathMatchPolicy) {
   MatcherConstPtr matcher = createMatcher(config);
   auto headers = TestRequestHeaderMapImpl{{":path", "/bar/test/foo"}};
   EXPECT_TRUE(matcher->matches(headers));
+
+  auto non_matching_headers = TestRequestHeaderMapImpl{{":path", "/bar/test/baz"}};
+  EXPECT_FALSE(matcher->matches(non_matching_headers));
 }
 
 TEST_F(MatcherTest, TestMatchPathMatchPolicyError) {

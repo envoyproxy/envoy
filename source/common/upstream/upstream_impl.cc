@@ -248,6 +248,23 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
   return cluster_options;
 }
 
+void appendBindAddressNoPortOption(UpstreamLocalAddress& upstream_local_address) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion")) {
+    return;
+  }
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    return;
+  }
+  if (upstream_local_address.address_ != nullptr &&
+      upstream_local_address.address_->ip() != nullptr &&
+      upstream_local_address.address_->ip()->port() == 0) {
+    ::Envoy::Network::Socket::appendOptions(
+        upstream_local_address.socket_options_,
+        ::Envoy::Network::SocketOptionFactory::buildBindAddressNoPort());
+  }
+}
+
 absl::StatusOr<std::vector<::Envoy::Upstream::UpstreamLocalAddress>>
 parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
                 const std::optional<std::string>& cluster_name,
@@ -271,7 +288,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
                                             base_socket_options);
     ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
                                             cluster_socket_options);
-
+    appendBindAddressNoPortOption(upstream_local_address);
     upstream_local_addresses.push_back(upstream_local_address);
 
     for (const auto& extra_source_address : bind_config->extra_source_addresses()) {
@@ -295,6 +312,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
         ::Envoy::Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
                                                 cluster_socket_options);
       }
+      appendBindAddressNoPortOption(extra_upstream_local_address);
       upstream_local_addresses.push_back(extra_upstream_local_address);
     }
 
@@ -310,6 +328,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
                                               base_socket_options);
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
                                               cluster_socket_options);
+      appendBindAddressNoPortOption(additional_upstream_local_address);
       upstream_local_addresses.push_back(additional_upstream_local_address);
     }
   } else {
