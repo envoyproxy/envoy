@@ -502,7 +502,6 @@ void EnvoyQuicClientStream::OnClose() {
   clearWatermarkBuffer();
 }
 
-
 void EnvoyQuicClientStream::OnCanWrite() {
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   quic::QuicSpdyClientStream::OnCanWrite();
