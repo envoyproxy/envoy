@@ -77,6 +77,11 @@ Network::Address::InstanceConstSharedPtr LogicalHost::address() const {
   return address_;
 }
 
+Network::Address::InstanceConstSharedPtr LogicalHost::orcaReportingAddress() const {
+  absl::MutexLock lock(address_lock_);
+  return address_;
+}
+
 Upstream::Host::CreateConnectionData LogicalHost::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
@@ -106,6 +111,26 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
   return HostImplBase::createConnection(
       dispatcher, cluster(), address, address_list_or_null, factory, options, effective_options,
       std::make_shared<RealHostDescription>(address, shared_from_this()));
+}
+
+Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    Network::UpstreamTransportSocketFactory& factory,
+    Network::Address::InstanceConstSharedPtr orca_address) const {
+  Network::Address::InstanceConstSharedPtr host_address;
+  SharedConstAddressVector address_list_or_null;
+  {
+    absl::MutexLock lock(address_lock_);
+    host_address = address_;
+    address_list_or_null = address_list_or_null_;
+  }
+  // The caller's options pass through unchanged; as with health checks,
+  // override_transport_socket_options_ is not consulted here.
+  return createOrcaConnection(
+      dispatcher, transport_socket_options, factory, orca_address, host_address,
+      address_list_or_null,
+      std::make_shared<RealHostDescription>(orca_address, shared_from_this()));
 }
 
 } // namespace Upstream

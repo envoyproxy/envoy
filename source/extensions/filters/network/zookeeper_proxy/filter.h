@@ -256,8 +256,13 @@ public:
                         const bool enable_per_opcode_decoder_error_metrics,
                         const bool enable_latency_threshold_metrics,
                         const std::chrono::milliseconds default_latency_threshold,
-                        const LatencyThresholdOverrideList& latency_threshold_overrides,
+                        const LatencyThresholdOverrideMap& latency_threshold_override_map,
                         Stats::Scope& scope);
+
+  // Parses the latency threshold overrides from the config into a map keyed by the opcode enum
+  // value defined in decoder.h. Returns an error status if an unknown opcode is present.
+  static absl::StatusOr<LatencyThresholdOverrideMap>
+  parseLatencyThresholdOverrides(const LatencyThresholdOverrideList& latency_threshold_overrides);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
@@ -338,9 +343,7 @@ private:
                                        {LatencyThresholdOverride::AddWatch, 106}});
   }
 
-  int32_t getOpCodeIndex(LatencyThresholdOverride_Opcode opcode);
-  LatencyThresholdOverrideMap
-  parseLatencyThresholdOverrides(const LatencyThresholdOverrideList& latency_threshold_overrides);
+  static absl::StatusOr<int32_t> getOpCodeIndex(LatencyThresholdOverride_Opcode opcode);
 
   const bool enable_latency_threshold_metrics_;
   const std::chrono::milliseconds default_latency_threshold_;
@@ -368,8 +371,8 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // ZooKeeperProxy::DecoderCallback
-  void onDecodeError(const absl::optional<OpCodes> opcode) override;
-  void onRequestBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
+  void onDecodeError(const std::optional<OpCodes> opcode) override;
+  void onRequestBytes(const std::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnect(bool readonly) override;
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
@@ -396,7 +399,7 @@ public:
   absl::Status onGetAllChildrenNumberRequest(const absl::StatusOr<std::string>& path,
                                              const OpCodes opcode) override;
   void onCloseRequest() override;
-  void onResponseBytes(const absl::optional<OpCodes> opcode, const uint64_t bytes) override;
+  void onResponseBytes(const std::optional<OpCodes> opcode, const uint64_t bytes) override;
   void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
                          const std::chrono::milliseconds latency) override;
   void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,

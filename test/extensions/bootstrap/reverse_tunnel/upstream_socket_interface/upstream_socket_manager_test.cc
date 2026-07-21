@@ -1,19 +1,28 @@
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
+#include "envoy/router/string_accessor.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/stream_info/uint64_accessor.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -50,11 +59,16 @@ protected:
     EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _))
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockFileEvent>>());
 
+    auto time_sys = std::make_unique<Event::SimulatedTimeSystem>();
+    time_sys->setMonotonicTime(std::chrono::milliseconds(1000));
+    dispatcher_.time_system_ = std::move(time_sys);
+
     // Create the socket manager with real extension.
     socket_manager_ = std::make_unique<UpstreamSocketManager>(dispatcher_, extension_.get());
   }
 
   void TearDown() override {
+    tls_registry_.reset();
     socket_manager_.reset();
     extension_.reset();
     socket_interface_.reset();
@@ -102,6 +116,12 @@ protected:
            socket_manager_->fd_to_socket_it_map_.end();
   }
   size_t getFDToSocketItMapSize() { return socket_manager_->fd_to_socket_it_map_.size(); }
+
+  bool verifyFDToStartTimeMap(int fd) {
+    return socket_manager_->fd_to_start_time_map_.find(fd) !=
+           socket_manager_->fd_to_start_time_map_.end();
+  }
+  size_t getFDToStartTimeMapSize() { return socket_manager_->fd_to_start_time_map_.size(); }
 
   uint32_t getNodeToActiveFdCount(const std::string& node_id) {
     auto it = socket_manager_->node_to_active_fd_count_.find(node_id);
@@ -197,6 +217,39 @@ protected:
     return (it != manager->node_to_conn_count_map_.end()) ? it->second : 0;
   }
 
+  // Wire up TLS so extension_->getLocalRegistry() returns a real registry,
+  // then swap in mock histograms for recording verification.
+  void setupTLSWithMockHistograms() {
+    tls_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    auto tls_slot = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
+    thread_local_.setDispatcher(&dispatcher_);
+    tls_slot->set([registry = tls_registry_](Event::Dispatcher&) { return registry; });
+    extension_->setTestOnlyTLSRegistry(std::move(tls_slot));
+
+    tls_registry_->cx_upgrade_time_ = &mock_cx_upgrade_time_;
+    tls_registry_->cx_idle_expire_time_ = &mock_cx_idle_expire_time_;
+  }
+
+  const Protobuf::Struct& lifecycleMetadata(const StreamInfo::StreamInfo& stream_info) const {
+    return stream_info.dynamicMetadata().filter_metadata().at(
+        std::string(kAccessLogMetadataNamespace));
+  }
+
+  std::string filterStateString(const StreamInfo::StreamInfo& stream_info,
+                                absl::string_view key) const {
+    const auto* accessor = stream_info.filterState().getDataReadOnly<Router::StringAccessor>(key);
+    return accessor != nullptr ? std::string(accessor->asString()) : "";
+  }
+
+  uint64_t filterStateUint64(const StreamInfo::StreamInfo& stream_info,
+                             absl::string_view key) const {
+    const auto* accessor =
+        stream_info.filterState().getDataReadOnly<StreamInfo::UInt64Accessor>(key);
+    return accessor != nullptr ? accessor->value() : 0;
+  }
+
+  OptRef<const MonotonicTime> findStartTime(int fd) { return socket_manager_->findStartTime(fd); }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -209,6 +262,10 @@ protected:
   std::unique_ptr<ReverseTunnelAcceptor> socket_interface_;
   std::unique_ptr<ReverseTunnelAcceptorExtension> extension_;
   std::unique_ptr<UpstreamSocketManager> socket_manager_;
+
+  std::shared_ptr<UpstreamSocketThreadLocal> tls_registry_;
+  NiceMock<Stats::MockHistogram> mock_cx_upgrade_time_;
+  NiceMock<Stats::MockHistogram> mock_cx_idle_expire_time_;
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
@@ -256,6 +313,124 @@ TEST_F(TestUpstreamSocketManager, AddConnectionSocketEmptyNodeId) {
 
   auto retrieved_socket = socket_manager_->getConnectionSocket(node_id);
   EXPECT_EQ(retrieved_socket, nullptr);
+}
+
+TEST_F(TestUpstreamSocketManager, SetupLogPreservesOriginalIdentifiersWithTenantIsolation) {
+  socket_manager_->setTenantIsolationEnabled(true);
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  const int fd = 123;
+  auto socket = createMockSocket(fd, "10.0.0.1:8080", "10.0.0.2:9090");
+
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(
+          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+            const auto& metadata = lifecycleMetadata(stream_info);
+            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+            EXPECT_EQ(metadata.fields().at("event").string_value(),
+                      std::string(kLifecycleEventTunnelSetup));
+            EXPECT_EQ(metadata.fields().at("node_id").string_value(), "node-a");
+            EXPECT_EQ(metadata.fields().at("cluster_id").string_value(), "cluster-a");
+            EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "tenant-a");
+            EXPECT_EQ(metadata.fields().at("socket_state").string_value(),
+                      std::string(kLifecycleSocketStateIdle));
+            EXPECT_EQ(metadata.fields().at("fd").number_value(), fd);
+            EXPECT_EQ(filterStateString(stream_info, kFilterStateNodeId), "node-a");
+            EXPECT_EQ(filterStateString(stream_info, kFilterStateClusterId), "cluster-a");
+            EXPECT_EQ(filterStateString(stream_info, kFilterStateTenantId), "tenant-a");
+            EXPECT_EQ(filterStateUint64(stream_info, kFilterStateFd), fd);
+          }))
+      .RetiresOnSaturation();
+
+  socket_manager_->addConnectionSocket("node-a", "cluster-a", std::move(socket),
+                                       std::chrono::seconds(30), false, "tenant-a");
+
+  EXPECT_EQ(getNodeToClusterMapping("tenant-a:node-a"), "tenant-a:cluster-a");
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, SyntheticLifecycleLogDoesNotSetConnectionId) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        // Connection ID should not be set on synthetic lifecycle logs — the FD is
+        // available in dynamic metadata instead, and FDs are not valid connection IDs
+        // because they can be recycled by the OS.
+        auto id = stream_info.downstreamAddressProvider().connectionID();
+        EXPECT_FALSE(id.has_value());
+      }));
+
+  auto socket = createMockSocket(42);
+  socket_manager_->addConnectionSocket("node-1", "cluster-1", std::move(socket),
+                                       std::chrono::seconds(30));
+
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, HandoffAndCloseLogsUseLifecycleMetadata) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  const int fd = 456;
+  auto socket = createMockSocket(fd, "10.0.0.1:8081", "10.0.0.2:9091");
+
+  testing::InSequence sequence;
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(
+          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+            const auto& metadata = lifecycleMetadata(stream_info);
+            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+            EXPECT_EQ(metadata.fields().at("event").string_value(),
+                      std::string(kLifecycleEventTunnelSetup));
+          }));
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(
+          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+            const auto& metadata = lifecycleMetadata(stream_info);
+            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamPoolReady);
+            EXPECT_EQ(metadata.fields().at("event").string_value(),
+                      std::string(kLifecycleEventSocketHandoff));
+            EXPECT_EQ(metadata.fields().at("handoff_kind").string_value(),
+                      std::string(kLifecycleHandoffKindPoolToUpstream));
+            EXPECT_EQ(metadata.fields().at("socket_state").string_value(),
+                      std::string(kLifecycleSocketStateHandedOff));
+          }));
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(
+          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+            const auto& metadata = lifecycleMetadata(stream_info);
+            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
+            EXPECT_EQ(metadata.fields().at("event").string_value(),
+                      std::string(kLifecycleEventTunnelClosed));
+            EXPECT_EQ(metadata.fields().at("close_reason").string_value(),
+                      StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
+            EXPECT_EQ(metadata.fields().at("socket_state").string_value(),
+                      std::string(kLifecycleSocketStateInUse));
+          }));
+
+  socket_manager_->addConnectionSocket("node-b", "cluster-b", std::move(socket),
+                                       std::chrono::seconds(30), false, "tenant-b");
+  auto handed_off_socket = socket_manager_->getConnectionSocket("node-b");
+  ASSERT_NE(handed_off_socket, nullptr);
+  socket_manager_->setCloseReason(fd, StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
+  socket_manager_->markSocketDead(fd);
+}
+
+TEST_F(TestUpstreamSocketManager, GetClusterForNode) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket),
+                                       std::chrono::seconds(30));
+
+  EXPECT_EQ(socket_manager_->getClusterForNode(node_id), cluster_id);
+  EXPECT_EQ(socket_manager_->getClusterForNode("unknown-node"), "");
 }
 
 TEST_F(TestUpstreamSocketManager, AddAndGetMultipleSocketsSameNode) {
@@ -671,7 +846,7 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseValidResponse) {
 
   const std::string ping_response = "RPING";
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce([&](Buffer::Instance& buffer, absl::optional<uint64_t>) -> Api::IoCallUint64Result {
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(ping_response);
         return Api::IoCallUint64Result{ping_response.size(), Api::IoError::none()};
       });
@@ -736,7 +911,7 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseInvalidData) {
 
   const std::string invalid_response = "INVALID_DATA";
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce([&](Buffer::Instance& buffer, absl::optional<uint64_t>) -> Api::IoCallUint64Result {
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
         buffer.add(invalid_response);
         return Api::IoCallUint64Result{invalid_response.size(), Api::IoError::none()};
       });
@@ -789,6 +964,51 @@ TEST_F(TestUpstreamSocketManager, NodeToActiveFdCountTracking) {
   // markSocketDead on last socket should remove the entry.
   socket_manager_->markSocketDead(789);
   EXPECT_EQ(getNodeToActiveFdCount(node_id), 0);
+}
+
+// Exercises the public canAcceptConnection() accessor: it admits while the live per-node socket
+// count is below the configured cap, rejects once the cap is reached, and follows add/death
+// transitions. A cap of 0 (the default) rejects everything, which is why the filter only consults
+// this when rate limiting is explicitly enabled.
+TEST_F(TestUpstreamSocketManager, CanAcceptConnection) {
+  const std::string node_id = "count-node";
+  const std::string cluster_id = "count-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Default cap of 0 rejects every node, even unknown ones.
+  EXPECT_FALSE(socket_manager_->canAcceptConnection("missing-node", ""));
+
+  socket_manager_->setMaxConnectionsPerNode(2);
+
+  // Unknown node is under the cap without inserting a map entry.
+  EXPECT_TRUE(socket_manager_->canAcceptConnection("missing-node", ""));
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, createMockSocket(201), ping_interval);
+  EXPECT_TRUE(socket_manager_->canAcceptConnection(node_id, "")); // 1 < 2
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, createMockSocket(202), ping_interval);
+  EXPECT_FALSE(socket_manager_->canAcceptConnection(node_id, "")); // 2 is not < 2
+
+  // Death of a socket frees capacity.
+  socket_manager_->markSocketDead(201);
+  EXPECT_TRUE(socket_manager_->canAcceptConnection(node_id, ""));
+
+  socket_manager_->markSocketDead(202);
+  EXPECT_TRUE(socket_manager_->canAcceptConnection(node_id, ""));
+}
+
+// With tenant isolation enabled the cap must be scoped per tenant, so the same node under a
+// different tenant is tracked independently.
+TEST_F(TestUpstreamSocketManager, CanAcceptConnectionWithTenantIsolation) {
+  socket_manager_->setTenantIsolationEnabled(true);
+  socket_manager_->setMaxConnectionsPerNode(1);
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket("node", "cluster", createMockSocket(301), ping_interval,
+                                       false, "tenant-a");
+
+  EXPECT_FALSE(socket_manager_->canAcceptConnection("node", "tenant-a")); // at cap for tenant-a
+  EXPECT_TRUE(socket_manager_->canAcceptConnection("node", "tenant-b"));  // independent tenant
 }
 
 TEST_F(TestUpstreamSocketManager, SendTimerCleanupOnGetConnectionSocket) {
@@ -1179,7 +1399,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
   auto* reporter_cfg = config_with_reporter.mutable_reporter_config();
   reporter_cfg->set_name(MOCK_REPORTER);
   Protobuf::StringValue noop_config;
-  reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
 
   NiceMock<MockReporterFactory> reporter_factory;
   Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
@@ -1530,6 +1750,299 @@ TEST_F(TestUpstreamSocketManagerRebalancing, MainThreadExcludedFromRebalancing) 
   // Verify connection count was incremented only on worker_0.
   EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 101);
   EXPECT_EQ(getNodeConnCount(main_socket_manager.get(), node_id), 0);
+}
+
+// --- Start-time map lifecycle tests ---
+
+TEST_F(TestUpstreamSocketManager, StartTimeMapPopulatedOnAdd) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+
+  EXPECT_TRUE(verifyFDToStartTimeMap(123));
+  EXPECT_EQ(getFDToStartTimeMapSize(), 1);
+}
+
+TEST_F(TestUpstreamSocketManager, StartTimeMapCleanedOnGetConnectionSocket) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  EXPECT_EQ(getFDToStartTimeMapSize(), 1);
+
+  auto retrieved = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_NE(retrieved, nullptr);
+  EXPECT_EQ(getFDToStartTimeMapSize(), 0);
+}
+
+TEST_F(TestUpstreamSocketManager, StartTimeMapCleanedOnMarkIdleSocketDead) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  EXPECT_EQ(getFDToStartTimeMapSize(), 1);
+
+  socket_manager_->markSocketDead(123);
+  EXPECT_EQ(getFDToStartTimeMapSize(), 0);
+}
+
+TEST_F(TestUpstreamSocketManager, StartTimeMapMultipleSocketsTrackedIndependently) {
+  auto socket1 = createMockSocket(100, "127.0.0.1:8080", "127.0.0.1:9090");
+  auto socket2 = createMockSocket(200, "127.0.0.1:8081", "127.0.0.1:9091");
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket("node1", "cluster1", std::move(socket1), ping_interval);
+  socket_manager_->addConnectionSocket("node2", "cluster2", std::move(socket2), ping_interval);
+
+  EXPECT_EQ(getFDToStartTimeMapSize(), 2);
+  EXPECT_TRUE(verifyFDToStartTimeMap(100));
+  EXPECT_TRUE(verifyFDToStartTimeMap(200));
+
+  socket_manager_->getConnectionSocket("node1");
+  EXPECT_EQ(getFDToStartTimeMapSize(), 1);
+  EXPECT_FALSE(verifyFDToStartTimeMap(100));
+  EXPECT_TRUE(verifyFDToStartTimeMap(200));
+}
+
+TEST_F(TestUpstreamSocketManager, UpgradeTimeHistogramRecordedOnGet) {
+  setupTLSWithMockHistograms();
+
+  auto socket = createMockSocket(123);
+  const std::chrono::seconds ping_interval(30);
+  socket_manager_->addConnectionSocket("node", "cluster", std::move(socket), ping_interval);
+
+  EXPECT_CALL(mock_cx_upgrade_time_, recordValue(_));
+  auto retrieved = socket_manager_->getConnectionSocket("node");
+  EXPECT_NE(retrieved, nullptr);
+}
+
+TEST_F(TestUpstreamSocketManager, IdleExpireTimeHistogramRecordedOnMarkDead) {
+  setupTLSWithMockHistograms();
+
+  auto socket = createMockSocket(123);
+  const std::chrono::seconds ping_interval(30);
+  socket_manager_->addConnectionSocket("node", "cluster", std::move(socket), ping_interval);
+
+  EXPECT_CALL(mock_cx_idle_expire_time_, recordValue(_));
+  socket_manager_->markSocketDead(123);
+}
+
+TEST_F(TestUpstreamSocketManager, SendPingEmitsIdlePingSentEvent) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Expect tunnel_setup on add.
+  EXPECT_CALL(*access_log, log(_, _)).Times(1).RetiresOnSaturation();
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  auto& sockets = getSocketsForNode(node_id);
+  auto* mock_io_handle =
+      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets.front()->ioHandle());
+
+  EXPECT_CALL(*mock_io_handle, write(_))
+      .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        uint64_t len = buffer.length();
+        buffer.drain(len);
+        return Api::IoCallUint64Result{len, Api::IoError::none()};
+      }));
+
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(
+          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+            const auto& metadata = lifecycleMetadata(stream_info);
+            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+            EXPECT_EQ(metadata.fields().at("event").string_value(),
+                      std::string(kLifecycleEventIdlePingSent));
+            EXPECT_EQ(metadata.fields().at("socket_state").string_value(),
+                      std::string(kLifecycleSocketStateIdle));
+          }));
+
+  socket_manager_->sendPingForConnection(123);
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, PingAckEmitsIdlePingAckEvent) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Expect tunnel_setup on add.
+  EXPECT_CALL(*access_log, log(_, _)).Times(1).RetiresOnSaturation();
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+
+  const std::string ping_response = "RPING";
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillOnce([&](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add(ping_response);
+        return Api::IoCallUint64Result{ping_response.size(), Api::IoError::none()};
+      });
+
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(
+          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+            const auto& metadata = lifecycleMetadata(stream_info);
+            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+            EXPECT_EQ(metadata.fields().at("event").string_value(),
+                      std::string(kLifecycleEventIdlePingAck));
+          }));
+
+  socket_manager_->onPingResponse(*mock_io_handle);
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, PingMissEmitsIdlePingMissEvent) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Expect tunnel_setup on add.
+  EXPECT_CALL(*access_log, log(_, _)).Times(1).RetiresOnSaturation();
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  // Default miss threshold is 3. First timeout should emit idle_ping_miss.
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(
+          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+            const auto& metadata = lifecycleMetadata(stream_info);
+            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+            EXPECT_EQ(metadata.fields().at("event").string_value(),
+                      std::string(kLifecycleEventIdlePingMiss));
+            EXPECT_EQ(metadata.fields().at("miss_count").string_value(), "1");
+          }));
+
+  socket_manager_->onPingTimeout(123);
+  EXPECT_TRUE(verifyFDToNodeMap(123)); // Should still be alive.
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, PingTimeoutEmitsIdlePingTimeoutEvent) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Expect tunnel_setup on add.
+  EXPECT_CALL(*access_log, log(_, _)).Times(1).RetiresOnSaturation();
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  // Miss twice (below threshold=3) -- expect idle_ping_miss events.
+  EXPECT_CALL(*access_log, log(_, _))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+            const auto& metadata = lifecycleMetadata(stream_info);
+            EXPECT_EQ(metadata.fields().at("event").string_value(),
+                      std::string(kLifecycleEventIdlePingMiss));
+          }))
+      .RetiresOnSaturation();
+  socket_manager_->onPingTimeout(123);
+  socket_manager_->onPingTimeout(123);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  // Third miss exceeds threshold -- expect idle_ping_timeout then tunnel_closed.
+  testing::InSequence seq;
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(metadata.fields().at("event").string_value(),
+                  std::string(kLifecycleEventIdlePingTimeout));
+        EXPECT_EQ(metadata.fields().at("miss_count").string_value(), "3");
+      }));
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(metadata.fields().at("event").string_value(),
+                  std::string(kLifecycleEventTunnelClosed));
+        EXPECT_EQ(metadata.fields().at("close_reason").string_value(),
+                  std::string(kLifecycleCloseReasonIdlePingTimeout));
+      }));
+
+  socket_manager_->onPingTimeout(123);
+  EXPECT_FALSE(verifyFDToNodeMap(123)); // Should be dead.
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, DestructorEmitsDeferredCloseLogs) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  const int fd = 555;
+  auto socket = createMockSocket(fd);
+
+  // Expect tunnel_setup on add, then socket_handoff on get.
+  EXPECT_CALL(*access_log, log(_, _)).Times(2).RetiresOnSaturation();
+  socket_manager_->addConnectionSocket("node-x", "cluster-x", std::move(socket),
+                                       std::chrono::seconds(30), false, "tenant-x");
+  auto handed_off = socket_manager_->getConnectionSocket("node-x");
+  ASSERT_NE(handed_off, nullptr);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  // Attach the lifecycle filter flag so markSocketDead defers the close log.
+  socket_manager_->markUpstreamLifecycleFilterAttached(fd);
+
+  // markSocketDead with empty close reason + filter attached = deferred.
+  // This should NOT emit the close log yet.
+  EXPECT_CALL(*access_log, log(_, _)).Times(0);
+  socket_manager_->markSocketDead(fd);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  // Destructor should emit the deferred tunnel_closed log.
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(metadata.fields().at("event").string_value(),
+                  std::string(kLifecycleEventTunnelClosed));
+        EXPECT_EQ(metadata.fields().at("close_reason").string_value(),
+                  std::string(kLifecycleCloseReasonExplicitClose));
+      }));
+
+  socket_manager_.reset(); // Triggers destructor.
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, FindStartTimeReturnsNulloptIfNotFound) {
+  EXPECT_EQ(findStartTime(123).has_value(), false);
+}
+
+TEST_F(TestUpstreamSocketManager, FindStartTimeReturnsValueIfFound) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  EXPECT_EQ(findStartTime(123).has_value(), true);
+  EXPECT_EQ(*findStartTime(123), MonotonicTime(std::chrono::milliseconds(1000)));
 }
 
 } // namespace ReverseConnection.

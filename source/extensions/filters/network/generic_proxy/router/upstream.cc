@@ -26,7 +26,7 @@ void SharedRequestManager::onConnectionClose(Network::ConnectionEvent event) {
 }
 
 void SharedRequestManager::onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                                             absl::optional<StartTime> start_time) {
+                                             std::optional<StartTime> start_time) {
 
   const uint64_t stream_id = header_frame->frameFlags().streamId();
   const bool end_stream = header_frame->frameFlags().endStream();
@@ -100,7 +100,7 @@ void UniqueRequestManager::onConnectionClose(Network::ConnectionEvent event) {
 }
 
 void UniqueRequestManager::onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                                             absl::optional<StartTime> start_time) {
+                                             std::optional<StartTime> start_time) {
   if (pending_request_ != nullptr) {
     auto cb = pending_request_;
 
@@ -330,7 +330,6 @@ GenericUpstreamSharedPtr ProdGenericUpstreamFactory::createGenericUpstream(
       bound_upstream = new_bound_upstream.get();
       downstream_conn.streamInfo().filterState()->setData(
           RouterFilterName, std::move(new_bound_upstream),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     return bound_upstream->shared_from_this();

@@ -15,7 +15,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
@@ -773,7 +773,7 @@ actions:
 
   setupTest(yaml);
 
-  EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::Return(std::nullopt));
 
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
 
@@ -1421,6 +1421,27 @@ filter_metadata:
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}}),
               testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, StaticRateLimitOverride) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: limited_fake_key
+limit:
+ rate_limit:
+   requests_per_unit: 42
+   unit: HOUR
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  auto descriptors =
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}});
+  descriptors[0].limit_ = {42, envoy::type::v3::RateLimitUnit::HOUR};
+  EXPECT_THAT(descriptors, testing::ContainerEq(descriptors_));
 }
 
 const std::string RequestHeaderMatchInputDescriptor = R"EOF(

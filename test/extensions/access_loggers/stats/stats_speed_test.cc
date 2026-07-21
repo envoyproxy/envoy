@@ -4,7 +4,7 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/extensions/access_loggers/stats/stats.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -26,10 +26,12 @@ public:
   void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                         Stats::Gauge::ImportMode import_mode, uint64_t value,
                         std::vector<Stats::StatNameDynamicStorage> tags_storage) {
-    if (value == 0)
+    if (value == 0) {
       return;
+    }
 
-    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
+    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name,
+                                                Stats::Scope::toTagSpan(tags),
                                                 logger_->scope().symbolTable());
     Stats::StatName joined_name = joiner.nameWithTags();
     auto it = inflight_gauges_.find(joined_name);
@@ -44,10 +46,12 @@ public:
 
   void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                            Stats::Gauge::ImportMode import_mode, uint64_t value) {
-    if (value == 0)
+    if (value == 0) {
       return;
+    }
 
-    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
+    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name,
+                                                Stats::Scope::toTagSpan(tags),
                                                 logger_->scope().symbolTable());
     Stats::StatName joined_name = joiner.nameWithTags();
     auto it = inflight_gauges_.find(joined_name);
@@ -152,24 +156,24 @@ static void runBenchmark(benchmark::State& state, SharedBencherSetup& setup, T& 
 }
 
 // --- Reality Benchmark ---
-static void BM_AccessLogState(benchmark::State& state) {
+static void bmAccessLogState(benchmark::State& state) {
   SharedBencherSetup setup;
   auto access_log_state = std::make_shared<AccessLogState>(setup.logger_);
   runBenchmark(state, setup, *access_log_state);
 }
-BENCHMARK(BM_AccessLogState)
+BENCHMARK(bmAccessLogState)
     ->Args({/*tag_count=*/3, /*length_selector=*/0})
     ->Args({/*tag_count=*/10, /*length_selector=*/0})
     ->Args({/*tag_count=*/3, /*length_selector=*/1})
     ->Args({/*tag_count=*/10, /*length_selector=*/1});
 
 // --- Joiner Benchmark ---
-static void BM_AccessLogStateUsingJoiner(benchmark::State& state) {
+static void bmAccessLogStateUsingJoiner(benchmark::State& state) {
   SharedBencherSetup setup;
   AccessLogStateUsingJoiner access_log_state(setup.logger_);
   runBenchmark(state, setup, access_log_state);
 }
-BENCHMARK(BM_AccessLogStateUsingJoiner)
+BENCHMARK(bmAccessLogStateUsingJoiner)
     ->Args({/*tag_count=*/3, /*length_selector=*/0})
     ->Args({/*tag_count=*/10, /*length_selector=*/0})
     ->Args({/*tag_count=*/3, /*length_selector=*/1})

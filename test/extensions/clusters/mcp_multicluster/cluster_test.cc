@@ -8,7 +8,6 @@
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -83,9 +82,9 @@ cluster_type:
 
   EXPECT_TRUE(metadata.typed_filter_metadata().contains("envoy.clusters.mcp_multicluster"));
   envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig mcp_multicluster_config;
-  metadata.typed_filter_metadata()
-      .at("envoy.clusters.mcp_multicluster")
-      .UnpackTo(&mcp_multicluster_config);
+  std::ignore = metadata.typed_filter_metadata()
+                    .at("envoy.clusters.mcp_multicluster")
+                    .UnpackTo(&mcp_multicluster_config);
   EXPECT_EQ("primary", mcp_multicluster_config.servers()[0].name());
   EXPECT_EQ("secondary", mcp_multicluster_config.servers()[1].name());
   EXPECT_EQ(Upstream::Cluster::InitializePhase::Secondary, cluster_->initializePhase());

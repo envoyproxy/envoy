@@ -232,6 +232,34 @@ TEST_P(TcpProxyIntegrationTest, NoUpstream) {
   tcp_client->waitForDisconnect();
 }
 
+#if defined(__linux__)
+// Regression test: when the upstream connection cannot be created because binding to the
+// configured network namespace fails at connection time (the namespace file cannot be opened),
+// the TCP proxy closes the downstream connection gracefully instead of crashing on a null
+// connection.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionCreationFailure) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
+    source_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    source_address->set_port_value(0);
+    // The namespace file does not exist, so entering it at connection time fails and the
+    // dispatcher returns a null connection. validate_network_namespaces is intentionally not set,
+    // so the configuration is accepted and the failure happens at connection time.
+    source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  // The upstream connection cannot be created, so the pool surfaces a graceful connection failure
+  // (rather than crashing) and the TCP proxy exhausts its connect attempts. Assert on the cluster
+  // counter, which is only incremented when the failure is handled cleanly.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
+  tcp_client->close();
+}
+#endif
+
 TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
@@ -398,14 +426,14 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
         "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
         "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
         "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
     auto* runtime_filter = access_log->mutable_filter()->mutable_runtime_filter();
     runtime_filter->set_runtime_key("unused-key");
     auto* percent_sampled = runtime_filter->mutable_percent_sampled();
     percent_sampled->set_numerator(100);
     percent_sampled->set_denominator(envoy::type::v3::FractionalPercent::DenominatorType::
                                          FractionalPercent_DenominatorType_HUNDRED);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
 
@@ -453,6 +481,55 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        ip_port_regex, ip_regex)));
 }
 
+// Check that the COMMON_DURATION downstream and upstream connection time points are populated for
+// TCP connections, so each duration renders as a number instead of "-".
+TEST_P(TcpProxyIntegrationTest, AccessLogCommonDuration) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "ds_cx=%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)% "
+        "us_cx=%COMMON_DURATION(US_CX_BEG:US_CX_END:us)% "
+        "setup=%COMMON_DURATION(DS_CX_BEG:US_CX_BEG:us)%");
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
+  });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(fake_upstream_connection->write("hello"));
+  tcp_client->waitForData("hello");
+
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Guarantee client is done writing to the log.
+  test_server_.reset();
+  auto log_result = waitForAccessLog(access_log_path);
+
+  EXPECT_THAT(log_result, MatchesRegex(R"EOF(ds_cx=[0-9]+ us_cx=[0-9]+ setup=[0-9]+\r?.*)EOF"));
+}
+
 // Verifies that access log value for `UPSTREAM_TRANSPORT_FAILURE_REASON` matches the failure
 // message when there is an upstream transport failure.
 TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
@@ -476,8 +553,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_TRANSPORT_FAILURE_REASON%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   // Ensure we don't get an upstream connection.
@@ -522,11 +599,11 @@ TEST_P(TcpProxyIntegrationTest, AccessLogSessionIdleTimeout) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%DOWNSTREAM_LOCAL_CLOSE_REASON%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
   enableHalfClose(false);
   initialize();
@@ -560,8 +637,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_DETECTED_CLOSE_TYPE%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -607,8 +684,8 @@ TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_DETECTED_CLOSE_TYPE%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
   enableHalfClose(false);
   initialize();
@@ -652,11 +729,11 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamLocalCloseReasonIdleTimeout) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_LOCAL_CLOSE_REASON%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
   enableHalfClose(false);
   initialize();
@@ -693,8 +770,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%ACCESS_LOG_TYPE%-%UPSTREAM_CONNECTION_ID%\n");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -749,8 +826,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnStart) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%ACCESS_LOG_TYPE%\n");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -787,8 +864,8 @@ TEST_P(TcpProxyIntegrationTest, PeriodicAccessLog) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "ACCESS_LOG_TYPE=%ACCESS_LOG_TYPE%");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -938,7 +1015,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -959,8 +1036,9 @@ TEST_P(TcpProxyIntegrationTest, TestPerClientIdletimeout) {
       tcp_options.mutable_idle_timeout()->set_nanos(
           std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
               .count());
-      cluster_protocol_options["envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions"].PackFrom(
-          tcp_options);
+      std::ignore =
+          cluster_protocol_options["envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions"].PackFrom(
+              tcp_options);
 
       // two more connections which are going to be closed by the per-client idle timers
       cluster->mutable_preconnect_policy()->mutable_predictive_preconnect_ratio()->set_value(2);
@@ -1002,7 +1080,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -1034,7 +1112,7 @@ TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithNoData) {
     tcp_proxy_config.mutable_max_downstream_connection_duration()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -1057,7 +1135,7 @@ TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithLargeOuts
     tcp_proxy_config.mutable_max_downstream_connection_duration()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -1090,7 +1168,7 @@ TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithJitter) {
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
     tcp_proxy_config.mutable_max_downstream_connection_duration_jitter_percentage()->set_value(25);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -1242,8 +1320,8 @@ TEST_P(TcpProxyIntegrationTest, RecordsUpstreamConnectionTimeLatency) {
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("testaccesslog");
     test::integration::accesslog::FakeAccessLog access_log_config;
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -1300,11 +1378,11 @@ void TcpProxyMetadataMatchIntegrationTest::initialize() {
     auto* static_resources = bootstrap.mutable_static_resources();
 
     ASSERT(static_resources->listeners_size() == 1);
-    static_resources->mutable_listeners(0)
-        ->mutable_filter_chains(0)
-        ->mutable_filters(tcp_proxy_filter_index_)
-        ->mutable_typed_config()
-        ->PackFrom(tcp_proxy_);
+    std::ignore = static_resources->mutable_listeners(0)
+                      ->mutable_filter_chains(0)
+                      ->mutable_filters(tcp_proxy_filter_index_)
+                      ->mutable_typed_config()
+                      ->PackFrom(tcp_proxy_);
 
     ASSERT(static_resources->clusters_size() == 1);
     auto* cluster_0 = static_resources->mutable_clusters(0);
@@ -1684,9 +1762,9 @@ TEST_P(TcpProxySslIntegrationTest, SslConnectionDataEarlyReadNotCached) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "san=%DOWNSTREAM_PEER_URI_SAN% fingerprint=%DOWNSTREAM_PEER_FINGERPRINT_256%\n");
-    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
     tcp_proxy_config.mutable_access_log_options()->set_flush_access_log_on_connected(true);
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   setupConnections();
@@ -1704,6 +1782,29 @@ TEST_P(TcpProxySslIntegrationTest, SslConnectionDataEarlyReadNotCached) {
   EXPECT_EQ(log_result,
             "san=spiffe://lyft.com/frontend-team,http://frontend.lyft.com "
             "fingerprint=c07e14fc43b9c7b3d92f1004f91d3a9e071d9c93a58afc76b4c14303ae3a0f34");
+}
+
+// Test that Envoy does not crash when a downstream TLS connection is rejected
+// due to upstream circuit breaker max_connections overflow.
+TEST_P(TcpProxySslIntegrationTest, CircuitBreakerOverflowWithDownstreamTls) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* threshold = cluster->mutable_circuit_breakers()->add_thresholds();
+    threshold->mutable_max_connections()->set_value(1);
+  });
+
+  initialize();
+
+  // Connection 1: should succeed.
+  auto client1 = std::make_unique<ClientSslConnection>(*this);
+  client1->waitForUpstreamConnection();
+
+  // Connection 2: should be rejected by circuit breaker and NOT crash Envoy.
+  auto client2 = std::make_unique<ClientSslConnection>(*this);
+  client2->waitForDisconnect();
+
+  // Clean up.
+  client1->close();
 }
 
 // Test that a half-close on the downstream side is proxied correctly.
@@ -1927,7 +2028,6 @@ public:
     // the connection.
     read_callbacks_->connection().streamInfo().filterState()->setData(
         TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 
@@ -2018,8 +2118,9 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
 
   config_helper_.setBufferLimits(upstream_buffer_limit, downstream_buffer_limit);
   std::string data;
-  for (uint32_t i = 0; i < data_size / 4; i++)
+  for (uint32_t i = 0; i < data_size / 4; i++) {
     data += "abcd";
+  }
 
   initialize();
   FakeRawConnectionPtr fake_upstream_connection;
@@ -2194,13 +2295,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamData) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2239,13 +2340,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeEarlyDataWithHalfClose) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2281,13 +2382,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeMultipleConcurrent) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2340,13 +2441,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamDataNonTls) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2376,13 +2477,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeDownstreamCloseBeforeUpstream
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2406,13 +2507,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeNonTls) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2447,13 +2548,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2491,7 +2592,7 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
     tcp_proxy_config.mutable_max_early_data_bytes()->set_value(0);
 
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   setupConnections();
@@ -2514,7 +2615,7 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
     tcp_proxy_config.mutable_max_early_data_bytes()->set_value(16384);
 
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -2604,13 +2705,13 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeConnectionCloseDuringWait) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(65536);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2639,12 +2740,12 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeImmediate) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2673,14 +2774,14 @@ TEST_P(TcpProxyIntegrationTest, TlsHandshakeModeWithEarlyDataOrthogonality) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     // TLS_HANDSHAKE mode with early data buffering (orthogonal features).
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(4096);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2706,13 +2807,13 @@ TEST_P(TcpProxyIntegrationTest, SingleConnectionTriggerWithRapidDataChunks) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2747,14 +2848,14 @@ TEST_P(TcpProxyIntegrationTest, BufferOverflowStability) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     // Small buffer to trigger overflow.
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(100);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2783,13 +2884,13 @@ TEST_P(TcpProxyIntegrationTest, BidirectionalFlowAfterDelayedConnection) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2821,13 +2922,13 @@ TEST_P(TcpProxyIntegrationTest, NoDataDoesNotTriggerConnection) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2857,13 +2958,13 @@ TEST_P(TcpProxyIntegrationTest, ZeroBufferWithOnDownstreamData) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2912,13 +3013,13 @@ TEST_P(TcpProxyIntegrationTest, LargePayloadWithOnDownstreamData) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(65536);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2946,13 +3047,13 @@ TEST_P(TcpProxyIntegrationTest, ConnectionCloseBeforeDataInOnDownstreamData) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -2976,13 +3077,13 @@ TEST_P(TcpProxyIntegrationTest, MultipleConcurrentConnectionsWithOnDownstreamDat
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -3026,12 +3127,12 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedImmediatelyInImmediateMode) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -3049,13 +3150,13 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedAfterDataInOnDownstreamDataMode)
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(1024);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -3076,13 +3177,13 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithBufferedDataBeforeUpstreamRe
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
     tcp_proxy.mutable_max_early_data_bytes()->set_value(8192);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -3105,12 +3206,12 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithEndStreamNoData) {
     auto* filter = filter_chain->mutable_filters(0);
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-    filter->typed_config().UnpackTo(&tcp_proxy);
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
 
     // Set max_early_data_bytes to enable receive_before_connect behavior.
     tcp_proxy.mutable_max_early_data_bytes()->set_value(1024);
 
-    filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
 
   initialize();
@@ -3119,6 +3220,65 @@ TEST_P(TcpProxyIntegrationTest, DownstreamClosedWithEndStreamNoData) {
 
   // Close without sending data but with end_stream=true (FIN).
   tcp_client->close();
+}
+
+// Test route delayed route selection based on filter state
+TEST_P(TcpProxyIntegrationTest, DelayRouteSelectionWithSetFilterStateOnData) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tcp_proxy_delay_route_selection",
+                                    "true");
+  fake_upstreams_count_ = 2;
+  config_helper_.addNetworkFilter(R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_downstream_data:
+  - object_key: envoy.tcp_proxy.cluster
+    format_string:
+      text_format_source:
+        inline_string: "cluster_1"
+)EOF");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add cluster_1 configuration (cluster_0 already exists by default)
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    cluster->set_name("cluster_1");
+
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(1);
+
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+    std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
+
+    tcp_proxy.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(1024);
+
+    std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Wait to ensure no connection is established without data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(1000)));
+
+  // Now send actual data.
+  ASSERT_TRUE(tcp_client->write("data"));
+
+  // Connection should now be established.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(4));
+
+  tcp_client->close();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.route_delayed_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 }
 
 } // namespace Envoy

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
@@ -9,8 +10,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/status.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,8 +24,8 @@ public:
       : upstream_content_type_(std::move(upstream_content_type)),
         withhold_grpc_frames_(withhold_grpc_frames),
         response_size_header_(!response_size_header.empty()
-                                  ? absl::make_optional(Http::LowerCaseString(response_size_header))
-                                  : absl::nullopt) {}
+                                  ? std::make_optional(Http::LowerCaseString(response_size_header))
+                                  : std::nullopt) {}
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -44,7 +43,7 @@ private:
 
   const std::string upstream_content_type_;
   const bool withhold_grpc_frames_;
-  const absl::optional<Http::LowerCaseString> response_size_header_;
+  const std::optional<Http::LowerCaseString> response_size_header_;
 
   bool enabled_{};
   bool prefix_stripped_{};
@@ -52,6 +51,9 @@ private:
   // Tracking state for gRPC frame status when withholding gRPC frames from the
   // upstream and streaming responses.
   bool frame_header_added_{};
+  // Set when Content-Length from response headers is used to determine the
+  // response size for streaming (when response_size_header is not configured).
+  bool content_length_from_header_{};
   // The content length reported by the upstream.
   uint32_t response_message_length_{};
   // The actual size of the response returned by the upstream so far.

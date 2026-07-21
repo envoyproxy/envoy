@@ -23,6 +23,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -43,7 +44,8 @@ namespace {
 using ::Envoy::Extensions::HttpFilters::RateLimitQuota::FilterConfig;
 using envoy::service::rate_limit_quota::v3::BucketId;
 using envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
-using ::Envoy::StatusHelpers::StatusIs;
+using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using envoy::type::v3::RateLimitStrategy;
 using envoy::type::v3::TokenBucket;
 using Server::Configuration::MockFactoryContext;
@@ -155,7 +157,7 @@ public:
     // Asserts that the request matching succeeded.
     // OK status is expected to be returned even if the exact request matching
     // failed. It is because `on_no_match` field is configured.
-    ASSERT_TRUE(match_result.ok());
+    ASSERT_OK(match_result);
     // Retrieve the matched action.
     const RateLimitOnMatchAction* match_action =
         dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
@@ -165,7 +167,7 @@ public:
     auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
     // Asserts that the bucket id generation succeeded and then retrieve the
     // bucket ids.
-    ASSERT_TRUE(ret.ok());
+    ASSERT_OK(ret);
     auto bucket_ids = ret.value().bucket();
     auto serialized_bucket_ids =
         absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
@@ -198,9 +200,8 @@ TEST_F(FilterTest, EmptyMatcherConfig) {
   addMatcherConfig(MatcherConfigType::Empty);
   createFilter();
   auto match_result = filter_->requestMatching(default_headers_);
-  EXPECT_FALSE(match_result.ok());
-  EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(match_result.status().message(), "Matcher tree has not been initialized yet.");
+  EXPECT_THAT(match_result,
+              HasStatus(absl::StatusCode::kInternal, "Matcher tree has not been initialized yet."));
 }
 
 TEST_F(FilterTest, RequestMatchingSucceeded) {
@@ -229,9 +230,8 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   auto match = filter_->requestMatching(default_headers_);
   // Not_OK status is expected to be returned because the matching failed due to
   // mismatched inputs.
-  EXPECT_FALSE(match.ok());
-  EXPECT_THAT(match, StatusIs(absl::StatusCode::kNotFound));
-  EXPECT_EQ(match.status().message(), "Matching completed but no match result was found.");
+  EXPECT_THAT(match, HasStatus(absl::StatusCode::kNotFound,
+                               "Matching completed but no match result was found."));
 }
 
 TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
@@ -242,9 +242,8 @@ TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
   auto match = filter_->requestMatching(empty_header);
   // Not_OK status is expected to be returned because the matching failed due to
   // empty headers.
-  EXPECT_FALSE(match.ok());
-  EXPECT_EQ(match.status().message(),
-            "Unable to match due to the required data not being available.");
+  EXPECT_THAT(match,
+              HasStatusMessage("Unable to match due to the required data not being available."));
 }
 
 TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
@@ -252,9 +251,8 @@ TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
   createFilter(/*set_callback*/ false);
 
   auto match = filter_->requestMatching(default_headers_);
-  EXPECT_FALSE(match.ok());
-  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(match.status().message(), "Filter callback has not been initialized successfully yet.");
+  EXPECT_THAT(match, HasStatus(absl::StatusCode::kInternal,
+                               "Filter callback has not been initialized successfully yet."));
 }
 
 TEST_F(FilterTest, RequestMatchingWithOnNoMatch) {
@@ -282,7 +280,7 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   // Asserts that the request matching succeeded.
   // OK status is expected to be returned even if the exact request matching
   // failed. It is because `on_no_match` field is configured.
-  ASSERT_TRUE(match_result.ok());
+  ASSERT_OK(match_result);
   // Retrieve the matched action.
   const RateLimitOnMatchAction* match_action =
       dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
@@ -292,8 +290,7 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
   // Bucket id generation is expected to fail, which is due to no support for
   // dynamic id generation (i.e., via custom_value with for on_no_match case.
-  EXPECT_FALSE(ret.ok());
-  EXPECT_EQ(ret.status().message(), "Failed to generate the id from custom value config.");
+  EXPECT_THAT(ret, HasStatusMessage("Failed to generate the id from custom value config."));
 }
 
 TEST_F(FilterTest, DecodeHeaderWithInValidConfig) {
@@ -361,7 +358,7 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
     }
   )pb";
   google::api::expr::v1alpha1::CheckedExpr checked_expr;
-  Protobuf::TextFormat::ParseFromString(cel_expr_str, &checked_expr);
+  std::ignore = Protobuf::TextFormat::ParseFromString(cel_expr_str, &checked_expr);
 
   xds::type::matcher::v3::CelMatcher cel_matcher;
   cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
@@ -372,10 +369,11 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
 
   xds::type::matcher::v3::HttpAttributesCelMatchInput cel_match_input;
   single_predicate->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
-  single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
+  std::ignore =
+      single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
 
   auto* custom_matcher = single_predicate->mutable_custom_match();
-  custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
+  std::ignore = custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
 
   std::string on_match_str = R"pb(
     action {
@@ -409,7 +407,7 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
     }
   )pb";
   xds::type::matcher::v3::Matcher::OnMatch on_match;
-  Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
+  std::ignore = Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
   inner_matcher->mutable_on_match()->MergeFrom(on_match);
   config_.mutable_bucket_matchers()->MergeFrom(matcher);
   addMatcherConfig(matcher);
@@ -1022,7 +1020,7 @@ bucket_matchers:
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke(
           [](Http::Code, absl::string_view body_text, std::function<void(Http::ResponseHeaderMap&)>,
-             const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view) {
+             const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view) {
             EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::Unavailable);
             EXPECT_EQ(body_text, "Service temporarily unavailable");
           }));
@@ -1064,12 +1062,12 @@ TEST_F(FilterTest, DenyResponseDefaultBehavior) {
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
-  // Should use default behavior (absl::nullopt for gRPC status)
+  // Should use default behavior (std::nullopt for gRPC status)
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(
           Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
-                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    absl::string_view) { EXPECT_EQ(grpc_status, absl::nullopt); }));
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view) { EXPECT_EQ(grpc_status, std::nullopt); }));
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
@@ -1195,17 +1193,16 @@ matcher_list:
 
   // Expect sendLocalReply to be called with custom gRPC message in body_text parameter
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code, absl::string_view body,
-                          std::function<void(Http::ResponseHeaderMap&)>,
-                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                          absl::string_view details) {
-        // Check that the custom message is in the body_text parameter (for gRPC message)
-        EXPECT_EQ(body, "Custom rate limit message from test");
-        // Check that the gRPC status is RESOURCE_EXHAUSTED
-        EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
-        // Check that details contains our debug info
-        EXPECT_EQ(details, "rate_limited_by_quota");
-      }));
+      .WillOnce(Invoke(
+          [](Http::Code, absl::string_view body, std::function<void(Http::ResponseHeaderMap&)>,
+             const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+            // Check that the custom message is in the body_text parameter (for gRPC message)
+            EXPECT_EQ(body, "Custom rate limit message from test");
+            // Check that the gRPC status is RESOURCE_EXHAUSTED
+            EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
+            // Check that details contains our debug info
+            EXPECT_EQ(details, "rate_limited_by_quota");
+          }));
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(headers, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);

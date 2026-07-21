@@ -227,7 +227,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
-    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ratelimit", *dynamic_metadata);
+    callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), *dynamic_metadata);
   }
 
   switch (status) {
@@ -292,7 +292,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     } else {
       state_ = State::Responded;
       callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimitServiceError);
-      callbacks_->sendLocalReply(config_->statusOnError(), response_body, nullptr, absl::nullopt,
+      callbacks_->sendLocalReply(config_->statusOnError(), response_body, nullptr, std::nullopt,
                                  RcDetails::get().RateLimitError);
     }
   } else if (!initiating_call_) {

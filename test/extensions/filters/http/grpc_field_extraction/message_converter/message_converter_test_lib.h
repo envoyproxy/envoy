@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/stream_message.h"
 
 #include "test/proto/apikeys.pb.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,7 +26,7 @@ void checkSerializedData(Envoy::Buffer::Instance& data,
                          std::vector<MessageType> expected_requests) {
   ::Envoy::Grpc::Decoder grpc_decoder;
   std::vector<::Envoy::Grpc::Frame> frames_after_processing;
-  ASSERT_TRUE(grpc_decoder.decode(data, frames_after_processing).ok());
+  ASSERT_OK(grpc_decoder.decode(data, frames_after_processing));
 
   ASSERT_EQ(expected_requests.size(), frames_after_processing.size());
   for (unsigned long i = 0; i < frames_after_processing.size(); i++) {
@@ -40,16 +41,15 @@ void checkSerializedData(Envoy::Buffer::Instance& data,
 apikeys::CreateApiKeyRequest parseFromStreamMessage(StreamMessage& msg) {
   apikeys::CreateApiKeyRequest parsed_request;
   auto* c = dynamic_cast<Protobuf::field_extraction::CordMessageData*>(msg.message());
-  parsed_request.ParseFromCord(c->Cord());
+  std::ignore = parsed_request.ParseFromCord(c->Cord());
   return parsed_request;
 }
 
 // Serialize the request message into a pre-existing StreamMessage.
 // Serialization overwrites pre-existing date in the buffer.
 void serializeToStreamMessage(StreamMessage& msg, apikeys::CreateApiKeyRequest& request) {
-  apikeys::CreateApiKeyRequest parsed_request;
   auto* c = dynamic_cast<Protobuf::field_extraction::CordMessageData*>(msg.message());
-  request.SerializeToCord(&(c->Cord()));
+  std::ignore = request.SerializeToCord(&(c->Cord()));
 }
 } // namespace GrpcFieldExtraction
 } // namespace HttpFilters

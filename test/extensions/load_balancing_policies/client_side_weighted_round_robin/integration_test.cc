@@ -1,17 +1,23 @@
 #include <chrono>
 #include <cstdint>
+#include <functional>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/grpc/common.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 
 #include "test/integration/http_integration.h"
 
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
+#include "xds/data/orca/v3/orca_load_report.pb.h"
 
 using testing::Eq;
 using testing::Ge;
@@ -163,7 +169,7 @@ public:
     std::vector<uint64_t> initial_usage;
     sendRequestsAndTrackUpstreamUsage(50, initial_usage);
 
-    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+    ENVOY_LOG(trace, "initial_usage {}", absl::StrJoin(initial_usage, ","));
 
     // Wait longer than blackout period to ensure that client side weights are
     // applied.
@@ -173,7 +179,7 @@ public:
     // used proportionally to their weights.
     std::vector<uint64_t> weighted_usage;
     sendRequestsAndTrackUpstreamUsage(100, weighted_usage);
-    ENVOY_LOG(trace, "weighted_usage {}", weighted_usage);
+    ENVOY_LOG(trace, "weighted_usage {}", absl::StrJoin(weighted_usage, ","));
     EXPECT_LT(weighted_usage[0], weighted_usage[1]);
     EXPECT_LT(weighted_usage[1], weighted_usage[2]);
   }
@@ -189,6 +195,188 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(ClientSideWeightedRoundRobinIntegrationTest, NormalLoadBalancing) {
   initializeConfig();
   runNormalLoadBalancing();
+}
+
+// Minimal happy-path integration test for ORCA out-of-band (OOB) reporting.
+// Verifies that when `enable_oob_load_report=true` is set on a
+// `client_side_weighted_round_robin` cluster,
+// Envoy opens one OOB gRPC stream per upstream host targeting
+// /xds.service.orca.v3.OpenRcaService/StreamCoreMetrics, and that
+// server-pushed OrcaLoadReports are observed via the cluster-scoped
+// `lb_orca_oob.*` stats.
+class ClientSideWeightedRoundRobinOobIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  ClientSideWeightedRoundRobinOobIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    // OOB reports use gRPC, so upstream connections must speak HTTP/2.
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    setUpstreamCount(2);
+  }
+
+  void TearDown() override { cleanupOobStreams(); }
+
+  using ClientSideWeightedRoundRobinProto = envoy::extensions::load_balancing_policies::
+      client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
+
+  // customize_policy, when set, mutates the typed policy config after the base
+  // config is applied (e.g. to set oob_reporting_config). Runs inside the config
+  // modifier, after fake upstreams exist, so it can reference their ports.
+  void initializeConfig(
+      std::function<void(ClientSideWeightedRoundRobinProto&)> customize_policy = nullptr) {
+    config_helper_.addConfigModifier([customize_policy](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+      ASSERT(cluster_0->name() == "cluster_0");
+      auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+
+      constexpr absl::string_view endpoints_yaml = R"EOF(
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          )EOF";
+      const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
+      TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
+                                *endpoint);
+
+      auto* policy = cluster_0->mutable_load_balancing_policy();
+      std::string policy_yaml = R"EOF(
+          policies:
+          - typed_extension_config:
+              name: envoy.load_balancing_policies.client_side_weighted_round_robin
+              typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+                  enable_oob_load_report: true
+                  oob_reporting_period:
+                      seconds: 1
+                  blackout_period:
+                      seconds: 1
+                  weight_expiration_period:
+                      seconds: 180
+                  weight_update_period:
+                      seconds: 1)EOF";
+      TestUtility::loadFromYaml(policy_yaml, *policy);
+      if (customize_policy != nullptr) {
+        auto* typed_config =
+            policy->mutable_policies(0)->mutable_typed_extension_config()->mutable_typed_config();
+        auto cswrr = MessageUtil::anyConvert<ClientSideWeightedRoundRobinProto>(*typed_config);
+        customize_policy(cswrr);
+        std::ignore = typed_config->PackFrom(cswrr);
+      }
+    });
+    HttpIntegrationTest::initialize();
+  }
+
+  // Accept one OOB stream on the given upstream, record its :authority, and
+  // reply with one server-streamed OrcaLoadReport. The stream remains open (no
+  // trailers): the connection and stream are held for the lifetime of the test
+  // so Envoy continues to see an active OOB session.
+  void acceptOobStream(size_t upstream_index, double qps) {
+    FakeHttpConnectionPtr conn;
+    ASSERT_TRUE(fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_, conn));
+
+    FakeStreamPtr stream;
+    ASSERT_TRUE(conn->waitForNewStream(*dispatcher_, stream));
+    // Envoy ends the request half-stream after sending the single
+    // OrcaLoadReportRequest message.
+    ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+    oob_authorities_.push_back(std::string(stream->headers().getHostValue()));
+
+    // Send gRPC response headers; do NOT send trailers (server-streaming).
+    Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                                 {"content-type", "application/grpc"}};
+    stream->encodeHeaders(resp_headers, false);
+
+    xds::data::orca::v3::OrcaLoadReport report;
+    report.set_application_utilization(0.5);
+    report.set_rps_fractional(qps);
+    auto frame = Grpc::Common::serializeToGrpcFrame(report);
+    stream->encodeData(*frame, false);
+
+    stream_holder_.push_back(std::move(stream));
+    conn_holder_.push_back(std::move(conn));
+  }
+
+  // Accept one OOB stream per upstream and reply with one server-streamed
+  // OrcaLoadReport per stream.
+  void respondToOobStreams(double host0_qps, double host1_qps) {
+    acceptOobStream(0, host0_qps);
+    acceptOobStream(1, host1_qps);
+  }
+
+  void cleanupOobStreams() {
+    for (auto& conn : conn_holder_) {
+      if (conn != nullptr) {
+        AssertionResult result = conn->close();
+        RELEASE_ASSERT(result, result.message());
+        result = conn->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+      }
+    }
+    stream_holder_.clear();
+    conn_holder_.clear();
+  }
+
+  std::vector<FakeHttpConnectionPtr> conn_holder_;
+  std::vector<FakeStreamPtr> stream_holder_;
+  // :authority observed on each accepted OOB stream, in accept order.
+  std::vector<std::string> oob_authorities_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClientSideWeightedRoundRobinOobIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobReportsApplyWeights) {
+  initializeConfig();
+  // Envoy should open one OOB stream per upstream host. Drive each stream
+  // through to a single OrcaLoadReport.
+  respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
+
+  // Verify the OOB plumbing is alive and reporting.
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", Eq(2));
+}
+
+// oob_reporting_config.authority overrides :authority on every OOB stream.
+TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobAuthorityOverride) {
+  initializeConfig([](ClientSideWeightedRoundRobinProto& cswrr) {
+    cswrr.mutable_oob_reporting_config()->set_authority("orca.example.com");
+  });
+  respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
+
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
+  ASSERT_EQ(oob_authorities_.size(), 2);
+  EXPECT_EQ(oob_authorities_[0], "orca.example.com");
+  EXPECT_EQ(oob_authorities_[1], "orca.example.com");
+}
+
+// oob_reporting_config.port_value redirects OOB streams to an alternate port
+// (the reporting-sidecar case): the cluster's endpoints are upstreams 0 and 1,
+// but both hosts' OOB streams must arrive at upstream 2's port.
+TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobPortOverrideDialsAlternatePort) {
+  setUpstreamCount(3);
+  // Upstream 2 is the OOB target only; no cluster endpoint consumes its port.
+  config_helper_.skipPortUsageValidation();
+  initializeConfig([this](ClientSideWeightedRoundRobinProto& cswrr) {
+    cswrr.mutable_oob_reporting_config()->set_port_value(
+        fake_upstreams_[2]->localAddress()->ip()->port());
+  });
+  // Both hosts resolve to loopback, so with the port override both OOB
+  // streams land on upstream 2 as separate connections.
+  acceptOobStream(2, /*qps=*/100.0);
+  acceptOobStream(2, /*qps=*/1000.0);
+
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", Ge(2));
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", Eq(2));
 }
 
 // Tests to verify the behavior of load balancing policy when cluster is added,
@@ -333,7 +521,9 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.filters.http.router
+            - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP1
           route_config:
             name: route_config_0
@@ -697,7 +887,9 @@ public:
               "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
               stat_prefix: config_test
               http_filters:
-                name: envoy.filters.http.router
+                - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
               codec_type: HTTP1
               route_config:
                 name: route_config_0
@@ -749,14 +941,14 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, UpdateLocalityPriority) {
     // Send 100 requests to cluster1 so host weights are updated.
     std::vector<uint64_t> initial_usage;
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
-    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+    ENVOY_LOG(trace, "initial_usage {}", absl::StrJoin(initial_usage, ", "));
 
     test_server_->waitForCounter("cluster.cluster_1.membership_change", Eq(i * 2 + 1));
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 100, upstream_usage);
-    ENVOY_LOG(trace, "upstream_usage {}", upstream_usage);
+    ENVOY_LOG(trace, "upstream_usage {}", absl::StrJoin(upstream_usage, ", "));
     // Expect the usage of first locality to be non-zero.
     EXPECT_GT(upstream_usage[0], 0);
     EXPECT_GT(upstream_usage[1], 0);
@@ -798,14 +990,14 @@ TEST_P(ClientSideWeightedRoundRobinEdsIntegrationTest, AddRemoveLocality) {
     // Send 100 requests to cluster1 so host weights are updated.
     std::vector<uint64_t> initial_usage;
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 10, initial_usage);
-    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+    ENVOY_LOG(trace, "initial_usage {}", absl::StrJoin(initial_usage, ", "));
 
     test_server_->waitForCounter("cluster.cluster_1.membership_change", Eq(i + 1));
 
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;
     sendRequestsAndTrackUpstreamUsage(upstream_qps, 100, upstream_usage);
-    ENVOY_LOG(trace, "upstream_usage {}", upstream_usage);
+    ENVOY_LOG(trace, "upstream_usage {}", absl::StrJoin(upstream_usage, ", "));
     // Expect the usage of first locality to be non-zero.
     EXPECT_GT(upstream_usage[0], 0);
     EXPECT_GT(upstream_usage[1], 0);

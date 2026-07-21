@@ -6,6 +6,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 class MetadataControlFilter : public Http::PassThroughFilter {
@@ -27,7 +28,7 @@ public:
     if (metadata_map.contains("should_continue")) {
       return Http::FilterMetadataStatus::ContinueAll;
     } else if (metadata_map.contains("local_reply")) {
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "baaaad", nullptr, absl::nullopt,
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "baaaad", nullptr, std::nullopt,
                                          "reallybad");
       return Http::FilterMetadataStatus::StopIterationForLocalReply;
     }
@@ -46,7 +47,7 @@ public:
     if (metadata_map.contains("should_continue")) {
       return Http::FilterMetadataStatus::ContinueAll;
     } else if (metadata_map.contains("local_reply")) {
-      encoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "baaaad", nullptr, absl::nullopt,
+      encoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "baaaad", nullptr, std::nullopt,
                                          "reallybad");
       return Http::FilterMetadataStatus::StopIterationForLocalReply;
     }
@@ -55,11 +56,15 @@ public:
 };
 
 constexpr char MetadataControlFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<MetadataControlFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<MetadataControlFilter,
+                             test::integration::filters::MetadataControlFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<MetadataControlFilter>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<MetadataControlFilter,
+                             test::integration::filters::MetadataControlFilterConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 
 } // namespace Envoy

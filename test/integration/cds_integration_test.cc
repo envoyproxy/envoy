@@ -281,10 +281,8 @@ public:
     test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
   }
 
-  void sendRequestToClusterAndWaitForResponse() {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
-    ASSERT_TRUE(response->complete());
+  void sendRequestToClusterAndWaitForResponse(int upstream_index = UpstreamIndex1) {
+    testRouterHeaderOnlyRequestAndResponse(nullptr, upstream_index, "/cluster1");
     cleanupUpstreamAndDownstream();
   };
 
@@ -406,7 +404,8 @@ TEST_P(DeferredCreationClusterStatsTest,
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
 
   // cluster_1 traffic stats created, due to the above http request.
-  sendRequestToClusterAndWaitForResponse();
+  // updateCluster() configures cluster_1 to point to fake_upstreams_[UpstreamIndex2] port.
+  sendRequestToClusterAndWaitForResponse(UpstreamIndex2);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 }
@@ -434,7 +433,8 @@ TEST_P(DeferredCreationClusterStatsTest,
   updateCluster();
   test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(4));
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
-  sendRequestToClusterAndWaitForResponse();
+  // updateCluster() configures cluster_1 to point to fake_upstreams_[UpstreamIndex2] port.
+  sendRequestToClusterAndWaitForResponse(UpstreamIndex2);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 }
 

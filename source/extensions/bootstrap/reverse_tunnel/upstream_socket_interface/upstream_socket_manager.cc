@@ -18,6 +18,25 @@ namespace ReverseConnection {
 
 constexpr absl::string_view kMainThreadDispatcherName = "main_thread";
 
+namespace {
+
+std::string maybeBuildTenantScopedIdentifier(bool tenant_isolation_enabled,
+                                             absl::string_view tenant_id,
+                                             absl::string_view identifier) {
+  if (tenant_isolation_enabled && !tenant_id.empty()) {
+    return ReverseConnectionUtility::buildTenantScopedIdentifier(tenant_id, identifier);
+  }
+
+  return std::string(identifier);
+}
+
+AccessLog::AccessLogType closeAccessLogType(const ReverseTunnelLifecycleInfo& lifecycle) {
+  return lifecycle.handed_off_to_upstream ? AccessLog::AccessLogType::UpstreamEnd
+                                          : AccessLog::AccessLogType::TcpConnectionEnd;
+}
+
+} // namespace
+
 std::vector<UpstreamSocketManager*> UpstreamSocketManager::socket_managers_{};
 absl::Mutex UpstreamSocketManager::socket_manager_lock{};
 
@@ -84,28 +103,36 @@ UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
 void UpstreamSocketManager::handoffSocketToWorker(const std::string& node_id,
                                                   const std::string& cluster_id,
                                                   Network::ConnectionSocketPtr socket,
-                                                  const std::chrono::seconds& ping_interval) {
-  dispatcher_.post(
-      [this, node_id, cluster_id, ping_interval, socket = std::move(socket)]() mutable -> void {
-        this->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
-                                  true /* rebalanced */);
-      });
+                                                  const std::chrono::seconds& ping_interval,
+                                                  absl::string_view tenant_id) {
+  dispatcher_.post([this, node_id, cluster_id, ping_interval, tenant_id = std::string(tenant_id),
+                    socket = std::move(socket)]() mutable -> void {
+    this->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
+                              true /* rebalanced */, tenant_id);
+  });
 }
 
 void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
                                                 const std::string& cluster_id,
                                                 Network::ConnectionSocketPtr socket,
                                                 const std::chrono::seconds& ping_interval,
-                                                bool rebalanced) {
+                                                bool rebalanced, absl::string_view tenant_id) {
+  const std::string scoped_node_id =
+      maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, node_id);
+  const std::string scoped_cluster_id =
+      maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, cluster_id);
+
   // If not already rebalanced, check if we should move this socket to a different worker thread.
   if (!rebalanced) {
-    UpstreamSocketManager& target_manager = pickLeastLoadedSocketManager(node_id, cluster_id);
+    UpstreamSocketManager& target_manager =
+        pickLeastLoadedSocketManager(scoped_node_id, scoped_cluster_id);
     if (&target_manager != this) {
       ENVOY_LOG(debug,
                 "reverse_tunnel: Rebalancing socket to a different worker thread for node: "
                 "{} cluster: {}",
                 node_id, cluster_id);
-      target_manager.handoffSocketToWorker(node_id, cluster_id, std::move(socket), ping_interval);
+      target_manager.handoffSocketToWorker(node_id, cluster_id, std::move(socket), ping_interval,
+                                           tenant_id);
       return;
     }
   }
@@ -128,29 +155,46 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
             node_id, cluster_id);
 
   // Store node -> cluster mapping.
-  ENVOY_LOG(trace, "reverse_tunnel: adding mapping node {} -> cluster {}.", node_id, cluster_id);
-  if (node_to_cluster_map_.find(node_id) == node_to_cluster_map_.end()) {
-    node_to_cluster_map_[node_id] = cluster_id;
-    cluster_to_node_info_map_[cluster_id].nodes.push_back(node_id);
+  ENVOY_LOG(trace, "reverse_tunnel: adding mapping node {} -> cluster {}.", scoped_node_id,
+            scoped_cluster_id);
+  if (node_to_cluster_map_.find(scoped_node_id) == node_to_cluster_map_.end()) {
+    node_to_cluster_map_[scoped_node_id] = scoped_cluster_id;
+    cluster_to_node_info_map_[scoped_cluster_id].nodes.push_back(scoped_node_id);
   }
 
-  fd_to_node_map_[fd] = node_id;
-  fd_to_cluster_map_[fd] = cluster_id;
-  node_to_active_fd_count_[node_id]++;
+  fd_to_node_map_[fd] = scoped_node_id;
+  fd_to_cluster_map_[fd] = scoped_cluster_id;
+  fd_to_lifecycle_info_[fd] =
+      ReverseTunnelLifecycleInfo{node_id,
+                                 cluster_id,
+                                 std::string(tenant_id),
+                                 socket->connectionInfoProvider().localAddress(),
+                                 socket->connectionInfoProvider().remoteAddress(),
+                                 dispatcher_.name(),
+                                 fd,
+                                 false,
+                                 false,
+                                 false,
+                                 false,
+                                 ""};
+  node_to_active_fd_count_[scoped_node_id]++;
 
   // Create per-connection timeout timer for ping responses.
   fd_to_timer_map_[fd] = dispatcher_.createTimer([this, fd]() { onPingTimeout(fd); });
 
-  accepted_reverse_connections_[node_id].push_back(std::move(socket));
-  fd_to_socket_it_map_[fd] = std::prev(accepted_reverse_connections_[node_id].end());
-  Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[node_id].back();
+  accepted_reverse_connections_[scoped_node_id].push_back(std::move(socket));
+  fd_to_socket_it_map_[fd] = std::prev(accepted_reverse_connections_[scoped_node_id].end());
+  Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[scoped_node_id].back();
 
   // Update stats registry.
   if (auto extension = getUpstreamExtension()) {
-    extension->updateConnectionStats(node_id, cluster_id, true /* increment */,
+    extension->updateConnectionStats(scoped_node_id, scoped_cluster_id, true /* increment */,
                                      tenant_isolation_enabled_);
-    ENVOY_LOG(debug, "reverse_tunnel: updated stats registry for node '{}' cluster '{}'.", node_id,
-              cluster_id);
+    extension->emitSyntheticLifecycleLog(kLifecycleEventTunnelSetup, fd_to_lifecycle_info_[fd],
+                                         dispatcher_.timeSource(),
+                                         AccessLog::AccessLogType::TcpUpstreamConnected);
+    ENVOY_LOG(debug, "reverse_tunnel: updated stats registry for node '{}' cluster '{}'.",
+              scoped_node_id, scoped_cluster_id);
   }
 
   // onPingResponse() expects a ping reply on the socket.
@@ -174,8 +218,20 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   fd_to_ping_send_timer_map_[fd]->enableTimer(
       std::chrono::milliseconds(pingIntervalWithJitterMs()));
 
+  // Note the reverse connection start time.
+  fd_to_start_time_map_[fd] = dispatcher_.timeSource().monotonicTime();
+
   ENVOY_LOG(debug, "reverse_tunnel: added socket to maps. node: {} connection key: {} fd: {}.",
-            node_id, connectionKey, fd);
+            scoped_node_id, connectionKey, fd);
+}
+
+bool UpstreamSocketManager::canAcceptConnection(absl::string_view node_id,
+                                                absl::string_view tenant_id) const {
+  const std::string scoped_node_id =
+      maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, node_id);
+  auto it = node_to_active_fd_count_.find(scoped_node_id);
+  const uint32_t count = it == node_to_active_fd_count_.end() ? 0 : it->second;
+  return count < max_connections_per_node_;
 }
 
 Network::ConnectionSocketPtr
@@ -220,7 +276,25 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
   fd_to_ping_send_timer_map_.erase(fd);
+  fd_to_miss_count_.erase(fd);
   fd_to_socket_it_map_.erase(fd);
+
+  auto lifecycle_it = fd_to_lifecycle_info_.find(fd);
+  if (lifecycle_it != fd_to_lifecycle_info_.end()) {
+    lifecycle_it->second.handed_off_to_upstream = true;
+    if (auto extension = getUpstreamExtension()) {
+      extension->emitSyntheticLifecycleLog(
+          kLifecycleEventSocketHandoff, lifecycle_it->second, dispatcher_.timeSource(),
+          AccessLog::AccessLogType::UpstreamPoolReady, kLifecycleHandoffKindPoolToUpstream);
+    }
+  }
+
+  auto start_time = findStartTime(fd);
+  auto extension = getUpstreamExtension();
+  if (extension && start_time.has_value()) {
+    extension->updateUpgradeTime(*start_time, dispatcher_.timeSource().monotonicTime());
+  }
+  fd_to_start_time_map_.erase(fd);
 
   return socket;
 }
@@ -249,6 +323,62 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
   return key;
 }
 
+std::string UpstreamSocketManager::getClusterForNode(absl::string_view node_id) const {
+  const auto it = node_to_cluster_map_.find(node_id);
+  return it != node_to_cluster_map_.end() ? it->second : std::string();
+}
+
+const ReverseTunnelLifecycleInfo* UpstreamSocketManager::getLifecycleInfo(int fd) const {
+  auto it = fd_to_lifecycle_info_.find(fd);
+  return it != fd_to_lifecycle_info_.end() ? &it->second : nullptr;
+}
+
+void UpstreamSocketManager::setCloseReason(int fd, absl::string_view close_reason) {
+  auto it = fd_to_lifecycle_info_.find(fd);
+  if (it != fd_to_lifecycle_info_.end()) {
+    it->second.close_reason = std::string(close_reason);
+  }
+}
+
+void UpstreamSocketManager::markUpstreamLifecycleFilterAttached(int fd) {
+  auto it = fd_to_lifecycle_info_.find(fd);
+  if (it != fd_to_lifecycle_info_.end()) {
+    it->second.upstream_lifecycle_filter_attached = true;
+  }
+}
+
+void UpstreamSocketManager::maybeEmitDeferredCloseLog(int fd, absl::string_view close_reason) {
+  auto lifecycle_it = fd_to_lifecycle_info_.find(fd);
+  if (lifecycle_it == fd_to_lifecycle_info_.end()) {
+    return;
+  }
+
+  auto& lifecycle = lifecycle_it->second;
+  if (!close_reason.empty()) {
+    lifecycle.close_reason = std::string(close_reason);
+  }
+
+  if (!lifecycle.socket_dead_notified) {
+    return;
+  }
+
+  if (!lifecycle.close_log_emitted) {
+    if (lifecycle.close_reason.empty()) {
+      lifecycle.close_reason = std::string(kLifecycleCloseReasonExplicitClose);
+    }
+    if (auto* extension = getUpstreamExtension()) {
+      extension->emitSyntheticLifecycleLog(kLifecycleEventTunnelClosed, lifecycle,
+                                           dispatcher_.timeSource(), closeAccessLogType(lifecycle),
+                                           {}, lifecycle.close_reason);
+    }
+    lifecycle.close_log_emitted = true;
+  }
+
+  if (lifecycle.socket_dead_notified) {
+    fd_to_lifecycle_info_.erase(lifecycle_it);
+  }
+}
+
 bool UpstreamSocketManager::hasAnySocketsForNode(const std::string& node_id) {
   auto it = node_to_active_fd_count_.find(node_id);
   return it != node_to_active_fd_count_.end() && it->second > 0;
@@ -263,6 +393,17 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     return;
   }
   const std::string node_id = node_it->second;
+
+  ReverseTunnelLifecycleInfo lifecycle;
+  auto lifecycle_it = fd_to_lifecycle_info_.find(fd);
+  if (lifecycle_it != fd_to_lifecycle_info_.end()) {
+    lifecycle_it->second.socket_dead_notified = true;
+    lifecycle = lifecycle_it->second;
+  } else {
+    lifecycle.node_id = node_id;
+    lifecycle.worker = dispatcher_.name();
+    lifecycle.fd = fd;
+  }
 
   // Get cluster_id from fd_to_cluster_map_. We use the fd_to_cluster_map_ to get the cluster_id
   // and not the cluster_to_node_info_map_ because the node might have changed clusters before the
@@ -282,10 +423,14 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   }
   ENVOY_LOG(debug, "reverse_tunnel: found node '{}' cluster '{}' for fd: {}", node_id, cluster_id,
             fd);
+  if (lifecycle.cluster_id.empty()) {
+    lifecycle.cluster_id = cluster_id;
+  }
 
   // Remove FD from tracking maps before checking remaining sockets.
   fd_to_node_map_.erase(fd);
   fd_to_cluster_map_.erase(fd);
+  fd_to_miss_count_.erase(fd);
 
   // Decrement the active FD counter for the node.
   auto count_it = node_to_active_fd_count_.find(node_id);
@@ -309,6 +454,15 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     fd_to_event_map_.erase(fd);
     fd_to_timer_map_.erase(fd);
     fd_to_ping_send_timer_map_.erase(fd);
+
+    // Update the cx_idle_expire_time_ histogram with this info.
+    auto start_time = findStartTime(fd);
+    auto extension = getUpstreamExtension();
+    if (extension && start_time.has_value()) {
+      extension->updateIdleExpireTime(*start_time, dispatcher_.timeSource().monotonicTime());
+    }
+    fd_to_start_time_map_.erase(fd);
+
   } else {
     // FD not found in idle pool, this is a used socket.
     // The socket will be closed by the owning UpstreamReverseConnectionIOHandle.
@@ -316,12 +470,28 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
               node_id, cluster_id, fd);
   }
 
+  const bool defer_close_log = lifecycle.handed_off_to_upstream &&
+                               lifecycle.upstream_lifecycle_filter_attached &&
+                               !lifecycle.close_log_emitted && lifecycle.close_reason.empty();
+
   // Update Envoy's stats system.
   if (auto extension = getUpstreamExtension()) {
     extension->updateConnectionStats(node_id, cluster_id, false /* decrement */,
                                      tenant_isolation_enabled_);
     // Report the disconnection to the extension for further action.
     extension->reportDisconnection(node_id, cluster_id);
+    if (!defer_close_log && !lifecycle.close_log_emitted) {
+      if (lifecycle.close_reason.empty()) {
+        lifecycle.close_reason = std::string(kLifecycleCloseReasonExplicitClose);
+      }
+      extension->emitSyntheticLifecycleLog(kLifecycleEventTunnelClosed, lifecycle,
+                                           dispatcher_.timeSource(), closeAccessLogType(lifecycle),
+                                           {}, lifecycle.close_reason);
+      lifecycle.close_log_emitted = true;
+      if (lifecycle_it != fd_to_lifecycle_info_.end()) {
+        lifecycle_it->second.close_log_emitted = true;
+      }
+    }
 
     ENVOY_LOG(trace, "reverse_tunnel: decremented stats registry for node '{}' cluster '{}'.",
               node_id, cluster_id);
@@ -336,6 +506,11 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   } else {
     ENVOY_LOG(trace, "reverse_tunnel: node '{}' still has remaining sockets, keeping in maps.",
               node_id);
+  }
+
+  if (lifecycle_it != fd_to_lifecycle_info_.end() &&
+      (!defer_close_log || lifecycle_it->second.close_log_emitted)) {
+    fd_to_lifecycle_info_.erase(lifecycle_it);
   }
 }
 
@@ -384,10 +559,11 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   const auto ping_size =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::PING_MESSAGE
           .size();
-  Api::IoCallUint64Result result = io_handle.read(buffer, absl::make_optional(ping_size));
+  Api::IoCallUint64Result result = io_handle.read(buffer, std::make_optional(ping_size));
   if (!result.ok()) {
     ENVOY_LOG(debug, "reverse_tunnel: Read error on FD: {}: error - {}", fd,
               result.err_->getErrorDetails());
+    setCloseReason(fd, kLifecycleCloseReasonIdleReadError);
     markSocketDead(fd);
     return;
   }
@@ -396,6 +572,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   // peer in a graceful manner, unlike a connection refused, or a reset.
   if (result.return_value_ == 0) {
     ENVOY_LOG(debug, "reverse_tunnel: FD: {}: reverse connection closed", fd);
+    setCloseReason(fd, kLifecycleCloseReasonIdlePeerClose);
     markSocketDead(fd);
     return;
   }
@@ -418,6 +595,15 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   fd_to_timer_map_[fd]->disableTimer();
   // Reset miss counter on success.
   fd_to_miss_count_.erase(fd);
+
+  if (auto* ext = getUpstreamExtension()) {
+    auto lifecycle_it = fd_to_lifecycle_info_.find(fd);
+    if (lifecycle_it != fd_to_lifecycle_info_.end()) {
+      ext->emitSyntheticLifecycleLog(kLifecycleEventIdlePingAck, lifecycle_it->second,
+                                     dispatcher_.timeSource(),
+                                     AccessLog::AccessLogType::TcpUpstreamConnected);
+    }
+  }
 
   // Re-arm the per-connection send timer with jitter.
   rearmPingSendTimer(fd);
@@ -454,9 +640,19 @@ void UpstreamSocketManager::sendPingForConnection(int fd) {
                 result.return_value_, result.err_->getErrorDetails());
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
         ENVOY_LOG(error, "reverse_tunnel: node:{} FD:{}: failed to send ping", node_id, fd);
+        setCloseReason(fd, kLifecycleCloseReasonIdlePingWriteFailure);
         markSocketDead(fd);
         return;
       }
+    }
+  }
+
+  if (auto* ext = getUpstreamExtension()) {
+    auto lifecycle_it = fd_to_lifecycle_info_.find(fd);
+    if (lifecycle_it != fd_to_lifecycle_info_.end()) {
+      ext->emitSyntheticLifecycleLog(kLifecycleEventIdlePingSent, lifecycle_it->second,
+                                     dispatcher_.timeSource(),
+                                     AccessLog::AccessLogType::TcpUpstreamConnected);
     }
   }
 }
@@ -469,22 +665,38 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
   if (misses >= miss_threshold_) {
     ENVOY_LOG(debug, "reverse_tunnel: fd {} exceeded miss threshold {}; marking dead.", fd,
               miss_threshold_);
+    if (auto* ext = getUpstreamExtension()) {
+      auto lifecycle_it = fd_to_lifecycle_info_.find(fd);
+      if (lifecycle_it != fd_to_lifecycle_info_.end()) {
+        ext->emitSyntheticLifecycleLog(kLifecycleEventIdlePingTimeout, lifecycle_it->second,
+                                       dispatcher_.timeSource(),
+                                       AccessLog::AccessLogType::TcpUpstreamConnected, {}, {},
+                                       {{"miss_count", std::to_string(misses)}});
+      }
+    }
     fd_to_miss_count_.erase(fd);
+    setCloseReason(fd, kLifecycleCloseReasonIdlePingTimeout);
     markSocketDead(fd);
   } else {
     // Below threshold: re-arm send timer for the next ping cycle.
+    if (auto* ext = getUpstreamExtension()) {
+      auto lifecycle_it = fd_to_lifecycle_info_.find(fd);
+      if (lifecycle_it != fd_to_lifecycle_info_.end()) {
+        ext->emitSyntheticLifecycleLog(kLifecycleEventIdlePingMiss, lifecycle_it->second,
+                                       dispatcher_.timeSource(),
+                                       AccessLog::AccessLogType::TcpUpstreamConnected, {}, {},
+                                       {{"miss_count", std::to_string(misses)}});
+      }
+    }
     rearmPingSendTimer(fd);
   }
 }
 
 uint64_t UpstreamSocketManager::pingIntervalWithJitterMs() {
-  uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  // 15% upward jitter, matching the HTTP/2 keepalive pattern.
   constexpr uint64_t jitter_percent = 15;
-  uint64_t jitter_mod = jitter_percent * interval_ms / 100;
-  if (jitter_mod > 0) {
-    interval_ms += random_generator_->random() % jitter_mod;
-  }
-  return interval_ms;
+  const uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  return ReverseConnectionUtility::addJitter(interval_ms, jitter_percent, *random_generator_);
 }
 
 void UpstreamSocketManager::rearmPingSendTimer(int fd) {
@@ -516,6 +728,27 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   }
   fd_to_ping_send_timer_map_.clear();
 
+  // Emit any deferred close logs before tearing down. If a lifecycle filter never reported
+  // a close reason (e.g., connection destroyed without firing callbacks), we emit the
+  // tunnel_closed log here with a fallback reason to avoid permanently losing the entry.
+  if (extension_ != nullptr) {
+    for (auto& [fd, lifecycle] : fd_to_lifecycle_info_) {
+      if (!lifecycle.close_log_emitted) {
+        if (lifecycle.close_reason.empty()) {
+          lifecycle.close_reason = std::string(kLifecycleCloseReasonExplicitClose);
+        }
+        extension_->emitSyntheticLifecycleLog(
+            kLifecycleEventTunnelClosed, lifecycle, dispatcher_.timeSource(),
+            closeAccessLogType(lifecycle), {}, lifecycle.close_reason);
+        lifecycle.close_log_emitted = true;
+      }
+    }
+  }
+
+  // Null out extension before cleanup to avoid calling into a potentially-destroyed
+  // ReverseTunnelAcceptorExtension during TLS teardown.
+  extension_ = nullptr;
+
   // Now mark all sockets as dead.
   std::vector<int> fds_to_cleanup;
   for (const auto& [fd, node_id] : fd_to_node_map_) {
@@ -530,6 +763,7 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   // Clear any remaining fd mappings.
   fd_to_node_map_.clear();
   fd_to_cluster_map_.clear();
+  fd_to_lifecycle_info_.clear();
   fd_to_socket_it_map_.clear();
 
   // Remove this instance from the global socket managers list.
@@ -538,6 +772,16 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   if (it != socket_managers_.end()) {
     socket_managers_.erase(it);
   }
+}
+
+OptRef<const MonotonicTime> UpstreamSocketManager::findStartTime(int fd) const {
+  auto it = fd_to_start_time_map_.find(fd);
+  if (it == fd_to_start_time_map_.end()) {
+    ENVOY_LOG(error, "reverse_tunnel: findStartTime: fd {} not found in fd_to_start_time_map_.",
+              fd);
+    return {};
+  }
+  return it->second;
 }
 
 } // namespace ReverseConnection.

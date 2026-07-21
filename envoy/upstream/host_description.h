@@ -45,7 +45,8 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_total)                                                                                \
   GAUGE(cx_active)                                                                                 \
-  GAUGE(rq_active)
+  GAUGE(rq_active)                                                                                 \
+  GAUGE(rq_pending_active)
 
 /**
  * All per host stats defined. @see stats_macros.h
@@ -208,6 +209,15 @@ public:
   virtual const std::string& hostname() const PURE;
 
   /**
+   * @return the observability name associated with the host. Used in per-endpoint stats and other
+   * observability surfaces. This is configured with
+   * :ref:`stat_name <envoy_v3_api_field_config.endpoint.v3.Endpoint.stat_name>`. If this method
+   * returns an empty string view, then the host's address should be used as fallback for the
+   * observability name.
+   */
+  virtual absl::string_view observabilityName() const PURE;
+
+  /**
    * @return the transport socket factory responsible for this host.
    */
   virtual Network::UpstreamTransportSocketFactory& transportSocketFactory() const PURE;
@@ -264,6 +274,12 @@ public:
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
 
   /**
+   * @return the address used to dial ORCA out-of-band load reporting streams
+   *         (xds.service.orca.v3.OpenRcaService).
+   */
+  virtual Network::Address::InstanceConstSharedPtr orcaReportingAddress() const PURE;
+
+  /**
    * @return the priority of the host.
    */
   virtual uint32_t priority() const PURE;
@@ -277,7 +293,7 @@ public:
    * @return timestamp of when host has transitioned from unhealthy to
    *         healthy state via an active healthchecking.
    */
-  virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
+  virtual std::optional<MonotonicTime> lastHcPassTime() const PURE;
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an

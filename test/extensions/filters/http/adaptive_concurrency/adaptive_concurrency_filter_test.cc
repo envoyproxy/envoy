@@ -134,7 +134,7 @@ enabled:
   runtime_key: "adaptive_concurrency.enabled"
 )EOF";
 
-  EXPECT_THROW(auto config = makeConfig(yaml_config), ProtoValidationException);
+  EXPECT_THROW(makeConfig(yaml_config), ProtoValidationException);
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, TestNanosValidationPass) {

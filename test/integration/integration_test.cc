@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/cpu_affinity.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/socket_option_factory.h"
@@ -171,6 +172,53 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   codec_client_->close();
   codec_client2->close();
   check_listener_stats(0, 1);
+}
+
+// Verify that Envoy starts and serves traffic with worker CPU affinity enabled. On Linux this pins
+// each worker thread to a CPU, on other platforms it is a no-op.
+TEST_P(IntegrationTest, WorkerCpuAffinity) {
+  concurrency_ = 2;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.set_enable_worker_cpu_affinity(true);
+  });
+  initialize();
+
+  // Worker pinning happens during startup, so the gauge reflects the per-worker CPU assignment
+  // derived from the same process affinity mask observed here.
+  const uint64_t expected_pinned_workers = Thread::workerCpuAssignment(concurrency_).size();
+  test_server_->waitForGauge("listener_manager.workers_pinned", Eq(expected_pinned_workers));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  codec_client_->close();
+}
+
+// Verify that a listener configured with the CPU locality connection balancer and worker CPU
+// affinity starts and serves traffic. On kernels that support reuse port BPF steering this
+// exercises the BPF fast path, otherwise the kernel distributes connections with its default
+// reuse port hashing.
+TEST_P(IntegrationTest, CpuLocalityConnectionBalancer) {
+  concurrency_ = 2;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.set_enable_worker_cpu_affinity(true);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_connection_balance_config()->mutable_cpu_locality_balance();
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  codec_client_->close();
 }
 
 class TestConnectionBalanceFactory : public Network::ConnectionBalanceFactory {
@@ -548,7 +596,12 @@ TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestBeforeHeaders) {
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
-  config_helper_.prependFilter("{ name: buffer-continue-filter }", false);
+  config_helper_.prependFilter(R"EOF(
+    name: buffer-continue-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.BufferContinueFilterConfig
+  )EOF",
+                               false);
   testRouterRetryOnResetBeforeRequestBeforeHeaders();
 }
 
@@ -1822,7 +1875,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1854,7 +1911,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: encoder-decoder-buffer-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+  )EOF");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1887,7 +1948,11 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
 
 // Test that if the route cache is cleared, it doesn't cause problems.
 TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
-  config_helper_.prependFilter("{ name: clear-route-cache }");
+  config_helper_.prependFilter(R"EOF(
+    name: clear-route-cache
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ClearRouteCacheFilterConfig
+  )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
@@ -1924,7 +1989,11 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectHealthy) {
-  config_helper_.prependFilter("{ name: process-context-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: process-context-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ProcessContextFilterConfig
+  )EOF");
 
   ProcessObjectForFilter healthy_object(true);
   process_object_ = healthy_object;
@@ -1944,7 +2013,11 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectUnealthy) {
-  config_helper_.prependFilter("{ name: process-context-filter }");
+  config_helper_.prependFilter(R"EOF(
+    name: process-context-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.ProcessContextFilterConfig
+  )EOF");
 
   ProcessObjectForFilter unhealthy_object(false);
   process_object_ = unhealthy_object;

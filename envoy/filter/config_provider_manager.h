@@ -1,12 +1,12 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/dynamic_extension_config_provider.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Filter {

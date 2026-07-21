@@ -379,15 +379,21 @@ ContextImpl::ContextImpl(
       if (!fips_mode) {
         ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
       }
-      for (auto& tls_context : tls_contexts_) {
-        int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
-                                               ssl_compliance_policy_fips_202205);
-        if (rc != 1) {
-          creation_status = absl::InvalidArgumentError(
-              absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
-                           Utility::getLastCryptoError().value_or("")));
-          return;
-        }
+      creation_status = setCompliancePolicy(ssl_compliance_policy_fips_202205);
+      if (!creation_status.ok()) {
+        return;
+      }
+      break;
+    case ProtoPolicy::CNSA2_202603:
+      creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa2_202603);
+      if (!creation_status.ok()) {
+        return;
+      }
+      break;
+    case ProtoPolicy::CNSA1_202603:
+      creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa1_202603);
+      if (!creation_status.ok()) {
+        return;
       }
       break;
     default:
@@ -397,6 +403,18 @@ ContextImpl::ContextImpl(
   }
 }
 
+absl::Status ContextImpl::setCompliancePolicy(enum ssl_compliance_policy_t policy) {
+  for (auto& tls_context : tls_contexts_) {
+    int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(), policy);
+    if (rc != 1) {
+      return absl::InvalidArgumentError(absl::StrCat("Failed to apply compliance policy: ",
+                                                     Utility::getLastCryptoError().value_or("")));
+    }
+  }
+
+  return absl::OkStatus();
+}
+
 void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   ASSERT(ssl != nullptr);
   auto callbacks =
@@ -404,14 +422,20 @@ void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   auto ctx = static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
   ASSERT(callbacks != nullptr);
   ASSERT(ctx != nullptr);
+  ctx->maybeWriteKeyLog(line, callbacks->connection().connectionInfoProvider().localAddress().get(),
+                        callbacks->connection().connectionInfoProvider().remoteAddress().get());
+}
 
-  if ((ctx->tls_keylog_local_.getIpListSize() == 0 ||
-       ctx->tls_keylog_local_.contains(
-           *(callbacks->connection().connectionInfoProvider().localAddress()))) &&
-      (ctx->tls_keylog_remote_.getIpListSize() == 0 ||
-       ctx->tls_keylog_remote_.contains(
-           *(callbacks->connection().connectionInfoProvider().remoteAddress())))) {
-    ctx->tls_keylog_file_->write(absl::StrCat(line, "\n"));
+void ContextImpl::maybeWriteKeyLog(const char* line, const Network::Address::Instance* local_addr,
+                                   const Network::Address::Instance* remote_addr) const {
+  if (tls_keylog_file_ == nullptr) {
+    return;
+  }
+  if ((tls_keylog_local_.getIpListSize() == 0 ||
+       (local_addr != nullptr && tls_keylog_local_.contains(*local_addr))) &&
+      (tls_keylog_remote_.getIpListSize() == 0 ||
+       (remote_addr != nullptr && tls_keylog_remote_.contains(*remote_addr)))) {
+    tls_keylog_file_->write(absl::StrCat(line, "\n"));
   }
 }
 
@@ -516,7 +540,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
     stats_.fail_verify_error_.inc();
     ENVOY_LOG(debug, "verify cert failed: no cert chain");
     return {ValidationResults::ValidationStatus::Failed, Ssl::ClientValidationStatus::NotValidated,
-            SSL_AD_INTERNAL_ERROR, absl::nullopt};
+            SSL_AD_INTERNAL_ERROR, std::nullopt};
   }
   ASSERT(cert_validator_);
   const char* host_name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
@@ -571,13 +595,6 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   if (!cert.get()) {
     stats_.no_certificate_.inc();
   }
-
-  // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
-  // error but is allowed because the enforcement that rsa key usage and tls usage need to be
-  // matched has been disabled.
-  if (SSL_was_key_usage_invalid(ssl)) {
-    stats_.was_key_usage_invalid_.inc();
-  }
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {
@@ -593,24 +610,24 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
   return providers;
 }
 
-absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
-  absl::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
+std::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
+  std::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
   if (!daysUntilExpiration.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   for (auto& ctx : tls_contexts_) {
-    const absl::optional<uint32_t> tmp =
+    const std::optional<uint32_t> tmp =
         Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), factory_context_.timeSource());
     if (!tmp.has_value()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     daysUntilExpiration = std::min<uint32_t>(tmp.value(), daysUntilExpiration.value());
   }
   return daysUntilExpiration;
 }
 
-absl::optional<uint64_t> ContextImpl::secondsUntilFirstOcspResponseExpires() const {
-  absl::optional<uint64_t> secs_until_expiration;
+std::optional<uint64_t> ContextImpl::secondsUntilFirstOcspResponseExpires() const {
+  std::optional<uint64_t> secs_until_expiration;
   for (auto& ctx : tls_contexts_) {
     if (ctx.ocsp_response_) {
       uint64_t next_expiration = ctx.ocsp_response_->secondsUntilExpiration();
@@ -675,7 +692,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
   if (SSL_CTX_get_verify_mode(ssl_ctx) == SSL_VERIFY_NONE) {
     // Skip validation if the TLS is configured SSL_VERIFY_NONE.
     return {ValidationResults::ValidationStatus::Successful,
-            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, absl::nullopt};
+            Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt, std::nullopt};
   }
   ValidationResults result =
       cert_validator_->doVerifyCertChain(cert_chain, std::move(callback), transport_socket_options,

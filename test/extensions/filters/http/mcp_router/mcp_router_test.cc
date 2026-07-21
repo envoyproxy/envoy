@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -20,9 +21,12 @@ namespace HttpFilters {
 namespace McpRouter {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::ReturnRef;
 
 // Verifies parseMethodString correctly maps MCP method strings to enum values.
@@ -68,7 +72,8 @@ TEST_F(McpRouterConfigTest, MultipleBackendsEnablesMultiplexing) {
   server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
   server2->mutable_mcp_cluster()->set_path("/mcp/calc");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   EXPECT_EQ(config.backends().size(), 2);
   EXPECT_TRUE(config.isMultiplexing());
@@ -95,7 +100,8 @@ TEST_F(McpRouterConfigTest, SingleBackendSetsDefaultName) {
   server->set_name("tools");
   server->mutable_mcp_cluster()->set_cluster("tools_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   EXPECT_EQ(config.backends().size(), 1);
   EXPECT_FALSE(config.isMultiplexing());
@@ -110,7 +116,8 @@ TEST_F(McpRouterConfigTest, DefaultPathWhenNotSpecified) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   const McpBackendConfig* backend = config.findBackend("test");
   ASSERT_NE(backend, nullptr);
@@ -125,7 +132,8 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
@@ -139,8 +147,8 @@ TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
   server->mutable_mcp_cluster()->mutable_timeout()->set_seconds(10);
 
   envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
-  auto base_config = std::make_shared<McpRouterConfigImpl>(base_proto, "test.", *store_.rootScope(),
-                                                           factory_context_);
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
 
   McpRouterClusterConfigImpl cluster_config(proto_config, base_config);
 
@@ -254,7 +262,7 @@ TEST_F(SessionCodecTest, BuildCompositeSessionId) {
 
   EXPECT_TRUE(absl::StrContains(composite, "route1@"));
   auto parsed = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
   EXPECT_EQ(parsed->subject, "user1");
   EXPECT_TRUE(absl::StrContains(composite, "backend1:"));
   EXPECT_TRUE(absl::StrContains(composite, "backend2:"));
@@ -270,7 +278,7 @@ TEST_F(SessionCodecTest, ParseCompositeSessionId) {
   std::string composite = SessionCodec::buildCompositeSessionId("myroute", "myuser", sessions);
 
   auto parsed = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->route, "myroute");
   EXPECT_EQ(parsed->subject, "myuser");
@@ -281,10 +289,10 @@ TEST_F(SessionCodecTest, ParseCompositeSessionId) {
 
 // Verifies parsing rejects malformed session IDs.
 TEST_F(SessionCodecTest, ParseCompositeSessionIdRejectsMalformedInput) {
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("no-at-signs").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("one@part").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("route@user@backend-no-colon").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("route@user@:session").ok());
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("no-at-signs"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("one@part"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("route@user@backend-no-colon"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("route@user@:session"), Not(IsOk()));
 }
 
 // Verifies full encode-decode-parse round-trip.
@@ -299,7 +307,7 @@ TEST_F(SessionCodecTest, FullRoundTrip) {
   std::string decoded = SessionCodec::decode(encoded);
 
   auto parsed = SessionCodec::parseCompositeSessionId(decoded);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->route, "route");
   EXPECT_EQ(parsed->subject, "subject");
@@ -318,7 +326,7 @@ TEST_F(SessionCodecTest, SpecialCharactersInSessionId) {
   std::string decoded = SessionCodec::decode(encoded);
 
   auto parsed = SessionCodec::parseCompositeSessionId(decoded);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->backend_sessions["backend"], "sess+with/special=chars");
 }
@@ -330,7 +338,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityDisabledByDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_FALSE(config.hasSessionIdentity());
   EXPECT_FALSE(config.shouldEnforceValidation());
 }
@@ -345,7 +354,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithHeaderSource) {
   auto* identity = proto_config.mutable_session_identity();
   identity->mutable_identity()->mutable_header()->set_name("x-user-id");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<HeaderSubjectSource>(config.subjectSource()));
   EXPECT_FALSE(config.shouldEnforceValidation()); // DISABLED by default
@@ -364,7 +374,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithMetadataSource) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<MetadataSubjectSource>(config.subjectSource()));
 }
@@ -382,7 +393,8 @@ TEST_F(McpRouterConfigTest, MetadataKeyPathParsed) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   const auto& source = absl::get<MetadataSubjectSource>(config.subjectSource());
   EXPECT_EQ(source.filter, "jwt");
   ASSERT_EQ(source.path_keys.size(), 2);
@@ -402,7 +414,8 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   identity->mutable_validation()->set_mode(
       envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE);
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(config.shouldEnforceValidation());
   EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
@@ -420,7 +433,8 @@ protected:
   McpRouterConfigSharedPtr
   createConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config) {
     return std::make_shared<McpRouterConfigImpl>(proto_config, std::string("test."),
-                                                 *store_.rootScope(), factory_context_);
+                                                 *store_.rootScope(),
+                                                 factory_context_.server_factory_context_);
   }
 
   void setDynamicMetadata(const std::string& filter_name, const std::string& key,
@@ -458,6 +472,55 @@ protected:
     (*mcp_metadata.mutable_fields())["id"].set_number_value(static_cast<double>(id));
   }
 
+  void setMcpToolCallMetadata(const std::string& tool_name, int64_t id = 1,
+                              const std::string& metadata_namespace = "envoy.filters.http.mcp") {
+    auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())[metadata_namespace];
+    (*mcp_metadata.mutable_fields())["method"].set_string_value("tools/call");
+    (*mcp_metadata.mutable_fields())["id"].set_number_value(static_cast<double>(id));
+    auto& params = (*mcp_metadata.mutable_fields())["params"];
+    (*params.mutable_struct_value()->mutable_fields())["name"].set_string_value(tool_name);
+  }
+
+  void setupMockAsyncClient(
+      std::vector<Http::AsyncClient::StreamCallbacks*>& http_callbacks,
+      std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>>& http_streams) {
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"test_cluster", "time_cluster", "calc_cluster", "tools_cluster"});
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .async_client_,
+                start(_, _))
+        .WillRepeatedly(
+            [&http_callbacks, &http_streams](Http::AsyncClient::StreamCallbacks& callbacks,
+                                             const Http::AsyncClient::StreamOptions&) {
+              http_callbacks.push_back(&callbacks);
+              http_streams.emplace_back(std::make_unique<NiceMock<Http::MockAsyncClientStream>>());
+              return http_streams.back().get();
+            });
+  }
+
+  void simulateBackendResponse(Http::AsyncClient::StreamCallbacks* cb, const std::string& body,
+                               const std::string& session_id = "",
+                               const std::string& content_type = "application/json") {
+    auto response_headers = Http::ResponseHeaderMapImpl::create();
+    response_headers->setStatus(200);
+    response_headers->setContentType(content_type);
+    if (!session_id.empty()) {
+      response_headers->addCopy(Http::LowerCaseString("mcp-session-id"), session_id);
+    }
+    cb->onHeaders(std::move(response_headers), false);
+    Buffer::OwnedImpl response_data(body);
+    cb->onData(response_data, true);
+  }
+
+  void simulateBackendError(Http::AsyncClient::StreamCallbacks* cb, uint64_t status_code = 500) {
+    auto response_headers = Http::ResponseHeaderMapImpl::create();
+    response_headers->setStatus(status_code);
+    response_headers->setContentType("text/plain");
+    cb->onHeaders(std::move(response_headers), false);
+    Buffer::OwnedImpl response_data("error");
+    cb->onData(response_data, true);
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -487,10 +550,9 @@ TEST_F(McpRouterFilterTest, UsingClusterConfigForListOfServers) {
   auto* backend = cluster_config.add_servers();
   backend->set_name("backend");
   backend->mutable_mcp_cluster()->set_cluster("backend_cluster");
-
-  (*decoder_callbacks_.cluster_info_->metadata_
-        .mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
-      .PackFrom(cluster_config);
+  std::ignore = (*decoder_callbacks_.cluster_info_->metadata_
+                      .mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
+                    .PackFrom(cluster_config);
 
   Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
@@ -718,13 +780,13 @@ TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
   })";
 
   auto parsed = Json::Factory::loadFromString(backend_response);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   auto result = (*parsed)->getObject("result");
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
 
   auto tools = (*result)->getObjectArray("tools");
-  ASSERT_TRUE(tools.ok());
+  ASSERT_OK(tools);
   ASSERT_EQ(tools->size(), 1);
 
   const auto& tool = (*tools)[0];
@@ -732,30 +794,26 @@ TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
 
   // Verify all attributes are present.
   auto name = tool->getString("name");
-  EXPECT_TRUE(name.ok());
-  EXPECT_EQ(*name, "get_weather");
+  EXPECT_THAT(name, IsOkAndHolds("get_weather"));
 
   auto title = tool->getString("title");
-  EXPECT_TRUE(title.ok());
-  EXPECT_EQ(*title, "Weather Tool");
+  EXPECT_THAT(title, IsOkAndHolds("Weather Tool"));
 
   auto desc = tool->getString("description");
-  EXPECT_TRUE(desc.ok());
-  EXPECT_EQ(*desc, "Get weather information");
+  EXPECT_THAT(desc, IsOkAndHolds("Get weather information"));
 
   auto input_schema = tool->getObject("inputSchema");
-  EXPECT_TRUE(input_schema.ok());
-  EXPECT_TRUE(*input_schema != nullptr);
+  EXPECT_THAT(input_schema, IsOkAndHolds(::testing::NotNull()));
 
   // Verify nested inputSchema properties are present.
   auto props = (*input_schema)->getObject("properties");
-  EXPECT_TRUE(props.ok());
+  EXPECT_OK(props);
 
   auto output_schema = tool->getObject("outputSchema");
-  EXPECT_TRUE(output_schema.ok());
+  EXPECT_OK(output_schema);
 
   auto annotations = tool->getObject("annotations");
-  EXPECT_TRUE(annotations.ok());
+  EXPECT_OK(annotations);
 }
 
 // Verifies tool JSON serialization preserves nested inputSchema.
@@ -773,30 +831,1311 @@ TEST(AggregateToolsListTest, SerializationPreservesNestedInputSchema) {
   })";
 
   auto parsed = Json::Factory::loadFromString(tool_json);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   // Serialize and re-parse to verify round-trip.
   std::string serialized = (*parsed)->asJsonString();
 
   auto reparsed = Json::Factory::loadFromString(serialized);
-  ASSERT_TRUE(reparsed.ok());
+  ASSERT_OK(reparsed);
 
   auto input_schema = (*reparsed)->getObject("inputSchema");
-  ASSERT_TRUE(input_schema.ok());
+  ASSERT_OK(input_schema);
 
   auto props = (*input_schema)->getObject("properties");
-  ASSERT_TRUE(props.ok());
+  ASSERT_OK(props);
 
   auto query_prop = (*props)->getObject("query");
-  EXPECT_TRUE(query_prop.ok());
+  EXPECT_OK(query_prop);
 
   auto count_prop = (*props)->getObject("count");
-  EXPECT_TRUE(count_prop.ok());
+  EXPECT_OK(count_prop);
 
   // Verify the nested properties are preserved.
   auto count_type = (*count_prop)->getString("type");
-  EXPECT_TRUE(count_type.ok());
-  EXPECT_EQ(*count_type, "integer");
+  EXPECT_THAT(count_type, IsOkAndHolds("integer"));
+}
+
+// Verifies lazy_initialization config field defaults to false and can be enabled.
+TEST_F(McpRouterConfigTest, LazyInitializationDefault) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+  EXPECT_FALSE(config.lazyInitialization());
+}
+
+TEST_F(McpRouterConfigTest, LazyInitializationEnabled) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+  proto_config.set_lazy_initialization(true);
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+  EXPECT_TRUE(config.lazyInitialization());
+}
+
+// Verifies McpRouterClusterConfigImpl delegates lazyInitialization to base.
+TEST_F(McpRouterConfigTest, ClusterConfigDelegatesLazyInit) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
+  base_proto.set_lazy_initialization(true);
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
+
+  envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig cluster_proto;
+  auto* server = cluster_proto.add_servers();
+  server->set_name("cluster_backend");
+  server->mutable_mcp_cluster()->set_cluster("target_cluster");
+
+  McpRouterClusterConfigImpl cluster_config(cluster_proto, base_config);
+  EXPECT_TRUE(cluster_config.lazyInitialization());
+}
+
+// Verifies lazy initialization responds immediately to initialize without backend fanout.
+TEST_F(McpRouterFilterTest, LazyInitializeRespondsImmediately) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("initialize");
+
+  auto config = createConfig(proto_config);
+  McpRouterFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        auto session_header = headers.get(Http::LowerCaseString("mcp-session-id"));
+        EXPECT_FALSE(session_header.empty());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  filter.decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-06-18"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter.decodeData(buffer, true);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init tools/call triggers backend initialization then forwards the request.
+TEST_F(McpRouterFilterTest, LazyInitToolsCallInitializesBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpToolCallMetadata("get_time");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  // Build a session ID with empty backend sessions (lazy init state).
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"tools/call","id":2,"params":{"name":"get_time"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  // First stream should be the lazy init (initialize) request to the backend.
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  // Simulate backend init response.
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":2,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  // Second stream should be the actual tools/call request.
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  // Simulate tools/call response.
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string tool_response =
+      R"({"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"12:00"}]}})";
+  simulateBackendResponse(http_callbacks[1], tool_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init tools/list triggers fanout initialization then forwards the list request.
+TEST_F(McpRouterFilterTest, LazyInitToolsListInitializesAllBackends) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server1 = proto_config.add_servers();
+  server1->set_name("time");
+  server1->mutable_mcp_cluster()->set_cluster("time_cluster");
+  auto* server2 = proto_config.add_servers();
+  server2->set_name("calc");
+  server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
+
+  setMcpMethodMetadata("tools/list");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  // Build a session ID with empty backend sessions.
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"tools/list","id":3})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  // First two streams should be the lazy init fanout (initialize to both backends).
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":3,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "time-session");
+  simulateBackendResponse(http_callbacks[1], init_response, "calc-session");
+
+  // Next two streams should be the actual tools/list fanout.
+  ASSERT_GE(http_callbacks.size(), 4);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string time_tools =
+      R"({"jsonrpc":"2.0","id":3,"result":{"tools":[{"name":"get_time"}]}})";
+  const std::string calc_tools = R"({"jsonrpc":"2.0","id":3,"result":{"tools":[{"name":"add"}]}})";
+  simulateBackendResponse(http_callbacks[2], time_tools);
+  simulateBackendResponse(http_callbacks[3], calc_tools);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init notifications with no initialized backends respond 202 immediately.
+TEST_F(McpRouterFilterTest, LazyInitNotificationNoBackends) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("notifications/initialized");
+
+  auto config = createConfig(proto_config);
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Build a session ID with empty backend sessions.
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+        EXPECT_EQ("202", headers.getStatusValue());
+        EXPECT_TRUE(end_stream);
+        response_sent = true;
+      }));
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"notifications/initialized"})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init with eager mode disabled (default) behaves normally.
+TEST_F(McpRouterFilterTest, EagerInitUnchangedWithLazyDisabled) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("initialize");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-06-18"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  // Eager mode should have started a backend stream (unlike lazy init which responds immediately).
+  EXPECT_GE(http_callbacks.size(), 1);
+}
+
+// Verifies lazy init prompts/get triggers backend initialization.
+TEST_F(McpRouterFilterTest, LazyInitPromptsGetInitializesBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  // Set prompts/get metadata with prompt name.
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("prompts/get");
+  (*mcp_metadata.mutable_fields())["id"].set_number_value(4);
+  auto& params = (*mcp_metadata.mutable_fields())["params"];
+  (*params.mutable_struct_value()->mutable_fields())["name"].set_string_value("greeting");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"prompts/get","id":4,"params":{"name":"greeting"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  // First stream should be the lazy init request.
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":4,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  // Second stream should be the actual prompts/get request.
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string prompt_response =
+      R"({"jsonrpc":"2.0","id":4,"result":{"messages":[{"role":"assistant","content":{"type":"text","text":"Hello!"}}]}})";
+  simulateBackendResponse(http_callbacks[1], prompt_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init prompts/list triggers fanout initialization.
+TEST_F(McpRouterFilterTest, LazyInitPromptsListInitializesBackends) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("prompts/list");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"prompts/list","id":5})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  // First stream: lazy init.
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":5,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  // Second stream: actual prompts/list fanout.
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string prompts_response =
+      R"({"jsonrpc":"2.0","id":5,"result":{"prompts":[{"name":"greeting"}]}})";
+  simulateBackendResponse(http_callbacks[1], prompts_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init resources/list triggers fanout initialization.
+TEST_F(McpRouterFilterTest, LazyInitResourcesListInitializesBackends) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("resources/list");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"resources/list","id":6})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  // First stream: lazy init.
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":6,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  // Second stream: actual resources/list fanout.
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string resources_response =
+      R"({"jsonrpc":"2.0","id":6,"result":{"resources":[{"uri":"file://test","name":"test"}]}})";
+  simulateBackendResponse(http_callbacks[1], resources_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init resources/templates/list triggers fanout initialization.
+TEST_F(McpRouterFilterTest, LazyInitResourcesTemplatesListInitializesBackends) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("resources/templates/list");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"resources/templates/list","id":7})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":7,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string templates_response =
+      R"({"jsonrpc":"2.0","id":7,"result":{"resourceTemplates":[{"uriTemplate":"file:///{path}","name":"file"}]}})";
+  simulateBackendResponse(http_callbacks[1], templates_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init logging/setLevel triggers fanout initialization.
+TEST_F(McpRouterFilterTest, LazyInitLoggingSetLevelInitializesBackends) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("logging/setLevel");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"logging/setLevel","id":8,"params":{"level":"debug"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":8,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string logging_response = R"({"jsonrpc":"2.0","id":8,"result":{}})";
+  simulateBackendResponse(http_callbacks[1], logging_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init resources/read triggers backend initialization.
+TEST_F(McpRouterFilterTest, LazyInitResourcesReadInitializesBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  // Set resources/read metadata with URI.
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("resources/read");
+  (*mcp_metadata.mutable_fields())["id"].set_number_value(9);
+  auto& params = (*mcp_metadata.mutable_fields())["params"];
+  (*params.mutable_struct_value()->mutable_fields())["uri"].set_string_value("file://test.txt");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"resources/read","id":9,"params":{"uri":"file://test.txt"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":9,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string resource_response =
+      R"({"jsonrpc":"2.0","id":9,"result":{"contents":[{"uri":"file://test.txt","text":"hello"}]}})";
+  simulateBackendResponse(http_callbacks[1], resource_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init completion/complete with ref/prompt triggers backend initialization.
+TEST_F(McpRouterFilterTest, LazyInitCompletionCompleteInitializesBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  // Set completion/complete metadata with ref/prompt.
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("completion/complete");
+  (*mcp_metadata.mutable_fields())["id"].set_number_value(10);
+  auto& params = (*mcp_metadata.mutable_fields())["params"];
+  auto& ref = (*params.mutable_struct_value()->mutable_fields())["ref"];
+  (*ref.mutable_struct_value()->mutable_fields())["type"].set_string_value("ref/prompt");
+  (*ref.mutable_struct_value()->mutable_fields())["name"].set_string_value("greeting");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"completion/complete","id":10,"params":{"ref":{"type":"ref/prompt","name":"greeting"},"argument":{"name":"name","value":"wo"}}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":10,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string completion_response =
+      R"({"jsonrpc":"2.0","id":10,"result":{"completion":{"values":["world"]}}})";
+  simulateBackendResponse(http_callbacks[1], completion_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies lazy init tools/call sends error when backend init fails.
+TEST_F(McpRouterFilterTest, LazyInitToolsCallInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpToolCallMetadata("get_time");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"tools/call","id":2,"params":{"name":"get_time"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies lazy init tools/list sends error when fanout init fails.
+TEST_F(McpRouterFilterTest, LazyInitToolsListInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("tools/list");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"tools/list","id":3})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies lazy init prompts/get sends error when backend init fails.
+TEST_F(McpRouterFilterTest, LazyInitPromptsGetInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("prompts/get");
+  (*mcp_metadata.mutable_fields())["id"].set_number_value(4);
+  auto& params = (*mcp_metadata.mutable_fields())["params"];
+  (*params.mutable_struct_value()->mutable_fields())["name"].set_string_value("greeting");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"prompts/get","id":4,"params":{"name":"greeting"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies lazy init prompts/list sends error when fanout init fails.
+TEST_F(McpRouterFilterTest, LazyInitPromptsListInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("prompts/list");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"prompts/list","id":5})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies lazy init resources/list sends error when fanout init fails.
+TEST_F(McpRouterFilterTest, LazyInitResourcesListInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("resources/list");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"resources/list","id":6})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies lazy init resources/read sends error when backend init fails.
+TEST_F(McpRouterFilterTest, LazyInitResourcesReadInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("resources/read");
+  (*mcp_metadata.mutable_fields())["id"].set_number_value(9);
+  auto& params = (*mcp_metadata.mutable_fields())["params"];
+  (*params.mutable_struct_value()->mutable_fields())["uri"].set_string_value("file://test.txt");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"resources/read","id":9,"params":{"uri":"file://test.txt"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies lazy init completion/complete sends error when backend init fails.
+TEST_F(McpRouterFilterTest, LazyInitCompletionCompleteInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("completion/complete");
+  (*mcp_metadata.mutable_fields())["id"].set_number_value(10);
+  auto& params = (*mcp_metadata.mutable_fields())["params"];
+  auto& ref = (*params.mutable_struct_value()->mutable_fields())["ref"];
+  (*ref.mutable_struct_value()->mutable_fields())["type"].set_string_value("ref/prompt");
+  (*ref.mutable_struct_value()->mutable_fields())["name"].set_string_value("greeting");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"completion/complete","id":10,"params":{"ref":{"type":"ref/prompt","name":"greeting"}}})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies lazy init resources/templates/list sends error when fanout init fails.
+TEST_F(McpRouterFilterTest, LazyInitResourcesTemplatesListInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("resources/templates/list");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"resources/templates/list","id":7})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies lazy init logging/setLevel sends error when fanout init fails.
+TEST_F(McpRouterFilterTest, LazyInitLoggingSetLevelInitFailure) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("logging/setLevel");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","method":"logging/setLevel","id":8})";
+  Buffer::OwnedImpl buffer(body);
+  filter->decodeData(buffer, true);
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  bool error_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("500", headers.getStatusValue());
+        error_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  simulateBackendError(http_callbacks[0]);
+
+  EXPECT_TRUE(error_sent);
+}
+
+// Verifies multi-chunk data is buffered during lazy init.
+TEST_F(McpRouterFilterTest, LazyInitBuffersMultiChunkData) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpToolCallMetadata("get_time");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite =
+      SessionCodec::buildCompositeSessionId("default", "default", empty_sessions);
+  std::string encoded_session = SessionCodec::encode(composite);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/mcp"},
+                                         {"content-type", "application/json"},
+                                         {"mcp-session-id", encoded_session}};
+
+  filter->decodeHeaders(headers, false);
+
+  // Send first chunk (not end_stream) — triggers lazy init.
+  const std::string body_part1 = R"({"jsonrpc":"2.0","method":"tools/call",)";
+  Buffer::OwnedImpl buffer1(body_part1);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter->decodeData(buffer1, false));
+
+  // Send second chunk while lazy init is still pending — should be buffered.
+  const std::string body_part2 = R"("id":2,"params":{"name":"get_time"}})";
+  Buffer::OwnedImpl buffer2(body_part2);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter->decodeData(buffer2, true));
+
+  ASSERT_GE(http_callbacks.size(), 1);
+
+  const std::string init_response =
+      R"({"jsonrpc":"2.0","id":2,"result":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  simulateBackendResponse(http_callbacks[0], init_response, "backend-session-1");
+
+  ASSERT_GE(http_callbacks.size(), 2);
+
+  bool response_sent = false;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+        response_sent = true;
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string tool_response =
+      R"({"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"12:00"}]}})";
+  simulateBackendResponse(http_callbacks[1], tool_response);
+
+  EXPECT_TRUE(response_sent);
+}
+
+// Verifies empty backend session map produces a valid session ID.
+TEST_F(SessionCodecTest, EmptyBackendSessions) {
+  absl::flat_hash_map<std::string, std::string> empty_sessions;
+  std::string composite = SessionCodec::buildCompositeSessionId("route", "user", empty_sessions);
+
+  auto parsed = SessionCodec::parseCompositeSessionId(composite);
+  ASSERT_OK(parsed);
+  EXPECT_EQ(parsed->route, "route");
+  EXPECT_EQ(parsed->subject, "user");
+  EXPECT_TRUE(parsed->backend_sessions.empty());
+
+  std::string encoded = SessionCodec::encode(composite);
+  std::string decoded = SessionCodec::decode(encoded);
+  EXPECT_EQ(decoded, composite);
 }
 
 // Verifies tools with icons array are handled correctly.
@@ -810,11 +2149,168 @@ TEST(AggregateToolsListTest, IconsArrayPreserved) {
   })";
 
   auto parsed = Json::Factory::loadFromString(tool_json);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   auto icons = (*parsed)->getObjectArray("icons");
-  ASSERT_TRUE(icons.ok());
+  ASSERT_OK(icons);
   EXPECT_EQ(icons->size(), 2);
+}
+
+// Verifies __jsonrpc_response maps to McpMethod::ServerResponse.
+TEST(ParseMethodStringTest, ServerResponse) {
+  EXPECT_EQ(parseMethodString("__jsonrpc_response"), McpMethod::ServerResponse);
+}
+
+// Verifies initialize response includes elicitation capability.
+TEST_F(McpRouterFilterTest, GatewayCapabilitiesIncludeElicitation) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("initialize");
+
+  auto config = createConfig(proto_config);
+  McpRouterFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+
+  std::string response_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { response_body = data.toString(); }));
+
+  filter.decodeHeaders(headers, false);
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-06-18"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter.decodeData(buffer, true);
+
+  EXPECT_THAT(response_body, testing::HasSubstr("\"elicitation\":{}"));
+}
+
+// Verifies server response routes to the correct backend based on prefixed ID.
+TEST_F(McpRouterFilterTest, HandleServerResponseRoutesToBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server1 = proto_config.add_servers();
+  server1->set_name("time");
+  server1->mutable_mcp_cluster()->set_cluster("time_cluster");
+  auto* server2 = proto_config.add_servers();
+  server2->set_name("calc");
+  server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
+
+  // Set metadata for a server response with prefixed ID.
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("time__42");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","id":"time__42","result":{"action":"accept","content":{"name":"test"}}})";
+  Buffer::OwnedImpl buffer(body);
+
+  std::string forwarded_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { forwarded_body = data.toString(); }));
+
+  filter->decodeData(buffer, true);
+
+  ASSERT_EQ(http_callbacks.size(), 1);
+
+  simulateBackendResponse(http_callbacks[0], R"({"jsonrpc":"2.0","id":42,"result":{}})");
+
+  EXPECT_FALSE(forwarded_body.empty());
+}
+
+// Verifies server response with invalid prefix returns error.
+TEST_F(McpRouterFilterTest, HandleServerResponseInvalidId) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("time");
+  server->mutable_mcp_cluster()->set_cluster("time_cluster");
+  auto* server2 = proto_config.add_servers();
+  server2->set_name("calc");
+  server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("unknown__42");
+
+  auto config = createConfig(proto_config);
+  McpRouterFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter.decodeHeaders(headers, false);
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("400", headers.getStatusValue());
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string body = R"({"jsonrpc":"2.0","id":"unknown__42","result":{"action":"accept"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter.decodeData(buffer, true);
+}
+
+// Verifies single-backend mode routes server responses without prefix parsing.
+TEST_F(McpRouterFilterTest, HandleServerResponseSingleBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("tools");
+  server->mutable_mcp_cluster()->set_cluster("tools_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("42");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","id":"42","result":{"action":"accept"}})";
+  Buffer::OwnedImpl buffer(body);
+
+  std::string forwarded_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { forwarded_body = data.toString(); }));
+
+  filter->decodeData(buffer, true);
+
+  ASSERT_EQ(http_callbacks.size(), 1);
+  simulateBackendResponse(http_callbacks[0], R"({"jsonrpc":"2.0","id":42,"result":{}})");
+  EXPECT_FALSE(forwarded_body.empty());
 }
 
 } // namespace

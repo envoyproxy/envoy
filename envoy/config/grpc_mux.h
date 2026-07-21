@@ -13,6 +13,7 @@
 #include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -120,11 +121,13 @@ public:
   /**
    * Updates the current gRPC-Mux object to use a new gRPC client, and config.
    */
-  virtual absl::Status
-  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
-                  BackOffStrategyPtr&& backoff_strategy,
-                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) PURE;
+  virtual absl::Status updateMuxSource(
+      Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+      Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
+      BackOffStrategyPtr&& backoff_strategy,
+      const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+      std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory =
+          nullptr) PURE;
 
   /**
    * Returns a load-stats-reporter that was created for the gRPC-Mux.
@@ -143,7 +146,7 @@ public:
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
 using GrpcMuxSharedPtr = std::shared_ptr<GrpcMux>;
 
-template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
+template <class ResponseProto> using ResponseProtoPtr = ArenaWrappedProto<ResponseProto>;
 /**
  * A grouping of callbacks that a GrpcMux should provide to its GrpcStream.
  */

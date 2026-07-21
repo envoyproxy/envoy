@@ -14,7 +14,17 @@ absl::StatusOr<Http::FilterFactoryCb>
 McpJsonRestBridgeFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
         proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  // This filter does not use the factory context, so delegate to the server-context variant.
+  return createHttpFilterFactoryFromProtoTyped(proto_config, stats_prefix,
+                                               context.serverFactoryContext());
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+McpJsonRestBridgeFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+        proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext&) {
 
   if (proto_config.tool_config().has_tool_list_http_rule()) {
     const auto& rule = proto_config.tool_config().tool_list_http_rule();
@@ -30,6 +40,14 @@ McpJsonRestBridgeFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<McpJsonRestBridgeFilter>(config));
   };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+McpJsonRestBridgeFilterConfigFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+        proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<McpJsonRestBridgePerRouteConfig>(proto_config);
 }
 
 /**

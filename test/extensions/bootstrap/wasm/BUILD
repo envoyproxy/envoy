@@ -41,11 +41,10 @@ envoy_extension_cc_test(
         "//source/extensions/common/wasm:wasm_lib",
         "//test/extensions/bootstrap/wasm/test_data:stats_cpp_plugin",
         "//test/extensions/common/wasm:wasm_runtime",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -108,11 +107,10 @@ envoy_extension_cc_test_binary(
         "//source/extensions/common/wasm:wasm_lib",
         "//test/extensions/bootstrap/wasm/test_data:speed_cpp_plugin",
         "//test/extensions/common/wasm:wasm_runtime",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@abseil-cpp//absl/types:optional",
         "@benchmark",
     ],
 )

@@ -12,7 +12,10 @@
 #include "envoy/network/filter.h"
 #include "envoy/service/network_ext_proc/v3/network_external_processor.pb.h"
 
+#include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/network/ext_proc/client_impl.h"
+
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -104,6 +107,9 @@ public:
         typed_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().typed().begin(),
             config.metadata_options().forwarding_namespaces().typed().end()),
+        untyped_receiving_namespaces_(
+            config.metadata_options().receiving_namespaces().untyped().begin(),
+            config.metadata_options().receiving_namespaces().untyped().end()),
         stats_(generateStats(config.stat_prefix(), scope)),
         message_timeout_(std::chrono::milliseconds(
             PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
@@ -124,6 +130,10 @@ public:
     return typed_forwarding_namespaces_;
   }
 
+  const absl::flat_hash_set<std::string>& untypedReceivingMetadataNamespaces() const {
+    return untyped_receiving_namespaces_;
+  }
+
   const NetworkExtProcStats& stats() const { return stats_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
@@ -141,6 +151,7 @@ private:
   const envoy::config::core::v3::GrpcService grpc_service_;
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
+  const absl::flat_hash_set<std::string> untyped_receiving_namespaces_;
   NetworkExtProcStats stats_;
   const std::chrono::milliseconds message_timeout_;
 };
@@ -213,7 +224,7 @@ public:
   void updateCloseCallbackStatus(bool enable, bool is_read);
 
   // ExternalProcessorCallbacks
-  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& res) override;
+  void onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& res) override;
   void onGrpcClose() override;
   void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void logStreamInfo() override {};
@@ -265,8 +276,8 @@ private:
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
   DownstreamCallbacks downstream_callbacks_;
 
-  absl::optional<MonotonicTime> read_call_start_time_;
-  absl::optional<MonotonicTime> write_call_start_time_;
+  std::optional<MonotonicTime> read_call_start_time_;
+  std::optional<MonotonicTime> write_call_start_time_;
   NetworkExtProcLoggingInfo* logging_info_{nullptr};
 
   bool processing_complete_{false};

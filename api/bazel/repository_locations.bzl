@@ -44,8 +44,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/prometheus/client_model/archive/v{version}.tar.gz"],
     ),
     rules_buf = dict(
-        version = "0.5.2",
-        sha256 = "19d845cedf32c0e74a01af8d0bd904872bddc7905f087318d00b332aa36d3929",
+        version = "0.5.4",
+        sha256 = "e1feef4c326e342d8a4e56dc1cea68d33c80376331ec687bccd97ee5547969db",
         strip_prefix = "rules_buf-{version}",
         urls = ["https://github.com/bufbuild/rules_buf/archive/refs/tags/v{version}.tar.gz"],
     ),
@@ -74,8 +74,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.34",
-        sha256 = "49bb8b3cff6b28d74f9cd18ca9b3607cf4a5b2e81ecb57a04a9bc3fe94ac7ac8",
+        version = "0.3.35",
+        sha256 = "5179bc3f912d9c2dd5a6e5215e98222abe088847f021eba9f0f2e9a006deacaa",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),

@@ -26,7 +26,7 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter() {
     user-agent: '%REQ(USER-AGENT)%'
   )EOF";
   TestUtility::loadFromYaml(format_yaml, struct_format);
-  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(struct_format, false);
+  return Envoy::Formatter::JsonFormatterImpl::create(struct_format, false).value();
 }
 
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo(TimeSource& time_source) {

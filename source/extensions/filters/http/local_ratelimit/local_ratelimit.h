@@ -76,7 +76,7 @@ class FilterConfig : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
-               const bool per_route = false);
+               absl::Status& creation_status, const bool per_route = false);
   ~FilterConfig() override {
     // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
     // timer is created and running.
@@ -112,7 +112,7 @@ public:
     return vh_rate_limits_;
   }
   bool consumeDefaultTokenBucket() const { return always_consume_default_token_bucket_; }
-  const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
+  const std::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
 
@@ -157,15 +157,15 @@ private:
   std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   Router::HeaderParserPtr response_headers_parser_;
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
   const bool enable_x_rate_limit_headers_;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
-  const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
+  const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
 };
 

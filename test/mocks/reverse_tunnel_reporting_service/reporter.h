@@ -15,7 +15,7 @@ class MockReverseTunnelReporter : public ReverseTunnelReporter {
 public:
   MOCK_METHOD(void, onServerInitialized, (), (override));
   MOCK_METHOD(void, reportConnectionEvent,
-              (absl::string_view, absl::string_view, absl::string_view), (override));
+              (absl::string_view, absl::string_view, absl::string_view, int64_t), (override));
   MOCK_METHOD(void, reportDisconnectionEvent, (absl::string_view, absl::string_view), (override));
 };
 

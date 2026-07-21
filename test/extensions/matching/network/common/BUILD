@@ -38,6 +38,6 @@ envoy_cc_test(
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )

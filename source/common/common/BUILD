@@ -48,6 +48,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cpu_affinity_lib",
+    srcs = ["cpu_affinity.cc"],
+    hdrs = ["cpu_affinity.h"],
+    deps = [
+        "//source/common/api:os_sys_calls_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "debug_recursion_checker_lib",
     hdrs = ["debug_recursion_checker.h"],
     deps = [":assert_lib"],
@@ -85,6 +94,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "c_smart_ptr_lib",
     hdrs = ["c_smart_ptr.h"],
+)
+
+envoy_cc_library(
+    name = "callbacks_handler_lib",
+    hdrs = ["callbacks_handler.h"],
+    deps = [
+        ":assert_lib",
+        "//envoy/common:optref_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -163,7 +181,10 @@ envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
-    deps = [":utility_lib"],
+    deps = [
+        ":utility_lib",
+        "@abseil-cpp//absl/types:span",
+    ],
 )
 
 envoy_cc_library(
@@ -333,7 +354,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:path_utility_lib",
         "//source/common/protobuf",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -347,6 +367,7 @@ envoy_cc_library(
         "//envoy/common:exception_lib",
         "//envoy/common:matchers_interface",
         "//envoy/common:pure_lib",
+        "//source/common/matcher:address_matcher_lib",
         "//source/common/network:cidr_range_lib",
         "@abseil-cpp//absl/status:statusor",
     ],

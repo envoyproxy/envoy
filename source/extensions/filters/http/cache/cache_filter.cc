@@ -78,14 +78,14 @@ void CacheFilter::sendUpstreamRequest(Http::RequestHeaderMap& request_headers) {
 }
 
 void CacheFilter::sendNoRouteResponse() {
-  decoder_callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, std::nullopt,
                                      "cache_no_route");
 }
 
 void CacheFilter::sendNoClusterResponse(absl::string_view cluster_name) {
   ENVOY_STREAM_LOG(debug, "upstream cluster '{}' was not available to cache", *decoder_callbacks_,
                    cluster_name);
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, std::nullopt,
                                      "cache_no_cluster");
 }
 
@@ -94,8 +94,7 @@ void CacheFilter::onStreamComplete() {
   InsertStatus insert_status = insertStatus();
   decoder_callbacks_->streamInfo().filterState()->setData(
       CacheFilterLoggingInfo::FilterStateKey,
-      std::make_shared<CacheFilterLoggingInfo>(lookup_status, insert_status),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      std::make_shared<CacheFilterLoggingInfo>(lookup_status, insert_status));
 }
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -141,7 +140,7 @@ void CacheFilter::onUpstreamRequestComplete() { upstream_request_ = nullptr; }
 
 void CacheFilter::onUpstreamRequestReset() {
   upstream_request_ = nullptr;
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, std::nullopt,
                                      "cache_upstream_reset");
 }
 
@@ -176,7 +175,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 }
 
 /*static*/ LookupStatus
-CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status,
+CacheFilter::resolveLookupStatus(std::optional<CacheEntryStatus> cache_entry_status,
                                  FilterState filter_state) {
   if (cache_entry_status.has_value()) {
     switch (cache_entry_status.value()) {

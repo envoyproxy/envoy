@@ -2,9 +2,10 @@
 
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -23,7 +24,7 @@ TEST(RoundRobinConfigTest, ValidateFail) {
   envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancing_policies.round_robin");
   envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin config_msg;
-  config.mutable_typed_config()->PackFrom(config_msg);
+  std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.round_robin", factory.name());
@@ -35,7 +36,7 @@ TEST(RoundRobinConfigTest, ValidateFail) {
                      context.api_.random_, context.time_system_);
   EXPECT_NE(nullptr, thread_aware_lb);
 
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   auto thread_local_lb_factory = thread_aware_lb->factory();
   EXPECT_NE(nullptr, thread_local_lb_factory);

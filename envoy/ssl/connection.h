@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -8,7 +10,6 @@
 #include "envoy/ssl/parsed_x509_name.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace Envoy {
@@ -113,7 +114,7 @@ public:
 
   /**
    * @return the well-known attribute values parsed from subject field of the peer certificate.
-   *         Returns absl::nullopt if there is no peer certificate.
+   *         Returns std::nullopt if there is no peer certificate.
    **/
   virtual ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const PURE;
 
@@ -154,6 +155,17 @@ public:
    *       may include certificates that are not part of the validated chain.
    **/
   virtual absl::Span<const std::string> pemEncodedPeerCertificateChain() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the PEM-encoded representation of each certificate in the
+   *         validated peer certificate chain (the chain Envoy built and verified during certificate
+   *         validation), as individual strings ordered leaf-first. Returns {} if the peer
+   *         certificate was not validated or the validated chain is unavailable.
+   *
+   * @note Unlike pemEncodedPeerCertificateChain(), this is not the raw chain presented by the peer;
+   *       it reflects the path Envoy actually trusted, so it may differ in order and contents.
+   **/
+  virtual absl::Span<const std::string> pemEncodedValidatedPeerCertificateChain() const PURE;
 
   /**
    * @return bool whether the provided matcher matches a SAN in the peer certificate.
@@ -223,16 +235,16 @@ public:
   virtual absl::Span<const std::string> oidsLocalCertificate() const PURE;
 
   /**
-   * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be
-   *         considered valid from. Returns empty absl::optional if there is no peer certificate.
+   * @return std::optional<SystemTime> the time that the peer certificate was issued and should be
+   *         considered valid from. Returns empty std::optional if there is no peer certificate.
    **/
-  virtual absl::optional<SystemTime> validFromPeerCertificate() const PURE;
+  virtual std::optional<SystemTime> validFromPeerCertificate() const PURE;
 
   /**
-   * @return absl::optional<SystemTime> the time that the peer certificate expires and should not be
-   *         considered valid after. Returns empty absl::optional if there is no peer certificate.
+   * @return std::optional<SystemTime> the time that the peer certificate expires and should not be
+   *         considered valid after. Returns empty std::optional if there is no peer certificate.
    **/
-  virtual absl::optional<SystemTime> expirationPeerCertificate() const PURE;
+  virtual std::optional<SystemTime> expirationPeerCertificate() const PURE;
 
   /**
    * @return std::string the hex-encoded TLS session ID as defined in rfc5246.

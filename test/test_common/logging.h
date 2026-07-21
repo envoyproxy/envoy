@@ -87,6 +87,7 @@ public:
 };
 
 // Initializes the global log environment and must be called prior to execution of Envoy code.
+// NOLINTNEXTLINE(readability-identifier-naming)
 inline LogRecordingSink& GetLogSink() {
   return *static_cast<LogRecordingSink*>(Logger::Registry::getSink()->recorder_test_only_);
 }

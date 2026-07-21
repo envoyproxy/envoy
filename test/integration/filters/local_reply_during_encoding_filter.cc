@@ -8,6 +8,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -16,18 +17,22 @@ public:
   constexpr static char name[] = "local-reply-during-encode";
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
-    encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
+    encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, std::nullopt,
                                        "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 };
 
 constexpr char LocalReplyDuringEncode::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringEncode>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<LocalReplyDuringEncode,
+                             test::integration::filters::LocalReplyDuringEncodeConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringEncode>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<LocalReplyDuringEncode,
+                             test::integration::filters::LocalReplyDuringEncodeConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 
 } // namespace Envoy

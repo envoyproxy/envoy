@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.validate.h" // IWYU pragma: keep
 
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,16 +16,28 @@ namespace McpJsonRestBridge {
  */
 class McpJsonRestBridgeFilterConfigFactory
     : public Common::ExceptionFreeFactoryBase<
-          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge> {
+          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge,
+          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute> {
 public:
-  McpJsonRestBridgeFilterConfigFactory()
-      : ExceptionFreeFactoryBase("envoy.filters.http.mcp_json_rest_bridge") {}
+  McpJsonRestBridgeFilterConfigFactory() : ExceptionFreeFactoryBase(FilterName) {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
           proto_config,
       const std::string&, Server::Configuration::FactoryContext&) override;
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+          proto_config,
+      const std::string&, Server::Configuration::ServerFactoryContext&) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace McpJsonRestBridge

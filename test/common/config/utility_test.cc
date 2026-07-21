@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/api/v2/cluster.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -23,7 +25,6 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
@@ -503,9 +504,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(1000 + 1));
 
     // only valid base interval value
-    strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
-            .value();
+    strategy = Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
+                   .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     // time limit will be 10 * provided default base interval
@@ -513,7 +513,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(500 * 10 + 1));
 
     // invalid base interval value
-    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt)
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, std::nullopt)
                   .status()
                   .message(),
               "default_base_interval_ms must be greater than zero");
@@ -537,7 +537,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
     EXPECT_FALSE(config.has_retry_policy());
 
     JitteredExponentialBackOffStrategyPtr strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
             .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
@@ -546,7 +546,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(500 * 10 + 1));
 
     // test an invalid default base interval
-    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt)
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, std::nullopt)
                   .status()
                   .message(),
               "default_base_interval_ms must be greater than zero");
@@ -563,7 +563,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
 
     JitteredExponentialBackOffStrategyPtr strategy =
         Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 500,
-                                                           absl::nullopt)
+                                                           std::nullopt)
             .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
@@ -573,7 +573,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
 
     // test an invalid default base interval
     EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 0,
-                                                                 absl::nullopt)
+                                                                 std::nullopt)
                   .status()
                   .message(),
               "default_base_interval_ms must be greater than zero");
@@ -597,7 +597,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {
     TestUtility::loadFromYaml(config_yaml, config);
     EXPECT_TRUE(config.has_retry_policy());
     JitteredExponentialBackOffStrategyPtr strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
             .value();
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     EXPECT_EQ(
@@ -626,7 +626,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {
 
     JitteredExponentialBackOffStrategyPtr strategy =
         Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 500,
-                                                           absl::nullopt)
+                                                           std::nullopt)
             .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
@@ -664,7 +664,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
           test_max_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
               .value();
 
       // provided time limit is equal to max time limit
@@ -691,7 +691,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
           test_base_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
               .value();
 
       // max_interval should be less than or equal test_base_interval * 10
@@ -719,7 +719,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
           test_max_interval_ms);
 
       EXPECT_FALSE(
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
               .status()
               .ok());
     }
@@ -731,7 +731,7 @@ TEST(UtilityTest, AnyWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
   Protobuf::Timestamp out;
   EXPECT_THAT(
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
@@ -745,7 +745,7 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
@@ -763,7 +763,7 @@ TEST(UtilityTest, TranslateAnyToFactoryConfig) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
@@ -783,7 +783,7 @@ public:
     (*typed_struct.mutable_type_url()) =
         absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());
     MessageUtil::jsonConvert(inner, *typed_struct.mutable_value());
-    typed_config.PackFrom(typed_struct);
+    std::ignore = typed_config.PackFrom(typed_struct);
   }
 };
 
@@ -893,7 +893,7 @@ TEST(UtilityTest, AnyToClusterV2) {
     drain_connections_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  typed_config.PackFrom(cluster);
+  std::ignore = typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::api::v2::Cluster) out;
   EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
@@ -911,7 +911,7 @@ TEST(UtilityTest, AnyToClusterV3) {
     ignore_health_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  typed_config.PackFrom(cluster);
+  std::ignore = typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
   EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
@@ -924,7 +924,7 @@ TEST(UtilityTest, AnyToClusterV3) {
 TEST(UtilityTest, EmptyToEmptyConfig) {
   Protobuf::Any typed_config;
   Protobuf::Empty empty_config;
-  typed_config.PackFrom(empty_config);
+  std::ignore = typed_config.PackFrom(empty_config);
 
   envoy::extensions::filters::http::cors::v3::Cors out;
   EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
@@ -1050,7 +1050,7 @@ TEST(UtilityTest, GetGrpcControlPlane) {
       api_type: GRPC
     )EOF";
     TestUtility::loadFromYaml(config_yaml, api_config_source);
-    EXPECT_EQ(absl::nullopt, Utility::getGrpcControlPlane(api_config_source));
+    EXPECT_EQ(std::nullopt, Utility::getGrpcControlPlane(api_config_source));
   }
 }
 

@@ -2,10 +2,13 @@
 
 #include <memory>
 
+#include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/upstream/retry_factory.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Router {
@@ -31,7 +34,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
           retry_policy.retriable_headers(), common_context)),
       retriable_request_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
           retry_policy.retriable_request_headers(), common_context)),
-      validation_visitor_(&validation_visitor) {
+      validation_visitor_(&validation_visitor),
+      refresh_cluster_on_retry_(retry_policy.refresh_cluster_on_retry()) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   per_try_idle_timeout_ =
@@ -39,6 +43,13 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
   retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on()).first;
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on()).first;
+  const auto unknown_tokens = RetryStateImpl::getUnknownRetryOnTokens(retry_policy.retry_on());
+  if (!unknown_tokens.empty()) {
+    ENVOY_LOG_EVERY_POW_2_MISC(warn,
+                               "Unknown retry_on policy token(s) [{}] in retry_on config '{}'. "
+                               "These tokens will be silently ignored.",
+                               absl::StrJoin(unknown_tokens, ", "), retry_policy.retry_on());
+  }
 
   for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
@@ -103,7 +114,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
     reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(
         retry_policy.rate_limited_retry_back_off().reset_headers());
 
-    absl::optional<std::chrono::milliseconds> reset_max_interval =
+    std::optional<std::chrono::milliseconds> reset_max_interval =
         PROTOBUF_GET_OPTIONAL_MS(retry_policy.rate_limited_retry_back_off(), max_interval);
     if (reset_max_interval.has_value()) {
       std::chrono::milliseconds max_interval = reset_max_interval.value();

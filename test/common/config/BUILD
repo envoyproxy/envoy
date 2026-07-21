@@ -148,7 +148,6 @@ envoy_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -183,7 +182,7 @@ envoy_cc_test(
         ":dummy_config_proto_cc_proto",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -299,5 +298,17 @@ envoy_cc_test(
         "//source/common/protobuf:message_validator_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "singleton_subscription_adapter_test",
+    srcs = ["singleton_subscription_adapter_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:singleton_subscription_adapter_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

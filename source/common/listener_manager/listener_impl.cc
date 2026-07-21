@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/network/udp_packet_writer_factory_factory.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
@@ -39,6 +40,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/quic_packet_writer_interface.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #endif
 
@@ -266,10 +269,13 @@ generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
   auto& stats = server.stats();
   Stats::StatsMatcherSharedPtr scope_matcher;
 
-  // Check for a per-listener stats matcher in typed_filter_metadata. If present, unpack it as
-  // StatsMatcher and use it to restrict which stats are created for this listener's scope.
-  const auto& typed_meta = config.metadata().typed_filter_metadata();
-  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+  if (config.has_stats_matcher()) {
+    scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(
+        config.stats_matcher(), stats.symbolTable(), server.serverFactoryContext());
+  } else if (auto it = config.metadata().typed_filter_metadata().find(StatsMatcherMetadataKey);
+             it != config.metadata().typed_filter_metadata().end()) {
+    // Check for a per-listener stats matcher in typed_filter_metadata. If present, unpack it as
+    // StatsMatcher and use it to restrict which stats are created for this listener's scope.
     envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
     if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
       MessageUtil::validate(stats_matcher_proto,
@@ -457,7 +463,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     }
   }
 
-  const absl::optional<std::string> runtime_val =
+  const std::optional<std::string> runtime_val =
       listener_factory_context_->serverFactoryContext().runtime().snapshot().get(
           cx_limit_runtime_key_);
   if (runtime_val && runtime_val->empty()) {
@@ -701,7 +707,7 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
     auto* factory_factory = Config::Utility::getFactory<Network::UdpPacketWriterFactoryFactory>(
         config.udp_listener_config().udp_packet_packet_writer_config());
     udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
-        config.udp_listener_config().udp_packet_packet_writer_config());
+        config.udp_listener_config().udp_packet_packet_writer_config(), *listener_factory_context_);
   }
   if (config.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
@@ -713,6 +719,18 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
         validation_visitor_, *listener_factory_context_);
+
+    if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
+      auto* quic_packet_writer_factory_factory =
+          Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
+              config.udp_listener_config().udp_packet_packet_writer_config());
+      if (quic_packet_writer_factory_factory != nullptr) {
+        udp_listener_config_->quic_writer_factory_ =
+            quic_packet_writer_factory_factory->createQuicPacketWriterFactory(
+                config.udp_listener_config().udp_packet_packet_writer_config(),
+                *listener_factory_context_);
+      }
+    }
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
@@ -763,6 +781,11 @@ void ListenerImpl::buildListenSocketOptions(
     if (reuse_port_) {
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
+      if (reusePortBpfCpuSteeringEnabled(config)) {
+        addListenSocketOptions(listen_socket_options_list_[i],
+                               Network::SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(
+                                   parent_.workerCpus()));
+      }
     }
     if (!address_opts_list[i]->empty()) {
       addListenSocketOptions(listen_socket_options_list_[i], address_opts_list[i]);
@@ -866,12 +889,28 @@ ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& 
 
 absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::Listener& config) {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
-  ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
+  // The only connection oriented UDP transport protocol right now is QUIC.
+  const bool is_quic = udpListenerConfig().has_value() &&
+                       !udpListenerConfig()->listenerFactory().isTransportConnectionless();
+  ListenerFilterChainFactoryBuilder builder(is_quic, validation_visitor_, *parent_.factory_,
+                                            *transport_factory_context_);
   return filter_chain_manager_->addFilterChains(
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,
       config.filter_chains(),
       config.has_default_filter_chain() ? &config.default_filter_chain() : nullptr, builder,
       *filter_chain_manager_);
+}
+
+bool ListenerImpl::reusePortBpfCpuSteeringEnabled(
+    const envoy::config::listener::v3::Listener& config) const {
+  // Steering maps each receiving CPU to the worker pinned to it. The listener manager tracks the
+  // global prerequisites (worker CPU affinity and kernel support) once for all workers. The mapping
+  // is fixed at startup, so a listener added later via LDS can steer too.
+  return socket_type_ == Network::Socket::Type::Stream && reuse_port_ &&
+         config.has_connection_balance_config() &&
+         config.connection_balance_config().balance_type_case() ==
+             envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kCpuLocalityBalance &&
+         parent_.reusePortBpfCpuSteeringSupported();
 }
 
 absl::Status
@@ -917,6 +956,21 @@ ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listene
                 config.connection_balance_config().extend_balance(), *listener_factory_context_));
         break;
       }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kCpuLocalityBalance:
+        // CPU locality balancing is performed by the kernel reuse port BPF program installed as a
+        // listen socket option, so no user space balancer is needed and the no-op balancer is
+        // always used. When steering is not available the kernel distributes connections with its
+        // default reuse port hashing instead.
+        if (!reusePortBpfCpuSteeringEnabled(config)) {
+          ENVOY_LOG(warn,
+                    "the CPU locality connection balancer is configured for TCP listener '{}' but "
+                    "reuse port BPF CPU steering is not active, so new connections are not steered "
+                    "to CPU-local workers.",
+                    config.name());
+        }
+        connection_balancers_.emplace(address.asString(),
+                                      std::make_shared<Network::NopConnectionBalancerImpl>());
+        break;
       case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
         return absl::InvalidArgumentError("No valid balance type for connection balance");
       }
@@ -1004,6 +1058,18 @@ ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValida
 Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() {
   return listener_factory_context_base_->serverFactoryContext();
 }
+envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
+  return listener_factory_context_base_->listenerInfo().direction();
+}
+bool PerListenerFactoryContextImpl::isQuic() const {
+  return listener_factory_context_base_->listenerInfo().isQuic();
+}
+bool PerListenerFactoryContextImpl::shouldBypassOverloadManager() const {
+  return listener_factory_context_base_->listenerInfo().shouldBypassOverloadManager();
+}
+Stats::Scope& PerListenerFactoryContextImpl::prefixedScope() {
+  return listener_factory_context_base_->listenerScope();
+}
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
 }
@@ -1050,7 +1116,7 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
 }
 
 void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
-  dump.PackFrom(config_maybe_partial_filter_chains_);
+  std::ignore = dump.PackFrom(config_maybe_partial_filter_chains_);
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

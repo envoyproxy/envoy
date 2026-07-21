@@ -25,7 +25,7 @@ namespace Controller {
 GradientControllerConfig::GradientControllerConfig(
     const envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig&
         proto_config,
-    Runtime::Loader& runtime)
+    Runtime::Loader& runtime, absl::Status& creation_status)
     : runtime_(runtime),
       min_rtt_calc_interval_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
@@ -48,8 +48,9 @@ GradientControllerConfig::GradientControllerConfig(
 
   if (min_rtt_calc_interval_ < std::chrono::milliseconds(1) &&
       fixed_value_ <= std::chrono::milliseconds::zero()) {
-    throw EnvoyException(
+    creation_status = absl::InvalidArgumentError(
         "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set");
+    return;
   }
 }
 GradientController::GradientController(GradientControllerConfig config,

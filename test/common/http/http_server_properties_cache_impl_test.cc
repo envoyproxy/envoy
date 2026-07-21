@@ -2,6 +2,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
@@ -14,8 +15,8 @@ namespace Http {
 
 namespace {
 
-static const absl::optional<std::chrono::seconds> kNoTtl = absl::nullopt;
-class HttpServerPropertiesCacheImplTest : public testing::TestWithParam<Envoy::MockKeyValueStore*> {
+static const std::optional<std::chrono::seconds> kNoTtl = std::nullopt;
+class HttpServerPropertiesCacheImplTest : public testing::TestWithParam<bool> {
 public:
   HttpServerPropertiesCacheImplTest()
       : dispatcher_([]() {
@@ -24,7 +25,7 @@ public:
               []() { return std::make_unique<Event::SimulatedTimeSystemHelper>(); });
           return NiceMock<Event::MockDispatcher>();
         }()),
-        store_(GetParam()), expiration1_(dispatcher_.timeSource().monotonicTime() + Seconds(5)),
+        expiration1_(dispatcher_.timeSource().monotonicTime() + Seconds(5)),
         expiration2_(dispatcher_.timeSource().monotonicTime() + Seconds(10)),
         protocol1_(alpn1_, hostname1_, port1_, expiration1_),
         protocol2_(alpn2_, hostname2_, port2_, expiration2_), protocols1_({protocol1_}),
@@ -35,15 +36,23 @@ public:
   }
 
   void initialize() {
+    store_ = nullptr;
+    if (GetParam()) {
+      owned_store_ = std::make_unique<NiceMock<MockKeyValueStore>>();
+      store_ = owned_store_.get();
+    } else {
+      owned_store_.reset();
+    }
     protocols_ = std::make_unique<HttpServerPropertiesCacheImpl>(
-        dispatcher_, std::move(suffixes_), std::unique_ptr<KeyValueStore>(store_), max_entries_);
+        dispatcher_, std::move(suffixes_), std::move(owned_store_), max_entries_);
   }
 
   size_t max_entries_ = 10;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<std::string> suffixes_;
-  MockKeyValueStore* store_;
+  MockKeyValueStore* store_{};
+  std::unique_ptr<MockKeyValueStore> owned_store_;
   std::unique_ptr<HttpServerPropertiesCacheImpl> protocols_;
 
   const std::string hostname1_ = "hostname1";
@@ -213,7 +222,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterTruncation) {
 TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromOriginString) {
   initialize();
   std::string origin_str = "https://hostname1:1";
-  absl::optional<HttpServerPropertiesCache::Origin> origin =
+  std::optional<HttpServerPropertiesCache::Origin> origin =
       HttpServerPropertiesCacheImpl::stringToOrigin(origin_str);
   ASSERT_TRUE(origin.has_value());
   EXPECT_EQ(1, origin.value().port_);
@@ -224,7 +233,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromOriginString) {
 
   // Test with no scheme or port.
   std::string origin_str2 = "://:1";
-  absl::optional<HttpServerPropertiesCache::Origin> origin2 =
+  std::optional<HttpServerPropertiesCache::Origin> origin2 =
       HttpServerPropertiesCacheImpl::stringToOrigin(origin_str2);
   ASSERT_TRUE(origin2.has_value());
   EXPECT_EQ(1, origin2.value().port_);
@@ -265,7 +274,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromString) {
   initialize();
   auto testAltSvc = [&](const std::string& original_alt_svc,
                         const std::string& expected_alt_svc) -> void {
-    absl::optional<HttpServerPropertiesCacheImpl::OriginData> origin_data =
+    std::optional<HttpServerPropertiesCacheImpl::OriginData> origin_data =
         HttpServerPropertiesCacheImpl::originDataFromString(original_alt_svc,
                                                             dispatcher_.timeSource(), true);
     ASSERT(origin_data.has_value());
@@ -570,7 +579,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCa
 
 // Execute all tests when key value store is nullptr and when it is valid.
 INSTANTIATE_TEST_SUITE_P(HttpServerPropertiesCacheImplTestSuite, HttpServerPropertiesCacheImplTest,
-                         testing::Values(nullptr, new NiceMock<MockKeyValueStore>()));
+                         testing::Bool());
 } // namespace
 } // namespace Http
 } // namespace Envoy

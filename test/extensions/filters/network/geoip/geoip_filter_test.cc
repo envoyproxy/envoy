@@ -6,9 +6,8 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/network/geoip/geoip_filter.h"
 
-#include "test/extensions/filters/http/geoip/mocks.h"
+#include "test/mocks/geoip/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -19,11 +18,6 @@
 
 using testing::_;
 using testing::Invoke;
-
-// Import the shared geoip mocks from the HTTP filter tests.
-using Envoy::Extensions::HttpFilters::Geoip::DummyGeoipProviderFactory;
-using Envoy::Extensions::HttpFilters::Geoip::MockDriver;
-using Envoy::Extensions::HttpFilters::Geoip::MockDriverSharedPtr;
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +30,7 @@ const std::string BasicGeoipConfig = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
 
 // Matcher to verify LookupRequest has the expected remote address.
@@ -75,7 +69,8 @@ MATCHER_P2(HasGeoField, key, value_matcher, "") {
 class GeoipFilterTest : public testing::Test {
 public:
   GeoipFilterTest()
-      : dummy_factory_(new DummyGeoipProviderFactory()), dummy_driver_(dummy_factory_->getDriver()),
+      : dummy_factory_(new Geolocation::DummyGeoipProviderFactory()),
+        dummy_driver_(dummy_factory_->getDriver()),
         filter_state_(std::make_shared<StreamInfo::FilterStateImpl>(
             StreamInfo::FilterState::LifeSpan::Connection)) {
     ON_CALL(filter_callbacks_.connection_.stream_info_, filterState())
@@ -110,15 +105,14 @@ public:
 
   void setFilterStateClientIp(const std::string& key, const std::string& ip) {
     filter_state_->setData(key, std::make_shared<Router::StringAccessorImpl>(ip),
-                           StreamInfo::FilterState::StateType::Mutable,
                            StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   NiceMock<Stats::MockStore> stats_;
   GeoipFilterConfigSharedPtr config_;
   std::shared_ptr<GeoipFilter> filter_;
-  std::unique_ptr<DummyGeoipProviderFactory> dummy_factory_;
-  MockDriverSharedPtr dummy_driver_;
+  std::unique_ptr<Geolocation::DummyGeoipProviderFactory> dummy_factory_;
+  Geolocation::MockDriverSharedPtr dummy_driver_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   StreamInfo::FilterStateSharedPtr filter_state_;
 };

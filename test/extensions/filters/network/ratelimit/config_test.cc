@@ -4,14 +4,17 @@
 
 #include "source/extensions/filters/network/ratelimit/config.h"
 
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::HasSubstr;
+using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -72,6 +75,35 @@ TEST(RateLimitFilterConfigTest, EmptyProto) {
           factory.createEmptyConfigProto().get());
   EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, context).IgnoreError(),
                EnvoyException);
+}
+
+TEST(RateLimitFilterConfigTest, DeprecatedV2TransportApiVersion) {
+  const std::string yaml = R"EOF(
+  stat_prefix: my_stat_prefix
+  domain: fake_domain
+  descriptors:
+    entries:
+       key: my_key
+       value: my_value
+  rate_limit_service:
+    transport_api_version: V2
+    grpc_service:
+      envoy_grpc:
+        cluster_name: ratelimit_cluster
+  )EOF";
+
+  envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config{};
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  ON_CALL(context, messageValidationVisitor()).WillByDefault(ReturnRef(validation_visitor));
+
+  RateLimitConfigFactory factory;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              HasSubstr("V2 xDS transport protocol version is deprecated"));
 }
 
 TEST(RateLimitFilterConfigTest, IncorrectProto) {

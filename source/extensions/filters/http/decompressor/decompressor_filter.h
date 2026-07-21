@@ -161,7 +161,7 @@ private:
     uint64_t total_compressed_bytes_{};
     uint64_t total_uncompressed_bytes_{};
   };
-  using ByteTrackerOptConstRef = absl::optional<std::reference_wrapper<const ByteTracker>>;
+  using ByteTrackerOptConstRef = std::optional<std::reference_wrapper<const ByteTracker>>;
 
   template <class HeaderType>
   Http::FilterHeadersStatus
@@ -191,7 +191,7 @@ private:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  using HeaderMapOptRef = absl::optional<std::reference_wrapper<Http::HeaderMap>>;
+  using HeaderMapOptRef = std::optional<std::reference_wrapper<Http::HeaderMap>>;
   void decompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                   const Compression::Decompressor::DecompressorPtr& decompressor,
                   Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer,

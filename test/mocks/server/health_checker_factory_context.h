@@ -45,7 +45,7 @@ public:
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Envoy::Random::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
-  testing::NiceMock<Envoy::Api::MockApi> api_{};
+  testing::NiceMock<Envoy::Api::MockApi> api_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   std::unique_ptr<testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>> event_logger_;
   testing::NiceMock<MockServerFactoryContext> server_context_;

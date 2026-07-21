@@ -65,7 +65,7 @@ public:
       GrpcStreamCallbacks<ResponseType>* stream_callbacks)>;
 
   GrpcMuxFailover(GrpcStreamCreator primary_stream_creator,
-                  absl::optional<GrpcStreamCreator> failover_stream_creator,
+                  std::optional<GrpcStreamCreator> failover_stream_creator,
                   GrpcStreamCallbacks<ResponseType>& grpc_mux_callbacks,
                   Event::Dispatcher& dispatcher)
       : grpc_mux_callbacks_(grpc_mux_callbacks), primary_callbacks_(*this),
@@ -179,7 +179,7 @@ public:
   }
 
   // Returns the close status for testing purposes only.
-  absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() {
+  std::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() {
     if (connectingToOrConnectedToFailover()) {
       return failover_grpc_stream_->getCloseStatusForTest();
     }
@@ -395,7 +395,7 @@ private:
   // the class will no longer need to extend the interface, and these can be removed.
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override { PANIC("not implemented"); }
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override { PANIC("not implemented"); }
-  void onReceiveMessage(std::unique_ptr<ResponseType>&&) override { PANIC("not implemented"); }
+  void onReceiveMessage(Grpc::ResponsePtr<ResponseType>&&) override { PANIC("not implemented"); }
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {
     PANIC("not implemented");
   }

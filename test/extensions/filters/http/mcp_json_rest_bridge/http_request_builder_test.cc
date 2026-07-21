@@ -1,9 +1,9 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
 
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include "ocpdiag/core/testing/parse_text_proto.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,15 +14,15 @@ namespace {
 using ::envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule;
 using ::Envoy::StatusHelpers::StatusIs;
 using ::nlohmann::json;
-using ::ocpdiag::testing::ParseTextProtoOrDie;
 using ::testing::StrEq;
 
 TEST(HttpRequestBuilderTest, WildCardHttpRuleBodyContainsAllArgumentsNotInPath) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
-    get: "/v1/{parent=projects/*}"
-    body: "*"
-  )pb");
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+get: "/v1/{parent=projects/*}"
+body: "*"
+)yaml",
+                            http_rule);
 
   json arguments = json::parse(R"json({
     "shelf": {
@@ -41,7 +41,7 @@ TEST(HttpRequestBuilderTest, WildCardHttpRuleBodyContainsAllArgumentsNotInPath) 
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789"));
   EXPECT_THAT(http_request->method, StrEq("GET"));
@@ -62,11 +62,12 @@ TEST(HttpRequestBuilderTest, WildCardHttpRuleBodyContainsAllArgumentsNotInPath) 
 }
 
 TEST(HttpRequestBuilderTest, ExtractHttpRuleBody) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
-    post: "/v1/{parent=projects/*}"
-    body: "shelf"
-  )pb");
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+post: "/v1/{parent=projects/*}"
+body: "shelf"
+)yaml",
+                            http_rule);
 
   json arguments = json::parse(R"json({
     "shelf": {
@@ -85,7 +86,7 @@ TEST(HttpRequestBuilderTest, ExtractHttpRuleBody) {
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789?theme=Kids"));
   EXPECT_THAT(http_request->method, StrEq("POST"));
@@ -103,10 +104,11 @@ TEST(HttpRequestBuilderTest, ExtractHttpRuleBody) {
 }
 
 TEST(HttpRequestBuilderTest, PrimitiveArrayInQueryParameters) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
-    put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
-  )pb");
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
@@ -116,7 +118,7 @@ TEST(HttpRequestBuilderTest, PrimitiveArrayInQueryParameters) {
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(
       http_request->url,
@@ -128,10 +130,11 @@ TEST(HttpRequestBuilderTest, PrimitiveArrayInQueryParameters) {
 }
 
 TEST(HttpRequestBuilderTest, ObjectArrayInQueryParameters) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
-    patch: "/v1/{parent=projects/*}/shelves/{shelf.name}"
-  )pb");
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+patch: "/v1/{parent=projects/*}/shelves/{shelf.name}"
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
@@ -144,7 +147,7 @@ TEST(HttpRequestBuilderTest, ObjectArrayInQueryParameters) {
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url,
               StrEq("/v1/projects/123456789/shelves/"
@@ -154,10 +157,11 @@ TEST(HttpRequestBuilderTest, ObjectArrayInQueryParameters) {
 }
 
 TEST(HttpRequestBuilderTest, PrimitiveTypeInQueryParameters) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
-    delete: "/v1/{parent=projects/*}"
-  )pb");
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+delete: "/v1/{parent=projects/*}"
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "integer": 123,
     "float": 123.456,
@@ -168,7 +172,7 @@ TEST(HttpRequestBuilderTest, PrimitiveTypeInQueryParameters) {
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789?boolean=true&float=123.456&"
                                        "integer=123&null=null&string=test%20string"));
@@ -177,11 +181,12 @@ TEST(HttpRequestBuilderTest, PrimitiveTypeInQueryParameters) {
 }
 
 TEST(HttpRequestBuilderTest, NestedPathInPathTemplate) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
-    get: "/v1/{parent=projects/*}/shelves/{shelf.name}"
-    body: "*"
-  )pb");
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+get: "/v1/{parent=projects/*}/shelves/{shelf.name}"
+body: "*"
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
@@ -192,7 +197,7 @@ TEST(HttpRequestBuilderTest, NestedPathInPathTemplate) {
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789/shelves/science-fiction"));
   EXPECT_THAT(http_request->method, StrEq("GET"));
@@ -205,10 +210,11 @@ TEST(HttpRequestBuilderTest, NestedPathInPathTemplate) {
 }
 
 TEST(HttpRequestBuilderTest, PathTemplateNotInArgumentsReturnError) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
-    get: "/v1/{parent=projects/*}"
-  )pb");
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+get: "/v1/{parent=projects/*}"
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({
     "string": "test string"
   })json");
@@ -217,11 +223,12 @@ TEST(HttpRequestBuilderTest, PathTemplateNotInArgumentsReturnError) {
 }
 
 TEST(HttpRequestBuilderTest, FailToExtractBodyReturnError) {
-  HttpRule http_rule = ParseTextProtoOrDie(
-      R"pb(
-    get: "/v1"
-    body: "foo"
-  )pb");
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+get: "/v1"
+body: "foo"
+)yaml",
+                            http_rule);
   json arguments = json::parse(R"json({})json");
 
   EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));

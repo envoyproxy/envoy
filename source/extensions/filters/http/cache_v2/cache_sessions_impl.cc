@@ -86,7 +86,7 @@ static Http::ResponseHeaderMapPtr notSatisfiableHeaders() {
 }
 
 void ActiveLookupContext::getHeaders(GetHeadersCallback&& cb) {
-  absl::optional<std::vector<RawByteRange>> ranges = lookup().parseRange();
+  std::optional<std::vector<RawByteRange>> ranges = lookup().parseRange();
   if (ranges) {
     // If it's a range request, inject the appropriate modified content-range and
     // content-length headers into the response once we have the response headers.
@@ -128,8 +128,9 @@ void ActiveLookupContext::getTrailers(GetTrailersCallback&& cb) {
   entry_->wantTrailers(dispatcher(), std::move(cb));
 }
 
-std::shared_ptr<CacheSessions> CacheSessions::create(Server::Configuration::FactoryContext& context,
-                                                     std::unique_ptr<HttpCache> cache) {
+std::shared_ptr<CacheSessions>
+CacheSessions::create(Server::Configuration::ServerFactoryContext& context,
+                      std::unique_ptr<HttpCache> cache) {
   return std::make_shared<CacheSessionsImpl>(context, std::move(cache));
 }
 

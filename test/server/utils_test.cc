@@ -1,6 +1,8 @@
 #include "source/server/utils.h"
 
 #include "test/mocks/server/options.h"
+#include "test/test_common/enum_test_utils.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,7 +17,7 @@ namespace Utility {
 // of special cases to get remaining coverage.
 TEST(UtilsTest, BadServerState) {
   Utility::serverState(Init::Manager::State::Uninitialized, true);
-  EXPECT_ENVOY_BUG(Utility::serverState(static_cast<Init::Manager::State>(123), true),
+  EXPECT_ENVOY_BUG(Utility::serverState(uncheckedEnumCastForTest<Init::Manager::State>(123), true),
                    "unexpected server state");
 }
 
@@ -23,21 +25,21 @@ TEST(UtilsTest, AssertExclusiveLogFormatMethod) {
   {
     testing::NiceMock<MockOptions> options;
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
-    EXPECT_TRUE(Utility::assertExclusiveLogFormatMethod(options, log_config).ok());
+    EXPECT_OK(Utility::assertExclusiveLogFormatMethod(options, log_config));
   }
 
   {
     testing::NiceMock<MockOptions> options;
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     EXPECT_CALL(options, logFormatSet()).WillRepeatedly(Return(true));
-    EXPECT_TRUE(Utility::assertExclusiveLogFormatMethod(options, log_config).ok());
+    EXPECT_OK(Utility::assertExclusiveLogFormatMethod(options, log_config));
   }
 
   {
     testing::NiceMock<MockOptions> options;
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     log_config.mutable_log_format();
-    EXPECT_TRUE(Utility::assertExclusiveLogFormatMethod(options, log_config).ok());
+    EXPECT_OK(Utility::assertExclusiveLogFormatMethod(options, log_config));
   }
 
   {
@@ -54,25 +56,25 @@ TEST(UtilsTest, AssertExclusiveLogFormatMethod) {
 TEST(UtilsTest, MaybeSetApplicationLogFormat) {
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
-    EXPECT_TRUE(Utility::maybeSetApplicationLogFormat(log_config).ok());
+    EXPECT_OK(Utility::maybeSetApplicationLogFormat(log_config));
   }
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     log_config.mutable_log_format();
-    EXPECT_TRUE(Utility::maybeSetApplicationLogFormat(log_config).ok());
+    EXPECT_OK(Utility::maybeSetApplicationLogFormat(log_config));
   }
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     log_config.mutable_log_format()->mutable_json_format();
-    EXPECT_TRUE(Utility::maybeSetApplicationLogFormat(log_config).ok());
+    EXPECT_OK(Utility::maybeSetApplicationLogFormat(log_config));
   }
 
   {
     envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig log_config;
     log_config.mutable_log_format()->mutable_text_format();
-    EXPECT_TRUE(Utility::maybeSetApplicationLogFormat(log_config).ok());
+    EXPECT_OK(Utility::maybeSetApplicationLogFormat(log_config));
   }
 
   {

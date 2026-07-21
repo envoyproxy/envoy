@@ -15,7 +15,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -654,32 +654,6 @@ TEST(HttpUtility, parseHttp2Settings) {
   }
 
   {
-
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.safe_http2_options", "false"}});
-
-    using ::Envoy::Http2::Utility::OptionsLimits;
-    auto http2_options = parseHttp2OptionsFromV3Yaml("{}");
-    EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY,
-              http2_options.max_concurrent_streams().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY,
-              http2_options.initial_stream_window_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE_LEGACY,
-              http2_options.initial_connection_window_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES,
-              http2_options.max_outbound_frames().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
-              http2_options.max_outbound_control_frames().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
-              http2_options.max_consecutive_inbound_frames_with_empty_payload().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
-              http2_options.max_inbound_priority_frames_per_stream().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
-              http2_options.max_inbound_window_update_frames_per_data_frame_sent().value());
-  }
-
-  {
     const std::string yaml = R"EOF(
 hpack_table_size: 1
 max_concurrent_streams: 2
@@ -1072,7 +1046,7 @@ TEST(HttpUtility, SendLocalReply) {
   EXPECT_CALL(callbacks, streamInfo());
   sendLocalReplyTestHelper(
       is_reset, callbacks,
-      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", std::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReply) {
@@ -1091,7 +1065,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
       }));
   sendLocalReplyTestHelper(
       is_reset, callbacks,
-      Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
+      Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", std::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
@@ -1169,7 +1143,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
       }));
   sendLocalReplyTestHelper(
       is_reset, callbacks,
-      Utility::LocalReplyData{true, Http::Code::Unauthorized, json, absl::nullopt, false});
+      Utility::LocalReplyData{true, Http::Code::Unauthorized, json, std::nullopt, false});
 }
 
 TEST(HttpUtility, RateLimitedGrpcStatus) {
@@ -1184,7 +1158,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
       }));
   sendLocalReplyTestHelper(
       false, callbacks,
-      Utility::LocalReplyData{true, Http::Code::TooManyRequests, "", absl::nullopt, false});
+      Utility::LocalReplyData{true, Http::Code::TooManyRequests, "", std::nullopt, false});
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -1195,7 +1169,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   sendLocalReplyTestHelper(
       false, callbacks,
       Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
-                              absl::make_optional<Grpc::Status::GrpcStatus>(
+                              std::make_optional<Grpc::Status::GrpcStatus>(
                                   Grpc::Status::WellKnownGrpcStatus::ResourceExhausted),
                               false});
 }
@@ -1211,7 +1185,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
   sendLocalReplyTestHelper(
       is_reset, callbacks,
-      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", std::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
@@ -1224,7 +1198,7 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
       }));
   sendLocalReplyTestHelper(
       is_reset, callbacks,
-      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, true});
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", std::nullopt, true});
 }
 
 TEST(HttpUtility, TestExtractHostPathFromUri) {
@@ -1362,22 +1336,22 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
 }
 
 TEST(HttpUtility, CheckIsIpAddress) {
-  std::array<std::tuple<bool, std::string, std::string, absl::optional<uint32_t>>, 15> patterns{
-      std::make_tuple(true, "1.2.3.4", "1.2.3.4", absl::nullopt),
+  std::array<std::tuple<bool, std::string, std::string, std::optional<uint32_t>>, 15> patterns{
+      std::make_tuple(true, "1.2.3.4", "1.2.3.4", std::nullopt),
       std::make_tuple(true, "1.2.3.4:0", "1.2.3.4", 0),
       std::make_tuple(true, "0.0.0.0:4000", "0.0.0.0", 4000),
       std::make_tuple(true, "127.0.0.1:0", "127.0.0.1", 0),
       std::make_tuple(true, "[::]:0", "::", 0),
-      std::make_tuple(true, "[::]", "::", absl::nullopt),
+      std::make_tuple(true, "[::]", "::", std::nullopt),
       std::make_tuple(true, "[1::2:3]:0", "1::2:3", 0),
       std::make_tuple(true, "[a::1]:0", "a::1", 0),
       std::make_tuple(true, "[a:b:c:d::]:0", "a:b:c:d::", 0),
-      std::make_tuple(false, "example.com", "example.com", absl::nullopt),
+      std::make_tuple(false, "example.com", "example.com", std::nullopt),
       std::make_tuple(false, "example.com:8000", "example.com", 8000),
-      std::make_tuple(false, "example.com:abc", "example.com:abc", absl::nullopt),
+      std::make_tuple(false, "example.com:abc", "example.com:abc", std::nullopt),
       std::make_tuple(false, "localhost:10000", "localhost", 10000),
-      std::make_tuple(false, "localhost", "localhost", absl::nullopt),
-      std::make_tuple(false, "", "", absl::nullopt)};
+      std::make_tuple(false, "localhost", "localhost", std::nullopt),
+      std::make_tuple(false, "", "", std::nullopt)};
 
   for (const auto& pattern : patterns) {
     bool status_pattern = std::get<0>(pattern);

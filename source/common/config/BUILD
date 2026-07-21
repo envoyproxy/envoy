@@ -170,6 +170,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "singleton_subscription_adapter_lib",
+    srcs = ["singleton_subscription_adapter.cc"],
+    hdrs = ["singleton_subscription_adapter.h"],
+    deps = [
+        "//envoy/config:subscription_interface",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_library(
     name = "subscription_factory_lib",
     srcs = ["subscription_factory_impl.cc"],
     hdrs = ["subscription_factory_impl.h"],
@@ -234,7 +246,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/version:api_version_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

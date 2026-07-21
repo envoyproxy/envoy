@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -49,7 +50,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<Cluster>(
         new Cluster(cluster_config_, config_, factory_context, creation_status));
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   envoy::config::cluster::v3::Cluster cluster_config_;
@@ -118,7 +119,7 @@ cluster_type:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_null;
   NiceMock<Upstream::MockLoadBalancerContext> context_null;
   EXPECT_CALL(context_null, requestStreamInfo()).WillOnce(Return(&stream_info_null));
-  EXPECT_CALL(stream_info_null, attemptCount()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(stream_info_null, attemptCount()).WillOnce(Return(std::nullopt));
   EXPECT_EQ(0, lb.getAttemptCount(&context_null));
 }
 
@@ -208,14 +209,14 @@ cluster_type:
   std::vector<uint8_t> hash_key;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
 
   // Test all load balancer methods when no cluster is available.
   auto result = lb.chooseHost(&context);
   EXPECT_EQ(nullptr, result.host);
 
   EXPECT_EQ(nullptr, lb.peekAnotherHost(&context));
-  EXPECT_EQ(absl::nullopt, lb.selectExistingConnection(&context, host, hash_key));
+  EXPECT_EQ(std::nullopt, lb.selectExistingConnection(&context, host, hash_key));
   EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
 }
 
@@ -263,7 +264,7 @@ cluster_type:
   // Test thread aware load balancer.
   CompositeThreadAwareLoadBalancer thread_aware_lb(*cluster_);
   EXPECT_NE(nullptr, thread_aware_lb.factory());
-  EXPECT_TRUE(thread_aware_lb.initialize().ok());
+  EXPECT_OK(thread_aware_lb.initialize());
 
   // Test load balancer factory.
   CompositeLoadBalancerFactory factory(*cluster_);
@@ -329,7 +330,7 @@ TEST_F(CompositeClusterTest, LoadBalancerContextWithNullContext) {
   CompositeLoadBalancerContext wrapper(nullptr, 0);
 
   // Should create owned context and delegate to it.
-  EXPECT_EQ(absl::nullopt, wrapper.computeHashKey());
+  EXPECT_EQ(std::nullopt, wrapper.computeHashKey());
   EXPECT_EQ(nullptr, wrapper.downstreamConnection());
   EXPECT_EQ(nullptr, wrapper.requestStreamInfo());
 
@@ -426,7 +427,7 @@ cluster_type:
   auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("target_cluster"))
       .WillRepeatedly(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
@@ -461,7 +462,7 @@ cluster_type:
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("peek_target"))
       .WillOnce(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillOnce(ReturnRef(mock_lb));
@@ -494,7 +495,7 @@ cluster_type:
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(3)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(3)));
 
   EXPECT_EQ(nullptr, lb.peekAnotherHost(&context));
 }
@@ -521,7 +522,7 @@ cluster_type:
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster"))
       .WillOnce(Return(nullptr));
 
@@ -550,7 +551,7 @@ cluster_type:
   NiceMock<Upstream::MockHost> mock_host;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("select_target"))
       .WillOnce(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillOnce(ReturnRef(mock_lb));
@@ -560,7 +561,7 @@ cluster_type:
   NiceMock<Network::MockConnection> mock_connection;
   Upstream::SelectedPoolAndConnection expected_result{mock_pool, mock_connection};
   EXPECT_CALL(mock_lb, selectExistingConnection(_, _, _))
-      .WillOnce(Return(absl::optional<Upstream::SelectedPoolAndConnection>(expected_result)));
+      .WillOnce(Return(std::optional<Upstream::SelectedPoolAndConnection>(expected_result)));
 
   auto connection_result = lb.selectExistingConnection(&context, mock_host, hash_key);
   EXPECT_TRUE(connection_result.has_value());
@@ -582,10 +583,10 @@ TEST_F(CompositeClusterTest, FactoryCreateMethod) {
   envoy::extensions::clusters::composite::v3::ClusterConfig typed_config;
   auto* entry = typed_config.add_clusters();
   entry->set_name("factory_cluster_1");
-  cluster_type->mutable_typed_config()->PackFrom(typed_config);
+  std::ignore = cluster_type->mutable_typed_config()->PackFrom(typed_config);
 
   auto result = factory.create(cluster_config, factory_context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_NE(nullptr, result.value().first);
   EXPECT_NE(nullptr, result.value().second);
 }
@@ -654,7 +655,7 @@ cluster_type:
   NiceMock<Upstream::MockLoadBalancerContext> mock_context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(mock_context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
 
   // Mock cluster manager to return nullptr for missing_cluster_0.
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster_0"))
@@ -691,7 +692,7 @@ cluster_type:
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
 
   // Test attempt 3 which exceeds available clusters (only have 2).
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(3)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(3)));
 
   auto result = lb.chooseHost(&context);
   EXPECT_EQ(nullptr, result.host);

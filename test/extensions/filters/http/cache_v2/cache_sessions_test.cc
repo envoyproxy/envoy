@@ -69,7 +69,8 @@ protected:
         .WillRepeatedly(Return(true));
     auto mock_http_cache = std::make_unique<MockHttpCache>();
     mock_http_cache_ = mock_http_cache.get();
-    cache_sessions_ = CacheSessions::create(mock_factory_context_, std::move(mock_http_cache));
+    cache_sessions_ = CacheSessions::create(mock_factory_context_.server_factory_context_,
+                                            std::move(mock_http_cache));
     ON_CALL(*mock_http_cache_, lookup)
         .WillByDefault([this](LookupRequest&&, HttpCache::LookupCallback&& cb) {
           captured_lookup_callbacks_.push_back(std::move(cb));
@@ -172,7 +173,7 @@ static std::string dateNowPlus60s() {
   return formatter.fromTime(t);
 }
 
-Http::ResponseHeaderMapPtr cacheableResponseHeaders(absl::optional<uint64_t> content_length = 0) {
+Http::ResponseHeaderMapPtr cacheableResponseHeaders(std::optional<uint64_t> content_length = 0) {
   auto h = std::make_unique<Http::TestResponseHeaderMapImpl>();
   h->setStatus("200");
   h->addCopy(":scheme", "http");
@@ -186,7 +187,7 @@ Http::ResponseHeaderMapPtr cacheableResponseHeaders(absl::optional<uint64_t> con
 }
 
 Http::ResponseHeaderMapPtr
-cacheableResponseHeadersByExpire(absl::optional<uint64_t> content_length = 0) {
+cacheableResponseHeadersByExpire(std::optional<uint64_t> content_length = 0) {
   auto h = std::make_unique<Http::TestResponseHeaderMapImpl>();
   h->setStatus("200");
   h->addCopy(":scheme", "http");

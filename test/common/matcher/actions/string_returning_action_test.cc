@@ -1,7 +1,7 @@
 #include "source/common/matcher/actions/string_returning_action.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 
 #include "gtest/gtest.h"
@@ -17,7 +17,7 @@ public:
     factory_ = Config::Utility::getAndCheckFactory<
         Matcher::ActionFactory<StringReturningActionFactoryContext>>(typed_config_);
     config_ = factory_->createEmptyConfigProto();
-    typed_config_.typed_config().UnpackTo(config_.get());
+    std::ignore = typed_config_.typed_config().UnpackTo(config_.get());
     action_ = factory_->createAction(*config_, factory_context_,
                                      ProtobufMessage::getStrictValidationVisitor());
     ASSERT_NE(nullptr, action_);

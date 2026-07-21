@@ -15,7 +15,6 @@ envoy_cc_library(
         "//envoy/common:time_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -72,6 +71,7 @@ envoy_cc_library(
         "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
     ],
 )
 
@@ -100,6 +100,7 @@ envoy_cc_library(
     name = "subscription_interface",
     hdrs = ["subscription.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/stats:stats_macros",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -132,7 +133,6 @@ envoy_cc_library(
         ":typed_config_interface",
         "//envoy/api:api_interface",
         "//envoy/protobuf:message_validator_interface",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

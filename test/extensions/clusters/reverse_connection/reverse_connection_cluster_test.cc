@@ -28,10 +28,10 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -62,14 +62,14 @@ public:
   }
 
   // Upstream::LoadBalancerContext.
-  absl::optional<uint64_t> computeHashKey() override { return 0; }
+  std::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
   StreamInfo::StreamInfo* requestStreamInfo() const override { return request_stream_info_; }
   const Http::RequestHeaderMap* downstreamHeaders() const override {
     return downstream_headers_.get();
   }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
   StreamInfo::StreamInfo* request_stream_info_;
   Http::RequestHeaderMapPtr downstream_headers_;
@@ -98,7 +98,7 @@ public:
     // Both options_.config_proto_ and bootstrap_ are populated since validation may use either.
     auto* bootstrap_extension = server_context_.options_.config_proto_.add_bootstrap_extensions();
     bootstrap_extension->set_name("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-    bootstrap_extension->mutable_typed_config()->PackFrom(config_);
+    std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(config_);
     *server_context_.bootstrap_.add_bootstrap_extensions() = *bootstrap_extension;
   }
 
@@ -257,7 +257,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
   std::shared_ptr<RevConCluster> cluster_;
-  ReadyWatcher membership_updated_;
+  NiceMock<ReadyWatcher> membership_updated_;
   ReadyWatcher initialized_;
   Event::MockTimer* cleanup_timer_;
   ::Envoy::Common::CallbackHandlePtr priority_update_cb_;
@@ -1777,7 +1777,7 @@ public:
     auto& bootstrap = server_context_.bootstrap_;
     for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
       if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
-        extension.mutable_typed_config()->PackFrom(config_);
+        std::ignore = extension.mutable_typed_config()->PackFrom(config_);
         break;
       }
     }
@@ -2076,6 +2076,310 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest, ClusterUsesRequestStream
   auto result = lb.chooseHost(&lb_context);
   ASSERT_NE(result.host, nullptr);
   EXPECT_EQ(result.host->address()->logicalName(), "tenant1:node1");
+}
+
+// --- Cluster membership stats tests ---
+
+// Verify that chooseHost() posts a priority set update for new hosts, and that
+// membership_total/membership_healthy/membership_change reflect the actual state.
+TEST_F(ReverseConnectionClusterTest, HostCreationUpdatesMembership) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("test-node-1", "test-cluster-1");
+
+  // Capture the callback posted to the dispatcher by chooseHost().
+  Event::PostCb post_cb;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-node-1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+
+  // Priority set not yet updated (post hasn't run).
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // Simulate main thread processing the posted callback.
+  EXPECT_CALL(membership_updated_, ready());
+  post_cb();
+
+  // Now membership should reflect the new host.
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+}
+
+// Verify that reusing an existing host does not post another priority set update.
+TEST_F(ReverseConnectionClusterTest, HostReuseDoesNotDoubleMembership) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("test-node-1", "test-cluster-1");
+
+  Event::PostCb post_cb;
+  // Expect exactly one post (for the first chooseHost only).
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-node-1"}}};
+
+  // First call creates the host and posts.
+  auto result1 = lb.chooseHost(&lb_context);
+  ASSERT_NE(result1.host, nullptr);
+
+  // Run the posted callback.
+  EXPECT_CALL(membership_updated_, ready());
+  post_cb();
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // Second call reuses the host — no additional post expected.
+  auto result2 = lb.chooseHost(&lb_context);
+  ASSERT_NE(result2.host, nullptr);
+  EXPECT_EQ(result1.host, result2.host);
+
+  // Membership unchanged.
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+// Verify that multiple distinct hosts each trigger a membership update.
+TEST_F(ReverseConnectionClusterTest, MultipleHostsMembershipUpdate) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("node-a", "cluster-a");
+  addTestSocket("node-b", "cluster-b");
+
+  std::vector<Event::PostCb> post_cbs;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .Times(2)
+      .WillRepeatedly(
+          testing::Invoke([&post_cbs](Event::PostCb cb) { post_cbs.push_back(std::move(cb)); }));
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Create host A.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-a"}}};
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+  }
+
+  // Create host B.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-b"}}};
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+  }
+
+  ASSERT_EQ(2UL, post_cbs.size());
+
+  // Run both posted callbacks.
+  EXPECT_CALL(membership_updated_, ready()).Times(2);
+  post_cbs[0]();
+  post_cbs[1]();
+
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+}
+
+// Verify that cleanup() removes stale hosts from the priority set.
+TEST_F(ReverseConnectionClusterTest, CleanupRemovesHostsFromPrioritySet) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("stale-node", "stale-cluster");
+
+  Event::PostCb post_cb;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "stale-node"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+
+  // Run the post to add to priority set.
+  EXPECT_CALL(membership_updated_, ready());
+  post_cb();
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // The host is not "used" (no active connection pool holds it), so cleanup should remove it.
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  callCleanup();
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+// The reverse-connection cluster surfaces currently-reachable tunnels as admin endpoints without
+// creating load-balanced hosts.
+TEST_F(ReverseConnectionClusterTest, AdminEndpointsExposeReachableTunnels) {
+  config_.set_enable_detailed_stats(true);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // The cluster is its own admin endpoint provider.
+  EXPECT_EQ(static_cast<const Upstream::AdminEndpointProvider*>(cluster_.get()),
+            cluster_->adminEndpointProvider());
+
+  // No tunnels yet: nothing reported, and no load-balanced hosts created.
+  EXPECT_TRUE(cluster_->adminEndpoints().empty());
+
+  // Two connections to the same node surface as one endpoint with a count of 2.
+  extension_->updateConnectionStats("node-a", "cluster-a", true, false);
+  extension_->updateConnectionStats("node-a", "cluster-a", true, false);
+
+  auto endpoints = cluster_->adminEndpoints();
+  ASSERT_EQ(1, endpoints.size());
+  const auto& ep = endpoints[0];
+
+  // Mirrors a real reverse-tunnel host: placeholder 127.0.0.1:0 address, node id in logicalName,
+  // and "cluster:node" in the hostname, weight 1, healthy.
+  EXPECT_EQ("node-a", ep.address->logicalName());
+  EXPECT_EQ("127.0.0.1:0", ep.address->asString());
+  EXPECT_EQ("cluster-a:node-a", ep.hostname);
+  EXPECT_EQ(1u, ep.weight);
+  EXPECT_EQ(envoy::config::core::v3::HEALTHY, ep.health);
+
+  ASSERT_EQ(1, ep.gauges.size());
+  EXPECT_EQ("rt_connection_count", ep.gauges[0].first);
+  EXPECT_EQ(2, ep.gauges[0].second);
+
+  // Surfacing admin endpoints does not add load-balanced hosts to the priority set.
+  for (const auto& host_set : cluster_->prioritySet().hostSetsPerPriority()) {
+    EXPECT_TRUE(host_set->hosts().empty());
+  }
+}
+
+// A node that already has a real (lazily-created) load-balanced host is not also surfaced as a
+// synthetic admin endpoint, so it is never listed twice.
+TEST_F(ReverseConnectionClusterTest, AdminEndpointsSkipNodesWithRealHost) {
+  config_.set_enable_detailed_stats(true);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("node-a", "cluster-a");
+
+  // The reachable-tunnel inventory knows about node-a.
+  extension_->updateConnectionStats("node-a", "cluster-a", true, false);
+  EXPECT_EQ(1, cluster_->adminEndpoints().size());
+
+  // Route a request to node-a so a real load-balanced host is created for it.
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-a"}}};
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+
+  // The real host carries the same "cluster:node" hostname as the synthetic endpoint did.
+  EXPECT_EQ("cluster-a:node-a", result.host->hostname());
+
+  // Now that node-a has a real host, it is no longer reported as a synthetic endpoint.
+  EXPECT_TRUE(cluster_->adminEndpoints().empty());
 }
 
 } // namespace ReverseConnection

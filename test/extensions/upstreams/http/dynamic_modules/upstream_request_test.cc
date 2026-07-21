@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/upstreams/http/dynamic_modules/config.h"
@@ -9,11 +11,13 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::AnyNumber;
 using testing::Invoke;
@@ -38,9 +42,9 @@ void setTestModulesSearchPath() {
 BridgeConfigSharedPtr createBridgeConfig(const std::string& module_name) {
   auto module =
       Envoy::Extensions::DynamicModules::newDynamicModuleByName(module_name, false, false);
-  EXPECT_TRUE(module.ok());
+  EXPECT_OK(module);
   auto config_or = BridgeConfig::create("test_bridge", "", std::move(module.value()));
-  EXPECT_TRUE(config_or.ok());
+  EXPECT_OK(config_or);
   return config_or.value();
 }
 
@@ -56,22 +60,21 @@ public:
 TEST_F(BridgeConfigTest, CreateSuccess) {
   auto module = Envoy::Extensions::DynamicModules::newDynamicModuleByName("upstream_bridge_no_op",
                                                                           false, false);
-  ASSERT_TRUE(module.ok());
+  ASSERT_OK(module);
 
   auto config = BridgeConfig::create("test_bridge", "test_config", std::move(module.value()));
-  ASSERT_TRUE(config.ok());
+  ASSERT_OK(config);
   EXPECT_NE(config.value()->in_module_config_, nullptr);
 }
 
 TEST_F(BridgeConfigTest, CreateFailConfigNewReturnsNull) {
   auto module = Envoy::Extensions::DynamicModules::newDynamicModuleByName(
       "upstream_bridge_config_new_fail", false, false);
-  ASSERT_TRUE(module.ok());
+  ASSERT_OK(module);
 
   auto config = BridgeConfig::create("test_bridge", "test_config", std::move(module.value()));
-  ASSERT_FALSE(config.ok());
-  EXPECT_THAT(config.status().message(),
-              testing::HasSubstr("failed to initialize dynamic module bridge configuration"));
+  ASSERT_THAT(config, HasStatusMessage(testing::HasSubstr(
+                          "failed to initialize dynamic module bridge configuration")));
 }
 
 // =============================================================================
@@ -169,19 +172,19 @@ TEST_F(HttpTcpBridgeTest, EncodeHeadersNoOp) {
       {":method", "POST"}, {":path", "/test"}, {":authority", "example.com"}};
 
   auto status = bridge_->encodeHeaders(headers, false);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 TEST_F(HttpTcpBridgeTest, EncodeHeadersEndOfStream) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
 
   auto status = bridge_->encodeHeaders(headers, true);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 TEST_F(HttpTcpBridgeTest, EncodeData) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
 
   Buffer::OwnedImpl data("hello");
   bridge_->encodeData(data, true);
@@ -189,7 +192,7 @@ TEST_F(HttpTcpBridgeTest, EncodeData) {
 
 TEST_F(HttpTcpBridgeTest, EncodeTrailers) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
 
   Envoy::Http::TestRequestTrailerMapImpl trailers{{"trailer-key", "trailer-value"}};
   bridge_->encodeTrailers(trailers);
@@ -197,10 +200,54 @@ TEST_F(HttpTcpBridgeTest, EncodeTrailers) {
 
 TEST_F(HttpTcpBridgeTest, OnUpstreamDataNoOp) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
 
   Buffer::OwnedImpl data("response data");
   bridge_->onUpstreamData(data, false);
+}
+
+TEST_F(HttpTcpBridgeTest, RequestBufferRemainsReadableAfterEncodeData) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
+
+  Buffer::OwnedImpl data("hello");
+  bridge_->encodeData(data, false);
+
+  // Reading the request buffer after encodeData returns must not touch freed storage.
+  auto* envoy_ptr =
+      static_cast<envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr>(bridge_.get());
+  size_t chunks =
+      envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(
+          envoy_ptr);
+  ASSERT_EQ(1, chunks);
+  std::vector<envoy_dynamic_module_type_envoy_buffer> result(chunks);
+  size_t result_length = 0;
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
+      envoy_ptr, result.data(), &result_length);
+  ASSERT_EQ(1, result_length);
+  EXPECT_EQ("hello", absl::string_view(result[0].ptr, result[0].length));
+}
+
+TEST_F(HttpTcpBridgeTest, ResponseBufferRemainsReadableAfterOnUpstreamData) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
+
+  Buffer::OwnedImpl data("world");
+  bridge_->onUpstreamData(data, false);
+
+  // Reading the response buffer after onUpstreamData returns must not touch freed storage.
+  auto* envoy_ptr =
+      static_cast<envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr>(bridge_.get());
+  size_t chunks =
+      envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(
+          envoy_ptr);
+  ASSERT_EQ(1, chunks);
+  std::vector<envoy_dynamic_module_type_envoy_buffer> result(chunks);
+  size_t result_length = 0;
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
+      envoy_ptr, result.data(), &result_length);
+  ASSERT_EQ(1, result_length);
+  EXPECT_EQ("world", absl::string_view(result[0].ptr, result[0].length));
 }
 
 TEST_F(HttpTcpBridgeTest, OnUpstreamConnectionClose) {
@@ -240,8 +287,7 @@ public:
 TEST_F(HttpTcpBridgeNullBridgeTest, EncodeHeadersReturnsError) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, true);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "dynamic module bridge is null");
+  EXPECT_THAT(status, HasStatusMessage("dynamic module bridge is null"));
 }
 
 TEST_F(HttpTcpBridgeNullBridgeTest, EncodeDataIsNoOp) {
@@ -271,12 +317,12 @@ public:
 TEST_F(HttpTcpBridgeStopAndBufferTest, EncodeHeadersNoCallbacksCalled) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, false);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 TEST_F(HttpTcpBridgeStopAndBufferTest, EncodeDataNoCallbacksCalled) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
 
   Buffer::OwnedImpl chunk1("chunk1");
   bridge_->encodeData(chunk1, false);
@@ -287,7 +333,7 @@ TEST_F(HttpTcpBridgeStopAndBufferTest, EncodeDataNoCallbacksCalled) {
 
 TEST_F(HttpTcpBridgeStopAndBufferTest, OnUpstreamDataNoCallbacksCalled) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
 
   Buffer::OwnedImpl data("upstream data");
   bridge_->onUpstreamData(data, false);
@@ -304,7 +350,7 @@ public:
 
 TEST_F(HttpTcpBridgeEndStreamTest, EncodeDataSendsResponse) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
 
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
   EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
@@ -315,7 +361,7 @@ TEST_F(HttpTcpBridgeEndStreamTest, EncodeDataSendsResponse) {
 
 TEST_F(HttpTcpBridgeEndStreamTest, EncodeTrailersSendsResponse) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
 
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, true));
 
@@ -325,7 +371,7 @@ TEST_F(HttpTcpBridgeEndStreamTest, EncodeTrailersSendsResponse) {
 
 TEST_F(HttpTcpBridgeEndStreamTest, OnUpstreamDataSendsResponseHeadersAndData) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
 
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
   EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
@@ -339,7 +385,7 @@ TEST_F(HttpTcpBridgeEndStreamTest, EncodeHeadersExercisesAbiCallbacks) {
       {":method", "POST"}, {":path", "/test"}, {"x-custom", "value"}};
 
   auto status = bridge_->encodeHeaders(headers, false);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 // =============================================================================
@@ -358,7 +404,7 @@ TEST_F(HttpTcpBridgeHeadersEndStreamTest, SendResponseWithBody) {
 
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, true);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 TEST_F(HttpTcpBridgeHeadersEndStreamTest, SendResponseWithoutBody) {
@@ -369,7 +415,7 @@ TEST_F(HttpTcpBridgeHeadersEndStreamTest, SendResponseWithoutBody) {
 
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, true);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 TEST_F(HttpTcpBridgeHeadersEndStreamTest, OnEventAfterResponseStarted) {
@@ -377,7 +423,7 @@ TEST_F(HttpTcpBridgeHeadersEndStreamTest, OnEventAfterResponseStarted) {
   EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
 
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, true).ok());
+  EXPECT_OK(bridge_->encodeHeaders(headers, true));
 
   EXPECT_CALL(mock_upstream_to_downstream_, onResetStream(_, _));
   bridge_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -403,7 +449,7 @@ TEST_F(HttpTcpBridgeAbiEdgeCasesTest, EdgeCaseCallbacksExercised) {
 
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, false);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 // =============================================================================
@@ -531,7 +577,22 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccess) {
   auto config = createProtoConfig();
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
+  EXPECT_NE(pool, nullptr);
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name. The upstream
+// HTTP conn-pool factory has no factory context, so only this synchronous path is supported.
+TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccessWithLocalFile) {
+  envoy::extensions::upstreams::http::dynamic_modules::v3::Config config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c/"
+                                  "libupstream_bridge_no_op.so"));
+  config.set_bridge_name("test_bridge");
+
+  auto pool = factory_.createGenericConnPool(
+      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool, nullptr);
 }
 
@@ -539,12 +600,12 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CacheHit) {
   auto config = createProtoConfig();
   auto pool1 = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool1, nullptr);
 
   auto pool2 = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool2, nullptr);
 }
 
@@ -554,7 +615,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, ModuleLoadFailure) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_EQ(pool, nullptr);
 }
 
@@ -564,7 +625,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigCreateFailure) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_EQ(pool, nullptr);
 }
 
@@ -574,7 +635,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, NoBridgeConfig) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool, nullptr);
 }
 
@@ -588,7 +649,7 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigParseFailure) {
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_EQ(pool, nullptr);
 }
 
@@ -606,11 +667,11 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigWithStruct) {
 
   Protobuf::Struct struct_value;
   (*struct_value.mutable_fields())["key"].set_string_value("value");
-  config.mutable_bridge_config()->PackFrom(struct_value);
+  std::ignore = config.mutable_bridge_config()->PackFrom(struct_value);
 
   auto pool = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_NE(pool, nullptr);
 }
 
@@ -627,14 +688,14 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateEmptyConfigProto) {
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, InvalidTcpPool) {
   NiceMock<Upstream::MockClusterManager> cm2;
   cm2.initializeThreadLocalClusters({"fake_cluster"});
-  EXPECT_CALL(cm2.thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cm2.thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(std::nullopt));
 
   auto config = createProtoConfig();
   config.set_bridge_name("invalid_pool_test");
 
   auto pool = factory_.createGenericConnPool(
       host_, cm2.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
   EXPECT_EQ(pool, nullptr);
 }
 

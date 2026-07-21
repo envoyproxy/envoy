@@ -73,11 +73,13 @@ public:
   void createVerifier() {
     ON_CALL(mock_factory_, create(_, _, _, _))
         .WillByDefault(Invoke([&](const JwtVerify::CheckAudience*,
-                                  const absl::optional<std::string>& provider, bool, bool) {
+                                  const std::optional<std::string>& provider, bool, bool) {
           return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
         }));
-    verifier_ = Verifier::create(proto_config_.rules(0).requires_(), proto_config_.providers(),
-                                 mock_factory_);
+    auto verifier_or = Verifier::create(proto_config_.rules(0).requires_(),
+                                        proto_config_.providers(), mock_factory_);
+    ASSERT_TRUE(verifier_or.ok());
+    verifier_ = std::move(verifier_or).value();
   }
   void createSyncMockAuthsAndVerifier(const StatusMap& statuses) {
     for (const auto& it : statuses) {

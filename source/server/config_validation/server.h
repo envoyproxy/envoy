@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <optional>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -33,8 +34,6 @@
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/server.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -46,7 +45,7 @@ bool validateConfig(const Options& options,
                     const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                     Filesystem::Instance& file_system,
-                    const ProcessContextOptRef& process_context = absl::nullopt);
+                    const ProcessContextOptRef& process_context = std::nullopt);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -70,7 +69,7 @@ public:
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
                      ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                      Filesystem::Instance& file_system,
-                     const ProcessContextOptRef& process_context = absl::nullopt);
+                     const ProcessContextOptRef& process_context = std::nullopt);
 
   ~ValidationInstance() override;
 

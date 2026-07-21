@@ -66,6 +66,7 @@ public:
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
   MOCK_METHOD(bool, maybePreconnect, (float), ());
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
+  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (override));
 
   Envoy::ConnectionPool::MockCancellable* newConnectionImpl(Callbacks& cb);
   void poolFailure(PoolFailureReason reason, bool host_null = false);
@@ -82,6 +83,7 @@ public:
       new NiceMock<Upstream::MockHostDescription>()};
   std::unique_ptr<NiceMock<MockConnectionData>> connection_data_{
       new NiceMock<MockConnectionData>()};
+  Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
 
 } // namespace ConnectionPool

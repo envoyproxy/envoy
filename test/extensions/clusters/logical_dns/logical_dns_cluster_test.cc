@@ -24,8 +24,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -63,10 +64,9 @@ protected:
     if (cluster_config.has_cluster_type()) {
       ProtobufTypes::MessagePtr dns_cluster_msg =
           std::make_unique<envoy::extensions::clusters::dns::v3::DnsCluster>();
-      ASSERT_TRUE(Config::Utility::translateOpaqueConfig(
-                      cluster_config.cluster_type().typed_config(),
-                      factory_context.messageValidationVisitor(), *dns_cluster_msg)
-                      .ok());
+      ASSERT_OK(Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
+                                                       factory_context.messageValidationVisitor(),
+                                                       *dns_cluster_msg));
       dns_cluster =
           MessageUtil::downcastAndValidate<const envoy::extensions::clusters::dns::v3::DnsCluster&>(
               *dns_cluster_msg, factory_context.messageValidationVisitor());
@@ -182,7 +182,7 @@ protected:
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
     logical_host->outlierDetector().putResult(Outlier::Result::ExtOriginRequestSuccess,
-                                              absl::optional<uint64_t>(200));
+                                              std::optional<uint64_t>(200));
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
@@ -222,7 +222,7 @@ protected:
     EXPECT_TRUE(TestUtility::protoEqual(envoy::config::core::v3::Metadata::default_instance(),
                                         *data.host_description_->metadata()));
     data.host_description_->outlierDetector().putResult(Outlier::Result::ExtOriginRequestSuccess,
-                                                        absl::optional<uint64_t>(200));
+                                                        std::optional<uint64_t>(200));
     data.host_description_->healthChecker().setUnhealthy(
         HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 
@@ -489,6 +489,50 @@ TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRate) {
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
   dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "",
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
+}
+
+TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRateWithMinRefreshRate) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
+  // dns_min_refresh_rate: 10s, dns_refresh_rate: 4s, respect_dns_ttl: true
+  // TTL < min → use min; TTL > min → use TTL
+  const std::string yaml = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  cluster_type:
+    name: envoy.cluster.dns
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      respect_dns_ttl: true
+      dns_min_refresh_rate: 10s
+      dns_lookup_family: V4_ONLY
+  lb_policy: ROUND_ROBIN
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                     address: foo.bar.com
+                     port_value: 443
+  )EOF";
+
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV3Yaml(yaml);
+
+  // TTL (5s) < dns_min_refresh_rate (10s) → refresh rate floored to 10s
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.1"}, std::chrono::seconds(5)));
+
+  // TTL (30s) > dns_min_refresh_rate (10s) → refresh rate uses TTL (30s)
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(30000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.1"}, std::chrono::seconds(30)));
 }
 
 TEST_P(LogicalDnsImplementationsTest, BadConfig) {
@@ -787,7 +831,7 @@ TEST_P(LogicalDnsImplementationsTest, UseDnsExtension) {
 
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+  ASSERT_OK(factorySetupFromV3Yaml(config));
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -823,7 +867,7 @@ TEST_P(LogicalDnsImplementationsTest, TypedConfigBackcompat) {
 
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+  ASSERT_OK(factorySetupFromV3Yaml(config));
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1055,7 +1099,7 @@ TEST_P(LogicalDnsImplementationsTest, LogicalDnsUpdatesEntireAddressList) {
 
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+  ASSERT_OK(factorySetupFromV3Yaml(config));
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(testing::Ge(std::chrono::milliseconds(3000)), _))

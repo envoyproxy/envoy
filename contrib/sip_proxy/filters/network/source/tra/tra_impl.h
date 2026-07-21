@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -28,6 +30,8 @@ using TrafficRoutingAssistantAsyncRequestCallbacks = Grpc::AsyncRequestCallbacks
     envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>;
 using TrafficRoutingAssistantAsyncStreamCallbacks = Grpc::AsyncStreamCallbacks<
     envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>;
+using TraServiceResponsePtr = Grpc::ResponsePtr<
+    envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>;
 
 // TODO: We should have only one client per thread, but today we create one per filter stack.
 // This will require support for more than one outstanding request per client.
@@ -37,27 +41,27 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::filter> {
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client, Event::Dispatcher& dispatcher,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const std::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl() override;
 
   // Extensions::NetworkFilters::SipProxy::TrafficRoutingAssistant::Client
   void setRequestCallbacks(RequestCallbacks& callbacks) override;
   void createTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
-                                     const absl::optional<TraContextMap> context,
+                                     const std::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void updateTrafficRoutingAssistant(const std::string& type,
                                      const absl::flat_hash_map<std::string, std::string>& data,
-                                     const absl::optional<TraContextMap> context,
+                                     const std::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                       const absl::optional<TraContextMap> context,
+                                       const std::optional<TraContextMap> context,
                                        Tracing::Span& parent_span,
                                        const StreamInfo::StreamInfo& stream_info) override;
   void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                     const absl::optional<TraContextMap> context,
+                                     const std::optional<TraContextMap> context,
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void subscribeTrafficRoutingAssistant(const std::string& type, Tracing::Span& parent_span,
@@ -65,19 +69,12 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-  void
-  onSuccess(std::unique_ptr<
-                envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-                response,
-            Tracing::Span& span) override;
+  void onSuccess(TraServiceResponsePtr&& response, Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
   // Grpc::AsyncStreamCallbacks
-  void onReceiveMessage(
-      std::unique_ptr<
-          envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-          message) override;
+  void onReceiveMessage(TraServiceResponsePtr&& message) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
@@ -108,11 +105,7 @@ private:
     void onCreateInitialMetadata(Http::RequestHeaderMap& data) override {
       return parent_.onCreateInitialMetadata(data);
     }
-    void onSuccess(
-        std::unique_ptr<
-            envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-            response,
-        Tracing::Span& span) override {
+    void onSuccess(TraServiceResponsePtr&& response, Tracing::Span& span) override {
       parent_.onSuccess(std::move(response), span);
       cleanup();
     }
@@ -146,10 +139,7 @@ private:
     void onCreateInitialMetadata(Http::RequestHeaderMap& data) override {
       return parent_.onCreateInitialMetadata(data);
     }
-    void onReceiveMessage(
-        std::unique_ptr<
-            envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-            message) override {
+    void onReceiveMessage(TraServiceResponsePtr&& message) override {
       parent_.onReceiveMessage(std::move(message));
     }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
@@ -183,7 +173,7 @@ private:
       envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>
       async_client_;
   Event::Dispatcher& dispatcher_;
-  absl::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
 
   std::list<std::unique_ptr<AsyncRequestCallbacks>> request_callbacks_;
   std::list<std::unique_ptr<AsyncStreamCallbacks>> stream_callbacks_;

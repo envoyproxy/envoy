@@ -42,8 +42,8 @@ public:
           host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
           Config::MetadataEnvoyLbKeys::get().HASH_KEY);
       if (val.kind_case() != val.kStringValue && val.kind_case() != val.KIND_NOT_SET) {
-        FINE_GRAIN_LOG(debug, "hash_key must be string type, got: {}",
-                       static_cast<int>(val.kind_case()));
+        ENVOY_LOG(debug, "hash_key must be string type, got: {}",
+                  static_cast<int>(val.kind_case()));
       }
       absl::string_view hash_key = val.string_value();
       if (hash_key.empty()) {
@@ -99,11 +99,11 @@ public:
   // Preconnect not implemented for hash based load balancing
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
   // Pool selection not implemented.
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                            const Upstream::Host& /*host*/,
                            std::vector<uint8_t>& /*hash_key*/) override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Lifetime tracking not implemented.
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
@@ -126,24 +126,29 @@ private:
   };
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
+  struct LoadBalancerFactoryImpl;
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterLbStats& stats, Random::RandomGenerator& random,
-                     HashPolicySharedPtr hash_policy)
-        : stats_(stats), random_(random), hash_policy_(std::move(hash_policy)) {}
+    LoadBalancerImpl(std::shared_ptr<LoadBalancerFactoryImpl> factory, ClusterLbStats& stats,
+                     Random::RandomGenerator& random, HashPolicySharedPtr hash_policy,
+                     const Upstream::PrioritySet& priority_set);
 
     // Upstream::LoadBalancer
     HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
     // Preconnect not implemented for hash based load balancing
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
-      return absl::nullopt;
+      return std::nullopt;
     }
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       return {};
     }
+
+    void refresh();
+
+    std::shared_ptr<LoadBalancerFactoryImpl> factory_;
 
     ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
@@ -152,16 +157,21 @@ private:
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
+
+    Common::CallbackHandlePtr member_update_cb_;
   };
 
-  struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
+  struct LoadBalancerFactoryImpl : public LoadBalancerFactory,
+                                   public std::enable_shared_from_this<LoadBalancerFactoryImpl> {
     LoadBalancerFactoryImpl(ClusterLbStats& stats, Random::RandomGenerator& random,
                             std::shared_ptr<Http::HashPolicy> hash_policy)
         : stats_(stats), random_(random), hash_policy_(std::move(hash_policy)) {}
 
     // Upstream::LoadBalancerFactory
-    // Ignore the params for the thread-aware LB.
+    // Uses the per-worker params to create the thread-aware LB instance, including the worker
+    // priority_set used to register member-update callbacks.
     LoadBalancerPtr create(LoadBalancerParams) override;
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     ClusterLbStats& stats_;
     Random::RandomGenerator& random_;

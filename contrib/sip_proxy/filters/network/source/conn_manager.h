@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
@@ -69,12 +71,12 @@ public:
 
   virtual void updateTrafficRoutingAssistant(const std::string& type, const std::string& key,
                                              const std::string& val,
-                                             const absl::optional<TraContextMap> context);
+                                             const std::optional<TraContextMap> context);
   virtual QueryStatus retrieveTrafficRoutingAssistant(
-      const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
+      const std::string& type, const std::string& key, const std::optional<TraContextMap> context,
       SipFilters::DecoderFilterCallbacks& activetrans, std::string& host);
   virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                             const absl::optional<TraContextMap> context);
+                                             const std::optional<TraContextMap> context);
   virtual void subscribeTrafficRoutingAssistant(const std::string& type);
   void complete(const TrafficRoutingAssistant::ResponseType& type, const std::string& message_type,
                 const absl::any& resp) override;
@@ -337,7 +339,7 @@ private:
     MessageMetadataSharedPtr metadata_;
     std::list<ActiveTransDecoderFilterPtr> decoder_filters_;
     ResponseDecoderPtr response_decoder_;
-    absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    std::optional<Router::RouteConstSharedPtr> cached_route_;
 
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
 
@@ -362,7 +364,6 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 
   DecoderPtr decoder_;
-  absl::flat_hash_map<std::string, ActiveTransPtr> transactions_;
   Buffer::OwnedImpl request_buffer_;
   Random::RandomGenerator& random_generator_;
   TimeSource& time_source_;
@@ -373,6 +374,7 @@ private:
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   PendingList pending_list_;
+  absl::flat_hash_map<std::string, ActiveTransPtr> transactions_;
 };
 
 } // namespace SipProxy

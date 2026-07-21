@@ -176,7 +176,7 @@ public:
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
-      response.add_resources()->PackFrom(listener_config);
+      std::ignore = response.add_resources()->PackFrom(listener_config);
     }
     ASSERT(lds_upstream_info_.stream_by_resource_name_[listener_name_] != nullptr);
     lds_upstream_info_.stream_by_resource_name_[listener_name_]->sendGrpcMessage(response);
@@ -199,7 +199,7 @@ public:
     response.set_type_url(Config::TestTypeUrl::get().RouteConfiguration);
     const auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(route_configuration);
+    std::ignore = response.add_resources()->PackFrom(route_configuration);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
@@ -349,7 +349,11 @@ TEST_P(ListenerIntegrationTest, RejectsUnknownHttpFilter) {
                           cluster: cluster_0
               http_filters:
                 - name: filter.unknown
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.Empty
                 - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         )EOF");
     sendLdsResponse({listener}, "2");
   };
@@ -389,7 +393,11 @@ TEST_P(ListenerIntegrationTest, IgnoreUnknownOptionalHttpFilter) {
               http_filters:
                 - name: filter.unknown
                   is_optional: true
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.Empty
                 - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         )EOF");
     sendLdsResponse({listener}, "2");
   };
@@ -812,6 +820,13 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
   // Make a connection to the listener from version 1.
   codec_client_ = makeHttpConnection(lookupPort("address1"));
 
+  // Ensure Envoy has accepted the connection before starting reloads.
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_total", Ge(1));
+  } else {
+    test_server_->waitForCounter("listener.[__1]_0.downstream_cx_total", Ge(1));
+  }
+
   for (int version = 2; version <= 10; version++) {
     // Touch the metadata to get a different hash.
     (*(*listener_config_.mutable_metadata()->mutable_filter_metadata())["random_filter_name"]
@@ -1001,7 +1016,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
   // the sockets in the filter chain draining listener. The new connection should be reset.
   while (true) {
     auto codec =
-        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), std::nullopt);
     // The socket are closed asynchronously, if the socket is connected directly, it means
     // the listener socket isn't closed yet, we will try next connection.
     if (codec->connected()) {
@@ -1095,7 +1110,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   // the sockets in the filter chain draining listener. The new connection should be reset.
   while (true) {
     auto codec =
-        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), std::nullopt);
     // The socket are closed asynchronously, if the socket is connected directly, it means
     // the listener socket isn't closed yet, we will try next connection.
     if (codec->connected()) {
@@ -1227,7 +1242,7 @@ public:
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
-      response.add_resources()->PackFrom(listener_config);
+      std::ignore = response.add_resources()->PackFrom(listener_config);
     }
     ASSERT_NE(nullptr, lds_stream_);
     lds_stream_->sendGrpcMessage(response);
@@ -1254,7 +1269,7 @@ public:
 
   envoy::config::listener::v3::Listener listener_config_;
   FakeHttpConnectionPtr lds_connection_;
-  FakeStreamPtr lds_stream_{};
+  FakeStreamPtr lds_stream_;
 };
 
 TEST_P(ListenerFilterIntegrationTest, InspectDataFilterDrainData) {
@@ -1855,7 +1870,7 @@ public:
           // link time.
           auto& filter = *src_listener_config.add_listener_filters();
           filter.set_name("envoy.filters.listener.original_dst");
-          filter.mutable_typed_config()->PackFrom(Protobuf::Struct());
+          std::ignore = filter.mutable_typed_config()->PackFrom(Protobuf::Struct());
           auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
           virtual_listener_config = src_listener_config;
           virtual_listener_config.mutable_use_original_dst()->set_value(false);

@@ -70,7 +70,7 @@ protected:
   }
 
 public:
-  ReverseTunnelFilterUnitTest() : stats_store_(), overload_manager_() {
+  ReverseTunnelFilterUnitTest() {
     // Prepare proto config with defaults.
     proto_config_.set_request_path("/reverse_connections/request");
     proto_config_.set_request_method(envoy::config::core::v3::GET);
@@ -177,6 +177,43 @@ public:
     return headers;
   }
 
+  // Helper to build reverse tunnel headers with initiation time.
+  std::string makeRtHeadersWithInitiationTime(const std::string& node, const std::string& cluster,
+                                              const std::string& tenant,
+                                              int64_t initiation_time_ms) {
+    std::string headers = makeRtHeaders(node, cluster, tenant);
+    headers +=
+        "x-envoy-reverse-tunnel-initiation-time: " + std::to_string(initiation_time_ms) + "\r\n";
+    return headers;
+  }
+
+  // Helper to craft HTTP request with initiation time header.
+  std::string makeHttpRequestWithInitiationTime(const std::string& method, const std::string& path,
+                                                const std::string& node, const std::string& cluster,
+                                                const std::string& tenant,
+                                                int64_t initiation_time_ms) {
+    std::string req = fmt::format("{} {} HTTP/1.1\r\n", method, path);
+    req += "Host: localhost\r\n";
+    req += makeRtHeadersWithInitiationTime(node, cluster, tenant, initiation_time_ms);
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
+  }
+
+  // Helper to craft HTTP request with a raw (possibly non-numeric) initiation-time header value.
+  // Used to exercise the parse-failure fallback path.
+  std::string makeHttpRequestWithRawInitiationTime(const std::string& method,
+                                                   const std::string& path, const std::string& node,
+                                                   const std::string& cluster,
+                                                   const std::string& tenant,
+                                                   const std::string& initiation_time_value) {
+    std::string req = fmt::format("{} {} HTTP/1.1\r\n", method, path);
+    req += "Host: localhost\r\n";
+    req += makeRtHeaders(node, cluster, tenant);
+    req += "x-envoy-reverse-tunnel-initiation-time: " + initiation_time_value + "\r\n";
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
+  }
+
   // Helper to craft HTTP request with reverse tunnel headers and optional body.
   std::string makeHttpRequestWithRtHeaders(const std::string& method, const std::string& path,
                                            const std::string& node, const std::string& cluster,
@@ -202,6 +239,22 @@ public:
     req += fmt::format("Content-Length: {}\r\n\r\n", body.size());
     req += body;
     return req;
+  }
+
+  // Builds a mock connection socket with the given fd for populating the upstream socket manager
+  // directly in connection-limit tests (the remote port is derived from the fd to keep keys
+  // distinct).
+  Network::ConnectionSocketPtr createUpstreamSocket(int fd) {
+    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    EXPECT_CALL(*io_handle, fdDoNotUse()).WillRepeatedly(Return(fd));
+    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*io_handle));
+    socket->io_handle_ = std::move(io_handle);
+    socket->connection_info_provider_->setLocalAddress(
+        Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080));
+    socket->connection_info_provider_->setRemoteAddress(
+        Network::Utility::parseInternetAddressNoThrow("127.0.0.1", fd));
+    return socket;
   }
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config_;
@@ -438,7 +491,8 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream)
   auto logs = decoder.accessLogHandlers();
   EXPECT_TRUE(logs.empty());
   auto handle = decoder.getRequestDecoderHandle();
-  EXPECT_EQ(nullptr, handle.get());
+  EXPECT_NE(nullptr, handle.get());
+  EXPECT_EQ(&decoder, handle->get().ptr());
 }
 
 // Test configuration with custom ping interval.
@@ -479,6 +533,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   EXPECT_FALSE(config->autoCloseConnections());
   EXPECT_EQ("/reverse_connections/request", config->requestPath());
   EXPECT_EQ("GET", config->requestMethod());
+  EXPECT_FALSE(config->skipRebalancing());
 }
 
 // Test RequestDecoder methods not fully covered.
@@ -842,7 +897,7 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) 
   decoder.sendLocalReply(
       Http::Code::Forbidden, "",
       [](Http::ResponseHeaderMap& h) { h.addCopy(Http::LowerCaseString("x-custom-mod"), "v"); },
-      absl::nullopt, "test");
+      std::nullopt, "test");
 
   EXPECT_TRUE(saw_custom_header);
 }
@@ -1378,7 +1433,7 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
       // Invalid characters in headers
       "GET /reverse_connections/request HTTP/1.1\r\nHo\x00st: test\r\n\r\n"};
 
-  for (size_t i = 0; i < malformed_requests.size(); ++i) {
+  for (const auto& malformed_request : malformed_requests) {
     // Create new filter for each test to avoid state issues
     auto test_filter = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                              overload_manager_);
@@ -1394,7 +1449,7 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
 
     test_filter->initializeReadFilterCallbacks(test_callbacks);
 
-    Buffer::OwnedImpl request(malformed_requests[i]);
+    Buffer::OwnedImpl request(malformed_request);
     EXPECT_EQ(Network::FilterStatus::StopIteration, test_filter->onData(request, false));
   }
 }
@@ -1488,7 +1543,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
   auto* reporter_cfg = upstream_config_.mutable_reporter_config();
   reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
   Protobuf::StringValue reporter_payload;
-  reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
 
   NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
   Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
@@ -1505,7 +1560,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                 testing::Eq(tenant_id)));
+                                                 testing::Eq(tenant_id), testing::_));
     return reporter;
   }));
 
@@ -1537,11 +1592,178 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
 }
 
+TEST_F(ReverseTunnelFilterWithUpstreamTest,
+       ProcessAcceptedConnectionPropagatesInitiationTimeHeader) {
+  auto* reporter_cfg = upstream_config_.mutable_reporter_config();
+  reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
+  Protobuf::StringValue reporter_payload;
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+
+  NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
+      reporter_injector(reporter_factory);
+
+  std::string node_id = "node";
+  std::string cluster_id = "cluster";
+  std::string tenant_id = "tenant";
+  const int64_t initiation_time_ms = 1700000000000;
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter =
+        std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
+    EXPECT_CALL(*reporter,
+                reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                      testing::Eq(tenant_id), testing::Eq(initiation_time_ms)));
+    return reporter;
+  }));
+
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
+
+  EXPECT_CALL(*dup_io_handle, resetFileEvents());
+  EXPECT_CALL(*dup_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(100));
+  EXPECT_CALL(*dup_io_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_io_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+
+  static Network::ConnectionSocketPtr stored_mock_socket2;
+  static std::unique_ptr<Network::MockIoHandle> stored_io_handle2;
+  stored_io_handle2 = std::move(mock_io_handle);
+  stored_mock_socket2 = std::move(mock_socket);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_mock_socket2));
+
+  Buffer::OwnedImpl request(makeHttpRequestWithInitiationTime(
+      "GET", "/reverse_connections/request", node_id, cluster_id, tenant_id, initiation_time_ms));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+}
+
+TEST_F(ReverseTunnelFilterWithUpstreamTest,
+       ProcessAcceptedConnectionReportsZeroWhenInitiationTimeAbsent) {
+  auto* reporter_cfg = upstream_config_.mutable_reporter_config();
+  reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
+  Protobuf::StringValue reporter_payload;
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+
+  NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
+      reporter_injector(reporter_factory);
+
+  std::string node_id = "node-no-time";
+  std::string cluster_id = "cluster";
+  std::string tenant_id = "tenant";
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter =
+        std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
+    EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                 testing::Eq(tenant_id), testing::Eq(int64_t(0))));
+    return reporter;
+  }));
+
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
+
+  EXPECT_CALL(*dup_io_handle, resetFileEvents());
+  EXPECT_CALL(*dup_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(100));
+  EXPECT_CALL(*dup_io_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_io_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+
+  static Network::ConnectionSocketPtr stored_mock_socket3;
+  static std::unique_ptr<Network::MockIoHandle> stored_io_handle3;
+  stored_io_handle3 = std::move(mock_io_handle);
+  stored_mock_socket3 = std::move(mock_socket);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_mock_socket3));
+
+  // No initiation-time header — standard request without it.
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                         node_id, cluster_id, tenant_id));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+}
+
+TEST_F(ReverseTunnelFilterWithUpstreamTest,
+       ProcessAcceptedConnectionFallsBackToZeroOnUnparseableInitiationTime) {
+  auto* reporter_cfg = upstream_config_.mutable_reporter_config();
+  reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
+  Protobuf::StringValue reporter_payload;
+  std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+
+  NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
+      reporter_injector(reporter_factory);
+
+  std::string node_id = "node-bad-time";
+  std::string cluster_id = "cluster";
+  std::string tenant_id = "tenant";
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  // A non-numeric header value must fail to parse and fall back to 0.
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter =
+        std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
+    EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                 testing::Eq(tenant_id), testing::Eq(int64_t(0))));
+    return reporter;
+  }));
+
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
+
+  EXPECT_CALL(*dup_io_handle, resetFileEvents());
+  EXPECT_CALL(*dup_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(100));
+  EXPECT_CALL(*dup_io_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_io_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+
+  static Network::ConnectionSocketPtr stored_mock_socket4;
+  static std::unique_ptr<Network::MockIoHandle> stored_io_handle4;
+  stored_io_handle4 = std::move(mock_io_handle);
+  stored_mock_socket4 = std::move(mock_socket);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_mock_socket4));
+
+  // Non-numeric initiation-time value exercises the SimpleAtoi failure branch.
+  Buffer::OwnedImpl request(makeHttpRequestWithRawInitiationTime(
+      "GET", "/reverse_connections/request", node_id, cluster_id, tenant_id, "not-a-number"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+}
+
 // Test systematic HTTP error patterns to trigger codec dispatch error paths.
 TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
   auto patterns = HttpErrorHelper::getHttpErrorPatterns();
 
-  for (size_t i = 0; i < patterns.size(); ++i) {
+  for (const auto& pattern : patterns) {
     // Create new filter for each test to avoid state pollution
     auto error_filter = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                               overload_manager_);
@@ -1563,7 +1785,7 @@ TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
     error_filter->initializeReadFilterCallbacks(error_callbacks);
 
     // Test this error pattern
-    Buffer::OwnedImpl error_request(patterns[i]);
+    Buffer::OwnedImpl error_request(pattern);
     EXPECT_EQ(Network::FilterStatus::StopIteration, error_filter->onData(error_request, false));
   }
 }
@@ -2180,6 +2402,87 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_MissingUpgradeRejected) 
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
   ASSERT_NE(nullptr, parse_error);
   EXPECT_EQ(1, parse_error->value());
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, FilterConfigLoadsSkipRebalancing) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_skip_rebalancing(true);
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  EXPECT_TRUE(config_or_error.value()->skipRebalancing());
+}
+
+// enable_connection_limit defaults to false, so the limit check is a no-op and never consults the
+// socket manager; it allows even when no upstream socket interface is wired up.
+TEST_F(ReverseTunnelFilterUnitTest, ConnectionLimitDisabledByDefaultAllows) {
+  EXPECT_EQ(config_->validateConnectionLimit("any-node", ""), true);
+}
+
+// When the filter opts into the connection limit, the bootstrap extension's per-node cap rejects
+// new connections once the live count reaches the limit, and counts are independent across nodes.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ConnectionLimitEnforcedPerNode) {
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto cfg = config_or_error.value();
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  // The cap lives on the bootstrap extension; the socket manager mirrors it per worker.
+  socket_manager->setMaxConnectionsPerNode(2);
+
+  const std::string node = "node-cap";
+
+  // No live connections yet: under the cap.
+  EXPECT_TRUE(cfg->validateConnectionLimit(node, ""));
+
+  // One live connection: still under the cap (1 < 2).
+  socket_manager->addConnectionSocket(node, "cluster", createUpstreamSocket(1001),
+                                      std::chrono::seconds(30));
+  EXPECT_TRUE(cfg->validateConnectionLimit(node, ""));
+
+  // Two live connections: at the cap (2 is not < 2) -> rejected.
+  socket_manager->addConnectionSocket(node, "cluster", createUpstreamSocket(1002),
+                                      std::chrono::seconds(30));
+  EXPECT_FALSE(cfg->validateConnectionLimit(node, ""));
+
+  // A different node is unaffected by node-cap's count.
+  EXPECT_TRUE(cfg->validateConnectionLimit("other-node", ""));
+}
+
+// When the connection limit is enabled but the upstream socket manager is unavailable, the check
+// fails closed (rejects).
+TEST_F(ReverseTunnelFilterUnitTest, ConnectionLimitFailsClosedWithoutSocketManager) {
+  // Wire up a live extension but no thread-local registry, so getLocalRegistry() returns nullptr
+  // and the limit cannot be verified.
+  setupUpstreamExtension();
+
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  EXPECT_FALSE(config_or_error.value()->validateConnectionLimit("node", ""));
+}
+
+// With tenant isolation enabled the cap is scoped per tenant: hitting the cap for one tenant does
+// not block a different tenant on the same node.
+TEST_F(ReverseTunnelFilterWithTenantIsolationTest, ConnectionLimitScopedPerTenant) {
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto cfg = config_or_error.value();
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  ASSERT_TRUE(socket_manager->tenantIsolationEnabled());
+  socket_manager->setMaxConnectionsPerNode(1);
+
+  // One live connection for tenant-a brings it to the cap.
+  socket_manager->addConnectionSocket("node", "cluster", createUpstreamSocket(2001),
+                                      std::chrono::seconds(30), false, "tenant-a");
+
+  EXPECT_FALSE(cfg->validateConnectionLimit("node", "tenant-a"));
+  EXPECT_TRUE(cfg->validateConnectionLimit("node", "tenant-b"));
 }
 
 } // namespace

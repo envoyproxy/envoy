@@ -5,14 +5,16 @@
 #include "source/extensions/filters/http/geoip/config.h"
 #include "source/extensions/filters/http/geoip/geoip_filter.h"
 
-#include "test/extensions/filters/http/geoip/mocks.h"
+#include "test/mocks/geoip/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::testing::AllOf;
 
 namespace Envoy {
@@ -26,7 +28,7 @@ public:
   static uint32_t xffNumTrustedHops(const GeoipFilter& filter) {
     return filter.config_->xffNumTrustedHops();
   }
-  static const absl::optional<Http::LowerCaseString>& ipAddressHeader(const GeoipFilter& filter) {
+  static const std::optional<Http::LowerCaseString>& ipAddressHeader(const GeoipFilter& filter) {
     return filter.config_->ipAddressHeader();
   }
 };
@@ -67,13 +69,13 @@ MATCHER_P(HasIpAddressHeader, expected, "") {
 
 TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
   TestScopedRuntime scoped_runtime;
-  DummyGeoipProviderFactory dummy_factory;
+  Geolocation::DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
   )EOF";
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
@@ -90,7 +92,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   TestScopedRuntime scoped_runtime;
-  DummyGeoipProviderFactory dummy_factory;
+  Geolocation::DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
     xff_config:
@@ -98,7 +100,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
   )EOF";
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
@@ -113,9 +115,36 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   cb(filter_callback);
 }
 
+TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto2) {
+  TestScopedRuntime scoped_runtime;
+  Geolocation::DummyGeoipProviderFactory dummy_factory;
+  Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
+  std::string filter_config_yaml = R"EOF(
+    xff_config:
+      xff_num_trusted_hops: 1
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+  )EOF";
+  GeoipFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context.server_factory_context_, messageValidationVisitor()).Times(2);
+  GeoipFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory
+          .createHttpFilterFactoryFromProto(filter_config, "geoip", context.server_factory_context_)
+          .value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback,
+              addStreamDecoderFilter(AllOf(HasUseXff(true), HasXffNumTrustedHops(1))));
+  cb(filter_callback);
+}
+
 TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingProvider) {
   TestScopedRuntime scoped_runtime;
-  DummyGeoipProviderFactory dummy_factory;
+  Geolocation::DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
     xff_config:
@@ -134,7 +163,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingProvider) {
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
   TestScopedRuntime scoped_runtime;
-  DummyGeoipProviderFactory dummy_factory;
+  Geolocation::DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
     provider:
@@ -154,7 +183,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigWithIpAddressHeader) {
   TestScopedRuntime scoped_runtime;
-  DummyGeoipProviderFactory dummy_factory;
+  Geolocation::DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
     custom_header_config:
@@ -162,7 +191,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithIpAddressHeader) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
   )EOF";
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
@@ -179,7 +208,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithIpAddressHeader) {
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigMutualExclusionXffAndIpAddressHeader) {
   TestScopedRuntime scoped_runtime;
-  DummyGeoipProviderFactory dummy_factory;
+  Geolocation::DummyGeoipProviderFactory dummy_factory;
   Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
   std::string filter_config_yaml = R"EOF(
     xff_config:
@@ -189,17 +218,17 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMutualExclusionXffAndIpAddressHeade
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
   )EOF";
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GeoipFilterFactory factory;
   auto status_or = factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context);
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_EQ(status_or.status().message(),
-            "Only one of xff_config or custom_header_config can be set in the geoip filter "
-            "configuration");
+  EXPECT_THAT(status_or,
+              HasStatusMessage(
+                  "Only one of xff_config or custom_header_config can be set in the geoip filter "
+                  "configuration"));
 }
 
 } // namespace

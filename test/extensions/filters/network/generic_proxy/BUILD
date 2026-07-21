@@ -34,7 +34,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/generic_proxy:route_lib",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:route_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -115,7 +115,6 @@ envoy_cc_test(
         "//test/extensions/filters/network/generic_proxy/mocks:route_mocks",
         "//test/integration:base_integration_test_lib",
         "//test/integration:common_extensions_lib",
-        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
@@ -180,6 +179,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/generic_proxy:stats_lib",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )

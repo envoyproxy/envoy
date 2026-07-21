@@ -43,10 +43,11 @@ envoy_cc_test(
         "//source/extensions/filters/http/proto_message_extraction:extractor_impl",
         "//source/extensions/filters/http/proto_message_extraction:filter_config",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

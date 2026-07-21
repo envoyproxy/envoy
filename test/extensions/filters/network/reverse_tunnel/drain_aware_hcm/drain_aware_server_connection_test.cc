@@ -2,6 +2,8 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/http/stream_decoder.h"
+#include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"
@@ -10,6 +12,7 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -146,6 +149,92 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresAfterGoAwaySentIsNoop) {
   timer_->callback_();
 
   destroyConnection(conn);
+}
+
+// With an on_local_drain callback set, shutdownNotice() fires the callback and SUPPRESSES the
+// inner shutdownNotice (the early GOAWAY), so the peer keeps using the tunnel during the grace
+// window while a replacement is dialed.
+TEST_F(DrainAwareServerConnectionTest,
+       ShutdownNoticeWithLocalDrainFiresCallbackAndSuppressesInner) {
+  bool fired = false;
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
+  auto conn = std::make_unique<DrainAwareServerConnection>(
+      std::move(inner_), dispatcher_, drain_decision_, [&fired]() { fired = true; });
+  EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
+  conn->shutdownNotice();
+  EXPECT_TRUE(fired);
+  destroyConnection(conn);
+}
+
+// on_local_drain fires at most once across shutdownNotice() and the drain timer.
+TEST_F(DrainAwareServerConnectionTest, LocalDrainFiresAtMostOnce) {
+  int fired = 0;
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
+  auto conn = std::make_unique<DrainAwareServerConnection>(
+      std::move(inner_), dispatcher_, drain_decision_, [&fired]() { ++fired; });
+  conn->shutdownNotice();
+  EXPECT_EQ(1, fired);
+
+  // The drain timer also detects drain and emits the final GOAWAY, but the once-guard prevents a
+  // second callback fire.
+  ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
+  EXPECT_CALL(*inner_ptr_, goAway());
+  timer_->invokeCallback();
+  EXPECT_EQ(1, fired);
+  destroyConnection(conn);
+}
+
+// Tests for the peer-GOAWAY interceptor that sits between the codec and the HCM callbacks.
+class DrainAwareServerConnectionCallbacksTest : public testing::Test {
+protected:
+  NiceMock<Http::MockServerConnectionCallbacks> inner_callbacks_;
+};
+
+// A received GOAWAY fires the re-dial closure exactly once and still delegates to the inner
+// callbacks; a second GOAWAY delegates but does not re-fire the closure.
+TEST_F(DrainAwareServerConnectionCallbacksTest, PeerGoAwayFiresClosureOnceAndDelegates) {
+  int fired = 0;
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, [&fired]() { ++fired; });
+
+  EXPECT_CALL(inner_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(1, fired);
+
+  EXPECT_CALL(inner_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(1, fired);
+}
+
+// A null closure (peer-GOAWAY re-dial disabled) just delegates onGoAway.
+TEST_F(DrainAwareServerConnectionCallbacksTest, NullClosureJustDelegatesGoAway) {
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  EXPECT_CALL(inner_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
+}
+
+// newStream passes through to the inner callbacks unchanged.
+TEST_F(DrainAwareServerConnectionCallbacksTest, NewStreamDelegates) {
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  NiceMock<Http::MockResponseEncoder> encoder;
+  NiceMock<Http::MockRequestDecoder> decoder;
+  EXPECT_CALL(inner_callbacks_, newStream(_, false)).WillOnce(ReturnRef(decoder));
+  EXPECT_EQ(&decoder, &wrapper.newStream(encoder, false));
+}
+
+// onSettings passes through to the inner callbacks unchanged.
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnSettingsDelegates) {
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  NiceMock<Http::MockReceivedSettings> settings;
+  EXPECT_CALL(inner_callbacks_, onSettings(_));
+  wrapper.onSettings(settings);
+}
+
+// onMaxStreamsChanged passes through to the inner callbacks unchanged. (onMaxStreamsChanged has a
+// default interface implementation, so it is not a gmock method; exercising the forwarding path is
+// enough for coverage.)
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMaxStreamsChangedDelegates) {
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  wrapper.onMaxStreamsChanged(7);
 }
 
 } // namespace

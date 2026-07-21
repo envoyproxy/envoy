@@ -79,8 +79,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
         offset += current_chunk;
 
-        // Check if early termination occurred
-        if (custom_parser.isAllFieldsCollected()) {
+        // Check if parsing completed (root object closed)
+        if (custom_parser.isParsingComplete()) {
           break;
         }
       }

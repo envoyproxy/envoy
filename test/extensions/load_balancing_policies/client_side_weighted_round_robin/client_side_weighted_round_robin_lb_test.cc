@@ -45,7 +45,7 @@ public:
     lb_->orca_weight_manager_->updateWeightsOnHosts(hosts);
   }
 
-  static absl::optional<uint32_t>
+  static std::optional<uint32_t>
   getClientSideWeightIfValidFromHost(const Host& host, const MonotonicTime& min_non_empty_since,
                                      const MonotonicTime& max_last_update_time) {
     return OrcaWeightManager::getWeightIfValidFromHost(host, min_non_empty_since,
@@ -124,7 +124,7 @@ public:
             lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/absl::nullopt));
+            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/std::nullopt));
 
     // Initialize the thread aware load balancer from config.
     ASSERT_EQ(lb_->initialize(), absl::OkStatus());
@@ -137,7 +137,7 @@ public:
         0,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, empty_host_vector_, empty_host_vector_, random_.random(), absl::nullopt);
+        {}, empty_host_vector_, empty_host_vector_, random_.random(), std::nullopt);
   }
 
   void peekThenPick(std::vector<int> picks) {
@@ -418,12 +418,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   size_t h1_count = 0, h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Expect h1 to be chosen noticeably more often (ratio ~ (1):(0.35)).
   EXPECT_GT(h1_count, h2_count);
@@ -436,12 +437,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Now expect closer to 2:1 ratio in favor of h1; i.e., still h1 > h2.
   EXPECT_GT(h1_count, h2_count);
@@ -454,12 +456,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Expect approximately equal selection; allow 30% tolerance.
   double final_ratio =
@@ -683,6 +686,23 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
                 orca_load_report, {"named_metrics.foo"}, 2.0)
                 .value(),
             1428);
+}
+
+TEST(ClientSideWeightedRoundRobinConfigTest, OobConfigDefaultsAndOverridePropagate) {
+  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+      ClientSideWeightedRoundRobin proto;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  ClientSideWeightedRoundRobinLbConfig defaults(proto, dispatcher, tls);
+  EXPECT_FALSE(defaults.enable_oob_load_report);
+  EXPECT_EQ(defaults.oob_manager_config.reporting_period, std::chrono::seconds(10));
+
+  proto.mutable_enable_oob_load_report()->set_value(true);
+  proto.mutable_oob_reporting_period()->set_seconds(5);
+  ClientSideWeightedRoundRobinLbConfig override(proto, dispatcher, tls);
+  EXPECT_TRUE(override.enable_oob_load_report);
+  EXPECT_EQ(override.oob_manager_config.reporting_period, std::chrono::seconds(5));
 }
 
 } // namespace

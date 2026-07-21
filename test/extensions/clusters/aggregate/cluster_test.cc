@@ -7,7 +7,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -71,7 +71,7 @@ public:
         priority,
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts, {}, absl::nullopt, 100);
+        nullptr, hosts, {}, std::nullopt, 100);
   }
 
   void setupSecondary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
@@ -81,7 +81,7 @@ public:
         priority,
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts, {}, absl::nullopt, 100);
+        nullptr, hosts, {}, std::nullopt, 100);
   }
 
   void setupPrioritySet() {
@@ -189,7 +189,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
         lb_->lifetimeCallbacks();
     EXPECT_FALSE(lifetime_callbacks.has_value());
     std::vector<uint8_t> hash_key = {1, 2, 3};
-    absl::optional<Upstream::SelectedPoolAndConnection> selection =
+    std::optional<Upstream::SelectedPoolAndConnection> selection =
         lb_->selectExistingConnection(nullptr, *host, hash_key);
     EXPECT_FALSE(selection.has_value());
     EXPECT_EQ(host.get(), target.get());
@@ -412,10 +412,10 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
           return *(ps.hostSetsPerPriority()[priority]->hosts()[0]);
         };
 
-        EXPECT_EQ(mapping_func(host_from_priority(primary_ps_, 0)), absl::optional<uint32_t>(0));
-        EXPECT_EQ(mapping_func(host_from_priority(primary_ps_, 1)), absl::optional<uint32_t>(1));
-        EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 0)), absl::optional<uint32_t>(2));
-        EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 1)), absl::optional<uint32_t>(3));
+        EXPECT_EQ(mapping_func(host_from_priority(primary_ps_, 0)), std::optional<uint32_t>(0));
+        EXPECT_EQ(mapping_func(host_from_priority(primary_ps_, 1)), std::optional<uint32_t>(1));
+        EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 0)), std::optional<uint32_t>(2));
+        EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 1)), std::optional<uint32_t>(3));
 
         return secondary_priority_1;
       }));

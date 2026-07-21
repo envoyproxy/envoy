@@ -27,6 +27,7 @@
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -401,8 +402,10 @@ FakeHttpConnection::FakeHttpConnection(
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    bool deferred_read_enable)
     : FakeConnectionBase(shared_connection, time_system), type_(type),
+      deferred_read_enable_(deferred_read_enable),
       header_validator_factory_(
           IntegrationUtil::makeHeaderValidationFactory(fakeUpstreamHeaderValidatorConfig())) {
   ASSERT(max_request_headers_count != 0);
@@ -435,6 +438,17 @@ FakeHttpConnection::FakeHttpConnection(
   }
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+}
+
+void FakeHttpConnection::initialize() {
+  FakeConnectionBase::initialize();
+  if (deferred_read_enable_ && shared_connection_.connected() &&
+      !shared_connection_.connection().readEnabled()) {
+    // Re-enable reads that were explicitly deferred by consumeConnection(defer_read_enable=true)
+    // to ensure the HTTP codec and read filter are fully initialized before processing request
+    // bytes. This must not re-enable reads when disable_and_do_not_enable_ is active.
+    shared_connection_.connection().readDisable(false);
+  }
 }
 
 AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
@@ -712,8 +726,8 @@ void FakeUpstream::initializeServer() {
   }
 
   dispatcher_->post([this]() -> void {
-    EXPECT_TRUE(socket_factories_[0]->doFinalPreWorkerInit().ok());
-    handler_->addListener(absl::nullopt, listener_, runtime_, random_);
+    EXPECT_OK(socket_factories_[0]->doFinalPreWorkerInit());
+    handler_->addListener(std::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
   });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
@@ -821,8 +835,10 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(lock_);
     connection = std::make_unique<FakeHttpConnection>(
-        *this, consumeConnection(), http_type_, time_system_, config_.max_request_headers_kb_,
-        config_.max_request_headers_count_, config_.headers_with_underscores_action_);
+        *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
+        config_.max_request_headers_kb_, config_.max_request_headers_count_,
+        config_.headers_with_underscores_action_,
+        /*deferred_read_enable=*/read_disable_on_new_connection_ && !disable_and_do_not_enable_);
     connection->initialize();
     return AssertionSuccess();
   });
@@ -858,9 +874,11 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       EXPECT_TRUE(upstream.runOnDispatcherThreadAndWait([&]() {
         absl::MutexLock lock(upstream.lock_);
         connection = std::make_unique<FakeHttpConnection>(
-            upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
-            Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-            envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+            upstream, upstream.consumeConnection(/*defer_read_enable=*/true), upstream.http_type_,
+            upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+            /*deferred_read_enable=*/upstream.read_disable_on_new_connection_ &&
+                !upstream.disable_and_do_not_enable_);
         connection->initialize();
         return AssertionSuccess();
       }));
@@ -929,7 +947,7 @@ void FakeUpstream::convertFromRawToHttp(FakeRawConnectionPtr& raw_connection,
   raw_connection.release();
 }
 
-SharedConnectionWrapper& FakeUpstream::consumeConnection() {
+SharedConnectionWrapper& FakeUpstream::consumeConnection(bool defer_read_enable) {
   ASSERT(!new_connections_.empty());
   auto* const connection_wrapper = new_connections_.front().get();
   // Skip the thread safety check if the network connection has already been freed since there's no
@@ -939,10 +957,11 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
   if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
       http_type_ != Http::CodecType::HTTP3 && !disable_and_do_not_enable_) {
-    // Re-enable read and early close detection.
     auto& connection = connection_wrapper->connection();
     connection.detectEarlyCloseWhenReadDisabled(true);
-    connection.readDisable(false);
+    if (!defer_read_enable) {
+      connection.readDisable(false);
+    }
   }
   return *connection_wrapper;
 }

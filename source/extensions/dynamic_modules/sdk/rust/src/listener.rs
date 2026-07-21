@@ -30,6 +30,45 @@ pub trait EnvoyListenerFilterConfig {
     name: &str,
   ) -> Result<EnvoyHistogramId, abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Increment the counter with the given id from the config context.
+  ///
+  /// Unlike [`EnvoyListenerFilter::increment_counter`], this does not require a per-connection
+  /// filter and can be called outside of the connection lifecycle, for example from a scheduled
+  /// background task.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id from the config context.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id from the config context.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id from the config context.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id from the config context.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
   /// Create a new implementation of the [`EnvoyListenerFilterConfigScheduler`] trait.
   fn new_config_scheduler(&self) -> impl EnvoyListenerFilterConfigScheduler + 'static;
 }
@@ -75,13 +114,25 @@ pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
 
   /// This is called when data is available to be read from the connection.
   ///
+  /// * `data_length` is the number of bytes available in the buffer for inspection.
+  ///
   /// This must return [`abi::envoy_dynamic_module_type_on_listener_filter_status`] to
   /// indicate the status of the data processing.
   fn on_data(
     &mut self,
     _envoy_filter: &mut ELF,
+    _data_length: usize,
   ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+
+  /// This is called to query the maximum number of bytes the filter wants to inspect from the
+  /// connection. Returning 0 means the filter does not need any data, in which case
+  /// [`ListenerFilter::on_data`] will not be called.
+  ///
+  /// This is called frequently and should be a fast operation.
+  fn max_read_bytes(&mut self, _envoy_filter: &mut ELF) -> usize {
+    0
   }
 
   /// This is called when the listener filter is destroyed for each accepted connection.
@@ -153,8 +204,29 @@ pub trait EnvoyListenerFilter {
   /// Check if the local address has been restored (e.g., by original_dst filter).
   fn is_local_address_restored(&self) -> bool;
 
+  /// Set the remote address (e.g., for proxy protocol parsing).
+  /// Returns true if the address was set successfully.
+  fn set_remote_address(&mut self, address: &str, port: u32, is_ipv6: bool) -> bool;
+
+  /// Restore the local address (e.g., for original destination or proxy protocol).
+  /// Returns true if the address was restored successfully.
+  fn restore_local_address(&mut self, address: &str, port: u32, is_ipv6: bool) -> bool;
+
+  /// Continue the filter chain after returning
+  /// [`abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration`].
+  /// If `success` is false, the connection will be closed.
+  fn continue_filter_chain(&mut self, success: bool);
+
   /// Indicate to Envoy that the original destination address should be used.
   fn use_original_dst(&mut self);
+
+  /// Set a bytes value in filter state with connection life span.
+  /// Returns true if the operation was successful.
+  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Get a bytes value from filter state.
+  /// Returns None if the value is not found.
+  fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the downstream transport failure reason.
   fn set_downstream_transport_failure_reason(&mut self, reason: &str);
@@ -164,10 +236,32 @@ pub trait EnvoyListenerFilter {
 
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
+  fn get_dynamic_metadata_string<'a>(
+    &'a self,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
+
+  /// Set the dynamic metadata value with the given namespace and key to raw bytes.
+  ///
+  /// The bytes are stored as the metadata value as is, so non-UTF-8 values are preserved. Read
+  /// them back with [`Self::get_dynamic_metadata_string`].
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]);
+
+  /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
+  ///
+  /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
+  /// namespace and merges into the metadata struct only once. Existing entries with the same key
+  /// are overwritten. Within `entries`, a later entry overwrites an earlier one with the same key.
+  /// An empty `entries` is a no-op and does not create the namespace.
+  fn set_dynamic_metadata_string_batch<'a>(
+    &mut self,
+    namespace: &'a str,
+    entries: &'a [(&'a str, &'a str)],
+  );
 
   /// Get the number-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
@@ -184,21 +278,60 @@ pub trait EnvoyListenerFilter {
   /// Returns None if SNI is not available.
   fn get_requested_server_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
+  /// Get the value of the attribute with the given ID as a string.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_string<'a>(
+    &'a self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the value of the attribute with the given ID as an integer.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64>;
+
+  /// Get the value of the attribute with the given ID as a boolean.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool>;
+
+  /// Set the requested server name (SNI) on the connection socket.
+  fn set_requested_server_name(&mut self, name: &str);
+
   /// Get the detected transport protocol (e.g., "tls", "raw_buffer") from the connection socket.
   /// Returns None if the transport protocol is not available.
   fn get_detected_transport_protocol<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Set the detected transport protocol (e.g., "tls", "raw_buffer") on the connection socket.
+  fn set_detected_transport_protocol(&mut self, protocol: &str);
 
   /// Get the requested application protocols (ALPN) from the connection socket.
   /// Returns an empty vector if no application protocols are available.
   fn get_requested_application_protocols<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
 
+  /// Set the requested application protocols (ALPN) on the connection socket.
+  fn set_requested_application_protocols<'a>(&mut self, protocols: &'a [&'a str]);
+
   /// Get the JA3 fingerprint hash from the connection socket.
   /// Returns None if the JA3 hash is not available.
   fn get_ja3_hash<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
+  /// Set the JA3 fingerprint hash on the connection socket.
+  fn set_ja3_hash(&mut self, hash: &str);
+
   /// Get the JA4 fingerprint hash from the connection socket.
   /// Returns None if the JA4 hash is not available.
   fn get_ja4_hash<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Set the JA4 fingerprint hash on the connection socket.
+  fn set_ja4_hash(&mut self, hash: &str);
 
   /// Check if SSL/TLS connection information is available on the socket.
   fn is_ssl(&self) -> bool;
@@ -368,6 +501,10 @@ pub trait EnvoyListenerFilterScheduler: Send + Sync {
   /// Once this is called, [`ListenerFilter::on_scheduled`] will be called with
   /// the same `event_id` on the worker thread where the filter is running IF
   /// by the time the event is committed, the filter is still alive.
+  ///
+  /// This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+  /// module must join or quiesce any thread that may call this before worker shutdown so a
+  /// scheduled event cannot race the worker dispatcher teardown.
   fn commit(&self, event_id: u64);
 }
 
@@ -503,6 +640,90 @@ impl EnvoyListenerFilterConfig for EnvoyListenerFilterConfigImpl {
       )
     })?;
     Ok(EnvoyHistogramId(id))
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_increment_counter(
+        self.raw, id, value,
+      )
+    };
+    if res == abi::envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_set_gauge(self.raw, id, value)
+    };
+    if res == abi::envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_increment_gauge(self.raw, id, value)
+    };
+    if res == abi::envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(self.raw, id, value)
+    };
+    if res == abi::envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+        self.raw, id, value,
+      )
+    };
+    if res == abi::envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
   }
 
   fn new_config_scheduler(&self) -> impl EnvoyListenerFilterConfigScheduler + 'static {
@@ -667,9 +888,66 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
+  fn set_remote_address(&mut self, address: &str, port: u32, is_ipv6: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_remote_address(
+        self.raw,
+        str_to_module_buffer(address),
+        port,
+        is_ipv6,
+      )
+    }
+  }
+
+  fn restore_local_address(&mut self, address: &str, port: u32, is_ipv6: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_restore_local_address(
+        self.raw,
+        str_to_module_buffer(address),
+        port,
+        is_ipv6,
+      )
+    }
+  }
+
+  fn continue_filter_chain(&mut self, success: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_continue_filter_chain(self.raw, success);
+    }
+  }
+
   fn use_original_dst(&mut self) {
     unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_use_original_dst(self.raw, true);
+    }
+  }
+
+  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_filter_state(
+        self.raw,
+        crate::bytes_to_module_buffer(key),
+        crate::bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_filter_state(
+        self.raw,
+        crate::bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
     }
   }
 
@@ -688,7 +966,7 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -702,9 +980,7 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let value_str =
-        unsafe { crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) };
-      Some(value_str.into_owned())
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -717,6 +993,41 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        crate::bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
+    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
+    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
+    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
+    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
+      Vec::with_capacity(entries.len());
+    for (key, value) in entries {
+      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: key.as_ptr() as *const _,
+        key_length: key.len(),
+        value_ptr: value.as_ptr() as *const _,
+        value_length: value.len(),
+      });
+    }
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+        self.raw,
+        str_to_module_buffer(namespace),
+        pairs.as_ptr(),
+        pairs.len(),
       )
     }
   }
@@ -771,6 +1082,75 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
+  fn get_attribute_string(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64> {
+    let mut result: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool> {
+    let mut result: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn set_requested_server_name(&mut self, name: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_requested_server_name(
+        self.raw,
+        str_to_module_buffer(name),
+      );
+    }
+  }
+
   fn get_detected_transport_protocol(&self) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
@@ -789,6 +1169,15 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
+  fn set_detected_transport_protocol(&mut self, protocol: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(
+        self.raw,
+        str_to_module_buffer(protocol),
+      );
+    }
+  }
+
   fn get_requested_application_protocols(&self) -> Vec<EnvoyBuffer<'_>> {
     let size = unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
@@ -799,34 +1188,32 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       return Vec::new();
     }
 
-    let mut protocol_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut protocol_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
         self.raw,
-        protocol_buffers.as_mut_ptr(),
+        protocol_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      protocol_buffers.set_len(size);
+    }
     protocol_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
+  }
+
+  fn set_requested_application_protocols<'a>(&mut self, protocols: &'a [&'a str]) {
+    let mut protocol_buffers: Vec<abi::envoy_dynamic_module_type_module_buffer> =
+      protocols.iter().map(|p| str_to_module_buffer(p)).collect();
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(
+        self.raw,
+        protocol_buffers.as_mut_ptr(),
+        protocol_buffers.len(),
+      );
+    }
   }
 
   fn get_ja3_hash(&self) -> Option<EnvoyBuffer<'_>> {
@@ -844,6 +1231,15 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
+    }
+  }
+
+  fn set_ja3_hash(&mut self, hash: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_ja3_hash(
+        self.raw,
+        str_to_module_buffer(hash),
+      );
     }
   }
 
@@ -865,6 +1261,15 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
+  fn set_ja4_hash(&mut self, hash: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
+        self.raw,
+        str_to_module_buffer(hash),
+      );
+    }
+  }
+
   fn is_ssl(&self) -> bool {
     unsafe { abi::envoy_dynamic_module_callback_listener_filter_is_ssl(self.raw) }
   }
@@ -876,34 +1281,20 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       return Vec::new();
     }
 
-    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut sans_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
         self.raw,
-        sans_buffers.as_mut_ptr(),
+        sans_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      sans_buffers.set_len(size);
+    }
     sans_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn get_ssl_dns_sans(&self) -> Vec<EnvoyBuffer<'_>> {
@@ -913,34 +1304,20 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       return Vec::new();
     }
 
-    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
-      abi::envoy_dynamic_module_type_envoy_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      };
-      size
-    ];
+    let mut sans_buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
         self.raw,
-        sans_buffers.as_mut_ptr(),
+        sans_buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
       )
     };
     if !ok {
       return Vec::new();
     }
-
+    unsafe {
+      sans_buffers.set_len(size);
+    }
     sans_buffers
-      .iter()
-      .take(size)
-      .map(|buf| {
-        if !buf.ptr.is_null() && buf.length > 0 {
-          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
-        } else {
-          EnvoyBuffer::default()
-        }
-      })
-      .collect()
   }
 
   fn get_ssl_subject(&self) -> Option<EnvoyBuffer<'_>> {
@@ -1306,15 +1683,35 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_accept(
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_data(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+  data_length: usize,
 ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
     let filter = unsafe { &mut *filter };
-    filter.on_data(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
+    filter.on_data(&mut EnvoyListenerFilterImpl::new(envoy_ptr), data_length)
   }))
   .unwrap_or_else(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_on_data", panic);
     abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_listener_filter_get_max_read_bytes(
+  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+) -> usize {
+  catch_unwind(AssertUnwindSafe(|| {
+    let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+    let filter = unsafe { &mut *filter };
+    filter.max_read_bytes(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_listener_filter_get_max_read_bytes",
+      panic,
+    );
+    0
   })
 }
 

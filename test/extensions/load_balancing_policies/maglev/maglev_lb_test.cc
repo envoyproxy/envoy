@@ -1,4 +1,5 @@
 #include <memory>
+#include <optional>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
@@ -13,9 +14,8 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -35,13 +35,13 @@ public:
         should_select_another_host_(should_select_another_host) {}
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
   uint32_t hostSelectionRetryCount() const override { return retry_count_; };
   bool shouldSelectAnotherHost(const Host& host) override {
     return should_select_another_host_(host);
   }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
   uint32_t retry_count_;
   HostPredicate should_select_another_host_;
 };
@@ -96,7 +96,7 @@ public:
     }
 
     createLb();
-    EXPECT_TRUE(lb_->initialize().ok());
+    EXPECT_OK(lb_->initialize());
   }
 
   NiceMock<MockPrioritySet> priority_set_;
@@ -133,6 +133,93 @@ TEST_F(MaglevLoadBalancerTest, LbDestructedBeforeFactory) {
   lb_.reset();
 
   EXPECT_NE(nullptr, factory->create(lb_params_));
+}
+
+// The thread-aware factory updates the worker LB in place via a member update callback on the
+// worker priority set, so the cluster manager should not recreate the worker LB on host changes.
+TEST_F(MaglevLoadBalancerTest, FactoryDoesNotRecreateOnHostChange) {
+  init(7);
+  EXPECT_FALSE(lb_->factory()->recreateOnHostChangeDeprecated());
+}
+
+// Worker LB instances pick up new factory state when the worker priority set fires a member
+// update, without needing to be recreated.
+TEST_F(MaglevLoadBalancerTest, WorkerLbRefreshesOnMemberUpdate) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  // The worker LB is created once and keeps a reference to the factory.
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(nullptr).host);
+
+  // Replace the host set. host_set_.runCallbacks fires the main priority set's callbacks, which
+  // recomputes the factory state on the main thread.
+  auto new_host = makeTestHost(info_, "tcp://127.0.0.1:91");
+  host_set_.hosts_ = {new_host};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+
+  // The worker LB still references the previous per-priority state until its own priority set
+  // fires the member update.
+  EXPECT_EQ("127.0.0.1:90", lb->chooseHost(nullptr).host->address()->asString());
+
+  // Simulate the worker priority set firing the member update on the worker. The worker LB must
+  // refresh its cached state from the factory.
+  worker_priority_set_.member_update_cb_helper_.runCallbacks({}, {});
+
+  EXPECT_EQ(new_host, lb->chooseHost(nullptr).host);
+}
+
+// Multiple worker LBs share the same factory; each refreshes independently when its own priority
+// set fires a member update.
+TEST_F(MaglevLoadBalancerTest, MultipleWorkerLbsRefreshIndependently) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  NiceMock<MockPrioritySet> worker_priority_set_a;
+  NiceMock<MockPrioritySet> worker_priority_set_b;
+  LoadBalancerParams params_a{worker_priority_set_a, {}};
+  LoadBalancerParams params_b{worker_priority_set_b, {}};
+
+  LoadBalancerPtr lb_a = lb_->factory()->create(params_a);
+  LoadBalancerPtr lb_b = lb_->factory()->create(params_b);
+
+  EXPECT_EQ(host_set_.hosts_[0], lb_a->chooseHost(nullptr).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_b->chooseHost(nullptr).host);
+
+  auto new_host = makeTestHost(info_, "tcp://127.0.0.1:91");
+  host_set_.hosts_ = {new_host};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+
+  // Only refresh worker A; worker B keeps the previous state until its own priority set fires.
+  worker_priority_set_a.member_update_cb_helper_.runCallbacks({}, {});
+  EXPECT_EQ(new_host, lb_a->chooseHost(nullptr).host);
+  EXPECT_EQ("127.0.0.1:90", lb_b->chooseHost(nullptr).host->address()->asString());
+
+  worker_priority_set_b.member_update_cb_helper_.runCallbacks({}, {});
+  EXPECT_EQ(new_host, lb_b->chooseHost(nullptr).host);
+}
+
+// The worker LB unregisters its member update callback on destruction; firing the worker priority
+// set's callback after the LB is gone must not touch freed memory.
+TEST_F(MaglevLoadBalancerTest, WorkerLbCallbackUnregisteredOnDestruction) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(nullptr).host);
+
+  lb.reset();
+
+  // Must be a no-op rather than calling into freed memory.
+  worker_priority_set_.member_update_cb_helper_.runCallbacks({}, {});
 }
 
 // Throws an exception if table size is not a prime number.

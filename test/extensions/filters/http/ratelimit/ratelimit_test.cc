@@ -19,6 +19,7 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -61,7 +62,7 @@ public:
     config_ = std::make_shared<FilterConfig>(
         proto_config, factory_context_.local_info_, *factory_context_.store_.rootScope(),
         factory_context_.runtime_loader_, factory_context_, status);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
@@ -79,7 +80,7 @@ public:
       absl::Status creation_status = absl::OkStatus();
       route_config_ =
           std::make_shared<FilterConfigPerRoute>(factory_context_, settings, creation_status);
-      EXPECT_TRUE(creation_status.ok());
+      EXPECT_OK(creation_status);
 
       EXPECT_CALL(filter_callbacks_, mostSpecificPerFilterConfig())
           .WillOnce(Return(route_config_.get()));
@@ -362,8 +363,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   InSequence s;
 
   filter_callbacks_.stream_info_.filter_state_->setData(
-      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(5),
-      StreamInfo::FilterState::StateType::Mutable);
+      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(5));
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -410,8 +410,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   testing::Mock::VerifyAndClearExpectations(&vh_rate_limit_);
   filter_callbacks_.stream_info_.filter_state_->setData(
       // Ensures that addend can be set differently than the request path.
-      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(100),
-      StreamInfo::FilterState::StateType::Mutable);
+      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(100));
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -432,8 +431,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHitsAddendFilterState) {
   InSequence s;
 
   filter_callbacks_.stream_info_.filter_state_->setData(
-      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(10),
-      StreamInfo::FilterState::StateType::Mutable);
+      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(10));
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -815,6 +813,64 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithDynamicMetadata) {
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ratelimit");
+        EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
+      }));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited));
+
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl()};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"},
+      {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True}};
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               std::move(h), nullptr, "", std::move(dynamic_metadata));
+
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_over_limit_)
+                    .value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_4xx_).value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
+}
+
+TEST_F(HttpRateLimitFilterTest, LimitResponseWithCustomDynamicMetadataNamespace) {
+  const std::string filter_config_with_custom_metadata_namespace = R"EOF(
+  domain: foo
+  metadata_namespace: custom.namespace
+  )EOF";
+
+  setUpTest(filter_config_with_custom_metadata_namespace);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Filters::Common::RateLimit::DynamicMetadataPtr dynamic_metadata =
+      std::make_unique<Protobuf::Struct>();
+  auto* fields = dynamic_metadata->mutable_fields();
+  (*fields)["name"] = ValueUtil::stringValue("my-limit");
+  (*fields)["x"] = ValueUtil::numberValue(3);
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, "custom.namespace");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));
 
@@ -1592,7 +1648,7 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   settings.clear_vh_rate_limits();
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1643,7 +1699,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1694,7 +1750,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
@@ -1745,7 +1801,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
@@ -1793,7 +1849,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1843,7 +1899,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1891,7 +1947,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
@@ -1926,7 +1982,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
   settings.set_domain(per_route_domain);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))

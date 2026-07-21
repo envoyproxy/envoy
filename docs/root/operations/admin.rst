@@ -260,6 +260,14 @@ modify different aspects of the server:
   Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
   Requires compiling with tcmalloc (default).
 
+.. _operations_admin_interface_peak_heap_dump:
+
+.. http:get:: /peak_heap_dump
+
+  Dump peak heap profile of Envoy process. This captures the heap state at peak memory usage.
+  The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
 .. http:post:: /allocprofiler
 
   Enable or disable the allocation profiler. The output content is parsable binary by the ``pprof`` tool.
@@ -342,6 +350,7 @@ modify different aspects of the server:
     source/common/network/udp_listener_impl.cc: trace
 
   - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
+  - ``/logging?group=http:info`` will make the level of all loggers in the ``http`` group be info.
   - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
   - ``/logging?paths=source/common*:warning`` will make the level of ``source/common/event/dispatcher_impl.cc:``, ``source/common/network/tcp_listener_impl.cc`` be warning.
     Other unmatched loggers will be the default trace, e.g., `admin_filter.cc`, even it was updated to info from the previous post update.
@@ -490,15 +499,15 @@ modify different aspects of the server:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
-  .. http::get:: /stats?hidden=showonly
+  .. http:get:: /stats?hidden=only
 
   Only outputs statistics that are internally marked as hidden.
 
-  .. http::get:: /stats?hidden=include
+  .. http:get:: /stats?hidden=include
 
   Hidden stats will be shown along side non-hidden stats.
 
-  .. http::get:: /stats?hidden=exclude
+  .. http:get:: /stats?hidden=exclude
 
   Hidden stats will be excluded from the output. This is the default behavior.
 
@@ -512,6 +521,11 @@ modify different aspects of the server:
 
   By default, the regular expression is evaluated using the
   `Google RE2 <https://github.com/google/re2>`_ engine.
+
+  .. http:get:: /stats?filter=regex&invert_filter
+
+  Inverts the ``filter`` regex, returning stats whose names do not match.
+  Requires ``filter``.
 
   .. http:get:: /stats?histogram_buckets=cumulative
 

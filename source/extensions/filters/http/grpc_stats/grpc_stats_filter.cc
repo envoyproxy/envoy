@@ -32,7 +32,7 @@ public:
                                      const envoy::config::core::v3::GrpcMethodList& method_list)
       : stat_name_pool_(symbol_table), map_(populate(method_list)) {}
 
-  absl::optional<Grpc::Context::RequestStatNames>
+  std::optional<Grpc::Context::RequestStatNames>
   lookup(const Grpc::Common::RequestNames& request_names) const {
     auto it = map_.find(request_names);
     if (it != map_.end()) {
@@ -112,7 +112,7 @@ struct Config {
   const bool enable_upstream_stats_;
   const bool replace_dots_in_grpc_service_name_;
   const bool stats_for_all_methods_;
-  absl::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
+  std::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
 };
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
@@ -146,7 +146,7 @@ public:
           // Resolve the service and method to a string_view, then get
           // the Context::RequestStatNames out of the pre-allocated list that
           // can be produced with the allowlist being present.
-          absl::optional<Grpc::Common::RequestNames> request_names =
+          std::optional<Grpc::Common::RequestNames> request_names =
               Grpc::Common::resolveServiceAndMethod(headers.Path());
 
           if (request_names) {
@@ -183,12 +183,16 @@ public:
       uint64_t delta = request_counter_.inspect(data);
       if (delta > 0) {
         maybeWriteFilterState();
-        config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
+        if (doStatTracking()) {
+          config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
+        }
       }
     } else if (connect_unary_ && end_stream) {
       connect_unary_request_body_ = true;
       maybeWriteFilterState();
-      config_->context_.chargeRequestMessageStat(*cluster_, request_names_, 1);
+      if (doStatTracking()) {
+        config_->context_.chargeRequestMessageStat(*cluster_, request_names_, 1);
+      }
     }
     return Http::FilterDataStatus::Continue;
   }
@@ -225,9 +229,11 @@ public:
       uint64_t delta = response_counter_.inspect(data);
       if (delta > 0) {
         maybeWriteFilterState();
-        config_->context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
+        if (doStatTracking()) {
+          config_->context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
+        }
       }
-      if (end_stream) {
+      if (end_stream && doStatTracking()) {
         config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                      response_counter_.connectSuccess());
         maybeChargeUpstreamStat();
@@ -235,8 +241,10 @@ public:
     } else if (connect_unary_ && end_stream) {
       connect_unary_response_body_ = true;
       maybeWriteFilterState();
-      config_->context_.chargeResponseMessageStat(*cluster_, request_names_, 1);
-      maybeChargeUpstreamStat();
+      if (doStatTracking()) {
+        config_->context_.chargeResponseMessageStat(*cluster_, request_names_, 1);
+        maybeChargeUpstreamStat();
+      }
     }
     return Http::FilterDataStatus::Continue;
   }
@@ -261,7 +269,6 @@ public:
       filter_object_ = state.get();
       decoder_callbacks_->streamInfo().filterState()->setData(
           "envoy.filters.http.grpc_stats", std::move(state),
-          StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
     if (connect_unary_) {
@@ -274,7 +281,7 @@ public:
   }
 
   void maybeChargeUpstreamStat() {
-    if (!config_->enable_upstream_stats_) {
+    if (!config_->enable_upstream_stats_ || !doStatTracking()) {
       return;
     }
     StreamInfo::TimingUtility timing(decoder_callbacks_->streamInfo());
@@ -302,12 +309,13 @@ private:
   Grpc::FrameInspector request_counter_;
   ResponseFrameCounter response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  absl::optional<Grpc::Context::RequestStatNames> request_names_;
+  std::optional<Grpc::Context::RequestStatNames> request_names_;
 };
 
 } // namespace
 
-Http::FilterFactoryCb GrpcStatsFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+GrpcStatsFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
     const std::string&, Server::Configuration::FactoryContext& factory_context) {
 
