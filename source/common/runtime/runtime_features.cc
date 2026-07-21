@@ -92,6 +92,7 @@ RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 // false once their cookie TTL has elapsed and no legacy cookies remain in circulation.
 // TODO: flip the default to false and remove the flag once the migration window has elapsed.
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_legacy_cbc_decrypt_compat);
+RUNTIME_GUARD(envoy_reloadable_features_oauth2_use_scheme_from_token_endpoint_uri);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_track_end_stream);

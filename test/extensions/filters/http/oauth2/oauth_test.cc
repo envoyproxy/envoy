@@ -10,6 +10,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -63,6 +64,33 @@ public:
     return AssertionSuccess();
   }
 
+  // Builds a client for the given token endpoint URI, dispatches an access token request, and
+  // returns the value of the ":scheme" pseudo-header on the outgoing request (empty if unset).
+  std::string schemeForTokenEndpointUri(const std::string& token_endpoint_uri) {
+    envoy::config::core::v3::HttpUri uri;
+    uri.set_cluster("auth");
+    uri.set_uri(token_endpoint_uri);
+    uri.mutable_timeout()->set_seconds(1);
+    std::shared_ptr<OAuth2Client> client =
+        std::make_shared<OAuth2ClientImpl>(cm_, uri, nullptr, 0s);
+
+    std::string scheme;
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+        .WillOnce(
+            Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              scheme = std::string(message->headers().getSchemeValue());
+              callbacks_.push_back(&cb);
+              return &request_;
+            }));
+
+    // The request is left in flight; the client cancels it when destroyed at scope exit.
+    EXPECT_CALL(request_, cancel());
+    client->setCallbacks(*mock_callbacks_);
+    client->asyncGetAccessToken("a", "b", "c", "d", "e");
+    return scheme;
+  }
+
   NiceMock<Upstream::MockClusterManager> cm_;
   std::shared_ptr<MockCallbacks> mock_callbacks_;
   Http::MockAsyncClientRequest request_;
@@ -109,6 +137,29 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+}
+
+// The token endpoint request carries ":scheme https" when the configured URI is https.
+TEST_F(OAuth2ClientTest, SchemeHeaderSetFromHttpsUri) {
+  EXPECT_EQ("https", schemeForTokenEndpointUri("https://auth.com/oauth/token"));
+}
+
+// The token endpoint request carries ":scheme http" when the configured URI is http.
+TEST_F(OAuth2ClientTest, SchemeHeaderSetFromHttpUri) {
+  EXPECT_EQ("http", schemeForTokenEndpointUri("http://auth.com/oauth/token"));
+}
+
+// A scheme-less configured URI leaves ":scheme" unset, preserving behavior for existing configs.
+TEST_F(OAuth2ClientTest, SchemeHeaderNotSetForSchemelessUri) {
+  EXPECT_EQ("", schemeForTokenEndpointUri("auth.com/oauth/token"));
+}
+
+// With the runtime guard disabled, ":scheme" is left unset even for an https URI.
+TEST_F(OAuth2ClientTest, SchemeHeaderNotSetWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.oauth2_use_scheme_from_token_endpoint_uri", "false"}});
+  EXPECT_EQ("", schemeForTokenEndpointUri("https://auth.com/oauth/token"));
 }
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenMissingExpiresIn) {

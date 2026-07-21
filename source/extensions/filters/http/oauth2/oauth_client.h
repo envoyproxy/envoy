@@ -12,6 +12,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
 
 namespace Envoy {
@@ -134,7 +135,9 @@ private:
   void handleRefreshTokenFailure(bool is_request_dispatched);
 
   Http::RequestMessagePtr createPostRequest() {
-    auto request = Http::Utility::prepareHeaders(uri_);
+    auto request = Http::Utility::prepareHeaders(
+        uri_, Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.oauth2_use_scheme_from_token_endpoint_uri"));
     request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     request->headers().setReferenceContentType(
         Http::Headers::get().ContentTypeValues.FormUrlEncoded);
