@@ -134,6 +134,34 @@ public:
 };
 
 /**
+ * Callbacks for singleton resource subscriptions.
+ */
+class SingletonSubscriptionCallbacks {
+public:
+  virtual ~SingletonSubscriptionCallbacks() = default;
+
+  /**
+   * Called when the singleton resource is successfully updated or created.
+   * @param resource the decoded protobuf resource.
+   * @param version_info the xDS discovery response version string for telemetry and debugging.
+   */
+  virtual absl::Status onResourceUpdate(const DecodedResource& resource,
+                                        const std::string& version_info) PURE;
+
+  /**
+   * Called when the singleton resource is explicitly removed by the control plane.
+   */
+  virtual void onResourceRemoved() PURE;
+
+  /**
+   * Called when a configuration update fails (gRPC disconnect, malformed proto, PGV error).
+   * @param reason the high-level failure category.
+   * @param e the underlying EnvoyException containing rich error details (can be nullptr).
+   */
+  virtual void onFailure(ConfigUpdateFailureReason reason, const EnvoyException* e) PURE;
+};
+
+/**
  * Options associated with a Subscription.
  */
 struct SubscriptionOptions {
@@ -235,6 +263,19 @@ public:
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;
+
+/**
+ * Subscription to a singleton resource.
+ */
+class SingletonSubscription {
+public:
+  virtual ~SingletonSubscription() = default;
+
+  /**
+   * Starts the singleton subscription. The resource name is securely encapsulated at creation time.
+   */
+  virtual void start() PURE;
+};
 
 /**
  * Per subscription stats. @see stats_macros.h

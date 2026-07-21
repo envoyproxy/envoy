@@ -60,6 +60,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings:string_view",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

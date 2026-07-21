@@ -581,6 +581,8 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
       };
     }
 
+    host_to_conn_info_map_[key].target_connection_count = cluster_config.reverse_connection_count;
+
     // Check if we should attempt connection to this host (backoff logic).
     if (!shouldAttemptConnectionToHost(host_address, cluster_name)) {
       ENVOY_LOG(debug, "reverse_tunnel: Skipping connection attempt to host {} due to backoff",
@@ -1052,9 +1054,20 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   auto wrapper = std::make_unique<RCConnectionWrapper>(*this, std::move(conn_data.connection_),
                                                        conn_data.host_description_, cluster_name);
 
+  // Stamp the episode initiation time on the first dial of an establishment episode, and reuse it
+  // for subsequent handshake retries. It is cleared on handshake success (see onConnectionDone()),
+  // so a redial after a live connection drops begins a fresh episode with a new timestamp.
+  auto& host_info = host_to_conn_info_map_[normalized_host_key];
+  if (!host_info.episode_initiation_time_ms.has_value()) {
+    host_info.episode_initiation_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                               getTimeSource().systemTime().time_since_epoch())
+                                               .count();
+  }
+
   // Send the reverse connection handshake over the TCP connection.
   const std::string connection_key =
-      wrapper->connect(config_.src_tenant_id, config_.src_cluster_id, config_.src_node_id);
+      wrapper->connect(config_.src_tenant_id, config_.src_cluster_id, config_.src_node_id,
+                       host_info.episode_initiation_time_ms);
   ENVOY_LOG(debug, "reverse_tunnel: Initiated reverse connection handshake for host {} with key {}",
             host_address, connection_key);
 
@@ -1223,6 +1236,12 @@ void ReverseConnectionIOHandle::onConnectionDone(
       host_it->second.connection_keys.insert(connection_key);
       ENVOY_LOG(debug, "reverse_tunnel: Added connection key {} for host {}", connection_key,
                 host_address);
+      // End the establishment episode only once all target connections for the host are up, so that
+      // the 2..N handshakes of a multi-connection episode still report the original intent time. A
+      // future redial after a connection drops then begins a fresh episode with a new timestamp.
+      if (host_it->second.connection_keys.size() >= host_it->second.target_connection_count) {
+        host_it->second.episode_initiation_time_ms.reset();
+      }
     }
 
     // Set quiet shutdown since we are duplicating the socket and closing the original socket. When
