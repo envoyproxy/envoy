@@ -6,11 +6,13 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::Return;
 using ::testing::Truly;
 
@@ -122,9 +124,8 @@ arn: "arn:aws:lambda:region:424242:fun"
   AwsLambdaFilterFactory factory;
 
   auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_EQ(status_or.status().message(),
-            "aws_lambda_filter: Invalid ARN: arn:aws:lambda:region:424242:fun");
+  EXPECT_THAT(status_or,
+              HasStatusMessage("aws_lambda_filter: Invalid ARN: arn:aws:lambda:region:424242:fun"));
 }
 
 TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARN) {
@@ -142,9 +143,8 @@ TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARN) {
 
   auto status_or = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_EQ(status_or.status().message(),
-            "aws_lambda_filter: Invalid ARN: arn:aws:lambda:region:424242:fun");
+  EXPECT_THAT(status_or,
+              HasStatusMessage("aws_lambda_filter: Invalid ARN: arn:aws:lambda:region:424242:fun"));
 }
 
 TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {

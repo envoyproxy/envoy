@@ -585,6 +585,8 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
       };
     }
 
+    host_to_conn_info_map_[key].target_connection_count = cluster_config.reverse_connection_count;
+
     // Check if we should attempt connection to this host (backoff logic).
     if (!shouldAttemptConnectionToHost(host_address, cluster_name)) {
       ENVOY_LOG(debug, "reverse_tunnel: Skipping connection attempt to host {} due to backoff",
@@ -1069,9 +1071,20 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   auto wrapper = std::make_unique<RCConnectionWrapper>(*this, std::move(conn_data.connection_),
                                                        conn_data.host_description_, cluster_name);
 
+  // Stamp the episode initiation time on the first dial of an establishment episode, and reuse it
+  // for subsequent handshake retries. It is cleared on handshake success (see onConnectionDone()),
+  // so a redial after a live connection drops begins a fresh episode with a new timestamp.
+  auto& host_info = host_to_conn_info_map_[normalized_host_key];
+  if (!host_info.episode_initiation_time_ms.has_value()) {
+    host_info.episode_initiation_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                               getTimeSource().systemTime().time_since_epoch())
+                                               .count();
+  }
+
   // Send the reverse connection handshake over the TCP connection.
   const std::string connection_key =
-      wrapper->connect(config_.src_tenant_id, config_.src_cluster_id, config_.src_node_id);
+      wrapper->connect(config_.src_tenant_id, config_.src_cluster_id, config_.src_node_id,
+                       host_info.episode_initiation_time_ms);
   ENVOY_LOG(debug, "reverse_tunnel: Initiated reverse connection handshake for host {} with key {}",
             host_address, connection_key);
 
@@ -1194,9 +1207,6 @@ void ReverseConnectionIOHandle::onConnectionDone(
               connection_key);
   }
 
-  // Get connection pointer for safe access in success/failure handling.
-  connection = wrapper->getConnection();
-
   // Process connection result safely.
   bool is_success = (error == "reverse connection accepted" || error == "success" ||
                      error == "handshake successful" || error == "connection established");
@@ -1224,6 +1234,8 @@ void ReverseConnectionIOHandle::onConnectionDone(
   } else {
     // Handle connection success.
     ENVOY_LOG(debug, "reverse_tunnel: Connection succeeded for host {}", host_address);
+    auto released_conn = wrapper->releaseConnection();
+    ASSERT(released_conn != nullptr, "Connection should not be null after success");
 
     resetHostBackoff(host_address);
     updateConnectionState(host_address, cluster_name, connection_key,
@@ -1231,21 +1243,9 @@ void ReverseConnectionIOHandle::onConnectionDone(
 
     emitAccessLog("handshake_success", host_address, cluster_name, connection_key, "");
 
-    // Only proceed if connection is still valid.
-    if (!connection) {
-      ENVOY_LOG(error, "reverse_tunnel: Cannot complete successful handshake - connection is null");
-      return;
-    }
-
     ENVOY_LOG(info, "reverse_tunnel: Transferring tunnel socket for "
                     "reverse_conn_listener consumption");
-
-    // Reset file events safely.
-    if (connection->getSocket()) {
-      ENVOY_LOG(debug, "reverse_tunnel: Removing connection callbacks and resetting file events");
-      connection->removeConnectionCallbacks(*wrapper);
-      connection->getSocket()->ioHandle().resetFileEvents();
-    }
+    released_conn->getSocket()->ioHandle().resetFileEvents();
 
     // Update host connection tracking safely.
     auto host_it = host_to_conn_info_map_.find(host_address);
@@ -1253,33 +1253,35 @@ void ReverseConnectionIOHandle::onConnectionDone(
       host_it->second.connection_keys.insert(connection_key);
       ENVOY_LOG(debug, "reverse_tunnel: Added connection key {} for host {}", connection_key,
                 host_address);
+      // End the establishment episode only once all target connections for the host are up, so that
+      // the 2..N handshakes of a multi-connection episode still report the original intent time. A
+      // future redial after a connection drops then begins a fresh episode with a new timestamp.
+      if (host_it->second.connection_keys.size() >= host_it->second.target_connection_count) {
+        host_it->second.episode_initiation_time_ms.reset();
+      }
     }
 
     // Set quiet shutdown since we are duplicating the socket and closing the original socket. When
     // the original socket is closed, a TLS close_notify alert is otherwise sent.
-    ReverseConnectionUtility::applySslQuietClose(*connection);
+    ReverseConnectionUtility::applySslQuietClose(*released_conn);
 
-    Network::ClientConnectionPtr released_conn = wrapper->releaseConnection();
+    ENVOY_LOG(info, "reverse_tunnel: Connection will be consumed by "
+                    "reverse_conn_listener for HTTP processing");
 
-    if (released_conn) {
-      ENVOY_LOG(info, "reverse_tunnel: Connection will be consumed by "
-                      "reverse_conn_listener for HTTP processing");
+    // Move connection to established queue for reverse_conn_listener to consume.
+    established_connections_.push(std::move(released_conn));
 
-      // Move connection to established queue for reverse_conn_listener to consume.
-      established_connections_.push(std::move(released_conn));
-
-      // Trigger accept mechanism safely.
-      if (isTriggerPipeReady()) {
-        char trigger_byte = 1;
-        ssize_t bytes_written = ::write(trigger_pipe_write_fd_, &trigger_byte, 1);
-        if (bytes_written == 1) {
-          ENVOY_LOG(info,
-                    "reverse_tunnel: Successfully triggered reverse_conn_listener "
-                    "accept() for host {}",
-                    host_address);
-        } else {
-          ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}", errorDetails(errno));
-        }
+    // Trigger accept mechanism safely.
+    if (isTriggerPipeReady()) {
+      char trigger_byte = 1;
+      ssize_t bytes_written = ::write(trigger_pipe_write_fd_, &trigger_byte, 1);
+      if (bytes_written == 1) {
+        ENVOY_LOG(info,
+                  "reverse_tunnel: Successfully triggered reverse_conn_listener "
+                  "accept() for host {}",
+                  host_address);
+      } else {
+        ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}", errorDetails(errno));
       }
     }
   }

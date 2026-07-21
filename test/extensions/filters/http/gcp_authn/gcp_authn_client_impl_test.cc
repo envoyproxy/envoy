@@ -8,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,10 +20,12 @@ namespace GcpAuthn {
 namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using Server::Configuration::MockFactoryContext;
 using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using Upstream::MockThreadLocalCluster;
 
@@ -75,7 +78,9 @@ public:
         }));
   }
 
-  void createClient() { client_ = std::make_unique<GcpAuthnClientImpl>(config_, context_); }
+  void createClient() {
+    client_ = std::make_unique<GcpAuthnClientImpl>(config_, context_.server_factory_context_);
+  }
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
@@ -171,8 +176,7 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenParsingFailure) {
   // Assert that callbacks are notified with an error since JSON parsing failed.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
       .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
-        EXPECT_FALSE(token.ok());
-        EXPECT_EQ(token.status().message(), "Failed to parse access token response as JSON.");
+        EXPECT_THAT(token, HasStatusMessage("Failed to parse access token response as JSON."));
       }));
 
   client_callback_->onSuccess(client_request_, std::move(response));
@@ -197,9 +201,8 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenMissing) {
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
       .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
-        EXPECT_FALSE(token.ok());
-        EXPECT_EQ(token.status().message(),
-                  "Failed to extract access_token or expires_in from response.");
+        EXPECT_THAT(
+            token, HasStatusMessage("Failed to extract access_token or expires_in from response."));
       }));
 
   client_callback_->onSuccess(client_request_, std::move(response));
@@ -224,9 +227,8 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenExpiresInMissing) {
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
       .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
-        EXPECT_FALSE(token.ok());
-        EXPECT_EQ(token.status().message(),
-                  "Failed to extract access_token or expires_in from response.");
+        EXPECT_THAT(
+            token, HasStatusMessage("Failed to extract access_token or expires_in from response."));
       }));
 
   client_callback_->onSuccess(client_request_, std::move(response));
@@ -251,8 +253,7 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenEmptyInResponse) {
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
       .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
-        EXPECT_FALSE(token.ok());
-        EXPECT_EQ(token.status().message(), "Extracted access_token is empty.");
+        EXPECT_THAT(token, HasStatusMessage("Extracted access_token is empty."));
       }));
 
   client_callback_->onSuccess(client_request_, std::move(response));
@@ -278,8 +279,7 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenExpiresInNonPositive) {
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
       .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
-        EXPECT_FALSE(token.ok());
-        EXPECT_EQ(token.status().message(), "Extracted expires_in is non-positive.");
+        EXPECT_THAT(token, HasStatusMessage("Extracted expires_in is non-positive."));
       }));
 
   client_callback_->onSuccess(client_request_, std::move(response));
@@ -437,8 +437,7 @@ TEST_F(GcpAuthnClientImplTest, JwtParsingFailure) {
   // Assert that callbacks are notified with an error since JWT parsing failed.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
       .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
-        EXPECT_FALSE(token.ok());
-        EXPECT_EQ(token.status().message(), "Failed to parse identity token/JWT.");
+        EXPECT_THAT(token, HasStatusMessage("Failed to parse identity token/JWT."));
       }));
 
   client_callback_->onSuccess(client_request_, std::move(response));

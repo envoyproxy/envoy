@@ -56,6 +56,15 @@ public:
                            absl::string_view tenant_id = {});
 
   /**
+   * Returns true if a new reverse connection can be accepted for the given node, scoped by tenant
+   * when tenant isolation is enabled.
+   * @param node_id the node ID to check.
+   * @param tenant_id the tenant ID to check.
+   * @return true if a new reverse connection can be accepted, false otherwise.
+   */
+  bool canAcceptConnection(absl::string_view node_id, absl::string_view tenant_id) const;
+
+  /**
    * Hand off a socket to this socket manager's dispatcher.
    * Used for cross-thread rebalancing of reverse connection sockets.
    * @param node_id node_id of initiating node.
@@ -134,6 +143,9 @@ public:
    */
   void setMissThreshold(uint32_t threshold) { miss_threshold_ = std::max<uint32_t>(1, threshold); }
   void setTenantIsolationEnabled(bool enabled) { tenant_isolation_enabled_ = enabled; }
+  void setMaxConnectionsPerNode(uint32_t max_connections_per_node) {
+    max_connections_per_node_ = max_connections_per_node;
+  }
   bool tenantIsolationEnabled() const { return tenant_isolation_enabled_; }
 
   /**
@@ -189,6 +201,8 @@ private:
    */
   void rearmPingSendTimer(int fd);
 
+  OptRef<const MonotonicTime> findStartTime(int fd) const;
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
@@ -234,6 +248,11 @@ private:
   // Per-connection send timers that schedule individual ping sends with jitter.
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_ping_send_timer_map_;
 
+  // Per connection start time for tracking latency histogram metrics.
+  // The time is calculated from after the handshake complete -> reverse_tunnel_filter transfers
+  // this to us.
+  absl::flat_hash_map<int, MonotonicTime> fd_to_start_time_map_;
+
   // Track consecutive ping misses per file descriptor.
   absl::flat_hash_map<int, uint32_t> fd_to_miss_count_;
   // Miss threshold before declaring a socket dead.
@@ -254,6 +273,7 @@ private:
   absl::flat_hash_map<std::string, int> node_to_conn_count_map_;
 
   bool tenant_isolation_enabled_{false};
+  uint32_t max_connections_per_node_{0};
 
   // Global list of all socket managers across threads for rebalancing.
   static std::vector<UpstreamSocketManager*> socket_managers_;

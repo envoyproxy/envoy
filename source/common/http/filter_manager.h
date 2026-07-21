@@ -1115,6 +1115,8 @@ private:
                   FilterIterationStartState filter_iteration_start_state);
   void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
   void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
+  bool hasSavedResponseMetadata() const;
+  void encodeSavedResponseMetadataToCodec();
 
   // Returns true if new metadata is decoded. Otherwise, returns false.
   bool processNewlyAddedMetadata();
