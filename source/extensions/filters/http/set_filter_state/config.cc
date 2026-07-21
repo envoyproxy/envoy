@@ -35,7 +35,7 @@ Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& 
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> SetFilterStateConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 

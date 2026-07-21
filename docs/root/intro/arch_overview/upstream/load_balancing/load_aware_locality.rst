@@ -132,14 +132,14 @@ per-endpoint capacity. Each consumer attaches independent
 ``HostLbPolicyData`` entries, so the two policies do not interfere.
 
 Utilization is derived from each host's ORCA report using the same
-extraction as CSWRR (precedence may be flipped by the
+extraction as CSWRR, which takes the first source whose value is greater
+than 0 (precedence may be flipped by the
 ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first``
 runtime feature). By default:
 
-1. ``application_utilization`` -- value in [0, 1], used when reported and
-   greater than 0.
-2. Named metrics via ``metric_names_for_computing_utilization`` -- max of
-   present values, used when ``application_utilization`` is not reported.
+1. Named metrics via ``metric_names_for_computing_utilization`` -- max of
+   present values.
+2. ``application_utilization``.
 3. ``cpu_utilization`` -- final fallback.
 
 .. _load_aware_locality_weight_computation:
@@ -317,10 +317,10 @@ Configuration parameters
        least 100 ms.
    * - ``metric_names_for_computing_utilization``
      - (unset)
-     - Named ORCA metrics used to compute utilization when
-       ``application_utilization`` is not reported. The max of matching
-       values is taken. Map entries use ``<map_field_name>.<map_key>`` (e.g.
-       ``named_metrics.foo``). See
+     - Named ORCA metrics used to compute utilization. By default the max of
+       matching values takes precedence over ``application_utilization`` when
+       that max is greater than 0. Map entries use ``<map_field_name>.<map_key>``
+       (e.g. ``named_metrics.foo``). See
        :ref:`Weight computation <load_aware_locality_weight_computation>` for
        precedence.
    * - ``utilization_variance_threshold``

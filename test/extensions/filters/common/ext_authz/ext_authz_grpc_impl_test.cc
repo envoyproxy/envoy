@@ -66,7 +66,7 @@ public:
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = CheckResponsePtr();
   auto status = check_response->mutable_status();
 
   Protobuf::Struct expected_dynamic_metadata;
@@ -177,7 +177,7 @@ TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = CheckResponsePtr();
   auto status = check_response->mutable_status();
   const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
   status->set_code(grpc_status);
@@ -203,7 +203,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = CheckResponsePtr();
   auto status = check_response->mutable_status();
   const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Unknown;
   status->set_code(grpc_status);
@@ -446,7 +446,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorNoAttributes) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = CheckResponsePtr();
   auto status = check_response->mutable_status();
 
   Protobuf::Struct expected_dynamic_metadata;
@@ -487,7 +487,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   initialize();
 
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto check_response = CheckResponsePtr();
   auto status = check_response->mutable_status();
 
   const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
@@ -582,8 +582,7 @@ ok_response:
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzOkResponse(expected_authz_response))));
-  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
-                     span_);
+  client_->onSuccess(CheckResponsePtr(std::move(check_response)), span_);
 }
 
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkUpstreamHeaderMutations) {
@@ -631,8 +630,7 @@ ok_response:
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzOkResponse(expected_authz_response))));
-  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
-                     span_);
+  client_->onSuccess(CheckResponsePtr(std::move(check_response)), span_);
 }
 
 // TODO(https://github.com/envoyproxy/envoy/issues/45003)
@@ -674,8 +672,7 @@ ok_response:
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzOkResponse(expected_authz_response))));
-  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
-                     span_);
+  client_->onSuccess(CheckResponsePtr(std::move(check_response)), span_);
 }
 
 } // namespace ExtAuthz

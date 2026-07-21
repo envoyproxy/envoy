@@ -719,6 +719,33 @@ TEST_P(MetadataIntegrationTest, TestResponseMetadata) {
   EXPECT_EQ(3, response->metadataMapsDecodedCount());
 }
 
+TEST_P(MetadataIntegrationTest, SendDirectLocalReplyEncodesSavedResponseMetadata) {
+  const std::string local_reply_during_encode_filter = R"EOF(
+name: local-reply-during-encode
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeConfig
+)EOF";
+
+  prependFilters({response_metadata_filter, local_reply_during_encode_filter});
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+
+  // The response metadata filter runs before the local-reply filter on the encode path. Its saved
+  // metadata must be flushed before the direct local reply ends the stream.
+  verifyExpectedMetadata(response->metadataMap(), {"duplicate", "headers", "local-reply"});
+  EXPECT_EQ(2, response->metadataMapsDecodedCount());
+  EXPECT_EQ(response->keyCount("duplicate"), 1);
+}
+
 TEST_P(MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

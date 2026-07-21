@@ -10,17 +10,31 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpRouter {
 
-absl::StatusOr<Http::FilterFactoryCb>
-McpRouterFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> McpRouterFilterConfigFactory::createFilterFactory(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
+    Stats::Scope& scope) {
 
-  auto config =
-      std::make_shared<McpRouterConfigImpl>(proto_config, stats_prefix, context.scope(), context);
+  auto config = std::make_shared<McpRouterConfigImpl>(proto_config, stats_prefix, scope, context);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<McpRouterFilter>(config));
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+McpRouterFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto_config, stats_prefix, context.serverFactoryContext(),
+                             context.scope());
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+McpRouterFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto_config, stats_prefix, context, context.scope());
 }
 
 /**
