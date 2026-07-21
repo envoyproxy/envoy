@@ -83,7 +83,6 @@ ClientContextImpl::ClientContextImpl(
         absl::InvalidArgumentError("Client TLS context supports only a single certificate");
     return;
   }
-  ASSERT(tls_contexts_.size() == 1);
 
   if (!parsed_alpn_protocols_.empty()) {
     for (auto& ctx : tls_contexts_) {

@@ -17,9 +17,21 @@ namespace Quic {
 
 namespace {
 
+// The QUICHE client handshaker requires direct access to the private key, so client certificates
+// configured with a private key provider cannot be supported on QUIC.
+absl::Status validateClientCertificatesForQuic(const Ssl::ClientContextConfig& config) {
+  for (const auto& tls_certificate : config.tlsCertificates()) {
+    if (tls_certificate.get().privateKeyMethod() != nullptr) {
+      return absl::UnimplementedError(
+          "client certificates with a private key provider are not supported on QUIC");
+    }
+  }
+  return absl::OkStatus();
+}
+
 // Installs the configured client certificate chain and private key on the QUICHE client SSL
 // context so that upstream QUIC connections present a certificate when the peer requests one.
-// QUICHE's SSL context uses the CRYPTO_BUFFER-based method, so the chain is installed via
+// The QUICHE SSL context uses the CRYPTO_BUFFER-based method, so the chain is installed via
 // SSL_CTX_set_chain_and_key rather than the X509-based APIs.
 absl::Status configureQuicClientCertChain(SSL_CTX* quic_ssl_ctx,
                                           const Ssl::TlsContext& tls_context) {
@@ -81,14 +93,8 @@ QuicClientTransportSocketFactory::create(
   }
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_upstream_client_certificates")) {
-    // QUICHE's client handshaker requires direct access to the private key, so private key
-    // providers cannot be supported; reject them at config load time.
-    for (const auto& tls_certificate : config->tlsCertificates()) {
-      if (tls_certificate.get().privateKeyMethod() != nullptr) {
-        return absl::UnimplementedError(
-            "client certificates with a private key provider are not supported on QUIC");
-      }
-    }
+    // Reject incompatible client certificates at config load time.
+    RETURN_IF_NOT_OK(validateClientCertificatesForQuic(*config));
   }
   absl::Status creation_status = absl::OkStatus();
   auto factory = std::unique_ptr<QuicClientTransportSocketFactory>(
@@ -123,6 +129,21 @@ QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
       factory_context.statsScope());
   SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
   fallback_factory_ = std::move(*factory_or_error);
+  // Reject SDS updates that deliver a certificate incompatible with QUIC so the update is
+  // surfaced as a config rejection with the usual observability signals, instead of connections
+  // failing later. Static configurations are rejected in create(); the check in getCryptoConfig()
+  // remains as a backstop.
+  fallback_factory_->setSecretUpdateValidationHook([this]() -> absl::Status {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_upstream_client_certificates")) {
+      return absl::OkStatus();
+    }
+    absl::Status status = validateClientCertificatesForQuic(*clientContextConfig());
+    if (!status.ok()) {
+      stats_.upstream_context_incompatible_certificate_.inc();
+    }
+    return status;
+  });
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalQuicConfig>(); });
 }
 
@@ -168,11 +189,13 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
       absl::Status status = configureQuicClientCertChain(
           tls_config.crypto_config_->ssl_ctx(), tls_config.client_context_->getTlsContext());
       if (!status.ok()) {
-        // Configurations which can hit this are rejected at config load time, so this is only
-        // reachable when a certificate delivered later via SDS cannot be installed (e.g. it uses
-        // a private key provider). Fail closed rather than sending connections without the
-        // configured client certificate.
-        ENVOY_LOG(error, "Not creating QUIC connections: {}", status.message());
+        // Incompatible configurations are rejected at config load time and incompatible SDS
+        // updates are rejected by the secret update validation hook, so this is a backstop for
+        // certificates that cannot be installed for any other reason. Fail closed rather than
+        // sending connections without the configured client certificate.
+        ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10), "Not creating QUIC connections: {}",
+                           status.message());
+        stats_.upstream_context_incompatible_certificate_.inc();
         tls_config.client_context_ = nullptr;
         tls_config.crypto_config_ = nullptr;
         return nullptr;

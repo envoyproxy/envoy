@@ -304,7 +304,7 @@ public:
   // Will be owned by factory_.
   NiceMock<Ssl::MockClientContextConfig>* context_config_{
       new NiceMock<Ssl::MockClientContextConfig>};
-  std::function<void()> update_callback_;
+  std::function<absl::Status()> update_callback_;
 };
 
 TEST_F(QuicClientTransportSocketFactoryTest, SupportedAlpns) {
@@ -340,14 +340,14 @@ TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
   Ssl::ClientContextSharedPtr ssl_context1{new NiceMock<Ssl::MockClientContext>()};
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context1));
-  update_callback_();
+  ASSERT_TRUE(update_callback_().ok());
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config1 = factory_->getCryptoConfig();
   EXPECT_NE(nullptr, crypto_config1);
 
   Ssl::ClientContextSharedPtr ssl_context2{new NiceMock<Ssl::MockClientContext>()};
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context2));
-  update_callback_();
+  ASSERT_TRUE(update_callback_().ok());
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config2 = factory_->getCryptoConfig();
   EXPECT_NE(crypto_config2, crypto_config1);
 }
@@ -359,7 +359,7 @@ TEST_F(QuicClientTransportSocketFactoryTest, ClientCertificateConfigured) {
   Ssl::ClientContextSharedPtr context = makeRealClientContext(/*with_cert=*/true);
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(context));
-  update_callback_();
+  ASSERT_TRUE(update_callback_().ok());
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
   ASSERT_NE(nullptr, crypto_config);
   EXPECT_NE(nullptr, SSL_CTX_get0_privatekey(crypto_config->ssl_ctx()));
@@ -370,7 +370,7 @@ TEST_F(QuicClientTransportSocketFactoryTest, NoClientCertificate) {
   Ssl::ClientContextSharedPtr context = makeRealClientContext(/*with_cert=*/false);
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(context));
-  update_callback_();
+  ASSERT_TRUE(update_callback_().ok());
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
   ASSERT_NE(nullptr, crypto_config);
   EXPECT_EQ(nullptr, SSL_CTX_get0_privatekey(crypto_config->ssl_ctx()));
@@ -386,14 +386,14 @@ TEST_F(QuicClientTransportSocketFactoryTest, ClientCertificateRuntimeDisabled) {
   Ssl::ClientContextSharedPtr context = makeRealClientContext(/*with_cert=*/true);
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(context));
-  update_callback_();
+  ASSERT_TRUE(update_callback_().ok());
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
   ASSERT_NE(nullptr, crypto_config);
   EXPECT_EQ(nullptr, SSL_CTX_get0_privatekey(crypto_config->ssl_ctx()));
 }
 
 // A client certificate with a private key provider is rejected at config load time because
-// QUICHE's client handshaker requires direct access to the private key.
+// The QUICHE client handshaker requires direct access to the private key.
 TEST_F(QuicClientTransportSocketFactoryTest, PrivateKeyProviderRejectedAtConfigLoad) {
   // This test does not pass the fixture's context_config_ to a factory; take ownership so the
   // mock is deleted.
@@ -435,6 +435,28 @@ TEST_F(QuicClientTransportSocketFactoryTest, PrivateKeyProviderAllowedWhenRuntim
   EXPECT_TRUE(factory_or_error.ok());
 }
 
+// An SDS update that delivers a client certificate with a private key provider is rejected
+// before a new SSL context is created, so the update is surfaced as a config rejection and the
+// existing context stays in use.
+TEST_F(QuicClientTransportSocketFactoryTest, PrivateKeyProviderRejectedOnSdsUpdate) {
+  initialize();
+
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  auto provider = std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  ON_CALL(cert_config, privateKeyMethod()).WillByDefault(Return(provider));
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> certs{cert_config};
+  ON_CALL(*context_config_, tlsCertificates()).WillByDefault(Return(certs));
+
+  // The update is rejected by the validation hook before a new SSL context is created.
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _)).Times(0);
+  absl::Status status = update_callback_();
+  EXPECT_EQ(absl::StatusCode::kUnimplemented, status.code());
+  EXPECT_EQ(1, context_.store_
+                   .counter("quic_client_transport_socket_factory.upstream_context_incompatible_"
+                            "certificate")
+                   .value());
+}
+
 // If a certificate which cannot be installed on the QUICHE SSL context arrives at runtime (via
 // SDS), the factory fails closed: no crypto config is returned, so no connections are created
 // without the configured client certificate.
@@ -454,7 +476,7 @@ TEST_F(QuicClientTransportSocketFactoryTest, FailClosedWhenCertificateCannotBeIn
   ON_CALL(*mock_context, getTlsContext()).WillByDefault(ReturnRef(tls_context));
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
-  update_callback_();
+  ASSERT_TRUE(update_callback_().ok());
 
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());
   // The failure is not cached; subsequent calls fail the same way.

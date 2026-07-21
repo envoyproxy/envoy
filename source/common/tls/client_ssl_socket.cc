@@ -83,6 +83,9 @@ bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 absl::Status ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
+  if (secret_update_validation_hook_ != nullptr) {
+    RETURN_IF_NOT_OK(secret_update_validation_hook_());
+  }
   auto ctx_or_error = manager_.createSslClientContext(stats_scope_, *config_);
   RETURN_IF_NOT_OK(ctx_or_error.status());
   {
