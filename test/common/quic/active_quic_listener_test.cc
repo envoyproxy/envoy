@@ -798,18 +798,23 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   EXPECT_TRUE(debug_visitor_factory.has_value());
 }
 
-class ActiveQuicListenerFactoryDoFinalPreWorkerInitTest : public ActiveQuicListenerFactoryTest {
+class ActiveQuicListenerFactoryCidGeneratorInitTest : public ActiveQuicListenerFactoryTest {
 protected:
-  ActiveQuicListenerFactoryDoFinalPreWorkerInitTest() : registration_(config_factory_) {}
+  ActiveQuicListenerFactoryCidGeneratorInitTest() : registration_(config_factory_) {}
 
   void SetUp() override { factory_ = makeFactory(concurrency_); }
 
-  std::unique_ptr<ActiveQuicListenerFactory> makeFactory(uint32_t concurrency) {
-    EXPECT_CALL(config_factory_, createQuicConnectionIdGeneratorContext).WillOnce(Invoke([this]() {
-      auto result = std::make_unique<StrictMock<MockEnvoyQuicConnectionIdGeneratorContext>>();
-      cid_generator_context_ = result.get();
-      return result;
-    }));
+  std::unique_ptr<ActiveQuicListenerFactory>
+  makeFactory(uint32_t concurrency, std::function<void()> on_context_created = nullptr) {
+    EXPECT_CALL(config_factory_, createQuicConnectionIdGeneratorContext)
+        .WillOnce(Invoke([this, on_context_created = std::move(on_context_created)]() {
+          auto result = std::make_unique<StrictMock<MockEnvoyQuicConnectionIdGeneratorContext>>();
+          cid_generator_context_ = result.get();
+          if (on_context_created != nullptr) {
+            on_context_created();
+          }
+          return result;
+        }));
 
     envoy::config::listener::v3::QuicProtocolOptions options;
     options.mutable_connection_id_generator_config()->set_name(
@@ -867,7 +872,7 @@ protected:
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
 };
 
-TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, FactoryCreatedPreWorker) {
+TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, FactoryCreatedPreWorker) {
 
   EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), nullptr);
 
@@ -888,7 +893,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, FactoryCreatedPreWorke
             default_cid_worker_selector_(buffer, 0));
 }
 
-TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, UnimplementedLogsWarn) {
+TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, UnimplementedLogsWarn) {
   std::ignore = makeCidGeneratorFactory(absl::UnimplementedError("test platform"));
 
   EXPECT_LOG_CONTAINS("warn", "Efficient routing of QUIC packets",
@@ -898,7 +903,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, UnimplementedLogsWarn)
   EXPECT_FALSE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
 }
 
-TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, PostsSocketOptions) {
+TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, PostsSocketOptions) {
   const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
   std::ignore = makeCidGeneratorFactory(mock_option);
 
@@ -925,7 +930,7 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, PostsSocketOptions) {
   }
 }
 
-TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, PostsSocketOptionsFailure) {
+TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, PostsSocketOptionsFailure) {
   const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
   std::ignore = makeCidGeneratorFactory(mock_option);
 
@@ -942,6 +947,31 @@ TEST_F(ActiveQuicListenerFactoryDoFinalPreWorkerInitTest, PostsSocketOptionsFail
                           "cannot apply listener factory socket options on socket: ")));
   EXPECT_THAT(status, StatusHelpers::HasStatusMessage(testing::HasSubstr(
                           sockets.back()->connectionInfoProvider().localAddress()->asString())));
+}
+
+TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, InitInCtorWhenFlagOff) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.restart_features.quic_listener_factory_deferred_socket_option_init", "false"}});
+
+  const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
+  StrictMock<MockEnvoyQuicConnectionIdGeneratorFactory>* cid_generator_factory = nullptr;
+  factory_ = makeFactory(concurrency_, [this, &cid_generator_factory, &mock_option] {
+    cid_generator_factory = makeCidGeneratorFactory(mock_option);
+  });
+
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), cid_generator_factory);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::workerSelector(*factory_)(buffer, 0),
+            default_cid_worker_selector_(buffer, 0));
+  EXPECT_TRUE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
+  ASSERT_EQ(factory_->socketOptions()->size(), 1u);
+  EXPECT_EQ((*factory_->socketOptions())[0].get(), mock_option.get());
+
+  EXPECT_OK(factory_->doFinalPreWorkerInit({}));
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), cid_generator_factory);
+  EXPECT_EQ(factory_->socketOptions()->size(), 1u);
 }
 
 namespace {
