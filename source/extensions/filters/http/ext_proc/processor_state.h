@@ -661,6 +661,8 @@ public:
     return !local_response_started_ && ProcessorState::noExternalProcess();
   }
 
+  void handleModeOverride();
+
 private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);

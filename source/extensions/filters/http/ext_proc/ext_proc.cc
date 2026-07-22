@@ -1812,6 +1812,9 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     return;
   }
 
+  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
+                   responseCaseToString(response->response_case()), response->DebugString());
+
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
@@ -1835,10 +1838,19 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server is disallowed",
                        *decoder_callbacks_);
     }
-  }
 
-  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
-                   responseCaseToString(response->response_case()), response->DebugString());
+    // If the response case is not set, this response message is only for overriding the
+    // processing mode. In such case, just send the buffered data if necessary, then return.
+    if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
+      // Such mode override is only supported when Envoy is waiting for the request header
+      // response state, and the new request body mode is FULL_DUPLEX_STREAMED.
+      if (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback &&
+          decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
+        decoding_state_.handleModeOverride();
+        return;
+      }
+    }
+  }
 
   bool eos_seen_in_body = false;
   absl::Status processing_status;
