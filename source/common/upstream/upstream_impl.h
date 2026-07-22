@@ -672,9 +672,6 @@ public:
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt);
 
-  // Updates partition vectors without firing any member-update callbacks.
-  void updatePartitionOnly(PrioritySet::UpdateHostsParams&& update_hosts_params);
-
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
@@ -732,8 +729,6 @@ public:
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
-
-  void refreshPartition(uint32_t priority) const override;
 
   HostMapConstSharedPtr crossPriorityHostMap() const override {
     return const_cross_priority_host_map_;

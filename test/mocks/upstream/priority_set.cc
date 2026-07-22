@@ -27,29 +27,6 @@ MockPrioritySet::MockPrioritySet() {
         return priority_update_cb_helper_.add(cb);
       }));
   ON_CALL(*this, crossPriorityHostMap()).WillByDefault(ReturnPointee(&cross_priority_host_map_));
-  ON_CALL(testing::Const(*this), refreshPartition(_))
-      .WillByDefault(Invoke([this](uint32_t priority) {
-        if (priority >= host_sets_.size()) {
-          return;
-        }
-        auto* hs = static_cast<MockHostSet*>(host_sets_[priority].get());
-        hs->healthy_hosts_.clear();
-        hs->degraded_hosts_.clear();
-        hs->excluded_hosts_.clear();
-        for (const auto& host : hs->hosts_) {
-          if (host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-              host->healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) ||
-              host->healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING)) {
-            hs->excluded_hosts_.push_back(host);
-            continue;
-          }
-          if (host->coarseHealth() == Host::Health::Healthy) {
-            hs->healthy_hosts_.push_back(host);
-          } else if (host->coarseHealth() == Host::Health::Degraded) {
-            hs->degraded_hosts_.push_back(host);
-          }
-        }
-      }));
 }
 
 MockPrioritySet::~MockPrioritySet() = default;

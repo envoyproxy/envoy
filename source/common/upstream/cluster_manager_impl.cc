@@ -571,7 +571,20 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // This is used by cluster types such as EDS clusters to drain the connection pools of removed
   // hosts.
   cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, this](const HostVector&, const HostVector& hosts_removed) {
+      [&cluster, &cm_cluster, this](const HostVector&, const HostVector& hosts_removed) {
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+          // ThreadAwareLoadBalancerBase::member_update_cb_ was registered in initialize() before
+          // this callback, so its refresh() has already published the new LB snapshot under the
+          // factory mutex. Post the buffered per-priority updates to workers now so they read the
+          // updated snapshot when their LoadBalancerImpl::refresh() fires.
+          if (cm_cluster.pending_coalesced_update_) {
+            cm_stats_.cluster_updated_.inc();
+            postThreadLocalClusterUpdate(cm_cluster,
+                                         std::move(*cm_cluster.pending_coalesced_update_));
+            cm_cluster.pending_coalesced_update_.reset();
+          }
+        }
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
@@ -597,6 +610,21 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
                           const HostVector& hosts_removed) {
         // This fires when a cluster is about to have an updated member set. We need to send this
         // out to all of the thread local configurations.
+
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+          // Accumulate updates to be flushed in member_update_cb_ after
+          // ThreadAwareLoadBalancerBase::refresh() has published the new LB snapshot.
+          // This ensures workers always read the updated snapshot when their
+          // LoadBalancerImpl::refresh() fires in response to the TLS update.
+          if (!cm_cluster.pending_coalesced_update_) {
+            cm_cluster.pending_coalesced_update_ =
+                std::make_unique<ThreadLocalClusterUpdateParams>();
+          }
+          cm_cluster.pending_coalesced_update_->per_priority_update_params_.emplace_back(
+              priority, hosts_added, hosts_removed);
+          return;
+        }
 
         // Should we save this update and merge it with other updates?
         //

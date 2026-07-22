@@ -834,15 +834,6 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
   runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
-void HostSetImpl::updatePartitionOnly(PrioritySet::UpdateHostsParams&& update_hosts_params) {
-  healthy_hosts_ = std::move(update_hosts_params.healthy_hosts);
-  degraded_hosts_ = std::move(update_hosts_params.degraded_hosts);
-  excluded_hosts_ = std::move(update_hosts_params.excluded_hosts);
-  healthy_hosts_per_locality_ = std::move(update_hosts_params.healthy_hosts_per_locality);
-  degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
-  excluded_hosts_per_locality_ = std::move(update_hosts_params.excluded_hosts_per_locality);
-}
-
 PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality,
@@ -935,18 +926,6 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
   runUpdateCallbacks(net_hosts_added, net_hosts_removed);
-}
-
-void PrioritySetImpl::refreshPartition(uint32_t priority) const {
-  if (priority >= host_sets_.size()) {
-    return;
-  }
-  // updatePartitionOnly is used instead of updateHosts to avoid
-  // firing any member-update or priority-update callbacks.
-  HostSetImpl& host_set =
-      *static_cast<HostSetImpl*>(const_cast<HostSet*>(host_sets_[priority].get()));
-  auto params = HostSetImpl::partitionHosts(host_set.hostsPtr(), host_set.hostsPerLocalityPtr());
-  host_set.updatePartitionOnly(std::move(params));
 }
 
 void PrioritySetImpl::BatchUpdateScope::updateHosts(

@@ -818,6 +818,10 @@ private:
     SystemTime last_updated_;
     Common::CallbackHandlePtr member_update_cb_;
     Common::CallbackHandlePtr priority_update_cb_;
+    // Accumulates per-priority update params during a batch when
+    // coalesce_lb_rebuilds_on_batch_update is enabled. Flushed in member_update_cb_ after
+    // ThreadAwareLoadBalancerBase::refresh() has published the new LB snapshot.
+    std::unique_ptr<ThreadLocalClusterUpdateParams> pending_coalesced_update_;
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
     const bool avoid_cds_removal_ : 1;

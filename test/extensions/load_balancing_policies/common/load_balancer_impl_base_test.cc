@@ -705,50 +705,6 @@ TEST(ZoneAwareLbCoalesceEnabledTest, CoalescedPathExercised) {
   EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
 }
 
-TEST(LoadBalancerBaseCoalesceEnabledTest, RefreshPartitionCorrectsStalSnapshotBeforeRecalculate) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
-
-  Stats::IsolatedStoreImpl stats_store;
-  ClusterLbStatNames stat_names(stats_store.symbolTable());
-  ClusterLbStats stats(stat_names, *stats_store.rootScope());
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Random::MockRandomGenerator> random;
-  NiceMock<MockPrioritySet> priority_set;
-  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
-
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
-  TestLb lb(priority_set, stats, runtime, random, common_config);
-
-  MockHostSet& host_set = *priority_set.getMockHostSet(0);
-
-  auto host = makeTestHost(info, "tcp://127.0.0.1:80");
-  // host is marked unhealthy.
-  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-
-  // stale snapshot: hosts_ contains the host but healthy_hosts_ still lists it as healthy.
-  host_set.hosts_ = {host};
-  host_set.healthy_hosts_ = {host};
-
-  host_set.runCallbacks({host}, {});
-
-  // verify that processDirtyPriorities() calls refreshPartition() before
-  // recalculatePerPriorityState(), so that a stale snapshot that healthy_hosts_ not yet
-  // reflecting a recent health check flag change is corrected.
-  EXPECT_TRUE(host_set.healthy_hosts_.empty());
-
-  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-
-  // healthy_hosts_ is empty even though the host is now healthy.
-  // refreshPartition must re-classify it as healthy.
-  host_set.healthy_hosts_ = {};
-  host_set.runCallbacks({}, {});
-
-  EXPECT_EQ(1u, host_set.healthy_hosts_.size());
-  EXPECT_EQ(100, lb.percentageLoad(0));
-}
-
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
