@@ -636,7 +636,7 @@ private:
       // worker-local load balancer coalesces its rebuild across all the updated priorities. Used by
       // the cluster manager when batch-aware updates are enabled and more than one priority is
       // being updated. `updates` must not contain duplicate priorities.
-      void updateHostsBatch(
+      void updateHosts(
           const std::vector<
               std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
           HostMapConstSharedPtr cross_priority_host_map);
@@ -659,7 +659,7 @@ private:
 
     private:
       // Applies a batch of per-priority host updates to the cluster entry's priority set via
-      // PrioritySet::batchHostUpdate(). See ClusterEntry::updateHostsBatch().
+      // PrioritySet::batchHostUpdate(). See ClusterEntry::updateHosts().
       class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
       public:
         BatchUpdateHelper(

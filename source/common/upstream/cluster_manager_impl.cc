@@ -620,6 +620,9 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         // This fires when a cluster is about to have an updated member set. We need to send this
         // out to all of the thread local configurations.
 
+        const auto merge_timeout = PROTOBUF_GET_MS_OR_DEFAULT(
+            cm_cluster.cluster().info()->lbConfig(), update_merge_window, 1000);
+
         // If a batch host update is in progress on the main thread and batch-aware updates are
         // enabled, accumulate this per-priority update instead of posting it now. The whole batch
         // is posted to the worker threads as a single update at the end of the batch, from the
@@ -627,6 +630,20 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         // with the thread-aware load balancer deferring its factory rebuild to the end of the
         // batch, ensures workers never observe a partially-updated cluster.
         if (batch_aware_update && cluster.prioritySet().batchUpdateActive()) {
+          if (merge_timeout > 0) {
+            // This update can never be merged but we still need to update the last_updated_ time
+            // so that a subsequent mergeable update is merged relative to this update rather than
+            // being treated as out-of-merge-window and delivered immediately.
+            scheduleUpdate(cm_cluster, priority, /*mergeable=*/false, merge_timeout);
+          }
+          // TODO(wbpcode): do we actually need to distinguish between the batch update and
+          // non-batch update here? For the batch update, we will accumulate all the updates and
+          // post them at the end of the batch by the member update callback above. for non-batch
+          // update, we still could accumulate the updates and post them by the member update
+          // callback above because the member update callback will be called after every priority
+          // update callback in the non-batch update case. That's say we actually could handle them
+          // in the same way. But let us keep the exsiting logic first and do it later if we want to
+          // change it.
           cluster_data_ref.pending_batch_update_params_.per_priority_update_params_.emplace_back(
               priority, hosts_added, hosts_removed);
           return;
@@ -645,8 +662,6 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         //
         // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
         bool scheduled = false;
-        const auto merge_timeout = PROTOBUF_GET_MS_OR_DEFAULT(
-            cm_cluster.cluster().info()->lbConfig(), update_merge_window, 1000);
         // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
         const bool is_mergeable = hosts_added.empty() && hosts_removed.empty();
 
@@ -1233,7 +1248,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   HostMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
 
   // When enabled, a multi-priority update is applied to each worker thread's priority set as a
-  // single batch (see ClusterEntry::updateHostsBatch()) so the worker-local load balancer rebuilds
+  // single batch (see ClusterEntry::updateHosts()) so the worker-local load balancer rebuilds
   // once for the whole update instead of once per priority. Captured once here so all worker
   // threads make the same decision for this update.
   const bool enable_batch_aware_update =
@@ -1314,7 +1329,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
         cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(drop_overload);
         cluster_manager->thread_local_clusters_[info->name()]->setDropCategory(drop_category);
       }
-      if (enable_batch_aware_update && params.per_priority_update_params_.size() > 1) {
+      if (enable_batch_aware_update) {
         // Apply the whole update to the worker thread's priority set as a single batch so the
         // worker-local load balancer coalesces its rebuild across all the updated priorities.
         std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>
@@ -1323,7 +1338,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
         for (const auto& per_priority : params.per_priority_update_params_) {
           updates.emplace_back(per_priority);
         }
-        cluster_manager->thread_local_clusters_[info->name()]->updateHostsBatch(updates, map);
+        cluster_manager->thread_local_clusters_[info->name()]->updateHosts(updates, map);
       } else {
         for (const auto& per_priority : params.per_priority_update_params_) {
           cluster_manager->updateClusterMembership(
@@ -1424,8 +1439,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
   thread_local_clusters_[cluster] = std::move(cluster_entry);
   local_stats_.clusters_inflated_.set(thread_local_clusters_.size());
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update") &&
-      initialization_object->per_priority_state_.size() > 1) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update")) {
     // Apply the whole update to the worker thread's priority set as a single batch so the
     // worker-local load balancer coalesces its rebuild across all the updated priorities.
     std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>> updates;
@@ -1433,7 +1447,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
     for (const auto& [_, per_priority] : initialization_object->per_priority_state_) {
       updates.emplace_back(per_priority);
     }
-    cluster_entry_ptr->updateHostsBatch(updates, initialization_object->cross_priority_host_map_);
+    cluster_entry_ptr->updateHosts(updates, initialization_object->cross_priority_host_map_);
   } else {
     for (const auto& [_, per_priority] : initialization_object->per_priority_state_) {
       updateClusterMembership(initialization_object->cluster_info_->name(), per_priority.priority_,
@@ -1602,10 +1616,17 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
   }
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHostsBatch(
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
     const std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>&
         updates,
     HostMapConstSharedPtr cross_priority_host_map) {
+  // Nothing to apply. Return early so we match the per-priority path, which simply iterates an
+  // empty update list and does nothing: no batch host update (and so no end-of-batch member update
+  // callback fired with an empty diff) and no load balancer recreation.
+  if (updates.empty()) {
+    return;
+  }
+
   ENVOY_LOG(debug, "batch membership update for TLS cluster {} across {} priorities",
             cluster_info_->name(), updates.size());
   BatchUpdateHelper helper(updates, std::move(cross_priority_host_map));
