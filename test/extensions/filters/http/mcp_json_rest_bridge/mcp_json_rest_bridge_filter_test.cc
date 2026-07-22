@@ -20,6 +20,7 @@ namespace {
 
 using testing::_;
 using testing::Eq;
+using testing::Invoke;
 using testing::Return;
 using testing::SizeIs;
 using testing::StrEq;
@@ -1290,6 +1291,76 @@ tool_config:
   Buffer::OwnedImpl body("12345678901"); // 11 bytes
   EXPECT_EQ(filter_->encodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ToolCallHeadersOnly204EmitsSyntheticSuccessResult) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_api_key"}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  const std::string expected =
+      R"json({"id":7,"jsonrpc":"2.0","result":{"content":[{"text":"","type":"text"}],"isError":false}})json";
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected](Buffer::Instance& data, bool) {
+        EXPECT_EQ(nlohmann::json::parse(data.toString()), nlohmann::json::parse(expected));
+      }));
+
+  response_headers_ = {{":status", "204"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(expected.size())));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ToolCallHeadersOnly5xxEmitsSyntheticErrorResult) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_api_key"}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  const std::string expected =
+      R"json({"id":8,"jsonrpc":"2.0","result":{"content":[{"text":"","type":"text"}],"isError":true}})json";
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected](Buffer::Instance& data, bool) {
+        EXPECT_EQ(nlohmann::json::parse(data.toString()), nlohmann::json::parse(expected));
+      }));
+
+  response_headers_ = {{":status", "503"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(expected.size())));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ToolsListHeadersOnly204EmitsSyntheticServerError) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":9,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  const std::string expected =
+      R"json({"error":{"code":-32000,"message":"Server error"},"id":9,"jsonrpc":"2.0"})json";
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected](Buffer::Instance& data, bool) {
+        EXPECT_EQ(nlohmann::json::parse(data.toString()), nlohmann::json::parse(expected));
+      }));
+
+  response_headers_ = {{":status", "204"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(expected.size())));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, DynamicMetadataStoredWhenConfigured) {
