@@ -157,6 +157,8 @@ protected:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
+  absl::Status initializeCidGeneratorAndWorkerRouting();
+
   std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
       crypto_server_stream_factory_;
   std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>> proof_source_factory_;
