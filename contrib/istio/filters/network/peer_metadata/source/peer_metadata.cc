@@ -352,6 +352,7 @@ bool UpstreamFilter::tryRegistryLookup() {
   auto value = registry_->getValue(*key);
   if (!value.has_value()) {
     ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", *key);
+    populateNoPeerMetadata();
     return true;
   }
 
