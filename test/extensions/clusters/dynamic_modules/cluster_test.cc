@@ -4387,7 +4387,9 @@ TEST_F(DynamicModuleClusterTest, ChooseHostShortCircuitsWhenInModuleLbIsNull) {
 TEST_F(DynamicModuleClusterTest, HandleDestructorIsNoOpWhenClusterIsNull) {
   // No dispatcher.post call should occur because the destructor returns early.
   EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
-  { DynamicModuleClusterHandle handle(nullptr); }
+  {
+    DynamicModuleClusterHandle handle(nullptr);
+  }
 }
 
 // The cluster destructor cancels any pending HTTP callouts before clearing them.
