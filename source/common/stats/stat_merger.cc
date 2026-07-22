@@ -75,17 +75,39 @@ StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name
 }
 
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
-                               const DynamicsMap& dynamic_map) {
+                               const DynamicsMap& dynamic_map, const TagsMap& tags_map) {
   for (const auto& counter : counter_deltas) {
     const std::string& name = counter.first;
     StatMerger::DynamicContext dynamic_context(temp_scope_->symbolTable());
     StatName stat_name = dynamic_context.makeDynamicStatName(name, dynamic_map);
-    temp_scope_->counterFromStatName(stat_name).add(counter.second);
+
+    // If the parent transmitted tag metadata for this counter, re-create it with the original
+    // tags. The counter was created on the parent with programmatic tags, whose values are
+    // embedded in the flat name; without re-supplying the tags, the merge would create the
+    // counter with no tags and that no-tags counter would win the central-cache slot, so the
+    // child's later tagged write would return the mangled counter. See the TODO this resolves.
+    auto tags_iter = tags_map.find(name);
+    if (tags_iter != tags_map.end()) {
+      const ParentTags& parent_tags = tags_iter->second;
+      StatNamePool pool(temp_scope_->symbolTable());
+      StatName tag_extracted_name = pool.add(parent_tags.tag_extracted_name_);
+      StatNameTagVector stat_name_tags;
+      stat_name_tags.reserve(parent_tags.tags_.size());
+      for (const auto& tag : parent_tags.tags_) {
+        stat_name_tags.emplace_back(pool.add(tag.first), pool.add(tag.second));
+      }
+      temp_scope_
+          ->counterFromMergedStatName(stat_name, tag_extracted_name,
+                                      StatNameTagSpan(stat_name_tags))
+          .add(counter.second);
+    } else {
+      temp_scope_->counterFromStatName(stat_name).add(counter.second);
+    }
   }
 }
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
-                             const DynamicsMap& dynamic_map) {
+                             const DynamicsMap& dynamic_map, const TagsMap& tags_map) {
   for (const auto& gauge : gauges) {
     // Merging gauges via RPC from the parent has 3 cases; case 1 and 3b are the
     // most common.
@@ -119,8 +141,26 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
       }
     }
 
-    // TODO(snowp): Propagate tag values during hot restarts.
-    auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, import_mode);
+    // Re-create the gauge with the parent's programmatic tags when present, mirroring the counter
+    // path above; otherwise fall back to deriving tags from the name. This resolves the long-
+    // standing "Propagate tag values during hot restarts" gap for gauges created with tags.
+    auto make_gauge = [&]() -> Gauge& {
+      auto tags_iter = tags_map.find(gauge.first);
+      if (tags_iter == tags_map.end()) {
+        return temp_scope_->gaugeFromStatName(stat_name, import_mode);
+      }
+      const ParentTags& parent_tags = tags_iter->second;
+      StatNamePool pool(temp_scope_->symbolTable());
+      StatName tag_extracted_name = pool.add(parent_tags.tag_extracted_name_);
+      StatNameTagVector stat_name_tags;
+      stat_name_tags.reserve(parent_tags.tags_.size());
+      for (const auto& tag : parent_tags.tags_) {
+        stat_name_tags.emplace_back(pool.add(tag.first), pool.add(tag.second));
+      }
+      return temp_scope_->gaugeFromMergedStatName(stat_name, tag_extracted_name,
+                                                  StatNameTagSpan(stat_name_tags), import_mode);
+    };
+    auto& gauge_ref = make_gauge();
     if (gauge_ref.importMode() == Gauge::ImportMode::NeverImport) {
       // On the first iteration through the loop, the gauge will not be loaded into the scope
       // cache even though it might exist in another scope. Thus, we need to check again for
@@ -148,9 +188,10 @@ void StatMerger::retainParentGaugeValue(Stats::StatName gauge_name) {
 
 void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                             const Protobuf::Map<std::string, uint64_t>& gauges,
-                            const DynamicsMap& dynamics) {
-  mergeCounters(counter_deltas, dynamics);
-  mergeGauges(gauges, dynamics);
+                            const DynamicsMap& dynamics, const TagsMap& counter_tags,
+                            const TagsMap& gauge_tags) {
+  mergeCounters(counter_deltas, dynamics, counter_tags);
+  mergeGauges(gauges, dynamics, gauge_tags);
 }
 
 } // namespace Stats

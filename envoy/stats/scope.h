@@ -248,6 +248,39 @@ public:
   }
 
   /**
+   * Re-materializes a Counter during hot restart stat merging from a fully-resolved stat name
+   * together with the tag-extracted name and tags captured from the parent process, WITHOUT
+   * re-deriving tags from the name. Counters created with programmatic tags embed their tag
+   * values in the flat name; the parent transmits the tag metadata so the child can re-create
+   * the counter with identical labels instead of letting the merge create it with empty tags,
+   * which would otherwise win the central-cache slot and permanently strip the programmatic
+   * tags.
+   *
+   * The default delegates to counterFromTaggedName, which retains the metadata on tag-aware
+   * scope implementations. Legacy scope implementations intentionally drop tag metadata on that
+   * path (they cannot compose tag-extracted names with their prefix in general), so they
+   * override this to honor the components, which arrive fully resolved.
+   *
+   * This assumes the parent and child processes use the same scope implementation across the hot
+   * restart: full_name is taken verbatim as the child's cache key rather than being re-derived,
+   * so a mismatch in how the two processes compose flat names is not supported.
+   * @param full_name the complete flat stat name (with tag values) recovered from the parent,
+   *                  matching what the child independently creates for the same stat.
+   * @param tag_extracted_name the stat name with tag values removed.
+   * @param tags the tag name/value pairs.
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                             std::optional<StatNameTagSpan> tags) {
+    if (!tags.has_value() || tags->empty()) {
+      // Without tags the flat name is the only meaningful component; tags may be re-derived from
+      // it by extraction as usual.
+      return counterFromTaggedName(full_name, std::nullopt, StatName());
+    }
+    return counterFromTaggedName(tag_extracted_name, tags, full_name);
+  }
+
+  /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
@@ -275,6 +308,28 @@ public:
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) {
     return gaugeFromTaggedName(name, toTagSpan(tags), StatName(), import_mode);
+  }
+
+  /**
+   * Re-materializes a Gauge during hot restart stat merging from a fully-resolved stat name
+   * together with the tag-extracted name and tags captured from the parent process, WITHOUT
+   * re-deriving tags from the name. See counterFromMergedStatName for the rationale and the
+   * default/override contract.
+   * @param full_name the complete flat stat name (with tag values) recovered from the parent.
+   * @param tag_extracted_name the stat name with tag values removed.
+   * @param tags the tag name/value pairs.
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                         std::optional<StatNameTagSpan> tags,
+                                         Gauge::ImportMode import_mode) {
+    if (!tags.has_value() || tags->empty()) {
+      // Without tags the flat name is the only meaningful component; tags may be re-derived from
+      // it by extraction as usual.
+      return gaugeFromTaggedName(full_name, std::nullopt, StatName(), import_mode);
+    }
+    return gaugeFromTaggedName(tag_extracted_name, tags, full_name, import_mode);
   }
 
   /**

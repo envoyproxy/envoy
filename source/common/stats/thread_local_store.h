@@ -311,6 +311,15 @@ private:
     TextReadout& textReadoutFromTaggedName(StatName base_name,
                                            std::optional<StatNameTagSpan> name_tags,
                                            StatName tagged_name) override;
+    // Unlike counterFromTaggedName/gaugeFromTaggedName, these honor the caller-supplied
+    // tag-extracted name and tags even on the legacy scope: hot restart stat merging supplies
+    // fully-resolved components recovered from the parent process, so no prefix/tag composition
+    // or re-derivation from the name is needed (or wanted).
+    Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                       std::optional<StatNameTagSpan> tags) override;
+    Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                   std::optional<StatNameTagSpan> tags,
+                                   Gauge::ImportMode import_mode) override;
     ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
                                              TagStringViewSpan name_tags,
                                              absl::string_view tagged_name, bool evictable,
@@ -532,6 +541,17 @@ private:
     TextReadout& textReadoutFromTaggedName(StatName base_name,
                                            std::optional<StatNameTagSpan> name_tags,
                                            StatName tagged_name) override;
+    // Re-select the Scope defaults, which map the merged-stat components onto the tag-aware
+    // creation API (retaining the supplied tag metadata), over the legacy ScopeImpl overrides.
+    Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                       std::optional<StatNameTagSpan> tags) override {
+      return Scope::counterFromMergedStatName(full_name, tag_extracted_name, tags);
+    }
+    Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                   std::optional<StatNameTagSpan> tags,
+                                   Gauge::ImportMode import_mode) override {
+      return Scope::gaugeFromMergedStatName(full_name, tag_extracted_name, tags, import_mode);
+    }
 
   private:
     std::unique_ptr<StatNamePool> pool_;

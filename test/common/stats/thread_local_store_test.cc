@@ -364,6 +364,52 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(2L, store_->textReadouts().front().use_count());
 }
 
+// counterFromMergedStatName/gaugeFromMergedStatName honor fully-resolved components on the
+// legacy scope: the flat name is the cache key, and the supplied tag metadata is retained
+// rather than re-derived from the name. Without tags they fall back to name-derived creation.
+TEST_F(StatsThreadLocalStoreTest, MergedStatNameHonorsSuppliedTags) {
+  StatNamePool pool(symbol_table_);
+  const StatNameTagVector tags{{pool.add("source"), pool.add("svc-a")}};
+  Counter& counter =
+      scope_.counterFromMergedStatName(pool.add("custom.requests_total.source.svc-a"),
+                                       pool.add("custom.requests_total"), StatNameTagSpan(tags));
+  EXPECT_EQ("custom.requests_total.source.svc-a", counter.name());
+  EXPECT_EQ("custom.requests_total", counter.tagExtractedName());
+  ASSERT_EQ(1, counter.tags().size());
+  EXPECT_EQ("source", counter.tags()[0].name_);
+  EXPECT_EQ("svc-a", counter.tags()[0].value_);
+  // Merged re-creation counts as programmatic tags, so a subsequent hot restart (this process
+  // becoming the parent) still exports the tag metadata.
+  EXPECT_TRUE(counter.noTagExtraction());
+
+  Gauge& gauge = scope_.gaugeFromMergedStatName(pool.add("custom.active.source.svc-a"),
+                                                pool.add("custom.active"), StatNameTagSpan(tags),
+                                                Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("custom.active.source.svc-a", gauge.name());
+  EXPECT_EQ("custom.active", gauge.tagExtractedName());
+  ASSERT_EQ(1, gauge.tags().size());
+  EXPECT_TRUE(gauge.noTagExtraction());
+
+  // A caller creating the same stat with programmatic tags resolves to the same object: the
+  // flat names (cache keys) match.
+  const StatNameTagVector tags2{{pool.add("source"), pool.add("svc-a")}};
+  Counter& tagged = scope_.counterFromStatNameWithTags(pool.add("custom.requests_total"), tags2);
+  EXPECT_EQ(&tagged, &counter);
+
+  // Without tags, creation falls back to the name-derived path keyed by the flat name.
+  Counter& untagged = scope_.counterFromMergedStatName(pool.add("plain.counter"),
+                                                       pool.add("plain.counter"), std::nullopt);
+  EXPECT_EQ("plain.counter", untagged.name());
+  EXPECT_TRUE(untagged.tags().empty());
+  EXPECT_FALSE(untagged.noTagExtraction());
+  Gauge& untagged_gauge =
+      scope_.gaugeFromMergedStatName(pool.add("plain.gauge"), pool.add("plain.gauge"), std::nullopt,
+                                     Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("plain.gauge", untagged_gauge.name());
+  EXPECT_TRUE(untagged_gauge.tags().empty());
+  EXPECT_FALSE(untagged_gauge.noTagExtraction());
+}
+
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -2791,6 +2837,39 @@ TEST_F(ThreadLocalStoreTagScopeTest, CreateScopeWithTagStringViews) {
   ASSERT_EQ(1, c.tags().size());
   EXPECT_EQ("cluster_name", c.tags()[0].name_);
   EXPECT_EQ("foo", c.tags()[0].value_);
+}
+
+// The merged-stat creation methods on a tag-aware scope route through the tag-aware API and
+// retain the supplied metadata, including the explicit flat name as the cache key.
+TEST_F(ThreadLocalStoreTagScopeTest, MergedStatNameHonorsSuppliedTags) {
+  StatNameTagVector tags{{makeStatName("source"), makeStatName("svc-a")}};
+  Counter& counter = scope_.counterFromMergedStatName(
+      makeStatName("custom.rq.source.svc-a"), makeStatName("custom.rq"), StatNameTagSpan(tags));
+  EXPECT_EQ("custom.rq.source.svc-a", counter.name());
+  EXPECT_EQ("custom.rq", counter.tagExtractedName());
+  ASSERT_EQ(1, counter.tags().size());
+  EXPECT_EQ("source", counter.tags()[0].name_);
+  EXPECT_EQ("svc-a", counter.tags()[0].value_);
+  EXPECT_TRUE(counter.noTagExtraction());
+
+  Gauge& gauge = scope_.gaugeFromMergedStatName(
+      makeStatName("custom.active.source.svc-a"), makeStatName("custom.active"),
+      StatNameTagSpan(tags), Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("custom.active.source.svc-a", gauge.name());
+  EXPECT_EQ("custom.active", gauge.tagExtractedName());
+  ASSERT_EQ(1, gauge.tags().size());
+  EXPECT_TRUE(gauge.noTagExtraction());
+
+  // Empty tags fall back to name-derived creation keyed by the flat name.
+  Counter& untagged = scope_.counterFromMergedStatName(makeStatName("plain.counter"),
+                                                       makeStatName("plain.counter"), std::nullopt);
+  EXPECT_EQ("plain.counter", untagged.name());
+  EXPECT_TRUE(untagged.tags().empty());
+  EXPECT_FALSE(untagged.noTagExtraction());
+  Gauge& untagged_gauge =
+      scope_.gaugeFromMergedStatName(makeStatName("plain.gauge"), makeStatName("plain.gauge"),
+                                     std::nullopt, Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("plain.gauge", untagged_gauge.name());
 }
 
 // Covers TagScopeImpl::histogramFromStatName and textReadoutFromStatName when the scope carries
