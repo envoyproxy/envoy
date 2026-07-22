@@ -23,6 +23,17 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::decompressor::v3::Decompressor& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::decompressor::v3::Decompressor& config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
+  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
+  // (ServerFactoryContext) paths.
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
+      const std::string& stats_prefix, Server::Configuration::GenericFactoryContext& context);
 };
 
 DECLARE_FACTORY(DecompressorFilterFactory);
