@@ -224,13 +224,18 @@ message ProcessingResponse {
   // particular request/response only. Servers may use this to intelligently control how requests
   // are processed based on the headers and other metadata that they see.
   //
-  // This field is only applicable when servers are responding to the header requests. If it is set
+  // This field is applicable when servers are responding to the header requests. If it is set
   // in the response to the body or trailer requests, it will be ignored by the data plane.
   // It is also ignored by the data plane when the ext_proc filter config
   // :ref:`allow_mode_override <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
   // is set to ``false``, or
   // :ref:`send_body_without_waiting_for_header_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
   // is set to ``true``.
+  //
+  // Upon receiving request headers, the server can also override the Envoy ext_proc processing mode by
+  // returning a ProcessingResponse with only this field set. Subsequent ProcessingRequest and ProcessingResponse
+  // messages for headers, body, or trailers will adhere to the new mode. This direct processing mode override
+  // is only supported when overriding the body mode from STREAMED to FULL_DUPLEX_STREAMED.
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 
   // [#not-implemented-hide:]
