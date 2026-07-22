@@ -93,20 +93,11 @@ struct ParserConfig {
   // 0 = no per-element limit.
   size_t max_element_capture_bytes{0};
 
-  // Operator-declared JSON fields to extract from the body.
+  // Extraction policy to extract JSON fields from the body.
   //
-  // The handler routes extraction by STRUCTURAL matching: convert each spec's
+  // The handler routes extraction by structural matching: convert each spec's
   // segments to WuffsJsonCursor::PatternSegment once at init, then call
-  // cursor.matchesPatternPath(segments, depth) at each callback (see
-  // SpecMatchingHandler in extract_field_spec_test.cc for the template).
-  //
-  // Do NOT route by comparing serialized strings (buildPatternPath() ==
-  // canonicalPath()): that is not collision-free — document keys may contain
-  // '.', '[', ']' or be empty ("" is a legal JSON key), letting a hostile
-  // body synthesize the same (string, depth) pair as a legitimately nested
-  // field, e.g. {"":{"a.b":"decoy"}} vs spec "a.b" meaning {"a":{"b":...}}
-  // (see StructuralMatchTest.RejectsHostileKeyCollision). The string forms
-  // are diagnostics-only.
+  // cursor.matchesPatternPath(segments, depth) at each callback.
   std::vector<ExtractFieldSpec> extract_fields;
 
   // Returns the minimum cursor max_depth needed to reach all declared fields.

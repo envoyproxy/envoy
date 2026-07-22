@@ -1,4 +1,4 @@
-#include "source/common/json/wuffs_json/extract_field_spec.h"
+#include "source/common/json/wuffs_json/parser_config.h"
 
 #include <algorithm>
 #include <string>

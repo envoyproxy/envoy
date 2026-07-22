@@ -21,9 +21,9 @@ cc_library(
 )
 
 envoy_cc_library(
-    name = "extract_field_spec_lib",
-    srcs = ["extract_field_spec.cc"],
-    hdrs = ["extract_field_spec.h"],
+    name = "parser_config_lib",
+    srcs = ["parser_config.cc"],
+    hdrs = ["parser_config.h"],
     deps = [
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",

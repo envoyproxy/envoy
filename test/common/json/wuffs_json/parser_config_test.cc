@@ -2,7 +2,7 @@
 #include <utility>
 #include <vector>
 
-#include "source/common/json/wuffs_json/extract_field_spec.h"
+#include "source/common/json/wuffs_json/parser_config.h"
 #include "source/common/json/wuffs_json/wuffs_json_cursor.h"
 
 #include "gtest/gtest.h"
@@ -192,12 +192,12 @@ TEST(CanonicalPathTest, RoundTrip) {
 // ParserConfig::requiredMaxDepth
 // ============================================================================
 
-TEST(DecoderConfigTest, EmptySpecListReturnsZero) {
+TEST(ParserConfigTest, EmptySpecListReturnsZero) {
   ParserConfig cfg;
   EXPECT_EQ(cfg.requiredMaxDepth(), 0);
 }
 
-TEST(DecoderConfigTest, SingleSpecDepth) {
+TEST(ParserConfigTest, SingleSpecDepth) {
   ParserConfig cfg;
   auto spec = parseExtractFieldSpec("model");
   ASSERT_TRUE(spec.ok());
@@ -205,7 +205,7 @@ TEST(DecoderConfigTest, SingleSpecDepth) {
   EXPECT_EQ(cfg.requiredMaxDepth(), 1);
 }
 
-TEST(DecoderConfigTest, MultipleSpecsReturnMax) {
+TEST(ParserConfigTest, MultipleSpecsReturnMax) {
   ParserConfig cfg;
   for (const auto* path : {"model", "messages[].role", "params._meta.traceparent"}) {
     auto s = parseExtractFieldSpec(path);
@@ -215,7 +215,7 @@ TEST(DecoderConfigTest, MultipleSpecsReturnMax) {
   EXPECT_EQ(cfg.requiredMaxDepth(), 3);
 }
 
-TEST(DecoderConfigTest, DeepestSpecDrivesMaxDepth) {
+TEST(ParserConfigTest, DeepestSpecDrivesMaxDepth) {
   ParserConfig cfg;
   for (const auto* path : {"messages[].content[]", "model"}) {
     auto s = parseExtractFieldSpec(path);
