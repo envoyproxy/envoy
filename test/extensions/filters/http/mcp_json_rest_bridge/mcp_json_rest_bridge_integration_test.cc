@@ -197,6 +197,8 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MissingMethod) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  // TODO(guoyilin42): Per JSON-RPC 2.0, a missing method field is an Invalid Request (-32600);
+  // -32601 is for a well-formed request naming a nonexistent method.
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -630,7 +632,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithErrorResponse) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("500"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
 
   const std::string expected_rpc_response = R"({
     "jsonrpc": "2.0",
@@ -1840,7 +1842,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
 
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("500"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
   EXPECT_THAT(response->headers().getContentLengthValue(), IsEmpty());
 
