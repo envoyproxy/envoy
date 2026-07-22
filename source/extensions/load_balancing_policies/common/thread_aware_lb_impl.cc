@@ -127,23 +127,54 @@ absl::Status ThreadAwareLoadBalancerBase::initialize() {
   // I will look into doing this in a follow up. Doing everything using a background thread heavily
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
-    member_update_cb_ =
-        priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+  //
+  // refresh() rebuilds the factory state (the ring/table) that worker threads snapshot. It must
+  // run before the cluster manager posts the corresponding host update to the worker threads,
+  // otherwise a worker can wake up and snapshot a stale factory (see
+  // https://github.com/envoyproxy/envoy/issues/45055). The cluster manager posts from a
+  // PriorityUpdateCb registered after this load balancer's callbacks, so refreshing from our own
+  // PriorityUpdateCb keeps refresh() ahead of the post.
+  //
+  // The exception is a batch host update: there the per-priority PriorityUpdateCb fires repeatedly
+  // (once per priority) while the MemberUpdateCb fires only once at the end of the batch. To avoid
+  // rebuilding the factory N times per batch, we defer the refresh to the single end-of-batch
+  // MemberUpdateCb while a batch is in progress. This coalescing is gated behind two runtime flags:
+  //   - coalesce_lb_rebuilds_on_batch_update: when false we always refresh from the
+  //     PriorityUpdateCb, regardless of whether a batch is in progress.
+  //   - enable_batch_aware_update: this also makes the cluster manager post the whole batch as a
+  //     single cross-thread update at the end of the batch (from a MemberUpdateCb registered after
+  //     this load balancer's). Deferring our refresh is only safe when that post is also deferred,
+  //     so both flags must be enabled for us to defer.
+  const bool coalesce_lb_rebuilds = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update");
+  const bool batch_aware_update =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
+  const bool defer_refresh_during_batch = coalesce_lb_rebuilds && batch_aware_update;
+
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+      [this, defer_refresh_during_batch](uint32_t, const HostVector&, const HostVector&) {
+        // Refresh eagerly here for individual updates. Defer to the end-of-batch MemberUpdateCb
+        // only while a batch update is in progress and refresh coalescing is enabled.
+        if (!defer_refresh_during_batch || !priority_set_.batchUpdateActive()) {
           processDirtyPriorities();
           refresh();
-        });
+        }
+      });
+  member_update_cb_ = priority_set_.addMemberUpdateCb(
+      [this, defer_refresh_during_batch](const HostVector&, const HostVector&) {
+        // The end-of-batch callback only refreshes for coalesced batch updates; individual updates
+        // are already handled by the PriorityUpdateCb above.
+        if (defer_refresh_during_batch && priority_set_.batchUpdateActive()) {
+          processDirtyPriorities();
+          refresh();
+        }
+      });
 
-    // PriorityUpdateCb can fire before initialize() during batch host updates, while MemberUpdateCb
-    // (which flushes dirty priorities) is deferred until the batch completes. If initialize() is
-    // invoked mid-batch, process any queued priorities now so per_priority_panic_ is sized for all
-    // current priorities before refresh() indexes into it.
-    processDirtyPriorities();
-  } else {
-    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-        [this](uint32_t, const HostVector&, const HostVector&) { refresh(); });
-  }
+  // PriorityUpdateCb can fire before initialize() during batch host updates, while MemberUpdateCb
+  // (which flushes dirty priorities) is deferred until the batch completes. If initialize() is
+  // invoked mid-batch, process any queued priorities now so per_priority_panic_ is sized for all
+  // current priorities before refresh() indexes into it.
+  processDirtyPriorities();
 
   refresh();
   return absl::OkStatus();

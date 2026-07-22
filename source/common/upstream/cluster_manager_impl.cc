@@ -567,11 +567,33 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
     RETURN_IF_NOT_OK(cluster_data->second->thread_aware_lb_->initialize());
   }
 
+  // When enabled, per-priority updates that arrive during a main-thread batch host update are
+  // accumulated and posted to the worker threads as a single batched update at the end of the
+  // batch (see the callbacks below). This is captured once here so the member and priority update
+  // callbacks agree, and so it stays consistent with the thread-aware load balancer, which reads
+  // the same flag in its initialize() above.
+  const bool batch_aware_update =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
+  ClusterData& cluster_data_ref = *cluster_data->second;
+
   // Now setup for cross-thread updates.
   // This is used by cluster types such as EDS clusters to drain the connection pools of removed
   // hosts.
   cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, this](const HostVector&, const HostVector& hosts_removed) {
+      [&cluster, &cluster_data_ref, this](const HostVector&, const HostVector& hosts_removed) {
+        // If per-priority updates were accumulated during a main-thread batch host update (see the
+        // priority update callback below), post them to the worker threads now as a single batched
+        // update. This MemberUpdateCb fires once at the end of the batch, after the thread-aware
+        // load balancer's own end-of-batch callback (registered earlier) has rebuilt its factory,
+        // so workers never snapshot a stale factory. Posting here, before the connection draining
+        // below, preserves the membership-update-then-drain ordering of the non-batch path.
+        auto& pending = cluster_data_ref.pending_batch_update_params_;
+        if (!pending.per_priority_update_params_.empty()) {
+          cm_stats_.cluster_updated_.inc();
+          postThreadLocalClusterUpdate(cluster_data_ref, std::move(pending));
+          pending.per_priority_update_params_.clear();
+        }
+
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
@@ -593,10 +615,22 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // This is used by cluster types such as EDS clusters to update the cluster
   // without draining the cluster.
   cluster_data->second->priority_update_cb_ = cluster.prioritySet().addPriorityUpdateCb(
-      [&cm_cluster, this](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) {
+      [&cm_cluster, &cluster, &cluster_data_ref, batch_aware_update,
+       this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
         // This fires when a cluster is about to have an updated member set. We need to send this
         // out to all of the thread local configurations.
+
+        // If a batch host update is in progress on the main thread and batch-aware updates are
+        // enabled, accumulate this per-priority update instead of posting it now. The whole batch
+        // is posted to the worker threads as a single update at the end of the batch, from the
+        // member update callback above. This avoids one cross-thread post per priority and, paired
+        // with the thread-aware load balancer deferring its factory rebuild to the end of the
+        // batch, ensures workers never observe a partially-updated cluster.
+        if (batch_aware_update && cluster.prioritySet().batchUpdateActive()) {
+          cluster_data_ref.pending_batch_update_params_.per_priority_update_params_.emplace_back(
+              priority, hosts_added, hosts_removed);
+          return;
+        }
 
         // Should we save this update and merge it with other updates?
         //
@@ -1198,6 +1232,13 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 
   HostMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
 
+  // When enabled, a multi-priority update is applied to each worker thread's priority set as a
+  // single batch (see ClusterEntry::updateHostsBatch()) so the worker-local load balancer rebuilds
+  // once for the whole update instead of once per priority. Captured once here so all worker
+  // threads make the same decision for this update.
+  const bool enable_batch_aware_update =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
+
   pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
 
   const UnitFloat drop_overload = cm_cluster.cluster().dropOverload();
@@ -1211,7 +1252,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
                         add_or_update_cluster, load_balancer_factory, map = std::move(host_map),
                         cluster_initialization_object = std::move(cluster_initialization_object),
-                        drop_overload, drop_category = std::move(drop_category)](
+                        drop_overload, drop_category = std::move(drop_category),
+                        enable_batch_aware_update](
                            OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     ASSERT(cluster_manager.has_value(),
            "Expected the ThreadLocalClusterManager to be set during ClusterManagerImpl creation.");
@@ -1272,11 +1314,24 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
         cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(drop_overload);
         cluster_manager->thread_local_clusters_[info->name()]->setDropCategory(drop_category);
       }
-      for (const auto& per_priority : params.per_priority_update_params_) {
-        cluster_manager->updateClusterMembership(
-            info->name(), per_priority.priority_, per_priority.update_hosts_params_,
-            per_priority.locality_weights_, per_priority.hosts_added_, per_priority.hosts_removed_,
-            per_priority.weighted_priority_health_, per_priority.overprovisioning_factor_, map);
+      if (enable_batch_aware_update && params.per_priority_update_params_.size() > 1) {
+        // Apply the whole update to the worker thread's priority set as a single batch so the
+        // worker-local load balancer coalesces its rebuild across all the updated priorities.
+        std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>
+            updates;
+        updates.reserve(params.per_priority_update_params_.size());
+        for (const auto& per_priority : params.per_priority_update_params_) {
+          updates.emplace_back(per_priority);
+        }
+        cluster_manager->thread_local_clusters_[info->name()]->updateHostsBatch(updates, map);
+      } else {
+        for (const auto& per_priority : params.per_priority_update_params_) {
+          cluster_manager->updateClusterMembership(
+              info->name(), per_priority.priority_, per_priority.update_hosts_params_,
+              per_priority.locality_weights_, per_priority.hosts_added_,
+              per_priority.hosts_removed_, per_priority.weighted_priority_health_,
+              per_priority.overprovisioning_factor_, map);
+        }
       }
 
       if (new_cluster != nullptr) {
@@ -1369,13 +1424,25 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
   thread_local_clusters_[cluster] = std::move(cluster_entry);
   local_stats_.clusters_inflated_.set(thread_local_clusters_.size());
 
-  for (const auto& [_, per_priority] : initialization_object->per_priority_state_) {
-    updateClusterMembership(initialization_object->cluster_info_->name(), per_priority.priority_,
-                            per_priority.update_hosts_params_, per_priority.locality_weights_,
-                            per_priority.hosts_added_, per_priority.hosts_removed_,
-                            per_priority.weighted_priority_health_,
-                            per_priority.overprovisioning_factor_,
-                            initialization_object->cross_priority_host_map_);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update") &&
+      initialization_object->per_priority_state_.size() > 1) {
+    // Apply the whole update to the worker thread's priority set as a single batch so the
+    // worker-local load balancer coalesces its rebuild across all the updated priorities.
+    std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>> updates;
+    updates.reserve(initialization_object->per_priority_state_.size());
+    for (const auto& [_, per_priority] : initialization_object->per_priority_state_) {
+      updates.emplace_back(per_priority);
+    }
+    cluster_entry_ptr->updateHostsBatch(updates, initialization_object->cross_priority_host_map_);
+  } else {
+    for (const auto& [_, per_priority] : initialization_object->per_priority_state_) {
+      updateClusterMembership(initialization_object->cluster_info_->name(), per_priority.priority_,
+                              per_priority.update_hosts_params_, per_priority.locality_weights_,
+                              per_priority.hosts_added_, per_priority.hosts_removed_,
+                              per_priority.weighted_priority_health_,
+                              per_priority.overprovisioning_factor_,
+                              initialization_object->cross_priority_host_map_);
+    }
   }
   thread_local_clusters_[cluster]->setDropOverload(initialization_object->drop_overload_);
   thread_local_clusters_[cluster]->setDropCategory(initialization_object->drop_category_);
@@ -1531,6 +1598,29 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
         "Re-creating local LB for TLS cluster ({}) is deprecated and the LB should be refactored "
         "to not require this",
         name);
+    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHostsBatch(
+    const std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>&
+        updates,
+    HostMapConstSharedPtr cross_priority_host_map) {
+  ENVOY_LOG(debug, "batch membership update for TLS cluster {} across {} priorities",
+            cluster_info_->name(), updates.size());
+  BatchUpdateHelper helper(updates, std::move(cross_priority_host_map));
+  priority_set_.batchHostUpdate(helper);
+
+  // Mirror the individual updateHosts() path: if an LB is thread aware, create a new worker local
+  // LB on membership changes. In the batch path we recreate it once for the whole batch rather than
+  // once per priority.
+  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChangeDeprecated()) {
+    ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", cluster_info_->name());
+    ENVOY_LOG_FIRST_N(
+        warn, 200,
+        "Re-creating local LB for TLS cluster ({}) is deprecated and the LB should be refactored "
+        "to not require this",
+        cluster_info_->name());
     lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }
 }

@@ -9,6 +9,7 @@
 #include "test/common/upstream/metadata_writer_lb.pb.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -152,7 +153,111 @@ public:
                   .chooseHost(nullptr)
                   .host);
   }
+
+  // Creates and initializes a ring-hash cluster with a single host in priority 0 and returns it.
+  // After this returns the cluster manager's cross-thread update callbacks are registered.
+  std::shared_ptr<MockClusterMockPrioritySet> initRingHashCluster() {
+    const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                          clustersJson({defaultStaticClusterJson("cluster_0")}));
+
+    std::shared_ptr<MockClusterMockPrioritySet> cluster1(
+        new NiceMock<MockClusterMockPrioritySet>());
+    cluster1->info_->name_ = "cluster_0";
+    cluster1->info_->lb_factory_ =
+        Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
+            "envoy.load_balancing_policies.ring_hash");
+    auto proto_message = cluster1->info_->lb_factory_->createEmptyConfigProto();
+    cluster1->info_->typed_lb_config_ =
+        cluster1->info_->lb_factory_->loadConfig(factory_.server_context_, *proto_message).value();
+
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+        .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+    ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+    create(parseBootstrapFromV3Json(json));
+
+    cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
+        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
+    cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
+        cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
+    cluster1->initialize_callback_();
+    EXPECT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
+    return cluster1;
+  }
+
+  // Drives the cluster's priority-set callbacks to simulate a main-thread batch host update that
+  // touches two priorities, then returns the value of the cluster_manager.cluster_updated counter.
+  uint64_t runTwoPriorityBatchUpdate(MockClusterMockPrioritySet& cluster) {
+    auto& priority_set = cluster.priority_set_;
+    HostVector p0_hosts = {makeTestHost(cluster.info_, "tcp://127.0.0.1:81")};
+    HostVector p1_hosts = {makeTestHost(cluster.info_, "tcp://127.0.0.2:80")};
+    priority_set.getMockHostSet(0)->hosts_ = p0_hosts;
+    priority_set.getMockHostSet(1)->hosts_ = p1_hosts;
+
+    // A batch update fires the per-priority callbacks first (batchUpdateActive() stays true), then
+    // the member update callback once at the end of the batch.
+    priority_set.batch_update_active_ = true;
+    priority_set.priority_update_cb_helper_.runCallbacks(0, p0_hosts, HostVector{});
+    priority_set.priority_update_cb_helper_.runCallbacks(1, p1_hosts, HostVector{});
+    priority_set.member_update_cb_helper_.runCallbacks(p0_hosts, HostVector{});
+    priority_set.batch_update_active_ = false;
+
+    return factory_.stats_.counter("cluster_manager.cluster_updated").value();
+  }
 };
+
+// With enable_batch_aware_update enabled, per-priority updates delivered during a main-thread batch
+// host update are coalesced into a single cross-thread post at the end of the batch, so
+// cluster_updated is incremented exactly once for a two-priority batch.
+TEST_F(ClusterManagerImplThreadAwareLbTest, BatchAwareUpdateCoalescesCrossThreadPost) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update", "true"}});
+
+  auto cluster = initRingHashCluster();
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+
+  EXPECT_EQ(1, runTwoPriorityBatchUpdate(*cluster));
+
+  factory_.tls_.shutdownThread();
+}
+
+// With enable_batch_aware_update enabled, the coalesced batch post is applied to the worker
+// thread's priority set as a single batch (see ClusterEntry::updateHostsBatch()). Verify that all
+// the priorities in the batch land on the worker priority set.
+TEST_F(ClusterManagerImplThreadAwareLbTest, BatchAwareUpdateAppliesAllPrioritiesToWorker) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update", "true"}});
+
+  auto cluster = initRingHashCluster();
+  runTwoPriorityBatchUpdate(*cluster);
+
+  // The worker thread-local cluster's priority set should carry both priorities updated in the
+  // batch, with the hosts set by runTwoPriorityBatchUpdate().
+  const auto& worker_priority_set =
+      cluster_manager_->getThreadLocalCluster("cluster_0")->prioritySet();
+  ASSERT_EQ(2, worker_priority_set.hostSetsPerPriority().size());
+  ASSERT_EQ(1, worker_priority_set.hostSetsPerPriority()[0]->hosts().size());
+  ASSERT_EQ(1, worker_priority_set.hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ("127.0.0.1:81",
+            worker_priority_set.hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+  EXPECT_EQ("127.0.0.2:80",
+            worker_priority_set.hostSetsPerPriority()[1]->hosts()[0]->address()->asString());
+
+  factory_.tls_.shutdownThread();
+}
+
+// Without enable_batch_aware_update, each per-priority update delivered during a batch is posted
+// cross-thread immediately, so a two-priority batch increments cluster_updated twice.
+TEST_F(ClusterManagerImplThreadAwareLbTest, WithoutBatchAwareUpdatePostsPerPriority) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update", "false"}});
+
+  auto cluster = initRingHashCluster();
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+
+  EXPECT_EQ(2, runTwoPriorityBatchUpdate(*cluster));
+
+  factory_.tls_.shutdownThread();
+}
 
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
