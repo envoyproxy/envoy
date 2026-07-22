@@ -56,7 +56,7 @@ public:
   }
 
   // AsyncStreamCallbacks
-  void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override;
+  void onReceiveMessage(Grpc::ResponsePtr<ResponseType>&& message) override;
 
   // RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -165,7 +165,7 @@ bool ProcessorStreamImpl<RequestType, ResponseType>::halfCloseAndDeleteOnRemoteC
 
 template <typename RequestType, typename ResponseType>
 void ProcessorStreamImpl<RequestType, ResponseType>::onReceiveMessage(
-    std::unique_ptr<ResponseType>&& response) {
+    Grpc::ResponsePtr<ResponseType>&& response) {
   if (!callbacks_.has_value()) {
     ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
     return;

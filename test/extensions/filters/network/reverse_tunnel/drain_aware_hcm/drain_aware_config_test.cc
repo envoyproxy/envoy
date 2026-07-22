@@ -9,11 +9,13 @@
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -81,18 +83,16 @@ TEST_F(DrainAwareConfigTest, CreateFilterFactoryFromValidConfig) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);
   auto result = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_TRUE(result.ok()) << result.status().message();
-  EXPECT_NE(nullptr, result.value());
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 }
 
 TEST_F(DrainAwareConfigTest, FilterFactoryCallbackIsNonNull) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);
   auto result = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_TRUE(result.ok());
   // Verify a callable callback was produced. The actual ConnectionManagerImpl
   // installation path is exercised end-to-end in integration_test.cc.
-  EXPECT_NE(nullptr, result.value());
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 }
 
 // Subclass that overrides createBaseCodec to return nullptr, exercising the defensive
@@ -119,7 +119,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptr) {
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
       creation_status);
-  ASSERT_TRUE(creation_status.ok()) << creation_status.message();
+  ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
   NiceMock<Http::MockServerConnectionCallbacks> callbacks;
@@ -144,7 +144,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptrDrai
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
       creation_status);
-  ASSERT_TRUE(creation_status.ok()) << creation_status.message();
+  ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
   Network::ConnectionSocketPtr socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
@@ -188,7 +188,7 @@ hcm_config:
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
       creation_status);
-  ASSERT_TRUE(creation_status.ok()) << creation_status.message();
+  ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
   NiceMock<Http::MockServerConnectionCallbacks> callbacks;
@@ -232,7 +232,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledNonReverseSocket) {
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
       creation_status);
-  ASSERT_TRUE(creation_status.ok()) << creation_status.message();
+  ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
   // Default MockConnectionSocket exposes a stock IoSocketHandleImpl, which the typed cast rejects.
@@ -263,7 +263,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
       creation_status);
-  ASSERT_TRUE(creation_status.ok()) << creation_status.message();
+  ASSERT_OK(creation_status);
 
   // Build a real initiator IoHandle to act as the tunnel's parent. The extension is unused during
   // codec construction (the re-dial closure that would reach it is created but not invoked here).

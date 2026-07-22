@@ -4300,4 +4300,26 @@ TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndSeparateRstStreamNoError) {
   tcp_client_->close();
 }
 
+// Verify that sending transfer-encoding header in H/2 protocol causes protocol error.
+TEST_P(Http2FrameIntegrationTest, TransferEncodingHeaderIsReset) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(yanavlasov): fix this check for oghttp2 in UHV mode.
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request =
+      Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(request_idx), "one.example.com",
+                                  "/path", {{"transfer-encoding", "chunked"}});
+  sendFrame(request);
+
+  // By default codec treats stream errors as protocol errors and closes the connection.
+  tcp_client_->waitForDisconnect();
+  tcp_client_->close();
+  test_server_->waitForCounter("http.config_test.downstream_cx_protocol_error", testing::Eq(1));
+}
+
 } // namespace Envoy
