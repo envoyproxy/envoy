@@ -21,6 +21,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/tls/ssl_socket.h"
 #include "source/server/configuration_impl.h"
+#include "source/server/drain_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
@@ -327,6 +328,87 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
 
   EXPECT_TRUE(context0->drainDecision().drainClose(Network::DrainDirection::All));
   EXPECT_FALSE(context1->drainDecision().drainClose(Network::DrainDirection::All));
+}
+
+TEST_P(FilterChainManagerImplTest, DrainingShouldBeGradual) {
+  // Create filter chain
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+  filter_chain_messages.push_back(filter_chain_template_);
+  filter_chain_messages[0].set_name("gradual_chain");
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(nullptr,
+                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                        &filter_chain_messages[0]},
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                  .ok());
+
+  // Set up a drain manager
+  Event::SimulatedTimeSystem time_system;
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  NiceMock<Server::MockInstance> server;
+  EXPECT_CALL(server, api()).WillRepeatedly(ReturnRef(server.api_));
+  uint64_t random_counter = 0;
+  ON_CALL(server.api_.random_, random())
+      .WillByDefault(Invoke([&random_counter]() -> uint64_t { return random_counter++; }));
+  EXPECT_CALL(server, healthCheckFailed()).WillRepeatedly(Return(false));
+
+  // Configure 100s drain time and gradual strategy
+  EXPECT_CALL(server.options_, drainTime()).WillRepeatedly(Return(std::chrono::seconds(100)));
+  EXPECT_CALL(server.options_, drainStrategy()).WillRepeatedly(Return(Server::DrainStrategy::Gradual));
+
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  DrainManagerImpl listener_drain_manager(server, envoy::config::listener::v3::Listener::DEFAULT, *dispatcher);
+
+  // Connect listener and drain manager
+  EXPECT_CALL(parent_context_.server_factory_context_, drainManager()).WillRepeatedly(ReturnRef(listener_drain_manager));
+  EXPECT_CALL(parent_context_.server_factory_context_, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher));
+  auto context = filter_chain_manager_->createFilterChainFactoryContext(&filter_chain_messages[0]);
+  auto* context_impl = dynamic_cast<PerFilterChainFactoryContextImpl*>(context.get());
+  ASSERT_NE(context_impl, nullptr);
+
+  // Not draining yet
+  EXPECT_FALSE(context->drainDecision().drainClose(Network::DrainDirection::All));
+
+  // Start draining
+  context_impl->startDraining();
+
+  // At zero seconds, no connections are closed yet
+  int true_count_t0 = 0;
+  for (int i = 0; i < 1000; i++) {
+    if (context->drainDecision().drainClose(Network::DrainDirection::All)) {
+      true_count_t0++;
+    }
+  }
+  EXPECT_EQ(true_count_t0, 0);
+
+  // Progress the clock to 50% of drain time
+  time_system.advanceTimeAndRun(std::chrono::seconds(50), *dispatcher,
+                                Event::Dispatcher::RunType::NonBlock);
+
+  // Expect some to be drained, others not
+  int true_count_t50 = 0;
+  for (int i = 0; i < 1000; i++) {
+    if (context->drainDecision().drainClose(Network::DrainDirection::All)) {
+      true_count_t50++;
+    }
+  }
+  EXPECT_GT(true_count_t50, 400);
+  EXPECT_LT(true_count_t50, 600);
+
+  // Progress past the drain time
+  time_system.advanceTimeAndRun(std::chrono::seconds(101), *dispatcher,
+                                Event::Dispatcher::RunType::NonBlock);
+
+  // All connections should drain
+  int true_count_t100 = 0;
+  for (int i = 0; i < 1000; i++) {
+    if (context->drainDecision().drainClose(Network::DrainDirection::All)) {
+      true_count_t100++;
+    }
+  }
+  EXPECT_EQ(true_count_t100, 1000);
 }
 
 TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {

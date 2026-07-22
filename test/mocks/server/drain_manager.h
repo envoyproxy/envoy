@@ -35,6 +35,7 @@ public:
 
   std::function<void()> drain_sequence_completion_;
   Network::DrainDirection drain_direction_;
+  bool draining_{false};
 };
 } // namespace Server
 } // namespace Envoy

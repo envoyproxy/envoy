@@ -155,6 +155,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/tls:ssl_socket_lib",
+        "//source/server:drain_manager_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
