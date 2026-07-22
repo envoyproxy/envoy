@@ -44,6 +44,7 @@ namespace Formatter {
 namespace {
 
 using StatusHelpers::HasStatus;
+using StatusHelpers::HasStatusCode;
 using testing::Const;
 using testing::ContainsRegex;
 using testing::HasSubstr;
@@ -5524,9 +5525,7 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "%START_TIME(%4On%)%"};
 
   for (const std::string& test_case : test_cases) {
-    EXPECT_THROW(THROW_OR_RETURN_VALUE(parser.parse(test_case), std::vector<FormatterProviderPtr>),
-                 EnvoyException)
-        << test_case;
+    EXPECT_THAT(parser.parse(test_case), HasStatusCode(absl::StatusCode::kInvalidArgument));
   }
 }
 
