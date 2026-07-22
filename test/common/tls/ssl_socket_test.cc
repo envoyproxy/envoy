@@ -2415,6 +2415,238 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsaWithFullScanEnabledOnSniMismatch) {
   testUtil(test_options.setExpectedSni("nomatch.example.com"));
 }
 
+// No per-cert tls_params: context-level tls_params still apply. Context restricts to AES128;
+// client offers both AES128 and AES256 — AES128 is negotiated via context-level params.
+TEST_P(SslSocketTest, ContextLevelTlsParamsInheritedWhenNoCertLevelParams) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES256-GCM-SHA384
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options);
+}
+
+// Per-cert tls_params applied: cert restricts to AES128 only. Client offering only AES256 fails
+// to connect, proving per-cert tls_params are enforced (not just the context-level defaults).
+TEST_P(SslSocketTest, PerCertTlsParamsApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES256-GCM-SHA384
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+)EOF";
+
+  // Client offers only AES256, cert's tls_params restricts to AES128 — no common cipher.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Per-cert tls_params: cert restricts signature algorithms to a set the client does not support.
+// No common signature algorithm causes the handshake to fail.
+TEST_P(SslSocketTest, PerCertTlsParamsSigAlgsApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        signature_algorithms:
+        - rsa_pss_rsae_sha256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+        signature_algorithms:
+        - rsa_pss_rsae_sha384
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Per-cert tls_params: cert sets min TLSv1_3. Client restricted to TLSv1_2 — version mismatch,
+// handshake fails. Exercises the TLSv1_3 branch in toVersion().
+TEST_P(SslSocketTest, PerCertTlsParamsTlsV13Applied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_3
+        tls_maximum_protocol_version: TLSv1_3
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+}
+
+// Per-cert tls_params: cert sets TLSv1_0 as min and TLSv1_2 as max. Client negotiates TLSv1_2.
+// Exercises toVersion() for TLSv1_0 and TLSv1_1 (used as min/max pair in a second sub-case).
+TEST_P(SslSocketTest, PerCertTlsParamsTlsV10V11Applied) {
+  // TLSv1_0 min, TLSv1_2 max: client negotiates TLSv1_2, toVersion(TLSv1_0) is called.
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  {
+    const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_0
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+)EOF";
+    TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+    testUtil(test_options);
+  }
+  {
+    // TLSv1_1 min, TLSv1_2 max: exercises toVersion(TLSv1_1).
+    const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_1
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+)EOF";
+    TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+    testUtil(test_options);
+  }
+}
+
+// Per-cert tls_params: cert sets compliance_policies. Client cipher incompatible with FIPS policy
+// causes connection failure, covering the compliance policy branch in applyTlsParamsToSsl.
+TEST_P(SslSocketTest, PerCertTlsParamsCompliancePolicyApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-CHACHA20-POLY1305
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-CHACHA20-POLY1305
+        ecdh_curves:
+        - P-256
+        compliance_policies:
+        - FIPS_202205
+)EOF";
+
+  // FIPS policy disallows CHACHA20-POLY1305 — no common cipher, handshake fails.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.connection_error"));
+}
+
 // EC cert is selected for a no-EC-capable client.
 TEST_P(SslSocketTest, CertWithNotECCapable) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(

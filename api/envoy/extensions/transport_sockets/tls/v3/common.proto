@@ -242,7 +242,7 @@ message PrivateKeyProvider {
   bool fallback = 4;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
@@ -309,6 +309,15 @@ message TlsCertificate {
 
   // [#not-implemented-hide:]
   repeated config.core.v3.DataSource signed_certificate_timestamp = 5;
+
+  // Optional per-certificate TLS parameters. When set on a server certificate, any specified
+  // fields override the corresponding context-level
+  // :ref:`tls_params <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_params>`
+  // for that certificate during the TLS handshake; unset fields continue to use the context-level
+  // values. This allows different cipher suites, ECDH curves, protocol versions, signature
+  // algorithms, or compliance policies per certificate.
+  // Setting this on a client certificate has no effect.
+  TlsParameters tls_params = 9;
 }
 
 message TlsSessionTicketKeys {

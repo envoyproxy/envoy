@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -46,6 +47,9 @@ struct TlsContext {
   // safely substituted via SSL_set_SSL_CTX() during the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello.
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+  // Per-certificate TLS params applied to the SSL* after SSL_set_SSL_CTX, which only transfers
+  // certificate material and does not propagate cipher/version/curve settings.
+  std::optional<Ssl::TlsParams> tls_params;
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;

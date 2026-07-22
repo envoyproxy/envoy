@@ -221,6 +221,7 @@ public:
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
         std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
     EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
+    EXPECT_CALL(tls_cert_config_, tlsParams()).WillRepeatedly(Return(nullptr));
     EXPECT_CALL(tls_cert_config_, pkcs12()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, certificateChainPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, certificateName()).WillRepeatedly(ReturnRef(EMPTY_STRING));

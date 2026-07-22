@@ -340,6 +340,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "tls_certificate_config_impl_test",
+    srcs = ["tls_certificate_config_impl_test.cc"],
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
+    deps = [
+        ":ssl_certs_test_lib",
+        "//source/common/tls:server_context_config_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "cert_compression_test",
     srcs = ["cert_compression_test.cc"],
     external_deps = ["ssl"],

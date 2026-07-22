@@ -112,6 +112,12 @@ ContextImpl::ContextImpl(
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
+    if (i < tls_certificates.size()) {
+      if (const Ssl::TlsParams* p = tls_certificates[i].get().tlsParams(); p != nullptr) {
+        ctx.tls_params = *p;
+      }
+    }
+
     rc = SSL_CTX_set_min_proto_version(ctx.ssl_ctx_.get(), config.minProtocolVersion());
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 

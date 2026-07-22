@@ -2161,6 +2161,30 @@ common_tls_context:
   EXPECT_EQ(gauge_opt->get().value(), 1787339648);
 }
 
+// tls_params on a client certificate has no effect — a warning is logged and context-level
+// params are used instead.
+TEST_F(SslContextImplTest, ClientCertTlsParamsWarns) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        cipher_suites: "ECDHE-RSA-AES128-GCM-SHA256"
+        ecdh_curves: "P-256"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Envoy::Ssl::ClientContextSharedPtr client_ctx;
+  EXPECT_LOG_CONTAINS("warning", "tls_params on a client TlsCertificate has no effect",
+                      client_ctx = *manager_.createSslClientContext(*store_.rootScope(), *cfg));
+  auto cleanup = cleanUpHelper(client_ctx);
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

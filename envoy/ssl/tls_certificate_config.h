@@ -1,13 +1,27 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/ssl/private_key/private_key.h"
 
 namespace Envoy {
 namespace Ssl {
+
+struct TlsParams {
+  using TlsProtocol = envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol;
+  TlsProtocol min_protocol_version{};
+  TlsProtocol max_protocol_version{};
+  std::string cipher_suites;
+  std::string ecdh_curves;
+  std::string signature_algorithms;
+  std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+      compliance_policy;
+};
 
 class TlsCertificateConfig {
 public:
@@ -77,6 +91,12 @@ public:
    * ocsp response was inlined.
    */
   virtual const std::string& ocspStaplePath() const PURE;
+
+  /**
+   * @return per-certificate TLS parameters where each set field overrides the corresponding
+   * context-level value during the TLS handshake, or nullptr if no per-certificate params are set.
+   */
+  virtual const TlsParams* tlsParams() const PURE;
 };
 
 using TlsCertificateConfigPtr = std::unique_ptr<TlsCertificateConfig>;

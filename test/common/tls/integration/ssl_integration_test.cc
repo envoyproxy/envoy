@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
@@ -1067,6 +1068,166 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP521EcdsaClientAllCurve
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
+}
+
+// RSA cert has tls_params restricting to AES128, ECDSA cert to AES256. Two connections are made:
+// one RSA-only client (selects RSA cert, negotiates AES128) and one ECDSA-only client (selects
+// ECDSA cert, negotiates AES256). Both cipher counters confirm per-cert tls_params take effect.
+// SSL_CTX always uses context-level ciphers so the RSA cert's tls_params do not affect
+// getClientEcdsaCapabilities(), which reads tls_contexts_[0]'s cipher list.
+TEST_P(SslCertficateIntegrationTest, MultiCertPerCertTlsParams) {
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    return;
+  }
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->UnpackTo(&tls_context),
+        "");
+    auto* common = tls_context.mutable_common_tls_context();
+    auto* rsa_params = common->mutable_tls_certificates(0)->mutable_tls_params();
+    rsa_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+    rsa_params->add_ecdh_curves("P-256");
+    auto* ecdsa_params = common->mutable_tls_certificates(1)->mutable_tls_params();
+    ecdsa_params->add_cipher_suites("ECDHE-ECDSA-AES256-GCM-SHA384");
+    ecdsa_params->add_ecdh_curves("P-256");
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context),
+        "");
+  });
+
+  initialize();
+
+  // RSA-only client: server selects RSA cert, per-cert tls_params restrict to AES128.
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"})));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"))
+                   ->value());
+  codec_client_->close();
+
+  // ECDSA-only client: server selects ECDSA cert, per-cert tls_params restrict to AES256.
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-ECDSA-AES256-GCM-SHA384"})));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1,
+            test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384"))
+                ->value());
+}
+
+// Single RSA cert with tls_params restricting to AES256. Client offers both AES128 and AES256:
+// only AES256 can be negotiated, confirming per-cert tls_params are applied for single-cert
+// servers.
+TEST_P(SslCertficateIntegrationTest, SingleCertPerCertTlsParams) {
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    return;
+  }
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = false;
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->UnpackTo(&tls_context),
+        "");
+    auto* rsa_params =
+        tls_context.mutable_common_tls_context()->mutable_tls_certificates(0)->mutable_tls_params();
+    rsa_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+    rsa_params->add_ecdh_curves("P-256");
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context),
+        "");
+  });
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(
+        ClientSslTransportOptions{}
+            .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+            .setCipherSuites({"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"}));
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384"))
+                   ->value());
+}
+
+// Two RSA certs covering different domains, each with distinct tls_params. Two connections with
+// different SNIs verify that domain-based cert selection applies the correct per-cert tls_params:
+// SNI lyft.com selects servercert (AES128), SNI lyft2.com selects server2cert (AES256).
+TEST_P(SslCertficateIntegrationTest, MultiCertPerCertTlsParamsBySni) {
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    return;
+  }
+  server_rsa_cert_ = false;
+  server_ecdsa_cert_ = false;
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->UnpackTo(&tls_context),
+        "");
+
+    auto* common = tls_context.mutable_common_tls_context();
+
+    // servercert.pem covers lyft.com, restricted to AES128.
+    auto* cert1 = common->add_tls_certificates();
+    cert1->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
+    cert1->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    auto* params1 = cert1->mutable_tls_params();
+    params1->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+    params1->add_ecdh_curves("P-256");
+
+    // server2cert.pem covers lyft2.com, restricted to AES256.
+    auto* cert2 = common->add_tls_certificates();
+    cert2->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/server2cert.pem"));
+    cert2->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/server2key.pem"));
+    auto* params2 = cert2->mutable_tls_params();
+    params2->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+    params2->add_ecdh_curves("P-256");
+
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context),
+        "");
+  });
+
+  initialize();
+
+  // SNI lyft.com: selects servercert, per-cert tls_params restrict to AES128.
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"})
+          .setSni("lyft.com")));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"))
+                   ->value());
+  codec_client_->close();
+
+  // SNI lyft2.com: selects server2cert, per-cert tls_params restrict to AES256.
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"})
+          .setSni("lyft2.com")));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384"))
+                   ->value());
 }
 
 // Server has an RSA certificate with an OCSP response works.
