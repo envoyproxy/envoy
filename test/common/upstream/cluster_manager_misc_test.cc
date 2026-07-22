@@ -221,7 +221,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, BatchAwareUpdateCoalescesCrossThread
 }
 
 // With enable_batch_aware_update enabled, the coalesced batch post is applied to the worker
-// thread's priority set as a single batch (see ClusterEntry::updateHostsBatch()). Verify that all
+// thread's priority set as a single batch (see ClusterEntry::updateHosts()). Verify that all
 // the priorities in the batch land on the worker priority set.
 TEST_F(ClusterManagerImplThreadAwareLbTest, BatchAwareUpdateAppliesAllPrioritiesToWorker) {
   TestScopedRuntime scoped_runtime;

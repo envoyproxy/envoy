@@ -634,8 +634,8 @@ private:
       // PrioritySetImpl::batchHostUpdate()). Unlike calling updateHosts() once per priority, the
       // priority set's end-of-batch MemberUpdateCb fires only once for the whole update, so the
       // worker-local load balancer coalesces its rebuild across all the updated priorities. Used by
-      // the cluster manager when batch-aware updates are enabled and more than one priority is
-      // being updated. `updates` must not contain duplicate priorities.
+      // the cluster manager when batch-aware updates are enabled. `updates` must not contain
+      // duplicate priorities; an empty `updates` is a no-op.
       void updateHosts(
           const std::vector<
               std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,

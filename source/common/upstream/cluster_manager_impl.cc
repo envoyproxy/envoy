@@ -642,7 +642,7 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
           // update, we still could accumulate the updates and post them by the member update
           // callback above because the member update callback will be called after every priority
           // update callback in the non-batch update case. That's say we actually could handle them
-          // in the same way. But let us keep the exsiting logic first and do it later if we want to
+          // in the same way. But let us keep the existing logic first and do it later if we want to
           // change it.
           cluster_data_ref.pending_batch_update_params_.per_priority_update_params_.emplace_back(
               priority, hosts_added, hosts_removed);
