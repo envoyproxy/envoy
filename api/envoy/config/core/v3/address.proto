@@ -144,7 +144,7 @@ message ExtraSourceAddress {
   SocketOptionsOverride socket_options = 2;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message BindConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.BindConfig";
 
@@ -180,6 +180,24 @@ message BindConfig {
   // <envoy_v3_api_msg_config.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`).
   // [#extension-category: envoy.upstream.local_address_selector]
   TypedExtensionConfig local_address_selector = 6;
+
+  // If set to true, the :ref:`network_namespace_filepath
+  // <envoy_v3_api_field_config.core.v3.SocketAddress.network_namespace_filepath>` of every source
+  // address in this bind config is validated when the configuration is loaded, and the
+  // configuration is rejected if a referenced network namespace cannot be opened.
+  //
+  // By default no such validation is performed: a network namespace that does not exist when the
+  // configuration is loaded may be created later, before connections are actually established, so
+  // eager validation would wrongly reject such configurations. If a namespace is unavailable when
+  // a connection is created, the connection attempt fails gracefully.
+  //
+  // Listener addresses do not need an equivalent option: a listener creates and binds its socket
+  // in the configured network namespace when the listener configuration is loaded, so an
+  // unavailable namespace always rejects the listener configuration.
+  //
+  // .. attention::
+  //     Network namespaces are only configurable on Linux. Otherwise, this field has no effect.
+  bool validate_network_namespaces = 7;
 }
 
 // Addresses specify either a logical or physical address and port, which are
