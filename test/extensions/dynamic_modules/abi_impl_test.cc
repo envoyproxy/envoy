@@ -1423,6 +1423,35 @@ WEAK_STUB(StatSinkSnapshotGetTextReadout,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(nullptr, 0, nullptr, 0,
                                                                             nullptr, nullptr, 0,
                                                                             nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(nullptr, 0,
+                                                                                 nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(nullptr, 0, 0, nullptr,
+                                                                           0, nullptr, nullptr, 0,
+                                                                           nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(nullptr, 0, 0, nullptr, 0,
+                                                                         nullptr, nullptr, 0,
+                                                                         nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(nullptr, 0,
+                                                                                      nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+              nullptr, 0, 0, nullptr, 0, nullptr, nullptr, 0, nullptr))
 WEAK_STUB(StatSinkConfigDefineGauge,
           envoy_dynamic_module_callback_stat_sink_config_define_gauge(nullptr, {nullptr, 0},
                                                                       nullptr))

@@ -26,6 +26,7 @@ namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -327,7 +328,7 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowAccepts) {
   // Configure reverse tunnel filter.
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -358,7 +359,7 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowMissingHeadersIsBadRequest) {
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -411,7 +412,7 @@ TEST_F(ReverseTunnelFilterUnitTest, AutoCloseConnectionsClosesAfterAccept) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   cfg.set_auto_close_connections(true);
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -437,7 +438,7 @@ TEST_F(ReverseTunnelFilterUnitTest, AutoCloseAppliesQuietShutdownOnTls) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   cfg.set_auto_close_connections(true);
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -504,7 +505,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
   proto_config.set_request_method(envoy::config::core::v3::PUT);
 
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
   EXPECT_EQ(std::chrono::milliseconds(10000), config->pingInterval());
   EXPECT_TRUE(config->autoCloseConnections());
@@ -516,7 +517,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
 TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaultsRemainStable) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
   EXPECT_EQ("/reverse_connections/request", config->requestPath());
 }
@@ -527,7 +528,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   // Leave everything empty to test defaults.
 
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
   EXPECT_EQ(std::chrono::milliseconds(2000), config->pingInterval());
   EXPECT_FALSE(config->autoCloseConnections());
@@ -639,7 +640,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ParseEmptyPayload) {
 TEST_F(ReverseTunnelFilterUnitTest, NonStringFilterStateIgnored) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -661,7 +662,7 @@ TEST_F(ReverseTunnelFilterUnitTest, NonStringFilterStateIgnored) {
 TEST_F(ReverseTunnelFilterUnitTest, ClusterIdMismatchIgnored) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -683,7 +684,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterIdMismatchIgnored) {
 TEST_F(ReverseTunnelFilterUnitTest, TenantIdMissingIgnored) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -966,7 +967,7 @@ TEST_F(ReverseTunnelFilterUnitTest, CompleteRequestSingleCall) {
 TEST_F(ReverseTunnelFilterUnitTest, PartialStateIgnored) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -1058,7 +1059,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationAllBranches) {
     cfg.mutable_ping_interval()->set_seconds(5);
     cfg.mutable_ping_interval()->set_nanos(500000000);
     auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-    ASSERT_TRUE(config_or_error.ok());
+    ASSERT_OK(config_or_error);
     auto config = config_or_error.value();
     EXPECT_EQ(std::chrono::milliseconds(5500), config->pingInterval());
   }
@@ -1067,7 +1068,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationAllBranches) {
   {
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
     auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-    ASSERT_TRUE(config_or_error.ok());
+    ASSERT_OK(config_or_error);
     auto config = config_or_error.value();
     EXPECT_EQ(std::chrono::milliseconds(2000), config->pingInterval());
   }
@@ -1078,7 +1079,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationAllBranches) {
     cfg.set_request_path("");
     cfg.set_request_method(envoy::config::core::v3::METHOD_UNSPECIFIED);
     auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-    ASSERT_TRUE(config_or_error.ok());
+    ASSERT_OK(config_or_error);
     auto config = config_or_error.value();
     EXPECT_EQ("/reverse_connections/request", config->requestPath());
     EXPECT_EQ("GET", config->requestMethod());
@@ -1165,7 +1166,7 @@ TEST_F(ReverseTunnelFilterUnitTest, CodecDispatchError) {
 TEST_F(ReverseTunnelFilterUnitTest, TenantIdMismatchIgnored2) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -1230,7 +1231,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDeprecatedField) {
   // No extra options set to test defaults.
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
   EXPECT_FALSE(config->autoCloseConnections());
   EXPECT_EQ("/test", config->requestPath());
@@ -2003,7 +2004,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationAcceptsMatchingName) {
   cfg.set_required_cluster_name("my-upstream-cluster");
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
 
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
@@ -2045,7 +2046,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationRejectsMismatchedName) 
   cfg.set_required_cluster_name("my-upstream-cluster");
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
 
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
@@ -2084,7 +2085,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationRejectsMissingHeader) {
   cfg.set_required_cluster_name("my-upstream-cluster");
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
 
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
@@ -2121,7 +2122,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationDisabledWhenNotSet) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
 
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
@@ -2182,7 +2183,7 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
        FilterRejectsDelimiterInNodeIdWhenTenantIsolationEnabled) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -2206,7 +2207,7 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
        FilterRejectsDelimiterInClusterIdWhenTenantIsolationEnabled) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -2230,7 +2231,7 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
        FilterRejectsDelimiterInTenantIdWhenTenantIsolationEnabled) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -2254,7 +2255,7 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
        FilterUsesTenantScopedIdentifiersForSocketRegistration) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -2275,7 +2276,7 @@ TEST_F(ReverseTunnelFilterUnitTest, FilterUsesNonScopedIdentifiersWhenTenantIsol
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -2292,7 +2293,7 @@ TEST_F(ReverseTunnelFilterUnitTest, FilterUsesNonScopedIdentifiersWhenTenantIsol
 TEST_F(ReverseTunnelFilterWithTenantIsolationTest, FilterReadsTenantIsolationFromSocketManager) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   auto local_config = config_or_error.value();
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
@@ -2321,7 +2322,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_RespondsWith101) {
   // Reconfigure filter with upgrade enabled.
   proto_config_.set_use_http_upgrade(true);
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   config_ = config_or_error.value();
   filter_ =
       std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(), overload_manager_);
@@ -2380,7 +2381,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_RespondsWith101) {
 TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_MissingUpgradeRejected) {
   proto_config_.set_use_http_upgrade(true);
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   config_ = config_or_error.value();
   filter_ =
       std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(), overload_manager_);
@@ -2409,7 +2410,7 @@ TEST_F(ReverseTunnelFilterUnitTest, FilterConfigLoadsSkipRebalancing) {
   cfg.set_skip_rebalancing(true);
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   EXPECT_TRUE(config_or_error.value()->skipRebalancing());
 }
 

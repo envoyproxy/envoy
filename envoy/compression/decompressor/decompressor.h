@@ -1,6 +1,9 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Compression {

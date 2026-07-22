@@ -1603,10 +1603,6 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   absl::flat_hash_map<std::string, std::string> cookies =
       Http::Utility::parseCookies(*request_headers_);
 
-  // TODO(Huabing): remove oauth_expires_ cookie after
-  // "envoy.reloadable_features.oauth2_cleanup_cookies" runtime flag is removed.
-  cookies.insert_or_assign(cookie_names.oauth_expires_, new_expires_);
-
   if (!access_token_.empty()) {
     cookies.insert_or_assign(cookie_names.bearer_token_, access_token_);
   }
@@ -1614,20 +1610,15 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
     cookies.insert_or_assign(cookie_names.id_token_, id_token_);
   }
 
-  // TODO(Huabing): remove refresh_token_ cookie after
-  // "envoy.reloadable_features.oauth2_cleanup_cookies" runtime flag is removed.
-  if (!refresh_token_.empty()) {
-    cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
-  } else if (cookies.contains(cookie_names.refresh_token_)) {
+  if (refresh_token_.empty() && cookies.contains(cookie_names.refresh_token_)) {
     // If we actually went through the refresh token flow, but we didn't get a new refresh token,
-    // we want to still ensure that the old one is set if it was sent in a cookie
+    // we want to still ensure that the old one is preserved if it was sent in a cookie.
     refresh_token_ = findValue(cookies, cookie_names.refresh_token_);
   }
 
-  // TODO(Huabing): remove oauth_hmac_ cookie after
-  // "envoy.reloadable_features.oauth2_cleanup_cookies" runtime flag is removed.
-  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
-
+  // The oauth_expires_, refresh_token_ and oauth_hmac_ OAuth flow cookies are intentionally not
+  // re-added here: removeOAuthFlowCookies() below strips them from the request before it is
+  // forwarded upstream.
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
   request_headers_->setReferenceKey(Http::Headers::get().Cookie, new_cookies);
   if (config_->forwardBearerToken() && !access_token_.empty()) {
@@ -1962,32 +1953,30 @@ void OAuth2Filter::removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const
   }
   const CookieNames& cookie_names = config_->cookieNames();
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_cleanup_cookies")) {
-    cookies.erase(cookie_names.oauth_hmac_);
-    cookies.erase(cookie_names.oauth_expires_);
-    cookies.erase(cookie_names.refresh_token_);
+  cookies.erase(cookie_names.oauth_hmac_);
+  cookies.erase(cookie_names.oauth_expires_);
+  cookies.erase(cookie_names.refresh_token_);
 
-    auto eraseCookieWithSuffix = [&cookies](const std::string& base_name) {
-      // Keep removing the legacy cookie name while we support mixed-version clusters.
-      // TODO(Huabing): Delete only suffixed names once all supported releases understand suffixed
-      // names.
-      cookies.erase(base_name);
-      const std::string prefix = absl::StrCat(base_name, CookieSuffixDelimiter);
-      for (auto it = cookies.begin(); it != cookies.end();) {
-        if (it->first.starts_with(prefix)) {
-          cookies.erase(it++);
-        } else {
-          ++it;
-        }
+  auto eraseCookieWithSuffix = [&cookies](const std::string& base_name) {
+    // Keep removing the legacy cookie name while we support mixed-version clusters.
+    // TODO(Huabing): Delete only suffixed names once all supported releases understand suffixed
+    // names.
+    cookies.erase(base_name);
+    const std::string prefix = absl::StrCat(base_name, CookieSuffixDelimiter);
+    for (auto it = cookies.begin(); it != cookies.end();) {
+      if (it->first.starts_with(prefix)) {
+        cookies.erase(it++);
+      } else {
+        ++it;
       }
-    };
+    }
+  };
 
-    eraseCookieWithSuffix(cookie_names.oauth_nonce_);
-    eraseCookieWithSuffix(cookie_names.code_verifier_);
+  eraseCookieWithSuffix(cookie_names.oauth_nonce_);
+  eraseCookieWithSuffix(cookie_names.code_verifier_);
 
-    std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
-    headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
-  }
+  std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+  headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
 }
 
 // Removes OAuth token cookies from the request headers.

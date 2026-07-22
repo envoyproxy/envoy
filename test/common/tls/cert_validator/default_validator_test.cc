@@ -440,7 +440,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameExactDNSFailure) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("api.example.com");
-  EXPECT_DEATH(std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context),
+  EXPECT_DEATH(std::ignore = std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context),
                "general_name_type != 2 || matcher.match_pattern_case() != "
                "envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact");
 #endif

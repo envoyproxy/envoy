@@ -166,7 +166,6 @@ def envoy_dependencies(skip_targets = []):
     # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
     _boringssl()
     _boringssl_fips()
-    _aws_lc()
     _openssl()
 
     _aws_c_auth_testdata()
@@ -314,27 +313,6 @@ def _boringssl_fips():
     )
     external_http_archive(
         name = "fips_go_linux_arm64",
-        build_file_content = GO_BUILD_CONTENT,
-    )
-
-def _aws_lc():
-    external_http_archive(
-        name = "aws_lc",
-        build_file = "@envoy//bazel/external:aws_lc.BUILD",
-    )
-    CMAKE_SOURCE_BUILD_CONTENT = "%s\nexports_files([\"bootstrap\"])" % BUILD_ALL_CONTENT
-    external_http_archive(
-        name = "fips_cmake_src",
-        build_file_content = CMAKE_SOURCE_BUILD_CONTENT,
-    )
-    CLANG_BUILD_CONTENT = "%s\nexports_files([\"bin/clang\", \"bin/clang++\"])" % BUILD_ALL_CONTENT
-    external_http_archive(
-        name = "fips_clang_ppc64le",
-        build_file_content = CLANG_BUILD_CONTENT,
-    )
-    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % _build_all_content(["test/**"])
-    external_http_archive(
-        name = "fips_go_ppc64le",
         build_file_content = GO_BUILD_CONTENT,
     )
 

@@ -78,7 +78,9 @@ public:
         }));
   }
 
-  void createClient() { client_ = std::make_unique<GcpAuthnClientImpl>(config_, context_); }
+  void createClient() {
+    client_ = std::make_unique<GcpAuthnClientImpl>(config_, context_.server_factory_context_);
+  }
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;

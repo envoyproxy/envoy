@@ -361,6 +361,12 @@ protected:
     io_handle_->conn_wrapper_to_host_map_[wrapper] = host_address;
   }
 
+  // Transfer ownership of a wrapper into the io handle so onConnectionDone() can find and remove
+  // it.
+  void pushConnectionWrapper(std::unique_ptr<RCConnectionWrapper> wrapper) {
+    io_handle_->connection_wrappers_.push_back(std::move(wrapper));
+  }
+
   void cleanup() { io_handle_->cleanup(); }
 
   void removeStaleHostAndCloseConnections(const std::string& host) {
@@ -2382,6 +2388,51 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   auto stat_map = extension_->getCrossWorkerStatMap();
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connecting"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connecting"], 1);
+}
+
+// For a host that needs N>1 connections, the establishment episode timestamp must survive the
+// 2..N-1 handshake completions and only clear once the target connection count is reached.
+TEST_F(ReverseConnectionIOHandleTest, EpisodeInitiationTimeClearedOnlyAtTargetCount) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+  createTriggerPipe();
+
+  // Host wants two connections; simulate the first dial already having stamped the episode time.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
+  getMutableHostConnectionInfo("192.168.1.1").episode_initiation_time_ms = 1000;
+
+  // Completes one handshake with a distinct local address (so it yields a distinct connection key).
+  auto complete_one_handshake = [&](uint32_t local_port) {
+    auto mock_connection = setupMockConnection();
+    auto local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", local_port);
+    auto remote = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+    auto provider = std::make_shared<Network::ConnectionInfoSetterImpl>(local, remote);
+    EXPECT_CALL(*mock_connection, connectionInfoProvider())
+        .WillRepeatedly(
+            Invoke([provider]() -> const Network::ConnectionInfoProvider& { return *provider; }));
+
+    auto host = createMockHost("192.168.1.1");
+    auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection),
+                                                         host, "test-cluster");
+    RCConnectionWrapper* wrapper_ptr = wrapper.get();
+    addWrapperToHostMap(wrapper_ptr, "192.168.1.1");
+    pushConnectionWrapper(std::move(wrapper));
+    io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+  };
+
+  // First handshake completes: still below target, timestamp must remain.
+  complete_one_handshake(11111);
+  ASSERT_EQ(getHostConnectionInfo("192.168.1.1").connection_keys.size(), 1u);
+  EXPECT_TRUE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
+  EXPECT_EQ(*getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms, 1000);
+
+  // Second handshake reaches the target: timestamp is cleared, ending the episode.
+  complete_one_handshake(22222);
+  ASSERT_EQ(getHostConnectionInfo("192.168.1.1").connection_keys.size(), 2u);
+  EXPECT_FALSE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
 }
 
 TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {

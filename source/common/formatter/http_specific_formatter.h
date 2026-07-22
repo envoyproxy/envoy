@@ -256,7 +256,7 @@ public:
 
 private:
   using FormatterProviderCreateFunc =
-      std::function<FormatterProviderPtr(absl::string_view, std::optional<size_t>)>;
+      std::function<absl::StatusOr<FormatterProviderPtr>(absl::string_view, std::optional<size_t>)>;
 
   using FormatterProviderLookupTbl =
       absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,

@@ -499,15 +499,15 @@ modify different aspects of the server:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
-  .. http::get:: /stats?hidden=showonly
+  .. http:get:: /stats?hidden=only
 
   Only outputs statistics that are internally marked as hidden.
 
-  .. http::get:: /stats?hidden=include
+  .. http:get:: /stats?hidden=include
 
   Hidden stats will be shown along side non-hidden stats.
 
-  .. http::get:: /stats?hidden=exclude
+  .. http:get:: /stats?hidden=exclude
 
   Hidden stats will be excluded from the output. This is the default behavior.
 

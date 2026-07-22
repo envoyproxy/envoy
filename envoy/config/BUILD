@@ -71,6 +71,7 @@ envoy_cc_library(
         "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
     ],
 )
 
@@ -99,6 +100,7 @@ envoy_cc_library(
     name = "subscription_interface",
     hdrs = ["subscription.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/stats:stats_macros",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",

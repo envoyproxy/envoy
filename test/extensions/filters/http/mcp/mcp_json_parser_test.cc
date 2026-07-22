@@ -16,7 +16,10 @@ namespace HttpFilters {
 namespace Mcp {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using ::testing::HasSubstr;
+using ::testing::Not;
 using namespace Filters::Common::Mcp::McpConstants;
 
 class McpJsonParserTest : public testing::Test {
@@ -39,7 +42,7 @@ TEST_F(McpJsonParserTest, ValidJsonRpcRequest) {
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "id": 1})";
 
   EXPECT_OK(parser_->parse(json));
-  ASSERT_TRUE(parser_->finishParse().ok());
+  ASSERT_OK(parser_->finishParse());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
   EXPECT_EQ(parser_->getMethod(), "test");
@@ -367,7 +370,7 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
   auto status2 = parser_->parse(json2);
   EXPECT_OK(status2);
 
-  ASSERT_TRUE(parser_->finishParse().ok());
+  ASSERT_OK(parser_->finishParse());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
   EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
@@ -390,7 +393,7 @@ TEST_F(McpJsonParserTest, PartialParsingEscapeSequence) {
 
   // The parsing fails on finishParse() due to the incomplete escape sequence.
   auto finish_status = parser_->finishParse();
-  EXPECT_FALSE(finish_status.ok());
+  EXPECT_THAT(finish_status, Not(IsOk()));
   EXPECT_TRUE(parser_->isValidMcpRequest());
 }
 
@@ -516,19 +519,17 @@ TEST_F(McpJsonParserTest, InvalidJson) {
   auto status = parser_->parse(json);
   EXPECT_OK(status);
   auto finish_status = parser_->finishParse();
-  EXPECT_FALSE(finish_status.ok());
-  EXPECT_THAT(finish_status.message(), HasSubstr("Closing quote expected in string"));
+  EXPECT_THAT(finish_status, HasStatusMessage(HasSubstr("Closing quote expected in string")));
 }
 
 TEST_F(McpJsonParserTest, EmptyJson) {
   std::string json = "";
 
   auto status = parser_->parse(json);
-  EXPECT_TRUE(status.ok()); // Parser accepts empty input
+  EXPECT_OK(status); // Parser accepts empty input
 
   auto finish_status = parser_->finishParse();
-  EXPECT_FALSE(finish_status.ok());
-  EXPECT_THAT(finish_status.message(), HasSubstr("Unexpected end of string"));
+  EXPECT_THAT(finish_status, HasStatusMessage(HasSubstr("Unexpected end of string")));
 }
 
 TEST_F(McpJsonParserTest, NullValues) {
@@ -1066,8 +1067,7 @@ TEST(McpFieldExtractorTest, DirectIntegerRendering) {
 TEST_F(McpJsonParserTest, FinishParseWithoutParsing) {
   // Test calling finishParse() without calling parse() first
   auto status = parser_->finishParse();
-  EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.message(), HasSubstr("No data has been parsed"));
+  EXPECT_THAT(status, HasStatusMessage(HasSubstr("No data has been parsed")));
 }
 
 TEST(McpFieldExtractorTest, RenderBytesAndFloat) {
@@ -1815,7 +1815,7 @@ TEST_F(McpJsonParserTest, TrailingGarbageRejected) {
 
   // Parse should fail because of trailing garbage in the chunk.
   auto status = parser_->parse(json);
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
 }
 
 // Test that default config has correct security settings.
@@ -1830,7 +1830,7 @@ TEST_F(McpJsonParserTest, ValidJsonRpcResponse) {
       R"({"jsonrpc":"2.0","id":1,"result":{"action":"accept","content":{"name":"test"}}})";
 
   EXPECT_OK(parser_->parse(json));
-  ASSERT_TRUE(parser_->finishParse().ok());
+  ASSERT_OK(parser_->finishParse());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
   EXPECT_TRUE(parser_->isResponse());
@@ -1842,7 +1842,7 @@ TEST_F(McpJsonParserTest, ValidJsonRpcErrorResponse) {
       R"({"jsonrpc":"2.0","id":1,"error":{"code":-32042,"message":"URL elicitation required"}})";
 
   EXPECT_OK(parser_->parse(json));
-  ASSERT_TRUE(parser_->finishParse().ok());
+  ASSERT_OK(parser_->finishParse());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
   EXPECT_TRUE(parser_->isResponse());
@@ -1853,7 +1853,7 @@ TEST_F(McpJsonParserTest, ResponseNotConfusedWithRequest) {
   std::string json = R"({"jsonrpc":"2.0","id":1,"result":{}})";
 
   EXPECT_OK(parser_->parse(json));
-  ASSERT_TRUE(parser_->finishParse().ok());
+  ASSERT_OK(parser_->finishParse());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
   EXPECT_TRUE(parser_->isResponse());
@@ -1868,7 +1868,7 @@ TEST_F(McpJsonParserTest, ResponseWithStringResult) {
   std::string json = R"({"jsonrpc":"2.0","id":1,"result":"ok"})";
 
   EXPECT_OK(parser_->parse(json));
-  ASSERT_TRUE(parser_->finishParse().ok());
+  ASSERT_OK(parser_->finishParse());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
   EXPECT_TRUE(parser_->isResponse());

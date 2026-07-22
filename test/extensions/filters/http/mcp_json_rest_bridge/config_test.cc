@@ -27,7 +27,7 @@ TEST(McpJsonRestBridgeFilterConfigFactoryTest, RegisterAndCreateFilterWithEmptyC
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::StatusOr<Http::FilterFactoryCb> cb =
       factory->createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_TRUE(cb.ok());
+  ASSERT_OK(cb);
 
   // TODO(paulhong01): Update the following verification once the proto config is processed
   // properly.
