@@ -2,10 +2,11 @@
 
 #include <cstring>
 #include <string>
-#include <vector>
 
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -118,10 +119,13 @@ Api::IoCallUint64Result RpingInterceptor::readv(uint64_t max_length, Buffer::Raw
   // right behind it. If we swallowed the RPING and returned, that trailing data would sit unread
   // with no further wakeup coming. To avoid that, once we consume an RPING we keep reading until
   // the socket is actually empty (a short read or EAGAIN).
+  //
+  // Scratch buffer for one read, reused across loop iterations. Sized to full capacity so it fits
+  // every iteration; each read uses only `room` of it.
+  absl::FixedArray<char> tmp(capacity);
   while (true) {
     // Size the read so partial_ping_ + fresh never exceeds caller capacity.
     const uint64_t room = capacity - partial_ping_.size();
-    std::vector<char> tmp(room);
     Buffer::RawSlice tmp_slice;
     tmp_slice.mem_ = tmp.data();
     tmp_slice.len_ = room;
