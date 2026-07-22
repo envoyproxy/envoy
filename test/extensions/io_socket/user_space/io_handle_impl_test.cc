@@ -1208,6 +1208,25 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   ASSERT_EQ(object->value_, dest_object->value_);
 }
 
+// wasPeerFullyClosed() distinguishes peer shutdown(WR) from peer close(). Half-close-enabled
+// connections rely on this to convert a full peer disconnect into RemoteClose.
+TEST_F(IoHandleImplTest, WasPeerFullyClosedDefaultsFalse) {
+  EXPECT_FALSE(io_handle_->wasPeerFullyClosed());
+  EXPECT_FALSE(io_handle_peer_->wasPeerFullyClosed());
+}
+
+TEST_F(IoHandleImplTest, WasPeerFullyClosedStaysFalseAfterPeerShutdownWrite) {
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+  EXPECT_TRUE(io_handle_->hasReceivedEof());
+  EXPECT_FALSE(io_handle_->wasPeerFullyClosed());
+}
+
+TEST_F(IoHandleImplTest, WasPeerFullyClosedTrueAfterPeerClose) {
+  io_handle_peer_->close();
+  EXPECT_TRUE(io_handle_->hasReceivedEof());
+  EXPECT_TRUE(io_handle_->wasPeerFullyClosed());
+}
+
 class IoHandleImplNotImplementedTest : public testing::Test {
 public:
   IoHandleImplNotImplementedTest() {
