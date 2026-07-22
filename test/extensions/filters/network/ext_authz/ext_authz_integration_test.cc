@@ -1,6 +1,3 @@
-// Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
-// generally should not change or remove existing tests.
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
