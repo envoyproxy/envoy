@@ -50,8 +50,8 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
 
   case SinkConfig::ProtocolSpecifierCase::kHttpService: {
     std::shared_ptr<OtlpMetricsExporter> http_metrics_exporter =
-        std::make_shared<OpenTelemetryHttpMetricsExporter>(server.clusterManager(),
-                                                           sink_config.http_service(), server);
+        std::make_shared<OpenTelemetryHttpMetricsExporter>(
+            server.clusterManager(), sink_config.http_service(), server, sink_config.compression());
 
     return std::make_unique<OpenTelemetrySink>(
         otlp_metrics_flusher, http_metrics_exporter,
