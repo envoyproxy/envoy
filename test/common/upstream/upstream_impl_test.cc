@@ -2384,6 +2384,68 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
+// Verifies that the happy eyeballs sort of the address list runs once when the host is
+// created, and not again on each connection attempt.
+TEST_F(HostImplTest, HappyEyeballsSortsAddressListOncePerHost) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  AddressVector address_list = {
+      address,
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
+
+  // Creating the host sorts the address list exactly once.
+  std::shared_ptr<Upstream::HostImpl> host;
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "sort address with happy_eyeballs config", 1, {
+    host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+        cluster.info_, "lyft.com", address,
+        std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+        std::make_shared<const envoy::config::core::v3::Locality>(locality),
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+        envoy::config::core::v3::UNKNOWN, address_list));
+  });
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  auto connection1 = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection1, setBufferLimits(0));
+  EXPECT_CALL(*connection1, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection1, connectionInfoSetter());
+  EXPECT_CALL(*connection1, streamInfo());
+  auto connection2 = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection2, setBufferLimits(0));
+  EXPECT_CALL(*connection2, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection2, connectionInfoSetter());
+  EXPECT_CALL(*connection2, streamInfo());
+  // Both connections should be created with the first address in the list.
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection1))
+      .WillOnce(Return(connection2));
+  EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
+
+  // Creating connections reuses the sorted list and does not sort again.
+  Envoy::Upstream::Host::CreateConnectionData connection_data1;
+  Envoy::Upstream::Host::CreateConnectionData connection_data2;
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "sort address with happy_eyeballs config", 0, {
+    connection_data1 = host->createConnection(dispatcher, options, transport_socket_options);
+    connection_data2 = host->createConnection(dispatcher, options, transport_socket_options);
+  });
+  // The created connections will be wrapped in HappyEyeballsConnectionImpls.
+  EXPECT_NE(connection1, connection_data1.connection_.get());
+  EXPECT_NE(connection2, connection_data2.connection_.get());
+}
+
 TEST_F(HostImplTest, HealthFlags) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
