@@ -136,7 +136,6 @@ private:
   void onResponseDecoderDead() const;
 
   Http::ResponseDecoderHandlePtr response_decoder_handle_;
-  Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
 
   // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".

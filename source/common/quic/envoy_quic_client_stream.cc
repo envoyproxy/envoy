@@ -41,10 +41,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
 }
 
 void EnvoyQuicClientStream::setResponseDecoder(Http::ResponseDecoder& decoder) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
-    response_decoder_handle_ = decoder.createResponseDecoderHandle();
-  }
-  response_decoder_ = &decoder;
+  response_decoder_handle_ = decoder.createResponseDecoderHandle();
 }
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
@@ -634,14 +631,11 @@ void EnvoyQuicClientStream::onResponseDecoderDead() const {
 }
 
 Http::ResponseDecoder* EnvoyQuicClientStream::getResponseDecoder() {
-  if (response_decoder_handle_ == nullptr) {
-    return response_decoder_;
-  }
-  if (response_decoder_handle_) {
-    if (OptRef<Http::ResponseDecoder> decoder = response_decoder_handle_->get();
-        decoder.has_value()) {
-      return &decoder.value().get();
-    }
+  // The decoder handle is always created in setResponseDecoder() before any response is processed.
+  ASSERT(response_decoder_handle_ != nullptr);
+  if (OptRef<Http::ResponseDecoder> decoder = response_decoder_handle_->get();
+      decoder.has_value()) {
+    return decoder.ptr();
   }
   return nullptr;
 }

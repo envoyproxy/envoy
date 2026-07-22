@@ -24,12 +24,6 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
-    : ResponseDecoderWrapper(response_decoder),
-      RequestEncoderWrapper(&parent.codec_client_->newStream(*this)), parent_(parent) {
-  RequestEncoderWrapper::inner_encoder_->getStream().addCallbacks(*this);
-}
-
 ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoderHandlePtr response_decoder_handle,
                                            ActiveClient& parent)
     : ResponseDecoderWrapper(std::move(response_decoder_handle)),
@@ -91,12 +85,6 @@ ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }
 
 bool ActiveClient::closingWithIncompleteStream() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
-}
-
-RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
-  ASSERT(!stream_wrapper_);
-  stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, *this);
-  return *stream_wrapper_;
 }
 
 RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) {

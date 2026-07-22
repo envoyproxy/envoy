@@ -154,8 +154,9 @@ public:
 
     // The owning grid.
     ConnectivityGrid& grid_;
-    // The decoder for the original newStream, needed to create streams on subsequent pools.
-    Http::ResponseDecoder& decoder_;
+    // Handle to the decoder for the original newStream, needed to create streams on subsequent
+    // pools. The handle also tracks the decoder's liveness so that a decoder which has already died
+    // is never accessed.
     Http::ResponseDecoderHandlePtr decoder_handle_;
 
     // The callbacks from the original caller, which must get onPoolFailure or
