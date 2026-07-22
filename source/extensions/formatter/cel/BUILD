@@ -50,6 +50,8 @@ envoy_cc_extension(
     ],
     deps = [
         "//envoy/registry",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/formatter/cel:cel_lib",
         "@envoy_api//envoy/extensions/formatter/cel/v3:pkg_cc_proto",
     ] + select(

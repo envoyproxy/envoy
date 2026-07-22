@@ -73,6 +73,32 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "tracing_formatter_config_test",
+    srcs = ["tracing_formatter_config_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = [
+        "envoy.filters.network.http_connection_manager",
+        "envoy.formatter.cel",
+    ],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        ":config_test_base",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/formatter/cel:config",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_filter_chain_test",
     srcs = ["config_filter_chain_test.cc"],
     extension_names = ["envoy.filters.network.http_connection_manager"],

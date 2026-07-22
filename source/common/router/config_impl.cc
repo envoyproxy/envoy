@@ -54,6 +54,7 @@
 #include "source/extensions/matching/network/common/inputs.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 #include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
@@ -411,7 +412,8 @@ const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
 bool DecoratorImpl::propagate() const { return propagate_; }
 
-RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing) {
+RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing,
+                                   const Formatter::CommandParserPtrVector& command_parsers) {
   if (!tracing.has_client_sampling()) {
     client_sampling_.set_numerator(100);
     client_sampling_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
@@ -431,15 +433,17 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
     overall_sampling_ = tracing.overall_sampling();
   }
   for (const auto& tag : tracing.custom_tags()) {
-    custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
+    custom_tags_.emplace(tag.tag(),
+                         Tracing::CustomTagUtility::createCustomTag(tag, command_parsers));
   }
   if (!tracing.operation().empty()) {
-    auto operation = Formatter::FormatterImpl::create(tracing.operation(), true);
+    auto operation = Formatter::FormatterImpl::create(tracing.operation(), true, command_parsers);
     THROW_IF_NOT_OK_REF(operation.status());
     operation_ = std::move(operation.value());
   }
   if (!tracing.upstream_operation().empty()) {
-    auto operation = Formatter::FormatterImpl::create(tracing.upstream_operation(), true);
+    auto operation =
+        Formatter::FormatterImpl::create(tracing.upstream_operation(), true, command_parsers);
     THROW_IF_NOT_OK_REF(operation.status());
     upstream_operation_ = std::move(operation.value());
   }
@@ -541,8 +545,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         return vec;
       }()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
-      route_tracing_(parseRouteTracing(route)), route_name_(route.name()),
-      time_source_(factory_context.mainThreadDispatcher().timeSource()),
+      route_tracing_(parseRouteTracing(route, factory_context, validator)),
+      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
       request_body_buffer_limit_(getRequestBodyBufferLimit(vhost, route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
@@ -1308,10 +1312,23 @@ DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::config::route:
 }
 
 RouteTracingConstPtr
-RouteEntryImplBase::parseRouteTracing(const envoy::config::route::v3::Route& route) {
+RouteEntryImplBase::parseRouteTracing(const envoy::config::route::v3::Route& route,
+                                      Server::Configuration::ServerFactoryContext& factory_context,
+                                      ProtobufMessage::ValidationVisitor& validator) {
   RouteTracingConstPtr ret;
   if (route.has_tracing()) {
-    ret = RouteTracingConstPtr(new RouteTracingImpl(route.tracing()));
+    // The `formatters` field only configures extension command parsers, including CEL option
+    // overrides such as `enable_string_functions`. Built-in parsers like `%CEL%` work when it is
+    // empty, so avoid resolving formatter config unless the field is present.
+    Formatter::CommandParserPtrVector command_parsers;
+    if (!route.tracing().formatters().empty()) {
+      Server::GenericFactoryContextImpl generic_context(factory_context, validator);
+      command_parsers =
+          THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+                                    route.tracing().formatters(), generic_context),
+                                Formatter::CommandParserPtrVector);
+    }
+    ret = RouteTracingConstPtr(new RouteTracingImpl(route.tracing(), command_parsers));
   }
   return ret;
 }
