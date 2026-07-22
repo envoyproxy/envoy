@@ -46,6 +46,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
+        "//source/common/runtime:runtime_features_lib",
         "//source/server:generic_factory_context_lib",
         "@abseil-cpp//absl/status:statusor",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
