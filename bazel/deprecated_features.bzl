@@ -12,9 +12,6 @@ Please use one of the new config options instead:
   For BoringSSL FIPS (Linux x86_64 only):
     bazel build --config=boringssl-fips //source/exe:envoy-static
 
-  For AWS-LC FIPS (Linux x86_64, aarch64, ppc64le):
-    bazel build --config=aws-lc-fips //source/exe:envoy-static
-
 See bazel/SSL.md for more details.
 ================================================================================
 """)

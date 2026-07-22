@@ -66,12 +66,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
     ),
-    aws_lc = dict(
-        version = "1.72.0",
-        sha256 = "f214c0e06e043c4f18b836059ccb5ecbed781173e8eed106839ee2dd4f4cc157",
-        strip_prefix = "aws-lc-{version}",
-        urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
-    ),
     openssl = dict(
         version = "3.5.7",
         sha256 = "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8",
@@ -736,24 +730,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "9d89a3ea57d141c2b22d70083f2c8459ba3890f2d9e818e7e933b75614936565",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
-    ),
-    fips_clang_ppc64le = dict(
-        version = "14.0.0",
-        sha256 = "2d504c4920885c86b306358846178bc2232dfac83b47c3b1d05861a8162980e6",
-        strip_prefix = "clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04.tar.xz"],
-    ),
-    fips_go_ppc64le = dict(
-        version = "1.26.3",
-        sha256 = "dbd82b50530ead2beb1fd72215117380df3cb16332b51467116dc35b3691dd75",
-        strip_prefix = "go",
-        urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
-    ),
-    fips_cmake_src = dict(
-        version = "4.4.0",
-        sha256 = "65757f442fdd242e27f1728fc26dc0cba4164f7a0791a5c788631c00080369bc",
-        strip_prefix = "cmake-{version}",
-        urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}.tar.gz"],
     ),
     wuffs = dict(
         version = "0.4.0-alpha.9",
