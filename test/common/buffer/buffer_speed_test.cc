@@ -343,6 +343,29 @@ BENCHMARK(bufferReserveCommitPartial)
     ->Arg(64 * 1024)
     ->Arg(128 * 1024);
 
+// Test the reserve+commit cycle with multiple buffers to simulate concurrent connections
+// and verify the effectiveness of the thread-local freelist.
+static void bufferReserveCommitMultiBuffer(benchmark::State& state) {
+  const size_t num_buffers = 4;
+  std::vector<Buffer::OwnedImpl> buffers(num_buffers);
+  auto size = state.range(0);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    std::vector<Buffer::Reservation> reservations;
+    reservations.reserve(num_buffers);
+    for (size_t i = 0; i < num_buffers; ++i) {
+      reservations.push_back(buffers[i].reserveForReadWithLengthForTest(size));
+    }
+    for (size_t i = 0; i < num_buffers; ++i) {
+      reservations[i].commit(reservations[i].length());
+    }
+    for (size_t i = 0; i < num_buffers; ++i) {
+      buffers[i].drain(buffers[i].length());
+    }
+  }
+}
+BENCHMARK(bufferReserveCommitMultiBuffer)->Arg(16 * 1024)->Arg(64 * 1024)->Arg(128 * 1024);
+
 // Test the linearization of a buffer in the best case where the data is in one slice.
 static void bufferLinearizeSimple(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
