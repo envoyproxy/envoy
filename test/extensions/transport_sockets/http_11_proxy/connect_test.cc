@@ -49,14 +49,16 @@ public:
   static inline const std::string TestHostname = "test.example.com";
   static inline const std::string ConnectRequestWithHostname = absl::StrCat(
       "CONNECT ", TestHostname, ":443 HTTP/1.1\r\nHost: ", TestHostname, ":443\r\n\r\n");
+  static inline const std::string ProxyAuthorizationValue = "Basic abcdefghijk";
 
   void initialize(bool no_proxy_protocol = false, std::optional<uint32_t> target_port = {}) {
     initializeInternal(no_proxy_protocol, false, target_port);
   }
 
   // Initialize the test with the proxy address provided via endpoint metadata.
-  void initializeWithMetadataProxyAddr(bool with_hostname = false) {
-    initializeInternal(false, true, {}, with_hostname);
+  void initializeWithMetadataProxyAddr(bool with_hostname = false,
+                                       const std::string& auth_value = "") {
+    initializeInternal(false, true, {}, with_hostname, false, auth_value);
   }
 
   // Initialize the test with the proxy address provided via default proxy address.
@@ -108,7 +110,7 @@ public:
 private:
   void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr,
                           std::optional<uint32_t> target_port, bool with_hostname = false,
-                          bool use_default_proxy_addr = false) {
+                          bool use_default_proxy_addr = false, const std::string& auth_value = "") {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
@@ -131,6 +133,16 @@ private:
         Protobuf::Any anypb;
         std::ignore = anypb.PackFrom(addr_proto);
         metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, anypb));
+
+        if (!auth_value.empty()) {
+          const std::string auth_key =
+              Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH;
+          Protobuf::StringValue auth_proto;
+          auth_proto.set_value(auth_value);
+          Protobuf::Any auth_anypb;
+          std::ignore = auth_anypb.PackFrom(auth_proto);
+          metadata->mutable_typed_filter_metadata()->emplace(auth_key, auth_anypb);
+        }
         EXPECT_CALL(*host, metadata()).Times(AnyNumber()).WillRepeatedly(Return(metadata));
 
         if (with_hostname) {
@@ -743,6 +755,106 @@ TEST_P(Http11ConnectTest, RuntimeGuardLegacyBehaviorEndpointMetadata) {
       .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
   Network::IoResult rc2 = connect_socket_->doWrite(msg, false);
   EXPECT_EQ(msg.length(), rc2.bytes_processed_);
+}
+
+// Test that the Proxy-Authorization header is not added when
+// ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH is absent from typed_filter_metadata
+// (legacy format mode disabled).
+TEST_P(Http11ConnectTest, NoProxyAuthHeaderWhenAuthMetadataAbsent) {
+  initializeWithMetadataProxyAddr(false, "");
+
+  const std::string address_str =
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
+  const std::string expected_connect_string =
+      absl::StrCat("CONNECT ", address_str, " HTTP/1.1\r\nHost: ", address_str, "\r\n\r\n");
+  Buffer::OwnedImpl expected_legacy_data{expected_connect_string};
+
+  EXPECT_CALL(io_handle_, write(BufferString(expected_legacy_data.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+
+  Buffer::OwnedImpl msg("data");
+  connect_socket_->doWrite(msg, false);
+}
+
+// Test that the Proxy-Authorization header is added when ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH
+// is present in typed_filter_metadata (legacy format mode disabled).
+TEST_P(Http11ConnectTest, ProxyAuthHeaderAddedWhenAuthMetadataPresent) {
+  initializeWithMetadataProxyAddr(false, ProxyAuthorizationValue);
+
+  const std::string address_str =
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
+  const std::string expected_connect_string =
+      absl::StrCat("CONNECT ", address_str, " HTTP/1.1\r\nHost: ", address_str,
+                   "\r\nProxy-Authorization: ", ProxyAuthorizationValue, "\r\n\r\n");
+  Buffer::OwnedImpl expected_legacy_data{expected_connect_string};
+
+  EXPECT_CALL(io_handle_, write(BufferString(expected_legacy_data.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+
+  Buffer::OwnedImpl msg("data");
+  connect_socket_->doWrite(msg, false);
+}
+
+// Test that the Proxy-Authorization header is not added when
+// ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH is absent from typed_filter_metadata
+// (legacy format mode enabled).
+TEST_P(Http11ConnectTest, NoProxyAuthHeaderWhenAuthMetadataAbsentLegacyMode) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_11_proxy_connect_legacy_format", "true"}});
+
+  initializeWithMetadataProxyAddr(false, "");
+
+  const std::string address_str =
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
+  const std::string expected_connect_string =
+      absl::StrCat("CONNECT ", address_str, " HTTP/1.1\r\n\r\n");
+  Buffer::OwnedImpl expected_legacy_data{expected_connect_string};
+
+  EXPECT_CALL(io_handle_, write(BufferString(expected_legacy_data.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+
+  Buffer::OwnedImpl msg("data");
+  connect_socket_->doWrite(msg, false);
+}
+
+// Test that the Proxy-Authorization header is added when ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH
+// is present in typed_filter_metadata (legacy format mode enabled).
+TEST_P(Http11ConnectTest, ProxyAuthHeaderAddedWhenAuthMetadataPresentLegacyMode) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_11_proxy_connect_legacy_format", "true"}});
+
+  initializeWithMetadataProxyAddr(false, ProxyAuthorizationValue);
+
+  const std::string address_str =
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
+  const std::string expected_connect_string =
+      absl::StrCat("CONNECT ", address_str,
+                   " HTTP/1.1\r\nProxy-Authorization: ", ProxyAuthorizationValue, "\r\n\r\n");
+  Buffer::OwnedImpl expected_legacy_data{expected_connect_string};
+
+  EXPECT_CALL(io_handle_, write(BufferString(expected_legacy_data.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+
+  Buffer::OwnedImpl msg("data");
+  connect_socket_->doWrite(msg, false);
 }
 
 // Test that writes are buffered until CONNECT response is received, and then flushed by

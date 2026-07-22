@@ -10,6 +10,8 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -69,8 +71,13 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
 }
 
 // Helper method to create a properly formatted CONNECT request with Host header.
-std::string UpstreamHttp11ConnectSocket::formatConnectRequest(absl::string_view target) {
-  return absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n\r\n");
+std::string UpstreamHttp11ConnectSocket::formatConnectRequest(absl::string_view target,
+                                                              absl::string_view authentication) {
+  if (authentication.empty()) {
+    return absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n\r\n");
+  }
+  return absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n",
+                      "Proxy-Authorization: ", authentication, "\r\n\r\n");
 }
 
 inline void UpstreamHttp11ConnectSocket::handleProxyInfoConnect(
@@ -93,6 +100,19 @@ inline void UpstreamHttp11ConnectSocket::handleProxyInfoConnect(
 
 inline void UpstreamHttp11ConnectSocket::handleHostMetadataConnect(
     std::shared_ptr<const Upstream::HostDescription> host) {
+  // Look up the optional Proxy-Authorization value from the endpoint's typed metadata.
+  std::string authentication;
+  if (host->metadata() != nullptr) {
+    auto auth_it = host->metadata()->typed_filter_metadata().find(
+        Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH);
+    if (auth_it != host->metadata()->typed_filter_metadata().end()) {
+      Protobuf::StringValue auth_value;
+      if (MessageUtil::unpackTo(auth_it->second, auth_value).ok()) {
+        authentication = auth_value.value();
+      }
+    }
+  }
+
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http_11_proxy_connect_legacy_format")) {
     // Prefer <host-name>:<port> for RFC 9110 compliance, unless URI is <host-ip>:<port>.
@@ -103,11 +123,16 @@ inline void UpstreamHttp11ConnectSocket::handleHostMetadataConnect(
     } else {
       target = host->address()->asStringView();
     }
-    header_buffer_.add(formatConnectRequest(target));
+    header_buffer_.add(formatConnectRequest(target, authentication));
   } else {
     // Legacy behavior: <host-ip>:<port> format, no Host header for backward compatibility.
-    header_buffer_.add(
-        absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
+    if (authentication.empty()) {
+      header_buffer_.add(
+          absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
+    } else {
+      header_buffer_.add(absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n",
+                                      "Proxy-Authorization: ", authentication, "\r\n\r\n"));
+    }
   }
   need_to_strip_connect_response_ = true;
 }

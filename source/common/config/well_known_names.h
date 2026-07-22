@@ -40,6 +40,12 @@ public:
   // Proxy address configuration namespace for HTTP/1.1 proxy transport sockets.
   const std::string ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR =
       "envoy.http11_proxy_transport_socket.proxy_address";
+
+  // Proxy-Authorization header value for HTTP/1.1 proxy transport sockets.
+  // When present, the value (a google.protobuf.StringValue) is added as a
+  // "Proxy-Authorization" header in the HTTP/1.1 CONNECT request.
+  const std::string ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH =
+      "envoy.http11_proxy_transport_socket.proxy_authorization";
 };
 
 using MetadataFilters = ConstSingleton<MetadataFilterValues>;
