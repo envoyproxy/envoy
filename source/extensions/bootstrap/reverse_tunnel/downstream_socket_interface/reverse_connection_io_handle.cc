@@ -49,7 +49,7 @@ constexpr uint64_t kMaintainIntervalMs = 10000;
 // Short re-check interval used while a hot-restart child is waiting to be allowed to dial (i.e.
 // until it has asked the parent to stop accepting). The handoff window is brief, so poll frequently
 // to bound the added latency before the child stands up its own tunnel.
-constexpr uint64_t kParentStopAcceptingRecheckMs = 100;
+constexpr uint64_t kParentStopAcceptingRecheckMs = 10;
 } // namespace
 
 // ReverseConnectionIOHandle implementation

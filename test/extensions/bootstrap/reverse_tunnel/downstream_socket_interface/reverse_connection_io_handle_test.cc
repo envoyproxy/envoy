@@ -2697,7 +2697,7 @@ TEST_F(ReverseConnectionIOHandleTest, MaintainReverseConnectionsDefersWhileParen
   // timer is enabled with the short re-check interval and no cluster dial is attempted.
   auto* mock_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
-  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(10), _));
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
 
   Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
