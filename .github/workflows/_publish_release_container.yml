@@ -7,6 +7,7 @@ on:
   workflow_call:
     secrets:
       dockerhub-write-token:
+      ghcr-write-token:
     inputs:
       dev:
         required: true
@@ -17,6 +18,13 @@ on:
         default: envoy
         type: string
       dockerhub-username:
+        required: true
+        type: string
+      ghcr-repo:
+        required: false
+        default: envoy
+        type: string
+      ghcr-username:
         required: true
         type: string
       sha:
@@ -62,73 +70,62 @@ jobs:
       with:
         input-format: yaml
         filter: >-
-          {manifests: .}
+          {manifests:
+            [.[] as $e
+             | ({name: "${{ inputs.dockerhub-repo }}", registry: "docker.io/envoyproxy"} + $e)
+               ${{ (inputs.trusted && (inputs.target-branch == 'main' || ! inputs.dev))
+                   && format(', ({{name: "{0}", registry: "ghcr.io/envoyproxy"}} + $e)', inputs.ghcr-repo)
+                   || '' }}]}
         input: |
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: dev
-            registry: docker.io/envoyproxy
+          - tag: dev
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy.{arch}.tar
             additional-tags:
             - dev-${{ github.sha }}
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: contrib-dev
-            registry: docker.io/envoyproxy
+          - tag: contrib-dev
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-contrib.{arch}.tar
             additional-tags:
             - contrib-dev-${{ github.sha }}
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: contrib-debug-dev
-            registry: docker.io/envoyproxy
+          - tag: contrib-debug-dev
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-contrib-debug.{arch}.tar
             additional-tags:
             - contrib-debug-dev-${{ github.sha }}
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: contrib-distroless-dev
-            registry: docker.io/envoyproxy
+          - tag: contrib-distroless-dev
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-contrib-distroless.{arch}.tar
             additional-tags:
             - contrib-distroless-dev-${{ github.sha }}
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: debug-dev
-            registry: docker.io/envoyproxy
+          - tag: debug-dev
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-debug.{arch}.tar
             additional-tags:
             - debug-dev-${{ github.sha }}
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: distroless-dev
-            registry: docker.io/envoyproxy
+          - tag: distroless-dev
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-distroless.{arch}.tar
             additional-tags:
             - distroless-dev-${{ github.sha }}
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: google-vrp-dev
-            registry: docker.io/envoyproxy
+          - tag: google-vrp-dev
             architectures:
             - amd64
             artifact-pattern: envoy-google-vrp.{arch}.tar
             additional-tags:
             - google-vrp-dev-${{ github.sha }}
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: tools-dev
-            registry: docker.io/envoyproxy
+          - tag: tools-dev
             architectures:
             - amd64
             - arm64
@@ -148,83 +145,83 @@ jobs:
               [.manifests[]
                | select(
                    (.tag | test("contrib-distroless") | not)
-                   or ($v.major > 1 or ($v.major == 1 and $v.minor >= 37)))]}
+                   or ($v.major > 1 or ($v.major == 1 and $v.minor >= 37)))
+               | . as $e
+               | ({name: "${{ inputs.dockerhub-repo }}", registry: "docker.io/envoyproxy"} + $e)
+                 ${{ (inputs.trusted && (inputs.target-branch == 'main' || ! inputs.dev))
+                     && format(', ({{name: "{0}", registry: "ghcr.io/envoyproxy"}} + $e)', inputs.ghcr-repo)
+                     || '' }}]}
         input: |
           version:
             major: ${{ inputs.version-major }}
             minor: ${{ inputs.version-minor }}
           manifests:
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
+          - tag: v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy.{arch}.tar
             additional-tags:
             - v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: contrib-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
+          - tag: contrib-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-contrib.{arch}.tar
             additional-tags:
             - contrib-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: contrib-debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
+          - tag: contrib-debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-contrib-debug.{arch}.tar
             additional-tags:
             - contrib-debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: contrib-distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
+          - tag: contrib-distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-contrib-distroless.{arch}.tar
             additional-tags:
             - contrib-distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
+          - tag: debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-debug.{arch}.tar
             additional-tags:
             - debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
+          - tag: distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-distroless.{arch}.tar
             additional-tags:
             - distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: google-vrp-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
+          - tag: google-vrp-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             architectures:
             - amd64
             artifact-pattern: envoy-google-vrp.{arch}.tar
             additional-tags:
             - google-vrp-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
-          - name: ${{ inputs.dockerhub-repo }}
-            tag: tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
+          - tag: tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             architectures:
             - amd64
             - arm64
             artifact-pattern: envoy-tools.{arch}.tar
             additional-tags:
             - tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
+
+    - name: Authenticate GHCR
+      if: ${{ inputs.trusted && (inputs.target-branch == 'main' || ! inputs.dev) }}
+      shell: bash
+      env:
+        GHCR_USERNAME: ${{ inputs.ghcr-username }}
+        GHCR_PASSWORD: ${{ secrets.ghcr-write-token }}
+      run: |
+        echo "::group::Authenticating with GHCR"
+        echo "$GHCR_PASSWORD" | buildah login --username "$GHCR_USERNAME" --password-stdin ghcr.io
+        echo "::endgroup::"
 
     - name: Collect and push OCI artifacts
       uses: envoyproxy/toolshed/actions/oci/collector@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
