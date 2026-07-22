@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["extract_field_spec_test.cc"],
     deps = [
         "//source/common/json/wuffs_json:extract_field_spec_lib",
+        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
     ],
 )
 

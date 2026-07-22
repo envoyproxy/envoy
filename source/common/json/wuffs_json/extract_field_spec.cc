@@ -1,6 +1,8 @@
 #include "source/common/json/wuffs_json/extract_field_spec.h"
 
 #include <algorithm>
+#include <string>
+#include <utility>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"

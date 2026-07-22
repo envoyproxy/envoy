@@ -130,9 +130,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
   pending_bytes_.clear();
 
   // body_src_pos_ is a global byte counter across all feed() calls. Token
-  // offsets are expressed in the same global space, so (token_start - chunk_base)
-  // gives the offset into effective_chunk — needed for substr() when extracting
-  // raw bytes for STRING / NUMBER / LITERAL tokens.
+  // offsets (token_start - chunk_base) gives the offset into effective_chunk for byte capture.
   const size_t chunk_base = body_src_pos_;
   wuffs_base__io_buffer source_buf = wuffs_base__ptr_u8__reader(
       const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(effective_chunk.data())),
@@ -149,6 +147,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       const uint64_t token_len = wuffs_base__token__length(tok);
       const bool continued = wuffs_base__token__continued(tok);
       const size_t token_start = body_src_pos_;
+      // Advance the total byte counter that wuffs has tokenized so far.
       body_src_pos_ += token_len;
 
       switch (token_category) {

@@ -218,14 +218,21 @@ public:
   // Return a dot-notation path string for the current cursor position.
   // Must only be called from within a Handler callback while feed() is active.
   // Requires track_paths=true at construction.
+  //
+  // Labels are concatenated without escaping, so the output is not injective:
+  // document keys containing '.', '[', ']' — or empty keys, which contribute
+  // nothing when leading — let distinct positions serialize identically.
+  // Consumers matching against config must compare structurally per level,
+  // not by string equality (see extract_field_spec.h).
   std::string buildIndexedPath(int depth) const; // e.g. "messages[0].role"
   std::string buildPatternPath(int depth) const; // e.g. "messages[].role"
 
   // Monotonically increasing byte offset of the next source byte to be consumed.
   // Matches the token_start / token_end values delivered to onContainerOpen / onContainerClose.
-  // TODO(tyxia): the outer filter should compare nextSourcePosition() against
-  // DecoderConfig::max_body_bytes between feed() calls and return ResourceExhausted
-  // before calling feed() again if the limit is exceeded.
+  // Bytes buffered in pending_bytes_ (at most kMaxPendingBytes) are not yet counted.
+  // TODO(tyxia): the outer filter should check nextSourcePosition() + chunk.size()
+  // against DecoderConfig::max_body_bytes before each feed() call and return
+  // ResourceExhausted instead of feeding, rejecting an oversized chunk unparsed.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
 private:
