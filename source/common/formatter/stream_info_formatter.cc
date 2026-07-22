@@ -2399,12 +2399,10 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoStringFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info)
                                          -> std::optional<std::string> {
-                                       if (const auto info = stream_info.downstreamAddressProvider()
-                                                                 .listenerInfo();
-                                           info.has_value()) {
-                                         if (!info->name().empty()) {
-                                           return std::string(info->name());
-                                         }
+                                       const auto info =
+                                           stream_info.downstreamAddressProvider().listenerInfo();
+                                       if (info.has_value() && !info->name().empty()) {
+                                         return std::string(info->name());
                                        }
                                        return std::nullopt;
                                      });
