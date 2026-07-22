@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Json {
 namespace Wuffs {
 
-absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path) {
+absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, int max_depth) {
   if (path.empty()) {
     return absl::InvalidArgumentError("extract_field_spec: path must not be empty");
   }
@@ -61,7 +61,7 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path) {
       if (!current_key.empty()) {
         out.segments.push_back({std::move(current_key), false});
         current_key.clear();
-      } else if (path[i - 1] == '.') {
+      } else if (i > 0 && path[i - 1] == '.') {
         return absl::InvalidArgumentError(
             absl::StrCat("extract_field_spec: consecutive '.' at position ", i, " in path"));
       }
@@ -71,6 +71,12 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path) {
       if (in_array) {
         return absl::InvalidArgumentError(
             "extract_field_spec: only '[]' wildcard is supported, not '[...]'");
+      }
+      // A key may not start directly after ']': buildPatternPath always emits
+      // a '.' separator between an array wildcard and a following dict key
+      // ("a[].b", never "a[]b").
+      if (i > 0 && path[i - 1] == ']') {
+        return absl::InvalidArgumentError("extract_field_spec: missing '.' between ']' and key");
       }
       current_key += c;
       break;
@@ -85,6 +91,11 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path) {
   }
   if (out.segments.empty()) {
     return absl::InvalidArgumentError("extract_field_spec: path contains no segments");
+  }
+  if (max_depth > 0 && static_cast<int>(out.segments.size()) > max_depth) {
+    return absl::InvalidArgumentError(absl::StrCat("extract_field_spec: path depth ",
+                                                   out.segments.size(),
+                                                   " exceeds maximum supported depth ", max_depth));
   }
   return out;
 }
@@ -105,7 +116,7 @@ std::string ExtractFieldSpec::canonicalPath() const {
   return path;
 }
 
-int DecoderConfig::requiredMaxDepth() const {
+int ParserConfig::requiredMaxDepth() const {
   int max = 0;
   for (const auto& spec : extract_fields) {
     max = std::max(max, spec.depth());

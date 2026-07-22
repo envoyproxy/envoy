@@ -444,6 +444,30 @@ std::string WuffsJsonCursor::buildPatternPath(int depth) const {
   return path;
 }
 
+bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments,
+                                         int depth) const {
+  // Compares: segment count must equal depth, and each level must agree
+  // in kind (dict vs array) and, for dicts, in whole-label equality.
+  if (depth <= 0 || depth >= kMaxTrackedDepth || static_cast<int>(segments.size()) != depth) {
+    return false;
+  }
+  for (int d = 1; d <= depth; ++d) {
+    const PatternSegment& seg = segments[d - 1];
+    if (is_dict_[d]) {
+      if (seg.is_array_element) {
+        return false;
+      }
+      const std::string& label = (d == depth) ? key_stack_[d] : push_key_[d + 1];
+      if (label != seg.key) {
+        return false;
+      }
+    } else if (!seg.is_array_element) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace Wuffs
 } // namespace Json
 } // namespace Envoy

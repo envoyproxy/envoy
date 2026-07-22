@@ -125,6 +125,34 @@ TEST(ParseExtractFieldSpecTest, NestedBracketsRejected) {
   EXPECT_FALSE(parseExtractFieldSpec("a[[]]").ok());
 }
 
+TEST(ParseExtractFieldSpecTest, KeyAfterBracketWithoutDotRejected) {
+  // buildPatternPath always separates an array wildcard from a following dict
+  // key with '.' ("a[].b", never "a[]b") — a bare key after ']' is a typo.
+  EXPECT_FALSE(parseExtractFieldSpec("a[]b").ok());
+  EXPECT_FALSE(parseExtractFieldSpec("messages[]role").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, BracketAfterBracketAccepted) {
+  // '[' directly after ']' stays legal: "a[][]" is a dict key whose value is
+  // an array of arrays (depth 3: key, outer wildcard, inner wildcard).
+  auto result = parseExtractFieldSpec("a[][]");
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(result->depth(), 3);
+  EXPECT_EQ(result->canonicalPath(), "a[][]");
+}
+
+TEST(ParseExtractFieldSpecTest, DepthBoundEnforced) {
+  constexpr absl::string_view kNineSegments = "a.b.c.d.e.f.g.h.i";
+  // Within bound and at the exact bound: accepted.
+  EXPECT_TRUE(parseExtractFieldSpec(kNineSegments, 9).ok());
+  // Over bound: rejected with an informative error.
+  auto result = parseExtractFieldSpec(kNineSegments, 8);
+  ASSERT_FALSE(result.ok());
+  EXPECT_FALSE(result.status().message().empty());
+  // Default (0) means no depth check.
+  EXPECT_TRUE(parseExtractFieldSpec(kNineSegments).ok());
+}
+
 // Error messages must be non-empty and contain relevant context (not just "false").
 TEST(ParseExtractFieldSpecTest, ErrorMessageIsInformative) {
   auto result = parseExtractFieldSpec("messages.[]");
@@ -136,15 +164,22 @@ TEST(ParseExtractFieldSpecTest, ErrorMessageIsInformative) {
 // ExtractFieldSpec::canonicalPath
 // ============================================================================
 
-// canonicalPath() must reproduce the accepted input syntax exactly; its
-// agreement with WuffsJsonCursor::buildPatternPath() is cross-checked against
-// a real cursor further below.
+// canonicalPath() must reproduce the accepted input syntax exactly (RoundTrip
+// below). It is diagnostics-only: routing compares segments structurally — see
+// the StructuralMatchTest section further below.
 
 // Canonical path is round-trippable: parse → canonicalPath == original path.
 TEST(CanonicalPathTest, RoundTrip) {
   const std::vector<std::string> paths = {
-      "model", "messages[]", "messages[].role", "params._meta.traceparent", "messages[].content[]",
-      "_meta", "[].role",
+      "model",
+      "messages[]",
+      "messages[].role",
+      "params._meta.traceparent",
+      "messages[].content[]",
+      "_meta",
+      "[].role",
+      "a[][]",
+      "[][]",
   };
   for (const auto& p : paths) {
     auto result = parseExtractFieldSpec(p);
@@ -154,16 +189,16 @@ TEST(CanonicalPathTest, RoundTrip) {
 }
 
 // ============================================================================
-// DecoderConfig::requiredMaxDepth
+// ParserConfig::requiredMaxDepth
 // ============================================================================
 
 TEST(DecoderConfigTest, EmptySpecListReturnsZero) {
-  DecoderConfig cfg;
+  ParserConfig cfg;
   EXPECT_EQ(cfg.requiredMaxDepth(), 0);
 }
 
 TEST(DecoderConfigTest, SingleSpecDepth) {
-  DecoderConfig cfg;
+  ParserConfig cfg;
   auto spec = parseExtractFieldSpec("model");
   ASSERT_TRUE(spec.ok());
   cfg.extract_fields.push_back(std::move(*spec));
@@ -171,7 +206,7 @@ TEST(DecoderConfigTest, SingleSpecDepth) {
 }
 
 TEST(DecoderConfigTest, MultipleSpecsReturnMax) {
-  DecoderConfig cfg;
+  ParserConfig cfg;
   for (const auto* path : {"model", "messages[].role", "params._meta.traceparent"}) {
     auto s = parseExtractFieldSpec(path);
     ASSERT_TRUE(s.ok());
@@ -181,7 +216,7 @@ TEST(DecoderConfigTest, MultipleSpecsReturnMax) {
 }
 
 TEST(DecoderConfigTest, DeepestSpecDrivesMaxDepth) {
-  DecoderConfig cfg;
+  ParserConfig cfg;
   for (const auto* path : {"messages[].content[]", "model"}) {
     auto s = parseExtractFieldSpec(path);
     ASSERT_TRUE(s.ok());
@@ -191,7 +226,7 @@ TEST(DecoderConfigTest, DeepestSpecDrivesMaxDepth) {
 }
 
 // ============================================================================
-// DecoderConfig::max_body_bytes contract
+// ParserConfig::max_body_bytes contract
 // ============================================================================
 
 // max_body_bytes directs the outer filter to check
@@ -249,11 +284,11 @@ TEST(MaxBodyBytesContractTest, NextSourcePositionLagsByInFlightTokenTail) {
 }
 
 // Executable form of the documented enforcement loop: the outer filter checks
-// nextSourcePosition() + chunk.size() against DecoderConfig::max_body_bytes
+// nextSourcePosition() + chunk.size() against ParserConfig::max_body_bytes
 // before each feed() and rejects instead of feeding. An oversized body must be
 // rejected before its offending chunk is parsed.
 TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
-  DecoderConfig cfg;
+  ParserConfig cfg;
   cfg.max_body_bytes = 12;
 
   MockHandler h;
@@ -275,24 +310,32 @@ TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
 }
 
 // ============================================================================
-// canonicalPath() vs buildPatternPath() cross-check on a real document
+// Structural spec matching (matchesPatternPath) on real documents
 // ============================================================================
 
-// canonicalPath() claims to match buildPatternPath() output *exactly*; the
-// claim is load-bearing at the openStringCapture routing decision. These tests
-// exercise it against a real cursor rather than hard-coded strings, so a
-// format drift in either side fails here.
+// SpecMatchingHandler is the executable template for the production routing
+// decision: convert spec.segments to PatternSegments once at config time,
+// then ask the cursor for a structural match at each openStringCapture —
+// zero allocations, and collision-free (see the hostile-key test below).
+// canonicalPath()/buildPatternPath() are diagnostics-only serializations.
 
-// Captures exactly the string values whose pattern path equals the spec's
-// canonical path; each completed capture is terminated with ';'.
+// Captures exactly the string values whose root-to-here chain structurally
+// matches the spec's segments; each completed capture is terminated with ';'.
 class SpecMatchingHandler : public MockHandler {
 public:
-  explicit SpecMatchingHandler(const ExtractFieldSpec& spec) : spec_(spec) {}
+  explicit SpecMatchingHandler(const ExtractFieldSpec& spec) {
+    // Config-time conversion: string_views into the spec's stable segment
+    // keys, so the per-callback match allocates nothing. `spec` must outlive
+    // this handler.
+    for (const auto& seg : spec.segments) {
+      pattern_.push_back({seg.key, seg.is_array_element});
+    }
+  }
 
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
   bool openStringCapture(absl::string_view, int depth, size_t) override {
-    capturing_ = cursor_->buildPatternPath(depth) == spec_.canonicalPath();
+    capturing_ = cursor_->matchesPatternPath(pattern_, depth);
     return capturing_;
   }
   bool onStringChunk(absl::string_view, int, absl::string_view chunk) override {
@@ -309,13 +352,13 @@ public:
   const std::string& captured() const { return captured_; }
 
 private:
-  const ExtractFieldSpec& spec_;
+  std::vector<WuffsJsonCursor::PatternSegment> pattern_;
   const WuffsJsonCursor* cursor_{nullptr};
   bool capturing_{false};
   std::string captured_;
 };
 
-TEST(CanonicalPathTest, RoutesCaptureAgainstRealBuildPatternPath) {
+TEST(StructuralMatchTest, RoutesArrayElementField) {
   auto spec = parseExtractFieldSpec("messages[].role");
   ASSERT_TRUE(spec.ok());
   SpecMatchingHandler h(*spec);
@@ -329,7 +372,7 @@ TEST(CanonicalPathTest, RoutesCaptureAgainstRealBuildPatternPath) {
   EXPECT_EQ(h.captured(), "user;tool;");
 }
 
-TEST(CanonicalPathTest, RoutesDepthOneScalarAgainstRealBuildPatternPath) {
+TEST(StructuralMatchTest, RoutesDepthOneScalar) {
   auto spec = parseExtractFieldSpec("model");
   ASSERT_TRUE(spec.ok());
   SpecMatchingHandler h(*spec);
@@ -342,7 +385,7 @@ TEST(CanonicalPathTest, RoutesDepthOneScalarAgainstRealBuildPatternPath) {
 
 // Dict-only chain: every intermediate label comes from the push-key of the
 // child container, not the current key.
-TEST(CanonicalPathTest, RoutesNestedDictsAgainstRealBuildPatternPath) {
+TEST(StructuralMatchTest, RoutesNestedDicts) {
   auto spec = parseExtractFieldSpec("params._meta.traceparent");
   ASSERT_TRUE(spec.ok());
   SpecMatchingHandler h(*spec);
@@ -357,7 +400,7 @@ TEST(CanonicalPathTest, RoutesNestedDictsAgainstRealBuildPatternPath) {
 
 // Nested arrays: the '[]' wildcard erases indices, so one spec matches the
 // target field in every element of both array levels.
-TEST(CanonicalPathTest, RoutesNestedArraysAgainstRealBuildPatternPath) {
+TEST(StructuralMatchTest, RoutesNestedArrays) {
   auto spec = parseExtractFieldSpec("messages[].content[].text");
   ASSERT_TRUE(spec.ok());
   SpecMatchingHandler h(*spec);
@@ -373,19 +416,11 @@ TEST(CanonicalPathTest, RoutesNestedArraysAgainstRealBuildPatternPath) {
   EXPECT_EQ(h.captured(), "a;b;c;");
 }
 
-// KNOWN LIMITATION — pattern-path string equality is not collision-free.
-//
-// buildPatternPath() concatenates labels without escaping, and a leading empty
-// key ("" is a legal JSON key) contributes nothing to the string while still
-// consuming a depth level. A hostile body can therefore synthesize the same
-// (string, depth) pair as a legitimately nested field, so neither string
-// equality nor an additional depth check distinguishes the two documents
-// below. This test pins the collision so the production handler's matcher is
-// written against it: it must match spec segments structurally (label by
-// label) or enforce key hygiene, not trust the serialized string.
-// If this test starts failing, the matching semantics changed — update the
-// routing documentation in extract_field_spec.h accordingly.
-TEST(CanonicalPathTest, StringEqualityCollidesOnHostileKeys) {
+// For collision case that {"":{"a.b":"decoy"}} produced the same (string "a.b", depth 2) pair as
+// the legitimate {"a":{"b":...}}. matchesPatternPath() compares labels per level with no
+// serialization: the decoy's "" label can never equal segment "a", and its "a.b" label can never
+// span the two segments a,b.
+TEST(StructuralMatchTest, RejectsHostileKeyCollision) {
   auto spec = parseExtractFieldSpec("a.b");
   ASSERT_TRUE(spec.ok());
   ASSERT_EQ(spec->depth(), 2);
@@ -402,10 +437,10 @@ TEST(CanonicalPathTest, StringEqualityCollidesOnHostileKeys) {
     SpecMatchingHandler h(*spec);
     WuffsJsonCursor cursor(h, /*track_paths=*/true);
     h.setCursor(&cursor);
-    // Hostile shape: the empty key vanishes from the path string and the
-    // literal key "a.b" supplies the rest — same string, same depth (2).
+    // Hostile shape that collides under string equality (same serialized
+    // string, same depth): structural matching rejects it at level 1.
     ASSERT_TRUE(cursor.feed(R"({"":{"a.b":"decoy"}})", /*closed=*/true).ok());
-    EXPECT_EQ(h.captured(), "decoy;"); // collision: captured despite wrong structure
+    EXPECT_EQ(h.captured(), ""); // decoy not captured; hole closed
   }
 }
 

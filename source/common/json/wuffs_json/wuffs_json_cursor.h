@@ -7,6 +7,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 
 // Wuffs JSON tokenizer — declarations only.
 // WUFFS_IMPLEMENTATION is defined in exactly one translation unit: wuffs_impl.c.
@@ -66,8 +67,9 @@ namespace Wuffs {
 // Path tracking
 //
 // With track_paths=true, call from any callback:
-//   buildIndexedPath(depth) → "messages[0].role"
-//   buildPatternPath(depth) → "messages[].role"
+//   matchesPatternPath(segments, depth) → bool     structural spec match (routing)
+//   buildIndexedPath(depth) → "messages[0].role"   diagnostics only
+//   buildPatternPath(depth) → "messages[].role"    diagnostics only
 //
 class WuffsJsonCursor {
 public:
@@ -185,15 +187,18 @@ public:
     // the parent is an array or this is the root container.
     // `token_start` is the byte offset of the opening { or [ in the body stream.
     //
-    // PATH TRACKING NOTE — call buildPatternPath(depth-1), NOT buildPatternPath(depth):
+    // PATH TRACKING NOTE — use depth-1, NOT depth, from this callback:
     // At the time this callback fires, key_stack_[depth] is not yet populated
-    // (no keys have been seen inside the new container). buildPatternPath(depth-1)
-    // gives the enclosing container's path, which combined with `key` identifies
-    // this container unambiguously.
+    // (no keys have been seen inside the new container). The enclosing chain at
+    // depth-1, combined with `key`, identifies this container unambiguously.
+    // This applies to matchesPatternPath and buildPatternPath alike: to match a
+    // container spec like "messages[]", match the first depth-1 segments with
+    // matchesPatternPath(segments.first(depth-1), depth-1) and compare the last
+    // segment against `key` / is_dict yourself.
     // Example: onContainerOpen(key="parameters", is_dict=true, depth=5)
     //   buildPatternPath(4) → "tools[].function.parameters"  ← correct
     //   buildPatternPath(5) → "tools[].function.<stale>"     ← wrong
-    // TODO(tyxia): add buildContainerPatternPath(key, is_dict, depth)
+    // TODO(tyxia): add matchesContainerPatternPath(segments, key, is_dict, depth)
     //   convenience wrapper that hides this depth-1 subtlety.
     virtual void onContainerOpen(absl::string_view key, bool is_dict, int depth,
                                  size_t token_start) = 0;
@@ -214,24 +219,45 @@ public:
   // Returns non-OK on malformed JSON or internal allocation failure.
   absl::Status feed(absl::string_view chunk, bool closed);
 
-  // Build dot-notation path strings for the field currently being selected.
-  // Return a dot-notation path string for the current cursor position.
+  // Diagnostic path serialization for the current cursor position.
   // Must only be called from within a Handler callback while feed() is active.
   // Requires track_paths=true at construction.
   //
   // Labels are concatenated without escaping, so the output is not injective:
   // document keys containing '.', '[', ']' — or empty keys, which contribute
   // nothing when leading — let distinct positions serialize identically.
-  // Consumers matching against config must compare structurally per level,
-  // not by string equality (see extract_field_spec.h).
+  // These strings are for diagnostics/logging only; extraction routing must
+  // use matchesPatternPath() below, which has no such ambiguity.
   std::string buildIndexedPath(int depth) const; // e.g. "messages[0].role"
   std::string buildPatternPath(int depth) const; // e.g. "messages[].role"
+
+  // One level of a structural pattern-path match: a dict key or an array
+  // wildcard. `key` is ignored when is_array_element is true and must outlive
+  // the matchesPatternPath() call.
+  struct PatternSegment {
+    absl::string_view key;
+    bool is_array_element{false};
+  };
+
+  // True iff the root-to-here chain at `depth` matches `segments` exactly —
+  // one segment per level, dict labels compared as whole strings, array
+  // levels matching the wildcard regardless of index.
+  //
+  // This is the collision-free routing primitive: unlike comparing
+  // buildPatternPath() output against a config string, a document key
+  // containing '.', '[', ']' — or an empty key — can never masquerade as
+  // nested structure, because no serialization is involved: each document
+  // label is compared atomically against exactly one segment.
+  // Zero allocations; O(depth) string_view compares with early exit.
+  // Must only be called from within a Handler callback while feed() is
+  // active. Requires track_paths=true at construction.
+  bool matchesPatternPath(absl::Span<const PatternSegment> segments, int depth) const;
 
   // Monotonically increasing byte offset of the next source byte to be consumed.
   // Matches the token_start / token_end values delivered to onContainerOpen / onContainerClose.
   // Bytes buffered in pending_bytes_ (at most kMaxPendingBytes) are not yet counted.
   // TODO(tyxia): the outer filter should check nextSourcePosition() + chunk.size()
-  // against DecoderConfig::max_body_bytes before each feed() call and return
+  // against ParserConfig::max_body_bytes before each feed() call and return
   // ResourceExhausted instead of feeding, rejecting an oversized chunk unparsed.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
@@ -286,7 +312,7 @@ private:
   //                   push_key_[kMaxTrackedDepth] is accessible when depth_
   //                   reaches kMaxTrackedDepth.
   //                   Only maintained when track_paths_=true (used by
-  //                   buildIndexedPath/buildPatternPath).
+  //                   matchesPatternPath/buildIndexedPath/buildPatternPath).
   // array_index_[d] — count of elements already completed at array depth d;
   //                   reset to 0 on container open, incremented after each
   //                   completed element (container close, scalar, or string value)
@@ -308,17 +334,17 @@ private:
   // buffer. Empty between feed() calls when no token straddles a boundary.
   std::string pending_bytes_;
 
-  // TODO(tyxia): Implement Handler : Handler that accepts DecoderConfig (max_body_bytes,
-  // max_inline_bytes, max_element_capture_bytes) and a list of ExtractFieldSpec; routes callbacks
-  // by matching buildPatternPath(depth) / buildPatternPath(depth-1) at onContainerOpen against
-  // specs and records element byte ranges.
+  // TODO(tyxia): Implement the production Handler that accepts ParserConfig (max_body_bytes,
+  // max_inline_bytes, max_element_capture_bytes) and a list of ExtractFieldSpec; converts each
+  // spec's segments to PatternSegment once at init and routes callbacks with
+  // matchesPatternPath(segments, depth) — depth-1 plus `key` at onContainerOpen (see the note
+  // there) — recording element byte ranges for container specs.
   //
-  // Implements the three-tier body-size logic (full capture semantic-only / reject).
-  // Implement a utility to parse ExtractFieldSpec path strings
-  // ("messages[].content[].text") into a normalized form directly comparable with
-  // buildPatternPath() output. At filter init, derive the max_depth constructor argument from the
-  // deepest ExtractFieldSpec path rather than the static default, tightening the DoS bound to
-  // exactly what the policy requires.
+  // Implements the three-tier body-size logic (full capture / semantic-only / reject).
+  // At filter init, derive the max_depth constructor argument from
+  // ParserConfig::requiredMaxDepth() rather than the static default, tightening the DoS bound
+  // to exactly what the policy requires (the spec-parsing utility already exists:
+  // parseExtractFieldSpec in extract_field_spec.h).
   bool string_is_key_{false};
   bool string_capturing_{false};    // openStringCapture returned true for current value string
   bool string_chunk_active_{false}; // onStringChunk hasn't returned false yet

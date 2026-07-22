@@ -11,20 +11,19 @@ namespace Envoy {
 namespace Json {
 namespace Wuffs {
 
-// Describes one field to extract from the JSON body.
-//
-// Path syntax exactly mirrors buildPatternPath() output — dict keys separated by
-// '.', with '[]' for array wildcards (no '.' precedes '[]'):
+// Describes the fields to extract from the JSON body.
+// For example:
 //   "model"                       depth=1, scalar under root object
 //   "messages[]"                  depth=2, every element of the messages array
 //   "messages[].role"             depth=3, the role field inside each element
 //   "params._meta.traceparent"    depth=3, nested dict scalar
 //   "messages[].content[]"        depth=4, inner array element
 //
-// depth() returns the number of segments, which equals the JSON nesting depth of
-// the target field. DecoderConfig::requiredMaxDepth() aggregates these so filter
+// depth() returns the the JSON nesting depth of the target field.
+// ParserConfig::requiredMaxDepth() aggregates these so filter
 // init can tighten the cursor's DoS depth bound to exactly what the policy
-// requires. TODO(tyxia): that needs a max_depth cursor constructor argument,
+// requires.
+// TODO(tyxia): that needs a max_depth cursor constructor argument,
 // which does not exist yet — the cursor is fixed at its compile-time
 // kMaxTrackedDepth bound.
 struct ExtractFieldSpec {
@@ -37,26 +36,34 @@ struct ExtractFieldSpec {
   std::string path;              // raw path string (kept for diagnostics)
   std::vector<Segment> segments; // parsed representation
 
-  // Number of path segments = nesting depth of the target field.
+  // Number of path segments (i.e., nesting depth of the target field)
   int depth() const { return static_cast<int>(segments.size()); }
 
-  // Reconstructs the canonical pattern-path string from segments, matching
-  // buildPatternPath() output exactly. Useful for comparison at runtime.
+  // Reconstructs the canonical pattern-path string from segments (same format
+  // as buildPatternPath() output). Diagnostics and config echo only — runtime
+  // routing must match `segments` structurally via
+  // WuffsJsonCursor::matchesPatternPath() (see extract_fields below).
   std::string canonicalPath() const;
 };
 
-// Parses a dot-notation path string into an ExtractFieldSpec.
+// Parses and convert the path string from config into a valid and structured
+// ExtractFieldSpec.
 // Returns InvalidArgumentError when the path is empty or malformed
 // (leading/trailing/double '.', unmatched '['/']', non-empty subscript
-// content such as '[0]', or '.' immediately before '[').
+// content such as '[0]', '.' immediately before '[', or a key starting
+// directly after ']' without a '.' separator).
+// When max_depth > 0, also rejects paths with more than max_depth segments —
+// pass the cursor's depth bound (kMaxTrackedDepth - 1) so a spec that the
+// cursor could never match is refused at config load instead of silently
+// matching nothing at runtime. 0 = no depth check.
 // On success, result.path == path and result.segments is populated.
-absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path);
+absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, int max_depth = 0);
 
 // Configuration that controls JSON decoding.
 //
 // Intended usage at filter init, once the cursor grows a max_depth constructor
-// argument (TODO(tyxia) in wuffs_json_cursor.h — not implemented yet):
-//   DecoderConfig cfg = ...;    // populate from proto
+// argument.
+//   ParserConfig cfg = ...;    // populate from proto
 //   int depth = cfg.requiredMaxDepth();
 //   WuffsJsonCursor cursor(handler, track_paths,
 //                          depth > 0 ? depth : /*cursor compile-time default*/);
@@ -65,7 +72,7 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path);
 // inter-field invariants that are currently implicit: max_body_bytes > 0 in
 // production, and max_inline_bytes / max_element_capture_bytes not exceeding
 // max_body_bytes when non-zero.
-struct DecoderConfig {
+struct ParserConfig {
   // Maximum raw body bytes to feed into the cursor. The outer filter should
   // check cursor.nextSourcePosition() + chunk.size() against this limit before
   // each feed() call and return ResourceExhausted instead of feeding, so an
@@ -86,18 +93,20 @@ struct DecoderConfig {
   // 0 = no per-element limit.
   size_t max_element_capture_bytes{0};
 
-  // Operator-declared JSON fields to extract from the body. The handler
-  // matches buildPatternPath() output against spec.canonicalPath() at each
-  // callback to route extraction.
+  // Operator-declared JSON fields to extract from the body.
   //
-  // TODO(tyxia): plain string equality is not collision-free. Document keys
-  // may contain '.', '[', ']' or be empty ("" is a legal JSON key), letting a
-  // hostile body synthesize the same (string, depth) pair as a legitimately
-  // nested field — e.g. {"":{"a.b":"decoy"}} collides with spec "a.b" meaning
-  // {"a":{"b":...}} (see StringEqualityCollidesOnHostileKeys in
-  // extract_field_spec_test.cc). The production handler must match
-  // spec.segments structurally (label by label) or enforce key hygiene,
-  // not trust the serialized string.
+  // The handler routes extraction by STRUCTURAL matching: convert each spec's
+  // segments to WuffsJsonCursor::PatternSegment once at init, then call
+  // cursor.matchesPatternPath(segments, depth) at each callback (see
+  // SpecMatchingHandler in extract_field_spec_test.cc for the template).
+  //
+  // Do NOT route by comparing serialized strings (buildPatternPath() ==
+  // canonicalPath()): that is not collision-free — document keys may contain
+  // '.', '[', ']' or be empty ("" is a legal JSON key), letting a hostile
+  // body synthesize the same (string, depth) pair as a legitimately nested
+  // field, e.g. {"":{"a.b":"decoy"}} vs spec "a.b" meaning {"a":{"b":...}}
+  // (see StructuralMatchTest.RejectsHostileKeyCollision). The string forms
+  // are diagnostics-only.
   std::vector<ExtractFieldSpec> extract_fields;
 
   // Returns the minimum cursor max_depth needed to reach all declared fields.
