@@ -85,6 +85,16 @@ bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::empty() const {
   return active_pools_.empty();
 }
 
+template <typename KEY_TYPE, typename POOL_TYPE>
+bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::hasReadyConnection() const {
+  for (const auto& pool_pair : active_pools_) {
+    if (pool_pair.second->hasReadyConnection()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL_TYPE>::clear() {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {

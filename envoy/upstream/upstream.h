@@ -354,6 +354,23 @@ public:
    * 0 if no response has been recorded.
    */
   virtual std::optional<uint64_t> lastHealthCheckHttpStatus() const PURE;
+
+  /**
+   * @return number of consecutive connection failures while an eager preconnect floor is
+   * configured. Used to pause floor maintenance for an unreachable host. Stored on the Host so it
+   * survives per-worker connection-pool teardown and recreation.
+   */
+  virtual uint32_t consecutiveEagerPreconnectFloorFailures() const PURE;
+
+  /**
+   * Increment consecutive eager-preconnect-floor connection failures.
+   */
+  virtual void incConsecutiveEagerPreconnectFloorFailures() const PURE;
+
+  /**
+   * Reset consecutive eager-preconnect-floor connection failures.
+   */
+  virtual void resetConsecutiveEagerPreconnectFloorFailures() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -736,6 +753,8 @@ public:
   COUNTER(original_dst_host_invalid)                                                               \
   COUNTER(retry_or_shadow_abandoned)                                                               \
   COUNTER(upstream_cx_close_notify)                                                                \
+  COUNTER(upstream_cx_lb_selected_warm)                                                            \
+  COUNTER(upstream_cx_lb_selected_cold)                                                            \
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
   COUNTER(upstream_cx_connect_timeout)                                                             \
@@ -755,6 +774,9 @@ public:
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \
   COUNTER(upstream_cx_pool_overflow)                                                               \
+  COUNTER(upstream_cx_preconnect_blocked)                                                          \
+  COUNTER(upstream_cx_preconnect_skipped)                                                          \
+  COUNTER(upstream_cx_preconnect_started)                                                          \
   COUNTER(upstream_cx_protocol_error)                                                              \
   COUNTER(upstream_cx_rx_bytes_total)                                                              \
   COUNTER(upstream_cx_total)                                                                       \
@@ -1076,6 +1098,42 @@ public:
    * @return how many streams should be anticipated per each current stream.
    */
   virtual float peekaheadRatio() const PURE;
+
+  /**
+   * @param host the upstream host being considered for a preconnect.
+   * @return whether anticipatory connections may be opened to the host, per the cluster's
+   * preconnect_enabled_metadata matcher. Does not affect on-demand connections for requests.
+   */
+  virtual bool shouldPreconnect(const Host& host) const PURE;
+
+  /**
+   * @return the eager preconnect floor: the minimum number of connections to maintain per healthy
+   * upstream host. When non-zero, Envoy proactively opens new connections and refills closed ones
+   * so that the floor of connections exists regardless of requests.
+   */
+  virtual uint32_t eagerPreconnectFloor() const PURE;
+
+  /**
+   * @return true if connection-aware load balancing is enabled. When enabled, host selection
+   * prefers hosts that already have at least one established connection on the current worker
+   * thread.
+   */
+  virtual bool connectionAwareLoadBalancingEnabled() const PURE;
+
+  /**
+   * @return the maximum number of times to reattempt host selection in order to find a host with a
+   * ready connection. Each reattempt also primes the rejected cold host when eagerPreconnectFloor()
+   * is set. Only used when connectionAwareLoadBalancingEnabled() is true. Defaults to 2.
+   */
+  virtual uint32_t connectionAwareLbHostSelectionRetryMaxAttempts() const PURE;
+
+  /**
+   * @return number of consecutive connection failures to a host, after which eager-preconnect-floor
+   * maintenance for that host is paused. The pause clears as soon as one connection establishes,
+   * typically driven by on-demand request traffic. Only used when eagerPreconnectFloor() is set.
+   * Defaults to 3.
+   */
+  virtual uint32_t eagerPreconnectFloorFailureThreshold() const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.

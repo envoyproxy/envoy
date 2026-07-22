@@ -14,6 +14,7 @@ import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/core/v3/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
 import "envoy/config/metrics/v3/stats.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -47,7 +48,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 62]
+// [#next-free-field: 63]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -754,6 +755,34 @@ message Cluster {
     // harm latency more than the preconnecting helps.
     google.protobuf.DoubleValue predictive_preconnect_ratio = 2
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
+
+    // Restricts anticipatory connections to hosts whose endpoint metadata matches this matcher.
+    // Non-matching hosts are never preconnected, and instead get connections only on demand, as they
+    // serve real requests. If unset, all healthy hosts are eligible.
+    type.matcher.v3.MetadataMatcher preconnect_enabled_metadata = 3;
+
+    // Minimum number of connections to maintain per healthy upstream host. When non-zero,
+    // Envoy proactively opens new connections and refills closed ones so that the floor of connections
+    // exists regardless of requests.
+    google.protobuf.UInt32Value eager_preconnect_floor = 4;
+
+    // Number of consecutive connection failures to a host, after which floor maintenance for that
+    // host is paused. The pause clears as soon as one connection establishes, typically driven by
+    // on-demand request traffic. Only used when ``eager_preconnect_floor`` is set.
+    // Defaults to 3.
+    google.protobuf.UInt32Value eager_preconnect_floor_failure_threshold = 5
+        [(validate.rules).uint32 = {gte: 1}];
+  }
+
+  // Configuration for connection-aware load balancing. When this field is set, host selection
+  // prefers hosts that already have at least one established upstream connection on
+  // the current worker thread. Most useful in combination with
+  // ``preconnect_policy.eager_preconnect_floor``, which proactively opens connections.
+  message ConnectionAwareLbConfig {
+    // The maximum number of times to reattempt host selection in order to find a host with a ready
+    // connection. Each reattempt also primes the rejected cold host when
+    // ``preconnect_policy.eager_preconnect_floor`` is enabled. Defaults to 2.
+    google.protobuf.UInt32Value host_selection_retry_max_attempts = 1;
   }
 
   reserved 12, 15, 7, 11, 35;
@@ -1310,6 +1339,10 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // Configuration for connection-aware load balancing. See ``ConnectionAwareLbConfig``
+  // for details.
+  ConnectionAwareLbConfig connection_aware_load_balancing = 62;
 }
 
 // Extensible load balancing policy configuration.
