@@ -518,6 +518,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithEscapedQueryParamKey) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithHeaderCookiesParams) {
+  makeFilter();
   request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
   Buffer::OwnedImpl request_body(
       R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test","pageSize":1,"header":"header_value","cookie":"cookie_value","header_2":"header_2_value","cookie_2":"cookie_2_value"}}})json");
@@ -544,6 +545,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithHeaderCookiesParams) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithHeaderOnlyParams) {
+  makeFilter();
   request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
   // Only header arguments are present, no cookie arguments.
   Buffer::OwnedImpl request_body(
@@ -569,6 +571,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithHeaderOnlyParams) {
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithCookieOnlyParams) {
+  makeFilter();
   request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
   // Only cookie arguments are present, no header arguments.
   Buffer::OwnedImpl request_body(
