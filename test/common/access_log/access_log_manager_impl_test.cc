@@ -8,6 +8,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
@@ -15,11 +16,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::ByMove;
 using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
@@ -74,11 +77,11 @@ protected:
 TEST_F(AccessLogManagerImplTest, BadFile) {
   EXPECT_CALL(*file_, open_(_))
       .WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, -1))));
-  EXPECT_FALSE(
+  EXPECT_THAT(
       access_log_manager_
           .createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})
-          .status()
-          .ok());
+          .status(),
+      Not(IsOk()));
 }
 
 TEST_F(AccessLogManagerImplTest, OpenFileWithRightFlags) {
