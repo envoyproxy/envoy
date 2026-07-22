@@ -8,6 +8,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/protobuf/utility.h"
@@ -26,6 +27,11 @@ void rebuildRouteConfigVirtualHosts(
     envoy::config::route::v3::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
   for (const auto& vhost : rds_vhosts) {
+    if (vhds_vhosts.contains(vhost.first)) {
+      ENVOY_LOG_MISC(debug, "VHDS virtual host '{}' overrides RDS virtual host with the same name",
+                     vhost.first);
+      continue;
+    }
     route_config.mutable_virtual_hosts()->Add()->CheckTypeAndMergeFrom(vhost.second);
   }
   for (const auto& vhost : vhds_vhosts) {
