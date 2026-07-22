@@ -10712,6 +10712,40 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes is called by the module
+ * to set the bytes value of the request's filter state with the given key. This lets a
+ * dynamic-module cluster publish a value that a later filter, the access log, or another producer
+ * reads back on the same request (stored as a ``Router::StringAccessor``). If the filter state is
+ * not accessible, this returns false. If the key does not exist, it will be created. The value is
+ * stored with FilterChain life span so it is available at access-log flush on the same request.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
+ * @return true if the operation is successful, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed is called by the module
+ * to set the typed filter state with the given key. Unlike set_filter_state_bytes which stores a
+ * raw ``Router::StringAccessor``, this uses the registered ``ObjectFactory`` for the key to create
+ * a properly typed filter state object via ``createFromBytes``, so a built-in Envoy filter that
+ * reads the key as a typed object can consume it. The value is stored with FilterChain life span.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if the request has no stream info, no
+ * ObjectFactory is registered for the key, or the factory fails to create the object.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_context_get_host_stat returns the value of a per-host
  * stat identified by the stat enum for the given host pointer. The module must ensure
  * host_envoy_ptr still belongs to the cluster's host set.
@@ -10725,6 +10759,40 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
     envoy_dynamic_module_type_host_stat stat);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number sets the number
+ * value of the request's dynamic metadata under the given namespace and key, overwriting any
+ * existing value. This lets a dynamic-module cluster annotate the current request so the value is
+ * observable in the access log via %DYNAMIC_METADATA(namespace:key)%.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the number value to set.
+ * @return true if the value was set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string sets the string
+ * value of the request's dynamic metadata under the given namespace and key, overwriting any
+ * existing value. This lets a dynamic-module cluster annotate the current request so the value is
+ * observable in the access log via %DYNAMIC_METADATA(namespace:key)%.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the string value to set.
+ * @return true if the value was set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
@@ -13859,6 +13927,115 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     char* name_buffer, size_t name_buffer_capacity, size_t* name_size, char* value_buffer,
     size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name writes the
+ * tag-extracted name of a counter at the given index. The tag-extracted name is the stat name with
+ * the tag values removed (for example "cluster.foo.bar" with a "cluster_name" tag extracted becomes
+ * "cluster.bar"), so a module can reconstruct the same name and labels that Envoy's built-in stat
+ * formatters produce. Pair this with the tag callbacks below.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param name_buffer is the module-owned buffer that receives the tag-extracted name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name, with the same truncation contract as the
+ *        name callbacks above. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count returns the number of
+ * tags on the counter at the given index.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param tag_count is set to the number of tags on the counter. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, tag_count is not written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag writes the name and value of a
+ * single tag on the counter at the given index into module-provided buffers.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param tag_index is the index of the tag (0-based, less than the count reported by
+ *        envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count).
+ * @param name_buffer is the module-owned buffer that receives the tag name. No null terminator is
+ *        written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the tag name, with the same truncation contract as
+ *        the name callbacks above. Must not be null.
+ * @param value_buffer is the module-owned buffer that receives the tag value. No null terminator is
+ *        written. May be null only if value_buffer_capacity is 0.
+ * @param value_buffer_capacity is the capacity of value_buffer in bytes.
+ * @param value_size is set to the full length of the tag value, with the same truncation contract.
+ *        Must not be null.
+ * @return true if both index and tag_index are valid, false otherwise. When false, no outputs are
+ *         written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name is the gauge
+ * counterpart of the counter tag-extracted-name callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count is the gauge counterpart of
+ * the counter tag-count callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag is the gauge counterpart of the
+ * counter tag callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name is the text
+ * readout counterpart of the counter tag-extracted-name callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count is the text readout
+ * counterpart of the counter tag-count callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag is the text readout
+ * counterpart of the counter tag callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
 
 /**
  * envoy_dynamic_module_callback_stat_sink_config_define_gauge creates a gauge with the given name

@@ -49,9 +49,9 @@ bool isApiNameValid(absl::string_view api_name) {
 
 } // namespace
 
-MatchTreeHttpMatchingDataSharedPtr
-ProtoApiScrubberFilterConfig::getOrCreateMatcher(const xds::type::matcher::v3::Matcher& matcher,
-                                                 Server::Configuration::FactoryContext& context) {
+MatchTreeHttpMatchingDataSharedPtr ProtoApiScrubberFilterConfig::getOrCreateMatcher(
+    const xds::type::matcher::v3::Matcher& matcher,
+    Server::Configuration::ServerFactoryContext& context) {
   // Use MessageUtil::hash for deterministic key generation.
   uint64_t key = MessageUtil::hash(matcher);
 
@@ -63,7 +63,7 @@ ProtoApiScrubberFilterConfig::getOrCreateMatcher(const xds::type::matcher::v3::M
   ProtoApiScrubberRemoveFieldAction remove_field_action;
   MatcherInputValidatorVisitor validation_visitor;
   Matcher::MatchTreeFactory<HttpMatchingData, ProtoApiScrubberRemoveFieldAction> matcher_factory(
-      remove_field_action, context.serverFactoryContext(), validation_visitor);
+      remove_field_action, context, validation_visitor);
   Matcher::MatchTreeFactoryCb<HttpMatchingData> match_tree_factory_cb =
       matcher_factory.create(matcher);
 
@@ -78,11 +78,12 @@ ProtoApiScrubberFilterConfig::getOrCreateMatcher(const xds::type::matcher::v3::M
 
 absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
 ProtoApiScrubberFilterConfig::create(const ProtoApiScrubberConfig& proto_config,
-                                     Server::Configuration::FactoryContext& context) {
-  ProtoApiScrubberStats stats(context.scope(), "proto_api_scrubber.");
+                                     Server::Configuration::ServerFactoryContext& context,
+                                     Stats::Scope& scope) {
+  ProtoApiScrubberStats stats(scope, "proto_api_scrubber.");
   std::shared_ptr<ProtoApiScrubberFilterConfig> filter_config_ptr =
       std::shared_ptr<ProtoApiScrubberFilterConfig>(
-          new ProtoApiScrubberFilterConfig(stats, context.serverFactoryContext().timeSource()));
+          new ProtoApiScrubberFilterConfig(stats, context.timeSource()));
 
   RETURN_IF_ERROR(filter_config_ptr->initialize(proto_config, context));
   return filter_config_ptr;
@@ -90,7 +91,7 @@ ProtoApiScrubberFilterConfig::create(const ProtoApiScrubberConfig& proto_config,
 
 absl::Status
 ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_config,
-                                         Server::Configuration::FactoryContext& context) {
+                                         Server::Configuration::ServerFactoryContext& context) {
   ENVOY_LOG(trace, "Initializing filter config from the proto config: {}",
             proto_config.DebugString());
 
@@ -103,8 +104,8 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   scrub_unknown_fields_ = proto_config.scrub_unknown_fields();
 
   // Initialize proto descriptor pool.
-  absl::StatusOr<Envoy::Protobuf::FileDescriptorSet> descriptor_set_or_error = loadDescriptorSet(
-      context.serverFactoryContext().api(), proto_config.descriptor_set().data_source());
+  absl::StatusOr<Envoy::Protobuf::FileDescriptorSet> descriptor_set_or_error =
+      loadDescriptorSet(context.api(), proto_config.descriptor_set().data_source());
   RETURN_IF_ERROR(descriptor_set_or_error.status());
 
   if (proto_config.has_restrictions()) {
@@ -140,7 +141,7 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
 
 absl::Status ProtoApiScrubberFilterConfig::initializeMethodLevelRestrictions(
     absl::string_view method_name, const MethodRestrictions& method_config,
-    Envoy::Server::Configuration::FactoryContext& context) {
+    Envoy::Server::Configuration::ServerFactoryContext& context) {
   if (method_config.has_method_restriction()) {
     method_level_restrictions_[method_name] =
         getOrCreateMatcher(method_config.method_restriction().matcher(), context);
@@ -150,7 +151,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodLevelRestrictions(
 
 absl::Status ProtoApiScrubberFilterConfig::initializeMessageRestrictions(
     const Map<std::string, MessageRestrictions>& message_configs,
-    Envoy::Server::Configuration::FactoryContext& context) {
+    Envoy::Server::Configuration::ServerFactoryContext& context) {
   for (const auto& pair : message_configs) {
     const std::string& message_name = pair.first;
     const auto& message_config = pair.second;
@@ -318,7 +319,7 @@ absl::Status ProtoApiScrubberFilterConfig::validateFieldMask(absl::string_view f
 absl::Status ProtoApiScrubberFilterConfig::initializeMethodFieldRestrictions(
     absl::string_view method_name, StringPairToMatchTreeMap& field_restrictions,
     const Map<std::string, RestrictionConfig>& restrictions,
-    Envoy::Server::Configuration::FactoryContext& context) {
+    Envoy::Server::Configuration::ServerFactoryContext& context) {
   for (const auto& restriction : restrictions) {
     absl::string_view field_mask = restriction.first;
     RETURN_IF_ERROR(validateFieldMask(field_mask));

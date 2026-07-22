@@ -53,7 +53,7 @@ DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandleP
 
 namespace {
 
-DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
+absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
     OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> odcds_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (!odcds_config.has_value()) {
@@ -69,11 +69,12 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
     // For xDS-TP based configs, both the odcds_config->source and
     // odcds_config->resources_locator must be empty.
     if (!odcds_config->has_source() && odcds_config->resources_locator().empty()) {
-      odcds = THROW_OR_RETURN_VALUE(
+      auto odcds_or =
           cm.allocateOdCdsApi(Upstream::withClusterIdleTimeout(&Upstream::XdstpOdCdsApiImpl::create,
                                                                cluster_idle_timeout),
-                              odcds_config->source(), std::nullopt, validation_visitor),
-          Upstream::OdCdsApiHandlePtr);
+                              odcds_config->source(), std::nullopt, validation_visitor);
+      RETURN_IF_NOT_OK_REF(odcds_or.status());
+      odcds = std::move(odcds_or.value());
     }
   }
   // TODO(adisuissa): Once the
@@ -87,29 +88,29 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_over_ads_fix")) {
         if (odcds_config->source().config_source_specifier_case() ==
             envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
-          odcds = THROW_OR_RETURN_VALUE(
+          auto odcds_or =
               cm.allocateOdCdsApi(Upstream::withClusterIdleTimeout(
                                       &Upstream::XdstpOdCdsApiImpl::create, cluster_idle_timeout),
-                                  odcds_config->source(), std::nullopt, validation_visitor),
-              Upstream::OdCdsApiHandlePtr);
+                                  odcds_config->source(), std::nullopt, validation_visitor);
+          RETURN_IF_NOT_OK_REF(odcds_or.status());
+          odcds = std::move(odcds_or.value());
         }
       }
       if (odcds == nullptr) {
-        odcds = THROW_OR_RETURN_VALUE(
-            cm.allocateOdCdsApi(Upstream::withClusterIdleTimeout(&Upstream::OdCdsApiImpl::create,
-                                                                 cluster_idle_timeout),
-                                odcds_config->source(), std::nullopt, validation_visitor),
-            Upstream::OdCdsApiHandlePtr);
+        auto odcds_or = cm.allocateOdCdsApi(
+            Upstream::withClusterIdleTimeout(&Upstream::OdCdsApiImpl::create, cluster_idle_timeout),
+            odcds_config->source(), std::nullopt, validation_visitor);
+        RETURN_IF_NOT_OK_REF(odcds_or.status());
+        odcds = std::move(odcds_or.value());
       }
     } else {
-      auto locator = THROW_OR_RETURN_VALUE(
-          Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
-          xds::core::v3::ResourceLocator);
-      odcds = THROW_OR_RETURN_VALUE(
-          cm.allocateOdCdsApi(Upstream::withClusterIdleTimeout(&Upstream::OdCdsApiImpl::create,
-                                                               cluster_idle_timeout),
-                              odcds_config->source(), locator, validation_visitor),
-          Upstream::OdCdsApiHandlePtr);
+      auto locator_or = Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator());
+      RETURN_IF_NOT_OK_REF(locator_or.status());
+      auto odcds_or = cm.allocateOdCdsApi(
+          Upstream::withClusterIdleTimeout(&Upstream::OdCdsApiImpl::create, cluster_idle_timeout),
+          odcds_config->source(), locator_or.value(), validation_visitor);
+      RETURN_IF_NOT_OK_REF(odcds_or.status());
+      odcds = std::move(odcds_or.value());
     }
   }
   // If changing the default timeout, please update the documentation in on_demand.proto too.
@@ -134,15 +135,23 @@ OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(
-          createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)) {}
+    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+    absl::Status& creation_status) {
+  auto behavior_or =
+      createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
+  SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
+  behavior_ = std::move(behavior_or.value());
+}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(
-          createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)) {}
+    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+    absl::Status& creation_status) {
+  auto behavior_or =
+      createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
+  SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
+  behavior_ = std::move(behavior_or.value());
+}
 
 OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
     : config_(std::move(config)) {
