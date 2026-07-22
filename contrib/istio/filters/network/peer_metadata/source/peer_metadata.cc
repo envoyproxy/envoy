@@ -114,19 +114,14 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& buffer, bool) {
     // no peer metadata available, we can give up waiting for it.
     ASSERT(read_callbacks_);
     std::optional<Envoy::Protobuf::Any> peer_metadata = discoverPeerMetadata();
-    std::optional<std::string> registry_key =
-        getRegistryKey(*read_callbacks_->connection().streamInfo().filterState());
-    if (!registry_key) {
-      // Legacy fallback: push the peer metadata (or an empty marker) into the
-      // data stream.
+    // Default: hand off via the thread-local registry. Otherwise we fallback
+    // to "byte stream data".
+    if (!storeInRegistry(peer_metadata)) {
       if (peer_metadata) {
         propagatePeerMetadata(*peer_metadata);
       } else {
         propagateNoPeerMetadata();
       }
-    } else if (peer_metadata) {
-      // Default: hand off via the thread-local registry.
-      storeInRegistry(*registry_key, *peer_metadata);
     }
     state_ = PeerMetadataState::PassThrough;
     break;
@@ -212,13 +207,21 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
   return wrapped;
 }
 
-void Filter::storeInRegistry(absl::string_view key, const Envoy::Protobuf::Any& peer_metadata) {
+bool Filter::storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata) {
+  ASSERT(read_callbacks_);
+  std::optional<std::string> key =
+      getRegistryKey(*read_callbacks_->connection().streamInfo().filterState());
+  if (!key) {
+    return false;
+  }
   if (registry_ == nullptr) {
     ENVOY_LOG(debug, "No instance for registry");
-    return;
+    return false;
   }
-  std::string serialized = peer_metadata.SerializeAsString();
-  registry_->setValue(key, serialized);
+  if (peer_metadata) {
+    registry_->setValue(*key, peer_metadata->SerializeAsString());
+  }
+  return true;
 }
 
 void Filter::propagatePeerMetadata(const Envoy::Protobuf::Any& peer_metadata) {
@@ -263,23 +266,17 @@ Network::FilterStatus UpstreamFilter::onData(Buffer::Instance& buffer, bool end_
       state_ = PeerMetadataState::PassThrough;
       break;
     }
-    std::optional<std::string> registry_key =
-        getRegistryKey(*callbacks_->connection().streamInfo().filterState());
-    if (!registry_key) {
-      // Legacy fallback: parse and strip the peer metadata preamble from the
-      // data stream.
-      if (consumePeerMetadata(buffer, end_stream)) {
-        state_ = PeerMetadataState::PassThrough;
-      } else {
-        // Waiting for more data to complete the preamble.
-        return Network::FilterStatus::StopIteration;
-      }
-    } else if (tryRegistryLookup(*registry_key)) {
+    // Default: look up peer metadata handed off via the thread-local registry.
+    // When the registry hand-off is unavailable (no downstream connection ID in
+    // filter state), fall back to parsing and stripping the peer metadata
+    // preamble from the data stream.
+    if (tryRegistryLookup()) {
+      state_ = PeerMetadataState::PassThrough;
+    } else if (consumePeerMetadata(buffer, end_stream)) {
       state_ = PeerMetadataState::PassThrough;
     } else {
-      ENVOY_LOG(trace, "No peer metadata available in registry");
-      populateNoPeerMetadata();
-      state_ = PeerMetadataState::PassThrough;
+      // Waiting for more data to complete the preamble.
+      return Network::FilterStatus::StopIteration;
     }
     break;
   }
@@ -341,35 +338,25 @@ bool UpstreamFilter::disableDiscovery() const {
   return false;
 }
 
-bool UpstreamFilter::tryRegistryLookup(absl::string_view key) {
+bool UpstreamFilter::tryRegistryLookup() {
+  ASSERT(callbacks_);
+  std::optional<std::string> key =
+      getRegistryKey(*callbacks_->connection().streamInfo().filterState());
+  if (!key) {
+    return false;
+  }
   if (registry_ == nullptr) {
+    ENVOY_LOG(debug, "No instance for registry");
     return false;
   }
-  auto value = registry_->getValue(key);
+  auto value = registry_->getValue(*key);
   if (!value.has_value()) {
-    ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", key);
-    return false;
-  }
-
-  registry_->removeValue(key);
-
-  Envoy::Protobuf::Any any;
-  if (!any.ParseFromString(*value)) {
-    ENVOY_LOG(error, "Failed to parse peer metadata from registry");
-    populateNoPeerMetadata();
+    ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", *key);
     return true;
   }
 
-  Envoy::Protobuf::Struct peer_metadata;
-  if (!any.UnpackTo(&peer_metadata)) {
-    ENVOY_LOG(error, "Failed to unpack peer metadata struct from registry");
-    populateNoPeerMetadata();
-    return true;
-  }
-
-  std::unique_ptr<::Istio::Common::WorkloadMetadataObject> workload =
-      ::Istio::Common::convertStructToWorkloadMetadata(peer_metadata);
-  populatePeerMetadata(*workload);
+  registry_->removeValue(*key);
+  populatePeerMetadataFromProto(*value);
   ENVOY_LOG(trace, "Successfully retrieved peer metadata from registry");
   return true;
 }
@@ -429,22 +416,7 @@ bool UpstreamFilter::consumePeerMetadata(Buffer::Instance& buffer, bool end_stre
   absl::string_view data{static_cast<const char*>(buffer.linearize(peer_metadata_size)),
                          peer_metadata_size};
   data = data.substr(sizeof(PeerMetadataHeader));
-  Envoy::Protobuf::Any any;
-  if (!any.ParseFromArray(data.data(), data.size())) {
-    ENVOY_LOG(trace, "Failed to parse peer metadata proto from the data stream");
-    populateNoPeerMetadata();
-    return true;
-  }
-
-  Envoy::Protobuf::Struct peer_metadata;
-  if (!any.UnpackTo(&peer_metadata)) {
-    ENVOY_LOG(trace, "Failed to unpack peer metadata struct");
-    populateNoPeerMetadata();
-    return true;
-  }
-
-  std::unique_ptr<WorkloadMetadataObject> workload = convertStructToWorkloadMetadata(peer_metadata);
-  populatePeerMetadata(*workload);
+  populatePeerMetadataFromProto(data);
   buffer.drain(peer_metadata_size);
   ENVOY_LOG(trace, "Successfully consumed peer metadata from the data stream");
   return true;
@@ -455,6 +427,26 @@ const CelStatePrototype& UpstreamFilter::peerInfoPrototype() {
       true, CelStateType::Protobuf, "type.googleapis.com/google.protobuf.Struct",
       StreamInfo::FilterState::LifeSpan::Connection);
   return *prototype;
+}
+
+void UpstreamFilter::populatePeerMetadataFromProto(absl::string_view serialized) {
+  Envoy::Protobuf::Any any;
+  if (!any.ParseFromArray(serialized.data(), serialized.size())) {
+    ENVOY_LOG(error, "Failed to parse peer metadata proto");
+    populateNoPeerMetadata();
+    return;
+  }
+
+  Envoy::Protobuf::Struct peer_metadata;
+  if (!any.UnpackTo(&peer_metadata)) {
+    ENVOY_LOG(error, "Failed to unpack peer metadata struct");
+    populateNoPeerMetadata();
+    return;
+  }
+
+  std::unique_ptr<::Istio::Common::WorkloadMetadataObject> workload =
+      ::Istio::Common::convertStructToWorkloadMetadata(peer_metadata);
+  populatePeerMetadata(*workload);
 }
 
 void UpstreamFilter::populatePeerMetadata(const ::Istio::Common::WorkloadMetadataObject& peer) {

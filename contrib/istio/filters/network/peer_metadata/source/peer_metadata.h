@@ -150,9 +150,11 @@ private:
   void populateBaggage();
   bool disableDiscovery() const;
   std::optional<Envoy::Protobuf::Any> discoverPeerMetadata();
-  // Store discovered peer metadata in the thread-local registry under the given
-  // key.
-  void storeInRegistry(absl::string_view key, const Envoy::Protobuf::Any& peer_metadata);
+  // Store discovered peer metadata in the thread-local registry, keyed by the
+  // downstream connection ID from filter state. Returns false when there is no
+  // connection ID in filter state (registry hand-off unavailable), so the caller
+  // can fall back to the data-stream approach.
+  bool storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata);
   // Legacy fallback: inject the peer metadata (or an empty marker) as a preamble
   // into the downstream data stream.
   void propagatePeerMetadata(const Envoy::Protobuf::Any& peer_metadata);
@@ -184,15 +186,21 @@ public:
 
 private:
   bool disableDiscovery() const;
-  // Look up peer metadata stored by the paired downstream filter under the given
-  // registry key.
-  bool tryRegistryLookup(absl::string_view key);
+  // Look up peer metadata stored by the paired downstream filter, keyed by this
+  // connection's ID from filter state. Returns false when there is no connection
+  // ID in filter state or the TLS registry is not allocated.
+  bool tryRegistryLookup();
   // Legacy fallback: parse and strip the peer metadata preamble from the
   // upstream data stream.
   bool consumePeerMetadata(Buffer::Instance& buffer, bool end_stream);
 
   static const CelStatePrototype& peerInfoPrototype();
 
+  // Parse serialized peer metadata (a serialized google.protobuf.Any wrapping a
+  // Struct), convert it to a WorkloadMetadataObject and populate filter state.
+  // On any parsing/unpacking failure, populates the no-peer-metadata marker
+  // instead.
+  void populatePeerMetadataFromProto(absl::string_view serialized);
   void populatePeerMetadata(const ::Istio::Common::WorkloadMetadataObject& peer);
   void populateNoPeerMetadata();
 
