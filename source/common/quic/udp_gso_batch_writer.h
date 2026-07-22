@@ -93,7 +93,6 @@ public:
   createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
                         Envoy::Event::Dispatcher& dispatcher,
                         absl::AnyInvocable<void() &&> on_can_write_cb) override;
-
 };
 
 } // namespace Quic

@@ -223,7 +223,9 @@ void StatsJsonRender::renderHistogramStart() {
   case Utility::HistogramBucketsMode::Detailed:
     json_->histogram_map2_ = json_->histogram_map1_->addMap();
     json_->histogram_map2_->addKey("supported_percentiles");
-    { populateSupportedPercentiles(*json_->histogram_map2_->addArray()); }
+    {
+      populateSupportedPercentiles(*json_->histogram_map2_->addArray());
+    }
     json_->histogram_map2_->addKey("details");
     json_->histogram_array_ = json_->histogram_map2_->addArray();
     break;
@@ -231,7 +233,9 @@ void StatsJsonRender::renderHistogramStart() {
   case Utility::HistogramBucketsMode::Summary:
     json_->histogram_map2_ = json_->histogram_map1_->addMap();
     json_->histogram_map2_->addKey("supported_quantiles");
-    { populateSupportedPercentiles(*json_->histogram_map2_->addArray()); }
+    {
+      populateSupportedPercentiles(*json_->histogram_map2_->addArray());
+    }
     json_->histogram_map2_->addKey("computed_quantiles");
     json_->histogram_array_ = json_->histogram_map2_->addArray();
     break;

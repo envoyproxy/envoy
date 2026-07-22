@@ -186,7 +186,9 @@ TEST_F(QuicPlatformTest, DISABLED_QuicThread) {
   int value = 0;
 
   // A QuicThread that is never started, which is ok.
-  { AdderThread t0(&value, 1); }
+  {
+    AdderThread t0(&value, 1);
+  }
   EXPECT_EQ(0, value);
 
   // A QuicThread that is started and joined as usual.
@@ -478,7 +480,9 @@ protected:
   void addFiles(std::list<std::string> files) {
     for (const std::string& file_name : files) {
       const std::string full_path = dir_path_ + "/" + file_name;
-      { const std::ofstream file(full_path); }
+      {
+        const std::ofstream file(full_path);
+      }
       files_to_remove_.push(full_path);
     }
   }
