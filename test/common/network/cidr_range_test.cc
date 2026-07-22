@@ -14,7 +14,9 @@
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
+using ::testing::HasSubstr;
 using ::testing::Not;
 using ::testing::PrintToString;
 
@@ -213,11 +215,11 @@ TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
   EXPECT_THAT(CidrRange::create(ptr, -1).status(),
-              Not(IsOk())); // Invalid length.
+              HasStatusMessage(HasSubstr("malformed IP address")));
 
   ptr.reset();
   EXPECT_THAT(CidrRange::create(ptr, 10).status(),
-              Not(IsOk())); // Invalid address.
+              HasStatusMessage(HasSubstr("malformed IP address")));
 }
 
 TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
@@ -232,10 +234,10 @@ TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
   EXPECT_THAT(CidrRange::create("1.2.3.4", -10).status(),
-              Not(IsOk())); // Invalid length.
+              HasStatusMessage(HasSubstr("malformed IP address: 1.2.3.4")));
 
   EXPECT_THAT(CidrRange::create("bogus", 31).status(),
-              Not(IsOk())); // Invalid address.
+              HasStatusMessage(HasSubstr("malformed IP address: bogus")));
 }
 
 TEST(Ipv4CidrRangeTest, StringCtor) {
@@ -249,13 +251,12 @@ TEST(Ipv4CidrRangeTest, StringCtor) {
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
   EXPECT_THAT(CidrRange::create("1.2.3.4/-10").status(),
-              Not(IsOk())); // Invalid length.
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
   EXPECT_THAT(CidrRange::create("bogus/31").status(),
-              Not(IsOk())); // Invalid address.
-  EXPECT_THAT(CidrRange::create("/31").status(),
-              Not(IsOk())); // Missing address.
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
+  EXPECT_THAT(CidrRange::create("/31").status(), HasStatusMessage(HasSubstr("Invalid CIDR range")));
   EXPECT_THAT(CidrRange::create("1.2.3.4/").status(),
-              Not(IsOk())); // Missing length.
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
 }
 
 TEST(Ipv4CidrRangeTest, BigRange) {
@@ -286,10 +287,10 @@ TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("abcd::346")));
 
   EXPECT_THAT(CidrRange::create(ptr, -1).status(),
-              Not(IsOk())); // Invalid length.
+              HasStatusMessage(HasSubstr("malformed IP address")));
   ptr.reset();
   EXPECT_THAT(CidrRange::create(ptr, 127).status(),
-              Not(IsOk())); // Invalid address.
+              HasStatusMessage(HasSubstr("malformed IP address")));
 }
 
 TEST(Ipv6CidrRange, StringAndLengthCtor) {
@@ -304,9 +305,9 @@ TEST(Ipv6CidrRange, StringAndLengthCtor) {
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("::1:0")));
 
   EXPECT_THAT(CidrRange::create("::ffff", -2).status(),
-              Not(IsOk())); // Invalid length.
+              HasStatusMessage(HasSubstr("malformed IP address: ::ffff")));
   EXPECT_THAT(CidrRange::create("bogus", 122).status(),
-              Not(IsOk())); // Invalid address.
+              HasStatusMessage(HasSubstr("malformed IP address: bogus")));
 }
 
 TEST(Ipv6CidrRange, StringCtor) {
@@ -320,13 +321,13 @@ TEST(Ipv6CidrRange, StringCtor) {
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("::1:00")));
 
   EXPECT_THAT(CidrRange::create("::fc1f/-10").status(),
-              Not(IsOk())); // Invalid length.
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
   EXPECT_THAT(CidrRange::create("::fc1f00/118").status(),
-              Not(IsOk())); // Invalid address.
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
   EXPECT_THAT(CidrRange::create("/118").status(),
-              Not(IsOk())); // Missing address.
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
   EXPECT_THAT(CidrRange::create("::fc1f/").status(),
-              Not(IsOk())); // Missing length.
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
 }
 
 TEST(Ipv6CidrRange, BigRange) {
