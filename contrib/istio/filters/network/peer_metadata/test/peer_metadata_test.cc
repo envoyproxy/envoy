@@ -373,7 +373,7 @@ std::shared_ptr<NiceMock<Upstream::MockHostDescription>> makeIpv4Host(absl::stri
   return host;
 }
 
-class PeerMetadataUpstreamFilterTest : public ::testing::TestWithParam<ExchangePath> {
+class PeerMetadataUpstreamFilterTestBase : public ::testing::Test {
 public:
   void initialize() {
     ON_CALL(callbacks_.connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
@@ -385,36 +385,11 @@ public:
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
-  void deliverPeerMetadata(Buffer::Instance& data, absl::string_view baggage,
-                           absl::string_view identity) {
-    const std::string serialized = encodePeerMetadata(baggage, identity);
-    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
-      registry_->setValue(defaultConnectionId, serialized);
-      return;
-    }
-    PeerMetadataHeader header{PeerMetadataHeader::magic_number,
-                              static_cast<uint32_t>(serialized.size())};
-    Buffer::OwnedImpl preamble{
-        absl::string_view(reinterpret_cast<const char*>(&header), sizeof(header))};
-    preamble.add(serialized);
-    preamble.add(data);
-    data.drain(data.length());
-    data.add(preamble);
-  }
-
   void setConnectionId(absl::string_view id) {
     stream_info_.filterState()->setData(
         Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey,
         std::make_shared<Router::StringAccessorImpl>(id),
         StreamInfo::FilterState::LifeSpan::Connection);
-  }
-
-  // Sets the downstream connection ID (registry key) only for the registry
-  // path; its absence selects the legacy data-stream preamble path.
-  void maybeSetConnectionId() {
-    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
-      setConnectionId(defaultConnectionId);
-    }
   }
 
   ::envoy::config::core::v3::Metadata& hostMetadata() { return *host_metadata_; }
@@ -446,6 +421,10 @@ public:
     return *peer_info;
   }
 
+  bool noPeerPopulated() const {
+    return stream_info_.filterState().hasDataWithName(Istio::Common::NoPeer);
+  }
+
   void setUpstreamHost(const std::shared_ptr<NiceMock<Upstream::MockHostDescription>>& host) {
     upstream_host_ = host;
     ON_CALL(Const(*upstream_host_), metadata()).WillByDefault(Return(host_metadata_));
@@ -459,6 +438,37 @@ public:
   std::shared_ptr<TestPeerMetadataRegistry> registry_ =
       std::make_shared<TestPeerMetadataRegistry>();
   std::unique_ptr<UpstreamFilter> filter_;
+};
+
+// Parameterized wrapper that selects the hand-off path (registry vs. legacy
+// data-stream preamble) and provides path-aware delivery helpers.
+class PeerMetadataUpstreamFilterTest : public PeerMetadataUpstreamFilterTestBase,
+                                       public ::testing::WithParamInterface<ExchangePath> {
+public:
+  void deliverPeerMetadata(Buffer::Instance& data, absl::string_view baggage,
+                           absl::string_view identity) {
+    const std::string serialized = encodePeerMetadata(baggage, identity);
+    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
+      registry_->setValue(defaultConnectionId, serialized);
+      return;
+    }
+    PeerMetadataHeader header{PeerMetadataHeader::magic_number,
+                              static_cast<uint32_t>(serialized.size())};
+    Buffer::OwnedImpl preamble{
+        absl::string_view(reinterpret_cast<const char*>(&header), sizeof(header))};
+    preamble.add(serialized);
+    preamble.add(data);
+    data.drain(data.length());
+    data.add(preamble);
+  }
+
+  // Sets the downstream connection ID (registry key) only for the registry
+  // path; its absence selects the legacy data-stream preamble path.
+  void maybeSetConnectionId() {
+    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
+      setConnectionId(defaultConnectionId);
+    }
+  }
 };
 
 TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
@@ -567,6 +577,27 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
   EXPECT_TRUE(registry_->getValue(defaultConnectionId).has_value());
   const auto peer_info = peerInfoFromFilterState();
   EXPECT_FALSE(peer_info.has_value());
+}
+
+// Registry hand-off is active (the downstream connection ID is present in filter
+// state) but nothing was ever stored under that key. The upstream filter must
+// fall back to marking the peer as unknown by populating NoPeer.
+TEST_F(PeerMetadataUpstreamFilterTestBase, TestNoPeerPopulatedWhenRegistryEmpty) {
+  initialize();
+  setUpstreamHost(makeInternalListenerHost("connect_originate"));
+  setConnectionId(defaultConnectionId);
+
+  EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
+
+  const std::string payload{"application data"};
+  Buffer::OwnedImpl data;
+  data.add(payload);
+  EXPECT_EQ(filter_->onData(data, /*end_stream*/ false), Network::FilterStatus::Continue);
+
+  EXPECT_TRUE(noPeerPopulated());
+  EXPECT_FALSE(peerInfoFromFilterState().has_value());
+  // The application data must be left untouched.
+  EXPECT_EQ(data.toString(), payload);
 }
 
 INSTANTIATE_TEST_SUITE_P(Modes, PeerMetadataUpstreamFilterTest,
