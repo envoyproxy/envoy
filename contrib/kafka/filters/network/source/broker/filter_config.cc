@@ -1,5 +1,7 @@
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
 
+#include <optional>
+
 #include "source/common/common/assert.h"
 
 namespace Envoy {
@@ -49,7 +51,7 @@ bool BrokerFilterConfig::needsResponseRewrite() const {
   return force_response_rewrite_ || !broker_address_rewrite_rules_.empty();
 }
 
-absl::optional<HostAndPort>
+std::optional<HostAndPort>
 BrokerFilterConfig::findBrokerAddressOverride(const uint32_t broker_id) const {
   for (const auto& rule : broker_address_rewrite_rules_) {
     if (rule.matches(broker_id)) {
@@ -57,7 +59,7 @@ BrokerFilterConfig::findBrokerAddressOverride(const uint32_t broker_id) const {
       return {hp};
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::flat_hash_set<int16_t> BrokerFilterConfig::apiKeysAllowed() const {

@@ -15,6 +15,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:cluster_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:cluster_run_on_all_workers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     rbe_pool = "6gig",
@@ -49,6 +50,7 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/rust:cluster_dynamic_metadata_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
@@ -61,6 +63,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",
+        "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",

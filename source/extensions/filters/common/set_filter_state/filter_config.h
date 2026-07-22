@@ -14,7 +14,6 @@ namespace Common {
 namespace SetFilterState {
 
 using LifeSpan = StreamInfo::FilterState::LifeSpan;
-using StateType = StreamInfo::FilterState::StateType;
 using StreamSharing = StreamInfo::StreamSharingMayImpactPooling;
 using FilterStateValueProto =
     envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue;

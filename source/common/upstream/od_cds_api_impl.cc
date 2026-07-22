@@ -96,7 +96,7 @@ void OdCdsApiImpl::sendAwaiting() {
   // InitialFetchDone (which happens on the first received response), the awaiting names list is not
   // used any more.
   ENVOY_LOG(debug, "odcds: sending request for awaiting cluster names {}",
-            fmt::join(awaiting_names_, ", "));
+            absl::StrJoin(awaiting_names_, ", "));
   subscription_->requestOnDemandUpdate(awaiting_names_);
   awaiting_names_.clear();
 }
@@ -214,7 +214,7 @@ private:
               resource_name_,
               old_ads
                   ? makeOptRef<const envoy::config::core::v3::ConfigSource>(staticAdsConfigSource())
-                  : absl::nullopt,
+                  : std::nullopt,
               Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this,
               resource_type_helper_.resourceDecoder(), {});
       RETURN_IF_NOT_OK_REF(subscription_or_error.status());

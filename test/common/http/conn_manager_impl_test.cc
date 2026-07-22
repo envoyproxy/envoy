@@ -491,9 +491,9 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
 
   startRequest(false);
 
-  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider());
-  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toInteger());
-  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toStringView());
+  EXPECT_NE(std::nullopt, decoder_->streamInfo().getStreamIdProvider());
+  EXPECT_NE(std::nullopt, decoder_->streamInfo().getStreamIdProvider()->toInteger());
+  EXPECT_NE(std::nullopt, decoder_->streamInfo().getStreamIdProvider()->toStringView());
   EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamAddressProvider().sslConnection());
   EXPECT_EQ(filter_callbacks_.connection_.id_,
             decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
@@ -506,7 +506,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
                                          Network::ProxyProtocolFilterState::key())
                                      ->value();
 
-  EXPECT_EQ(proxy_proto_data.version_, absl::nullopt);
+  EXPECT_EQ(proxy_proto_data.version_, std::nullopt);
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -1844,87 +1844,6 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanAndTraceDecisionRefreshA
   EXPECT_EQ(1UL, tracing_stats_.not_traceable_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanButDisableTraceDecisionRefresh) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.trace_refresh_after_route_refresh", "false"}});
-
-  setup(SetupOpts().setTracing(true));
-
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
-        auto factory = createDecoderFilterFactoryCb(filter);
-        callbacks.setFilterConfigName("");
-        factory(callbacks);
-        return true;
-      }));
-
-  // Treat request as internal, otherwise x-request-id header will be overwritten.
-  use_remote_address_ = false;
-  EXPECT_CALL(random_, uuid()).Times(0);
-
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        decoder_ = &conn_manager_->newStream(response_encoder_);
-
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":method", "GET"},
-                                         {":authority", "host"},
-                                         {":path", "/"},
-                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
-
-        auto* span = new NiceMock<Tracing::MockSpan>();
-        EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
-            .WillOnce(Invoke([&](const Tracing::Config& config, Tracing::TraceContext&,
-                                 const StreamInfo::StreamInfo&,
-                                 const Tracing::Decision) -> Tracing::Span* {
-              EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
-
-              return span;
-            }));
-
-        EXPECT_CALL(runtime_.snapshot_,
-                    featureEnabled("tracing.global_enabled",
-                                   An<const envoy::type::v3::FractionalPercent&>(), _))
-            .WillOnce(Return(true));
-
-        decoder_->decodeHeaders(std::move(headers), true);
-
-        // The trace decision will be refreshed when the route is refreshed.
-        EXPECT_CALL(runtime_.snapshot_,
-                    featureEnabled("tracing.global_enabled",
-                                   An<const envoy::type::v3::FractionalPercent&>(), _))
-            .Times(0);
-        EXPECT_CALL(*span, useLocalDecision()).Times(0);
-        EXPECT_CALL(*span, setSampled(_)).Times(0);
-
-        // Clear route cache and refresh the route. But this will not trigger a new trace
-        // decision because the feature is disabled.
-        filter->callbacks_->downstreamCallbacks()->clearRouteCache();
-        filter->callbacks_->route();
-
-        EXPECT_CALL(*span, finishSpan());
-        EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-
-        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
-        data.drain(4);
-
-        return Http::okStatus();
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
-  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
-  EXPECT_EQ(0UL, tracing_stats_.not_traceable_.value());
-}
-
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowWithHcmOperationFormatter) {
   setup();
   tracing_config_->operation_ = Formatter::FormatterImpl::create("hcm_downstream_op").value();
@@ -3184,7 +3103,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
           [&](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_EQ(AccessLog::AccessLogType::DownstreamPeriodic, log_context.accessLogType());
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
-            EXPECT_EQ(stream_info.requestComplete(), absl::nullopt);
+            EXPECT_EQ(stream_info.requestComplete(), std::nullopt);
             EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
                         testing::IsNull());
           }))
@@ -3593,7 +3512,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(*timer, disableTimer());
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
@@ -3604,10 +3523,10 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(17), _));
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
-    max_stream_duration_ = absl::nullopt;
+    max_stream_duration_ = std::nullopt;
   }
 
   // Add a gRPC header, but not a gRPC timeout and verify the timer is unchanged.
@@ -3616,7 +3535,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(*timer, disableTimer());
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
@@ -3701,7 +3620,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
                 grpcTimeoutHeaderOffset())
         .Times(AnyNumber())
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(15), _));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
@@ -3717,7 +3636,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
                 grpcTimeoutHeaderOffset())
         .Times(AnyNumber())
-        .WillRepeatedly(Return(absl::nullopt));
+        .WillRepeatedly(Return(std::nullopt));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
@@ -3863,9 +3782,9 @@ protected:
   const bool global_flush_timeout_set_;
   const bool route_flush_timeout_set_;
   const bool route_idle_timeout_set_;
-  absl::optional<std::chrono::milliseconds> global_flush_timeout_{absl::nullopt};
-  absl::optional<std::chrono::milliseconds> route_flush_timeout_{absl::nullopt};
-  absl::optional<std::chrono::milliseconds> route_idle_timeout_{absl::nullopt};
+  std::optional<std::chrono::milliseconds> global_flush_timeout_{std::nullopt};
+  std::optional<std::chrono::milliseconds> route_flush_timeout_{std::nullopt};
+  std::optional<std::chrono::milliseconds> route_idle_timeout_{std::nullopt};
 };
 
 INSTANTIATE_TEST_SUITE_P(IdleAndFlushTimeoutTestFixture, IdleAndFlushTimeoutTestFixture,
@@ -4964,9 +4883,9 @@ public:
                            /*decode_headers_stop_all=*/false);
     sendRequestHeadersAndData();
   }
-  const ResponseHeaderMap*
-  sendRequestWith(int status, StreamInfo::CoreResponseFlag response_flag, std::string details,
-                  absl::optional<std::string> proxy_status = absl::nullopt) {
+  const ResponseHeaderMap* sendRequestWith(int status, StreamInfo::CoreResponseFlag response_flag,
+                                           std::string details,
+                                           std::optional<std::string> proxy_status = std::nullopt) {
     auto response_headers = new TestResponseHeaderMapImpl{{":status", std::to_string(status)}};
     if (proxy_status.has_value()) {
       response_headers->setProxyStatus(proxy_status.value());

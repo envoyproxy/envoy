@@ -68,7 +68,8 @@ TEST_F(McpRouterConfigTest, MultipleBackendsEnablesMultiplexing) {
   server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
   server2->mutable_mcp_cluster()->set_path("/mcp/calc");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   EXPECT_EQ(config.backends().size(), 2);
   EXPECT_TRUE(config.isMultiplexing());
@@ -95,7 +96,8 @@ TEST_F(McpRouterConfigTest, SingleBackendSetsDefaultName) {
   server->set_name("tools");
   server->mutable_mcp_cluster()->set_cluster("tools_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   EXPECT_EQ(config.backends().size(), 1);
   EXPECT_FALSE(config.isMultiplexing());
@@ -110,7 +112,8 @@ TEST_F(McpRouterConfigTest, DefaultPathWhenNotSpecified) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   const McpBackendConfig* backend = config.findBackend("test");
   ASSERT_NE(backend, nullptr);
@@ -125,7 +128,8 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
@@ -139,8 +143,8 @@ TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
   server->mutable_mcp_cluster()->mutable_timeout()->set_seconds(10);
 
   envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
-  auto base_config = std::make_shared<McpRouterConfigImpl>(base_proto, "test.", *store_.rootScope(),
-                                                           factory_context_);
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
 
   McpRouterClusterConfigImpl cluster_config(proto_config, base_config);
 
@@ -330,7 +334,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityDisabledByDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_FALSE(config.hasSessionIdentity());
   EXPECT_FALSE(config.shouldEnforceValidation());
 }
@@ -345,7 +350,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithHeaderSource) {
   auto* identity = proto_config.mutable_session_identity();
   identity->mutable_identity()->mutable_header()->set_name("x-user-id");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<HeaderSubjectSource>(config.subjectSource()));
   EXPECT_FALSE(config.shouldEnforceValidation()); // DISABLED by default
@@ -364,7 +370,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithMetadataSource) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<MetadataSubjectSource>(config.subjectSource()));
 }
@@ -382,7 +389,8 @@ TEST_F(McpRouterConfigTest, MetadataKeyPathParsed) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   const auto& source = absl::get<MetadataSubjectSource>(config.subjectSource());
   EXPECT_EQ(source.filter, "jwt");
   ASSERT_EQ(source.path_keys.size(), 2);
@@ -402,7 +410,8 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   identity->mutable_validation()->set_mode(
       envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE);
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(config.shouldEnforceValidation());
   EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
@@ -420,7 +429,8 @@ protected:
   McpRouterConfigSharedPtr
   createConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config) {
     return std::make_shared<McpRouterConfigImpl>(proto_config, std::string("test."),
-                                                 *store_.rootScope(), factory_context_);
+                                                 *store_.rootScope(),
+                                                 factory_context_.server_factory_context_);
   }
 
   void setDynamicMetadata(const std::string& filter_name, const std::string& key,
@@ -471,7 +481,7 @@ protected:
       std::vector<Http::AsyncClient::StreamCallbacks*>& http_callbacks,
       std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>>& http_streams) {
     factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
-        {"test_cluster", "time_cluster", "calc_cluster"});
+        {"test_cluster", "time_cluster", "calc_cluster", "tools_cluster"});
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                     .async_client_,
                 start(_, _))
@@ -536,10 +546,9 @@ TEST_F(McpRouterFilterTest, UsingClusterConfigForListOfServers) {
   auto* backend = cluster_config.add_servers();
   backend->set_name("backend");
   backend->mutable_mcp_cluster()->set_cluster("backend_cluster");
-
-  (*decoder_callbacks_.cluster_info_->metadata_
-        .mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
-      .PackFrom(cluster_config);
+  std::ignore = (*decoder_callbacks_.cluster_info_->metadata_
+                      .mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
+                    .PackFrom(cluster_config);
 
   Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
@@ -855,7 +864,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_FALSE(config.lazyInitialization());
 }
 
@@ -866,7 +876,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationEnabled) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
   proto_config.set_lazy_initialization(true);
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.lazyInitialization());
 }
 
@@ -874,8 +885,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationEnabled) {
 TEST_F(McpRouterConfigTest, ClusterConfigDelegatesLazyInit) {
   envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
   base_proto.set_lazy_initialization(true);
-  auto base_config = std::make_shared<McpRouterConfigImpl>(base_proto, "test.", *store_.rootScope(),
-                                                           factory_context_);
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
 
   envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig cluster_proto;
   auto* server = cluster_proto.add_servers();
@@ -2144,6 +2155,163 @@ TEST(AggregateToolsListTest, IconsArrayPreserved) {
   auto icons = (*parsed)->getObjectArray("icons");
   ASSERT_TRUE(icons.ok());
   EXPECT_EQ(icons->size(), 2);
+}
+
+// Verifies __jsonrpc_response maps to McpMethod::ServerResponse.
+TEST(ParseMethodStringTest, ServerResponse) {
+  EXPECT_EQ(parseMethodString("__jsonrpc_response"), McpMethod::ServerResponse);
+}
+
+// Verifies initialize response includes elicitation capability.
+TEST_F(McpRouterFilterTest, GatewayCapabilitiesIncludeElicitation) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  proto_config.set_lazy_initialization(true);
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("initialize");
+
+  auto config = createConfig(proto_config);
+  McpRouterFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+
+  std::string response_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { response_body = data.toString(); }));
+
+  filter.decodeHeaders(headers, false);
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-06-18"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter.decodeData(buffer, true);
+
+  EXPECT_THAT(response_body, testing::HasSubstr("\"elicitation\":{}"));
+}
+
+// Verifies server response routes to the correct backend based on prefixed ID.
+TEST_F(McpRouterFilterTest, HandleServerResponseRoutesToBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server1 = proto_config.add_servers();
+  server1->set_name("time");
+  server1->mutable_mcp_cluster()->set_cluster("time_cluster");
+  auto* server2 = proto_config.add_servers();
+  server2->set_name("calc");
+  server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
+
+  // Set metadata for a server response with prefixed ID.
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("time__42");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter->decodeHeaders(headers, false);
+
+  const std::string body =
+      R"({"jsonrpc":"2.0","id":"time__42","result":{"action":"accept","content":{"name":"test"}}})";
+  Buffer::OwnedImpl buffer(body);
+
+  std::string forwarded_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { forwarded_body = data.toString(); }));
+
+  filter->decodeData(buffer, true);
+
+  ASSERT_EQ(http_callbacks.size(), 1);
+
+  simulateBackendResponse(http_callbacks[0], R"({"jsonrpc":"2.0","id":42,"result":{}})");
+
+  EXPECT_FALSE(forwarded_body.empty());
+}
+
+// Verifies server response with invalid prefix returns error.
+TEST_F(McpRouterFilterTest, HandleServerResponseInvalidId) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("time");
+  server->mutable_mcp_cluster()->set_cluster("time_cluster");
+  auto* server2 = proto_config.add_servers();
+  server2->set_name("calc");
+  server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("unknown__42");
+
+  auto config = createConfig(proto_config);
+  McpRouterFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter.decodeHeaders(headers, false);
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("400", headers.getStatusValue());
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::string body = R"({"jsonrpc":"2.0","id":"unknown__42","result":{"action":"accept"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter.decodeData(buffer, true);
+}
+
+// Verifies single-backend mode routes server responses without prefix parsing.
+TEST_F(McpRouterFilterTest, HandleServerResponseSingleBackend) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("tools");
+  server->mutable_mcp_cluster()->set_cluster("tools_cluster");
+
+  auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["envoy.filters.http.mcp"];
+  (*mcp_metadata.mutable_fields())["method"].set_string_value("__jsonrpc_response");
+  (*mcp_metadata.mutable_fields())["id"].set_string_value("42");
+
+  auto config = createConfig(proto_config);
+
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+  setupMockAsyncClient(http_callbacks, http_streams);
+
+  auto filter = std::make_shared<McpRouterFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  filter->decodeHeaders(headers, false);
+
+  const std::string body = R"({"jsonrpc":"2.0","id":"42","result":{"action":"accept"}})";
+  Buffer::OwnedImpl buffer(body);
+
+  std::string forwarded_body;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
+      .WillOnce(
+          testing::Invoke([&](Buffer::Instance& data, bool) { forwarded_body = data.toString(); }));
+
+  filter->decodeData(buffer, true);
+
+  ASSERT_EQ(http_callbacks.size(), 1);
+  simulateBackendResponse(http_callbacks[0], R"({"jsonrpc":"2.0","id":42,"result":{}})");
+  EXPECT_FALSE(forwarded_body.empty());
 }
 
 } // namespace

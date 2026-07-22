@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -1401,7 +1402,7 @@ void Filter::populateSliceWithMetadata(const std::string& filter_name, uint64_t*
   const auto& metadata = streamInfo().dynamicMetadata().filter_metadata();
   const auto filter_it = metadata.find(filter_name);
   if (filter_it != metadata.end()) {
-    filter_it->second.SerializeToString(&req_->strValue);
+    std::ignore = filter_it->second.SerializeToString(&req_->strValue);
     *buf_data = reinterpret_cast<uint64_t>(req_->strValue.data());
     *buf_len = req_->strValue.length();
   }
@@ -1439,7 +1440,7 @@ void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key
                                         const absl::string_view& buf) {
   Protobuf::Struct value;
   Protobuf::Value v;
-  v.ParseFromArray(buf.data(), buf.length());
+  std::ignore = v.ParseFromArray(buf.data(), buf.length());
 
   (*value.mutable_fields())[key] = v;
 
@@ -1447,7 +1448,7 @@ void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key
 }
 
 CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view value,
-                                        int state_type, int life_span, int stream_sharing) {
+                                        int /*state_type*/, int life_span, int stream_sharing) {
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1456,24 +1457,21 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
   if (isThreadSafe()) {
     streamInfo().filterState()->setData(
         key, std::make_shared<Router::StringAccessorImpl>(value),
-        static_cast<StreamInfo::FilterState::StateType>(state_type),
         static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
         static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
   } else {
     auto key_str = std::string(key);
     auto filter_state = std::make_shared<Router::StringAccessorImpl>(value);
     auto weak_ptr = weak_from_this();
-    getDispatcher().post(
-        [this, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
-          if (!weak_ptr.expired() && !hasDestroyed()) {
-            streamInfo().filterState()->setData(
-                key_str, filter_state, static_cast<StreamInfo::FilterState::StateType>(state_type),
-                static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
-                static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
-          } else {
-            ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
-          }
-        });
+    getDispatcher().post([this, weak_ptr, key_str, filter_state, life_span, stream_sharing] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        streamInfo().filterState()->setData(
+            key_str, filter_state, static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
+            static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in setStringFilterState");
+      }
+    });
   }
   return CAPIStatus::CAPIOK;
 }
@@ -1555,8 +1553,8 @@ CAPIStatus Filter::getStringPropertyCommon(absl::string_view path, uint64_t* val
   return status;
 }
 
-absl::optional<google::api::expr::runtime::CelValue> Filter::findValue(absl::string_view name,
-                                                                       Protobuf::Arena* arena) {
+std::optional<google::api::expr::runtime::CelValue> Filter::findValue(absl::string_view name,
+                                                                      Protobuf::Arena* arena) {
   // as we already support getting/setting FilterState, we don't need to implement
   // getProperty with non-attribute name & setProperty which actually work on FilterState
   return StreamActivation::FindValue(name, arena);
@@ -2093,12 +2091,12 @@ SecretReader::SecretReader(
   }
 }
 
-absl::optional<const std::string> SecretReader::secret(const std::string& name) const {
+std::optional<const std::string> SecretReader::secret(const std::string& name) const {
   auto secret = secrets_.find(name);
   if (secret != secrets_.end()) {
     return secret->second->secret();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Golang

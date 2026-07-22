@@ -45,7 +45,7 @@ ProtobufTypes::MessagePtr CelState::serializeAsProto() const {
   if (type_ != CelStateType::Protobuf) {
     Protobuf::BytesValue value;
     value.set_value(value_);
-    any->PackFrom(value);
+    std::ignore = any->PackFrom(value);
   } else {
     any->set_type_url(std::string(schema_));
     any->set_value(value_);

@@ -69,6 +69,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -123,6 +124,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/server/admin:stats_params_lib",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 
@@ -188,6 +190,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/server/admin:utils_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -253,6 +256,8 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":admin_instance_lib",
+        "//envoy/upstream:admin_endpoint_provider_interface",
+        "//source/common/network:address_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

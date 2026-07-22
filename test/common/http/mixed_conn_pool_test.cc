@@ -68,7 +68,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
 
-  void testAlpnHandshake(absl::optional<Protocol> protocol);
+  void testAlpnHandshake(std::optional<Protocol> protocol);
   TestScopedRuntime scoped_runtime;
   // The default capacity for HTTP/2 streams. This is determined by both the HTTP2 options
   // (DEFAULT_MAX_CONCURRENT_STREAMS) and DEFAULT_MAX_STREAMS of connection pool.
@@ -82,7 +82,7 @@ TEST_F(MixedConnPoolImplTest, AlpnTest) {
   EXPECT_EQ(fallback[1], Http::Utility::AlpnNames::get().Http11);
 }
 
-void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol) {
+void MixedConnPoolImplTest::testAlpnHandshake(std::optional<Protocol> protocol) {
   NiceMock<ConnPoolCallbacks> callbacks_;
 
   auto* connection = new NiceMock<Network::MockClientConnection>();

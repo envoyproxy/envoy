@@ -129,11 +129,11 @@ TEST(Http1MessageFrameTest, Http1MessageFrameTest) {
     frame.erase("custom");
 
     // Check that the headers are erased correctly.
-    EXPECT_EQ(frame.get("host"), absl::nullopt);
-    EXPECT_EQ(frame.get(":authority"), absl::nullopt);
-    EXPECT_EQ(frame.get(":path"), absl::nullopt);
-    EXPECT_EQ(frame.get(":method"), absl::nullopt);
-    EXPECT_EQ(frame.get("custom"), absl::nullopt);
+    EXPECT_EQ(frame.get("host"), std::nullopt);
+    EXPECT_EQ(frame.get(":authority"), std::nullopt);
+    EXPECT_EQ(frame.get(":path"), std::nullopt);
+    EXPECT_EQ(frame.get(":method"), std::nullopt);
+    EXPECT_EQ(frame.get("custom"), std::nullopt);
   }
 
   // Request FrameFlags.
@@ -275,7 +275,7 @@ TEST_F(Http1ServerCodecTest, DecodeHeaderOnlyRequest) {
              "\r\n");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](RequestHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](RequestHeaderFramePtr frame, std::optional<StartTime>) {
         EXPECT_EQ(frame->frameFlags().endStream(), true);
 
         auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
@@ -308,7 +308,7 @@ TEST_F(Http1ServerCodecTest, DecodeRequestWithBody) {
              "body");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](RequestHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](RequestHeaderFramePtr frame, std::optional<StartTime>) {
         auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), false);
 
@@ -348,7 +348,7 @@ TEST_F(Http1ServerCodecTest, DecodeRequestAndCloseConnectionAfterHeader) {
              "body");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([this](RequestHeaderFramePtr, absl::optional<StartTime>) {
+      .WillOnce(Invoke([this](RequestHeaderFramePtr, std::optional<StartTime>) {
         mock_connection_.close(Network::ConnectionCloseType::NoFlush);
       }));
 
@@ -398,7 +398,7 @@ TEST_F(Http1ServerCodecTest, DecodeRequestWithChunkedBody) {
              "\r\n");                         // Last chunk footer.
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](RequestHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](RequestHeaderFramePtr frame, std::optional<StartTime>) {
         auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), false);
 
@@ -444,7 +444,7 @@ TEST_F(Http1ServerCodecTest, DecodeRequestWithChunkedBodyWithMultipleFrames) {
              "\r\n"); // Chunk footer.
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](RequestHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](RequestHeaderFramePtr frame, std::optional<StartTime>) {
         auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), false);
 
@@ -855,7 +855,7 @@ TEST_F(Http1ServerCodecTest, DecodeExpectRequestAndItWillBeRepliedDirectly) {
   }));
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](RequestHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](RequestHeaderFramePtr frame, std::optional<StartTime>) {
         EXPECT_EQ(frame->frameFlags().endStream(), true);
 
         auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
@@ -969,7 +969,7 @@ TEST_F(Http1ServerCodecTest, DecodeRequestInSingleFrameMode) {
              "body");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](RequestHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](RequestHeaderFramePtr frame, std::optional<StartTime>) {
         auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
 
         EXPECT_EQ(frame->frameFlags().endStream(), true);
@@ -1051,7 +1051,7 @@ TEST_F(Http1ServerCodecTest, DecodeRequestWithChunkedBodyInSingleFrameMode) {
              "\r\n"); // Last chunk footer.
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](RequestHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](RequestHeaderFramePtr frame, std::optional<StartTime>) {
         auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
 
         EXPECT_EQ(frame->frameFlags().endStream(), true);
@@ -1098,7 +1098,7 @@ TEST_F(Http1ServerCodecTest, DecodeRequestWithChunkedBodyWithMultipleFramesInSin
              "\r\n"); // Last chunk footer.
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](RequestHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](RequestHeaderFramePtr frame, std::optional<StartTime>) {
         auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
 
         EXPECT_EQ(frame->frameFlags().endStream(), true);
@@ -1271,7 +1271,7 @@ TEST_F(Http1ClientCodecTest, DecodeHeaderOnlyResponse) {
              "\r\n");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         EXPECT_EQ(frame->frameFlags().endStream(), true);
 
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
@@ -1327,7 +1327,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseForHeadRequest) {
              "\r\n");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), true);
         EXPECT_EQ(response->response_->getStatusValue(), "200");
@@ -1352,7 +1352,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseShouldNotHasBody) {
              "\r\n");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), true);
         EXPECT_EQ(response->response_->getStatusValue(), "304");
@@ -1393,7 +1393,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseWithBody) {
              "body");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), false);
         EXPECT_EQ(response->response_->getStatusValue(), "200");
@@ -1429,7 +1429,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseAndCloseConnectionAfterHeader) {
              "body");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([this](ResponseHeaderFramePtr, absl::optional<StartTime>) {
+      .WillOnce(Invoke([this](ResponseHeaderFramePtr, std::optional<StartTime>) {
         mock_connection_.close(Network::ConnectionCloseType::NoFlush);
       }));
 
@@ -1480,7 +1480,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseWithChunkedBody) {
              "\r\n"); // Last chunk footer.
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), false);
         EXPECT_EQ(response->response_->getStatusValue(), "200");
@@ -1519,7 +1519,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseWithChunkedBodyWithMultipleFrames) {
              "body"   // Chunk body.
              "\r\n"); // Chunk footer.
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
         EXPECT_EQ(frame->frameFlags().endStream(), false);
         EXPECT_EQ(response->response_->getStatusValue(), "200");
@@ -2005,7 +2005,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseInSingleFrameMode) {
              "body");
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
 
         EXPECT_EQ(frame->frameFlags().endStream(), true);
@@ -2084,7 +2084,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseWithChunkedBodyInSingleFrameMode) {
              "\r\n"); // Last chunk footer.
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
 
         EXPECT_EQ(frame->frameFlags().endStream(), true);
@@ -2126,7 +2126,7 @@ TEST_F(Http1ClientCodecTest, DecodeResponseWithChunkedBodyWithMultipleFramesInSi
              "\r\n"); // Last chunk footer.
 
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_, _))
-      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, absl::optional<StartTime>) {
+      .WillOnce(Invoke([](ResponseHeaderFramePtr frame, std::optional<StartTime>) {
         auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
 
         EXPECT_EQ(frame->frameFlags().endStream(), true);

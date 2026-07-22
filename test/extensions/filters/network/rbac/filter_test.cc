@@ -33,9 +33,7 @@ public:
     Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   }
 
-  RoleBasedAccessControlNetworkFilterTest() {
-    // No per-logger log level setting needed
-  }
+  RoleBasedAccessControlNetworkFilterTest() = default;
 
   void
   setupPolicy(bool with_policy = true, bool continuous = false,
@@ -210,7 +208,7 @@ on_no_match:
   void setLocalAddressWithNetworkNamespace(const std::string& network_namespace_path,
                                            uint16_t port = 123) {
     address_ = std::make_shared<Network::Address::Ipv4Instance>(
-        "127.0.0.1", port, nullptr, absl::make_optional(std::string(network_namespace_path)));
+        "127.0.0.1", port, nullptr, std::make_optional(std::string(network_namespace_path)));
 
     stream_info_.downstream_connection_info_provider_->setLocalAddress(address_);
     ON_CALL(callbacks_.connection_.stream_info_, downstreamAddressProvider())

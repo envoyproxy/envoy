@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "envoy/common/pure.h"
@@ -11,7 +12,6 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -52,8 +52,6 @@ enum class StreamSharingMayImpactPooling {
  */
 class FilterState {
 public:
-  enum class StateType { ReadOnly, Mutable };
-
   // Objects stored in the FilterState may have different life span. Life span is what controls
   // how long an object stored in FilterState lives. Implementation of this interface actually
   // stores objects in a (reverse) tree manner - multiple FilterStateImpl with shorter life span may
@@ -99,11 +97,11 @@ public:
     virtual ProtobufTypes::MessagePtr serializeAsProto() const { return nullptr; }
 
     /**
-     * @return absl::optional<std::string> a optional string to the serialization of the filter
+     * @return std::optional<std::string> a optional string to the serialization of the filter
      * state. No value if the filter state cannot be serialized or serialization is not supported.
      * This method can be used to get an unstructured serialization result.
      */
-    virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
+    virtual std::optional<std::string> serializeAsString() const { return std::nullopt; }
 
     /**
      * @return bool true if the object supports field access. False if the object does not support
@@ -158,15 +156,6 @@ public:
   setData(absl::string_view data_name, std::shared_ptr<Object> data,
           LifeSpan life_span = LifeSpan::FilterChain,
           StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
-
-  /**
-   * Deprecated version of setData that takes the no longer used `StateType`.
-   */
-  void setData(absl::string_view data_name, std::shared_ptr<Object> data, StateType /*state_type*/,
-               LifeSpan life_span = LifeSpan::FilterChain,
-               StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) {
-    return setData(data_name, std::move(data), life_span, stream_sharing);
-  }
 
   /**
    * @param data_name the name of the data being looked up.

@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 using testing::ReturnRef;
@@ -24,8 +25,8 @@ namespace Aws {
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
   for (auto const& entry : std::filesystem::directory_iterator(
-           TestEnvironment::runfilesDirectory() +
-           "/external/aws-c-auth-testdata/tests/aws-signing-test-suite/v4a")) {
+           TestEnvironment::runfilesDirectory("aws-c-auth-testdata") +
+           "/tests/aws-signing-test-suite/v4a")) {
     directories.push_back(entry.path().string());
   }
   return directories;
@@ -178,7 +179,7 @@ public:
 
     auto ec_key_or =
         sigv4a_key_derivation->derivePrivateKey(absl::string_view(akid), absl::string_view(skid));
-    EXPECT_TRUE(ec_key_or.ok());
+    EXPECT_OK(ec_key_or);
     sigv4a_key_derivation->derivePublicKey(ec_key_or.value());
     signature = Hex::decode(calculated_signature);
 
@@ -243,7 +244,7 @@ public:
   void createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
                          const absl::string_view authorization_credential,
                          const absl::string_view long_date,
-                         const absl::optional<std::string> session_token,
+                         const std::optional<std::string> session_token,
                          const std::map<std::string, std::string>& signed_headers,
                          const uint16_t expiration_time) {
     return signer_->createQueryParams(query_params, authorization_credential, long_date,
@@ -251,7 +252,7 @@ public:
   };
 
   void addRequiredHeaders(Http::RequestHeaderMap& headers, const std::string long_date,
-                          const absl::optional<std::string> session_token,
+                          const std::optional<std::string> session_token,
                           const absl::string_view override_region) {
     signer_->addRequiredHeaders(headers, long_date, session_token, override_region);
   }
@@ -293,7 +294,7 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
   auto signer_friend = SigV4ASignerImplFriend(&headersigner_);
 
   signer_friend.addRequiredHeaders(message_.headers(), long_date_,
-                                   absl::optional<std::string>(token_), region_);
+                                   std::optional<std::string>(token_), region_);
 
   const auto calculated_canonical_headers =
       Utility::canonicalizeHeaders(message_.headers(), {}, {});
@@ -365,7 +366,7 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
 
   signer_friend.createQueryParams(
       query_params, signer_friend.createAuthorizationCredential(akid_, calculated_credential_scope),
-      long_date_, token_.empty() ? absl::optional<std::string>(absl::nullopt) : token_,
+      long_date_, token_.empty() ? std::optional<std::string>(std::nullopt) : token_,
       calculated_canonical_headers, expiration_);
 
   message_.headers().setPath(query_params.replaceQueryString(message_.headers().Path()->value()));

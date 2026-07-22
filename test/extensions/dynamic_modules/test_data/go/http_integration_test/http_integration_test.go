@@ -37,6 +37,7 @@ func init() {
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
 		"http_struct_config":           &HttpStructConfigFactory{},
 		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
+		"log_level":                    &LogLevelConfigFactory{},
 	})
 }
 
@@ -804,6 +805,12 @@ func (f *StatsCallbacksConfigFactory) Create(h shared.HttpFilterConfigHandle, c 
 	ids.epVals, err = h.DefineHistogram("entrypoint_header_values", "entrypoint", "method")
 	assertEq(err, shared.MetricsSuccess, "h2")
 
+	// Emit a metric directly from the config context (no per-stream filter), exercising the
+	// config-scoped emission path. This would typically be done from a scheduled background task.
+	configTotal, err := h.DefineCounter("config_total")
+	assertEq(err, shared.MetricsSuccess, "c3")
+	assertEq(h.IncrementCounterValue(configTotal, 1), shared.MetricsSuccess, "c3i")
+
 	ids.headerToCount = parts[0]
 	ids.headerToSet = parts[1]
 
@@ -1469,5 +1476,39 @@ func (f *ListMetadataCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap
 		}
 	}
 
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// LogLevel
+// -----------------------------------------------------------------------------
+
+type LogLevelConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *LogLevelConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &LogLevelFilterFactory{}, nil
+}
+
+type LogLevelFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *LogLevelFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &LogLevelFilter{handle: handle}
+}
+
+type LogLevelFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (p *LogLevelFilter) OnResponseHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	headers.Set("x-log-level", strconv.FormatUint(uint64(p.handle.GetLogLevel()), 10))
+	headers.Set("x-log-info-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelInfo)))
+	headers.Set("x-log-error-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelError)))
 	return shared.HeadersStatusContinue
 }

@@ -131,8 +131,10 @@ protected:
 
     ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
 
+    absl::Status creation_status = absl::OkStatus();
     filter_config_ = std::make_unique<FilterConfig>(
-        proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_);
+        proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_, creation_status);
+    ASSERT_TRUE(creation_status.ok());
 
     filter_ = std::make_unique<Filter>(*filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
@@ -180,7 +182,7 @@ apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb
       }
     )pb") {
   apikeys::CreateApiKeyRequest request;
-  Envoy::Protobuf::TextFormat::ParseFromString(pb, &request);
+  std::ignore = Envoy::Protobuf::TextFormat::ParseFromString(pb, &request);
   return request;
 }
 
@@ -195,7 +197,7 @@ apikeys::ApiKey makeCreateApiKeyResponse(absl::string_view pb = R"pb(
   expire_time { seconds: 1715842560 nanos: 0 }
 )pb") {
   apikeys::ApiKey response;
-  Envoy::Protobuf::TextFormat::ParseFromString(pb, &response);
+  std::ignore = Envoy::Protobuf::TextFormat::ParseFromString(pb, &response);
   return response;
 }
 

@@ -12,6 +12,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.h"
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.validate.h"
+#include "envoy/upstream/admin_endpoint_provider.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -79,7 +80,7 @@ public:
   // Set to default so that the default client connection factory is used to initiate connections
   // to. the address.
   absl::string_view addressType() const override { return "default"; }
-  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  std::optional<std::string> networkNamespace() const override { return std::nullopt; }
   Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
     return nullptr;
   }
@@ -132,7 +133,7 @@ private:
  * to retrieve reverse connection sockets to stream data to upstream endpoints.
  * Also, the RevConCluster cleans these hosts if no connection pool is using them.
  */
-class RevConCluster : public Upstream::ClusterImplBase {
+class RevConCluster : public Upstream::ClusterImplBase, public Upstream::AdminEndpointProvider {
   friend class ReverseConnectionClusterTest;
 
 public:
@@ -147,6 +148,13 @@ public:
   // Upstream::Cluster.
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
+  // Upstream::Cluster. This cluster provides its own admin endpoints.
+  const Upstream::AdminEndpointProvider* adminEndpointProvider() const override { return this; }
+
+  // Upstream::AdminEndpointProvider. Surfaces currently-reachable reverse-tunnel nodes on /clusters
+  // without creating load-balanced hosts.
+  std::vector<Upstream::AdminEndpointProvider::AdminEndpoint> adminEndpoints() const override;
+
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
     LoadBalancer(const std::shared_ptr<RevConCluster>& parent) : parent_(parent) {}
@@ -160,11 +168,11 @@ public:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     // Lifetime tracking not implemented.
@@ -183,6 +191,7 @@ private:
     // Upstream::LoadBalancerFactory.
     Upstream::LoadBalancerPtr create() { return std::make_unique<LoadBalancer>(cluster_); }
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     const std::shared_ptr<RevConCluster> cluster_;
   };
@@ -211,13 +220,19 @@ private:
   // Get the upstream socket manager from the thread-local registry.
   BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;
 
+  // Get the process-wide acceptor extension (for cross-worker stats). Returns nullptr if the
+  // bootstrap extension is not configured. Safe to call from the main/admin thread (does not
+  // require thread-local state).
+  BootstrapReverseConnection::ReverseTunnelAcceptorExtension* getAcceptorExtension() const;
+
   // No pre-initialize work needs to be completed by REVERSE CONNECTION cluster.
   void startPreInit() override { onPreInitComplete(); }
 
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds cleanup_interval_;
   Event::TimerPtr cleanup_timer_;
-  absl::Mutex host_map_lock_;
+  // Mutable so the const adminEndpoints() accessor can read host_map_ under the lock.
+  mutable absl::Mutex host_map_lock_;
   absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
   // Formatter for computing host identifier from request context.
   Envoy::Formatter::FormatterPtr host_id_formatter_;

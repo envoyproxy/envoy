@@ -1,17 +1,24 @@
 #include <cstdlib>
 #include <memory>
+#include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
 #include "envoy/network/exception.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/envoy_quic_clock.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_packet_writer_interface.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
@@ -19,6 +26,7 @@
 #include "source/server/configuration_impl.h"
 #include "source/server/process_context_impl.h"
 
+#include "test/common/quic/fake_quic_packet_writer.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
@@ -128,10 +136,10 @@ protected:
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getAnyAddress(version_, true)),
-        connection_handler_(*dispatcher_, absl::nullopt),
+        connection_handler_(*dispatcher_, std::nullopt),
         transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
-            true, *store_.rootScope(), std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-            ssl_context_manager_)),
+            /*enable_early_data=*/true, /*enable_resumption=*/true, *store_.rootScope(),
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -276,26 +284,28 @@ protected:
     }
     int value = kECT1;
     client_sockets_.back()->setSocketOption(level, optname, &value, sizeof(value));
-    Buffer::OwnedImpl payload =
-        generateChloPacketToSend(quic_version_, quic_config_, connection_id);
-    Buffer::RawSliceVector slice = payload.getRawSlices();
-    ASSERT_EQ(1u, slice.size());
-    Network::Address::InstanceConstSharedPtr dest_address;
-    if (client_address->ip()->version() == Network::Address::IpVersion::v4) {
-      dest_address = std::make_shared<const Network::Address::Ipv4Instance>(
-          client_address->ip()->addressAsString(),
-          listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
-          &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
-    } else {
-      dest_address = std::make_shared<const Network::Address::Ipv6Instance>(
-          client_address->ip()->addressAsString(),
-          listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
-          &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+    std::vector<Buffer::OwnedImpl> payloads =
+        generateChloPacketsToSend(quic_version_, quic_config_, connection_id);
+    for (Buffer::OwnedImpl& payload : payloads) {
+      Buffer::RawSliceVector slice = payload.getRawSlices();
+      ASSERT_EQ(1u, slice.size());
+      Network::Address::InstanceConstSharedPtr dest_address;
+      if (client_address->ip()->version() == Network::Address::IpVersion::v4) {
+        dest_address = std::make_shared<const Network::Address::Ipv4Instance>(
+            client_address->ip()->addressAsString(),
+            listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+            &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+      } else {
+        dest_address = std::make_shared<const Network::Address::Ipv6Instance>(
+            client_address->ip()->addressAsString(),
+            listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+            &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+      }
+      // Send a full CHLO to finish 0-RTT handshake.
+      auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(),
+                                                     slice.data(), 1, nullptr, *dest_address);
+      ASSERT_EQ(slice[0].len_, send_rc.return_value_);
     }
-    // Send a full CHLO to finish 0-RTT handshake.
-    auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(),
-                                                   1, nullptr, *dest_address);
-    ASSERT_EQ(slice[0].len_, send_rc.return_value_);
   }
 
   void readFromClientSockets() {
@@ -469,7 +479,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 0);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  EXPECT_CALL(mock_packet_forwarding, handle(_, _));
+  EXPECT_CALL(mock_packet_forwarding, handle(_, _))
+      .Times(generateChloPacketsToSend(quic_version_, quic_config_, connection_id).size());
   sendCHLO(connection_id);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
@@ -619,7 +630,7 @@ TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
 TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
   initialize();
   Network::Socket& socket = ActiveQuicListenerPeer::socket(*quic_listener_);
-  absl::optional<Network::Address::IpVersion> version = socket.ipVersion();
+  std::optional<Network::Address::IpVersion> version = socket.ipVersion();
   EXPECT_TRUE(version.has_value());
   int optval = 0;
   socklen_t optlen = sizeof(optval);
@@ -757,12 +768,55 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   envoy::config::listener::v3::QuicProtocolOptions quic_config;
   quic_config.mutable_connection_debug_visitor_config()->set_name(
       "envoy.quic.connection_debug_visitor.mock");
-  quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
-      test::common::config::DummyConfig());
+  std::ignore =
+      quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
+          test::common::config::DummyConfig());
   auto listener_factory = createQuicListenerFactory(quic_config);
   auto debug_visitor_factory =
       ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());
   EXPECT_TRUE(debug_visitor_factory.has_value());
+}
+
+namespace {
+
+class MockQuicPacketWriterFactory : public QuicPacketWriterFactory {
+public:
+  MockQuicPacketWriterFactory() = default;
+  ~MockQuicPacketWriterFactory() override = default;
+
+  MOCK_METHOD(QuicPacketWriterPtr, createQuicPacketWriter,
+              (Network::IoHandle & io_handle, Stats::Scope& scope,
+               Envoy::Event::Dispatcher& dispatcher, absl::AnyInvocable<void() &&> on_can_write_cb),
+              (override));
+};
+
+} // namespace
+
+TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
+  MockQuicPacketWriterFactory quic_packet_writer_factory;
+
+  // Override the quicPacketWriterFactory mock to return our QUIC factory.
+  EXPECT_CALL(udp_listener_config_, quicPacketWriterFactory())
+      .WillRepeatedly(Return(&quic_packet_writer_factory));
+
+  // Expect createQuicPacketWriter to be called, and return our dummy writer.
+  FakeQuicPacketWriter* raw_writer = nullptr;
+  EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
+      .WillOnce(Invoke([&raw_writer](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
+                                     absl::AnyInvocable<void()&&>) -> QuicPacketWriterPtr {
+        auto writer = std::make_unique<FakeQuicPacketWriter>();
+        raw_writer = writer.get();
+        return writer;
+      }));
+
+  // Initialize the listener. This will trigger createQuicPacketWriter.
+  initialize();
+
+  // Verify that the dispatcher was initialized with a writer (it shouldn't be null).
+  EXPECT_NE(quic_dispatcher_, nullptr);
+
+  // Verify that the listener keeps a member pointing to the created writer.
+  EXPECT_EQ(quic_listener_->quicPacketWriter(), raw_writer);
 }
 
 } // namespace Quic

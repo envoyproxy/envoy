@@ -168,17 +168,17 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
-absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
 compliancePolicyFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
   switch (params.compliance_policies_size()) {
   case 0:
-    return absl::nullopt;
+    return std::nullopt;
   case 1:
     return params.compliance_policies(0);
   default:
     IS_ENVOY_BUG("more than one policies are not supported");
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
@@ -429,17 +429,7 @@ ClientContextConfigImpl::ClientContextConfigImpl(
           FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),
-      enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, true)),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
-
-  if (!enforce_rsa_key_usage_) {
-    ENVOY_LOG(
-        warn,
-        "The 'enforce_rsa_key_usage' option is set to false, which disables the enforcement of RSA "
-        "key usage. This option will be removed in the next version. The handshake will fail "
-        "if the keyUsage extension is present and incompatible with the "
-        "TLS usage. Please update the certificates to be compliant.");
-  }
 
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.

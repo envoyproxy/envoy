@@ -330,7 +330,7 @@ public:
   }
 
 protected:
-  void expectToPrintCurrentProtocol(const absl::optional<Envoy::Http::Protocol>& protocol) {
+  void expectToPrintCurrentProtocol(const std::optional<Envoy::Http::Protocol>& protocol) {
     const std::string SCRIPT{R"EOF(
       function callMe(object)
         testPrint(string.format("'%s'", object:protocol()))
@@ -732,7 +732,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetVirtualClusterName) {
   setup(SCRIPT);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  const absl::optional<std::string> name = absl::make_optional<std::string>("test_virtual_cluster");
+  const std::optional<std::string> name = std::make_optional<std::string>("test_virtual_cluster");
   ON_CALL(stream_info, virtualClusterName()).WillByDefault(testing::ReturnRef(name));
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
@@ -753,7 +753,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetEmptyVirtualClusterName) {
   setup(SCRIPT);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  const absl::optional<std::string> name = absl::nullopt;
+  const std::optional<std::string> name = std::nullopt;
   ON_CALL(stream_info, virtualClusterName()).WillByDefault(testing::ReturnRef(name));
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
@@ -789,7 +789,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataBasic) {
 
   Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
-  any_metadata.PackFrom(test_struct);
+  std::ignore = any_metadata.PackFrom(test_struct);
 
   (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.test.metadata"] = any_metadata;
 
@@ -868,7 +868,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataComplexStructure) {
 
   Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
-  any_metadata.PackFrom(complex_struct);
+  std::ignore = any_metadata.PackFrom(complex_struct);
 
   (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.complex.metadata"] = any_metadata;
 
@@ -987,7 +987,7 @@ TEST_F(LuaStreamInfoWrapperTest, IterateDynamicTypedMetadata) {
   (*struct1.mutable_fields())["field_one"].set_string_value("value_one");
   Protobuf::Any any1;
   any1.set_type_url("type.googleapis.com/google.protobuf.Struct");
-  any1.PackFrom(struct1);
+  std::ignore = any1.PackFrom(struct1);
   (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.one"] = any1;
 
   // Create second metadata entry
@@ -995,7 +995,7 @@ TEST_F(LuaStreamInfoWrapperTest, IterateDynamicTypedMetadata) {
   (*struct2.mutable_fields())["field_two"].set_string_value("value_two");
   Protobuf::Any any2;
   any2.set_type_url("type.googleapis.com/google.protobuf.Struct");
-  any2.PackFrom(struct2);
+  std::ignore = any2.PackFrom(struct2);
   (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.two"] = any2;
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
@@ -1030,9 +1030,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateBasic) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create a simple string accessor for testing.
-  stream_info.filterState()->setData(
-      "test_key", std::make_shared<Router::StringAccessorImpl>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.filterState()->setData("test_key",
+                                     std::make_shared<Router::StringAccessorImpl>("test_value"),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -1100,11 +1100,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetMultipleFilterStateObjects) {
 
   // Add multiple filter state objects.
   stream_info.filterState()->setData("key1", std::make_shared<Router::StringAccessorImpl>("value1"),
-                                     StreamInfo::FilterState::StateType::ReadOnly,
                                      StreamInfo::FilterState::LifeSpan::FilterChain);
 
   stream_info.filterState()->setData("key2", std::make_shared<Router::StringAccessorImpl>("value2"),
-                                     StreamInfo::FilterState::StateType::ReadOnly,
                                      StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
@@ -1143,9 +1141,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNumericAccessor) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add numeric filter state object.
-  stream_info.filterState()->setData(
-      "numeric_key", std::make_shared<StreamInfo::UInt64AccessorImpl>(12345),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.filterState()->setData("numeric_key",
+                                     std::make_shared<StreamInfo::UInt64AccessorImpl>(12345),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -1181,9 +1179,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateBooleanAccessor) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add boolean filter state object.
-  stream_info.filterState()->setData(
-      "bool_key", std::make_shared<StreamInfo::BoolAccessorImpl>(true),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.filterState()->setData("bool_key",
+                                     std::make_shared<StreamInfo::BoolAccessorImpl>(true),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -1199,7 +1197,7 @@ class TestFieldSupportingFilterState : public StreamInfo::FilterState::Object {
 public:
   TestFieldSupportingFilterState(std::string base_value) : base_value_(base_value) {}
 
-  absl::optional<std::string> serializeAsString() const override { return base_value_; }
+  std::optional<std::string> serializeAsString() const override { return base_value_; }
 
   bool hasFieldSupport() const override { return true; }
 
@@ -1244,9 +1242,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessString) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add field-supporting filter state object.
-  stream_info.filterState()->setData(
-      "field_key", std::make_shared<TestFieldSupportingFilterState>("base_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.filterState()->setData("field_key",
+                                     std::make_shared<TestFieldSupportingFilterState>("base_value"),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -1282,9 +1280,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessNumeric) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add field-supporting filter state object.
-  stream_info.filterState()->setData(
-      "field_key", std::make_shared<TestFieldSupportingFilterState>("base_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.filterState()->setData("field_key",
+                                     std::make_shared<TestFieldSupportingFilterState>("base_value"),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -1315,9 +1313,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessNonExistent) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add field-supporting filter state object.
-  stream_info.filterState()->setData(
-      "field_key", std::make_shared<TestFieldSupportingFilterState>("base_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.filterState()->setData("field_key",
+                                     std::make_shared<TestFieldSupportingFilterState>("base_value"),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -1346,9 +1344,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessNoSupport) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add regular string accessor without field support.
-  stream_info.filterState()->setData(
-      "no_field_key", std::make_shared<Router::StringAccessorImpl>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.filterState()->setData("no_field_key",
+                                     std::make_shared<Router::StringAccessorImpl>("test_value"),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -1384,9 +1382,9 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessFallback) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Add field-supporting filter state object.
-  stream_info.filterState()->setData(
-      "field_key", std::make_shared<TestFieldSupportingFilterState>("test_base"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.filterState()->setData("field_key",
+                                     std::make_shared<TestFieldSupportingFilterState>("test_base"),
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);

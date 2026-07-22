@@ -147,6 +147,7 @@ namespace.
   host_removed, Counter, Number of hosts that have been removed from the cache.
   num_hosts, Gauge, Number of hosts that are currently in the cache.
   dns_rq_pending_overflow, Counter, Number of DNS pending request overflow.
+  dns_address_filter_out, Counter, Number of resolved addresses that were denied by :ref:`resolved_address_filter <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.resolved_address_filter>`.
 
 The dynamic forward proxy DNS cache circuit breakers output statistics in the ``dns_cache.<dns_cache_name>.circuit_breakers``
 namespace.

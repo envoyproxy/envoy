@@ -15,6 +15,7 @@
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -68,7 +69,7 @@ public:
 
   void initCache() {
     cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
-        http_cache_factory_->getCache(cacheConfig(testConfig()), context_));
+        http_cache_factory_->getCache(cacheConfig(testConfig()), context_.server_factory_context_));
   }
 
   void waitForEvictionThreadIdle() { cache_->cache_eviction_thread_.waitForIdle(); }
@@ -77,14 +78,14 @@ public:
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
     TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
     ConfigProto cfg;
-    EXPECT_TRUE(MessageUtil::unpackTo(cache_config.typed_config(), cfg).ok());
+    EXPECT_OK(MessageUtil::unpackTo(cache_config.typed_config(), cfg));
     cfg.set_cache_path(cache_path_);
     return cfg;
   }
 
   envoy::extensions::filters::http::cache::v3::CacheConfig cacheConfig(ConfigProto cfg) {
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
-    cache_config.mutable_typed_config()->PackFrom(cfg);
+    std::ignore = cache_config.mutable_typed_config()->PackFrom(cfg);
     return cache_config;
   }
 
@@ -118,7 +119,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_1_contents, true);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_2_contents, true);
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
-      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+      http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_));
   waitForEvictionThreadIdle();
   EXPECT_EQ(cache_->stats().size_limit_bytes_.value(), max_size);
   EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
@@ -137,7 +138,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
   // TODO(#24994): replace this with backdating the files when that's possible.
   sleep(1); // NO_CHECK_FORMAT(real_time)
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
-      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+      http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_));
   waitForEvictionThreadIdle();
   EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
@@ -170,7 +171,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
   // TODO(#24994): replace this with backdating the files when that's possible.
   sleep(1); // NO_CHECK_FORMAT(real_time)
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
-      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+      http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_));
   waitForEvictionThreadIdle();
   EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
@@ -237,19 +238,22 @@ TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
 TEST_F(FileSystemHttpCacheTest, ExceptionOnTryingToCreateCachesWithDistinctConfigsOnSamePath) {
   ConfigProto cfg = testConfig();
   cfg.mutable_manager_config()->mutable_thread_pool()->set_thread_count(2);
-  EXPECT_ANY_THROW(http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  EXPECT_ANY_THROW(
+      http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_));
 }
 
 TEST_F(FileSystemHttpCacheTest, IdenticalCacheConfigReturnsSameCacheInstance) {
   ConfigProto cfg = testConfig();
-  auto second_cache = http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  auto second_cache =
+      http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_);
   EXPECT_EQ(cache_, second_cache);
 }
 
 TEST_F(FileSystemHttpCacheTest, CacheConfigsWithDifferentPathsReturnDistinctCacheInstances) {
   ConfigProto cfg = testConfig();
   cfg.set_cache_path("/tmp");
-  auto second_cache = http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  auto second_cache =
+      http_cache_factory_->getCache(cacheConfig(cfg), context_.server_factory_context_);
   EXPECT_NE(cache_, second_cache);
 }
 
@@ -1395,11 +1399,12 @@ TEST(Registration, GetCacheFromFactory) {
   ON_CALL(factory_context.server_factory_context_.api_, threadFactory())
       .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
-  EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
-            "envoy.extensions.http.cache.file_system_http_cache");
+  EXPECT_EQ(
+      factory->getCache(cache_config, factory_context.server_factory_context_)->cacheInfo().name_,
+      "envoy.extensions.http.cache.file_system_http_cache");
   // Verify that the config path got a / suffixed onto it.
   EXPECT_EQ(std::dynamic_pointer_cast<FileSystemHttpCache>(
-                factory->getCache(cache_config, factory_context))
+                factory->getCache(cache_config, factory_context.server_factory_context_))
                 ->config()
                 .cache_path(),
             "/tmp/");

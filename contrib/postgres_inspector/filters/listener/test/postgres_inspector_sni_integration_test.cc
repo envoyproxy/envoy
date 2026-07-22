@@ -73,7 +73,7 @@ typed_config:
       envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy pg_config;
       pg_config.set_stat_prefix("postgres_with_ssl");
       pg_config.set_terminate_ssl(false);
-      pg_filter->mutable_typed_config()->PackFrom(pg_config);
+      std::ignore = pg_filter->mutable_typed_config()->PackFrom(pg_config);
 
       // Add TCP proxy for routing to backend.
       auto* tcp_filter = pg_chain->add_filters();
@@ -81,7 +81,7 @@ typed_config:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_config;
       tcp_config.set_stat_prefix("tcp_postgres");
       tcp_config.set_cluster("cluster_db1");
-      tcp_filter->mutable_typed_config()->PackFrom(tcp_config);
+      std::ignore = tcp_filter->mutable_typed_config()->PackFrom(tcp_config);
 
       // Default chain for non-PostgreSQL traffic.
       auto* default_chain = listener->add_filter_chains();
@@ -91,7 +91,7 @@ typed_config:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy default_config;
       default_config.set_stat_prefix("tcp_default");
       default_config.set_cluster("cluster_db2");
-      default_filter->mutable_typed_config()->PackFrom(default_config);
+      std::ignore = default_filter->mutable_typed_config()->PackFrom(default_config);
     });
 
     setUpstreamCount(2);

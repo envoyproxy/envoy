@@ -32,7 +32,7 @@ TEST(IoSocketHandleImplIntegration, LastRoundTripIntegrationTest) {
   socket_->setBlockingForTest(true);
   EXPECT_TRUE(socket_->connect(addr).return_value_ == 0);
 
-  EXPECT_TRUE(socket_->ioHandle().lastRoundTripTime() != absl::nullopt);
+  EXPECT_TRUE(socket_->ioHandle().lastRoundTripTime() != std::nullopt);
 }
 #endif
 

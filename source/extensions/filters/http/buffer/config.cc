@@ -26,8 +26,8 @@ absl::StatusOr<Http::FilterFactoryCb> BufferFilterFactory::createFilterFactoryFr
   };
 }
 
-Envoy::Http::FilterFactoryCb
-BufferFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Envoy::Http::FilterFactoryCb>
+BufferFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext&) {
   ASSERT(proto_config.has_max_request_bytes());

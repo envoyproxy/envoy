@@ -36,7 +36,7 @@ public:
   MOCK_METHOD(absl::Status, initialize, (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(bool, initialized, ());
   MOCK_METHOD(absl::StatusOr<bool>, addOrUpdateCluster,
-              (const envoy::config::cluster::v3::Cluster& cluster, const std::string& version_info,
+              (const envoy::config::cluster::v3::Cluster& cluster, absl::string_view version_info,
                const bool avoid_cds_removal));
   MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));
   MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
@@ -44,24 +44,24 @@ public:
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(ClusterInfoMaps, clusters, (), (const));
   MOCK_METHOD(void, forEachActiveCluster, (std::function<void(const Cluster&)>), (const));
-  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (const std::string& cluster_name), (const));
-  MOCK_METHOD(OptRef<const Cluster>, getActiveOrWarmingCluster, (const std::string& cluster_name),
+  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (absl::string_view cluster_name), (const));
+  MOCK_METHOD(OptRef<const Cluster>, getActiveOrWarmingCluster, (absl::string_view cluster_name),
               (const));
-  MOCK_METHOD(bool, hasCluster, (const std::string& cluster_name), (const));
+  MOCK_METHOD(bool, hasCluster, (absl::string_view cluster_name), (const));
   MOCK_METHOD(bool, hasActiveClusters, (), (const));
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
-  MOCK_METHOD(bool, removeCluster, (const std::string& cluster, const bool remove_ignored));
+  MOCK_METHOD(bool, removeCluster, (absl::string_view cluster, const bool remove_ignored));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
-  MOCK_METHOD(const absl::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
+  MOCK_METHOD(const std::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
   MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
   MOCK_METHOD(absl::Status, replaceAdsMux,
               (const envoy::config::core::v3::ApiConfigSource& ads_config));
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
   MOCK_METHOD(const std::string, versionInfo, (), (const));
-  MOCK_METHOD(const absl::optional<std::string>&, localClusterName, (), (const));
+  MOCK_METHOD(const std::optional<std::string>&, localClusterName, (), (const));
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
@@ -86,11 +86,14 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
   MOCK_METHOD(void, drainConnections,
-              (const std::string& cluster, DrainConnectionsHostPredicate predicate));
+              (absl::string_view cluster, DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(void, drainConnections,
               (DrainConnectionsHostPredicate predicate,
                ConnectionPool::DrainBehavior drain_behavior));
-  MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));
+  MOCK_METHOD(void, drainOrCloseConnPools,
+              (DrainConnectionsPoolPredicate predicate,
+               ConnectionPool::DrainBehavior drain_behavior));
+  MOCK_METHOD(absl::Status, checkActiveStaticCluster, (absl::string_view cluster));
   MOCK_METHOD(absl::StatusOr<OdCdsApiHandlePtr>, allocateOdCdsApi,
               (OdCdsCreationFunction creation_function,
                const envoy::config::core::v3::ConfigSource& odcds_config,
@@ -109,10 +112,10 @@ public:
   envoy::config::core::v3::BindConfig& mutableBindConfig();
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
-  absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
+  std::optional<envoy::config::core::v3::BindConfig> bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
-  absl::optional<std::string> local_cluster_name_;
+  std::optional<std::string> local_cluster_name_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;

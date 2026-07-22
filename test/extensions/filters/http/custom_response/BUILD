@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -12,12 +13,18 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_proto_library(
+    name = "custom_response_test_filters_proto",
+    srcs = ["custom_response_test_filters.proto"],
+)
+
 envoy_extension_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     extension_names = ["envoy.filters.http.custom_response"],
     deps = [
+        ":custom_response_test_filters_proto_cc_proto",
         "//envoy/http:filter_interface",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

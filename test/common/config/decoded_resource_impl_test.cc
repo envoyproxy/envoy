@@ -82,7 +82,7 @@ TEST(DecodedResourceImplTest, All) {
     metadata->mutable_filter_metadata()->insert(
         {"fake_test_domain", MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
     Protobuf::Any resource_any;
-    resource_any.PackFrom(resource_wrapper);
+    std::ignore = resource_any.PackFrom(resource_wrapper);
     EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource)))
         .WillOnce(InvokeWithoutArgs(
             []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Empty>(); }));

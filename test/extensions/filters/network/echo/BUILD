@@ -24,6 +24,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/echo:config",
         "//test/integration:integration_lib",
         "//test/server:utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

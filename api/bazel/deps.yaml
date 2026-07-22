@@ -73,7 +73,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-05-06"
+  release_date: "2026-06-10"
   use_category:
   - build
   - controlplane
@@ -107,7 +107,7 @@ rules_buf:
   project_name: "Bazel rules for Buf"
   project_desc: "Bazel rules for Buf"
   project_url: "https://github.com/bufbuild/rules_buf"
-  release_date: "2025-08-22"
+  release_date: "2026-04-30"
   use_category:
   - api
   license: "Apache-2.0"

@@ -66,6 +66,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )

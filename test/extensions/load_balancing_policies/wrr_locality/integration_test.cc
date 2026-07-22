@@ -307,7 +307,9 @@ public:
               "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
               stat_prefix: config_test
               http_filters:
-                name: envoy.filters.http.router
+                - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
               codec_type: HTTP1
               route_config:
                 name: route_config_0
@@ -354,7 +356,7 @@ TEST_P(WrrLocalityEdsIntegrationTest, AddRemoveLocality) {
     // Send another 100 requests to cluster1, expecting weights to be used.
     std::vector<uint64_t> upstream_usage;
     sendRequestsAndTrackUpstreamUsage(100, upstream_usage);
-    ENVOY_LOG(trace, "upstream_usage {}", upstream_usage);
+    ENVOY_LOG(trace, "upstream_usage {}", absl::StrJoin(upstream_usage, ", "));
     // Expect the usage of first locality to be non-zero.
     EXPECT_GT(upstream_usage[0], 0);
     EXPECT_GT(upstream_usage[1], 0);

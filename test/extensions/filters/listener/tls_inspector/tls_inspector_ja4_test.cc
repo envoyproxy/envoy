@@ -13,10 +13,8 @@
 
 using testing::_;
 using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -265,8 +263,10 @@ public:
       : cfg_(std::make_shared<Config>(
             *store_.rootScope(),
             envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
-        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false,
-                                                                            absl::nullopt, {})) {}
+        io_handle_(
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt, {})) {
+    ON_CALL(os_sys_calls_, close(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
+  }
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);

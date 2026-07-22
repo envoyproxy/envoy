@@ -6,6 +6,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -25,7 +26,7 @@ TEST(MaglevConfigTest, Validate) {
     envoy::config::core::v3::TypedExtensionConfig config;
     config.set_name("envoy.load_balancing_policies.maglev");
     envoy::extensions::load_balancing_policies::maglev::v3::Maglev config_msg;
-    config.mutable_typed_config()->PackFrom(config_msg);
+    std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
     auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
     EXPECT_EQ("envoy.load_balancing_policies.maglev", factory.name());
@@ -36,7 +37,7 @@ TEST(MaglevConfigTest, Validate) {
                        context.api_.random_, context.time_system_);
     EXPECT_NE(nullptr, thread_aware_lb);
 
-    ASSERT_TRUE(thread_aware_lb->initialize().ok());
+    ASSERT_OK(thread_aware_lb->initialize());
 
     auto thread_local_lb_factory = thread_aware_lb->factory();
     EXPECT_NE(nullptr, thread_local_lb_factory);
@@ -55,7 +56,7 @@ TEST(MaglevConfigTest, Validate) {
     *hash_policy->mutable_cookie()->mutable_path() = "/test/path";
     hash_policy->mutable_cookie()->mutable_ttl()->set_seconds(1000);
 
-    config.mutable_typed_config()->PackFrom(config_msg);
+    std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
     auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
     EXPECT_EQ("envoy.load_balancing_policies.maglev", factory.name());

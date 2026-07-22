@@ -141,7 +141,7 @@ void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
-                                          absl::optional<uint64_t> status, bool end_stream,
+                                          std::optional<uint64_t> status, bool end_stream,
                                           bool bodiless_request) {
   HeaderKeyFormatterOptConstRef formatter(headers.formatter());
   if (!formatter.has_value()) {
@@ -437,7 +437,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     is_response_to_connect_request_ = false;
   }
 
-  encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream, false);
+  encodeHeadersBase(headers, std::make_optional<uint64_t>(numeric_status), end_stream, false);
 }
 
 static constexpr absl::string_view REQUEST_POSTFIX = " HTTP/1.1\r\n";
@@ -506,7 +506,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
         {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
   }
 
-  encodeHeadersBase(headers, absl::nullopt, end_stream,
+  encodeHeadersBase(headers, std::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));
   return okStatus();
 }
@@ -1401,7 +1401,7 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
     ENVOY_BUG(decoder != nullptr, "RequestDecoder is null in sendProtocolError");
     if (decoder) {
       decoder->sendLocalReply(error_code_, CodeUtility::toString(error_code_), nullptr,
-                              absl::nullopt, details);
+                              std::nullopt, details);
     }
   }
   return okStatus();
@@ -1462,7 +1462,7 @@ void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
-                                           absl::optional<uint16_t> max_response_headers_kb,
+                                           std::optional<uint16_t> max_response_headers_kb,
                                            const uint32_t max_response_headers_count,
                                            bool passing_through_proxy)
     : ConnectionImpl(connection, stats, settings, MessageType::Response,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
@@ -11,10 +12,10 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/mcp/constants.h"
+#include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +28,8 @@ namespace Mcp {
 #define MCP_FILTER_STATS(COUNTER)                                                                  \
   COUNTER(requests_rejected)                                                                       \
   COUNTER(invalid_json)                                                                            \
-  COUNTER(body_too_large)
+  COUNTER(body_too_large)                                                                          \
+  COUNTER(duplicate_keys_rejected)
 
 /**
  * Struct definition for MCP filter stats. @see stats_macros.h
@@ -54,16 +56,17 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
-  const absl::optional<
+  const std::optional<
       envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>&
   propagateTraceContext() const {
     return propagate_trace_context_;
   }
-  const absl::optional<envoy::extensions::filters::http::mcp::v3::Mcp::BaggagePropagationConfig>&
+  const std::optional<envoy::extensions::filters::http::mcp::v3::Mcp::BaggagePropagationConfig>&
   propagateBaggage() const {
     return propagate_baggage_;
   }
 
+  bool rejectDuplicateKeys() const { return parser_config_.rejectDuplicateKeys(); }
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
@@ -86,10 +89,9 @@ public:
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
-  const absl::optional<
-      envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>
+  const std::optional<envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>
       propagate_trace_context_;
-  const absl::optional<envoy::extensions::filters::http::mcp::v3::Mcp::BaggagePropagationConfig>
+  const std::optional<envoy::extensions::filters::http::mcp::v3::Mcp::BaggagePropagationConfig>
       propagate_baggage_;
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
@@ -108,18 +110,18 @@ public:
       : traffic_mode_(proto_config.traffic_mode()),
         max_request_body_size_(
             proto_config.has_max_request_body_size()
-                ? absl::optional<uint32_t>(proto_config.max_request_body_size().value())
-                : absl::nullopt) {}
+                ? std::optional<uint32_t>(proto_config.max_request_body_size().value())
+                : std::nullopt) {}
 
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
     return traffic_mode_;
   }
 
-  absl::optional<uint32_t> maxRequestBodySize() const { return max_request_body_size_; }
+  std::optional<uint32_t> maxRequestBodySize() const { return max_request_body_size_; }
 
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
-  const absl::optional<uint32_t> max_request_body_size_;
+  const std::optional<uint32_t> max_request_body_size_;
 };
 
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
@@ -147,16 +149,19 @@ private:
   bool shouldRejectRequest() const;
   uint32_t getMaxRequestBodySize() const;
 
-  void handleParseError(absl::string_view error_msg);
+  void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   Http::FilterDataStatus completeParsing();
+  void setDynamicMetadataStatus(Protobuf::Struct metadata);
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   uint32_t bytes_parsed_{0};
   bool parsing_complete_{false};
+  bool is_exceeding_limit_{false};
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
+  Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
 };
 
 } // namespace Mcp

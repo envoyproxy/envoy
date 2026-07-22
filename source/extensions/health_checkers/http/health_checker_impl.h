@@ -85,7 +85,7 @@ private:
 
     void onResponseComplete();
     enum class HealthCheckResult { Succeeded, Degraded, Failed, Retriable };
-    HealthCheckResult healthCheckResult();
+    HealthCheckResult healthCheckResult(uint64_t response_code);
     bool shouldClose() const;
 
     // ActiveHealthCheckSession
@@ -171,7 +171,7 @@ private:
   PayloadMatcher::MatchSegments receive_bytes_;
   const envoy::config::core::v3::RequestMethod method_;
   uint64_t response_buffer_size_;
-  absl::optional<Matchers::StringMatcherImpl> service_name_matcher_;
+  std::optional<Matchers::StringMatcherImpl> service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
   const HttpStatusChecker http_status_checker_;
 

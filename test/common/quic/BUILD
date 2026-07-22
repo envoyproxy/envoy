@@ -6,6 +6,7 @@ load(
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_enable_http3",
+    "envoy_select_enable_http_datagrams",
 )
 
 licenses(["notice"])  # Apache 2
@@ -69,6 +70,7 @@ envoy_cc_test(
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
+        "//source/common/quic:envoy_tls_server_handshaker",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:server_context_lib",
         "//test/mocks/network:network_mocks",
@@ -143,6 +145,8 @@ envoy_cc_test(
         "@quiche//:quic_core_http_spdy_session_lib",
         "@quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
         "@quiche//:quic_test_tools_session_peer_lib",
+    ]) + envoy_select_enable_http_datagrams([
+        "//source/common/quic:web_transport_session_bridge_lib",
     ]),
 )
 
@@ -159,6 +163,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
+        "//test/mocks/http:webtransport_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -190,6 +195,7 @@ envoy_cc_test(
         "//test/test_common:global_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@quiche//:quic_test_tools_config_peer_lib",
         "@quiche//:quic_test_tools_stream_peer_lib",
         "@quiche//:quic_test_tools_server_session_base_peer",
@@ -231,6 +237,7 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3(["active_quic_listener_test.cc"]),
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
+        ":fake_quic_packet_writer_lib",
         ":test_proof_source_lib",
         ":test_utils_lib",
         "//source/common/http:utility_lib",
@@ -299,6 +306,14 @@ envoy_cc_test_library(
     deps = [
         "//source/common/quic:envoy_quic_proof_verifier_base_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "fake_quic_packet_writer_lib",
+    hdrs = envoy_select_enable_http3(["fake_quic_packet_writer.h"]),
+    deps = envoy_select_enable_http3([
+        "@quiche//:quic_core_packet_writer_lib",
+    ]),
 )
 
 envoy_cc_test(
@@ -412,6 +427,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "web_transport_session_bridge_test",
+    srcs = envoy_select_enable_http3(["web_transport_session_bridge_test.cc"]),
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:web_transport_session_bridge_lib",
+        "//test/mocks/http:webtransport_mocks",
+        "@quiche//:quiche_common_capsule_lib",
+    ]),
+)
+
+envoy_cc_test(
     name = "cert_compression_test",
     srcs = envoy_select_enable_http3(["cert_compression_test.cc"]),
     deps = envoy_select_enable_http3([
@@ -422,8 +448,16 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "connection_id_matchers",
-    hdrs = ["connection_id_matchers.h"],
-    deps = ["//test/mocks/network:network_mocks"],
+    srcs = envoy_select_enable_http3(["connection_id_matchers.cc"]),
+    hdrs = envoy_select_enable_http3(["connection_id_matchers.h"]),
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
+        "//test/mocks/network:network_mocks",
+        "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ]),
 )
 
 envoy_cc_test(

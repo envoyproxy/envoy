@@ -56,7 +56,7 @@ public:
 
             // Serialize to an Any
             Protobuf::Any typed_value;
-            typed_value.PackFrom(string_proto);
+            std::ignore = typed_value.PackFrom(string_proto);
 
             // Use the appropriate way to add typed metadata
             callbacks_->connection().streamInfo().setDynamicTypedMetadata(namespace_name,
@@ -87,7 +87,7 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext&) override {
-    const auto& struct_config = dynamic_cast<const Protobuf::Struct&>(proto_config);
+    const auto& struct_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(proto_config);
     return [struct_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<MetadataSetterFilter>(struct_config));
     };
@@ -158,15 +158,15 @@ public:
             auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
             auto* filter_chain = listeners->mutable_filter_chains(0);
             auto* filters = filter_chain->mutable_filters();
-            for (int i = 0; i < filters->size(); i++) {
-              if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
+            for (auto& filter : *filters) {
+              if (filter.name() == "envoy.network_ext_proc.ext_proc_filter") {
                 envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-                (*filters)[i].mutable_typed_config()->UnpackTo(&config);
+                std::ignore = filter.mutable_typed_config()->UnpackTo(&config);
 
                 // Apply the provided modifier function
                 config_modifier(config);
 
-                (*filters)[i].mutable_typed_config()->PackFrom(config);
+                std::ignore = filter.mutable_typed_config()->PackFrom(config);
                 break;
               }
             }
@@ -213,7 +213,7 @@ public:
   // Helper method to set either untyped or typed connection metadata
   void setConnectionMetadata(const std::string& namespace_name,
                              const std::map<std::string, std::string>& untyped_values,
-                             const absl::optional<std::string>& typed_value = absl::nullopt) {
+                             const std::optional<std::string>& typed_value = std::nullopt) {
     config_helper_.addConfigModifier([namespace_name, untyped_values, typed_value](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Find the metadata_setter filter
@@ -221,11 +221,11 @@ public:
       auto* filter_chain = listener->mutable_filter_chains(0);
       auto* filters = filter_chain->mutable_filters();
 
-      for (int i = 0; i < filters->size(); i++) {
-        if ((*filters)[i].name() == "test.metadata_setter") {
+      for (auto& filter : *filters) {
+        if (filter.name() == "test.metadata_setter") {
           Protobuf::Struct existing_config;
-          if ((*filters)[i].has_typed_config()) {
-            (*filters)[i].typed_config().UnpackTo(&existing_config);
+          if (filter.has_typed_config()) {
+            std::ignore = filter.typed_config().UnpackTo(&existing_config);
           }
 
           // Set untyped metadata
@@ -265,7 +265,7 @@ public:
                 .set_string_value(typed_value.value());
           }
 
-          (*filters)[i].mutable_typed_config()->PackFrom(existing_config);
+          std::ignore = filter.mutable_typed_config()->PackFrom(existing_config);
           break;
         }
       }

@@ -29,8 +29,8 @@ public:
   MOCK_METHOD(absl::StatusOr<ServerContextSharedPtr>, createSslServerContext,
               (Stats::Scope & stats, const ServerContextConfig& config,
                ContextAdditionalInitFunc additional_init));
-  MOCK_METHOD(absl::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
-  MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
+  MOCK_METHOD(std::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
+  MOCK_METHOD(std::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
   MOCK_METHOD(Ssl::PrivateKeyMethodManager&, privateKeyMethodManager, ());
   MOCK_METHOD(void, removeContext, (const Envoy::Ssl::ContextSharedPtr& old_context));
@@ -59,6 +59,7 @@ public:
   MOCK_METHOD(const std::string&, pemEncodedPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, pemEncodedPeerCertificateChain, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, pemEncodedValidatedPeerCertificateChain, (), (const));
   MOCK_METHOD(bool, peerCertificateSanMatches, (const Ssl::SanMatcher&), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
@@ -72,8 +73,8 @@ public:
   MOCK_METHOD(absl::Span<const std::string>, othernameSansLocalCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, oidsPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, oidsLocalCertificate, (), (const));
-  MOCK_METHOD(absl::optional<SystemTime>, validFromPeerCertificate, (), (const));
-  MOCK_METHOD(absl::optional<SystemTime>, expirationPeerCertificate, (), (const));
+  MOCK_METHOD(std::optional<SystemTime>, validFromPeerCertificate, (), (const));
+  MOCK_METHOD(std::optional<SystemTime>, expirationPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, sessionId, (), (const));
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
   MOCK_METHOD(std::string, ciphersuiteString, (), (const));
@@ -89,8 +90,8 @@ public:
   MockClientContext();
   ~MockClientContext() override;
 
-  MOCK_METHOD(absl::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
-  MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
+  MOCK_METHOD(std::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
+  MOCK_METHOD(std::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
 };
@@ -120,15 +121,15 @@ public:
   MOCK_METHOD(bool, autoHostServerNameIndication, (), (const));
   MOCK_METHOD(bool, autoSniSanMatch, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
-  MOCK_METHOD(bool, enforceRsaKeyUsage, (), (const));
+
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogLocal, (), (const));
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
-  MOCK_METHOD(absl::optional<
-                  envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
-              compliancePolicy, (), (const));
+  MOCK_METHOD(
+      std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
+      compliancePolicy, (), (const));
   MOCK_METHOD(OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>, tlsCertificateSelectorFactory, (),
               (const, override));
   Ssl::HandshakerCapabilities capabilities_;
@@ -137,7 +138,7 @@ public:
   std::string alpn_{""};
   std::string sigalgs_{""};
   Network::Address::IpList iplist_;
-  std::string path_{};
+  std::string path_;
 };
 
 class MockServerContextConfig : public ServerContextConfig {
@@ -156,7 +157,7 @@ public:
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
-  MOCK_METHOD(absl::optional<std::chrono::seconds>, sessionTimeout, (), (const));
+  MOCK_METHOD(std::optional<std::chrono::seconds>, sessionTimeout, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
@@ -175,9 +176,9 @@ public:
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
   MOCK_METHOD(bool, fullScanCertsOnSNIMismatch, (), (const));
-  MOCK_METHOD(absl::optional<
-                  envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
-              compliancePolicy, (), (const));
+  MOCK_METHOD(
+      std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
+      compliancePolicy, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, serverNames, (), (const));
 
   Ssl::HandshakerCapabilities capabilities_;
@@ -222,15 +223,16 @@ public:
   MOCK_METHOD(const std::vector<std::string>&, verifyCertificateHashList, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, verifyCertificateSpkiList, (), (const));
   MOCK_METHOD(bool, allowExpiredCertificate, (), (const));
-  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&,
+  MOCK_METHOD(const std::optional<envoy::config::core::v3::TypedExtensionConfig>&,
               customValidatorConfig, (), (const));
   MOCK_METHOD(Api::Api&, api, (), (const));
   MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
                   TrustChainVerification,
               trustChainVerification, (), (const));
   MOCK_METHOD(bool, onlyVerifyLeafCertificateCrl, (), (const));
-  MOCK_METHOD(absl::optional<uint32_t>, maxVerifyDepth, (), (const));
+  MOCK_METHOD(std::optional<uint32_t>, maxVerifyDepth, (), (const));
   MOCK_METHOD(bool, autoSniSanMatch, (), (const));
+  MOCK_METHOD(bool, suppressClientCaList, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {

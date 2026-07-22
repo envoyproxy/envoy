@@ -18,7 +18,7 @@ Http::FilterFactoryCb GrpcWebFilterConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb GrpcWebFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> GrpcWebFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_web::v3::GrpcWeb&, const std::string&,
     Server::Configuration::ServerFactoryContext& factory_context) {
   return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {

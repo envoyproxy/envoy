@@ -12,6 +12,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
+#include "source/common/formatter/builtin_command_parser_factory_helper.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -149,9 +150,13 @@ RevConCluster::checkAndCreateHost(absl::string_view host_id,
   Network::Address::InstanceConstSharedPtr host_address(
       std::make_shared<UpstreamReverseConnectionAddress>(node_id));
 
-  // Create a standard HostImpl using the custom address.
+  // Hostname "[tenant:]cluster:node" matches the synthetic admin endpoint, so /clusters shows
+  // the spoke cluster.
+  const std::string cluster_id = socket_manager->getClusterForNode(node_id);
   auto host_result = Upstream::HostImpl::create(
-      info(), absl::StrCat(info()->name(), static_cast<std::string>(node_id)),
+      info(),
+      BootstrapReverseConnection::ReverseConnectionUtility::buildClusterScopedIdentifier(
+          node_id, cluster_id),
       std::move(host_address), nullptr /* endpoint_metadata */, nullptr /* locality_metadata */,
       1 /* initial_weight */, std::make_shared<const envoy::config::core::v3::Locality>(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
@@ -174,7 +179,7 @@ void RevConCluster::addHostToHostSet(Upstream::HostSharedPtr host) {
             all_hosts->size());
   priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-      {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
+      {}, {std::move(host)}, {}, std::nullopt, std::nullopt);
 }
 
 void RevConCluster::cleanup() {
@@ -202,7 +207,7 @@ void RevConCluster::cleanup() {
     priority_set_.updateHosts(0,
                               Upstream::HostSetImpl::partitionHosts(
                                   keeping_hosts, Upstream::HostsPerLocalityImpl::empty()),
-                              {}, {}, to_be_removed, absl::nullopt, absl::nullopt);
+                              {}, {}, to_be_removed, std::nullopt, std::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_);
@@ -226,6 +231,49 @@ BootstrapReverseConnection::UpstreamSocketManager* RevConCluster::getUpstreamSoc
          "TLS should be initialized by onServerInitialized() before request handling");
 
   return tls_registry->socketManager();
+}
+
+BootstrapReverseConnection::ReverseTunnelAcceptorExtension*
+RevConCluster::getAcceptorExtension() const {
+  auto* upstream_interface =
+      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+  auto* acceptor =
+      dynamic_cast<const BootstrapReverseConnection::ReverseTunnelAcceptor*>(upstream_interface);
+  if (acceptor == nullptr) {
+    return nullptr;
+  }
+  // getExtension() returns the process-wide extension and does not require thread-local state, so
+  // this is safe to call from the main/admin thread.
+  return acceptor->getExtension();
+}
+
+std::vector<Upstream::AdminEndpointProvider::AdminEndpoint> RevConCluster::adminEndpoints() const {
+  std::vector<Upstream::AdminEndpointProvider::AdminEndpoint> endpoints;
+  auto* extension = getAcceptorExtension();
+  if (extension == nullptr) {
+    return endpoints;
+  }
+
+  absl::ReaderMutexLock rlock(host_map_lock_);
+  for (const auto& tunnel : extension->reachableTunnels()) {
+    // tunnel.node_id is the host_map_ key; skip nodes that already have a real host so they are not
+    // listed twice.
+    if (host_map_.contains(tunnel.node_id)) {
+      continue;
+    }
+
+    Upstream::AdminEndpointProvider::AdminEndpoint endpoint;
+    // Placeholder 127.0.0.1:0 address; "[tenant:]cluster:node" hostname, matching the real host.
+    endpoint.address = std::make_shared<UpstreamReverseConnectionAddress>(tunnel.node_id);
+    endpoint.hostname =
+        BootstrapReverseConnection::ReverseConnectionUtility::buildClusterScopedIdentifier(
+            tunnel.node_id, tunnel.cluster_id);
+    endpoint.weight = 1;
+    endpoint.health = envoy::config::core::v3::HEALTHY;
+    endpoint.gauges.emplace_back("rt_connection_count", tunnel.connection_count);
+    endpoints.push_back(std::move(endpoint));
+  }
+  return endpoints;
 }
 
 RevConCluster::RevConCluster(

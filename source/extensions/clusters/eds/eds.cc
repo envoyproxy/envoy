@@ -204,27 +204,31 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
     return absl::OkStatus();
   }
   if (resources.size() != 1) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected EDS resource length: {}", resources.size()));
+    const auto msg = fmt::format("Unexpected EDS resource length: {}", resources.size());
+    ENVOY_LOG(warn, "eds: cluster '{}' config rejected: {}", edsServiceName(), msg);
+    return absl::InvalidArgumentError(msg);
   }
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
-      dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+      Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources[0].get().resource());
   if (cluster_load_assignment.cluster_name() != edsServiceName()) {
-    return absl::InvalidArgumentError(fmt::format("Unexpected EDS cluster (expecting {}): {}",
-                                                  edsServiceName(),
-                                                  cluster_load_assignment.cluster_name()));
+    const auto msg = fmt::format("Unexpected EDS cluster (expecting {}): {}", edsServiceName(),
+                                 cluster_load_assignment.cluster_name());
+    ENVOY_LOG(warn, "eds: cluster '{}' config rejected: {}", edsServiceName(), msg);
+    return absl::InvalidArgumentError(msg);
   }
   // Validate that each locality doesn't have both LEDS and endpoints defined.
   // TODO(adisuissa): This is only needed for the API v3 support. In future major versions
   // the oneof definition will take care of it.
   for (const auto& locality : cluster_load_assignment.endpoints()) {
     if (locality.has_leds_cluster_locality_config() && locality.lb_endpoints_size() > 0) {
-      return absl::InvalidArgumentError(fmt::format(
+      const auto msg = fmt::format(
           "A ClusterLoadAssignment for cluster {} cannot include both LEDS (resource: {}) and a "
           "list of endpoints.",
-          edsServiceName(), locality.leds_cluster_locality_config().leds_collection_name()));
+          edsServiceName(), locality.leds_cluster_locality_config().leds_collection_name());
+      ENVOY_LOG(warn, "eds: cluster '{}' config rejected: {}", edsServiceName(), msg);
+      return absl::InvalidArgumentError(msg);
     }
   }
 
@@ -399,7 +403,7 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
 
     prioritySet().updateHosts(
         priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-        host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt, absl::nullopt);
+        host_set->localityWeights(), {}, hosts_to_remove, std::nullopt, std::nullopt);
   }
 }
 
@@ -438,7 +442,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
               info_->name(), host_set.hosts().size(), host_set.priority());
 
     priority_state_manager.updateClusterPrioritySet(
-        priority, std::move(current_hosts_copy), hosts_added, hosts_removed, absl::nullopt,
+        priority, std::move(current_hosts_copy), hosts_added, hosts_removed, std::nullopt,
         weighted_priority_health, overprovisioning_factor);
     return true;
   }
@@ -462,7 +466,8 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
           "Did not receive EDS response on time, using cached ClusterLoadAssignment for cluster {}",
           edsServiceName());
       envoy::config::endpoint::v3::ClusterLoadAssignment cached_load_assignment =
-          dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(*cached_resource);
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+              *cached_resource);
       info_->configUpdateStats().assignment_use_cached_.inc();
       using_cached_resource_ = true;
       update(std::move(cached_load_assignment));
