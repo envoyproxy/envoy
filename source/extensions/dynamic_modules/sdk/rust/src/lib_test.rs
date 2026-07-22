@@ -14,6 +14,40 @@ fn test_loggers() {
   envoy_log_error!("message with an argument: {}", "argument");
 }
 
+// Mock storage backing the log level callbacks so the unit tests can exercise the SDK wrappers
+// without the Envoy host symbols.
+static MOCK_LOG_LEVEL: std::sync::Mutex<abi::envoy_dynamic_module_type_log_level> =
+  std::sync::Mutex::new(abi::envoy_dynamic_module_type_log_level::Info);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_get_log_level(
+) -> abi::envoy_dynamic_module_type_log_level {
+  *MOCK_LOG_LEVEL.lock().unwrap()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_log_enabled(
+  level: abi::envoy_dynamic_module_type_log_level,
+) -> bool {
+  // A level is enabled when it is at or above the currently configured level.
+  (*MOCK_LOG_LEVEL.lock().unwrap() as u32) <= (level as u32)
+}
+
+#[test]
+fn test_log_level_callbacks() {
+  use abi::envoy_dynamic_module_type_log_level as Level;
+
+  *MOCK_LOG_LEVEL.lock().unwrap() = Level::Warn;
+  assert_eq!(get_log_level(), Level::Warn);
+  assert!(!is_log_enabled(Level::Info));
+  assert!(is_log_enabled(Level::Warn));
+  assert!(is_log_enabled(Level::Error));
+
+  *MOCK_LOG_LEVEL.lock().unwrap() = Level::Trace;
+  assert_eq!(get_log_level(), Level::Trace);
+  assert!(is_log_enabled(Level::Trace));
+}
+
 #[test]
 fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   struct TestHttpFilterConfig;
@@ -4902,6 +4936,24 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_filter_st
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
   _key: abi::envoy_dynamic_module_type_module_buffer,
   _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
   false
 }

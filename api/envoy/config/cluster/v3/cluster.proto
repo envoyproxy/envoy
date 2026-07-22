@@ -13,6 +13,7 @@ import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/core/v3/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
+import "envoy/config/metrics/v3/stats.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -46,7 +47,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 61]
+// [#next-free-field: 62]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -865,6 +866,12 @@ message Cluster {
   //   Any ``:`` in the name will be converted to ``_`` when emitting statistics. This should not be confused with
   //   :ref:`Router Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
   string alt_stat_name = 28 [(udpa.annotations.field_migrate).rename = "observability_name"];
+
+  // Optional stats matcher that can be used to configure which stats are instantiated for this
+  // cluster. If configured, this overrides the bootstrap :ref:`stats_config
+  // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_config>` stats matcher configuration
+  // for this cluster.
+  metrics.v3.StatsMatcher stats_matcher = 61;
 
   oneof cluster_discovery_type {
     // The :ref:`service discovery type <arch_overview_service_discovery_types>`

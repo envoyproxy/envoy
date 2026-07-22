@@ -23,6 +23,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -2033,6 +2034,30 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
+// The dispatcher can fail to create a client connection (e.g. when binding the upstream socket to
+// a configured network namespace fails at runtime). createConnection must surface the null
+// connection to the caller rather than crash on a null dereference.
+TEST_F(HostImplTest, CreateConnectionFailure) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "lyft.com", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN));
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(nullptr));
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  EXPECT_EQ(nullptr, connection_data.connection_);
+  EXPECT_EQ(host.get(), connection_data.host_description_.get());
+}
+
 TEST_F(HostImplTest, OrcaReportingAddressDefaultsToDataAddress) {
   MockClusterMockPrioritySet cluster;
   Network::Address::InstanceConstSharedPtr address =
@@ -2519,6 +2544,19 @@ TEST_F(HostImplTest, HealthcheckHostname) {
           envoy::config::core::v3::Locality().default_instance()),
       config, 1);
   EXPECT_EQ("foo", descr->hostnameForHealthChecks());
+}
+
+std::optional<Network::Socket::Option::Details>
+findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
+                  envoy::config::core::v3::SocketOption::SocketState state,
+                  Network::Socket& socket) {
+  for (const auto& option : options) {
+    const auto details = option->getOptionDetails(socket, state);
+    if (details.has_value() && details->name_ == name) {
+      return details;
+    }
+  }
+  return std::nullopt;
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -4333,6 +4371,101 @@ public:
   TestRandomGenerator random_;
 };
 
+TEST_F(StaticClusterImplTest, AppendBindAddressNoPortOption) {
+  NiceMock<Network::MockSocket> socket;
+
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    GTEST_SKIP() << "IP_BIND_ADDRESS_NO_PORT is not supported on this platform";
+  }
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    upstream_bind_config:
+      source_address:
+        address: 127.0.0.6
+        port_value: 0
+    load_assignment:
+      cluster_name: staticcluster
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 80
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster config;
+  TestUtility::loadFromYaml(yaml, config);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+
+  {
+    // port 0, guard ON -> option present.
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_TRUE(option.has_value());
+  }
+
+  {
+    // port 0, guard OFF -> option absent.
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion", "false"}});
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_FALSE(option.has_value());
+  }
+
+  {
+    // non-zero port -> option absent regardless of guard.
+    const std::string yaml_nonzero_port = R"EOF(
+      name: staticcluster
+      connect_timeout: 0.25s
+      type: static
+      upstream_bind_config:
+        source_address:
+          address: 127.0.0.6
+          port_value: 5000
+      load_assignment:
+        cluster_name: staticcluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 80
+    )EOF";
+    envoy::config::cluster::v3::Cluster config_nonzero_port;
+    TestUtility::loadFromYaml(yaml_nonzero_port, config_nonzero_port);
+    std::shared_ptr<StaticClusterImpl> cluster =
+        createCluster(config_nonzero_port, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_FALSE(option.has_value());
+  }
+}
+
 // Test creating and extending a priority set.
 TEST(PrioritySet, Extend) {
   PrioritySetImpl priority_set;
@@ -4934,11 +5067,8 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherRejectAll) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          reject_all: true
+    stats_matcher:
+      reject_all: true
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4965,13 +5095,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherInclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          inclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_cx"
+    stats_matcher:
+      inclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_cx"
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4999,13 +5126,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherExclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          exclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_rq"
+    stats_matcher:
+      exclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_rq"
     load_assignment:
         endpoints:
           - lb_endpoints:

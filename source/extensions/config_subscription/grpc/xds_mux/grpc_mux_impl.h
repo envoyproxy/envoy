@@ -99,7 +99,7 @@ public:
     handleStreamEstablishmentFailure(next_attempt_may_send_initial_resource_version);
   }
   void onWriteable() override { trySendDiscoveryRequests(); }
-  void onDiscoveryResponse(std::unique_ptr<RS>&& message,
+  void onDiscoveryResponse(ResponseProtoPtr<RS>&& message,
                            ControlPlaneStats& control_plane_stats) override {
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }

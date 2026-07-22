@@ -32,6 +32,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -1029,7 +1030,7 @@ TEST_F(ReverseConnectionClusterTest, ThreadAwareLoadBalancer) {
 
   // Test initialize() method.
   auto init_status = thread_aware_lb->initialize();
-  EXPECT_TRUE(init_status.ok());
+  EXPECT_OK(init_status);
 
   // Test factory() method.
   auto factory = thread_aware_lb->factory();

@@ -169,7 +169,6 @@ protected:
   std::optional<std::reference_wrapper<SidestreamWatermarkCallbacks>> watermark_callbacks_;
   bool complete_{};
   const bool discard_response_body_;
-  const bool new_async_client_retry_logic_{};
   std::optional<uint64_t> buffer_limit_{std::nullopt};
 
 private:
@@ -199,14 +198,6 @@ private:
   void continueDecoding() override {}
   RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
   void addDecodedData(Buffer::Instance& data, bool) override {
-    if (!new_async_client_retry_logic_) {
-      // This should only be called if the user has set up buffering. The request is already fully
-      // buffered. Note that this is only called via the async client's internal use of the router
-      // filter which uses this function for buffering.
-      ASSERT(buffered_body_ != nullptr);
-      return;
-    }
-
     // This will only be used by internal router filter for buffering for retries.
 
     // If the buffer limit is reached, the router filter will ignore the retry and the following
@@ -254,13 +245,7 @@ private:
   void setBufferLimit(uint64_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
   }
-  uint64_t bufferLimit() override {
-    if (new_async_client_retry_logic_) {
-      return buffer_limit_.value_or(kDefaultDecoderBufferLimit);
-    } else {
-      return buffer_limit_.value_or(0);
-    }
-  }
+  uint64_t bufferLimit() override { return buffer_limit_.value_or(kDefaultDecoderBufferLimit); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
@@ -423,12 +408,8 @@ private:
   }
   const Buffer::Instance* decodingBuffer() override { return &request_->body(); }
   uint64_t bufferLimit() override {
-    if (new_async_client_retry_logic_) {
-      // 0 means no limit because the whole body is already buffered in request message.
-      return 0;
-    } else {
-      return buffer_limit_.value_or(0);
-    }
+    // 0 means no limit because the whole body is already buffered in request message.
+    return 0;
   }
 
   RequestMessagePtr request_;
