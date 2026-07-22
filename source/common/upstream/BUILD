@@ -87,6 +87,7 @@ envoy_cc_library(
         ":load_balancer_context_base_lib",
         ":load_stats_reporter_lib",
         "//envoy/api:api_interface",
+        "//envoy/common:conn_pool_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codes_interface",

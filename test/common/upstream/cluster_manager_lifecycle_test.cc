@@ -1003,6 +1003,276 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+class EagerPreconnectFloorLifecycleTest : public ClusterManagerLifecycleTest {
+protected:
+  void setUpClusterWithPreconnectFloor(uint32_t floor,
+                                       std::initializer_list<Host::HealthFlag> initial_host_flags,
+                                       std::shared_ptr<MockClusterMockPrioritySet>& cluster,
+                                       HostSharedPtr& host, MockHealthChecker& health_checker,
+                                       Outlier::MockDetector& outlier_detector) {
+    const std::string json = fmt::sprintf(
+        "{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("eager_preconnect_floor_cluster")}));
+    cluster = std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+    cluster->info_->name_ = "eager_preconnect_floor_cluster";
+    ON_CALL(*cluster->info_, eagerPreconnectFloor()).WillByDefault(Return(floor));
+
+    host = makeTestHost(cluster->info_, "tcp://127.0.0.1:80");
+    for (const auto flag : initial_host_flags) {
+      host->healthFlagSet(flag);
+    }
+    cluster->prioritySet().getMockHostSet(0)->hosts_ = {host};
+    ON_CALL(*cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+
+    ON_CALL(*cluster, healthChecker()).WillByDefault(Return(&health_checker));
+    ON_CALL(*cluster, outlierDetector()).WillByDefault(Return(&outlier_detector));
+
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+        .WillOnce(Return(std::make_pair(cluster, nullptr)));
+    EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+    EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+    EXPECT_CALL(*cluster, initialize(_))
+        .WillOnce(Invoke(
+            [cluster](std::function<void()> initialize_callback) { initialize_callback(); }));
+    create(parseBootstrapFromV3Json(json));
+
+    // Instantiate the cluster on this worker.
+    ASSERT_NE(nullptr, cluster_manager_->getThreadLocalCluster("eager_preconnect_floor_cluster"));
+  }
+
+
+  NiceMock<Http::ConnectionPool::MockInstance>* useAsHttp(const HostSharedPtr& host) {
+    auto* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
+    cluster_manager_->getThreadLocalCluster("eager_preconnect_floor_cluster")
+        ->httpConnPool(host, ResourcePriority::Default, std::nullopt, nullptr);
+    return pool;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(EagerPreconnectFloorLifecycleTest, EagerPreconnectFloorLifecycleTest,
+                         testing::Bool());
+
+TEST_P(EagerPreconnectFloorLifecycleTest, DisabledByRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.eager_preconnect_floor", "false"}});
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  setUpClusterWithPreconnectFloor(2, {Host::HealthFlag::FAILED_ACTIVE_HC}, cluster, host,
+                                  health_checker, outlier_detector);
+
+  // No floor bootstrapped on usage.                
+  auto* cp = useAsHttp(host);
+  EXPECT_CALL(*cp, maybePreconnect(_)).Times(0);
+
+  // No floor bootstrapped on recovery.
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(host, HealthTransition::Changed, HealthState::Healthy);
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
+TEST_P(EagerPreconnectFloorLifecycleTest, SkippedWhenFloorUnset) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  setUpClusterWithPreconnectFloor(0, {Host::HealthFlag::FAILED_ACTIVE_HC}, cluster, host,
+                                  health_checker, outlier_detector);
+
+   // No floor bootstrapped on usage.
+  auto* cp = useAsHttp(host);
+  EXPECT_CALL(*cp, maybePreconnect(_)).Times(0);
+
+  // No floor bootstrapped on recovery.
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(host, HealthTransition::Changed, HealthState::Healthy);
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
+// When a host transitions back to healthy, the cluster manager opens a bootstrap connection
+// and defers the rest of the floor maintenance to the pool.
+TEST_P(EagerPreconnectFloorLifecycleTest, BootstrappedOnActiveHealthCheckRecovery) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  setUpClusterWithPreconnectFloor(2, {Host::HealthFlag::FAILED_ACTIVE_HC}, cluster, host,
+                                  health_checker, outlier_detector);
+
+  auto* cp = useAsHttp(host);
+  EXPECT_CALL(*cp, maybePreconnect(_)).WillOnce(Return(true));
+
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(host, HealthTransition::Changed, HealthState::Healthy);
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
+// When a host is un-ejected from the outlier detector, the cluster manager opens
+// a bootstrap connection and defers the rest of the floor maintenance to the pool.
+TEST_P(EagerPreconnectFloorLifecycleTest, BootstrappedOnOutlierUnejection) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  setUpClusterWithPreconnectFloor(2, {Host::HealthFlag::FAILED_OUTLIER_CHECK}, cluster, host,
+                                  health_checker, outlier_detector);
+
+  auto* cp = useAsHttp(host);
+  EXPECT_CALL(*cp, maybePreconnect(_)).WillOnce(Return(true));
+
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector.runCallbacks(host);
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
+// When a host transitions back to healthy, prior connection issues are cleared.
+TEST_P(EagerPreconnectFloorLifecycleTest, RebootstrapsLatchedHostOnHealthCheckRecovery) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  setUpClusterWithPreconnectFloor(2, {Host::HealthFlag::FAILED_ACTIVE_HC}, cluster, host,
+                                  health_checker, outlier_detector);
+
+  auto* cp = useAsHttp(host);
+
+  // Latch the host at the failure threshold (default 3).
+  host->incConsecutiveEagerPreconnectFloorFailures();
+  host->incConsecutiveEagerPreconnectFloorFailures();
+  host->incConsecutiveEagerPreconnectFloorFailures();
+  ASSERT_GE(host->consecutiveEagerPreconnectFloorFailures(), 3u);
+
+  // Recovery clears the latch and bootstraps the floor.
+  EXPECT_CALL(*cp, maybePreconnect(_)).WillOnce(Return(true));
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(host, HealthTransition::Changed, HealthState::Healthy);
+  EXPECT_EQ(0, host->consecutiveEagerPreconnectFloorFailures());
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
+// When a host is un-ejected from the outlier detector, prior connection issues are cleared.
+TEST_P(EagerPreconnectFloorLifecycleTest, RebootstrapsLatchedHostOnOutlierUnejection) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  setUpClusterWithPreconnectFloor(2, {Host::HealthFlag::FAILED_OUTLIER_CHECK}, cluster, host,
+                                  health_checker, outlier_detector);
+
+  auto* cp = useAsHttp(host);
+
+  // Latch the host at the failure threshold (default 3).
+  host->incConsecutiveEagerPreconnectFloorFailures();
+  host->incConsecutiveEagerPreconnectFloorFailures();
+  host->incConsecutiveEagerPreconnectFloorFailures();
+  ASSERT_GE(host->consecutiveEagerPreconnectFloorFailures(), 3u);
+
+  // Recovery clears the latch and bootstraps the floor.
+  EXPECT_CALL(*cp, maybePreconnect(_)).WillOnce(Return(true));
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector.runCallbacks(host);
+  EXPECT_EQ(0, host->consecutiveEagerPreconnectFloorFailures());
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
+// When a healthy host is added after the pool type is in use, the cluster manager opens
+// a bootstrap connection for the new host.
+TEST_P(EagerPreconnectFloorLifecycleTest, BootstrappedOnHostAdded) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  // Cluster has one unhealthy host, which will not be bootstrapped.
+  setUpClusterWithPreconnectFloor(2, {Host::HealthFlag::FAILED_ACTIVE_HC}, cluster, host,
+                                  health_checker, outlier_detector);
+
+  auto* existing_pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+  auto* added_pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
+      .WillOnce(Return(existing_pool))
+      .WillOnce(Return(added_pool));
+  // Only the newly added host is bootstrapped.
+  EXPECT_CALL(*existing_pool, maybePreconnect(_)).Times(0);
+  EXPECT_CALL(*added_pool, maybePreconnect(_)).WillOnce(Return(true));
+
+  // Mark the cluster as used for HTTP.
+  cluster_manager_->getThreadLocalCluster("eager_preconnect_floor_cluster")
+      ->httpConnPool(host, ResourcePriority::Default, std::nullopt, nullptr);
+
+  // Add a healthy host.
+  HostSharedPtr added_host = makeTestHost(cluster->info_, "tcp://127.0.0.1:81");
+  cluster->prioritySet().getMockHostSet(0)->hosts_ = {host, added_host};
+  cluster->prioritySet().getMockHostSet(0)->runCallbacks({added_host}, {});
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
+// When a recovery signal fires while the host already has a ready connection,
+// the cluster manager does not bootstrap.
+TEST_P(EagerPreconnectFloorLifecycleTest, SkippedWhenHostHasReadyConnection) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  setUpClusterWithPreconnectFloor(2, {Host::HealthFlag::FAILED_ACTIVE_HC}, cluster, host,
+                                  health_checker, outlier_detector);
+
+  auto* cp = useAsHttp(host);
+  // The pool reports a ready connection, so cluster manager does not bootstrap.
+  ON_CALL(*cp, hasReadyConnection()).WillByDefault(Return(true));
+  EXPECT_CALL(*cp, maybePreconnect(_)).Times(0);
+
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(host, HealthTransition::Changed, HealthState::Healthy);
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
+// When a host recovers via both the outlier and active health check paths,
+// the cluster manager opens only one bootstrap connection.
+TEST_P(EagerPreconnectFloorLifecycleTest, BootstrappedOnceAcrossRepeatedRecoveries) {
+  std::shared_ptr<MockClusterMockPrioritySet> cluster;
+  HostSharedPtr host;
+  MockHealthChecker health_checker;
+  Outlier::MockDetector outlier_detector;
+  setUpClusterWithPreconnectFloor(
+      2, {Host::HealthFlag::FAILED_ACTIVE_HC, Host::HealthFlag::FAILED_OUTLIER_CHECK}, cluster, host,
+      health_checker, outlier_detector);
+
+  // The pool starts cold and becomes ready once the cluster manager opens a bootstrap connection.
+  bool ready = false;
+  auto* cp = useAsHttp(host);
+  ON_CALL(*cp, hasReadyConnection()).WillByDefault([&ready] { return ready; });
+  EXPECT_CALL(*cp, maybePreconnect(_)).WillOnce([&ready] {
+    ready = true;
+    return true;
+  });
+
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  outlier_detector.runCallbacks(host);
+  health_checker.runCallbacks(host, HealthTransition::Changed, HealthState::Healthy);
+
+  factory_.tls_.shutdownThread();
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster.get()));
+}
+
 // Test that we drain or close all HTTP or TCP connection pool connections when there is a host
 // health failure and 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' set to true.
 TEST_P(ClusterManagerLifecycleTest,

@@ -65,6 +65,7 @@ public:
   MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
   MOCK_METHOD(bool, maybePreconnect, (float), ());
+  MOCK_METHOD(bool, hasReadyConnection, (), (const));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (override));
 
