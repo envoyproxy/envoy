@@ -3869,6 +3869,77 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_
   return false;
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, char*, size_t, size_t*,
+    char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, char*, size_t, size_t*,
+    char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name: "
+      "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, char*, size_t, size_t*,
+    char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_stat_sink_config_define_gauge(
     envoy_dynamic_module_type_stat_sink_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,

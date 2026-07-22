@@ -81,6 +81,53 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
   description_.setOutlierDetector(std::move(detector_host));
 }
 
+// Verifies that the happy eyeballs sorted address list is computed at construction and
+// recomputed by setNewAddresses, while addressListOrNull() keeps the original order.
+TEST(LogicalHostSortedAddressListTest, SortedListFollowsAddressUpdates) {
+  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  const Network::Address::InstanceConstSharedPtr v4_1 =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  const Network::Address::InstanceConstSharedPtr v4_2 =
+      *Network::Utility::resolveUrl("tcp://10.0.0.2:1234");
+  const Network::Address::InstanceConstSharedPtr v6_1 =
+      *Network::Utility::resolveUrl("tcp://[1::1]:1234");
+
+  auto host_or_error = Upstream::LogicalHost::create(
+      cluster_info, /*hostname=*/"", v4_1, /*address_list=*/{v4_1, v4_2, v6_1},
+      envoy::config::endpoint::v3::LocalityLbEndpoints(), envoy::config::endpoint::v3::LbEndpoint(),
+      /*override_transport_socket_options=*/nullptr);
+  ASSERT_TRUE(host_or_error.ok());
+  auto host = std::shared_ptr<Upstream::LogicalHost>(std::move(*host_or_error));
+
+  // The raw list keeps the original order while the sorted list interleaves address families.
+  ASSERT_NE(host->addressListOrNull(), nullptr);
+  EXPECT_EQ(*host->addressListOrNull(),
+            (Upstream::HostDescription::AddressVector{v4_1, v4_2, v6_1}));
+  ASSERT_NE(host->sortedAddressListOrNull(), nullptr);
+  EXPECT_EQ(*host->sortedAddressListOrNull(),
+            (Upstream::HostDescription::AddressVector{v4_1, v6_1, v4_2}));
+
+  // setNewAddresses recomputes both lists.
+  const Network::Address::InstanceConstSharedPtr v6_2 =
+      *Network::Utility::resolveUrl("tcp://[1::2]:1234");
+  const Network::Address::InstanceConstSharedPtr v6_3 =
+      *Network::Utility::resolveUrl("tcp://[1::3]:1234");
+  const Network::Address::InstanceConstSharedPtr v4_3 =
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:1234");
+  host->setNewAddresses(v6_2, {v6_2, v6_3, v4_3}, envoy::config::endpoint::v3::LbEndpoint());
+  ASSERT_NE(host->addressListOrNull(), nullptr);
+  EXPECT_EQ(*host->addressListOrNull(),
+            (Upstream::HostDescription::AddressVector{v6_2, v6_3, v4_3}));
+  ASSERT_NE(host->sortedAddressListOrNull(), nullptr);
+  EXPECT_EQ(*host->sortedAddressListOrNull(),
+            (Upstream::HostDescription::AddressVector{v6_2, v4_3, v6_3}));
+
+  // An update without an address list clears both lists.
+  host->setNewAddresses(v4_1, {}, envoy::config::endpoint::v3::LbEndpoint());
+  EXPECT_EQ(host->addressListOrNull(), nullptr);
+  EXPECT_EQ(host->sortedAddressListOrNull(), nullptr);
+}
+
 // Test fixture for LogicalHost per-connection transport socket resolution.
 class LogicalHostTransportSocketResolutionTest : public testing::Test {
 public:

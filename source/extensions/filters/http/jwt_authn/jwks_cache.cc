@@ -35,7 +35,8 @@ using JwtVerify::Status;
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, Server::Configuration::FactoryContext& context,
-               CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats)
+               CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats,
+               absl::Status& creation_status)
       : jwt_provider_(jwt_provider), time_source_(context.serverFactoryContext().timeSource()),
         tls_(context.serverFactoryContext().threadLocal()) {
     std::vector<std::string> audiences;
@@ -64,10 +65,10 @@ public:
       return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
     });
 
-    const auto inline_jwks =
-        THROW_OR_RETURN_VALUE(Config::DataSource::read(jwt_provider_.local_jwks(), true,
-                                                       context.serverFactoryContext().api()),
-                              std::string);
+    auto inline_jwks_or = Config::DataSource::read(jwt_provider_.local_jwks(), true,
+                                                   context.serverFactoryContext().api());
+    SET_AND_RETURN_IF_NOT_OK(inline_jwks_or.status(), creation_status);
+    const auto& inline_jwks = inline_jwks_or.value();
     if (!inline_jwks.empty()) {
       auto jwks = JwtVerify::Jwks::createFrom(inline_jwks, JwtVerify::Jwks::JWKS);
       if (jwks->getStatus() != Status::Ok) {
@@ -84,8 +85,9 @@ public:
       // remote_jwks.retry_policy has an invalid case that could not be validated by the
       // proto validation annotation. It has to be validated by the code.
       if (jwt_provider_.remote_jwks().has_retry_policy()) {
-        THROW_IF_NOT_OK(
-            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()));
+        SET_AND_RETURN_IF_NOT_OK(
+            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()),
+            creation_status);
         envoy::config::route::v3::RetryPolicy route_retry_policy =
             Http::Utility::convertCoreToRouteRetryPolicy(jwt_provider_.remote_jwks().retry_policy(),
                                                          "5xx,gateway-error,connect-failure,reset");
@@ -94,20 +96,32 @@ public:
         auto policy_or_error = Router::RetryPolicyImpl::create(
             route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
             context.serverFactoryContext());
-        THROW_IF_NOT_OK_REF(policy_or_error.status());
+        SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
         retry_policy_ = std::move(policy_or_error.value());
       }
 
       if (jwt_provider_.remote_jwks().has_cache_duration()) {
-        // Use `durationToMilliseconds` as it has stricter max boundary to the `seconds` value to
-        // avoid overflow.
+        // Use `durationToMillisecondsNoThrow` as it has stricter max boundary to the `seconds`
+        // value to avoid overflow.
         Protobuf::Duration duration_copy(jwt_provider_.remote_jwks().cache_duration());
-        (void)DurationUtil::durationToMilliseconds(duration_copy);
+        SET_AND_RETURN_IF_NOT_OK(
+            DurationUtil::durationToMillisecondsNoThrow(duration_copy).status(), creation_status);
 
         // remote_jwks.duration is used as: now + remote_jwks.duration.
         // need to verify twice of its `seconds` value.
         duration_copy.set_seconds(2 * duration_copy.seconds());
-        (void)DurationUtil::durationToMilliseconds(duration_copy);
+        SET_AND_RETURN_IF_NOT_OK(
+            DurationUtil::durationToMillisecondsNoThrow(duration_copy).status(), creation_status);
+      }
+
+      // Validate async_fetch.failed_refetch_duration here so that the JwksAsyncFetcher
+      // constructor does not need to throw on an out-of-range duration.
+      if (jwt_provider_.remote_jwks().async_fetch().has_failed_refetch_duration()) {
+        SET_AND_RETURN_IF_NOT_OK(
+            DurationUtil::durationToMillisecondsNoThrow(
+                jwt_provider_.remote_jwks().async_fetch().failed_refetch_duration())
+                .status(),
+            creation_status);
       }
 
       // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
@@ -215,10 +229,15 @@ class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
   JwksCacheImpl(const JwtAuthentication& config, Server::Configuration::FactoryContext& context,
-                CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats)
+                CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats,
+                absl::Status& creation_status)
       : stats_(stats) {
     for (const auto& [name, provider] : config.providers()) {
-      auto jwks_data = std::make_unique<JwksDataImpl>(provider, context, fetcher_fn, stats);
+      auto jwks_data =
+          std::make_unique<JwksDataImpl>(provider, context, fetcher_fn, stats, creation_status);
+      if (!creation_status.ok()) {
+        return;
+      }
       if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
         issuer_ptr_map_.emplace(provider.issuer(), jwks_data.get());
       }
@@ -272,11 +291,14 @@ private:
 
 } // namespace
 
-JwksCachePtr
+absl::StatusOr<JwksCachePtr>
 JwksCache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
                   Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
                   JwtAuthnFilterStats& stats) {
-  return std::make_unique<JwksCacheImpl>(config, context, fetcher_fn, stats);
+  absl::Status creation_status = absl::OkStatus();
+  auto cache = std::make_unique<JwksCacheImpl>(config, context, fetcher_fn, stats, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return cache;
 }
 
 } // namespace JwtAuthn

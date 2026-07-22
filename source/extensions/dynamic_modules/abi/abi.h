@@ -13929,6 +13929,115 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
     size_t value_buffer_capacity, size_t* value_size);
 
 /**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name writes the
+ * tag-extracted name of a counter at the given index. The tag-extracted name is the stat name with
+ * the tag values removed (for example "cluster.foo.bar" with a "cluster_name" tag extracted becomes
+ * "cluster.bar"), so a module can reconstruct the same name and labels that Envoy's built-in stat
+ * formatters produce. Pair this with the tag callbacks below.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param name_buffer is the module-owned buffer that receives the tag-extracted name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name, with the same truncation contract as the
+ *        name callbacks above. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count returns the number of
+ * tags on the counter at the given index.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param tag_count is set to the number of tags on the counter. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, tag_count is not written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag writes the name and value of a
+ * single tag on the counter at the given index into module-provided buffers.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param tag_index is the index of the tag (0-based, less than the count reported by
+ *        envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count).
+ * @param name_buffer is the module-owned buffer that receives the tag name. No null terminator is
+ *        written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the tag name, with the same truncation contract as
+ *        the name callbacks above. Must not be null.
+ * @param value_buffer is the module-owned buffer that receives the tag value. No null terminator is
+ *        written. May be null only if value_buffer_capacity is 0.
+ * @param value_buffer_capacity is the capacity of value_buffer in bytes.
+ * @param value_size is set to the full length of the tag value, with the same truncation contract.
+ *        Must not be null.
+ * @return true if both index and tag_index are valid, false otherwise. When false, no outputs are
+ *         written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name is the gauge
+ * counterpart of the counter tag-extracted-name callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count is the gauge counterpart of
+ * the counter tag-count callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag is the gauge counterpart of the
+ * counter tag callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name is the text
+ * readout counterpart of the counter tag-extracted-name callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count is the text readout
+ * counterpart of the counter tag-count callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag is the text readout
+ * counterpart of the counter tag callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
  * envoy_dynamic_module_callback_stat_sink_config_define_gauge creates a gauge with the given name
  * that the module can update later via envoy_dynamic_module_callback_stat_sink_config_set_gauge.
  *

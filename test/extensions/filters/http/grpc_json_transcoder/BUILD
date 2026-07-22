@@ -77,6 +77,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/grpc_json_transcoder:config",
         "//test/integration:http_integration_lib",
         "//test/proto:bookstore_proto_cc_proto",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],

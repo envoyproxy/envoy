@@ -8,6 +8,7 @@
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -91,7 +92,7 @@ typed_config:
       if (!expected_grpc_request_messages.empty()) {
         Grpc::Decoder grpc_decoder;
         std::vector<Grpc::Frame> frames;
-        ASSERT_TRUE(grpc_decoder.decode(request_body, frames).ok()) << dump;
+        ASSERT_OK(grpc_decoder.decode(request_body, frames)) << dump;
         EXPECT_EQ(expected_grpc_request_messages.size(), frames.size());
 
         for (size_t i = 0; i < expected_grpc_request_messages.size(); ++i) {
@@ -300,7 +301,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EmptyMessageStreamedHttpBodyPost) {
   }
   Grpc::Decoder grpc_decoder;
   std::vector<Grpc::Frame> frames;
-  ASSERT_TRUE(grpc_decoder.decode(request_body, frames).ok()) << dump;
+  ASSERT_OK(grpc_decoder.decode(request_body, frames)) << dump;
   ASSERT_EQ(1, frames.size());
   bookstore::EchoBodyRequest actual_message;
   ASSERT_TRUE(actual_message.ParseFromString(frames[0].data_->toString()));
