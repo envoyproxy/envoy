@@ -64,7 +64,7 @@ public:
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
   void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+      ResponseProtoPtr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
       ControlPlaneStats& control_plane_stats) override;
 
   void onStreamEstablished() override;

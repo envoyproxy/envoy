@@ -41,6 +41,7 @@ envoy_cc_library(
         "//source/common/common:basic_resource_lib",
         "//source/common/common:cpu_affinity_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
@@ -64,6 +65,7 @@ envoy_cc_library(
         "//source/server:factory_context_lib",
         "//source/server:listener_manager_factory_lib",
         "//source/server:transport_socket_config_lib",
+        "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -75,6 +77,7 @@ envoy_cc_library(
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:client_connection_factory_lib",
+        "//source/common/quic:quic_packet_writer_interface",
         "//source/common/quic:quic_server_factory_lib",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",

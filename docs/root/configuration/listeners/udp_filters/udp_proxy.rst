@@ -108,6 +108,7 @@ Envoy has the following builtin UDP session filters.
 
   session_filters/http_capsule
   session_filters/dynamic_forward_proxy
+  session_filters/ext_authz
 
 .. _config_udp_listener_filters_udp_proxy_tunneling_over_http:
 

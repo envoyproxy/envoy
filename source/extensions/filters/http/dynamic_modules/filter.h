@@ -244,6 +244,7 @@ public:
 
   bool hasConfig() const { return config_ != nullptr; }
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
+  const DynamicModuleHttpFilterConfigSharedPtr& getFilterConfigSharedPtr() const { return config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
 
   /**

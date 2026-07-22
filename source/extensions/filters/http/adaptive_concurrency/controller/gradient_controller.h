@@ -48,7 +48,7 @@ public:
   GradientControllerConfig(
       const envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig&
           proto_config,
-      Runtime::Loader& runtime);
+      Runtime::Loader& runtime, absl::Status& creation_status);
 
   std::chrono::milliseconds minRTTCalcInterval() const {
     const auto ms = runtime_.snapshot().getInteger(RuntimeKeys::get().MinRTTCalcIntervalKey,

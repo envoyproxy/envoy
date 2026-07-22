@@ -115,11 +115,16 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
   // Ignore the default token bucket if fill_interval is 0 because 0 fill_interval means nothing
   // and has undefined behavior.
   if (fill_interval.count() > 0) {
-    if (fill_interval < std::chrono::milliseconds(50)) {
-      throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
+    if (max_tokens == 0) {
+      // max_tokens=0 means always reject; no token bucket needed.
+      always_deny_default_ = true;
+    } else {
+      if (fill_interval < std::chrono::milliseconds(50)) {
+        throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
+      }
+      default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(
+          max_tokens, tokens_per_fill, fill_interval, time_source_, false);
     }
-    default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(
-        max_tokens, tokens_per_fill, fill_interval, time_source_, false);
   }
 
   for (const auto& descriptor : descriptors) {
@@ -141,8 +146,10 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     const auto shadow_mode = descriptor.shadow_mode();
 
     // Validate that the descriptor's fill interval is logically correct (same
-    // constraint of >=50msec as for fill_interval).
-    if (per_descriptor_fill_interval < std::chrono::milliseconds(50)) {
+    // constraint of >=50msec as for fill_interval). Skip the check when max_tokens=0
+    // since the fill interval is irrelevant for an always-reject bucket.
+    if (per_descriptor_max_tokens != 0 &&
+        per_descriptor_fill_interval < std::chrono::milliseconds(50)) {
       throw EnvoyException("local rate limit descriptor token bucket fill timer must be >= 50ms");
     }
 
@@ -226,6 +233,9 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
   // See if the request is forbidden by the default token bucket.
   if (matched_results.empty() || always_consume_default_token_bucket_) {
     if (default_token_bucket_ == nullptr) {
+      if (always_deny_default_) {
+        return {false, nullptr};
+      }
       return {
           true,
           matched_results.empty()

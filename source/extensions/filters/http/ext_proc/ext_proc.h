@@ -248,7 +248,7 @@ public:
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix, bool is_upstream,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-               Server::Configuration::CommonFactoryContext& context);
+               Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -560,7 +560,7 @@ public:
   // ExternalProcessorCallbacks
   void handleErrorResponse(absl::Status processing_status);
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
+      Grpc::ResponsePtr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
   void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void onGrpcClose() override;
   void onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status);

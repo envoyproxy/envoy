@@ -18,6 +18,7 @@ flushdb
 itr
 STREQ
 htonl
+htons
 ABI
 ACK
 ACL
@@ -85,6 +86,7 @@ Reserializer
 SION
 TRA
 Websockets
+reentrancy
 webtransport
 WEBTRANSPORT
 signalling
@@ -267,11 +269,20 @@ Grabbit
 HC
 HCM
 HDS
+HEXPIRE
+HEXPIREAT
+HEXPIRETIME
 HMAC
 HOL
 HPACK
+HPERSIST
+HPEXPIRE
+HPEXPIREAT
+HPEXPIRETIME
+HPTTL
 HTAB
 HTML
+HTTL
 HTTP
 HTTPS
 HV
@@ -498,6 +509,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIGUSR
 SIMD
 SIO
 SSE
@@ -584,6 +596,7 @@ WS
 WSA
 WSABUF
 WSS
+WUFFS
 Welford's
 Wi
 XDS
@@ -619,6 +632,7 @@ alls
 alphanumerics
 amongst
 anno
+Anthropic
 anonymization
 anonymizing
 anys
@@ -749,6 +763,7 @@ conns
 const
 constexpr
 constructible
+cooldown
 copyable
 coroutine
 coroutines
@@ -774,6 +789,7 @@ datacenter
 datadog
 datagram
 datagrams
+datapath
 de
 deallocate
 deallocated
@@ -840,6 +856,7 @@ dup
 durations
 dynamodb
 eg
+el
 emplace
 emplaced
 emscripten
@@ -957,6 +974,7 @@ healths
 healthz
 hermeticity
 highp
+hl
 hit
 hoc
 hostname
@@ -1004,6 +1022,7 @@ iov
 iovcnt
 iovec
 iovecs
+iop
 ips
 iptables
 ish
@@ -1036,6 +1055,7 @@ ldd
 len
 lenenc
 lexically
+libbpf
 libc
 libevent
 libprotobuf
@@ -1159,6 +1179,7 @@ nulled
 nullopt
 nullptr
 num
+numfields
 numkeys
 oauth
 observability
@@ -1171,6 +1192,7 @@ oob
 opcode
 openid
 openssl
+OpenAI
 opentracing
 optimizations
 optname
@@ -1311,6 +1333,7 @@ redispatch
 redistributions
 reentrant
 reentrants
+reentrantly
 refactor
 refactored
 refcount
@@ -1427,7 +1450,9 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+sockhash
 socklen
+sockmap
 sockopt
 sockopts
 somestring
@@ -1529,6 +1554,7 @@ testcase
 testcases
 testdata
 testee
+tgkill
 threadsafe
 thru
 timespan
@@ -1541,6 +1567,7 @@ tmpfs
 token
 tokenize
 tokenized
+tokenizer
 tokenizes
 tokenizing
 tokio
@@ -1612,6 +1639,8 @@ variadic
 varint
 vec
 vectorize
+VBC
+VBD
 ver
 verifier
 verifiers
@@ -1733,3 +1762,30 @@ datasets
 smartptr
 JA3
 JA4
+AiProtocolManager
+modelling
+delegator
+CNSA
+KEM
+MSS
+SERVFAIL
+WR
+exceptionless
+freeaddrinfo
+fstat
+getrlimit
+linkat
+mkstemp
+muxes
+pread
+pwrite
+setns
+setrlimit
+preprocessor
+RDWR
+stringification
+RMW
+acq
+interleavings
+millis
+msgs

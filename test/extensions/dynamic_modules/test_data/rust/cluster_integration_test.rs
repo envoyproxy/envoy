@@ -69,6 +69,20 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "worker_timer" => {
+      let armed_id = envoy_cluster_metrics
+        .define_counter("timer_armed_total")
+        .ok();
+      let fired_id = envoy_cluster_metrics
+        .define_counter("timer_fired_total")
+        .ok();
+      Some(Box::new(WorkerTimerClusterConfig {
+        upstream_address: config_str.to_string(),
+        armed_id,
+        fired_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     _ => None,
   }
 }
@@ -724,5 +738,118 @@ impl ClusterLb for MemberUpdatePackedAddressLb {
         }
       }
     }
+  }
+}
+
+// =============================================================================
+// Per-worker timer.
+// =============================================================================
+//
+// On the first choose_host (after the worker dispatcher has been captured) the load balancer
+// arms a 50ms repeating worker timer. Arming exercises enable/enabled/disable in one round-trip
+// and increments timer_armed_total only when the enabled/disabled observations agree. Each fire
+// runs on_worker_timer_fired on the worker thread, increments timer_fired_total, and re-arms the
+// timer, so it keeps firing without further requests. The timer is deleted when the load balancer
+// is destroyed on the worker thread at shutdown.
+
+const WORKER_TIMER_INTERVAL_MS: u64 = 50;
+
+struct WorkerTimerClusterConfig {
+  upstream_address: String,
+  armed_id: Option<EnvoyCounterId>,
+  fired_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for WorkerTimerClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(WorkerTimerCluster {
+      upstream_address: self.upstream_address.clone(),
+      hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
+      armed_id: self.armed_id,
+      fired_id: self.fired_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct WorkerTimerCluster {
+  upstream_address: String,
+  hosts: SharedHostList,
+  armed_id: Option<EnvoyCounterId>,
+  fired_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for WorkerTimerCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    let addresses = vec![self.upstream_address.clone()];
+    let weights = vec![1u32];
+    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+      self.hosts.lock().unwrap().0 = host_ptrs;
+    }
+    envoy_cluster.pre_init_complete();
+  }
+
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    Box::new(WorkerTimerLb {
+      hosts: self.hosts.clone(),
+      timer: None,
+      armed_id: self.armed_id,
+      fired_id: self.fired_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct WorkerTimerLb {
+  hosts: SharedHostList,
+  timer: Option<Box<dyn EnvoyClusterWorkerTimer>>,
+  armed_id: Option<EnvoyCounterId>,
+  fired_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for WorkerTimerLb {
+  fn choose_host(
+    &mut self,
+    context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.timer.is_none() {
+      if let Some(timer) = context.and_then(|ctx| ctx.worker_timer_new()) {
+        let interval = std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS);
+        timer.enable(interval);
+        let enabled_after_enable = timer.enabled();
+        timer.disable();
+        let disabled_after_disable = !timer.enabled();
+        // Re-arm so the timer actually starts firing.
+        timer.enable(interval);
+        if enabled_after_enable && disabled_after_disable {
+          if let Some(armed_id) = self.armed_id {
+            let _ = self.metrics.increment_counter(armed_id, 1);
+          }
+        }
+        self.timer = Some(timer);
+      }
+    }
+
+    let hosts = self.hosts.lock().unwrap();
+    if hosts.0.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    HostSelectionResult::Selected(hosts.0[0])
+  }
+
+  fn on_worker_timer_fired(
+    &mut self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    timer: &dyn EnvoyClusterWorkerTimer,
+  ) {
+    if let Some(fired_id) = self.fired_id {
+      let _ = self.metrics.increment_counter(fired_id, 1);
+    }
+    // Re-arm for periodic firing.
+    timer.enable(std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS));
   }
 }

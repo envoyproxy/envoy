@@ -23,6 +23,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/client_codec_factory.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/filter.h"
@@ -278,6 +279,17 @@ protected:
   makeAddressListOrNull(const Network::Address::InstanceConstSharedPtr& address,
                         const AddressVector& address_list);
 
+  /**
+   * @return nullptr if address_list has fewer than 2 addresses (happy eyeballs does not
+   * apply), otherwise a shared_ptr to a copy of address_list sorted with
+   * Network::HappyEyeballsConnectionProvider::sortAddresses() using the cluster's happy
+   * eyeballs config, or the default config if the cluster does not specify one. This is
+   * computed once when the address list is created or refreshed so that connection
+   * attempts do not re-sort it.
+   */
+  static SharedConstAddressVector makeSortedAddressListOrNull(const ClusterInfo& cluster,
+                                                              const AddressVector& address_list);
+
 private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
@@ -346,6 +358,11 @@ protected:
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority, const AddressVector& address_list = {}, absl::string_view stat_name = {});
 
+  // Happy eyeballs sorted copy of the address list, or nullptr if the host does not have
+  // multiple addresses. Set at construction and never changed; read by
+  // HostImpl::sortedAddressListOrNull().
+  const SharedConstAddressVector sorted_address_list_or_null_;
+
 private:
   // No locks are required in this implementation: all address-related member
   // variables are set at construction and never change. See
@@ -394,7 +411,8 @@ public:
   CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const envoy::config::core::v3::Metadata* metadata) const override;
+      Network::UpstreamTransportSocketFactory& factory,
+      Network::Address::InstanceConstSharedPtr orca_address) const override;
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {
@@ -476,10 +494,17 @@ public:
   }
 
 protected:
+  /**
+   * @return the address list sorted for happy eyeballs connection attempts, or nullptr if
+   * the host does not have multiple addresses. The list is computed once when the address
+   * list is created or refreshed rather than on every connection attempt.
+   */
+  virtual SharedConstAddressVector sortedAddressListOrNull() const PURE;
+
   static CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
-                   const SharedConstAddressVector& address_list,
+                   const SharedConstAddressVector& sorted_address_list,
                    Network::UpstreamTransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
@@ -488,6 +513,15 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       HostDescriptionConstSharedPtr host,
       const Network::UpstreamTransportSocketFactory& socket_factory);
+  // Shared body of createOrcaReportingConnection.
+  CreateConnectionData
+  createOrcaConnection(Event::Dispatcher& dispatcher,
+                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+                       Network::UpstreamTransportSocketFactory& factory,
+                       Network::Address::InstanceConstSharedPtr orca_address,
+                       const Network::Address::InstanceConstSharedPtr& host_address,
+                       const SharedConstAddressVector& sorted_address_list,
+                       HostDescriptionConstSharedPtr host) const;
 
 private:
   // Helper function to check multiple health flags at once.
@@ -545,6 +579,11 @@ protected:
         HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
                             locality_metadata, locality, health_check_config, priority,
                             address_list, stat_name) {}
+
+  // Upstream::HostImplBase
+  SharedConstAddressVector sortedAddressListOrNull() const override {
+    return sorted_address_list_or_null_;
+  }
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -905,6 +944,9 @@ public:
                                    Server::Configuration::ServerFactoryContext& context);
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
+  OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const override {
+    return makeOptRefFromPtr(upstream_client_codec_factory_.get());
+  }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
 
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
@@ -1087,6 +1129,10 @@ private:
   const std::unique_ptr<const std::string> eds_service_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
+  // Per-cluster upstream (client) codec factory, recovered from extension_protocol_options_ (an
+  // options entry that also implements the factory interface). Held to pin lifetime;
+  // upstreamHttpClientCodecFactory() returns a view into it.
+  const std::shared_ptr<const Http::ClientCodecFactory> upstream_client_codec_factory_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint32_t max_requests_per_connection_;

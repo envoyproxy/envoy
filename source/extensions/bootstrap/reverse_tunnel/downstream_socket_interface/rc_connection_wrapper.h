@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -159,16 +160,19 @@ public:
    * @param src_tenant_id the tenant identifier
    * @param src_cluster_id the cluster identifier
    * @param src_node_id the node identifier
+   * @param initiation_time_ms epoch millis to advertise as the tunnel's initiation time; when
+   *        absent, the current system time is used.
    * @return the local address as string
    */
   std::string connect(const std::string& src_tenant_id, const std::string& src_cluster_id,
-                      const std::string& src_node_id);
+                      const std::string& src_node_id,
+                      std::optional<int64_t> initiation_time_ms = std::nullopt);
 
   /**
    * Release ownership of the connection.
    * @return the connection pointer (ownership transferred to caller)
    */
-  Network::ClientConnectionPtr releaseConnection() { return std::move(connection_); }
+  Network::ClientConnectionPtr releaseConnection();
 
   /**
    * Process HTTP response from upstream.
@@ -185,8 +189,21 @@ public:
   /**
    * Handle handshake failure.
    * @param reason the failure reason with type and context
+   * @param retry_after optional server cool-off hint parsed from a ``Retry-After`` header on a 429
+   *        response; forwarded to the parent to drive the per-host backoff.
    */
-  void onHandshakeFailure(const HandshakeFailureReason& reason);
+  void onHandshakeFailure(const HandshakeFailureReason& reason,
+                          std::optional<std::chrono::milliseconds> retry_after = std::nullopt);
+
+  /**
+   * Parse an HTTP ``Retry-After`` header into a cool-off duration. Only the RFC 7231 delta-seconds
+   * form is supported (the form rate limiters emit); the HTTP-date form, a zero value, and
+   * malformed/absent values return ``nullopt`` so the caller falls back to its computed backoff.
+   * @param headers the response headers to inspect.
+   * @return the parsed cool-off duration, or ``nullopt`` if not present/parseable/zero.
+   */
+  static std::optional<std::chrono::milliseconds>
+  parseRetryAfter(const Http::ResponseHeaderMap& headers);
 
   /**
    * Perform graceful shutdown of the connection.
@@ -230,6 +247,7 @@ private:
   std::unique_ptr<Http::Http1::ClientConnectionImpl> http1_client_codec_;
   // Base interface pointer used to call dispatch via public API.
   Http::Connection* http1_parse_connection_{nullptr};
+  std::shared_ptr<SimpleConnReadFilter> read_filter_{std::make_shared<SimpleConnReadFilter>(this)};
 };
 
 } // namespace ReverseConnection

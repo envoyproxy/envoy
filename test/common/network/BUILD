@@ -133,6 +133,22 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "happy_eyeballs_speed_test",
+    srcs = ["happy_eyeballs_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:happy_eyeballs_connection_impl_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "happy_eyeballs_speed_test_benchmark_test",
+    benchmark_binary = "happy_eyeballs_speed_test",
+)
+
 envoy_cc_test(
     name = "multi_connection_base_impl_test",
     srcs = ["multi_connection_base_impl_test.cc"],
@@ -366,11 +382,13 @@ envoy_cc_test(
     deps = [
         "//envoy/network:address_interface",
         "//source/common/network:address_lib",
+        "//source/common/network:reuse_port_bpf_cpu_steering_option_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:socket_option_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -489,6 +507,23 @@ envoy_cc_benchmark_binary(
         "//test/test_common:network_utility_lib",
         "@benchmark",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "connection_balancer_impl_benchmark",
+    srcs = ["connection_balancer_impl_benchmark.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/network:connection_balancer_lib",
+        "@abseil-cpp//absl/types:optional",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "connection_balancer_impl_benchmark_test",
+    benchmark_binary = "connection_balancer_impl_benchmark",
 )
 
 envoy_cc_test(

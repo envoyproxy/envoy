@@ -15,14 +15,14 @@ namespace RBACFilter {
  * Config registration for the RBAC network filter. @see NamedNetworkFilterConfigFactory.
  */
 class RoleBasedAccessControlNetworkFilterConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::network::rbac::v3::RBAC> {
+    : public Common::ExceptionFreeFactoryBase<envoy::extensions::filters::network::rbac::v3::RBAC> {
 
 public:
   RoleBasedAccessControlNetworkFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().Rbac) {}
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().Rbac) {}
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };

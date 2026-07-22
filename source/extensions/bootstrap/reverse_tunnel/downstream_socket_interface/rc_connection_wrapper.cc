@@ -1,5 +1,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
 
+#include <algorithm>
+#include <optional>
+
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 
@@ -13,6 +16,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
+
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,7 +79,8 @@ Network::FilterStatus SimpleConnReadFilter::onData(Buffer::Instance& buffer, boo
 
 std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
                                          const std::string& src_cluster_id,
-                                         const std::string& src_node_id) {
+                                         const std::string& src_node_id,
+                                         std::optional<int64_t> initiation_time_ms) {
   // Register connection callbacks.
   ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, adding connection callbacks",
             connection_->id());
@@ -95,7 +101,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   http1_parse_connection_ = http1_client_codec_.get();
 
   // Add a tiny read filter to feed bytes into the codec for response parsing.
-  connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
+  connection_->addReadFilter(read_filter_);
 
   // Build HTTP handshake headers with identifiers.
   absl::string_view tenant_id = src_tenant_id;
@@ -152,10 +158,15 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
 
   const Http::LowerCaseString& initiation_time_hdr =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader();
-  auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    connection_->dispatcher().timeSource().systemTime().time_since_epoch())
-                    .count();
-  headers->addCopy(initiation_time_hdr, absl::StrCat(now_ms));
+  // Prefer the episode initiation time supplied by the caller so that handshake retries during
+  // initial establishment carry the original intent time; fall back to now for direct callers.
+  const int64_t initiation_ms =
+      initiation_time_ms.has_value()
+          ? *initiation_time_ms
+          : std::chrono::duration_cast<std::chrono::milliseconds>(
+                connection_->dispatcher().timeSource().systemTime().time_since_epoch())
+                .count();
+  headers->addCopy(initiation_time_hdr, absl::StrCat(initiation_ms));
 
   using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
   const auto apply_header = [&headers](const Http::LowerCaseString& key, absl::string_view value,
@@ -211,10 +222,41 @@ void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bo
   if (status == expected) {
     ENVOY_LOG(debug, "Received HTTP {} response", status);
     onHandshakeSuccess();
-  } else {
-    ENVOY_LOG(error, "Received unexpected HTTP response: {} (expected {})", status, expected);
-    onHandshakeFailure(HandshakeFailureReason::httpStatusError(absl::StrCat(status)));
+    return;
   }
+  ENVOY_LOG(error, "Received unexpected HTTP response: {} (expected {})", status, expected);
+  // A 429 may carry a Retry-After cool-off hint; forward it so the parent can honor it as the
+  // per-host backoff before the next attempt.
+  std::optional<std::chrono::milliseconds> retry_after;
+  if (status == 429) {
+    retry_after = parseRetryAfter(*headers);
+  }
+  onHandshakeFailure(HandshakeFailureReason::httpStatusError(absl::StrCat(status)), retry_after);
+}
+
+std::optional<std::chrono::milliseconds>
+RCConnectionWrapper::parseRetryAfter(const Http::ResponseHeaderMap& headers) {
+  // ``Retry-After`` is not a registered inline header, so look it up by name. The key is a
+  // function-local static to avoid reconstructing the LowerCaseString on every handshake response.
+  static const Http::LowerCaseString retry_after_header{"retry-after"};
+  const auto result = headers.get(retry_after_header);
+  if (result.empty()) {
+    return std::nullopt;
+  }
+  const absl::string_view value = result[0]->value().getStringView();
+  // RFC 7231 allows delta-seconds or an HTTP-date. Rate limiters emit delta-seconds; honor that
+  // form and ignore the date form (the caller falls back to its computed backoff). A zero (or
+  // unparseable) value is treated as absent so it cannot short-circuit the backoff.
+  uint64_t seconds = 0;
+  if (!absl::SimpleAtoi(value, &seconds) || seconds == 0) {
+    return std::nullopt;
+  }
+  // Clamp purely to avoid overflow when widening seconds to milliseconds; this is NOT the backoff
+  // policy cap. The effective ceiling (the configured ``max_reconnect_backoff``) is applied by the
+  // caller in trackConnectionFailure(), so this bound is intentionally far above any sane value.
+  constexpr uint64_t kMaxRetryAfterSeconds = 3600; // 1 hour.
+  seconds = std::min(seconds, kMaxRetryAfterSeconds);
+  return std::chrono::seconds(static_cast<int64_t>(seconds));
 }
 
 void RCConnectionWrapper::dispatchHttp1(Buffer::Instance& buffer) {
@@ -230,6 +272,16 @@ ReverseTunnelInitiatorExtension* RCConnectionWrapper::getDownstreamExtension() c
   return parent_.getDownstreamExtension();
 }
 
+Network::ClientConnectionPtr RCConnectionWrapper::releaseConnection() {
+  if (!connection_) {
+    return nullptr;
+  }
+
+  connection_->removeConnectionCallbacks(*this);
+  connection_->removeReadFilter(read_filter_);
+  return std::move(connection_);
+}
+
 void RCConnectionWrapper::onHandshakeSuccess() {
   std::string message = "reverse connection accepted";
   ENVOY_LOG(debug, "handshake succeeded: {}", message);
@@ -243,7 +295,8 @@ void RCConnectionWrapper::onHandshakeSuccess() {
   parent_.onConnectionDone(message, this, false);
 }
 
-void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reason) {
+void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reason,
+                                             std::optional<std::chrono::milliseconds> retry_after) {
   const std::string error_message = reason.getDetailedName();
   const std::string stats_failure_reason = reason.getNameForStats();
 
@@ -255,7 +308,7 @@ void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reaso
     extension->incrementHandshakeStats(cluster_name_, false, stats_failure_reason);
   }
 
-  parent_.onConnectionDone(error_message, this, false);
+  parent_.onConnectionDone(error_message, this, false, retry_after);
 }
 
 void RCConnectionWrapper::shutdown() {
@@ -277,9 +330,10 @@ void RCConnectionWrapper::shutdown() {
             static_cast<int>(state));
 
   connection_->removeConnectionCallbacks(*this);
-  connection_.reset();
-  ENVOY_LOG(debug, "RCConnectionWrapper: Connection cleared after shutdown");
-  ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown completed");
+  connection_->removeReadFilter(read_filter_);
+
+  // Defer the deletion of the connection and the codec.
+  connection_->dispatcher().deferredDelete(std::move(connection_));
 }
 
 } // namespace ReverseConnection

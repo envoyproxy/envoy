@@ -156,6 +156,44 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_connect_fail")->value(), 1);
 }
 
+#if defined(__linux__)
+// Regression test: when the upstream connection cannot be created because binding to the
+// configured network namespace fails at connection time (the namespace file cannot be opened),
+// the request fails gracefully with a 503 instead of crashing on a null connection.
+TEST_P(ProtocolIntegrationTest, UpstreamConnectionCreationFailure) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // QUIC upstream connections are created through a different code path which does not support
+    // binding to a network namespace, so the connection-time failure exercised here does not
+    // apply.
+    return;
+  }
+
+  // This test intentionally fails to create the upstream connection, so bypass the check that
+  // the test used upstream connections.
+  testing_upstream_intentionally_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
+    source_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    source_address->set_port_value(0);
+    // The namespace file does not exist, so entering it at connection time fails and the
+    // dispatcher returns a null connection. Note validate_network_namespaces is intentionally not
+    // set, so the configuration is accepted and the failure happens at connection time.
+    source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+  });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  codec_client_->close();
+}
+#endif
+
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
   OsSysCallsWithMockedDns mock_os_sys_calls;
   mock_os_sys_calls.setIpVersion(GetParam().version);

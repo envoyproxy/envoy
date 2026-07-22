@@ -17,6 +17,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/config/utility.h"
 #include "source/common/grpc/async_client_impl.h"
+#include "source/common/grpc/typed_async_client.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/locality_endpoint.h"
@@ -144,7 +145,7 @@ public:
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override;
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) override;
+      Grpc::ResponsePtr<envoy::service::health::v3::HealthCheckSpecifier>&& message) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse sendResponse();
@@ -160,7 +161,7 @@ private:
   // Establishes a connection with the management server
   void establishNewStream();
   absl::Status
-  processMessage(std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message);
+  processMessage(Grpc::ResponsePtr<envoy::service::health::v3::HealthCheckSpecifier>&& message);
   envoy::config::cluster::v3::Cluster
   createClusterConfig(const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check);
   absl::Status updateHdsCluster(HdsClusterPtr cluster,

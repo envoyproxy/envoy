@@ -128,7 +128,7 @@ public:
   // RefcountInterface
   void incRefCount() override;
   bool decRefCount() override;
-  uint32_t use_count() const override { return ref_count_; }
+  uint32_t use_count() const override { return ref_count_.load(std::memory_order_relaxed); }
 
   // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
   void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }

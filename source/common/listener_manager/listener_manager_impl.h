@@ -30,6 +30,8 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/listener_manager_factory.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -248,6 +250,15 @@ public:
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
+  // Returns the per-worker CPU assignment used to pin worker threads, mapping worker i to entry i.
+  // The result is computed once and cached. It is empty when worker CPU affinity is disabled or the
+  // worker count exceeds the available CPUs, in which case no worker is pinned.
+  absl::Span<const uint32_t> workerCpus();
+
+  // Returns true when reuse port BPF CPU steering can be used, that is every worker is pinned to a
+  // CPU and the kernel supports the steering program. The result is computed once and cached.
+  bool reusePortBpfCpuSteeringSupported();
+
   Instance& server_;
   std::unique_ptr<ListenerComponentFactory> factory_;
 
@@ -357,13 +368,6 @@ private:
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,
                                              const ListenerImpl& existing_listener);
 
-  /**
-   * Compute the per-worker CPU assignment used to pin worker threads, mapping worker i to entry i.
-   * Records the `workers_pinned` gauge and logs the outcome. Returns an empty vector when worker
-   * CPU affinity is disabled or no assignment is possible, in which case no worker is pinned.
-   */
-  std::vector<uint32_t> assignWorkerCpus();
-
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
@@ -379,6 +383,12 @@ private:
   std::list<DrainingFilterChainsManager> draining_filter_chains_manager_;
 
   std::vector<WorkerPtr> workers_;
+  // The per-worker CPU assignment, lazily computed and cached by workerCpus(). worker_cpus_[i] is
+  // the CPU that worker i is pinned to; the vector is empty when no worker is pinned.
+  std::optional<std::vector<uint32_t>> worker_cpus_;
+  // Whether reuse port BPF CPU steering is usable, lazily computed and cached by
+  // reusePortBpfCpuSteeringSupported().
+  std::optional<bool> reuse_port_bpf_cpu_steering_supported_;
   bool workers_started_{};
   std::optional<StopListenersType> stop_listeners_type_;
   Stats::ScopeSharedPtr scope_;

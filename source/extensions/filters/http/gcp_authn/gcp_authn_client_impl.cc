@@ -24,7 +24,7 @@ constexpr absl::string_view TokenUrlPath = "token";
 constexpr absl::string_view AudienceQueryKey = "audience";
 constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char MetadataFlavor[] = "Google";
-constexpr char ClientCertificateSha256Key[] = "client_certificate_sha256";
+constexpr char BindCertificateFingerprintKey[] = "bindCertificateFingerprint";
 
 Http::RequestMessagePtr buildRequest(absl::string_view url) {
   absl::string_view host;
@@ -100,7 +100,10 @@ void GcpAuthnClientImpl::fetchBoundJwt(
     const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) {
   Http::Utility::QueryParamsMulti query_params;
   query_params.add(AudienceQueryKey, audience.bound_jwt().url());
-  query_params.add(ClientCertificateSha256Key, fingerprint);
+  // N.B.: double-URL-encoding is REQUIRED by the GCP metadata server.
+  query_params.add(BindCertificateFingerprintKey,
+                   Http::Utility::PercentEncoding::urlEncode(
+                       Http::Utility::PercentEncoding::urlEncode(fingerprint)));
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, IdentityUrlPath, query_params.toString());
   makeTokenRequest(TokenType::BoundJwt, audience, final_url, fingerprint, callbacks);
@@ -110,7 +113,10 @@ void GcpAuthnClientImpl::fetchBoundAccessToken(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
     const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) {
   Http::Utility::QueryParamsMulti query_params;
-  query_params.add(ClientCertificateSha256Key, fingerprint);
+  // N.B.: double-URL-encoding is REQUIRED by the GCP metadata server.
+  query_params.add(BindCertificateFingerprintKey,
+                   Http::Utility::PercentEncoding::urlEncode(
+                       Http::Utility::PercentEncoding::urlEncode(fingerprint)));
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath, query_params.toString());
   makeTokenRequest(TokenType::BoundAccessToken, audience, final_url, fingerprint, callbacks);
@@ -129,8 +135,7 @@ void GcpAuthnClientImpl::makeTokenRequest(
 
   const std::string cluster =
       config_.cluster().empty() ? config_.http_uri().cluster() : config_.cluster();
-  const auto thread_local_cluster =
-      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(cluster);
+  const auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster);
 
   // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
@@ -183,8 +188,8 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
   if (token_type_ == TokenType::Jwt || token_type_ == TokenType::BoundJwt) {
     token_or_error = parseJwtResponse(response_body, audience_, fingerprint_);
   } else {
-    token_or_error = parseAccessTokenResponse(response_body, audience_, fingerprint_,
-                                              context_.serverFactoryContext().timeSource());
+    token_or_error =
+        parseAccessTokenResponse(response_body, audience_, fingerprint_, context_.timeSource());
   }
 
   if (token_or_error.ok()) {

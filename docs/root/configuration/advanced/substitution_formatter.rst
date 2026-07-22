@@ -173,7 +173,7 @@ Current supported substitution commands include:
 ``%RESPONSE_CODE_DETAILS(X)%``
   HTTP
     HTTP response code details provides additional information about the response code, such as
-    who set it (the upstream or envoy) and why. The string will not contain any whitespaces, which
+    who set it (the upstream or Envoy) and why. The string will not contain any whitespaces, which
     will be converted to underscore '_', unless optional parameter ``X`` is ``ALLOW_WHITESPACES``.
 
   TCP/UDP
@@ -1564,6 +1564,9 @@ Current supported substitution commands include:
 
 ``%FILTER_CHAIN_NAME%``
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
+
+``%LISTENER_NAME%``
+  The :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the listener that accepted the downstream connection.
 
 .. _config_access_log_format_access_log_type:
 

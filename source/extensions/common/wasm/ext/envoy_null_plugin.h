@@ -4,6 +4,8 @@
 #define PROXY_WASM_PROTOBUF 1
 #define PROXY_WASM_PROTOBUF_FULL 1
 
+#include <cstdint>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
