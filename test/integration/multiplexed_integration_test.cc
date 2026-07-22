@@ -719,6 +719,33 @@ TEST_P(MetadataIntegrationTest, TestResponseMetadata) {
   EXPECT_EQ(3, response->metadataMapsDecodedCount());
 }
 
+TEST_P(MetadataIntegrationTest, SendDirectLocalReplyEncodesSavedResponseMetadata) {
+  const std::string local_reply_during_encode_filter = R"EOF(
+name: local-reply-during-encode
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.LocalReplyDuringEncodeConfig
+)EOF";
+
+  prependFilters({response_metadata_filter, local_reply_during_encode_filter});
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+
+  // The response metadata filter runs before the local-reply filter on the encode path. Its saved
+  // metadata must be flushed before the direct local reply ends the stream.
+  verifyExpectedMetadata(response->metadataMap(), {"duplicate", "headers", "local-reply"});
+  EXPECT_EQ(2, response->metadataMapsDecodedCount());
+  EXPECT_EQ(response->keyCount("duplicate"), 1);
+}
+
 TEST_P(MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -4271,6 +4298,28 @@ TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndSeparateRstStreamNoError) {
                             << error_code;
 
   tcp_client_->close();
+}
+
+// Verify that sending transfer-encoding header in H/2 protocol causes protocol error.
+TEST_P(Http2FrameIntegrationTest, TransferEncodingHeaderIsReset) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(yanavlasov): fix this check for oghttp2 in UHV mode.
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request =
+      Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(request_idx), "one.example.com",
+                                  "/path", {{"transfer-encoding", "chunked"}});
+  sendFrame(request);
+
+  // By default codec treats stream errors as protocol errors and closes the connection.
+  tcp_client_->waitForDisconnect();
+  tcp_client_->close();
+  test_server_->waitForCounter("http.config_test.downstream_cx_protocol_error", testing::Eq(1));
 }
 
 } // namespace Envoy

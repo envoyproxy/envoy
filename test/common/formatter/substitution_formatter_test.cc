@@ -31,6 +31,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -38,17 +39,20 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
+namespace Formatter {
+namespace {
+
+using StatusHelpers::HasStatus;
 using testing::Const;
+using testing::ContainsRegex;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-
-namespace Envoy {
-namespace Formatter {
-namespace {
+using testing::StartsWith;
 
 // Helper class to test StreamInfoFormatter.
 class StreamInfoFormatter : public FormatterProvider {
@@ -3462,9 +3466,9 @@ TEST(SubstitutionFormatterTest, QueryParametersFormatter) {
   formatter_context.setRequestHeaders(request_header);
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%").IgnoreError(), EnvoyException,
-        "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed"));
   }
 
   {
@@ -4472,9 +4476,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
     plain_string: plain_string_value
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format({}, stream_info), expected_json_map));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format({}, stream_info), expected_json_map));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterPlainNumberTest) {
@@ -4494,9 +4498,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterPlainNumberTest) {
     plain_number: 400
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format({}, stream_info), expected_json_map));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format({}, stream_info), expected_json_map));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterTypesTest) {
@@ -4518,7 +4522,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypesTest) {
       - '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
   const Protobuf::Struct expected = TestUtility::jsonToStruct(R"EOF({
     "string_type": "plain_string_value",
@@ -4531,7 +4535,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypesTest) {
       "HTTP/1.1"
     ]
   })EOF");
-  const Protobuf::Struct out_struct = TestUtility::jsonToStruct(formatter.format({}, stream_info));
+  const Protobuf::Struct out_struct = TestUtility::jsonToStruct(formatter->format({}, stream_info));
   EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
 }
 
@@ -4591,7 +4595,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterNestedObjectsTest) {
           - '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
   const Protobuf::Struct expected = TestUtility::jsonToStruct(R"EOF({
     "struct": {
       "struct_string": "plain_string_value",
@@ -4650,7 +4654,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterNestedObjectsTest) {
       ],
     ],
   })EOF");
-  const Protobuf::Struct out_struct = TestUtility::jsonToStruct(formatter.format({}, stream_info));
+  const Protobuf::Struct out_struct = TestUtility::jsonToStruct(formatter->format({}, stream_info));
   EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
 }
 
@@ -4669,9 +4673,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
     protocol: '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  verifyStructOutput(TestUtility::jsonToStruct(formatter.format({}, stream_info)),
+  verifyStructOutput(TestUtility::jsonToStruct(formatter->format({}, stream_info)),
                      expected_json_map);
 }
 
@@ -4690,9 +4694,9 @@ TEST(SubstitutionFormatterTest, EmptyJsonFormatterTest) {
     protocol: ''
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  verifyStructOutput(TestUtility::jsonToStruct(formatter.format({}, stream_info)),
+  verifyStructOutput(TestUtility::jsonToStruct(formatter->format({}, stream_info)),
                      expected_json_map);
 }
 
@@ -4719,12 +4723,12 @@ TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
     some_response_header: '%RESP(some_response_header)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
   std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context, stream_info),
                                            expected_json_map));
 }
 
@@ -4756,12 +4760,12 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
     '%RESP(response_present_header?response_absent_header)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
   std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyStructOutput(TestUtility::jsonToStruct(formatter.format(formatter_context, stream_info)),
+  verifyStructOutput(TestUtility::jsonToStruct(formatter->format(formatter_context, stream_info)),
                      expected_json_map);
 }
 
@@ -4790,9 +4794,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
     test_obj.inner_key: '%DYNAMIC_METADATA(com.test:test_obj:inner_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format({}, stream_info), expected_json_map));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format({}, stream_info), expected_json_map));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataTest) {
@@ -4823,9 +4827,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataTest) {
     test_obj.non_existing_key: '%CLUSTER_METADATA(com.test:test_obj:non_existing_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context, stream_info),
                                            expected_json_map));
 }
 
@@ -4843,13 +4847,13 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataNoClusterInfoTest) {
     test_key: '%CLUSTER_METADATA(com.test:test_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
   // No cluster info
   {
     EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
         .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
-    EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
+    EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context, stream_info),
                                              expected_json_map));
   }
 }
@@ -4886,9 +4890,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataTest) {
     test_obj.non_existing_key: '%UPSTREAM_METADATA(com.test:test_obj:non_existing_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context, stream_info),
                                            expected_json_map));
 }
 
@@ -4904,12 +4908,13 @@ TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataNullPtrs) {
     test_key: '%UPSTREAM_METADATA(com.test:test_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
   // Empty optional (std::nullopt)
   {
     EXPECT_CALL(Const(stream_info), upstreamInfo()).WillOnce(Return(std::nullopt));
-    EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format({}, stream_info), expected_json_map));
+    EXPECT_TRUE(
+        TestUtility::jsonStringEqual(formatter->format({}, stream_info), expected_json_map));
     testing::Mock::VerifyAndClearExpectations(&stream_info);
   }
   // Empty host description info (nullptr)
@@ -4917,7 +4922,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataNullPtrs) {
     std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
         std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(stream_info.upstreamInfo());
     EXPECT_CALL(*mock_upstream_info, upstreamHost()).WillOnce(Return(nullptr));
-    EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format({}, stream_info), expected_json_map));
+    EXPECT_TRUE(
+        TestUtility::jsonStringEqual(formatter->format({}, stream_info), expected_json_map));
   }
 }
 
@@ -4945,9 +4951,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
     test_obj: '%FILTER_STATE(test_obj)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format({}, stream_info), expected_json_map));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format({}, stream_info), expected_json_map));
 }
 
 // Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
@@ -4982,9 +4988,9 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
     upstream_test_key_field: '%UPSTREAM_FILTER_STATE(test_key:FIELD:test_field)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format({}, stream_info), expected_json_map));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format({}, stream_info), expected_json_map));
 }
 
 // Error specifier will cause an exception to be thrown.
@@ -5001,8 +5007,9 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(JsonFormatterImpl formatter(key_mapping, false), EnvoyException,
-                            "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD.");
+  EXPECT_THAT(JsonFormatterImpl::create(key_mapping, false),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD."));
 }
 
 // Error specifier for PLAIN will cause an error if field is specified.
@@ -5012,9 +5019,10 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferFieldTest) {
     test_key_plain: '%FILTER_STATE(test_key:PLAIN:test_field)%'
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(JsonFormatterImpl formatter(key_mapping, false), EnvoyException,
-                            "Invalid filter state serialize type, FIELD "
-                            "should be used with the field name.");
+  EXPECT_THAT(JsonFormatterImpl::create(key_mapping, false),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Invalid filter state serialize type, FIELD "
+                        "should be used with the field name."));
 }
 
 // Error specifier for FIELD will cause an exception to be thrown if no field is specified.
@@ -5024,9 +5032,10 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferFieldNoNameTest) {
     test_key_plain: '%FILTER_STATE(test_key:FIELD)%'
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(JsonFormatterImpl formatter(key_mapping, false), EnvoyException,
-                            "Invalid filter state serialize type, FIELD "
-                            "should be used with the field name.");
+  EXPECT_THAT(JsonFormatterImpl::create(key_mapping, false),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Invalid filter state serialize type, FIELD "
+                        "should be used with the field name."));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
@@ -5057,9 +5066,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
     all_zeroes: '%START_TIME(%f.%1f.%2f.%3f)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  verifyStructOutput(TestUtility::jsonToStruct(formatter.format({}, stream_info)),
+  verifyStructOutput(TestUtility::jsonToStruct(formatter->format({}, stream_info)),
                      expected_json_map);
 }
 
@@ -5082,12 +5091,12 @@ TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
       %RESP(some_response_header)%'
     )EOF",
                               key_mapping);
-    JsonFormatterImpl formatter(key_mapping, false);
+    auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
     std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    verifyStructOutput(TestUtility::jsonToStruct(formatter.format(formatter_context, stream_info)),
+    verifyStructOutput(TestUtility::jsonToStruct(formatter->format(formatter_context, stream_info)),
                        expected_json_map);
   }
 }
@@ -5149,8 +5158,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
     "key": {}
   })EOF";
 
-  JsonFormatterImpl formatter(key_mapping, false);
-  const std::string out_json = formatter.format(formatter_context, stream_info);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
+  const std::string out_json = formatter->format(formatter_context, stream_info);
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
 }
 
@@ -5191,8 +5200,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
                                "}\n";
 
   // The formatter will always order the properties alphabetically.
-  JsonFormatterImpl formatter(key_mapping, false);
-  const std::string out_json = formatter.format({}, stream_info);
+  auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
+  const std::string out_json = formatter->format({}, stream_info);
   // Check string equality to verify the order.
   EXPECT_EQ(out_json, expected);
 }
@@ -5626,15 +5635,16 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
 
 TEST(SubstitutionFormatterTest, PathTest) {
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PATH(A)%").IgnoreError(),
-                              EnvoyException,
-                              "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%PATH(A)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed"));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse("%PATH(NQ:B)%").IgnoreError(), EnvoyException,
-        "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed");
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse("%PATH(NQ:B)%"),
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed"));
   }
 
   {
@@ -5936,54 +5946,56 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
 
   // Invalid JSON.
   {
-    EXPECT_THROW_WITH_REGEX(SubstitutionFormatParser::parse("%COALESCE(not json)%").IgnoreError(),
-                            EnvoyException, "COALESCE: failed to parse JSON configuration.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE(not json)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse JSON configuration")));
   }
 
   // Missing operators field.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)").IgnoreError(),
-        EnvoyException, "COALESCE: JSON configuration must contain 'operators' array");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE: JSON configuration must contain 'operators' array"));
   }
 
   // Empty operators array.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)").IgnoreError(),
-        EnvoyException, "COALESCE: 'operators' array must not be empty");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE: 'operators' array must not be empty"));
   }
 
   // Invalid operator which is not a string or object.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)").IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse operator at index 0")));
   }
 
   // Missing command field in operator object.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse operator at index 0")));
   }
 
   // Unknown command.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*unknown command.*");
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)"),
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            ContainsRegex("COALESCE: failed to parse operator at index 0.*unknown command.*")));
   }
 
   // Invalid not positive max_length.
   {
-    EXPECT_THROW_WITH_REGEX(
+    EXPECT_THAT(
         SubstitutionFormatParser::parse(
-            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*max_length.*positive.*");
+            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)"),
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  ContainsRegex(
+                      "COALESCE: failed to parse operator at index 0.*max_length.*positive.*")));
   }
 }
 

@@ -83,6 +83,14 @@ public:
   virtual absl::Status doFinalPreWorkerInit() PURE;
 };
 
+} // namespace Network
+
+namespace Quic {
+class QuicPacketWriterFactory;
+} // namespace Quic
+
+namespace Network {
+
 /**
  * Configuration for a UDP listener.
  */
@@ -99,6 +107,11 @@ public:
    * @return factory for writing to a UDP socket.
    */
   virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
+
+  /**
+   * @return factory for creating QUIC packet writers.
+   */
+  virtual Quic::QuicPacketWriterFactory* quicPacketWriterFactory() PURE;
 
   /**
    * @param address is used to query the address specific router.

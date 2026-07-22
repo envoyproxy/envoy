@@ -237,6 +237,7 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3(["active_quic_listener_test.cc"]),
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
+        ":fake_quic_packet_writer_lib",
         ":test_proof_source_lib",
         ":test_utils_lib",
         "//source/common/http:utility_lib",
@@ -305,6 +306,14 @@ envoy_cc_test_library(
     deps = [
         "//source/common/quic:envoy_quic_proof_verifier_base_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "fake_quic_packet_writer_lib",
+    hdrs = envoy_select_enable_http3(["fake_quic_packet_writer.h"]),
+    deps = envoy_select_enable_http3([
+        "@quiche//:quic_core_packet_writer_lib",
+    ]),
 )
 
 envoy_cc_test(

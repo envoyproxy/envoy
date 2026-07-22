@@ -53,7 +53,7 @@ public:
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override;
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
+      Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
@@ -80,7 +80,7 @@ private:
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;
   const envoy::service::load_stats::v3::LoadStatsRequest request_template_;
-  std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse> message_;
+  Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse> message_{nullptr};
   // Map from cluster name to start of measurement interval.
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;

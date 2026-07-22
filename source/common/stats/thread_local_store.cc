@@ -1094,10 +1094,9 @@ ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(cumulative_histogram_);
 }
 
-void ParentHistogramImpl::incRefCount() { ++ref_count_; }
+void ParentHistogramImpl::incRefCount() { ref_count_.fetch_add(1, std::memory_order_relaxed); }
 
 bool ParentHistogramImpl::decRefCount() {
-  bool ret;
   if (shutting_down_) {
     // When shutting down, we cannot reference thread_local_store_, as
     // histograms can outlive the store. So we decrement the ref-count without
@@ -1105,19 +1104,24 @@ bool ParentHistogramImpl::decRefCount() {
     // histogram map in this scenario, as the set was cleared during shutdown,
     // and will not be repopulated in histogramFromStatNameWithTags after
     // initiating shutdown.
-    ret = --ref_count_ == 0;
-  } else {
-    // We delegate to the Store object to decrement the ref-count so it can hold
-    // the lock to the map. If we don't hold a lock, another thread may
-    // simultaneously try to allocate the same name'd histogram after we
-    // decrement it, and we'll wind up with a dtor/update race. To avoid this we
-    // must hold the lock until the histogram is removed from the map.
-    //
-    // See also StatsSharedImpl::decRefCount() in allocator.cc, which has
-    // the same issue.
-    ret = thread_local_store_.decHistogramRefCount(*this, ref_count_);
+    return ref_count_.fetch_sub(1, std::memory_order_acq_rel) == 1;
   }
-  return ret;
+
+  // Fast path: when this is not the last reference, drop it without taking
+  // the store's histogram lock; see tryDecRefCountFastPath() in
+  // refcount_ptr.h for the interleaving analysis, with the store's histogram
+  // lock playing the role of the allocator's mutex.
+  if (tryDecRefCountFastPath(ref_count_)) {
+    return false;
+  }
+
+  // Slow path: we may hold the last reference, so we delegate to the Store
+  // object to decrement the ref-count under the lock to the map. If we don't
+  // hold a lock, another thread may simultaneously try to allocate the same
+  // name'd histogram after we decrement it, and we'll wind up with a
+  // dtor/update race. To avoid this we must hold the lock until the histogram
+  // is removed from the map.
+  return thread_local_store_.decHistogramRefCount(*this, ref_count_);
 }
 
 bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,

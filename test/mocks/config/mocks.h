@@ -58,6 +58,8 @@ public:
               (const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
                const absl::string_view error_detail),
               (override));
+  MOCK_METHOD(void, onResourceUnsubscribed,
+              (const absl::string_view type_url, absl::string_view resource), (override));
 };
 
 class MockXdsResourcesDelegate : public XdsResourcesDelegate {
@@ -200,7 +202,7 @@ public:
   MOCK_METHOD(void, onStreamEstablished, ());
   MOCK_METHOD(void, onEstablishmentFailure, (bool));
   MOCK_METHOD(void, onDiscoveryResponse,
-              (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message,
+              (ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse> && message,
                ControlPlaneStats& control_plane_stats));
   MOCK_METHOD(void, onWriteable, ());
 };

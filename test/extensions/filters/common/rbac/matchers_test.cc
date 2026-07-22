@@ -19,6 +19,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
@@ -1326,8 +1328,7 @@ TEST(IPMatcher, CreateWithInvalidCidrRange) {
   invalid_range->mutable_prefix_len()->set_value(24);
 
   auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to create CIDR range"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to create CIDR range")));
 }
 
 TEST(IPMatcher, CreateWithEmptyRangeList) {
@@ -1335,8 +1336,7 @@ TEST(IPMatcher, CreateWithEmptyRangeList) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> empty_ranges;
 
   auto result = IPMatcher::create(empty_ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Empty IP range list provided"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Empty IP range list provided")));
 }
 
 TEST(IPMatcher, MatchesWithNullIpAddress) {
@@ -1403,8 +1403,7 @@ TEST(IPMatcher, MultipleRangesCreateSuccess) {
   range3->mutable_prefix_len()->set_value(32);
 
   auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_TRUE(result.ok());
-  EXPECT_NE(result.value(), nullptr);
+  EXPECT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 
   // Test that the created matcher works
   NiceMock<Envoy::Network::MockConnection> conn;

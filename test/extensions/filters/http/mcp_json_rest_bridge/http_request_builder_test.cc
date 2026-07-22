@@ -45,7 +45,7 @@ body: "*"
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789"));
   EXPECT_THAT(http_request->method, StrEq("GET"));
@@ -90,7 +90,7 @@ body: "shelf"
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789?theme=Kids"));
   EXPECT_THAT(http_request->method, StrEq("POST"));
@@ -122,7 +122,7 @@ put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(
       http_request->url,
@@ -151,7 +151,7 @@ patch: "/v1/{parent=projects/*}/shelves/{shelf.name}"
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url,
               StrEq("/v1/projects/123456789/shelves/"
@@ -176,7 +176,7 @@ delete: "/v1/{parent=projects/*}"
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789?boolean=true&float=123.456&"
                                        "integer=123&null=null&string=test%20string"));
@@ -201,7 +201,7 @@ body: "*"
   })json");
 
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
-  ASSERT_TRUE(http_request.ok());
+  ASSERT_OK(http_request);
 
   EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789/shelves/science-fiction"));
   EXPECT_THAT(http_request->method, StrEq("GET"));

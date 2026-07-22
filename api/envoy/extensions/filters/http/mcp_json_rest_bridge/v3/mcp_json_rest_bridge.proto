@@ -90,7 +90,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   - Body: {"data": "updated value"}
 //     (Only the "payload" field from arguments is used as the body. Other arguments not in the
 //     path, like 'resource_id', become query parameters.)
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message McpJsonRestBridge {
   // Where to store parsed MCP request attributes.
   enum RequestStorageMode {
@@ -142,6 +142,10 @@ message McpJsonRestBridge {
   // will be extracted from ``_meta``.
   // Ref: `Request Meta SEP <https://modelcontextprotocol.io/seps/414-request-meta>`_
   TraceContextExtractionOptions trace_context_extraction = 6;
+
+  // When set to true, the filter will not clear the route cache after transcoding.
+  // This allows the route to be re-selected based on the updated request path or method.
+  bool disable_clear_route_cache = 7;
 }
 
 // Options for trace context extraction.

@@ -10,6 +10,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/transport_socket_match.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -181,7 +182,7 @@ protected:
         /*locality_lb_endpoint=*/envoy::config::endpoint::v3::LocalityLbEndpoints(),
         /*lb_endpoint=*/envoy::config::endpoint::v3::LbEndpoint(),
         /*override_transport_socket_options=*/nullptr);
-    ASSERT_TRUE(host_or_error.ok());
+    ASSERT_OK(host_or_error);
     host_ = std::shared_ptr<Upstream::LogicalHost>(std::move(*host_or_error));
   }
 
@@ -218,7 +219,7 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, CallerOptionsPassThroughUnchanged
       Upstream::LogicalHost::create(cluster_info_, /*hostname=*/"", address_, /*address_list=*/{},
                                     envoy::config::endpoint::v3::LocalityLbEndpoints(),
                                     envoy::config::endpoint::v3::LbEndpoint(), override_options);
-  ASSERT_TRUE(host_or_error.ok());
+  ASSERT_OK(host_or_error);
   auto host = std::shared_ptr<Upstream::LogicalHost>(std::move(*host_or_error));
 
   Network::TransportSocketOptionsConstSharedPtr seen_options;

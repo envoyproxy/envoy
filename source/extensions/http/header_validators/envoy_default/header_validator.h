@@ -55,11 +55,8 @@ public:
   HeaderValueValidationResult validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
 
   /*
-   * Validate the Content-Length request and response header as a whole number integer. The RFC
-   * states that multiple Content-Length values are acceptable if they are all the same value.
-   * However, UHV does not allow multiple values currently because the comma character will be
-   * rejected. We can add an option to allow multiple Content-Length values in the future if
-   * needed.
+   * Validate the Content-Length request and response header. RFC 9110 Section 8.6 states that
+   * multiple Content-Length values are acceptable if they are all the same value.
    */
   HeaderValueValidationResult validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
 

@@ -958,6 +958,145 @@ TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteConfigOverridesHttpRule) {
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
 }
 
+TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteConfigWithCustomPath) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      tool_config:
+        tools:
+          - name: "create_api_key"
+            http_rule:
+              post: "/v1/{parent=projects/*}/keys_default"
+              body: "key"
+  )EOF";
+
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute per_route;
+
+    // Configure default_server_info with a custom path of "/custom_mcp"
+    auto* tool_config = per_route.add_tool_config();
+    tool_config->mutable_default_server_info()->set_path("/custom_mcp");
+    tool_config->mutable_default_server_info()->set_host("host");
+
+    auto* tool = tool_config->add_tools();
+    tool->set_name("create_api_key");
+    tool->mutable_http_rule()->set_post("/v1/{parent=projects/*}/keys_override");
+    tool->mutable_http_rule()->set_body("key");
+
+    std::ignore =
+        (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp_json_rest_bridge"]
+            .PackFrom(per_route);
+  });
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // 1. Send request to custom path "/custom_mcp". It should match the custom path and get
+  // transcoded.
+  {
+    const std::string request_body = R"({
+      "jsonrpc": "2.0",
+      "id": 321,
+      "method": "tools/call",
+      "params": {
+        "name": "create_api_key",
+        "arguments": {
+          "parent": "projects/foo",
+          "key": {
+            "displayName": "bar"
+          }
+        }
+      }
+    })";
+
+    auto response = codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                       {":path", "/custom_mcp"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"},
+                                       {"content-type", "application/json"}},
+        request_body);
+
+    waitForNextUpstreamRequest();
+
+    EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
+    EXPECT_THAT(upstream_request_->headers().getPathValue(),
+                StrEq("/v1/projects/foo/keys_override"));
+    EXPECT_THAT(upstream_request_->headers().getContentTypeValue(), StrEq("application/json"));
+
+    Http::TestResponseHeaderMapImpl response_headers;
+    response_headers.setStatus(200);
+    response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+    upstream_request_->encodeHeaders(response_headers, false);
+
+    Buffer::OwnedImpl response_data;
+    response_data.add(R"({"displayName":"bar"})");
+    upstream_request_->encodeData(response_data, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(upstream_request_->complete());
+
+    EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+    EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+
+    const std::string expected_rpc_response = R"({
+      "jsonrpc": "2.0",
+      "id": 321,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"displayName\":\"bar\"}"
+          }
+        ],
+        "isError": false
+      }
+    })";
+    EXPECT_EQ(nlohmann::json::parse(response->body()),
+              nlohmann::json::parse(expected_rpc_response));
+  }
+
+  // 2. Send request to unconfigured path "/unconfigured_mcp". It should bypass the bridge
+  // completely and pass through to upstream as-is.
+  {
+    const std::string passthrough_body = R"({"some_passthrough_json": true})";
+
+    auto response = codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                       {":path", "/unconfigured_mcp"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"},
+                                       {"content-type", "application/json"}},
+        passthrough_body);
+
+    waitForNextUpstreamRequest();
+
+    // Verify it arrived at the upstream unmodified
+    EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
+    EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/unconfigured_mcp"));
+    EXPECT_THAT(upstream_request_->body().toString(), StrEq(passthrough_body));
+
+    Http::TestResponseHeaderMapImpl response_headers;
+    response_headers.setStatus(200);
+    response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+    upstream_request_->encodeHeaders(response_headers, false);
+
+    Buffer::OwnedImpl response_data;
+    response_data.add(R"({"passthrough_response": true})");
+    upstream_request_->encodeData(response_data, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(upstream_request_->complete());
+
+    EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+    EXPECT_EQ(response->body(), R"({"passthrough_response": true})");
+  }
+}
+
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithTraceContextExtraction) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
