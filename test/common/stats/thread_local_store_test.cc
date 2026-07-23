@@ -244,6 +244,19 @@ public:
       h2_interval_values_;
 };
 
+// setUseExplicitTags() can be enabled at any time, even after scopes have been created in legacy
+// mode. Such scopes have no prefix_tags_ and fall back to use the full prefix as the prefix of
+// stats.
+TEST_F(StatsThreadLocalStoreTest, SetUseExplicitTagsWithPreExistingLegacyScope) {
+  ScopeSharedPtr legacy_scope = store_->rootScope()->createScope("cluster.foo");
+
+  store_->setUseExplicitTags(true);
+  EXPECT_TRUE(store_->useExplicitTags());
+
+  Counter& c = legacy_scope->counterFromString("rq");
+  EXPECT_EQ("cluster.foo.rq", c.name());
+}
+
 TEST_F(StatsThreadLocalStoreTest, NoTls) {
   InSequence s;
 
@@ -2703,15 +2716,15 @@ TEST_F(StatsThreadLocalStoreTest, SetSinkPredicates) {
   EXPECT_EQ(expected_sinked_stats, num_sinked_text_readouts);
 }
 
-// Exercises the tag-aware scope (TagScopeImpl) of the thread-local store, enabled via the
-// use_tag_scope constructor flag.
-class ThreadLocalStoreTagScopeTest : public testing::Test {
+// Exercises the explicit-tags logic of the thread-local store, enabled via setUseExplicitTags().
+class ThreadLocalStoreExplicitTagsTest : public testing::Test {
 public:
-  ThreadLocalStoreTagScopeTest()
-      : alloc_(symbol_table_),
-        store_(std::make_unique<ThreadLocalStoreImpl>(alloc_, /*use_tag_scope=*/true)),
-        pool_(symbol_table_), scope_(*store_->rootScope()) {}
-  ~ThreadLocalStoreTagScopeTest() override {
+  ThreadLocalStoreExplicitTagsTest()
+      : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)),
+        pool_(symbol_table_), scope_(*store_->rootScope()) {
+    store_->setUseExplicitTags(true);
+  }
+  ~ThreadLocalStoreExplicitTagsTest() override {
     tls_.shutdownGlobalThreading();
     store_->shutdownThreading();
     tls_.shutdownThread();
@@ -2729,7 +2742,7 @@ public:
 
 // The explicit `tagged_name` controls the flat stat name while name_tags are still recorded;
 // `name` yields the tag-extracted name.
-TEST_F(ThreadLocalStoreTagScopeTest, CounterNameAndNameTags) {
+TEST_F(ThreadLocalStoreExplicitTagsTest, CounterNameAndNameTags) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
   Counter& c =
       scope_.counterFromTaggedName(makeStatName("cluster.upstream_rq"), StatNameTagSpan(name_tags),
@@ -2748,7 +2761,7 @@ TEST_F(ThreadLocalStoreTagScopeTest, CounterNameAndNameTags) {
 
 // A child scope created with name_tags + an explicit tagged_name propagates the tag to child stats
 // and interleaves the tag value without double-counting.
-TEST_F(ThreadLocalStoreTagScopeTest, ScopeTagsPropagate) {
+TEST_F(ThreadLocalStoreExplicitTagsTest, ScopeTagsPropagate) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
   ScopeSharedPtr cluster_scope = scope_.scopeFromTaggedName(
       makeStatName("cluster"), StatNameTagSpan(name_tags), makeStatName("cluster.foo"));
@@ -2768,8 +2781,8 @@ TEST_F(ThreadLocalStoreTagScopeTest, ScopeTagsPropagate) {
   ASSERT_EQ(1, g.tags().size());
 }
 
-// The legacy createScope/counter APIs still work on a tag-aware scope.
-TEST_F(ThreadLocalStoreTagScopeTest, LegacyScopeApiStillWorks) {
+// The legacy createScope/counter APIs still work on a explicit-tags scope.
+TEST_F(ThreadLocalStoreExplicitTagsTest, LegacyScopeApiStillWorks) {
   ScopeSharedPtr child = scope_.createScope("a.b");
   Counter& c = child->counterFromString("c");
   EXPECT_EQ("a.b.c", c.name());
@@ -2779,7 +2792,7 @@ TEST_F(ThreadLocalStoreTagScopeTest, LegacyScopeApiStillWorks) {
 
 // The string_view createScope interns its name_tags and tagged_name and propagates the tag to child
 // stats, exercising the TagStringViewSpan path.
-TEST_F(ThreadLocalStoreTagScopeTest, CreateScopeWithTagStringViews) {
+TEST_F(ThreadLocalStoreExplicitTagsTest, CreateScopeWithTagStringViews) {
   std::vector<TagStringView> name_tags{{"cluster_name", "foo"}};
   ScopeSharedPtr cluster_scope =
       scope_.createScopeWithTaggedName("cluster", name_tags, "cluster.foo");
@@ -2793,9 +2806,9 @@ TEST_F(ThreadLocalStoreTagScopeTest, CreateScopeWithTagStringViews) {
   EXPECT_EQ("foo", c.tags()[0].value_);
 }
 
-// Covers TagScopeImpl::histogramFromStatName and textReadoutFromStatName when the scope carries
-// inherited tags: the tag propagates as metadata and the prefix interleaves the value.
-TEST_F(ThreadLocalStoreTagScopeTest, HistogramAndTextReadoutTagsPropagate) {
+// Covers histogramFromStatName and textReadoutFromStatName in explicit-tags mode when the scope
+// carries inherited tags: the tag propagates as metadata and the prefix interleaves the value.
+TEST_F(ThreadLocalStoreExplicitTagsTest, HistogramAndTextReadoutTagsPropagate) {
   StatNameTagVector name_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
   ScopeSharedPtr cluster_scope = scope_.scopeFromTaggedName(
       makeStatName("cluster"), StatNameTagSpan(name_tags), makeStatName("cluster.foo"));
@@ -2815,9 +2828,10 @@ TEST_F(ThreadLocalStoreTagScopeTest, HistogramAndTextReadoutTagsPropagate) {
   EXPECT_EQ("foo", t.tags()[0].value_);
 }
 
-// Exercises the backward-compat branches in the legacy ScopeImpl (use_tag_scope=false): when the
-// new tag-aware createScope / scopeFromStatName / *FromStatName APIs are called with non-empty
-// `tagged_name`, the legacy path uses `tagged_name` as the scope/stat name and drops the tags.
+// Exercises the backward-compat branches in the legacy ScopeImpl (use_explicit_tags=false): when
+// the new explicit-tags createScope / scopeFromStatName / *FromStatName APIs are called with
+// non-empty `tagged_name`, the legacy path uses `tagged_name` as the scope/stat name and drops the
+// tags.
 TEST_F(StatsThreadLocalStoreTest, LegacyScopeBackwardCompatWithExplicitArgs) {
   StatNamePool pool(symbol_table_);
 
@@ -2828,6 +2842,26 @@ TEST_F(StatsThreadLocalStoreTest, LegacyScopeBackwardCompatWithExplicitArgs) {
   EXPECT_EQ("upstream_rq.cluster_name.foo", c.name());
   // Tag extraction runs against the flat name on the legacy path; well-known tags may still match.
   EXPECT_EQ(0, c.tags().size());
+
+  // Gauge/histogram/text-readout behave the same as counter on the legacy path: a non-empty
+  // tagged_name overrides `name` and the tags are dropped. Covers the backward-compat branch of
+  // each *FromTaggedName method.
+  Gauge& g = scope_.gaugeFromTaggedName(pool.add("active"), StatNameTagSpan(tags),
+                                        pool.add("active.cluster_name.foo"),
+                                        Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("active.cluster_name.foo", g.name());
+  EXPECT_EQ(0, g.tags().size());
+
+  Histogram& h = scope_.histogramFromTaggedName(pool.add("latency"), StatNameTagSpan(tags),
+                                                pool.add("latency.cluster_name.foo"),
+                                                Histogram::Unit::Milliseconds);
+  EXPECT_EQ("latency.cluster_name.foo", h.name());
+  EXPECT_EQ(0, h.tags().size());
+
+  TextReadout& t = scope_.textReadoutFromTaggedName(pool.add("version"), StatNameTagSpan(tags),
+                                                    pool.add("version.cluster_name.foo"));
+  EXPECT_EQ("version.cluster_name.foo", t.name());
+  EXPECT_EQ(0, t.tags().size());
 
   // createScope: explicit (non-empty) tagged_name overrides `name`; tags are dropped.
   std::vector<TagStringView> sv_tags{{"cluster_name", "foo"}};
@@ -2916,10 +2950,10 @@ TEST_F(StatsThreadLocalStoreTest, LegacyScopeCreationMatrix) {
   EXPECT_EQ("e.y.c", s4->counterFromString("c").name());
 }
 
-// TagScopeImpl stat-creation matrix on the root scope (no inherited tags). Per-stat name_tags are
+// Explicit-tags stat-creation matrix on the root scope (no inherited tags). Per-stat name_tags are
 // honored. tagged_name, when name_tags are present, supplies the flat name verbatim; when
 // name_tags are empty, tagged_name is ignored and `name` is used.
-TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnPlainScope) {
+TEST_F(ThreadLocalStoreExplicitTagsTest, TagStatCreationMatrixOnPlainScope) {
   // No name_tags, no tagged_name.
   Counter& c1 = scope_.counterFromTaggedName(makeStatName("rq"), std::nullopt, StatName());
   EXPECT_EQ("rq", c1.name());
@@ -2952,9 +2986,9 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnPlainScope) {
   ASSERT_EQ(1, c4.tags().size());
 }
 
-// TagScopeImpl scope-creation matrix. For each variation of (name_tags, tagged_name) creating a
+// Explicit-tags scope-creation matrix. For each variation of (name_tags, tagged_name) creating a
 // child scope, verify the child's prefix and the names/tag metadata of stats created in the child.
-TEST_F(ThreadLocalStoreTagScopeTest, TagScopeCreationMatrix) {
+TEST_F(ThreadLocalStoreExplicitTagsTest, ExplicitTagsScopeCreationMatrix) {
   // No name_tags, no tagged_name -> child has flat == canonical == "a".
   ScopeSharedPtr s1 = scope_.scopeFromTaggedName(makeStatName("a"), StatNameTagSpan{}, StatName());
   EXPECT_EQ("a", symbol_table_.toString(s1->prefix()));
@@ -2992,10 +3026,10 @@ TEST_F(ThreadLocalStoreTagScopeTest, TagScopeCreationMatrix) {
   EXPECT_EQ("v", s4c.tags()[0].value_);
 }
 
-// TagScopeImpl stat-creation matrix on a scope that already carries inherited tags. The inherited
+// Explicit-tags stat-creation matrix on a scope that already carries inherited tags. The inherited
 // scope tag must show up in every child stat regardless of whether the stat itself supplies tags
 // or a tagged_name.
-TEST_F(ThreadLocalStoreTagScopeTest, TagStatCreationMatrixOnTaggedScope) {
+TEST_F(ThreadLocalStoreExplicitTagsTest, TagStatCreationMatrixOnTaggedScope) {
   StatNameTagVector prefix_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
   ScopeSharedPtr cluster = scope_.scopeFromTaggedName(
       makeStatName("cluster"), StatNameTagSpan(prefix_tags), makeStatName("cluster.foo"));

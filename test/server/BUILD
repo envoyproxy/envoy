@@ -396,6 +396,10 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:notification_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:allocator_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",

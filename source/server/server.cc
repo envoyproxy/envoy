@@ -482,6 +482,22 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       bootstrap_, options_, messageValidationContext().staticValidationVisitor(), *api_));
   bootstrap_config_update_time_ = time_source_.systemTime();
 
+  // Decide whether the stats store should use the explicit-tags logic. The explicit-tags logic
+  // use the tags specified by the caller when creating a stat and will ignore any tags extraction
+  // rules.
+  // To keep the backwards compatibility, we only enable the explicit-tags logic if the user
+  // has not specified any custom tags extraction rules and has not disabled the use of default
+  // tags.
+  {
+    const auto& stats_config = bootstrap_.stats_config();
+    const bool use_all_default_tags =
+        !stats_config.has_use_all_default_tags() || stats_config.use_all_default_tags().value();
+    if (stats_config.stats_tags().empty() && use_all_default_tags &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_explicit_tags")) {
+      stats_store_.setUseExplicitTags(true);
+    }
+  }
+
   if (bootstrap_.has_application_log_config()) {
     RETURN_IF_NOT_OK(
         Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
