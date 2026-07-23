@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <string>
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
@@ -288,11 +287,6 @@ private:
   std::string key_stack_[kMaxTrackedDepth]{};
   std::string push_key_[kMaxTrackedDepth + 1]{};
   int array_index_[kMaxTrackedDepth]{};
-  // Tracks keys seen at each dict depth to detect and reject duplicates.
-  // Cleared on container open; flat_hash_set gives O(1) insert/lookup with
-  // one contiguous backing allocation (no per-node malloc unlike std::set).
-  absl::flat_hash_set<std::string> seen_keys_[kMaxTrackedDepth]{};
-
   bool in_string_chain_{false};
 
   // Bytes unread by Wuffs before the last short_read suspension. Wuffs rewinds

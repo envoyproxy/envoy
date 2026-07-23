@@ -143,11 +143,11 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
         decoder_.get(), &token_buf_, &source_buf, wuffs_base__empty_slice_u8());
 
     while (token_buf_.meta.ri < token_buf_.meta.wi) {
-      const wuffs_base__token* tok = &token_buf_.data.ptr[token_buf_.meta.ri++];
-      const int64_t token_category = wuffs_base__token__value_base_category(tok);
-      const uint64_t token_detail = wuffs_base__token__value_base_detail(tok);
-      const uint64_t token_len = wuffs_base__token__length(tok);
-      const bool continued = wuffs_base__token__continued(tok);
+      const wuffs_base__token* token_ptr = &token_buf_.data.ptr[token_buf_.meta.ri++];
+      const int64_t token_category = wuffs_base__token__value_base_category(token_ptr);
+      const uint64_t token_detail = wuffs_base__token__value_base_detail(token_ptr);
+      const uint64_t token_len = wuffs_base__token__length(token_ptr);
+      const bool continued = wuffs_base__token__continued(token_ptr);
       const size_t token_start = body_src_pos_;
       body_src_pos_ += token_len;
 
@@ -224,7 +224,8 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       }
       break;
     }
-    token_buf_.meta.ri = token_buf_.meta.wi = 0; // short_write: reset ring, retry
+    // short_write: reset ring, retry
+    token_buf_.meta.ri = token_buf_.meta.wi = 0;
   }
   return absl::OkStatus();
 }
@@ -239,7 +240,6 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
           absl::StrCat("wuffs json: nesting depth exceeds ", kMaxTrackedDepth - 1));
     }
     if (depth_ < kMaxTrackedDepth) {
-      seen_keys_[depth_].clear();
       is_dict_[depth_] = to_dict;
       expecting_key_[depth_] = to_dict;
       if (!to_dict) {
@@ -307,13 +307,6 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
   in_string_chain_ = continued;
   if (!in_string_chain_) {
     if (string_is_key_) {
-      // TODO(tyxia): duplicate-key rejection is unconditional. There are 3 popular options
-      // here: reject / last-wins / first-wins
-      // Adding a configuration option here to enable different options.
-      if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_).second) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
-      }
       if (depth_ < kMaxTrackedDepth) {
         key_stack_[depth_] = key_buffer_;
       }
