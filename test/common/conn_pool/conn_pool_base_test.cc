@@ -1,4 +1,8 @@
+#include "envoy/extensions/queue_policy/fifo/v3/fifo.pb.h"
+#include "envoy/registry/registry.h"
+
 #include "source/common/conn_pool/conn_pool_base.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
@@ -82,6 +86,63 @@ public:
   AttachContext& context_;
 };
 
+class TestPendingStreamQueue : public Extensions::QueuePolicy::QueueBase<PendingStream> {
+public:
+  using ItemPtrType = std::unique_ptr<PendingStream>;
+  using Iterator = QueueBase<PendingStream>::Iterator;
+
+  ConnectionPool::Cancellable* add(ItemPtrType&& item) override {
+    LinkedList::moveIntoListBack(std::move(item), this->items_);
+    return this->items_.back().get();
+  }
+
+  ItemPtrType remove(PendingStream& item) override { return item.removeFromList(this->items_); }
+
+  // Use LIFO ordering so connection-pool tests exercise policy-defined ordering.
+  const ItemPtrType& next() const override { return this->items_.back(); }
+  bool isOverloaded() const override { return this->items_.size() > 1; }
+
+  Iterator begin() override {
+    auto it = this->items_.begin();
+    return Iterator(std::move(it));
+  }
+
+  Iterator end() override {
+    auto it = this->items_.end();
+    return Iterator(std::move(it));
+  }
+};
+
+class TestPendingStreamQueueFactory
+    : public Extensions::QueuePolicy::QueuePolicyFactory<PendingStream> {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string&,
+                    ProtobufMessage::ValidationVisitor&) override {
+    return std::make_unique<TestPendingStreamQueue>();
+  }
+
+  std::string name() const override { return "envoy.queue_policy.fifo"; }
+};
+
+REGISTER_FACTORY(TestPendingStreamQueueFactory,
+                 Extensions::QueuePolicy::QueuePolicyFactory<PendingStream>);
+
+std::shared_ptr<Upstream::MockClusterInfo> makeClusterWithTestQueuePolicy() {
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig fifo_config;
+  cluster->queue_policy_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  cluster->queue_policy_config_->set_name("envoy.queue_policy.fifo");
+  std::ignore = cluster->queue_policy_config_->mutable_typed_config()->PackFrom(fifo_config);
+  cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
+
+  return cluster;
+}
+
 class TestConnPoolImplBase : public ConnPoolImplBase {
 public:
   using ConnPoolImplBase::ConnPoolImplBase;
@@ -139,6 +200,88 @@ public:
   AttachContext context_;
   std::vector<TestActiveClient*> clients_;
 };
+
+class ConnPoolImplBaseQueuePolicyTest : public testing::Test {
+public:
+  ConnPoolImplBaseQueuePolicyTest()
+      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_,
+              overload_manager_) {}
+
+  Upstream::ClusterConnectivityState state_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{makeClusterWithTestQueuePolicy()};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
+  TestConnPoolImplBase pool_;
+  AttachContext context_;
+};
+
+TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueuePolicy) {
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig fifo_config;
+  cluster->queue_policy_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  cluster->queue_policy_config_->set_name("envoy.queue_policy.fifo");
+  std::ignore = cluster->queue_policy_config_->mutable_typed_config()->PackFrom(fifo_config);
+  cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  new NiceMock<Event::MockSchedulableCallback>(&dispatcher);
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  Upstream::ClusterConnectivityState state;
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80");
+
+  TestConnPoolImplBase pool(host, Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
+                            state, overload_manager);
+}
+
+TEST_F(ConnPoolImplBaseQueuePolicyTest, QueueOverloadedGaugeTracksTransitions) {
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  auto* first = pool_.newPendingStream(context_, /*can_send_early_data=*/false);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  AttachContext second_context;
+  auto* second = pool_.newPendingStream(second_context, /*can_send_early_data=*/false);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  AttachContext third_context;
+  auto* third = pool_.newPendingStream(third_context, /*can_send_early_data=*/false);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  third->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  second->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  first->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+}
+
+TEST_F(ConnPoolImplBaseQueuePolicyTest, PurgeRespectsQueuePolicyOrder) {
+  pool_.newPendingStream(context_, /*can_send_early_data=*/false);
+  AttachContext second_context;
+  pool_.newPendingStream(second_context, /*can_send_early_data=*/false);
+  AttachContext third_context;
+  pool_.newPendingStream(third_context, /*can_send_early_data=*/false);
+
+  testing::InSequence sequence;
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(third_context)));
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(second_context)));
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(context_)));
+
+  pool_.purgePendingStreams(nullptr, "failure",
+                            ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  EXPECT_EQ(0, state_.pending_streams_);
+}
 
 class ConnPoolImplDispatcherBaseTest : public testing::Test {
 public:

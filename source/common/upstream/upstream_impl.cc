@@ -42,6 +42,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/conn_pool/pending_stream.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
@@ -53,6 +54,7 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -80,6 +82,29 @@ defaultHappyEyeballsConfig() {
         default_config.mutable_first_address_family_count()->set_value(1);
         return default_config;
       }());
+}
+
+absl::Status
+validateQueuePolicyConfig(const envoy::config::core::v3::TypedExtensionConfig& queue_policy_config,
+                          Server::Configuration::ServerFactoryContext& server_context) {
+  using PendingStreamQueueFactory =
+      Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
+  absl::Status resolve_status = absl::OkStatus();
+  TRY_ASSERT_MAIN_THREAD {
+    PendingStreamQueueFactory& factory =
+        Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(queue_policy_config);
+    ProtobufTypes::MessagePtr factory_config = Config::Utility::translateToFactoryConfig(
+        queue_policy_config, server_context.messageValidationVisitor(), factory);
+    auto queue = factory.createQueuePolicy(*factory_config, "cluster." + factory.name(),
+                                           server_context.messageValidationVisitor());
+    if (!queue.ok()) {
+      resolve_status = queue.status();
+    }
+  }
+  END_TRY
+  CATCH(EnvoyException & e, { resolve_status = absl::InvalidArgumentError(e.what()); });
+
+  return resolve_status;
 }
 
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
@@ -1283,6 +1308,10 @@ ClusterInfoImpl::ClusterInfoImpl(
       typed_metadata_(config.has_metadata()
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
                           : nullptr),
+      queue_policy_config_(config.has_queue_policy_config()
+                               ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+                                     config.queue_policy_config())
+                               : nullptr),
       common_lb_config_(
           factory_context.serverFactoryContext().clusterManager().getCommonLbConfigPtr(
               config.common_lb_config())),
@@ -1365,6 +1394,11 @@ ClusterInfoImpl::ClusterInfoImpl(
         absl::InvalidArgumentError("Only one of max_requests_per_connection from Cluster or "
                                    "HttpProtocolOptions can be specified");
     return;
+  }
+
+  if (config.has_queue_policy_config()) {
+    SET_AND_RETURN_IF_NOT_OK(
+        validateQueuePolicyConfig(config.queue_policy_config(), server_context), creation_status);
   }
 
   if (config.has_load_balancing_policy() ||

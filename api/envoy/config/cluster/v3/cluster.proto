@@ -1310,6 +1310,10 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // Queueing config for cluster pending requests. If unset, Envoy uses the FIFO queue policy.
+  // [#extension-category: envoy.queue_policy]
+  core.v3.TypedExtensionConfig queue_policy_config = 61;
 }
 
 // Extensible load balancing policy configuration.
