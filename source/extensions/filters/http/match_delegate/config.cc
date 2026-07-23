@@ -9,6 +9,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/status/status.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
@@ -239,6 +240,414 @@ void DelegatingStreamFilter::setEncoderFilterCallbacks(
   encoder_filter_->setEncoderFilterCallbacks(callbacks);
 }
 
+void LazyDelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
+    MatchDataUpdateFunc data_update_func) {
+  if (match_tree_evaluated_) {
+    return;
+  }
+
+  // If no match tree is set, interpret as a skip.
+  if (match_tree_ == nullptr) {
+    skip_filter_ = true;
+    match_tree_evaluated_ = true;
+    return;
+  }
+
+  ASSERT(matching_data_ != nullptr);
+  data_update_func(*matching_data_);
+
+  const Matcher::ActionMatchResult match_result =
+      Matcher::evaluateMatch<Envoy::Http::HttpMatchingData>(*match_tree_, *matching_data_);
+
+  match_tree_evaluated_ = match_result.isComplete();
+
+  if (match_tree_evaluated_ && match_result.isMatch()) {
+    const auto& result = match_result.action();
+    if (result == nullptr || SkipAction().typeUrl() == result->typeUrl()) {
+      skip_filter_ = true;
+    } else {
+      // Defer dispatching the custom action until the nested filter has been lazily created.
+      pending_match_action_ = result;
+    }
+  }
+}
+
+LazyDelegatingStreamFilter::LazyDelegatingStreamFilter(
+    Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree,
+    Envoy::Http::FilterFactoryCb filter_factory)
+    : match_state_(std::move(match_tree)), filter_factory_(std::move(filter_factory)) {}
+
+void LazyDelegatingStreamFilter::FilterCreationCallbacks::addStreamDecoderFilter(
+    Envoy::Http::StreamDecoderFilterSharedPtr filter) {
+  parent_.base_filters_.push_back(filter.get());
+  parent_.decoder_filters_.push_back(std::move(filter));
+}
+
+void LazyDelegatingStreamFilter::FilterCreationCallbacks::addStreamEncoderFilter(
+    Envoy::Http::StreamEncoderFilterSharedPtr filter) {
+  parent_.base_filters_.push_back(filter.get());
+  parent_.encoder_filters_.push_back(std::move(filter));
+}
+
+void LazyDelegatingStreamFilter::FilterCreationCallbacks::addStreamFilter(
+    Envoy::Http::StreamFilterSharedPtr filter) {
+  parent_.base_filters_.push_back(filter.get());
+  parent_.decoder_filters_.push_back(filter);
+  parent_.encoder_filters_.push_back(std::move(filter));
+}
+
+void LazyDelegatingStreamFilter::FilterCreationCallbacks::addAccessLogHandler(
+    AccessLog::InstanceSharedPtr handler) {
+  parent_.access_loggers_.push_back(std::move(handler));
+}
+
+Event::Dispatcher& LazyDelegatingStreamFilter::FilterCreationCallbacks::dispatcher() {
+  return parent_.decoder_callbacks_ != nullptr ? parent_.decoder_callbacks_->dispatcher()
+                                               : parent_.encoder_callbacks_->dispatcher();
+}
+
+const StreamInfo::StreamInfo&
+LazyDelegatingStreamFilter::FilterCreationCallbacks::streamInfo() const {
+  return parent_.decoder_callbacks_ != nullptr ? parent_.decoder_callbacks_->streamInfo()
+                                               : parent_.encoder_callbacks_->streamInfo();
+}
+
+void LazyDelegatingStreamFilter::ensureFilterCreated() {
+  if (filter_created_) {
+    return;
+  }
+  // The nested filter factory needs a live stream context; if neither set of callbacks is
+  // available yet we cannot create the filter.
+  if (decoder_callbacks_ == nullptr && encoder_callbacks_ == nullptr) {
+    return;
+  }
+  filter_created_ = true;
+
+  FilterCreationCallbacks creation_callbacks(*this);
+  filter_factory_(creation_callbacks);
+
+  if (decoder_callbacks_ != nullptr) {
+    for (auto& filter : decoder_filters_) {
+      if (filter != nullptr) {
+        filter->setDecoderFilterCallbacks(*decoder_callbacks_);
+      }
+    }
+  }
+  if (encoder_callbacks_ != nullptr) {
+    for (auto& filter : encoder_filters_) {
+      if (filter != nullptr) {
+        filter->setEncoderFilterCallbacks(*encoder_callbacks_);
+      }
+    }
+  }
+}
+
+void LazyDelegatingStreamFilter::maybeCreateAndDispatch() {
+  if (match_state_.skipFilter()) {
+    return;
+  }
+  ensureFilterCreated();
+  if (auto action = match_state_.takePendingMatchAction(); action != nullptr) {
+    for (auto* base_filter : base_filters_) {
+      if (base_filter != nullptr) {
+        base_filter->onMatchCallback(*action);
+      }
+    }
+  }
+}
+
+void LazyDelegatingStreamFilter::onStreamComplete() {
+  for (auto* base_filter : base_filters_) {
+    if (base_filter != nullptr) {
+      base_filter->onStreamComplete();
+    }
+  }
+}
+
+void LazyDelegatingStreamFilter::onDestroy() {
+  for (auto* base_filter : base_filters_) {
+    if (base_filter != nullptr) {
+      base_filter->onDestroy();
+    }
+  }
+}
+
+void LazyDelegatingStreamFilter::onMatchCallback(const Matcher::Action& action) {
+  for (auto* base_filter : base_filters_) {
+    if (base_filter != nullptr) {
+      base_filter->onMatchCallback(action);
+    }
+  }
+}
+
+Envoy::Http::LocalErrorStatus LazyDelegatingStreamFilter::onLocalReply(const LocalReplyData& data) {
+  Envoy::Http::LocalErrorStatus status = Envoy::Http::LocalErrorStatus::Continue;
+  for (auto* base_filter : base_filters_) {
+    if (base_filter != nullptr &&
+        base_filter->onLocalReply(data) == Envoy::Http::LocalErrorStatus::ContinueAndResetStream) {
+      status = Envoy::Http::LocalErrorStatus::ContinueAndResetStream;
+    }
+  }
+  return status;
+}
+
+void LazyDelegatingStreamFilter::log(const Formatter::Context& log_context,
+                                     const StreamInfo::StreamInfo& info) {
+  for (const auto& access_logger : access_loggers_) {
+    if (access_logger != nullptr) {
+      access_logger->log(log_context, info);
+    }
+  }
+}
+
+Envoy::Http::FilterHeadersStatus
+LazyDelegatingStreamFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool end_stream) {
+  const auto* per_route_config =
+      Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+          decoder_callbacks_);
+
+  if (per_route_config != nullptr) {
+    match_state_.setMatchTree(per_route_config->matchTree());
+  } else {
+    ENVOY_LOG(
+        trace,
+        "No per route config found, thus the matcher tree can not be built from per route config");
+  }
+
+  match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+    data.onRequestHeaders(headers);
+  });
+  maybeCreateAndDispatch();
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  Envoy::Http::FilterHeadersStatus status = Envoy::Http::FilterHeadersStatus::Continue;
+  for (auto& filter : decoder_filters_) {
+    if (filter == nullptr) {
+      continue;
+    }
+    status = filter->decodeHeaders(headers, end_stream);
+    if (status != Envoy::Http::FilterHeadersStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+Envoy::Http::FilterDataStatus LazyDelegatingStreamFilter::decodeData(Buffer::Instance& data,
+                                                                     bool end_stream) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+
+  Envoy::Http::FilterDataStatus status = Envoy::Http::FilterDataStatus::Continue;
+  for (auto& filter : decoder_filters_) {
+    if (filter == nullptr) {
+      continue;
+    }
+    status = filter->decodeData(data, end_stream);
+    if (status != Envoy::Http::FilterDataStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+Envoy::Http::FilterTrailersStatus
+LazyDelegatingStreamFilter::decodeTrailers(Envoy::Http::RequestTrailerMap& trailers) {
+  match_state_.evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+    data.onRequestTrailers(trailers);
+  });
+  maybeCreateAndDispatch();
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterTrailersStatus::Continue;
+  }
+
+  Envoy::Http::FilterTrailersStatus status = Envoy::Http::FilterTrailersStatus::Continue;
+  for (auto& filter : decoder_filters_) {
+    if (filter == nullptr) {
+      continue;
+    }
+    status = filter->decodeTrailers(trailers);
+    if (status != Envoy::Http::FilterTrailersStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+Envoy::Http::FilterMetadataStatus
+LazyDelegatingStreamFilter::decodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterMetadataStatus::Continue;
+  }
+
+  Envoy::Http::FilterMetadataStatus status = Envoy::Http::FilterMetadataStatus::Continue;
+  for (auto& filter : decoder_filters_) {
+    if (filter == nullptr) {
+      continue;
+    }
+    status = filter->decodeMetadata(metadata_map);
+    if (status != Envoy::Http::FilterMetadataStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+void LazyDelegatingStreamFilter::decodeComplete() {
+  if (match_state_.skipFilter()) {
+    return;
+  }
+  for (auto& filter : decoder_filters_) {
+    if (filter != nullptr) {
+      filter->decodeComplete();
+    }
+  }
+}
+
+void LazyDelegatingStreamFilter::setDecoderFilterCallbacks(
+    Envoy::Http::StreamDecoderFilterCallbacks& callbacks) {
+  match_state_.onStreamInfo(callbacks.streamInfo());
+  decoder_callbacks_ = &callbacks;
+  if (filter_created_) {
+    for (auto& filter : decoder_filters_) {
+      if (filter != nullptr) {
+        filter->setDecoderFilterCallbacks(callbacks);
+      }
+    }
+  }
+}
+
+Envoy::Http::Filter1xxHeadersStatus
+LazyDelegatingStreamFilter::encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::Filter1xxHeadersStatus::Continue;
+  }
+
+  Envoy::Http::Filter1xxHeadersStatus status = Envoy::Http::Filter1xxHeadersStatus::Continue;
+  for (auto it = encoder_filters_.rbegin(); it != encoder_filters_.rend(); ++it) {
+    if (*it == nullptr) {
+      continue;
+    }
+    status = (*it)->encode1xxHeaders(headers);
+    if (status != Envoy::Http::Filter1xxHeadersStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+Envoy::Http::FilterHeadersStatus
+LazyDelegatingStreamFilter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
+                                          bool end_stream) {
+  match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+    data.onResponseHeaders(headers);
+  });
+  maybeCreateAndDispatch();
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  Envoy::Http::FilterHeadersStatus status = Envoy::Http::FilterHeadersStatus::Continue;
+  for (auto it = encoder_filters_.rbegin(); it != encoder_filters_.rend(); ++it) {
+    if (*it == nullptr) {
+      continue;
+    }
+    status = (*it)->encodeHeaders(headers, end_stream);
+    if (status != Envoy::Http::FilterHeadersStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+Envoy::Http::FilterDataStatus LazyDelegatingStreamFilter::encodeData(Buffer::Instance& data,
+                                                                     bool end_stream) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+
+  Envoy::Http::FilterDataStatus status = Envoy::Http::FilterDataStatus::Continue;
+  for (auto it = encoder_filters_.rbegin(); it != encoder_filters_.rend(); ++it) {
+    if (*it == nullptr) {
+      continue;
+    }
+    status = (*it)->encodeData(data, end_stream);
+    if (status != Envoy::Http::FilterDataStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+Envoy::Http::FilterTrailersStatus
+LazyDelegatingStreamFilter::encodeTrailers(Envoy::Http::ResponseTrailerMap& trailers) {
+  match_state_.evaluateMatchTree([&trailers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
+    data.onResponseTrailers(trailers);
+  });
+  maybeCreateAndDispatch();
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterTrailersStatus::Continue;
+  }
+
+  Envoy::Http::FilterTrailersStatus status = Envoy::Http::FilterTrailersStatus::Continue;
+  for (auto it = encoder_filters_.rbegin(); it != encoder_filters_.rend(); ++it) {
+    if (*it == nullptr) {
+      continue;
+    }
+    status = (*it)->encodeTrailers(trailers);
+    if (status != Envoy::Http::FilterTrailersStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+Envoy::Http::FilterMetadataStatus
+LazyDelegatingStreamFilter::encodeMetadata(Envoy::Http::MetadataMap& metadata_map) {
+  if (match_state_.skipFilter()) {
+    return Envoy::Http::FilterMetadataStatus::Continue;
+  }
+
+  Envoy::Http::FilterMetadataStatus status = Envoy::Http::FilterMetadataStatus::Continue;
+  for (auto it = encoder_filters_.rbegin(); it != encoder_filters_.rend(); ++it) {
+    if (*it == nullptr) {
+      continue;
+    }
+    status = (*it)->encodeMetadata(metadata_map);
+    if (status != Envoy::Http::FilterMetadataStatus::Continue) {
+      break;
+    }
+  }
+  return status;
+}
+
+void LazyDelegatingStreamFilter::encodeComplete() {
+  if (match_state_.skipFilter()) {
+    return;
+  }
+  for (auto it = encoder_filters_.rbegin(); it != encoder_filters_.rend(); ++it) {
+    if (*it != nullptr) {
+      (*it)->encodeComplete();
+    }
+  }
+}
+
+void LazyDelegatingStreamFilter::setEncoderFilterCallbacks(
+    Envoy::Http::StreamEncoderFilterCallbacks& callbacks) {
+  match_state_.onStreamInfo(callbacks.streamInfo());
+  encoder_callbacks_ = &callbacks;
+  if (filter_created_) {
+    for (auto& filter : encoder_filters_) {
+      if (filter != nullptr) {
+        filter->setEncoderFilterCallbacks(callbacks);
+      }
+    }
+  }
+}
+
 absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
@@ -314,6 +723,18 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   }
 
   return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    // When lazy creation is enabled, register a single delegating filter that captures the nested
+    // filter factory and creates the nested filter only after a non-skip match. The delegating
+    // filter is also registered as an access log handler so the nested filter's access loggers run
+    // only when the nested filter is actually created.
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_delegate_lazy_creation")) {
+      auto lazy_delegating_filter =
+          std::make_shared<LazyDelegatingStreamFilter>(match_tree, filter_factory);
+      callbacks.addStreamFilter(lazy_delegating_filter);
+      callbacks.addAccessLogHandler(lazy_delegating_filter);
+      return;
+    }
+
     DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
     return filter_factory(delegating_callbacks);
   };
