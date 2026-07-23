@@ -117,26 +117,36 @@ public:
 
   static std::vector<std::string> cachedSniNames(ClientContextImpl& context) {
     absl::WriterMutexLock lock(context.session_keys_mu_);
-    return {context.session_sni_lru_.begin(), context.session_sni_lru_.end()};
+    std::vector<std::string> names;
+    names.reserve(context.session_keys_by_sni_.size());
+    for (const auto& entry : context.session_keys_by_sni_) {
+      names.push_back(entry.first);
+    }
+    return names;
   }
 
   static bool hasCachedSni(ClientContextImpl& context, absl::string_view sni) {
     absl::WriterMutexLock lock(context.session_keys_mu_);
-    return context.session_keys_by_sni_.contains(std::string(sni));
+    return context.session_keys_by_sni_.contains(sni);
   }
 
   static size_t cachedSessionCount(ClientContextImpl& context, absl::string_view sni) {
     absl::WriterMutexLock lock(context.session_keys_mu_);
-    auto it = context.session_keys_by_sni_.find(std::string(sni));
+    auto it = context.session_keys_by_sni_.find(sni);
     return it == context.session_keys_by_sni_.end() ? 0 : it->second.sessions.size();
   }
 
   static SSL_SESSION* cachedSession(ClientContextImpl& context, absl::string_view sni) {
     absl::WriterMutexLock lock(context.session_keys_mu_);
-    auto it = context.session_keys_by_sni_.find(std::string(sni));
+    auto it = context.session_keys_by_sni_.find(sni);
     return it != context.session_keys_by_sni_.end() && !it->second.sessions.empty()
-               ? it->second.sessions.front().get()
+               ? it->second.sessions.front()->session.get()
                : nullptr;
+  }
+
+  static size_t cachedSniSessionCount(ClientContextImpl& context) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    return context.sni_session_keys_lru_.size();
   }
 
   static size_t cachedContextSessionCount(ClientContextImpl& context) {
@@ -148,8 +158,6 @@ public:
     absl::WriterMutexLock lock(context.session_keys_mu_);
     return context.session_keys_.empty() ? nullptr : context.session_keys_.front().get();
   }
-
-  static size_t maxSniSessionCacheEntries() { return ClientContextImpl::MaxSniSessionCacheEntries; }
 };
 
 namespace {
@@ -5884,7 +5892,7 @@ max_session_keys: 2
   EXPECT_TRUE(ClientContextImplPeer::cachedSniNames(context.clientContext()).empty());
 }
 
-TEST_P(SslSocketTest, ClientSessionCacheKeepsConfiguredSessionCountPerSni) {
+TEST_P(SslSocketTest, ClientSessionCacheKeepsConfiguredSessionCount) {
   ClientSessionCacheTestContext context(R"EOF(
 common_tls_context:
 max_session_keys: 2
@@ -5925,7 +5933,7 @@ TEST_P(SslSocketTest, ClientSessionCacheUsesEffectiveSniPrecedence) {
 sni: static.example.com
 auto_host_sni: true
 common_tls_context:
-max_session_keys: 1
+max_session_keys: 3
 )EOF");
 
   auto ssl_static_or_error = context.clientContext().newSsl(nullptr, nullptr);
@@ -5958,10 +5966,10 @@ max_session_keys: 1
   EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "override.example.com"));
 }
 
-TEST_P(SslSocketTest, ClientSessionCacheEvictsLeastRecentlyUsedSniAfterBound) {
+TEST_P(SslSocketTest, ClientSessionCacheEvictsGloballyLeastRecentlyUsedSession) {
   ClientSessionCacheTestContext context(R"EOF(
 common_tls_context:
-max_session_keys: 1
+max_session_keys: 2
 )EOF");
 
   auto add_session = [&](absl::string_view sni) -> bssl::UniquePtr<SSL> {
@@ -5978,26 +5986,22 @@ max_session_keys: 1
     return ssl;
   };
 
-  bssl::UniquePtr<SSL> first_ssl;
-  for (size_t i = 1; i <= ClientContextImplPeer::maxSniSessionCacheEntries(); ++i) {
-    auto ssl = add_session(absl::StrCat("sni-", i, ".example.com"));
-    if (i == 1) {
-      first_ssl = std::move(ssl);
-    }
-  }
-  ASSERT_EQ(ClientContextImplPeer::maxSniSessionCacheEntries(),
-            ClientContextImplPeer::cachedSniNames(context.clientContext()).size());
+  auto ssl_a = add_session("a.example.com");
+  ASSERT_NE(nullptr, ssl_a);
+  add_session("b.example.com");
+  ASSERT_EQ(2, ClientContextImplPeer::cachedSniSessionCount(context.clientContext()));
 
-  ASSERT_EQ(
-      1, ClientContextImplPeer::newSessionKey(context.clientContext(), first_ssl.get(),
-                                              ClientContextImplPeer::newSession(first_ssl.get())));
-  add_session(
-      absl::StrCat("sni-", ClientContextImplPeer::maxSniSessionCacheEntries() + 1, ".example.com"));
+  // Learning a newer session for A makes A most recently used and evicts A's
+  // older session, making B the next global eviction candidate.
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_a.get(),
+                                                 ClientContextImplPeer::newSession(ssl_a.get())));
+  add_session("c.example.com");
 
-  EXPECT_EQ(ClientContextImplPeer::maxSniSessionCacheEntries(),
-            ClientContextImplPeer::cachedSniNames(context.clientContext()).size());
-  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "sni-1.example.com"));
-  EXPECT_FALSE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "sni-2.example.com"));
+  EXPECT_EQ(2, ClientContextImplPeer::cachedSniSessionCount(context.clientContext()));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "a.example.com"));
+  EXPECT_FALSE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "b.example.com"));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "c.example.com"));
 }
 
 TEST_P(SslSocketTest, ClientSessionCacheDoesNotReuseAcrossSniHandshake) {

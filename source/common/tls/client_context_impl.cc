@@ -224,12 +224,6 @@ ClientContextImpl::effectiveSni(const Network::TransportSocketOptionsConstShared
   return server_name_indication_;
 }
 
-void ClientContextImpl::touchSessionBucket(
-    absl::flat_hash_map<std::string, SniSessionBucket>::iterator it) {
-  session_sni_lru_.splice(session_sni_lru_.begin(), session_sni_lru_, it->second.lru_it);
-  it->second.lru_it = session_sni_lru_.begin();
-}
-
 void ClientContextImpl::setSessionForSni(SSL* ssl, absl::string_view sni) {
   // No SNI means there is no safe logical host boundary for session reuse.
   if (sni.empty()) {
@@ -242,21 +236,22 @@ void ClientContextImpl::setSessionForSni(SSL* ssl, absl::string_view sni) {
     return;
   }
 
-  touchSessionBucket(it);
-
   // Use the newest SSL_SESSION for this SNI. In TLS 1.3, BoringSSL represents
   // resumption tickets as SSL_SESSION objects, and those tickets can be
   // single-use, so remove them immediately after installing them on the new SSL
   // object.
-  SSL_SESSION* session = it->second.sessions.front().get();
+  const auto session_it = it->second.sessions.front();
+  SSL_SESSION* session = session_it->session.get();
   SSL_set_session(ssl, session);
 
   if (SSL_SESSION_should_be_single_use(session)) {
     it->second.sessions.pop_front();
+    sni_session_keys_lru_.erase(session_it);
     if (it->second.sessions.empty()) {
-      session_sni_lru_.erase(it->second.lru_it);
       session_keys_by_sni_.erase(it);
     }
+  } else {
+    sni_session_keys_lru_.splice(sni_session_keys_lru_.begin(), sni_session_keys_lru_, session_it);
   }
 }
 
@@ -303,31 +298,25 @@ int ClientContextImpl::newSessionKey(SSL* ssl, SSL_SESSION* session) {
 
   absl::WriterMutexLock lock(session_keys_mu_);
   const std::string& sni = *effective_sni;
-  auto [it, inserted] = session_keys_by_sni_.try_emplace(sni);
-  if (inserted) {
-    // New SNI bucket: place it at the front of the global SNI LRU.
-    session_sni_lru_.push_front(sni);
-    it->second.lru_it = session_sni_lru_.begin();
-  } else {
-    touchSessionBucket(it);
-  }
+  sni_session_keys_lru_.push_front({sni, bssl::UniquePtr<SSL_SESSION>(session)});
+  auto it = session_keys_by_sni_.try_emplace(sni).first;
+  it->second.sessions.push_front(sni_session_keys_lru_.begin());
 
-  auto& sessions = it->second.sessions;
-  // max_session_keys_ is interpreted per effective SNI bucket. The separate
-  // MaxSniSessionCacheEntries cap keeps the total number of buckets bounded.
-  // The newest sessions are stored at the front and oldest entries are
-  // discarded first.
-  while (sessions.size() >= max_session_keys_) {
-    sessions.pop_back();
-  }
-  sessions.push_front(bssl::UniquePtr<SSL_SESSION>(session));
-
-  // Bound the number of distinct SNI buckets so a long-lived context cannot
-  // grow without limit when upstream hostnames are highly variable.
-  while (session_keys_by_sni_.size() > MaxSniSessionCacheEntries) {
-    const std::string evict = session_sni_lru_.back();
-    session_sni_lru_.pop_back();
-    session_keys_by_sni_.erase(evict);
+  // max_session_keys_ retains its existing meaning as the maximum number of
+  // cached sessions for this client context. Evict the globally least recently
+  // used session, regardless of which SNI produced it.
+  while (sni_session_keys_lru_.size() > max_session_keys_) {
+    auto evict = sni_session_keys_lru_.end();
+    --evict;
+    auto bucket = session_keys_by_sni_.find(evict->sni);
+    ASSERT(bucket != session_keys_by_sni_.end());
+    ASSERT(!bucket->second.sessions.empty());
+    ASSERT(bucket->second.sessions.back() == evict);
+    bucket->second.sessions.pop_back();
+    if (bucket->second.sessions.empty()) {
+      session_keys_by_sni_.erase(bucket);
+    }
+    sni_session_keys_lru_.erase(evict);
   }
 
   return 1; // Tell BoringSSL that we took ownership of the session.
