@@ -38,6 +38,8 @@ This test case asserts that GET requests to ``api.lyft.com/api/locations`` are r
 
 .. code-block:: yaml
 
+  runtime:
+     re2.max_program_size.error_level: 32768
   tests:
   - test_name: cluster_name_test
     input:
@@ -95,6 +97,7 @@ Available test parameters
 
 .. code-block:: yaml
 
+  runtime: ...
   tests:
   - test_name: ...
     input:

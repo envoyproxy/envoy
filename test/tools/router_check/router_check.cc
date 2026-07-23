@@ -31,8 +31,8 @@ int main(int argc, char* argv[]) {
   Envoy::TestDeprecatedV2Api _deprecated_v2_api;
 
   try {
-    Envoy::RouterCheckTool checktool =
-        Envoy::RouterCheckTool::create(options.configPath(), options.disableDeprecationCheck());
+    Envoy::RouterCheckTool checktool = Envoy::RouterCheckTool::create(
+        options.configPath(), options.testPath(), options.disableDeprecationCheck());
 
     if (options.isDetailed()) {
       checktool.setShowDetails();
