@@ -19,6 +19,8 @@ struct HttpRequest {
   std::string url;
   std::string method;
   nlohmann::json body;
+  absl::flat_hash_map<std::string, std::string> headers_params;
+  std::vector<std::pair<std::string, std::string>> cookies_params;
 };
 
 // Builds an HttpRequest from `http_rule` and `arguments` from the JSON-RPC request body.

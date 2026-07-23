@@ -37,6 +37,19 @@ tool_config:
     - name: list_api_keys
       http_rule:
         get: "/v1/{parent=projects/*}/apiKeys"
+        bindings:
+          - type: HEADER
+            name: "header"
+            argument_path: "header"
+          - type: HEADER
+            name: "header_2"
+            argument_path: "header_2"
+          - type: COOKIE
+            name: "cookie"
+            argument_path: "cookie"
+          - type: COOKIE
+            name: "cookie_2"
+            argument_path: "cookie_2"
     - name: get_api_key
       http_rule:
         get: "/v1/apiKeys"
@@ -502,6 +515,84 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithEscapedQueryParamKey) {
   EXPECT_THAT(request_headers_.getContentLengthValue(), StrEq("0"));
 
   EXPECT_TRUE(request_body.toString().empty());
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithHeaderCookiesParams) {
+  makeFilter();
+  request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test","pageSize":1,"header":"header_value","cookie":"cookie_value","header_2":"header_2_value","cookie_2":"cookie_2_value"}}})json");
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/v1/projects/test/apiKeys?pageSize=1"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+  EXPECT_THAT(request_headers_.getContentLengthValue(), StrEq("0"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("header")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("header"))[0]->value().getStringView(),
+              StrEq("header_value"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("header_2")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("header_2"))[0]->value().getStringView(),
+              StrEq("header_2_value"));
+  ASSERT_THAT(request_headers_.get(Http::Headers::get().Cookie), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::Headers::get().Cookie)[0]->value().getStringView(),
+              StrEq("cookie=cookie_value; cookie_2=cookie_2_value"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithHeaderOnlyParams) {
+  makeFilter();
+  request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
+  // Only header arguments are present, no cookie arguments.
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test","header":"hval","header_2":"hval2"}}})json");
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/v1/projects/test/apiKeys"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("header")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("header"))[0]->value().getStringView(),
+              StrEq("hval"));
+  ASSERT_THAT(request_headers_.get(Http::LowerCaseString("header_2")), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("header_2"))[0]->value().getStringView(),
+              StrEq("hval2"));
+  // No cookie arguments provided, so no Cookie header should be set.
+  EXPECT_THAT(request_headers_.get(Http::Headers::get().Cookie), SizeIs(0));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithCookieOnlyParams) {
+  makeFilter();
+  request_headers_ = {{":path", "/mcp"}, {":method", "POST"}};
+  // Only cookie arguments are present, no header arguments.
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test","cookie":"cval","cookie_2":"cval2"}}})json");
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/v1/projects/test/apiKeys"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+  // No header arguments provided, so no custom headers should be set.
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("header")), SizeIs(0));
+  EXPECT_THAT(request_headers_.get(Http::LowerCaseString("header_2")), SizeIs(0));
+  // Cookie header should be set.
+  ASSERT_THAT(request_headers_.get(Http::Headers::get().Cookie), SizeIs(1));
+  EXPECT_THAT(request_headers_.get(Http::Headers::get().Cookie)[0]->value().getStringView(),
+              StrEq("cookie=cval; cookie_2=cval2"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolNameNotFoundReturnsError) {

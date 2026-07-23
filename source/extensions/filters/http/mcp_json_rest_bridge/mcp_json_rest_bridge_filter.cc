@@ -1044,6 +1044,30 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
     // Set AcceptEncoding to "identity" to prevent server encoding the response.
     request_headers->setCopy(Http::CustomHeaders::get().AcceptEncoding,
                              Http::CustomHeaders::get().AcceptEncodingValues.Identity);
+
+    // Add header parameters.
+    for (const auto& [key, value] : http_request->headers_params) {
+      Http::LowerCaseString lower_key(key);
+      absl::string_view key_view = lower_key.get();
+      if (key_view == "content-length" || key_view == "transfer-encoding" || key_view == "host" ||
+          key_view == ":authority" || key_view == "cookie" || key_view == "accept-encoding" ||
+          absl::StartsWith(key_view, ThreadSafeSingleton<Http::PrefixValue>::get().prefix())) {
+        ENVOY_STREAM_LOG(warn, "Ignoring restricted header parameter: {}", *decoder_callbacks_,
+                         key);
+        continue;
+      }
+      ENVOY_STREAM_LOG(debug, "Adding header: {} with value: {}", *decoder_callbacks_, key, value);
+      request_headers->setCopy(lower_key, value);
+    }
+
+    // Add cookie parameters.
+    if (!http_request->cookies_params.empty()) {
+      ENVOY_STREAM_LOG(debug, "Adding cookie: {}", *decoder_callbacks_,
+                       absl::StrJoin(http_request->cookies_params, "; ", absl::PairFormatter("=")));
+      request_headers->addCopy(
+          Envoy::Http::Headers::get().Cookie,
+          absl::StrJoin(http_request->cookies_params, "; ", absl::PairFormatter("=")));
+    }
   }
 
   if (config_->clearRouteCache() && decoder_callbacks_->downstreamCallbacks().has_value()) {
