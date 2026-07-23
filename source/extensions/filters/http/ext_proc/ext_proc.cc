@@ -145,6 +145,16 @@ initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
   return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().untyped())};
 }
 std::optional<std::vector<std::string>>
+initTypedReceivingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_receiving_namespaces()) {
+    return std::nullopt;
+  }
+
+  return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().typed())};
+}
+
+std::optional<std::vector<std::string>>
 initUntypedClusterMetadataForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
       !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()) {
@@ -269,6 +279,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       untyped_receiving_namespaces_(
           config.metadata_options().receiving_namespaces().untyped().begin(),
           config.metadata_options().receiving_namespaces().untyped().end()),
+      typed_receiving_namespaces_(config.metadata_options().receiving_namespaces().typed().begin(),
+                                  config.metadata_options().receiving_namespaces().typed().end()),
       untyped_cluster_metadata_forwarding_namespaces_(
           config.metadata_options().cluster_metadata_forwarding_namespaces().untyped().begin(),
           config.metadata_options().cluster_metadata_forwarding_namespaces().untyped().end()),
@@ -636,6 +648,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
+      typed_receiving_namespaces_(initTypedReceivingNamespaces(config)),
       untyped_cluster_metadata_forwarding_namespaces_(
           initUntypedClusterMetadataForwardingNamespaces(config)),
       typed_cluster_metadata_forwarding_namespaces_(
@@ -662,6 +675,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
                                         ? more_specific.untypedReceivingMetadataNamespaces()
                                         : less_specific.untypedReceivingMetadataNamespaces()),
+      typed_receiving_namespaces_(more_specific.typedReceivingMetadataNamespaces().has_value()
+                                      ? more_specific.typedReceivingMetadataNamespaces()
+                                      : less_specific.typedReceivingMetadataNamespaces()),
       untyped_cluster_metadata_forwarding_namespaces_(
           more_specific.untypedClusterMetadataForwardingNamespaces().has_value()
               ? more_specific.untypedClusterMetadataForwardingNamespaces()
@@ -1620,36 +1636,67 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
   (*req.mutable_attributes())[FilterName] = std::move(attributes);
 }
 
+void Filter::setUntypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                       const ProcessingResponse& response) {
+  if (!state.untypedReceivingMetadataNamespaces().empty() && response.has_dynamic_metadata()) {
+    const auto& response_metadata = response.dynamic_metadata().fields();
+    const auto& receiving_namespaces = state.untypedReceivingMetadataNamespaces();
+    for (const auto& context_key : response_metadata) {
+      bool found_allowed_namespace = false;
+      if (auto metadata_it = std::find(receiving_namespaces.begin(), receiving_namespaces.end(),
+                                       context_key.first);
+          metadata_it != receiving_namespaces.end()) {
+        cb->streamInfo().setDynamicMetadata(context_key.first, context_key.second.struct_value());
+        found_allowed_namespace = true;
+      }
+      if (!found_allowed_namespace) {
+        ENVOY_STREAM_LOG(debug,
+                         "processing response included dynamic metadata for namespace not "
+                         "configured for receiving: {}",
+                         *cb, context_key.first);
+      }
+    }
+  } else if (response.has_dynamic_metadata()) {
+    ENVOY_STREAM_LOG(debug,
+                     "processing response included dynamic metadata, but no receiving "
+                     "namespaces are configured.",
+                     *cb);
+  }
+}
+
+void Filter::setTypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                     const ProcessingResponse& response) {
+  if (!state.typedReceivingMetadataNamespaces().empty() &&
+      !response.typed_dynamic_metadata().empty()) {
+    const auto& response_typed_metadata = response.typed_dynamic_metadata();
+    const auto& receiving_typed_namespaces = state.typedReceivingMetadataNamespaces();
+    for (const auto& context_key : response_typed_metadata) {
+      bool found_allowed_namespace = false;
+      if (auto metadata_it = std::find(receiving_typed_namespaces.begin(),
+                                       receiving_typed_namespaces.end(), context_key.first);
+          metadata_it != receiving_typed_namespaces.end()) {
+        cb->streamInfo().setDynamicTypedMetadata(context_key.first, context_key.second);
+        found_allowed_namespace = true;
+      }
+      if (!found_allowed_namespace) {
+        ENVOY_STREAM_LOG(debug,
+                         "processing response included typed dynamic metadata for namespace not "
+                         "configured for receiving: {}",
+                         *cb, context_key.first);
+      }
+    }
+  } else if (!response.typed_dynamic_metadata().empty()) {
+    ENVOY_STREAM_LOG(debug,
+                     "processing response included typed dynamic metadata, but no typed receiving "
+                     "namespaces are configured.",
+                     *cb);
+  }
+}
+
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                                 const ProcessingResponse& response) {
-  if (state.untypedReceivingMetadataNamespaces().empty() || !response.has_dynamic_metadata()) {
-    if (response.has_dynamic_metadata()) {
-      ENVOY_STREAM_LOG(debug,
-                       "processing response included dynamic metadata, but no receiving "
-                       "namespaces are configured.",
-                       *decoder_callbacks_);
-    }
-    return;
-  }
-
-  const auto& response_metadata = response.dynamic_metadata().fields();
-  const auto& receiving_namespaces = state.untypedReceivingMetadataNamespaces();
-  for (const auto& context_key : response_metadata) {
-    bool found_allowed_namespace = false;
-    if (auto metadata_it =
-            std::find(receiving_namespaces.begin(), receiving_namespaces.end(), context_key.first);
-        metadata_it != receiving_namespaces.end()) {
-      cb->streamInfo().setDynamicMetadata(context_key.first,
-                                          response_metadata.at(context_key.first).struct_value());
-      found_allowed_namespace = true;
-    }
-    if (!found_allowed_namespace) {
-      ENVOY_STREAM_LOG(debug,
-                       "processing response included dynamic metadata for namespace not "
-                       "configured for receiving: {}",
-                       *decoder_callbacks_, context_key.first);
-    }
-  }
+  setUntypedDynamicMetadata(cb, state, response);
+  setTypedDynamicMetadata(cb, state, response);
 }
 
 void Filter::setEncoderDynamicMetadata(const ProcessingResponse& response) {
@@ -2194,6 +2241,15 @@ void Filter::mergePerRouteConfig() {
         *decoder_callbacks_);
     decoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
     encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
+  }
+
+  if (merged_config->typedReceivingMetadataNamespaces().has_value()) {
+    typed_receiving_namespaces_ = merged_config->typedReceivingMetadataNamespaces().value();
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new typed receiving metadata namespaces from per-route configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setTypedReceivingMetadataNamespaces(typed_receiving_namespaces_);
+    encoding_state_.setTypedReceivingMetadataNamespaces(typed_receiving_namespaces_);
   }
 
   if (merged_config->untypedClusterMetadataForwardingNamespaces().has_value()) {
