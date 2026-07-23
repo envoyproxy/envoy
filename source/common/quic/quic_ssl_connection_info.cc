@@ -18,11 +18,6 @@ STACK_OF(X509)* QuicSslConnectionInfo::peerCertificateChain() const {
   if (peer_cert_chain_ != nullptr) {
     return peer_cert_chain_.get();
   }
-  if (peer_cert_chain_cached_) {
-    // cachePeerCertificateChain() already ran and found no peer chain; the SSL object may have
-    // been released since, so don't touch it again.
-    return nullptr;
-  }
   SSL* ssl_handle = ssl();
   if (ssl_handle == nullptr) {
     // The SSL object has been released after the handshake.
@@ -59,10 +54,7 @@ X509* QuicSslConnectionInfo::validatedPeerIssuer() const {
   return validated_cert_chain_[1].get();
 }
 
-void QuicSslConnectionInfo::cachePeerCertificateChain() {
-  peerCertificateChain();
-  peer_cert_chain_cached_ = true;
-}
+void QuicSslConnectionInfo::cachePeerCertificateChain() { peerCertificateChain(); }
 
 void QuicSslConnectionInfo::onCertValidated(
     const std::vector<bssl::UniquePtr<X509>>& validated_chain) {

@@ -182,8 +182,7 @@ void EnvoyQuicServerSession::Initialize() {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_enable_reset_ssl_after_handshake")) {
     enable_reset_ssl_after_handshake();
-    // enable_reset_ssl_after_handshake() is a no-op for non-IETF versions.
-    reset_ssl_after_handshake_enabled_ = version().IsIetfQuic();
+    reset_ssl_after_handshake_enabled_ = true;
   }
   quic::QuicServerSessionBase::Initialize();
 

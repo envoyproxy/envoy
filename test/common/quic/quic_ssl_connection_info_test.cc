@@ -272,8 +272,8 @@ TEST_F(QuicSslConnectionInfoTest, PeerChainCachedBeforeSslRelease) {
   EXPECT_EQ(1, ssl_info_->pemEncodedPeerCertificateChain().size());
 }
 
-// Same as above without a client certificate: the cache records that no chain was presented, so
-// queries after the SSL object has been released return empty instead of touching it.
+// Same as above without a client certificate: queries after the SSL object has been released
+// return empty instead of touching it.
 TEST_F(QuicSslConnectionInfoTest, NoPeerChainCachedBeforeSslRelease) {
   createSslPair(/*with_client_cert=*/false);
   completeHandshake();

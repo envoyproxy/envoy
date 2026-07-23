@@ -125,9 +125,6 @@ private:
   // and cached. Null if conversion hasn't happened, was queried before the handshake delivered
   // the peer chain, or failed.
   mutable bssl::UniquePtr<STACK_OF(X509)> peer_cert_chain_;
-  // Set once cachePeerCertificateChain() ran. After that the peer chain (possibly absent) is
-  // final and the SSL object, which may have been released, is never touched again.
-  bool peer_cert_chain_cached_{false};
   // The certificate chain built during verification (leaf first, issuers following). Distinct from
   // peer_cert_chain_, which is the unverified list the peer sent. The validated-issuer accessors
   // are served from this so a peer cannot control what is reported as the issuer.
