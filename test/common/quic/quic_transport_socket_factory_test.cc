@@ -451,15 +451,11 @@ TEST_F(QuicClientTransportSocketFactoryTest, PrivateKeyProviderRejectedOnSdsUpda
   EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _)).Times(0);
   absl::Status status = update_callback_();
   EXPECT_EQ(absl::StatusCode::kUnimplemented, status.code());
-  EXPECT_EQ(1, context_.store_
-                   .counter("quic_client_transport_socket_factory.upstream_context_incompatible_"
-                            "certificate")
-                   .value());
 }
 
-// If a certificate which cannot be installed on the QUICHE SSL context arrives at runtime (via
-// SDS), the factory fails closed: no crypto config is returned, so no connections are created
-// without the configured client certificate.
+// A certificate which cannot be installed on the QUICHE SSL context should be unreachable (both
+// config load and SDS updates validate against the same latched runtime flag value), so it is an
+// ENVOY_BUG; the factory still fails closed by returning no crypto config.
 TEST_F(QuicClientTransportSocketFactoryTest, FailClosedWhenCertificateCannotBeInstalled) {
   initialize();
 
@@ -478,9 +474,8 @@ TEST_F(QuicClientTransportSocketFactoryTest, FailClosedWhenCertificateCannotBeIn
       .WillOnce(Return(ssl_context));
   ASSERT_TRUE(update_callback_().ok());
 
-  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
-  // The failure is not cached; subsequent calls fail the same way.
-  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
+  EXPECT_ENVOY_BUG(EXPECT_EQ(nullptr, factory_->getCryptoConfig()),
+                   "Failed to install client certificate chain for QUIC");
 }
 
 } // namespace Quic

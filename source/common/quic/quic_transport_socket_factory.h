@@ -17,8 +17,7 @@ namespace Quic {
 #define QUIC_TRANSPORT_SOCKET_FACTORY_STATS(COUNTER)                                               \
   COUNTER(context_config_update_by_sds)                                                            \
   COUNTER(upstream_context_secrets_not_ready)                                                      \
-  COUNTER(downstream_context_secrets_not_ready)                                                    \
-  COUNTER(upstream_context_incompatible_certificate)
+  COUNTER(downstream_context_secrets_not_ready)
 
 struct QuicTransportSocketFactoryStats {
   QUIC_TRANSPORT_SOCKET_FACTORY_STATS(GENERATE_COUNTER_STRUCT)
