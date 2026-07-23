@@ -267,8 +267,13 @@ private:
 
     ~RedisDiscoverySession() override;
 
-    // Initialize timer - must be called after construction since it uses shared_from_this()
-    void initialize();
+    // Cancels all in-flight discovery work (the CLUSTER SLOTS request, zone-discovery INFO
+    // requests, hostname resolutions), disables the resolve timer, and closes all discovery
+    // clients. ~RedisCluster() calls this before dropping its reference to the session: each
+    // discovery client holds a shared_ptr back to the session (as its client Config), so the
+    // session outlives the cluster until the deferred deletion of its closed clients runs.
+    // After shutdown() the session is inert; no callback can reach it or the destroyed cluster.
+    void shutdown();
 
     void registerDiscoveryAddress(std::list<Network::DnsResponse>&& response, const uint32_t port);
 
@@ -322,28 +327,6 @@ private:
     void finishClusterHostnameResolution(ClusterSlotsSharedPtr slots);
     void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
 
-  private:
-    friend class RedisCluster;
-    friend struct RedisCluster::DnsDiscoveryResolveTarget;
-    friend struct RedisDiscoveryClient;
-    // Thread-safe check if parent cluster is being destroyed.
-    // Returns true if it's safe to proceed with parent operations.
-    // NOTE: We check our own flag instead of parent_.is_destroying_ because
-    // parent_ is a reference that becomes dangling after parent is destroyed.
-    bool isParentAlive() const {
-      return !parent_destroyed_.load(std::memory_order_acquire);
-    }
-
-    // Thread-safe accessor for parent cluster info.
-    // Returns nullptr if parent is being destroyed or info is not available.
-    // This encapsulates the safety checks needed when accessing parent state from callbacks.
-    Upstream::ClusterInfoConstSharedPtr parentInfo() const {
-      if (!isParentAlive()) {
-        return nullptr;
-      }
-      return parent_.info_;
-    }
-
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
     std::string current_host_address_;
@@ -366,10 +349,16 @@ private:
         zone_requests_;
     HostZoneMap discovered_zones_; // address -> zone mapping from INFO responses
 
-    // Flag set by parent's destructor to signal that parent is being destroyed.
-    // Callbacks check this flag (owned by session) instead of accessing parent's flag
-    // to avoid use-after-free when parent is destroyed but callbacks are still queued.
-    std::atomic<bool> parent_destroyed_{false};
+    // In-flight hostname resolutions for CLUSTER SLOTS entries that returned hostnames instead
+    // of IP addresses (e.g. AWS ElastiCache). The resolve() handles are tracked so shutdown()
+    // can cancel them; completed queries unregister themselves by id.
+    absl::node_hash_map<uint64_t, Network::ActiveDnsQuery*> active_dns_queries_;
+    uint64_t next_dns_query_id_{0};
+
+    // Set once by shutdown(). All discovery work runs on the main thread and ~RedisCluster()
+    // calls shutdown() before tearing anything else down, so `!shutdown_` implies `parent_` is
+    // still valid.
+    bool shutdown_{false};
   };
 
   Upstream::ClusterManager& cluster_manager_;
@@ -397,9 +386,6 @@ private:
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
   const bool enable_zone_discovery_;
-
-  // Flag to prevent callbacks during destruction
-  std::atomic<bool> is_destroying_{false};
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
