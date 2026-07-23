@@ -139,16 +139,17 @@ message JwtHandshakeValidation {
   // audience is not checked.
   repeated string audiences = 2;
 
-  // JWKS source used to verify the token signature. Exactly one must be set. Only inline
-  // ``local_jwks`` is supported today; asynchronous ``remote_jwks`` fetching is a planned follow-up
-  // and will occupy field 8 in this oneof.
+  // Source of the JSON Web Key Set (JWKS) used to verify the signature of the handshake token.
+  // Exactly one source must be configured.
   oneof jwks_source_specifier {
     option (validate.required) = true;
 
-    // Inline JWKS used to verify the token signature. Only inline sources
-    // (``inline_string`` / ``inline_bytes`` / ``filename``) are supported; the JWKS is loaded once
-    // at config time and verification is fully synchronous.
+    // The JWKS provided inline as a data source: an ``inline_string``, ``inline_bytes``, or a
+    // ``filename`` loaded from disk. The keys are read once when the configuration is loaded, which
+    // keeps token verification during the handshake fully synchronous.
     config.core.v3.DataSource local_jwks = 3;
+
+    // [#comment:TODO: also allow fetching the JWKS from a remote source (remote_jwks).]
   }
 
   // Name of the header carrying the token. Defaults to ``authorization``, and a leading ``Bearer ``

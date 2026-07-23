@@ -255,9 +255,9 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
     return true;
   }
 
-  // Build a formatter context carrying the parsed handshake request headers so validation format
-  // strings can reference them via %REQ(...)% (and, once a preceding step publishes verified JWT
-  // claims to dynamic metadata, bind them via %DYNAMIC_METADATA(namespace:claim)%).
+  // Give the formatter the parsed handshake headers so validation strings can read them with
+  // %REQ(...)%, and %DYNAMIC_METADATA(namespace:claim)% can pick up any JWT claims published
+  // earlier in the handshake.
   const Formatter::Context context(&request_headers);
 
   // Validate node_id if formatter is configured.
@@ -293,10 +293,9 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
   return true;
 }
 
-// TODO(kanurag94): this is a thin synchronous verification path built directly on
-// //source/common/jwt. If a second L4/synchronous consumer of local-JWKS verification appears, this
-// orchestration (token extraction + iss/exp/aud checks + claim publication) should be promoted to a
-// shared `LocalJwtVerifier` helper in //source/common/jwt rather than copied.
+// TODO(kanurag94): this verifies a local-JWKS token inline, on top of //source/common/jwt. If
+// another synchronous L4 caller ever needs the same thing, move it into a shared helper rather than
+// copying it.
 bool ReverseTunnelFilterConfig::verifyHandshakeJwt(const Http::RequestHeaderMap& headers,
                                                    StreamInfo::StreamInfo& stream_info) const {
   ASSERT(jwt_enabled_);
@@ -307,9 +306,8 @@ bool ReverseTunnelFilterConfig::verifyHandshakeJwt(const Http::RequestHeaderMap&
     ENVOY_LOG(debug, "reverse_tunnel: jwt: missing token header '{}'", jwt_token_header_.get());
     return false;
   }
-  // Use the first value only, matching jwt_authn's header extractor. A well-formed initiator sends
-  // one token header; multiple values are anomalous and the extras are ignored. Logged at debug
-  // rather than warn so a hostile peer cannot amplify a per-handshake log line.
+  // A well-formed client sends one token header. If there are several, use the first (as jwt_authn
+  // does) and just note it at debug.
   if (token_values.size() > 1) {
     ENVOY_LOG(debug, "reverse_tunnel: jwt: {} values on token header '{}'; using the first",
               token_values.size(), jwt_token_header_.get());
@@ -360,12 +358,9 @@ bool ReverseTunnelFilterConfig::verifyHandshakeJwt(const Http::RequestHeaderMap&
     return false;
   }
 
-  // Success: publish verified claims as dynamic metadata so the validation block can bind a claimed
-  // handshake id to a verified claim via %DYNAMIC_METADATA(namespace:claim)%. This runs before
-  // validateIdentifiers(), so the claims are set even when validation subsequently fails and the
-  // handshake is rejected with 403. That is harmless: the metadata lives on this handshake's
-  // stream_info, which is discarded when the connection closes and is read only by that validation
-  // step — it is never registered or forwarded.
+  // Verified. Publish the claims as dynamic metadata so the validation block can match a claimed id
+  // against a real claim, e.g. %DYNAMIC_METADATA(namespace:claim)%. This runs just before
+  // validateIdentifiers(), which is where those bindings are read.
   stream_info.setDynamicMetadata(jwt_claims_namespace_, jwt.payload_pb_);
   ENVOY_LOG(debug, "reverse_tunnel: jwt: verified; claims published to namespace '{}'",
             jwt_claims_namespace_);
