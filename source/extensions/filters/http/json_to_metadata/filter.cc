@@ -88,18 +88,23 @@ Regex::CompiledMatcherPtr generateAllowContentTypeRegexs(
 
 } // anonymous namespace
 
-Rule::Rule(const ProtoRule& rule) : rule_(rule) {
+Rule::Rule(const ProtoRule& rule, absl::Status& creation_status) : rule_(rule) {
   if (!rule_.has_on_present() && !rule_.has_on_missing()) {
-    throw EnvoyException("json to metadata filter: neither `on_present` nor `on_missing` set");
+    creation_status = absl::InvalidArgumentError(
+        "json to metadata filter: neither `on_present` nor `on_missing` set");
+    return;
   }
 
   if (rule_.has_on_missing() && !rule_.on_missing().has_value()) {
-    throw EnvoyException(
+    creation_status = absl::InvalidArgumentError(
         "json to metadata filter: cannot specify on_missing rule with empty value");
+    return;
   }
 
   if (rule_.has_on_error() && !rule_.on_error().has_value()) {
-    throw EnvoyException("json to metadata filter: cannot specify on_error rule with empty value");
+    creation_status = absl::InvalidArgumentError(
+        "json to metadata filter: cannot specify on_error rule with empty value");
+    return;
   }
 
   // Support key selectors only.
@@ -125,8 +130,8 @@ FilterConfig::FilterConfig(
           POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
       respstats_{
           ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.resp"))},
-      request_rules_(generateRules(proto_config.request_rules().rules())),
-      response_rules_(generateRules(proto_config.response_rules().rules())),
+      request_rules_(generateRules(proto_config.request_rules().rules(), creation_status)),
+      response_rules_(generateRules(proto_config.response_rules().rules(), creation_status)),
       request_allow_content_types_(
           generateAllowContentTypes(proto_config.request_rules().allow_content_types())),
       response_allow_content_types_(
@@ -143,6 +148,8 @@ FilterConfig::FilterConfig(
               ? generateAllowContentTypeRegexs(
                     proto_config.response_rules().allow_content_types_regex(), regex_engine)
               : nullptr) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+
   if (per_route && request_rules_.empty() && response_rules_.empty()) {
     creation_status = absl::InvalidArgumentError(
         "json_to_metadata_filter: Per route configs must at least specify one of "
@@ -150,10 +157,14 @@ FilterConfig::FilterConfig(
   }
 }
 
-Rules FilterConfig::generateRules(const ProtobufRepeatedRule& proto_rules) const {
+Rules FilterConfig::generateRules(const ProtobufRepeatedRule& proto_rules,
+                                  absl::Status& creation_status) const {
   Rules rules;
   for (const auto& rule : proto_rules) {
-    rules.emplace_back(rule);
+    if (!creation_status.ok()) {
+      return {};
+    }
+    rules.emplace_back(rule, creation_status);
   }
   return rules;
 }
