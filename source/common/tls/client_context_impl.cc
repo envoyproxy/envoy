@@ -237,7 +237,7 @@ void ClientContextImpl::setSessionForSni(SSL* ssl, absl::string_view sni) {
   }
 
   absl::WriterMutexLock lock(session_keys_mu_);
-  auto it = session_keys_by_sni_.find(std::string(sni));
+  auto it = session_keys_by_sni_.find(sni);
   if (it == session_keys_by_sni_.end() || it->second.sessions.empty()) {
     return;
   }
