@@ -360,7 +360,8 @@ absl::Status FilterChainManagerImpl::maybeConstructMatcher(
       matcher_ = factory.create(*filter_chain_matcher)();
     }
     END_TRY CATCH(const EnvoyException& e, {
-      return absl::InvalidArgumentError(absl::StrCat("cannot create a filter chain matcher: ", e.what()));
+      return absl::InvalidArgumentError(
+          absl::StrCat("cannot create a filter chain matcher: ", e.what()));
     });
   }
   return absl::OkStatus();
@@ -1057,8 +1058,10 @@ public:
   }
 
   ~FcdsSubscriptionHandleImpl() override {
-    shared_manager_->unsubscribe(filter_chain_name_, callbacks_);
+    shared_manager_->unsubscribe(filter_chain_name_, *this);
   }
+
+  FcdsClientCallbacks& callbacks() override { return callbacks_; }
 
 private:
   const std::shared_ptr<FcdsSharedFilterChainManager> shared_manager_;
@@ -1085,19 +1088,20 @@ FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSou
     iter = subscriptions_.emplace(filter_chain_name, std::move(state)).first;
   }
   SubscriptionState& state = *iter->second;
-  state.callbacks_.insert(&callbacks);
   init_manager.add(state.api_->initTarget());
-  return std::make_shared<FcdsSubscriptionHandleImpl>(shared_from_this(), filter_chain_name,
-                                                      callbacks);
+  auto result = std::make_shared<FcdsSubscriptionHandleImpl>(shared_from_this(), filter_chain_name,
+                                                             callbacks);
+  state.handles_.insert(result.get());
+  return result;
 }
 
 void FcdsSharedFilterChainManager::unsubscribe(const std::string& filter_chain_name,
-                                               FcdsClientCallbacks& callbacks) {
+                                               FcdsSubscriptionHandle& handle) {
   auto iter = subscriptions_.find(filter_chain_name);
   if (iter != subscriptions_.end()) {
     SubscriptionState& state = *iter->second;
-    state.callbacks_.erase(&callbacks);
-    if (state.callbacks_.empty()) {
+    state.handles_.erase(&handle);
+    if (state.handles_.empty()) {
       subscriptions_.erase(iter);
     }
   }
@@ -1149,8 +1153,8 @@ void FcdsSharedFilterChainManager::onFilterChainWarmed(
   updateTlsState();
 
   if (draining) {
-    for (auto* callback : state.callbacks_) {
-      callback->drainFilterChain(draining);
+    for (auto* handle : state.handles_) {
+      handle->callbacks().drainFilterChain(draining);
     }
   }
   state.warming_filter_chain_ = nullptr;
@@ -1167,8 +1171,8 @@ void FcdsSharedFilterChainManager::onFilterChainRemoved(
 
   updateTlsState();
 
-  for (auto* callback : state.callbacks_) {
-    callback->drainFilterChain(draining);
+  for (auto* handle : state.handles_) {
+    handle->callbacks().drainFilterChain(draining);
   }
 }
 

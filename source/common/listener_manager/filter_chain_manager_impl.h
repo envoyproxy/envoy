@@ -459,18 +459,19 @@ private:
 constexpr absl::string_view FcdsSharedFilterChainManagerName =
     "fcds_shared_filter_chain_manager_singleton";
 
-class FcdsSubscriptionHandle {
-public:
-  virtual ~FcdsSubscriptionHandle() = default;
-  virtual const Network::FilterChain* filterChain() PURE;
-};
-using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
-
 class FcdsClientCallbacks {
 public:
   virtual ~FcdsClientCallbacks() = default;
   virtual void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) PURE;
 };
+
+class FcdsSubscriptionHandle {
+public:
+  virtual ~FcdsSubscriptionHandle() = default;
+  virtual const Network::FilterChain* filterChain() PURE;
+  virtual FcdsClientCallbacks& callbacks() PURE;
+};
+using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
 
 class FcdsContextCreator : public FilterChainFactoryContextCreator {
 public:
@@ -498,14 +499,14 @@ public:
                                ListenerComponentFactory& listener_component_factory);
   const Network::FilterChain* findThreadLocalFilterChain(const std::string& name) const;
 
-  // Subscribes a listener callback for a filter chain name.
-  virtual absl::StatusOr<FcdsSubscriptionHandleSharedPtr>
+  // Subscribes a listener callback for a filter chain name FCDS distribution.
+  absl::StatusOr<FcdsSubscriptionHandleSharedPtr>
   subscribe(const envoy::config::core::v3::ConfigSource& config_source,
             const std::string& filter_chain_name, FcdsClientCallbacks& callbacks,
             Init::Manager& init_manager);
 
-  // Unsubscribes a listener callback.
-  virtual void unsubscribe(const std::string& filter_chain_name, FcdsClientCallbacks& callbacks);
+  // Unsubscribes a listener from FCDS distribution.
+  void unsubscribe(const std::string& filter_chain_name, FcdsSubscriptionHandle& handle);
 
   // FilterChainUpdateCallbacks
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
@@ -522,7 +523,7 @@ private:
   Stats::ScopeSharedPtr scope_;
   struct SubscriptionState {
     std::unique_ptr<FcdsApiImpl> api_;
-    absl::flat_hash_set<FcdsClientCallbacks*> callbacks_;
+    absl::flat_hash_set<FcdsSubscriptionHandle*> handles_;
     Network::DrainableFilterChainSharedPtr warming_filter_chain_;
   };
   absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionState>> subscriptions_;
