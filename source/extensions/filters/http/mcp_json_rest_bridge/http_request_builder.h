@@ -10,9 +10,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpJsonRestBridge {
 
-// Percent-encode all printable ASCII characters in URL query parameters except for
+// Percent-encode all printable ASCII characters in URL path/query template values except for
 // `[-_./0-9a-zA-Z]`, per the Google API path template syntax:
 // https://cloud.google.com/service-infrastructure/docs/service-management/reference/rpc/google.api#path-template-syntax
+// This set intentionally preserves `.` and `/` for wildcard/multi-segment template variables
+// (e.g. `{name=projects/*}`), whose values are Google-API resource names that span path segments.
 inline constexpr absl::string_view ReservedChars = R"( !"#$%&'()*+,:;<=>?@[\]^`{|}~)";
 
 struct HttpRequest {
