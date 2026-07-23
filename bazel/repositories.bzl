@@ -918,6 +918,8 @@ def _toolchains_llvm():
         patches = [
             "@envoy_toolshed//:patches/toolchains_llvm.patch",
             "@envoy//bazel/foreign_cc:toolchains_llvm_stdc++.patch",
+            # TODO(jwendell): remove when upgrading to toolchains_llvm v1.8.0+.
+            "@envoy//bazel/foreign_cc:toolchains_llvm_macos_libc++.patch",
         ],
     )
 
