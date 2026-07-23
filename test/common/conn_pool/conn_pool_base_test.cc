@@ -43,7 +43,7 @@ public:
     ASSERT_TRUE(testClient != nullptr);
     testClient->active_streams_++;
   }
-  int64_t currentUnusedCapacity() const override {
+  uint32_t currentUnusedCapacity() const override {
     if (capacity_override_.has_value()) {
       return capacity_override_.value();
     }
@@ -68,7 +68,7 @@ public:
   bool supportsEarlyData() const override { return supports_early_data_; }
   uint32_t active_streams_{};
 
-  std::optional<uint64_t> capacity_override_;
+  std::optional<uint32_t> capacity_override_;
 
 private:
   bool supports_early_data_;
