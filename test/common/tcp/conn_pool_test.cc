@@ -119,6 +119,7 @@ public:
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override {
     return conn_pool_->socketOptions();
   }
+  bool hasReadyConnection() const override { return conn_pool_->hasReadyConnection(); }
 
   MOCK_METHOD(void, onConnReleasedForTest, ());
   MOCK_METHOD(void, onConnDestroyedForTest, ());
@@ -632,6 +633,27 @@ TEST_F(TcpConnPoolImplTest, MultipleRequestAndResponse) {
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(TcpConnPoolImplTest, HasReadyConnection) {
+  initialize();
+  cluster_->resetResourceManager(3, 1024, 1024, 1, 1);
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+
+  // A connection assigned to a request is busy, not ready.
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+
+  // Releasing it back to the pool makes it available for immediate checkout.
+  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
+  c1.releaseConn();
+  EXPECT_TRUE(conn_pool_->hasReadyConnection());
+
+  // Destroy the ready connection.
+  EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
 }
 
 /**
