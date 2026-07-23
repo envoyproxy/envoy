@@ -94,7 +94,7 @@ jobs:
     - name: Set default build target
       if: env.CPP_CHANGED == 'true' && env.BUILD_TARGETS == ''
       run: |
-        echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" > $GITHUB_ENV
+        echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" >> $GITHUB_ENV
 
     - name: Initialize CodeQL
       if: env.CPP_CHANGED == 'true'
