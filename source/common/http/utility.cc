@@ -1484,8 +1484,14 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
   } else {
     route_retry_policy.set_retry_on(retry_policy.retry_on());
   }
-  route_retry_policy.mutable_per_try_timeout()->CopyFrom(
-      route_retry_policy.retry_back_off().max_interval());
+  // Historically the computed backoff max_interval was copied into per_try_timeout, silently
+  // aborting tries when a small max_interval was configured (issue #38847). Leave per_try_timeout
+  // unset so each try is bounded by the caller's request timeout, as with route retry policies.
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.core_retry_policy_no_implicit_per_try_timeout")) {
+    route_retry_policy.mutable_per_try_timeout()->CopyFrom(
+        route_retry_policy.retry_back_off().max_interval());
+  }
 
   if (retry_policy.has_retry_priority()) {
     route_retry_policy.mutable_retry_priority()->set_name(retry_policy.retry_priority().name());

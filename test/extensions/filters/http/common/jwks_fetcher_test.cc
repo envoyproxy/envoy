@@ -310,8 +310,9 @@ TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
             EXPECT_EQ(options.parsed_retry_policy->maxInterval()->count(),
                       rp.expected_backoff_max_interval_ms_);
 
-            EXPECT_LE(options.parsed_retry_policy->maxInterval()->count(),
-                      options.parsed_retry_policy->perTryTimeout().count());
+            // per_try_timeout is no longer derived from the backoff max_interval; each try is
+            // bounded by the overall fetch timeout instead (see convertCoreToRouteRetryPolicy).
+            EXPECT_EQ(options.parsed_retry_policy->perTryTimeout().count(), 0);
 
             const auto retry_on = options.parsed_retry_policy->retryOn();
 
