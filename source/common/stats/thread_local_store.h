@@ -202,11 +202,10 @@ public:
   }
   void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
   void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) override;
-  // Enables/disables the explicit-tags logic store-wide. Safe to call during single-threaded
-  // startup even after some scopes exist: a scope created in legacy mode has no explicit_tag_data_,
-  // and the explicit-tags path falls back (via ScopeImpl::explicitTagPrefix()) to behavior
-  // identical to legacy mode for it. Must be set before threading is initialized.
+  // Enables/disables the explicit-tags logic store-wide. This should be called before
+  // any scope that with non-empty prefix is created.
   void setUseExplicitTags(bool use_explicit_tags) override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     use_explicit_tags_ = use_explicit_tags;
   }
   // Whether the store is using the explicit-tags logic. Exposed primarily so tests can verify the
@@ -506,10 +505,9 @@ private:
 
     // Whether this scope uses the explicit-tags logic (propagating scope-level tags) or the legacy
     // logic (which drops scope-level tag metadata). This mirrors the store-level flag, which is the
-    // single source of truth. Note that explicit_tag_data_ may still be null when this is true: a
+    // single source of truth. Note that prefix_tags_ may still be null when this is true: a
     // scope created in legacy mode before setUseExplicitTags() enabled the flag has no
-    // explicit_tag_data_. Use explicitTagPrefix() (not explicit_tag_data_ directly) so that case is
-    // handled.
+    // prefix_tags_.
     bool useExplicitTags() const { return parent_.use_explicit_tags_; }
 
     const uint64_t scope_id_;

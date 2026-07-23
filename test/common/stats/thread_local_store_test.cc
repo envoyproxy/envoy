@@ -245,16 +245,14 @@ public:
 };
 
 // setUseExplicitTags() can be enabled at any time, even after scopes have been created in legacy
-// mode. Such scopes have no explicit_tag_data_ and fall back (via ScopeImpl::explicitTagPrefix())
-// to behavior identical to legacy mode, so stats created in them still resolve correctly.
+// mode. Such scopes have no prefix_tags_ and fall back to use the full prefix as the prefix of
+// stats.
 TEST_F(StatsThreadLocalStoreTest, SetUseExplicitTagsWithPreExistingLegacyScope) {
   ScopeSharedPtr legacy_scope = store_->rootScope()->createScope("cluster.foo");
 
   store_->setUseExplicitTags(true);
   EXPECT_TRUE(store_->useExplicitTags());
 
-  // A stat created in the pre-existing (null explicit_tag_data_) scope resolves via the fallback,
-  // exactly as it would have in legacy mode.
   Counter& c = legacy_scope->counterFromString("rq");
   EXPECT_EQ("cluster.foo.rq", c.name());
 }

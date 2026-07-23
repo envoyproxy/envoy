@@ -44,7 +44,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
   StatNameManagedStorage empty_storage("", alloc.symbolTable());
   const StatName empty = empty_storage.statName();
   // The root scope is always created explicit-tag-capable (via the explicit-tags constructor, which
-  // populates explicit_tag_data_) even though use_explicit_tags_ defaults to false. This lets
+  // populates prefix_tags_) even though use_explicit_tags_ defaults to false. This lets
   // setUseExplicitTags() enable the explicit-tags logic later (during startup) without recreating
   // the root scope. For the empty-prefix, untagged root scope the explicit-tags and legacy code
   // paths produce identical stat names, so this is behavior-neutral until the flag is flipped.
