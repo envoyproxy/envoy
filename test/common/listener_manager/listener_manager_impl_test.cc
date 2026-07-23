@@ -7480,7 +7480,7 @@ api_listener:
   ASSERT_FALSE(manager_->apiListener().has_value());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, ApiListenerOnlyOneApiListener) {
+TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleApiListeners) {
   const std::string yaml = R"EOF(
 name: test_api_listener
 address:
@@ -7532,14 +7532,20 @@ api_listener:
   ASSERT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   ASSERT_TRUE(manager_->apiListener().has_value());
+  // When there are multiple, apiListener() returns the first one in the map.
+  // Before adding the second one, it should be test_api_listener.
   EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
 
-  // Only one ApiListener is added.
-  ASSERT_FALSE(addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
+  // Multiple ApiListeners can be added
+  ASSERT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
-  // The original ApiListener is there.
-  ASSERT_TRUE(manager_->apiListener().has_value());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+
+  // Both ApiListeners can be looked up by name
+  ASSERT_TRUE(manager_->apiListener("test_api_listener").has_value());
+  EXPECT_EQ("test_api_listener", manager_->apiListener("test_api_listener")->get().name());
+
+  ASSERT_TRUE(manager_->apiListener("test_api_listener_2").has_value());
+  EXPECT_EQ("test_api_listener_2", manager_->apiListener("test_api_listener_2")->get().name());
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
