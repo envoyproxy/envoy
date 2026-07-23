@@ -74,6 +74,8 @@ areas:
     title: load_report
   logging:
     title: logging
+  mcp_json_rest_bridge:
+    title: mcp_json_rest_bridge
   mcp_router:
     title: mcp_router
   mysql_proxy:
