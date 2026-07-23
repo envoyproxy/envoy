@@ -59,6 +59,11 @@ public:
 
 class FilterChainManagerImplTest : public testing::TestWithParam<bool> {
 public:
+  struct DummyFcdsClientCallbacks : public FcdsClientCallbacks {
+    void drainFilterChain(Network::DrainableFilterChainSharedPtr) override {}
+  };
+  DummyFcdsClientCallbacks dummy_fcds_callbacks_;
+  envoy::config::core::v3::ConfigSource empty_config_source_;
   void SetUp() override {
     addresses_.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
     filter_chain_manager_ =
@@ -110,7 +115,8 @@ public:
     THROW_IF_NOT_OK(filter_chain_manager_->addFilterChains(
         GetParam() ? &matcher_ : nullptr,
         std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
-        fallback_filter_chain, filter_chain_factory_builder_, *filter_chain_manager_));
+        fallback_filter_chain, filter_chain_factory_builder_, *filter_chain_manager_, nullptr,
+        empty_config_source_, dummy_fcds_callbacks_));
   }
 
   // Intermediate states.
@@ -178,7 +184,8 @@ TEST_P(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
                   ->addFilterChains(GetParam() ? &matcher_ : nullptr,
                                     std::vector<const envoy::config::listener::v3::FilterChain*>{
                                         &new_filter_chain},
-                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
+                                    nullptr, empty_config_source_, dummy_fcds_callbacks_)
                   .ok());
   auto filter_chain =
       findFilterChainHelper(10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
@@ -228,7 +235,8 @@ TEST_P(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage)
                   ->addFilterChains(GetParam() ? &matcher_ : nullptr,
                                     std::vector<const envoy::config::listener::v3::FilterChain*>{
                                         &filter_chain_messages[0], &filter_chain_messages[1]},
-                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
+                                    nullptr, empty_config_source_, dummy_fcds_callbacks_)
                   .ok());
 }
 
@@ -248,7 +256,8 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
                   ->addFilterChains(GetParam() ? &matcher_ : nullptr,
                                     std::vector<const envoy::config::listener::v3::FilterChain*>{
                                         &filter_chain_messages[0]},
-                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
+                                    nullptr, empty_config_source_, dummy_fcds_callbacks_)
                   .ok());
   FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
                                                   *filter_chain_manager_};
@@ -260,7 +269,8 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
                                        &filter_chain_messages[0], &filter_chain_messages[1],
                                        &filter_chain_messages[2]},
-                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager)
+                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager,
+                                   nullptr, empty_config_source_, dummy_fcds_callbacks_)
                   .ok());
 }
 
@@ -281,7 +291,8 @@ TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
                   ->addFilterChains(GetParam() ? &matcher_ : nullptr,
                                     std::vector<const envoy::config::listener::v3::FilterChain*>{
                                         &filter_chain_messages[0]},
-                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
+                                    nullptr, empty_config_source_, dummy_fcds_callbacks_)
                   .ok());
 
   FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
@@ -291,7 +302,8 @@ TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
                   .addFilterChains(GetParam() ? &matcher_ : nullptr,
                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
                                        &filter_chain_messages[1]},
-                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager)
+                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager,
+                                   nullptr, empty_config_source_, dummy_fcds_callbacks_)
                   .ok());
 
   // The new filter chain manager is based on the previous filter chain manager, but it has a new
@@ -355,7 +367,8 @@ TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
                 ->addFilterChains(nullptr,
                                   std::vector<const envoy::config::listener::v3::FilterChain*>{
                                       &new_filter_chain1, &new_filter_chain2},
-                                  nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                                  nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
+                                  nullptr, empty_config_source_, dummy_fcds_callbacks_)
                 .message(),
             "error adding listener '127.0.0.1:1234': filter chain 'foo' has the "
             "same matching rules defined as 'foo'"

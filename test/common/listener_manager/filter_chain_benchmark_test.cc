@@ -217,6 +217,11 @@ public:
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
   absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
+  struct DummyFcdsClientCallbacks : public FcdsClientCallbacks {
+    void drainFilterChain(Network::DrainableFilterChainSharedPtr) override {}
+  };
+  DummyFcdsClientCallbacks dummy_fcds_callbacks_;
+  envoy::config::core::v3::ConfigSource empty_config_source_;
   MockFilterChainFactoryBuilder dummy_builder_;
   Init::ManagerImpl init_manager_{"fcm_benchmark"};
 };
@@ -236,8 +241,9 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
-    THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr,
-                                                         dummy_builder_, filter_chain_manager));
+    THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(
+        nullptr, filter_chains_, nullptr, dummy_builder_, filter_chain_manager, nullptr,
+        empty_config_source_, dummy_fcds_callbacks_));
   }
 }
 
@@ -260,8 +266,9 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
   addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
   FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
 
-  THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr,
-                                                       dummy_builder_, filter_chain_manager));
+  THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(
+      nullptr, filter_chains_, nullptr, dummy_builder_, filter_chain_manager, nullptr,
+      empty_config_source_, dummy_fcds_callbacks_));
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);

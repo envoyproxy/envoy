@@ -5699,8 +5699,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
     )EOF";
   }
 
-  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                            "malformed IP address: a.b.c.d");
+  if (use_matcher_) {
+    EXPECT_THROW_WITH_MESSAGE(
+        addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+        "cannot create a filter chain matcher: malformed IP address: a.b.c.d");
+  } else {
+    EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+                              "malformed IP address: a.b.c.d");
+  }
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServerNamesMatch) {
