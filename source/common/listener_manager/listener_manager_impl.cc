@@ -406,7 +406,20 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
                                                          uint64_t workers_pending_removal)
     : draining_listener_(std::move(draining_listener)),
+      listener_tag_(draining_listener_->listenerTag()),
       workers_pending_removal_(workers_pending_removal) {}
+
+DrainingFilterChainsManager::DrainingFilterChainsManager(
+    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains,
+    uint64_t listener_tag, uint64_t workers_pending_removal)
+    : listener_tag_(listener_tag),
+      draining_filter_chain_shared_ptrs_(std::move(draining_filter_chains)),
+      workers_pending_removal_(workers_pending_removal) {
+  for (auto& fc : draining_filter_chain_shared_ptrs_) {
+    fc->startDraining();
+    draining_filter_chains_.push_back(fc.get());
+  }
+}
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          std::unique_ptr<ListenerComponentFactory>&& factory,
@@ -419,6 +432,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   if (!factory_) {
     factory_ = std::make_unique<ProdListenerComponentFactory>(server);
   }
+
   if (server.admin().has_value()) {
     listeners_config_tracker_entry_ = server.admin()->getConfigTracker().add(
         "listeners", [this](const Matchers::StringMatcher& name_matcher) {
@@ -932,16 +946,23 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
                                               std::move(draining_listener), workers_.size());
-  draining_group->getDrainingListener().diffFilterChain(
+  draining_group->getDrainingListener()->diffFilterChain(
       new_listener, [&draining_group](Network::DrainableFilterChain& filter_chain) mutable {
         filter_chain.startDraining();
         draining_group->addFilterChainToDrain(filter_chain);
       });
+  drainGroup(draining_group);
+  updateWarmingActiveGauges();
+}
+
+void ListenerManagerImpl::drainGroup(
+    std::list<DrainingFilterChainsManager>::iterator draining_group) {
   auto filter_chain_size = draining_group->numDrainingFilterChains();
   stats_.total_filter_chains_draining_.add(filter_chain_size);
-  draining_group->getDrainingListener().debugLog(
-      absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
-                   draining_group->getDrainingListener().name()));
+  if (auto listener = draining_group->getDrainingListener(); listener) {
+    listener->debugLog(absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
+                                    listener->name()));
+  }
 
   // Notify existing connections in the draining filter chains that draining has begun so
   // callbacks (e.g. HTTP/2 codecs) can react before the drain timer expires and the
@@ -955,9 +976,10 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
   // draining at whatever the server configured drain times are.
   draining_group->startDrainSequence(
       server_.options().drainTime(), server_.dispatcher(), [this, draining_group]() -> void {
-        draining_group->getDrainingListener().debugLog(
-            absl::StrCat("removing draining filter chains from listener ",
-                         draining_group->getDrainingListener().name()));
+        if (auto listener = draining_group->getDrainingListener(); listener) {
+          listener->debugLog(
+              absl::StrCat("removing draining filter chains from listener ", listener->name()));
+        }
         for (const auto& worker : workers_) {
           // Once the drain time has completed via the drain manager's timer, we tell the workers
           // to remove the filter chains.
@@ -969,9 +991,10 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
                 // listener while filters might still be using its context (stats, etc.).
                 server_.dispatcher().post([this, draining_group]() -> void {
                   if (draining_group->decWorkersPendingRemoval() == 0) {
-                    draining_group->getDrainingListener().debugLog(
-                        absl::StrCat("draining filter chains from listener ",
-                                     draining_group->getDrainingListener().name(), " complete"));
+                    if (auto listener = draining_group->getDrainingListener(); listener) {
+                      listener->debugLog(absl::StrCat("draining filter chains from listener ",
+                                                      listener->name(), " complete"));
+                    }
                     stats_.total_filter_chains_draining_.sub(
                         draining_group->numDrainingFilterChains());
                     draining_filter_chains_manager_.erase(draining_group);
@@ -980,7 +1003,21 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
               });
         }
       });
-  updateWarmingActiveGauges();
+}
+
+void ListenerManagerImpl::drainFilterChains(
+    ListenerImpl& listener,
+    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains) {
+  if (draining_filter_chains.empty()) {
+    return;
+  }
+  std::list<DrainingFilterChainsManager>::iterator draining_group =
+      draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
+                                              std::move(draining_filter_chains),
+                                              listener.listenerTag(), workers_.size());
+  listener.debugLog(absl::StrCat("draining ", draining_group->numDrainingFilterChains(),
+                                 " dynamic filter chains in listener ", listener.name()));
+  drainGroup(draining_group);
 }
 
 uint64_t ListenerManagerImpl::numConnections() const {
@@ -1235,16 +1272,15 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
     auto existing_draining_filter_chain = std::find_if(
         draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
         [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
-          return draining_filter_chain.getDrainingListener()
-                     .listenSocketFactories()[0]
-                     ->getListenSocket(0)
-                     ->isOpen() &&
-                 listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
+          OptRef<ListenerImpl> draining_listener = draining_filter_chain.getDrainingListener();
+          return draining_listener &&
+                 draining_listener->listenSocketFactories()[0]->getListenSocket(0)->isOpen() &&
+                 listener.hasCompatibleAddress(*draining_listener);
         });
 
     if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
-      existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
-      draining_listener_ptr = &existing_draining_filter_chain->getDrainingListener();
+      existing_draining_filter_chain->getDrainingListener()->debugLog("clones listener socket");
+      draining_listener_ptr = existing_draining_filter_chain->getDrainingListener().ptr();
     }
   }
 
@@ -1314,7 +1350,10 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
       // A listener can be in-place updated multiple times, so there may
       // have multiple draining listeners with same tag.
       if (manager.getDrainingListenerTag() == listener.listenerTag()) {
-        manager.getDrainingListener().closeAllSockets();
+        if (OptRef<ListenerImpl> draining_listener = manager.getDrainingListener();
+            draining_listener) {
+          draining_listener->closeAllSockets();
+        }
       }
     }
   }

@@ -76,6 +76,7 @@ bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
   return PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bind_to_port, true) &&
          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true);
 }
+
 } // namespace
 
 absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>> ListenSocketFactoryImpl::create(
@@ -474,9 +475,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 
   filter_chain_manager_ = std::make_unique<FilterChainManagerImpl>(
-      addresses_, listener_factory_context_->parentFactoryContext(), initManager()),
+      addresses_, listener_factory_context_->parentFactoryContext(), initManager());
 
   buildAccessLog(config);
+
   SET_AND_RETURN_IF_NOT_OK(validateConfig(), creation_status);
 
   // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
@@ -500,6 +502,21 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     // with their parent's initManager.
     parent_.server_.initManager().add(listener_init_target_);
   }
+}
+
+std::shared_ptr<FcdsSharedFilterChainManager>
+ListenerImpl::maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config) {
+  if (config.has_fcds_config()) {
+    return parent_.server_.serverFactoryContext()
+        .singletonManager()
+        .getTyped<FcdsSharedFilterChainManager>(
+            std::string(FcdsSharedFilterChainManagerName),
+            [this]() -> Singleton::InstanceSharedPtr {
+              return std::make_shared<FcdsSharedFilterChainManager>(
+                  parent_.server_.serverFactoryContext(), *parent_.factory_);
+            });
+  }
+  return nullptr;
 }
 
 ListenerImpl::ListenerImpl(ListenerImpl& origin,
@@ -856,6 +873,7 @@ ListenerImpl::createListenerFilterFactories(const envoy::config::listener::v3::L
 absl::Status
 ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& config) {
   if (config.filter_chains().empty() && !config.has_default_filter_chain() &&
+      !config.has_fcds_config() &&
       (socket_type_ == Network::Socket::Type::Stream ||
        !udp_listener_config_->listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
@@ -887,18 +905,22 @@ ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& 
   return absl::OkStatus();
 }
 
+bool ListenerImpl::isQuic() {
+  // The only connection oriented UDP transport protocol right now is QUIC.
+  return udpListenerConfig().has_value() &&
+         !udpListenerConfig()->listenerFactory().isTransportConnectionless();
+}
+
 absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::Listener& config) {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
-  // The only connection oriented UDP transport protocol right now is QUIC.
-  const bool is_quic = udpListenerConfig().has_value() &&
-                       !udpListenerConfig()->listenerFactory().isTransportConnectionless();
-  ListenerFilterChainFactoryBuilder builder(is_quic, validation_visitor_, *parent_.factory_,
+  ListenerFilterChainFactoryBuilder builder(isQuic(), validation_visitor_, *parent_.factory_,
                                             *transport_factory_context_);
   return filter_chain_manager_->addFilterChains(
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,
       config.filter_chains(),
       config.has_default_filter_chain() ? &config.default_filter_chain() : nullptr, builder,
-      *filter_chain_manager_);
+      *filter_chain_manager_, maybeCreateFilterChainManager(config),
+      config.fcds_config().config_source(), *this);
 }
 
 bool ListenerImpl::reusePortBpfCpuSteeringEnabled(
@@ -1032,6 +1054,7 @@ void ListenerImpl::buildProxyProtocolListenerFilter(
     listener_filter_factories_.push_back(std::move(filter_config_provider));
   }
 }
+
 PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config_message, ListenerImpl& listener_impl,
@@ -1423,6 +1446,12 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
   // Without message reflection, err on the side of reloads.
   return false;
 #endif
+}
+
+void ListenerImpl::drainFilterChain(Network::DrainableFilterChainSharedPtr draining) {
+  if (parent_.isWorkerStarted()) {
+    parent_.drainFilterChains(*this, {std::move(draining)});
+  }
 }
 
 } // namespace Server

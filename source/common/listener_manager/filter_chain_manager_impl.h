@@ -12,17 +12,23 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/hash.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
+#include "source/common/listener_manager/fcds_api.h"
 #include "source/common/listener_manager/filter_chain_factory_context_callback.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
 #include "source/server/factory_context_impl.h"
+#include "source/server/generic_factory_context.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -82,8 +88,26 @@ private:
   std::atomic<bool> is_draining_{false};
 };
 
-using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
+// Forward-declare FCDS-related definitions.
+class FcdsSharedFilterChainManager;
+class FcdsSubscriptionHandle;
+class FcdsClientCallbacks;
+
 using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
+
+struct FilterChainActionFactoryContext {
+  absl::flat_hash_map<std::string, Matcher::ActionConstSharedPtr>
+      actions_by_name_; // de-duplicates action objects.
+  Configuration::ServerFactoryContext& server_;
+  const FilterChainsByName& filter_chains_by_name_;
+  std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager_;
+  FcdsClientCallbacks& fcds_callbacks_;
+  const envoy::config::core::v3::ConfigSource& fcds_config_source_;
+  Init::Manager& init_manager_;
+};
+
 using FilterChainsByMatcher = absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch,
                                                   std::string, MessageUtil, MessageUtil>;
 
@@ -201,7 +225,10 @@ public:
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
-      FilterChainFactoryContextCreator& context_creator);
+      FilterChainFactoryContextCreator& context_creator,
+      std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager,
+      const envoy::config::core::v3::ConfigSource& fcds_config_source,
+      FcdsClientCallbacks& fcds_callbacks);
 
   static bool isWildcardServerName(const std::string& name);
 
@@ -273,9 +300,13 @@ private:
                           FilterChainsByName& filter_chains_by_name,
                           const envoy::config::listener::v3::FilterChain& filter_chain,
                           const Network::DrainableFilterChainSharedPtr& filter_chain_impl);
-  void maybeConstructMatcher(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
-                             const FilterChainsByName& filter_chains_by_name,
-                             Configuration::FactoryContext& parent_context);
+  absl::Status
+  maybeConstructMatcher(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                        FilterChainsByName&& filter_chains_by_name,
+                        Configuration::FactoryContext& parent_context,
+                        std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager,
+                        const envoy::config::core::v3::ConfigSource& fcds_config_source,
+                        FcdsClientCallbacks& fcds_callbacks);
 
   absl::Status addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
@@ -377,7 +408,6 @@ private:
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses_;
   // This is the reference to a factory context which all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
-  std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 
   // Reference to the previous generation of filter chain manager to share the filter chains.
   // Caution: only during warm up could the optional have value.
@@ -424,6 +454,82 @@ private:
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;
   Configuration::TransportSocketFactoryContext& factory_context_;
+};
+
+constexpr absl::string_view FcdsSharedFilterChainManagerName =
+    "fcds_shared_filter_chain_manager_singleton";
+
+class FcdsClientCallbacks {
+public:
+  virtual ~FcdsClientCallbacks() = default;
+  virtual void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) PURE;
+};
+
+class FcdsSubscriptionHandle {
+public:
+  virtual ~FcdsSubscriptionHandle() = default;
+  virtual const Network::FilterChain* filterChain() PURE;
+  virtual FcdsClientCallbacks& callbacks() PURE;
+};
+using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
+
+class FcdsContextCreator : public FilterChainFactoryContextCreator {
+public:
+  FcdsContextCreator(Server::Configuration::ServerFactoryContext& server_context,
+                     const ::envoy::config::listener::v3::FilterChain* const filter_chain);
+
+  // FilterChainFactoryContextCreator
+  Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
+
+  void initialize(std::function<void()> completion);
+
+private:
+  std::unique_ptr<FcdsFilterChainFactoryContextImpl> context_;
+  FcdsFilterChainFactoryContextImpl* saved_context_;
+};
+
+class FcdsSharedFilterChainManager
+    : public Singleton::Instance,
+      public std::enable_shared_from_this<FcdsSharedFilterChainManager>,
+      public FilterChainUpdateCallbacks,
+      public Logger::Loggable<Logger::Id::config> {
+public:
+  FcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
+                               ListenerComponentFactory& listener_component_factory);
+  const Network::FilterChain* findThreadLocalFilterChain(const std::string& name) const;
+
+  // Subscribes a listener callback for a filter chain name FCDS distribution.
+  absl::StatusOr<FcdsSubscriptionHandleSharedPtr>
+  subscribe(const envoy::config::core::v3::ConfigSource& config_source,
+            const std::string& filter_chain_name, FcdsClientCallbacks& callbacks,
+            Init::Manager& init_manager);
+
+  // Unsubscribes a listener from FCDS distribution.
+  void unsubscribe(const std::string& filter_chain_name, FcdsSubscriptionHandle& handle);
+
+  // FilterChainUpdateCallbacks
+  absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
+  void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
+
+private:
+  struct ThreadLocalState : public ThreadLocal::ThreadLocalObject {
+    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_;
+  };
+  Server::Configuration::ServerFactoryContext& server_context_;
+  ListenerComponentFactory& listener_component_factory_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalState> tls_slot_;
+  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
+  Stats::ScopeSharedPtr scope_;
+  struct SubscriptionState {
+    std::unique_ptr<FcdsApiImpl> api_;
+    absl::flat_hash_set<FcdsSubscriptionHandle*> handles_;
+    Network::DrainableFilterChainSharedPtr warming_filter_chain_;
+  };
+  absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionState>> subscriptions_;
+
+  void onFilterChainWarmed(Network::DrainableFilterChainSharedPtr filter_chain);
+  void updateTlsState();
 };
 
 } // namespace Server
