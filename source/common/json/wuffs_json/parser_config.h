@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
@@ -39,10 +40,11 @@ struct ExtractFieldSpec {
   // Number of path segments (i.e., nesting depth of the target field)
   int depth() const { return static_cast<int>(segments.size()); }
 
-  // Reconstructs the canonical pattern-path string from segments (same format
-  // as buildPatternPath() output). Diagnostics and config echo only — runtime
-  // routing must match `segments` structurally via
-  // WuffsJsonCursor::matchesPatternPath() (see extract_fields below).
+  // Reconstructs the canonical pattern-path string from segments (dict keys
+  // joined with '.', array wildcards as '[]', e.g. "messages[].role").
+  // Diagnostics and config echo only — runtime routing must match `segments`
+  // structurally via WuffsJsonCursor::matchesPatternPath() (see
+  // extract_fields below).
   std::string canonicalPath() const;
 };
 
@@ -63,15 +65,11 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, i
 //
 // Intended usage at filter init, once the cursor grows a max_depth constructor
 // argument.
-//   ParserConfig cfg = ...;    // populate from proto
+//   ParserConfig cfg = ...;    // populated at the time when parser is initialized.
 //   int depth = cfg.requiredMaxDepth();
 //   WuffsJsonCursor cursor(handler, track_paths,
 //                          depth > 0 ? depth : /*cursor compile-time default*/);
 //
-// TODO(tyxia): when the proto plumbing lands, add a validate() enforcing the
-// inter-field invariants that are currently implicit: max_body_bytes > 0 in
-// production, and max_inline_bytes / max_element_capture_bytes not exceeding
-// max_body_bytes when non-zero.
 struct ParserConfig {
   // Maximum raw body bytes to feed into the cursor. The outer filter should
   // check cursor.nextSourcePosition() + chunk.size() against this limit before
@@ -82,22 +80,55 @@ struct ParserConfig {
   // 0 = no limit (tests only; production must set a non-zero value).
   size_t max_body_bytes{0};
 
-  // Maximum decoded bytes to capture for a single inline scalar string value.
+  // Maximum decoded bytes for a single inline scalar string value. A value
+  // whose decoded size exceeds the budget is rejected — dropped entirely,
+  // never captured truncated — while parsing continues past it (see
+  // CaptureAllScalarsHandler in parser_config_test.cc).
   // Maps to the cursor-side per-value capture budget (the kMaxKeyBytes analog
   // for values; TODO(tyxia): not implemented in the cursor yet). 0 = use the
   // cursor's default once that budget lands.
-  size_t max_inline_bytes{0};
+  size_t max_scalar_capture_bytes{0};
 
   // Maximum raw bytes allowed in a single container byte-range capture
   // (e.g., a messages[] element or params.arguments blob).
   // 0 = no per-element limit.
   size_t max_element_capture_bytes{0};
 
+  // Maximum total captured bytes across all values of one body — the
+  // body-wide retention budget on top of the per-scalar / per-element caps
+  // above, which bound each capture individually but not how many captures a
+  // body can produce. A value whose size would push the running total over
+  // the budget is rejected — dropped entirely, same semantics as
+  // max_scalar_capture_bytes — while parsing continues, and a later smaller
+  // value that still fits is captured (see CaptureAllScalarsHandler in
+  // parser_config_test.cc). Counts recorded value bytes only; keys are
+  // already bounded by the cursor's kMaxKeyBytes.
+  // Note the document-order bias: earlier fields win the budget, so a
+  // hostile body can front-load junk to crowd out later fields.
+  // 0 = no total limit.
+  size_t max_total_capture_bytes{0};
+
+  // When true, capture every scalar value in the body (strings, numbers,
+  // booleans, nulls) keyed by its leaf dict key ("" for array elements),
+  // with no per-field routing: the handler needs no PatternSegment
+  // conversion, no matchesPatternPath() calls, and no track_paths cursor
+  // mode.
+  //
+  // Mutually exclusive with extract_fields — exactly one extraction mode may
+  // be active; validate() rejects a config that sets both.
+  //
+  // TODO(tyxia): open design points for this mode — qualified naming for
+  // nested scalars (the leaf key alone is ambiguous across parents) and a
+  // depth / inside-array scope cutoff.
+  bool capture_all_scalars{false};
+
   // Extraction policy to extract JSON fields from the body.
   //
   // The handler routes extraction by structural matching: convert each spec's
   // segments to WuffsJsonCursor::PatternSegment once at init, then call
   // cursor.matchesPatternPath(segments, depth) at each callback.
+  //
+  // Mutually exclusive with capture_all_scalars (see above).
   std::vector<ExtractFieldSpec> extract_fields;
 
   // Returns the minimum cursor max_depth needed to reach all declared fields.
@@ -105,6 +136,11 @@ struct ParserConfig {
   // The caller is responsible for clamping the result to the cursor's
   // compile-time depth bound (WuffsJsonCursor::kMaxTrackedDepth - 1).
   int requiredMaxDepth() const;
+
+  // Checks the inter-field invariants: capture_all_scalars and extract_fields
+  // are mutually exclusive extraction modes, so a config that sets both is
+  // rejected with InvalidArgumentError.
+  absl::Status validate() const;
 };
 
 } // namespace Wuffs

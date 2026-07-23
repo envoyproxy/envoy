@@ -68,8 +68,6 @@ namespace Wuffs {
 //
 // With track_paths=true, call from any callback:
 //   matchesPatternPath(segments, depth) → bool     structural spec match (routing)
-//   buildIndexedPath(depth) → "messages[0].role"   diagnostics only
-//   buildPatternPath(depth) → "messages[].role"    diagnostics only
 //
 class WuffsJsonCursor {
 public:
@@ -189,15 +187,12 @@ public:
     //
     // PATH TRACKING NOTE — use depth-1, NOT depth, from this callback:
     // At the time this callback fires, key_stack_[depth] is not yet populated
-    // (no keys have been seen inside the new container). The enclosing chain at
-    // depth-1, combined with `key`, identifies this container unambiguously.
-    // This applies to matchesPatternPath and buildPatternPath alike: to match a
-    // container spec like "messages[]", match the first depth-1 segments with
-    // matchesPatternPath(segments.first(depth-1), depth-1) and compare the last
-    // segment against `key` / is_dict yourself.
-    // Example: onContainerOpen(key="parameters", is_dict=true, depth=5)
-    //   buildPatternPath(4) → "tools[].function.parameters"  ← correct
-    //   buildPatternPath(5) → "tools[].function.<stale>"     ← wrong
+    // (no keys have been seen inside the new container), so a depth-length
+    // match would compare against a stale label. The enclosing chain at
+    // depth-1, combined with `key`, identifies this container unambiguously:
+    // to match a container spec like "messages[]", match the first depth-1
+    // segments with matchesPatternPath(segments.first(depth-1), depth-1) and
+    // compare the last segment against `key` / is_dict yourself.
     // TODO(tyxia): add matchesContainerPatternPath(segments, key, is_dict, depth)
     //   convenience wrapper that hides this depth-1 subtlety.
     virtual void onContainerOpen(absl::string_view key, bool is_dict, int depth,
@@ -219,18 +214,6 @@ public:
   // Returns non-OK on malformed JSON or internal allocation failure.
   absl::Status feed(absl::string_view chunk, bool closed);
 
-  // Diagnostic path serialization for the current cursor position.
-  // Must only be called from within a Handler callback while feed() is active.
-  // Requires track_paths=true at construction.
-  //
-  // Labels are concatenated without escaping, so the output is not injective:
-  // document keys containing '.', '[', ']' — or empty keys, which contribute
-  // nothing when leading — let distinct positions serialize identically.
-  // These strings are for diagnostics/logging only; extraction routing must
-  // use matchesPatternPath() below, which has no such ambiguity.
-  std::string buildIndexedPath(int depth) const; // e.g. "messages[0].role"
-  std::string buildPatternPath(int depth) const; // e.g. "messages[].role"
-
   // One level of a structural pattern-path match: a dict key or an array
   // wildcard. `key` is ignored when is_array_element is true and must outlive
   // the matchesPatternPath() call.
@@ -243,8 +226,8 @@ public:
   // one segment per level, dict labels compared as whole strings, array
   // levels matching the wildcard regardless of index.
   //
-  // This is the collision-free routing primitive: unlike comparing
-  // buildPatternPath() output against a config string, a document key
+  // This is the collision-free routing primitive: unlike comparing a
+  // serialized path string against a config string, a document key
   // containing '.', '[', ']' — or an empty key — can never masquerade as
   // nested structure, because no serialization is involved: each document
   // label is compared atomically against exactly one segment.
@@ -304,23 +287,17 @@ private:
   bool is_dict_[kMaxTrackedDepth]{};
   bool expecting_key_[kMaxTrackedDepth]{};
 
-  // key_stack_[d]   — most recently completed key at dict depth d.
-  //                   Always maintained (not gated on track_paths_) because it
-  //                   is forwarded as the `key` argument to Handler callbacks.
-  // push_key_[d]    — key at depth d-1 that opened the container at depth d;
-  //                   captured at push time. Size kMaxTrackedDepth+1 so
-  //                   push_key_[kMaxTrackedDepth] is accessible when depth_
-  //                   reaches kMaxTrackedDepth.
-  //                   Only maintained when track_paths_=true (used by
-  //                   matchesPatternPath/buildIndexedPath/buildPatternPath).
-  // array_index_[d] — count of elements already completed at array depth d;
-  //                   reset to 0 on container open, incremented after each
-  //                   completed element (container close, scalar, or string value)
-  //                   when the enclosing container is an array.
-  //                   Used by buildIndexedPath (requires track_paths_=true).
+  // key_stack_[d] — most recently completed key at dict depth d.
+  //                 Always maintained (not gated on track_paths_) because it
+  //                 is forwarded as the `key` argument to Handler callbacks.
+  // push_key_[d]  — key at depth d-1 that opened the container at depth d;
+  //                 captured at push time. Size kMaxTrackedDepth+1 so
+  //                 push_key_[kMaxTrackedDepth] is accessible when depth_
+  //                 reaches kMaxTrackedDepth.
+  //                 Only maintained when track_paths_=true (used by
+  //                 matchesPatternPath).
   std::string key_stack_[kMaxTrackedDepth]{};
   std::string push_key_[kMaxTrackedDepth + 1]{};
-  int array_index_[kMaxTrackedDepth]{};
   // Tracks keys seen at each dict depth to detect and reject duplicates.
   // Cleared on container open; flat_hash_set gives O(1) insert/lookup with
   // one contiguous backing allocation (no per-node malloc unlike std::set).
@@ -335,8 +312,8 @@ private:
   std::string pending_bytes_;
 
   // TODO(tyxia): Implement the production Handler that accepts ParserConfig (max_body_bytes,
-  // max_inline_bytes, max_element_capture_bytes) and a list of ExtractFieldSpec; converts each
-  // spec's segments to PatternSegment once at init and routes callbacks with
+  // max_scalar_capture_bytes, max_element_capture_bytes) and a list of ExtractFieldSpec; converts
+  // each spec's segments to PatternSegment once at init and routes callbacks with
   // matchesPatternPath(segments, depth) — depth-1 plus `key` at onContainerOpen (see the note
   // there) — recording element byte ranges for container specs.
   //

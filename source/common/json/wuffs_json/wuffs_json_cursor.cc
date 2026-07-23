@@ -241,9 +241,6 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
       seen_keys_[depth_].clear();
       is_dict_[depth_] = to_dict;
       expecting_key_[depth_] = to_dict;
-      if (!to_dict) {
-        array_index_[depth_] = 0;
-      }
     }
     if (track_paths_ && depth_ <= kMaxTrackedDepth) {
       push_key_[depth_] = (depth_ > 1 && is_dict_[depth_ - 1]) ? key_stack_[depth_ - 1] : "";
@@ -260,9 +257,6 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
     handler_.onContainerClose(pop_depth, body_src_pos_);
     if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
       expecting_key_[depth_] = true;
-    }
-    if (depth_ >= 1 && depth_ < kMaxTrackedDepth && !is_dict_[depth_]) {
-      ++array_index_[depth_];
     }
   }
   return absl::OkStatus();
@@ -327,12 +321,8 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
                                               ? absl::string_view(key_stack_[depth_])
                                               : absl::string_view();
       handler_.closeStringCapture(value_key, depth_, body_src_pos_);
-      if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
-        if (is_dict_[depth_]) {
-          expecting_key_[depth_] = true;
-        } else {
-          ++array_index_[depth_];
-        }
+      if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
+        expecting_key_[depth_] = true;
       }
     }
     string_capturing_ = false;
@@ -395,53 +385,10 @@ absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
   } else {
     handler_.onNull(value_key, depth_, token_start, body_src_pos_);
   }
-  if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
-    if (is_dict_[depth_]) {
-      expecting_key_[depth_] = true;
-    } else {
-      ++array_index_[depth_];
-    }
+  if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
+    expecting_key_[depth_] = true;
   }
   return absl::OkStatus();
-}
-
-std::string WuffsJsonCursor::buildIndexedPath(int depth) const {
-  std::string path;
-  for (int d = 1; d <= depth && d < kMaxTrackedDepth; ++d) {
-    if (is_dict_[d]) {
-      // At the target depth, key_stack_[d] is the key currently being processed.
-      // At intermediate depths, the label is the key that opened the child container
-      // at d+1, stored in push_key_[d+1] at push time.
-      const std::string& label = (d == depth) ? key_stack_[d] : push_key_[d + 1];
-      if (!path.empty()) {
-        path += '.';
-      }
-      path += label;
-    } else {
-      // array_index_[d] is the count of elements completed so far at this depth,
-      // which equals the 0-based index of the element currently being processed.
-      path += '[';
-      path += std::to_string(array_index_[d]);
-      path += ']';
-    }
-  }
-  return path;
-}
-
-std::string WuffsJsonCursor::buildPatternPath(int depth) const {
-  std::string path;
-  for (int d = 1; d <= depth && d < kMaxTrackedDepth; ++d) {
-    if (is_dict_[d]) {
-      const std::string& label = (d == depth) ? key_stack_[d] : push_key_[d + 1];
-      if (!path.empty()) {
-        path += '.';
-      }
-      path += label;
-    } else {
-      path += "[]";
-    }
-  }
-  return path;
 }
 
 bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments,

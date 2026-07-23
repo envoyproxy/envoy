@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 
@@ -35,8 +36,9 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, i
       if (in_array) {
         return absl::InvalidArgumentError("extract_field_spec: nested '[' in path");
       }
-      // '.' immediately before '[' is invalid: buildPatternPath never produces
-      // this sequence — '[]' always directly follows the parent dict key.
+      // '.' immediately before '[' is invalid: the canonical pattern-path
+      // syntax never contains '.[]' — '[]' always directly follows the
+      // parent dict key.
       if (i > 0 && path[i - 1] == '.') {
         return absl::InvalidArgumentError(
             "extract_field_spec: '.' before '[' is not valid; use 'key[]' not 'key.[]'");
@@ -72,9 +74,9 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, i
         return absl::InvalidArgumentError(
             "extract_field_spec: only '[]' wildcard is supported, not '[...]'");
       }
-      // A key may not start directly after ']': buildPatternPath always emits
-      // a '.' separator between an array wildcard and a following dict key
-      // ("a[].b", never "a[]b").
+      // A key may not start directly after ']': the canonical pattern-path
+      // syntax always has a '.' separator between an array wildcard and a
+      // following dict key ("a[].b", never "a[]b").
       if (i > 0 && path[i - 1] == ']') {
         return absl::InvalidArgumentError("extract_field_spec: missing '.' between ']' and key");
       }
@@ -106,7 +108,7 @@ std::string ExtractFieldSpec::canonicalPath() const {
     if (seg.is_array_element) {
       path += "[]";
     } else {
-      // Dict key: prepend '.' when path is non-empty, matching buildPatternPath().
+      // Dict key: prepend '.' when path is non-empty.
       if (!path.empty()) {
         path += '.';
       }
@@ -122,6 +124,14 @@ int ParserConfig::requiredMaxDepth() const {
     max = std::max(max, spec.depth());
   }
   return max;
+}
+
+absl::Status ParserConfig::validate() const {
+  if (capture_all_scalars && !extract_fields.empty()) {
+    return absl::InvalidArgumentError("parser_config: capture_all_scalars and extract_fields are "
+                                      "mutually exclusive; set exactly one extraction mode");
+  }
+  return absl::OkStatus();
 }
 
 } // namespace Wuffs
