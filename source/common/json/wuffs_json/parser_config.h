@@ -122,19 +122,25 @@ struct ParserConfig {
   // value that still fits is captured (see CaptureAllScalarsHandler in
   // parser_config_test.cc). Counts recorded value bytes only; keys are
   // already bounded by the cursor's kMaxKeyBytes.
-  // Note the document-order bias: earlier fields win the budget, so a
-  // hostile body can front-load junk to crowd out later fields.
-  // 0 = no total limit.
   size_t max_total_capture_bytes{0};
 
+  // Maximum byte span for a single captured container-element byte range.
+  // A container element whose [token_start, token_end) span exceeds this
+  // budget is rejected — its range is not recorded — while parsing continues
+  // past it (see ContainerRangeHandler in parser_config_test.cc).
+  // 0 = no per-element limit.
+  size_t max_element_capture_bytes{0};
+
   // When true, capture every scalar value in the body (strings, numbers,
-  // booleans, nulls) keyed from depth 1 through depth kMaxTrackedDepth - 1.
+  // booleans, nulls) at any depth from cursor. The cursor rejects nesting deeper
+  // than kMaxTrackedDepth - 1, so that is the effective ceiling.
   //
   // Mutually exclusive with extract_fields — exactly one extraction mode may
   // be active; validate() rejects a config that sets both.
   //
-  // TODO(tyxia): (1) depth / inside-array scope cutoff; (2) qualified naming
-  // for nested scalars (the leaf key alone is ambiguous across parents).
+  // TODO(tyxia): (1) max capture depth independent of (smaller than) kMaxTrackedDepth
+  // (2) inside-array scope cutoff;
+  // (3) qualified naming for nested scalars (the leaf key alone is ambiguous across parents).
   bool capture_all_scalars{false};
 
   // Extraction policy to extract JSON fields from the body.

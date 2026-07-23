@@ -107,6 +107,34 @@ TEST(CaptureAllScalarsTest, CapturesEveryScalarWithoutPathTracking) {
   EXPECT_EQ(h.captured(), "model=m;max_tokens=5;stream=false;id=null;name=n;");
 }
 
+// capture_all_scalars fires at every depth from 1 through kMaxTrackedDepth-1
+// (currently 8). The JSON places one string scalar at each depth via nested
+// "nest" dict keys; all eight must appear in the output.
+TEST(CaptureAllScalarsTest, CapturesAtAllDepthsThroughBound) {
+  constexpr int bound = WuffsJsonCursor::kMaxTrackedDepth - 1; // 8
+
+  // {"d1":"v1","nest":{"d2":"v2","nest":{...{"d8":"v8"}...}}}
+  std::string json = "{";
+  for (int d = 1; d <= bound; ++d) {
+    json += "\"d" + std::to_string(d) + "\":\"v" + std::to_string(d) + "\"";
+    if (d < bound) {
+      json += ",\"nest\":{";
+    }
+  }
+  json += std::string(bound - 1, '}') + "}";
+
+  // d1=v1;d2=v2;...d8=v8;
+  std::string expected;
+  for (int d = 1; d <= bound; ++d) {
+    expected += "d" + std::to_string(d) + "=v" + std::to_string(d) + ";";
+  }
+
+  CaptureAllScalarsHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), expected);
+}
+
 // Array-element scalars arrive with key "" — the leaf-key label carries no
 // parent context (the qualified-naming design point tracked in the
 // capture_all_scalars TODO).
@@ -559,7 +587,8 @@ TEST(StructuralMatchTest, DegenerateDepthArgumentsReturnFalse) {
 // byte range — the production shape for messages[] element passthrough.
 class ContainerRangeHandler : public MockHandler {
 public:
-  explicit ContainerRangeHandler(const ExtractFieldSpec& spec) {
+  explicit ContainerRangeHandler(const ExtractFieldSpec& spec, const ParserConfig& config = {})
+      : max_element_capture_bytes_(config.max_element_capture_bytes) {
     for (const auto& seg : spec.segments) {
       pattern_.push_back({seg.key, seg.is_array_element});
     }
@@ -576,7 +605,10 @@ public:
   }
   void onContainerClose(int depth, size_t token_end) override {
     if (depth == open_depth_) {
-      ranges_.emplace_back(range_start_, token_end);
+      if (max_element_capture_bytes_ == 0 ||
+          token_end - range_start_ <= max_element_capture_bytes_) {
+        ranges_.emplace_back(range_start_, token_end);
+      }
       open_depth_ = -1;
     }
   }
@@ -584,6 +616,7 @@ public:
   const std::vector<std::pair<size_t, size_t>>& ranges() const { return ranges_; }
 
 private:
+  const size_t max_element_capture_bytes_; // 0 = no per-element limit
   std::vector<WuffsJsonCursor::PatternSegment> pattern_;
   const WuffsJsonCursor* cursor_{nullptr};
   int open_depth_{-1};
@@ -607,6 +640,50 @@ TEST(StructuralMatchTest, ContainerSpecCapturesElementByteRanges) {
             R"({"role":"user"})");
   EXPECT_EQ(json.substr(h.ranges()[1].first, h.ranges()[1].second - h.ranges()[1].first),
             R"({"role":"tool"})");
+}
+
+// max_element_capture_bytes rejects container elements whose byte span exceeds
+// the budget. Parsing continues past the rejected element, and later elements
+// that fit are still captured.
+TEST(StructuralMatchTest, ElementBudgetRejectsOversizedElements) {
+  auto spec = parseExtractFieldSpec("messages[]");
+  ASSERT_TRUE(spec.ok());
+
+  ParserConfig cfg;
+  cfg.max_element_capture_bytes = 9; // {"r":"x"} == 9 bytes; {"r":"toolong"} == 15 bytes
+
+  ContainerRangeHandler h(*spec, cfg);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  // Three elements: fits (9 B), over budget (15 B), fits (9 B).
+  constexpr absl::string_view json = R"({"messages":[{"r":"x"},{"r":"toolong"},{"r":"y"}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+
+  // First and third elements captured; second rejected.
+  ASSERT_EQ(h.ranges().size(), 2u);
+  EXPECT_EQ(json.substr(h.ranges()[0].first, h.ranges()[0].second - h.ranges()[0].first),
+            R"({"r":"x"})");
+  EXPECT_EQ(json.substr(h.ranges()[1].first, h.ranges()[1].second - h.ranges()[1].first),
+            R"({"r":"y"})");
+}
+
+// An element whose byte span equals the budget exactly is still captured.
+TEST(StructuralMatchTest, ElementBudgetExactLimitIsAccepted) {
+  auto spec = parseExtractFieldSpec("messages[]");
+  ASSERT_TRUE(spec.ok());
+
+  ParserConfig cfg;
+  cfg.max_element_capture_bytes = 9; // {"r":"x"} == exactly 9 bytes
+
+  ContainerRangeHandler h(*spec, cfg);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json = R"({"messages":[{"r":"x"}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+
+  ASSERT_EQ(h.ranges().size(), 1u);
+  EXPECT_EQ(json.substr(h.ranges()[0].first, h.ranges()[0].second - h.ranges()[0].first),
+            R"({"r":"x"})");
 }
 
 // Pins the coupling asserted in the parseExtractFieldSpec doc: pass the
