@@ -2355,5 +2355,30 @@ TEST_P(QuicHttpIntegrationTest, InconsistentContentLengthHeadersOnlyDisabled) {
   codec_client_->close();
 }
 
+TEST_P(QuicHttpIntegrationTest, FirstRequestSucceedsWithoutEnvoyBugOnNewConnection) {
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // first request on the new connection.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_TRUE(response1->complete());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+
+  // second request on the same connection.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+
+  test_server_->waitForCounter("server.envoy_bug_failures", testing::Eq(0));
+
+  codec_client_->close();
+}
+
 } // namespace Quic
 } // namespace Envoy
