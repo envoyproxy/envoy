@@ -36,6 +36,9 @@ def envoy_dependencies_extra(
     py_repositories()
 
     # Registers underscored Python minor version - eg `python3_10`
+    # When use_host_tools is True, skip registering the hermetic Python toolchain
+    # and use the host Python instead. This is unsupported by the Envoy project
+    # and intended only for downstream builds in controlled environments.
     python_register_toolchains(
         name = "python%s" % _python_minor_version(python_version),
         python_version = python_version,

@@ -375,8 +375,11 @@ build --config=clang-local
 
 `BAZEL_LLVM_PATH` should point to the root of your LLVM installation.
 
-This is intended for downstream repositories that build inside controlled environments (e.g.
-container-based CI) where these tools are pre-installed at known versions. Upstream Envoy builds
+**Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
+hermetic toolchain versions are the only configuration tested in CI. Using host tools may result
+in build failures or unexpected behavior depending on the versions installed. This option is
+provided as a convenience for downstream repositories that build inside controlled environments
+(e.g. container-based CI) where tools are pre-installed at known versions. Upstream Envoy builds
 are unaffected when the parameter is omitted.
 
 ## Linking against libc++ on Linux

@@ -46,6 +46,10 @@ def envoy_dependency_imports(
         cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock",
         use_host_tools = False):
     compatibility_proxy_repo()
+
+    # When use_host_tools is True, skip downloading hermetic toolchains and use
+    # whatever is installed on the host. This is unsupported by the Envoy project
+    # and intended only for downstream builds in controlled environments.
     if use_host_tools:
         go_version = "host"
         rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
