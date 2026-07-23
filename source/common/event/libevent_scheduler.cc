@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "source/common/common/assert.h"
+#include "source/common/event/evwatch_observer_manager_impl.h"
 #include "source/common/event/schedulable_cb_impl.h"
 #include "source/common/event/timer_impl.h"
 
@@ -16,22 +17,6 @@ namespace {
 void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
   histogram.recordValue(tv.tv_sec * 1000000 + tv.tv_usec);
 }
-
-void pruneExpiredObservers(std::vector<std::weak_ptr<Evwatch::Observer>>& observers) {
-  observers.erase(std::remove_if(observers.begin(), observers.end(),
-                                 [](const auto& entry) { return entry.expired(); }),
-                  observers.end());
-}
-
-class ObserverHandleImpl : public Evwatch::ObserverHandle {
-public:
-  explicit ObserverHandleImpl(Evwatch::ObserverPtr observer) : observer_(std::move(observer)) {}
-
-  Evwatch::ObserverWeakPtr observer() const override { return observer_; }
-
-private:
-  std::shared_ptr<Evwatch::Observer> observer_;
-};
 } // namespace
 
 LibeventScheduler::LibeventScheduler(TimeSource& time_source) : time_source_(time_source) {
@@ -52,6 +37,30 @@ LibeventScheduler::LibeventScheduler(TimeSource& time_source) : time_source_(tim
 
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
+
+  evwatch_manager_ = std::make_unique<EvwatchObserverManagerImpl>(*libevent_, time_source_);
+}
+
+LibeventScheduler::LibeventScheduler(TimeSource& time_source,
+                                     EvwatchObserverManagerPtr evwatch_manager)
+    : LibeventScheduler(time_source) {
+  if (evwatch_manager != nullptr) {
+    evwatch_manager_ = std::move(evwatch_manager);
+  }
+}
+
+LibeventScheduler::~LibeventScheduler() = default;
+
+void LibeventScheduler::registerEvwatchObserver(Evwatch::Observer& observer) {
+  if (evwatch_manager_ != nullptr) {
+    evwatch_manager_->registerObserver(observer);
+  }
+}
+
+void LibeventScheduler::unregisterEvwatchObserver(Evwatch::Observer& observer) {
+  if (evwatch_manager_ != nullptr) {
+    evwatch_manager_->unregisterObserver(observer);
+  }
 }
 
 TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatcher) {
@@ -159,62 +168,6 @@ void LibeventScheduler::onCheckForStats(evwatch*, const evwatch_check_cb_info*, 
       recordTimeval(self->stats_->poll_delay_us_, delay);
     }
   }
-}
-
-void LibeventScheduler::onPrepareForObserver(evwatch*, const evwatch_prepare_cb_info* info,
-                                             void* arg) {
-  auto self = static_cast<LibeventScheduler*>(arg);
-  if (self->evwatch_observers_.empty()) {
-    return;
-  }
-  timeval timeout;
-  const bool timeout_set = evwatch_prepare_get_timeout(info, &timeout);
-  const std::optional<MonotonicTime::duration> timeout_duration =
-      timeout_set
-          ? std::optional<MonotonicTime::duration>(std::chrono::seconds(timeout.tv_sec) +
-                                                   std::chrono::microseconds(timeout.tv_usec))
-          : std::nullopt;
-
-  const MonotonicTime prepare_time = self->time_source_.monotonicTime();
-
-  const size_t size = self->evwatch_observers_.size();
-  for (size_t i = 0; i < size; ++i) {
-    if (auto observer = self->evwatch_observers_[i].lock()) {
-      observer->onPrepare(prepare_time, timeout_duration);
-    }
-  }
-  pruneExpiredObservers(self->evwatch_observers_);
-}
-
-void LibeventScheduler::onCheckForObserver(evwatch*, const evwatch_check_cb_info*, void* arg) {
-  auto self = static_cast<LibeventScheduler*>(arg);
-  if (self->evwatch_observers_.empty()) {
-    return;
-  }
-  const MonotonicTime check_time = self->time_source_.monotonicTime();
-
-  const size_t size = self->evwatch_observers_.size();
-  for (size_t i = 0; i < size; ++i) {
-    if (auto observer = self->evwatch_observers_[i].lock()) {
-      observer->onCheck(check_time);
-    }
-  }
-  pruneExpiredObservers(self->evwatch_observers_);
-}
-
-Evwatch::ObserverHandlePtr
-LibeventScheduler::registerEvwatchObserver(Evwatch::ObserverPtr observer) {
-  if (observer == nullptr) {
-    return nullptr;
-  }
-  if (!evwatch_observers_registered_) {
-    evwatch_observers_registered_ = true;
-    evwatch_prepare_new(libevent_.get(), &onPrepareForObserver, this);
-    evwatch_check_new(libevent_.get(), &onCheckForObserver, this);
-  }
-  auto handle = std::make_unique<ObserverHandleImpl>(std::move(observer));
-  evwatch_observers_.push_back(handle->observer());
-  return handle;
 }
 
 } // namespace Event

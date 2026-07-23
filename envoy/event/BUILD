@@ -50,6 +50,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "evwatch_observer_manager_interface",
+    hdrs = ["evwatch_observer_manager.h"],
+    deps = [
+        ":evwatch_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "file_event_interface",
     hdrs = ["file_event.h"],
 )
