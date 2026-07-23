@@ -1,14 +1,10 @@
-diff --git a/lib/includes/nghttp2/nghttp2.h b/lib/includes/nghttp2/nghttp2.h
---- a/lib/includes/nghttp2/nghttp2.h
-+++ b/lib/includes/nghttp2/nghttp2.h
-@@ -3162,6 +3162,18 @@
- */
- NGHTTP2_EXTERN void
- nghttp2_option_set_disable_huffman_encoding(nghttp2_option *option, int val);
-+
-+/**
-+ * @function
-+ *
+diff -uNr nghttp2-1.69.0-huffman-clean/lib/includes/nghttp2/nghttp2.h nghttp2-1.69.0-max-clean/lib/includes/nghttp2/nghttp2.h
+--- nghttp2-1.69.0-huffman-clean/lib/includes/nghttp2/nghttp2.h	2026-07-23 06:56:23.925197990 +0000
++++ nghttp2-1.69.0-max-clean/lib/includes/nghttp2/nghttp2.h	2026-07-23 06:56:59.812283368 +0000
+@@ -3189,6 +3189,18 @@
+ /**
+  * @function
+  *
 + * This option sets the maximum length of an individual header
 + * name/value that the HPACK inflater will accept.  The default value
 + * is 65536 (64 KiB on the wire).  Setting a larger value allows
@@ -17,13 +13,45 @@ diff --git a/lib/includes/nghttp2/nghttp2.h b/lib/includes/nghttp2/nghttp2.h
 + */
 +NGHTTP2_EXTERN void
 +nghttp2_option_set_max_hd_nv_size(nghttp2_option *option, size_t val);
++
++/**
++ * @function
++ *
+  * This function sets the maximum number of SETTINGS entries per
+  * SETTINGS frame that will be accepted. If more than those entries
+  * are received, the peer is considered to be misbehaving and session
+diff -uNr nghttp2-1.69.0-huffman-clean/lib/nghttp2_hd.c nghttp2-1.69.0-max-clean/lib/nghttp2_hd.c
+--- nghttp2-1.69.0-huffman-clean/lib/nghttp2_hd.c	2026-07-23 06:56:23.926197993 +0000
++++ nghttp2-1.69.0-max-clean/lib/nghttp2_hd.c	2026-07-23 06:56:59.812283368 +0000
+@@ -758,6 +758,7 @@
  
- /**
-  * @function
-
-diff --git a/lib/nghttp2_hd.h b/lib/nghttp2_hd.h
---- a/lib/nghttp2_hd.h
-+++ b/lib/nghttp2_hd.h
+   inflater->settings_hd_table_bufsize_max = NGHTTP2_HD_DEFAULT_MAX_BUFFER_SIZE;
+   inflater->min_hd_table_bufsize_max = UINT32_MAX;
++  inflater->max_nv = NGHTTP2_HD_MAX_NV;
+ 
+   inflater->nv_name_keep = NULL;
+   inflater->nv_value_keep = NULL;
+@@ -2180,7 +2181,7 @@
+     /* Fall through */
+     case NGHTTP2_HD_STATE_NEWNAME_READ_NAMELEN:
+       rfin = 0;
+-      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, NGHTTP2_HD_MAX_NV);
++      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, inflater->max_nv);
+       if (rv < 0) {
+         goto fail;
+       }
+@@ -2265,7 +2266,7 @@
+     /* Fall through */
+     case NGHTTP2_HD_STATE_READ_VALUELEN:
+       rfin = 0;
+-      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, NGHTTP2_HD_MAX_NV);
++      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, inflater->max_nv);
+       if (rv < 0) {
+         goto fail;
+       }
+diff -uNr nghttp2-1.69.0-huffman-clean/lib/nghttp2_hd.h nghttp2-1.69.0-max-clean/lib/nghttp2_hd.h
+--- nghttp2-1.69.0-huffman-clean/lib/nghttp2_hd.h	2026-07-23 06:56:23.926197993 +0000
++++ nghttp2-1.69.0-max-clean/lib/nghttp2_hd.h	2026-07-23 06:56:59.812283368 +0000
 @@ -252,6 +252,8 @@
    size_t min_hd_table_bufsize_max;
    /* The number of next shift to decode integer */
@@ -33,63 +61,9 @@ diff --git a/lib/nghttp2_hd.h b/lib/nghttp2_hd.h
    nghttp2_hd_opcode opcode;
    nghttp2_hd_inflate_state state;
    /* nonzero if string is huffman encoded */
-
-diff --git a/lib/nghttp2_hd.c b/lib/nghttp2_hd.c
---- a/lib/nghttp2_hd.c
-+++ b/lib/nghttp2_hd.c
-@@ -757,6 +757,7 @@
- 
-   inflater->settings_hd_table_bufsize_max = NGHTTP2_HD_DEFAULT_MAX_BUFFER_SIZE;
-   inflater->min_hd_table_bufsize_max = UINT32_MAX;
-+  inflater->max_nv = NGHTTP2_HD_MAX_NV;
- 
-   inflater->nv_name_keep = NULL;
-   inflater->nv_value_keep = NULL;
-@@ -2179,7 +2180,7 @@
-     /* Fall through */
-     case NGHTTP2_HD_STATE_NEWNAME_READ_NAMELEN:
-       rfin = 0;
--      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, NGHTTP2_HD_MAX_NV);
-+      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, inflater->max_nv);
-       if (rv < 0) {
-         goto fail;
-       }
-@@ -2263,7 +2264,7 @@
-     /* Fall through */
-     case NGHTTP2_HD_STATE_READ_VALUELEN:
-       rfin = 0;
--      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, NGHTTP2_HD_MAX_NV);
-+      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, inflater->max_nv);
-       if (rv < 0) {
-         goto fail;
-       }
-
-diff --git a/lib/nghttp2_option.h b/lib/nghttp2_option.h
---- a/lib/nghttp2_option.h
-+++ b/lib/nghttp2_option.h
-@@ -72,6 +72,7 @@
-   NGHTTP2_OPT_NO_RFC9113_LEADING_AND_TRAILING_WS_VALIDATION = 1 << 14,
-   NGHTTP2_OPT_STREAM_RESET_RATE_LIMIT = 1 << 15,
-   NGHTTP2_OPT_MAX_CONTINUATIONS = 1 << 16,
-+  NGHTTP2_OPT_MAX_HD_NV_SIZE = 1 << 29,
-   NGHTTP2_OPT_DISABLE_HUFFMAN = 1 << 30,
- } nghttp2_option_flag;
- 
-@@ -97,6 +98,10 @@
-    */
-   int disable_huffman;
-   /**
-+   * NGHTTP2_OPT_MAX_HD_NV_SIZE
-+   */
-+  size_t max_hd_nv_size;
-+  /**
-    * NGHTTP2_OPT_MAX_OUTBOUND_ACK
-    */
-   size_t max_outbound_ack;
-
-diff --git a/lib/nghttp2_option.c b/lib/nghttp2_option.c
---- a/lib/nghttp2_option.c
-+++ b/lib/nghttp2_option.c
+diff -uNr nghttp2-1.69.0-huffman-clean/lib/nghttp2_option.c nghttp2-1.69.0-max-clean/lib/nghttp2_option.c
+--- nghttp2-1.69.0-huffman-clean/lib/nghttp2_option.c	2026-07-23 06:56:23.926197993 +0000
++++ nghttp2-1.69.0-max-clean/lib/nghttp2_option.c	2026-07-23 06:56:59.813283370 +0000
 @@ -122,6 +122,11 @@
    option->disable_huffman = val;
  }
@@ -102,19 +76,39 @@ diff --git a/lib/nghttp2_option.c b/lib/nghttp2_option.c
  void nghttp2_option_set_no_closed_streams(nghttp2_option *option, int val) {
    option->opt_set_mask |= NGHTTP2_OPT_NO_CLOSED_STREAMS;
    option->no_closed_streams = val;
-
-diff --git a/lib/nghttp2_session.c b/lib/nghttp2_session.c
---- a/lib/nghttp2_session.c
-+++ b/lib/nghttp2_session.c
-@@ -586,6 +586,10 @@
-   rv = nghttp2_hd_inflate_init(&(*session_ptr)->hd_inflater, mem);
-   if (rv != 0) {
+diff -uNr nghttp2-1.69.0-huffman-clean/lib/nghttp2_option.h nghttp2-1.69.0-max-clean/lib/nghttp2_option.h
+--- nghttp2-1.69.0-huffman-clean/lib/nghttp2_option.h	2026-07-23 06:56:35.149229981 +0000
++++ nghttp2-1.69.0-max-clean/lib/nghttp2_option.h	2026-07-23 06:57:11.898326552 +0000
+@@ -73,6 +73,7 @@
+   NGHTTP2_OPT_STREAM_RESET_RATE_LIMIT = 1 << 15,
+   NGHTTP2_OPT_MAX_CONTINUATIONS = 1 << 16,
+   NGHTTP2_OPT_GLITCH_RATE_LIMIT = 1 << 17,
++  NGHTTP2_OPT_MAX_HD_NV_SIZE = 1 << 29,
+   NGHTTP2_OPT_DISABLE_HUFFMAN = 1 << 30,
+ } nghttp2_option_flag;
+ 
+@@ -103,6 +104,10 @@
+    */
+   int disable_huffman;
+   /**
++   * NGHTTP2_OPT_MAX_HD_NV_SIZE
++   */
++  size_t max_hd_nv_size;
++  /**
+    * NGHTTP2_OPT_MAX_OUTBOUND_ACK
+    */
+   size_t max_outbound_ack;
+diff -uNr nghttp2-1.69.0-huffman-clean/lib/nghttp2_session.c nghttp2-1.69.0-max-clean/lib/nghttp2_session.c
+--- nghttp2-1.69.0-huffman-clean/lib/nghttp2_session.c	2026-07-23 06:56:35.150229984 +0000
++++ nghttp2-1.69.0-max-clean/lib/nghttp2_session.c	2026-07-23 06:56:59.814283373 +0000
+@@ -598,6 +598,10 @@
      goto fail_hd_inflater;
-+  }
-+
-+  if (option && (option->opt_set_mask & NGHTTP2_OPT_MAX_HD_NV_SIZE)) {
-+    (*session_ptr)->hd_inflater.max_nv = option->max_hd_nv_size;
    }
  
++  if (option && (option->opt_set_mask & NGHTTP2_OPT_MAX_HD_NV_SIZE)) {
++    (*session_ptr)->hd_inflater.max_nv = option->max_hd_nv_size;
++  }
++
    nbuffer = ((*session_ptr)->max_send_header_block_length +
-
+              NGHTTP2_FRAMEBUF_CHUNKLEN - 1) /
+             NGHTTP2_FRAMEBUF_CHUNKLEN;
