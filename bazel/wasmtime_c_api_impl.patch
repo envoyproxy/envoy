@@ -1,0 +1,14 @@
+--- a/build.rs
++++ b/build.rs
+@@ -37,7 +37,10 @@
+     println!("cargo:rerun-if-changed=include");
+ 
+     let out_dir = std::env::var("OUT_DIR").unwrap();
+-    let mut cmake = Command::new("cmake");
++    // Allow the path to `cmake` to be provided via the `CMAKE` environment
++    // variable, so that a hermetic (Bazel provided) cmake can be used.
++    let cmake_bin = env::var("CMAKE").unwrap_or_else(|_| "cmake".to_string());
++    let mut cmake = Command::new(cmake_bin);
+     cmake.arg("-DWASMTIME_DISABLE_ALL_FEATURES=ON");
+     cmake.arg(format!("-DCMAKE_INSTALL_PREFIX={out_dir}"));
+     for f in FEATURES {
