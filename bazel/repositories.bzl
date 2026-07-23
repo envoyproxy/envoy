@@ -980,7 +980,6 @@ def _toolchains_llvm():
         patch_args = ["-p1"],
         patches = [
             "@envoy_toolshed//:patches/toolchains_llvm.patch",
-            "@envoy//bazel/foreign_cc:toolchains_llvm_stdc++.patch",
         ],
     )
 
