@@ -56,8 +56,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_proto/archive/refs/tags/{version}.tar.gz"],
     ),
     opentelemetry_proto = dict(
-        version = "1.10.0",
-        sha256 = "52c85df79badc45da7e6a8735e8090b05a961b0208756187e1492a40db2d1f5f",
+        version = "1.11.0",
+        sha256 = "cefb4cf0dee432bdd0eb25af73ed4c996b16e80baea7f98285c413184c1b92ad",
         strip_prefix = "opentelemetry-proto-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-proto/archive/v{version}.tar.gz"],
     ),
