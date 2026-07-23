@@ -202,6 +202,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # HTTP Local Rate Limit
 /*/extensions/filters/http/local_ratelimit @mattklein123 @wbpcode
 /*/extensions/filters/common/local_ratelimit @mattklein123 @wbpcode
+# Priority load shed
+/*/extensions/filters/http/priority_load_shed @kbaichoo @botengyao
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @yanavlasov
 # Rate limit expression descriptor

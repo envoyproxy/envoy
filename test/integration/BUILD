@@ -1869,6 +1869,7 @@ envoy_cc_test(
     deps = [
         ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
+        "//source/extensions/filters/http/priority_load_shed:config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration/filters:block_filter_lib",
         "//test/test_common:test_runtime_lib",

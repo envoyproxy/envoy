@@ -90,6 +90,8 @@ public:
   const std::string AdmissionControl = "envoy.filters.http.admission_control";
   // Original Src Filter
   const std::string OriginalSrc = "envoy.filters.http.original_src";
+  // Priority load shed filter
+  const std::string PriorityLoadShed = "envoy.filters.http.priority_load_shed";
   // Dynamic forward proxy filter
   const std::string DynamicForwardProxy = "envoy.filters.http.dynamic_forward_proxy";
   // Alternate Protocols Cache filter
