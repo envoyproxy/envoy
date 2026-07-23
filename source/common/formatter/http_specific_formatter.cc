@@ -636,7 +636,7 @@ BuiltInHttpCommandParser::parse(absl::string_view command, absl::string_view sub
   }
 
   // Check flags for the command.
-  THROW_IF_NOT_OK(
+  RETURN_IF_NOT_OK(
       CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, max_length));
 
   // Create a pointer to the formatter by calling a function
