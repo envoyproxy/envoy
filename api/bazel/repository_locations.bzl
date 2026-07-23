@@ -1,8 +1,8 @@
 # This should match the schema defined in external_deps.bzl.
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_skylib = dict(
-        version = "1.9.0",
-        sha256 = "3b5b49006181f5f8ff626ef8ddceaa95e9bb8ad294f7b5d7b11ea9f7ddaf8c59",
+        version = "1.9.2",
+        sha256 = "37cdfbc6faefea94f7b37760a305c98c08981116c2bc9e821e3b423221fad8c8",
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
     ),
     com_envoyproxy_protoc_gen_validate = dict(
