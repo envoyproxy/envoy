@@ -21,6 +21,11 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_context_));
+  ON_CALL(*this, statsScope()).WillByDefault(testing::Invoke([this]() -> Stats::Scope& {
+    return cluster_.info()->statsScope();
+  }));
+  ON_CALL(*this, healthFlagCallbacks())
+      .WillByDefault(testing::Return(Upstream::HealthFlagCallbacks{}));
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;

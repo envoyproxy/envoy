@@ -11,8 +11,6 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
-#include "envoy/extensions/health_checkers/multi/v3/multi.pb.h"
-
 namespace Envoy {
 namespace Upstream {
 
@@ -133,31 +131,12 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   auto& server_context = context.serverFactoryContext();
 
   if (!cluster.health_checks().empty()) {
-    if (cluster.health_checks().size() == 1) {
+    // TODO(htuch): Need to support multiple health checks in v2.
+    if (cluster.health_checks().size() != 1) {
+      return absl::InvalidArgumentError("Multiple health checks not supported");
+    } else {
       auto checker_or_error = HealthCheckerFactory::create(cluster.health_checks()[0],
                                                            *new_cluster_pair.first, server_context);
-      RETURN_IF_NOT_OK_REF(checker_or_error.status());
-      new_cluster_pair.first->setHealthChecker(checker_or_error.value());
-    } else {
-      // Multiple health checks: synthesize a config for the multi health checker extension
-      // which aggregates results from all configured health checks.
-      envoy::config::core::v3::HealthCheck synthetic;
-      synthetic.mutable_timeout()->set_seconds(1);
-      synthetic.mutable_interval()->set_seconds(1);
-      synthetic.mutable_unhealthy_threshold()->set_value(1);
-      synthetic.mutable_healthy_threshold()->set_value(1);
-
-      auto* custom = synthetic.mutable_custom_health_check();
-      custom->set_name("envoy.health_checkers.multi");
-
-      envoy::extensions::health_checkers::multi::v3::Multi multi_config;
-      for (const auto& hc : cluster.health_checks()) {
-        *multi_config.add_health_checks() = hc;
-      }
-      custom->mutable_typed_config()->PackFrom(multi_config);
-
-      auto checker_or_error =
-          HealthCheckerFactory::create(synthetic, *new_cluster_pair.first, server_context);
       RETURN_IF_NOT_OK_REF(checker_or_error.status());
       new_cluster_pair.first->setHealthChecker(checker_or_error.value());
     }

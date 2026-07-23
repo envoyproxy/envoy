@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 #include "envoy/upstream/health_checker.h"
 
 #include "gmock/gmock.h"

@@ -1380,7 +1380,6 @@ public:
    *         returns nullptr.
    */
   virtual HealthChecker* healthChecker() PURE;
-  virtual OptRef<const HealthChecker> healthChecker() const PURE;
 
   /**
    * @return the information about this upstream cluster.

@@ -13,7 +13,6 @@ envoy_cc_extension(
     srcs = ["multi.cc"],
     hdrs = ["multi.h"],
     extra_visibility = [
-        "//source/server/admin:__pkg__",
         "//test:__subpackages__",
     ],
     deps = [
@@ -22,8 +21,6 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:health_checker_lib",
-        "//source/common/upstream:upstream_includes",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/health_checkers/multi/v3:pkg_cc_proto",
     ],
 )

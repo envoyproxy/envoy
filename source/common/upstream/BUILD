@@ -537,7 +537,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/health_checkers/multi/v3:pkg_cc_proto",
     ],
 )
 

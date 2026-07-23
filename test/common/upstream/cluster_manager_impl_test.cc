@@ -105,7 +105,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
   create(parseBootstrapFromV3Yaml(yaml));
 }
 
-TEST_F(ClusterManagerImplTest, MultipleHealthCheckAccepted) {
+TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
   const std::string yaml = R"EOF(
  static_resources:
   clusters:
@@ -114,21 +114,16 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckAccepted) {
     health_checks:
       - timeout: 1s
         interval: 1s
-        unhealthy_threshold: 2
-        healthy_threshold: 2
         http_health_check:
           path: "/blah"
       - timeout: 1s
         interval: 1s
-        unhealthy_threshold: 2
-        healthy_threshold: 2
         http_health_check:
           path: "/"
   )EOF";
 
-  create(parseBootstrapFromV3Yaml(yaml));
-  const auto& active_clusters = cluster_manager_->clusters().active_clusters_;
-  EXPECT_NE(active_clusters.find("service_google"), active_clusters.end());
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "Multiple health checks not supported");
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
