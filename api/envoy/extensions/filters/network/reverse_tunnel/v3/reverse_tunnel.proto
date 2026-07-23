@@ -139,10 +139,17 @@ message JwtHandshakeValidation {
   // audience is not checked.
   repeated string audiences = 2;
 
-  // Inline JWKS used to verify the token signature. Only inline sources
-  // (``inline_string`` / ``inline_bytes`` / ``filename``) are supported; the JWKS is loaded once at
-  // config time and verification is fully synchronous.
-  config.core.v3.DataSource local_jwks = 3 [(validate.rules).message = {required: true}];
+  // JWKS source used to verify the token signature. Exactly one must be set. Only inline
+  // ``local_jwks`` is supported today; asynchronous ``remote_jwks`` fetching is a planned follow-up
+  // and will occupy field 8 in this oneof.
+  oneof jwks_source_specifier {
+    option (validate.required) = true;
+
+    // Inline JWKS used to verify the token signature. Only inline sources
+    // (``inline_string`` / ``inline_bytes`` / ``filename``) are supported; the JWKS is loaded once
+    // at config time and verification is fully synchronous.
+    config.core.v3.DataSource local_jwks = 3;
+  }
 
   // Name of the header carrying the token. Defaults to ``authorization``, and a leading ``Bearer ``
   // prefix is stripped when present.

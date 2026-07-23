@@ -2811,6 +2811,18 @@ TEST_F(ReverseTunnelJwtTest, InvalidJwksRejectedAtConfigLoad) {
   EXPECT_FALSE(config_or_error.ok());
 }
 
+// A jwt_validation block with no JWKS source set is rejected at config load. This locks in the
+// `jwks_source_specifier` oneof contract so a future `remote_jwks` arm cannot silently make the
+// source optional.
+TEST_F(ReverseTunnelJwtTest, JwksSourceRequiredAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validation();
+  jwt->set_issuer(std::string(kIssuer));
+  // No jwks_source_specifier arm (e.g. local_jwks) is set.
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
 } // namespace
 } // namespace ReverseTunnel
 } // namespace NetworkFilters
