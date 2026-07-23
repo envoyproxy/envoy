@@ -650,24 +650,15 @@ FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
     Server::Configuration::CommonFactoryContext& context,
     std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
-    const std::string& stats_prefix)
+    const std::string& stats_prefix, absl::Status& creation_status)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
-      post_logout_redirect_uri_formatter_(
-          (proto_config.post_logout_redirect_uri().uri().empty() ||
-           proto_config.end_session_endpoint().empty())
-              ? nullptr
-              : THROW_OR_RETURN_VALUE(
-                    Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri().uri()),
-                    Formatter::FormatterPtr)),
       disable_post_logout_redirect_uri_(proto_config.post_logout_redirect_uri().disabled()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
-      redirect_uri_(proto_config.redirect_uri()),
       allowed_redirect_domains_(proto_config.allowed_redirect_domains().begin(),
                                 proto_config.allowed_redirect_domains().end()),
-      original_request_uri_(proto_config.original_request_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
@@ -737,6 +728,28 @@ FilterConfig::FilterConfig(
            proto_config.cookie_configs().has_code_verifier_cookie_config())
               ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
+
+  {
+    // Create the redirect URI formatter unconditionally.
+    auto formatter_or_error = Formatter::FormatterImpl::create(proto_config.redirect_uri());
+    SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+    redirect_uri_formatter_ = std::move(formatter_or_error.value());
+  }
+
+  if (!proto_config.end_session_endpoint().empty()) {
+    if (!proto_config.post_logout_redirect_uri().uri().empty()) {
+      auto formatter_or_error =
+          Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri().uri());
+      SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+      post_logout_redirect_uri_formatter_ = std::move(formatter_or_error.value());
+    }
+  }
+  if (!proto_config.original_request_uri().empty()) {
+    auto formatter_or_error = Formatter::FormatterImpl::create(proto_config.original_request_uri());
+    SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+    original_request_uri_formatter_ = std::move(formatter_or_error.value());
+  }
+
   if (!context.clusterManager().hasCluster(oauth_token_endpoint_.cluster())) {
     // This is not necessarily a configuration error — sometimes cluster is sent later than the
     // listener in the xDS stream.
@@ -745,9 +758,10 @@ FilterConfig::FilterConfig(
   }
   if (!authorization_endpoint_url_.initialize(authorization_endpoint_,
                                               /*is_connect_request=*/false)) {
-    throw EnvoyException(
+    creation_status = absl::InvalidArgumentError(
         fmt::format("OAuth2 filter: invalid authorization endpoint URL '{}' in config.",
                     authorization_endpoint_));
+    return;
   }
   if (!end_session_endpoint_.empty()) {
     bool is_oidc = false;
@@ -758,8 +772,9 @@ FilterConfig::FilterConfig(
       }
     }
     if (!is_oidc) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           "OAuth2 filter: end session endpoint is only supported for OpenID Connect.");
+      return;
     }
   }
 
@@ -770,7 +785,7 @@ FilterConfig::FilterConfig(
     // been validated during the config load.
     auto parsed_policy_or_error = Router::RetryPolicyImpl::create(
         retry_policy, ProtobufMessage::getNullValidationVisitor(), context);
-    THROW_IF_NOT_OK_REF(parsed_policy_or_error.status());
+    SET_AND_RETURN_IF_NOT_OK(parsed_policy_or_error.status(), creation_status);
     retry_policy_ = std::move(parsed_policy_or_error.value());
   }
 }
@@ -1055,9 +1070,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   original_request_url_ = result.original_request_url_;
   auth_code_ = result.auth_code_;
-  Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
-      Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  const auto redirect_uri =
+      config_->redirectUri().format({&headers}, decoder_callbacks_->streamInfo());
 
   std::optional<std::string> encrypted_code_verifier =
       readCookieValueWithSuffix(headers, config_->cookieNames().code_verifier_, result.flow_id_);
@@ -1245,10 +1259,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   auto base_path = absl::StrCat(scheme, "://", host_);
 
-  if (!config_->originalRequestUri().empty()) {
-    Formatter::FormatterPtr base_path_formatter = THROW_OR_RETURN_VALUE(
-        Formatter::FormatterImpl::create(config_->originalRequestUri()), Formatter::FormatterPtr);
-    base_path = base_path_formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  if (config_->originalRequestUri() != nullptr) {
+    base_path = config_->originalRequestUri()->format({&headers}, decoder_callbacks_->streamInfo());
   }
 
   if (!isHostAllowedDomain(base_path, config_->allowedRedirectDomains())) {
@@ -1290,11 +1302,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
-  // Format redirect_uri — needed for the query param sent to the identity provider
-  Formatter::FormatterPtr redirect_uri_formatter = THROW_OR_RETURN_VALUE(
-      Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
+  // Format redirect_uri — needed for the query param sent to the identity provider.
   const auto redirect_uri =
-      redirect_uri_formatter->format({&headers}, decoder_callbacks_->streamInfo());
+      config_->redirectUri().format({&headers}, decoder_callbacks_->streamInfo());
   if (!isHostAllowedDomain(redirect_uri, config_->allowedRedirectDomains())) {
     sendUnauthorizedResponse(
         fmt::format("redirect_uri failed domain allow-list validation: {}", redirect_uri));
@@ -1409,11 +1419,11 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
     if (!config_->disablePostLogoutRedirectUri()) {
       std::string redirect_uri;
-      if (config_->postLogoutRedirectUriFormatter() == nullptr) {
+      if (config_->postLogoutRedirectUri() == nullptr) {
         redirect_uri = default_post_logout_redirect_url;
       } else {
-        redirect_uri = config_->postLogoutRedirectUriFormatter()->format(
-            {&headers}, decoder_callbacks_->streamInfo());
+        redirect_uri =
+            config_->postLogoutRedirectUri()->format({&headers}, decoder_callbacks_->streamInfo());
       }
       absl::StrAppend(&oidc_logout_url,
                       fmt::format(OIDCLogoutUrlPostLogoutRedirectFormatString,

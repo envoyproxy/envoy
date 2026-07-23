@@ -25,6 +25,9 @@ envoy_extension_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )
 
@@ -39,6 +42,9 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )
 
@@ -56,6 +62,9 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:factory_context_mocks",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )
 
@@ -77,6 +86,9 @@ envoy_extension_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )
 
@@ -90,5 +102,8 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )
