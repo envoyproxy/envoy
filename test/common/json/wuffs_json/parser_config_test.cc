@@ -308,8 +308,9 @@ TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
 // zero allocations, and collision-free (see the hostile-key test below).
 // canonicalPath() is a diagnostics-only serialization.
 
-// Captures exactly the string values whose root-to-here chain structurally
-// matches the spec's segments; each completed capture is terminated with ';'.
+// Captures exactly the scalar values (strings, numbers, booleans, nulls)
+// whose root-to-here chain structurally matches the spec's segments; each
+// completed capture is terminated with ';'.
 class SpecMatchingHandler : public MockHandler {
 public:
   explicit SpecMatchingHandler(const ExtractFieldSpec& spec) {
@@ -335,6 +336,26 @@ public:
     if (capturing_) {
       captured_ += ';';
       capturing_ = false;
+    }
+  }
+  absl::Status onNumber(absl::string_view, absl::string_view raw, int depth, size_t,
+                        size_t) override {
+    if (cursor_->matchesPatternPath(pattern_, depth)) {
+      captured_.append(raw.data(), raw.size());
+      captured_ += ';';
+    }
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view, bool value, int depth, size_t, size_t) override {
+    if (cursor_->matchesPatternPath(pattern_, depth)) {
+      captured_ += value ? "true" : "false";
+      captured_ += ';';
+    }
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view, int depth, size_t, size_t) override {
+    if (cursor_->matchesPatternPath(pattern_, depth)) {
+      captured_ += "null;";
     }
   }
 
@@ -431,6 +452,193 @@ TEST(StructuralMatchTest, RejectsHostileKeyCollision) {
     ASSERT_TRUE(cursor.feed(R"({"":{"a.b":"decoy"}})", /*closed=*/true).ok());
     EXPECT_EQ(h.captured(), ""); // decoy not captured; hole closed
   }
+}
+
+// Routing is not string-only: numbers, booleans, and nulls match from their
+// own callbacks. usage.total_tokens (a number in real traffic) is the
+// motivating example from the header.
+TEST(StructuralMatchTest, RoutesNonStringScalars) {
+  {
+    auto spec = parseExtractFieldSpec("usage.total_tokens");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    constexpr absl::string_view json =
+        R"({"usage":{"total_tokens":42,"cached":true},"total_tokens":7})";
+    ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+    // The depth-1 decoy with the same leaf key is skipped.
+    EXPECT_EQ(h.captured(), "42;");
+  }
+  {
+    auto spec = parseExtractFieldSpec("stream");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    ASSERT_TRUE(cursor.feed(R"({"stream":true,"id":null})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "true;");
+  }
+  {
+    auto spec = parseExtractFieldSpec("id");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    ASSERT_TRUE(cursor.feed(R"({"stream":true,"id":null})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "null;");
+  }
+}
+
+// Kind mismatch at an intermediate level: a spec's array wildcard never
+// matches a dict level and a spec's dict key never matches an array level,
+// even when the target depth and leaf key line up exactly.
+TEST(StructuralMatchTest, KindMismatchRejected) {
+  {
+    // Spec expects an array at level 2; document has a dict there.
+    auto spec = parseExtractFieldSpec("messages[].role");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    ASSERT_TRUE(cursor.feed(R"({"messages":{"inner":{"role":"x"}}})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "");
+  }
+  {
+    // Spec expects a dict key at level 2; document has an array there.
+    auto spec = parseExtractFieldSpec("params._meta.traceparent");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    ASSERT_TRUE(cursor.feed(R"({"params":[{"traceparent":"x"}]})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "");
+  }
+}
+
+// Probes matchesPatternPath's degenerate arguments directly from inside a
+// callback: depth 0, depth >= kMaxTrackedDepth, and segment count != depth
+// all return false rather than reading out of bounds or matching.
+class MatchProbeHandler : public MockHandler {
+public:
+  void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
+
+  bool openStringCapture(absl::string_view, int depth, size_t) override {
+    const std::vector<WuffsJsonCursor::PatternSegment> one = {{"a", false}};
+    matched_correct_ = cursor_->matchesPatternPath(one, depth);
+    matched_depth_zero_ = cursor_->matchesPatternPath(one, 0);
+    matched_size_mismatch_ = cursor_->matchesPatternPath(one, 2);
+    const std::vector<WuffsJsonCursor::PatternSegment> deep(WuffsJsonCursor::kMaxTrackedDepth,
+                                                            {"a", false});
+    matched_over_bound_ = cursor_->matchesPatternPath(deep, WuffsJsonCursor::kMaxTrackedDepth);
+    return false;
+  }
+
+  const WuffsJsonCursor* cursor_{nullptr};
+  bool matched_correct_{false};
+  bool matched_depth_zero_{true};
+  bool matched_size_mismatch_{true};
+  bool matched_over_bound_{true};
+};
+
+TEST(StructuralMatchTest, DegenerateDepthArgumentsReturnFalse) {
+  MatchProbeHandler h;
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  ASSERT_TRUE(cursor.feed(R"({"a":"x"})", /*closed=*/true).ok());
+  EXPECT_TRUE(h.matched_correct_); // sanity: the well-formed call matches
+  EXPECT_FALSE(h.matched_depth_zero_);
+  EXPECT_FALSE(h.matched_size_mismatch_);
+  EXPECT_FALSE(h.matched_over_bound_);
+}
+
+// Executable form of the onContainerOpen depth-1 recipe documented on the
+// cursor: when a container opens, the chain at `depth` is not yet populated,
+// so a container spec of N segments is matched with the full pattern at
+// depth-1 (== N). Captures each matching container's [token_start, token_end)
+// byte range — the production shape for messages[] element passthrough.
+class ContainerRangeHandler : public MockHandler {
+public:
+  explicit ContainerRangeHandler(const ExtractFieldSpec& spec) {
+    for (const auto& seg : spec.segments) {
+      pattern_.push_back({seg.key, seg.is_array_element});
+    }
+  }
+
+  void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
+
+  void onContainerOpen(absl::string_view, bool, int depth, size_t token_start) override {
+    if (open_depth_ == -1 && depth - 1 == static_cast<int>(pattern_.size()) &&
+        cursor_->matchesPatternPath(pattern_, depth - 1)) {
+      open_depth_ = depth;
+      range_start_ = token_start;
+    }
+  }
+  void onContainerClose(int depth, size_t token_end) override {
+    if (depth == open_depth_) {
+      ranges_.emplace_back(range_start_, token_end);
+      open_depth_ = -1;
+    }
+  }
+
+  const std::vector<std::pair<size_t, size_t>>& ranges() const { return ranges_; }
+
+private:
+  std::vector<WuffsJsonCursor::PatternSegment> pattern_;
+  const WuffsJsonCursor* cursor_{nullptr};
+  int open_depth_{-1};
+  size_t range_start_{0};
+  std::vector<std::pair<size_t, size_t>> ranges_;
+};
+
+TEST(StructuralMatchTest, ContainerSpecCapturesElementByteRanges) {
+  auto spec = parseExtractFieldSpec("messages[]");
+  ASSERT_TRUE(spec.ok());
+  ContainerRangeHandler h(*spec);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json =
+      R"({"messages":[{"role":"user"},{"role":"tool"}],"tools":[{"x":1}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  // Both messages[] elements captured as verbatim byte ranges; the tools[]
+  // element is structurally rejected.
+  ASSERT_EQ(h.ranges().size(), 2u);
+  EXPECT_EQ(json.substr(h.ranges()[0].first, h.ranges()[0].second - h.ranges()[0].first),
+            R"({"role":"user"})");
+  EXPECT_EQ(json.substr(h.ranges()[1].first, h.ranges()[1].second - h.ranges()[1].first),
+            R"({"role":"tool"})");
+}
+
+// Pins the coupling asserted in the parseExtractFieldSpec doc: pass the
+// cursor's public depth bound (kMaxTrackedDepth - 1) as max_depth and config
+// load accepts exactly the specs the cursor can match. A spec at the bound
+// extracts end-to-end; one segment deeper is refused at load — and could
+// never match anyway, since the cursor rejects bodies nested past the bound.
+TEST(StructuralMatchTest, SpecAtCursorDepthBoundMatchesEndToEnd) {
+  constexpr int bound = WuffsJsonCursor::kMaxTrackedDepth - 1;
+  std::string path; // "a.a. ... .k" — exactly `bound` segments
+  for (int i = 0; i < bound - 1; ++i) {
+    path += "a.";
+  }
+  path += "k";
+  auto spec = parseExtractFieldSpec(path, bound);
+  ASSERT_TRUE(spec.ok());
+  EXPECT_EQ(spec->depth(), bound);
+
+  // One segment deeper is refused at config load.
+  EXPECT_FALSE(parseExtractFieldSpec("x." + path, bound).ok());
+
+  SpecMatchingHandler h(*spec);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  std::string json; // {"a":{"a": ... {"k":"v"} ... }} — value at depth == bound
+  for (int i = 0; i < bound - 1; ++i) {
+    json += R"({"a":)";
+  }
+  json += R"({"k":"v"})";
+  json += std::string(bound - 1, '}');
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "v;");
 }
 
 // ============================================================================
@@ -555,6 +763,32 @@ TEST(ParseExtractFieldSpecTest, KeyAfterBracketWithoutDotRejected) {
   EXPECT_FALSE(parseExtractFieldSpec("messages[]role").ok());
 }
 
+TEST(ParseExtractFieldSpecTest, BackslashReservedRejected) {
+  // '\' is reserved for a future escape syntax for document keys containing
+  // '.', '[', ']' — reserving it now keeps that extension non-breaking.
+  auto result = parseExtractFieldSpec(R"(params.\_meta)");
+  ASSERT_FALSE(result.ok());
+  EXPECT_FALSE(result.status().message().empty());
+  EXPECT_FALSE(parseExtractFieldSpec(R"(a\.b)").ok());
+  EXPECT_FALSE(parseExtractFieldSpec(R"(a\\b)").ok());
+}
+
+// Executable form of the documented LIMITATION on ExtractFieldSpec: '.'
+// always splits segments, so a spec written for a single document key that
+// contains dots (the MCP reverse-DNS _meta convention) parses "successfully"
+// into nested segments that can never structurally match that key — a silent
+// no-match, not a config error. Lifting this needs either the reserved '\'
+// escape syntax or a structured segment-list config representation.
+TEST(ParseExtractFieldSpecTest, DottedDocumentKeyIsNotAddressable) {
+  auto result = parseExtractFieldSpec("params._meta.vendor.example.com/token");
+  ASSERT_TRUE(result.ok());
+  // Parsed as 5 nested dict keys, NOT as {params, _meta, "vendor.example.com/token"}.
+  ASSERT_EQ(result->segments.size(), 5u);
+  EXPECT_EQ(result->segments[2].key, "vendor");
+  EXPECT_EQ(result->segments[3].key, "example");
+  EXPECT_EQ(result->segments[4].key, "com/token");
+}
+
 TEST(ParseExtractFieldSpecTest, BracketAfterBracketAccepted) {
   // '[' directly after ']' stays legal: "a[][]" is a dict key whose value is
   // an array of arrays (depth 3: key, outer wildcard, inner wildcard).
@@ -565,11 +799,13 @@ TEST(ParseExtractFieldSpecTest, BracketAfterBracketAccepted) {
 }
 
 TEST(ParseExtractFieldSpecTest, DepthBoundEnforced) {
+  // 9 segments — one past the cursor's matchable bound of
+  // kMaxTrackedDepth - 1 (currently 8), the value the doc says to pass.
   constexpr absl::string_view kNineSegments = "a.b.c.d.e.f.g.h.i";
-  // Within bound and at the exact bound: accepted.
-  EXPECT_TRUE(parseExtractFieldSpec(kNineSegments, 9).ok());
+  // At the exact segment count: accepted.
+  EXPECT_TRUE(parseExtractFieldSpec(kNineSegments, WuffsJsonCursor::kMaxTrackedDepth).ok());
   // Over bound: rejected with an informative error.
-  auto result = parseExtractFieldSpec(kNineSegments, 8);
+  auto result = parseExtractFieldSpec(kNineSegments, WuffsJsonCursor::kMaxTrackedDepth - 1);
   ASSERT_FALSE(result.ok());
   EXPECT_FALSE(result.status().message().empty());
   // Default (0) means no depth check.

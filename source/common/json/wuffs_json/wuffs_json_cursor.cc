@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "source/common/common/assert.h"
+
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -129,8 +131,9 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
   }
   pending_bytes_.clear();
 
-  // body_src_pos_ is a global byte counter across all feed() calls. Token
-  // offsets (token_start - chunk_base) gives the offset into effective_chunk for byte capture.
+  // body_src_pos_ is a global byte counter across all feed() calls, and token
+  // offsets are expressed in that global byte space; token_start - chunk_base
+  // converts one to an offset into effective_chunk for byte capture.
   const size_t chunk_base = body_src_pos_;
   wuffs_base__io_buffer source_buf = wuffs_base__ptr_u8__reader(
       const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(effective_chunk.data())),
@@ -393,6 +396,10 @@ absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
 
 bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments,
                                          int depth) const {
+  // Without track_paths, push_key_ is not maintained: intermediate labels
+  // would compare against "" and dict-intermediate specs would silently
+  // never match. Fail loudly in debug builds instead.
+  ASSERT(track_paths_, "matchesPatternPath requires track_paths=true at construction");
   // Compares: segment count must equal depth, and each level must agree
   // in kind (dict vs array) and, for dicts, in whole-label equality.
   if (depth <= 0 || depth >= kMaxTrackedDepth || static_cast<int>(segments.size()) != depth) {

@@ -233,7 +233,10 @@ public:
   // label is compared atomically against exactly one segment.
   // Zero allocations; O(depth) string_view compares with early exit.
   // Must only be called from within a Handler callback while feed() is
-  // active. Requires track_paths=true at construction.
+  // active. Requires track_paths=true at construction: without it the
+  // intermediate labels it compares are not maintained, so dict-intermediate
+  // specs would silently never match — misuse is caught by ASSERT in debug
+  // builds.
   bool matchesPatternPath(absl::Span<const PatternSegment> segments, int depth) const;
 
   // Monotonically increasing byte offset of the next source byte to be consumed.
@@ -244,8 +247,31 @@ public:
   // ResourceExhausted instead of feeding, rejecting an oversized chunk unparsed.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
+  // Exclusive upper bound for per-depth state tracking: depths 1 through
+  // kMaxTrackedDepth-1 (currently 1–8) have full key/dup/path tracking.
+  // Value covers the deepest known OpenAI/Anthropic schema paths:
+  //   tools[i].function.parameters.properties.<arg>.type  (depth 7)
+  //   messages[i].content[j].content[k].text              (depth 7)
+  // plus one buffer level for schemas with one extra level of nesting.
+  //
+  // Nesting beyond kMaxTrackedDepth-1 is rejected with InvalidArgumentError.
+  // Public so config-load code can pass kMaxTrackedDepth - 1 as the
+  // max_depth argument of parseExtractFieldSpec, refusing specs the cursor
+  // could never match.
+  //
+  // TODO(tyxia): replace the fixed per-depth arrays with std::vector<T> to
+  // support dynamic depth so that max_depth_ can exceed kMaxTrackedDepth-1
+  // without losing tracking accuracy. This removes the hard compile-time cap
+  // at the cost of per-push heap allocation; evaluate against the
+  // request-path perf budget before doing so.
+  static constexpr int kMaxTrackedDepth = 9;
+
 private:
   Handler& handler_;
+  // When true, push_key_[d] is updated on every container push so that
+  // matchesPatternPath can compare intermediate dict labels. Only needed by
+  // the spec-based extraction mode (extract_fields); capture_all_scalars and
+  // handlers that route by depth+key alone can leave this false.
   const bool track_paths_;
 
   wuffs_json__decoder::unique_ptr decoder_;
@@ -256,23 +282,6 @@ private:
   size_t body_src_pos_{0};
   bool wuffs_done_{false};
 
-  // Exclusive upper bound for per-depth state tracking: depths 1 through
-  // kMaxTrackedDepth-1 (currently 1–8) have full key/dup/path tracking.
-  // Value covers the deepest known OpenAI/Anthropic schema paths:
-  //   tools[i].function.parameters.properties.<arg>.type  (depth 7)
-  //   messages[i].content[j].content[k].text              (depth 7)
-  // plus one buffer level for schemas with one extra level of nesting.
-  //
-  // Nesting beyond kMaxTrackedDepth-1 is rejected with InvalidArgumentError.
-  // Key/dup/path tracking accuracy is bounded by kMaxTrackedDepth-1 because
-  // the per-depth arrays below are stack-allocated at compile time.
-  //
-  // TODO(tyxia): replace the fixed arrays with std::vector<T> to support
-  // dynamic depth so that max_depth_ can exceed kMaxTrackedDepth-1 without
-  // losing tracking accuracy. This removes the hard compile-time cap at the
-  // cost of per-push heap allocation; evaluate against the request-path perf
-  // budget before doing so.
-  static constexpr int kMaxTrackedDepth = 9;
   // Cap key length at 256 bytes: well above any legitimate schema field name
   // (longest observed ~25B, e.g. "input_audio_transcription") while bounding
   // per-key allocation and guarding against DoS via unbounded key lengths.
@@ -312,12 +321,16 @@ private:
   std::string pending_bytes_;
 
   // TODO(tyxia): Implement the production Handler that accepts ParserConfig (max_body_bytes,
-  // max_scalar_capture_bytes, max_element_capture_bytes) and a list of ExtractFieldSpec; converts
+  // max_scalar_capture_bytes, max_total_capture_bytes) and a list of ExtractFieldSpec; converts
   // each spec's segments to PatternSegment once at init and routes callbacks with
   // matchesPatternPath(segments, depth) — depth-1 plus `key` at onContainerOpen (see the note
   // there) — recording element byte ranges for container specs.
   //
   // Implements the three-tier body-size logic (full capture / semantic-only / reject).
+  //
+  // Deferred: a max_depth constructor argument derived from the
+  // deepest configured spec, tightening the DoS depth bound to exactly what the
+  // policy requires instead of the static kMaxTrackedDepth default.
   bool string_is_key_{false};
   bool string_capturing_{false};    // openStringCapture returned true for current value string
   bool string_chunk_active_{false}; // onStringChunk hasn't returned false yet

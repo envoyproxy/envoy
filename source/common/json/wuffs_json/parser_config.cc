@@ -15,11 +15,19 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, i
   if (path.empty()) {
     return absl::InvalidArgumentError("extract_field_spec: path must not be empty");
   }
+
   if (path.front() == '.') {
     return absl::InvalidArgumentError("extract_field_spec: path must not start with '.'");
   }
   if (path.back() == '.') {
     return absl::InvalidArgumentError("extract_field_spec: path must not end with '.'");
+  }
+  // '\' is reserved for a future escape syntax for document keys containing
+  // '.', '[', ']' (see the LIMITATION note on ExtractFieldSpec). Rejecting it
+  // now keeps that extension non-breaking.
+  if (path.find('\\') != absl::string_view::npos) {
+    return absl::InvalidArgumentError(
+        "extract_field_spec: '\\' is reserved for future escape syntax");
   }
 
   ExtractFieldSpec out;
@@ -120,7 +128,7 @@ std::string ExtractFieldSpec::canonicalPath() const {
 absl::Status ParserConfig::validate() const {
   if (capture_all_scalars && !extract_fields.empty()) {
     return absl::InvalidArgumentError("parser_config: capture_all_scalars and extract_fields are "
-                                      "mutually exclusive; set exactly one extraction mode");
+                                      "mutually exclusive; set at most one extraction mode");
   }
   return absl::OkStatus();
 }

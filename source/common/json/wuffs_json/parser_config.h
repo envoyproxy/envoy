@@ -20,7 +20,13 @@ namespace Wuffs {
 //   "params._meta.traceparent"    depth=3, nested dict scalar
 //   "messages[].content[]"        depth=4, inner array element
 //
-// depth() returns the the JSON nesting depth of the target field.
+// depth() returns the JSON nesting depth of the target field.
+//
+// Note: the grammar cannot address document keys that contain '.',
+// contain the substring "[]", or are the empty string "". '.' always splits
+// segments, so a spec written for the single MCP-style key
+// "vendor.example.com/token" parses as multiple nested segments and silently
+// matches nothing at runtime. Address this later if needed.
 struct ExtractFieldSpec {
   // One step in the path: either a dict key or an array wildcard.
   struct Segment {
@@ -36,17 +42,13 @@ struct ExtractFieldSpec {
 
   // Reconstructs the canonical pattern-path string from segments (dict keys
   // joined with '.', array wildcards as '[]', e.g. "messages[].role").
-  // Diagnostics and config echo only — runtime routing must match `segments`
-  // structurally via WuffsJsonCursor::matchesPatternPath() (see
-  // extract_fields below).
   std::string canonicalPath() const;
 };
 
-// Parses and convert the path string into a valid and structured ExtractFieldSpec.
+// Parses and converts the path string into a valid and structured ExtractFieldSpec.
 // Returns InvalidArgumentError when the path is empty or malformed
-// (leading/trailing/double '.', unmatched '['/']', non-empty subscript
-// content such as '[0]', '.' immediately before '[', or a key starting
-// directly after ']' without a '.' separator).
+// (leading/trailing/double '.', unmatched '['/']' etc), or contains '\' —
+// reserved for a future key-escape syntax (see the note on ExtractFieldSpec).
 // When max_depth > 0, also rejects paths with more than max_depth segments —
 // pass the cursor's depth bound (kMaxTrackedDepth - 1) so a spec that the
 // cursor could never match is refused at config load instead of silently
@@ -107,20 +109,15 @@ struct ParserConfig {
   // never captured truncated — while parsing continues past it (see
   // CaptureAllScalarsHandler in parser_config_test.cc).
   // Maps to the cursor-side per-value capture budget (the kMaxKeyBytes analog
-  // for values; TODO(tyxia): not implemented in the cursor yet). 0 = use the
-  // cursor's default once that budget lands.
+  // for values; TODO(tyxia): not implemented in the cursor yet).
+  // 0 = no per-value limit.
   size_t max_scalar_capture_bytes{0};
 
-  // Maximum raw bytes allowed in a single container byte-range capture
-  // (e.g., a messages[] element or params.arguments blob).
-  // 0 = no per-element limit.
-  size_t max_element_capture_bytes{0};
-
   // Maximum total captured bytes across all values of one body — the
-  // body-wide retention budget on top of the per-scalar / per-element caps
-  // above, which bound each capture individually but not how many captures a
-  // body can produce. A value whose size would push the running total over
-  // the budget is rejected — dropped entirely, same semantics as
+  // body-wide retention budget on top of the per-scalar cap above, which
+  // bounds each capture individually but not how many captures a body can
+  // produce. A value whose size would push the running total over the budget
+  // is rejected — dropped entirely, same semantics as
   // max_scalar_capture_bytes — while parsing continues, and a later smaller
   // value that still fits is captured (see CaptureAllScalarsHandler in
   // parser_config_test.cc). Counts recorded value bytes only; keys are
@@ -136,8 +133,8 @@ struct ParserConfig {
   // Mutually exclusive with extract_fields — exactly one extraction mode may
   // be active; validate() rejects a config that sets both.
   //
-  // TODO(tyxia):(1) depth / inside-array scope cutoff.
-  // (2) qualified naming for nested scalars (the leaf key alone is ambiguous across parents) and
+  // TODO(tyxia): (1) depth / inside-array scope cutoff; (2) qualified naming
+  // for nested scalars (the leaf key alone is ambiguous across parents).
   bool capture_all_scalars{false};
 
   // Extraction policy to extract JSON fields from the body.

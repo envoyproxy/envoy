@@ -25,6 +25,7 @@ envoy_cc_library(
     srcs = ["parser_config.cc"],
     hdrs = ["parser_config.h"],
     deps = [
+        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
     ],
@@ -36,6 +37,7 @@ envoy_cc_library(
     hdrs = ["wuffs_json_cursor.h"],
     deps = [
         ":wuffs_impl",
+        "//source/common/common:assert_lib",
         "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
