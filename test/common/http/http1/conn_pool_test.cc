@@ -1111,6 +1111,27 @@ TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnection
   conn_pool_->expectAndRunUpstreamReady();
 }
 
+TEST_F(Http1ConnPoolImplTest, HasReadyConnection) {
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+
+  // An in-flight request occupies the connection, so it is busy, not ready.
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+
+  // Completing the response returns the connection to the pool, ready for immediate reuse.
+  conn_pool_->expectEnableUpstreamReady();
+  r1.completeResponse(false);
+  EXPECT_TRUE(conn_pool_->hasReadyConnection());
+
+  // Draining the idle connection leaves nothing ready.
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+  conn_pool_->expectAndRunUpstreamReady();
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+}
+
 TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
   conn_pool_->expectClientCreate();
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);
