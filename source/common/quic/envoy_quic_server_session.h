@@ -190,6 +190,9 @@ private:
   bool h3_go_away_sent_ = false;
   bool on_connection_closed_called_ = false;
   bool is_in_idle_list_ = false;
+  // Whether the SSL object will be released after the handshake, in which case the peer
+  // certificate chain is cached at handshake completion.
+  bool reset_ssl_after_handshake_enabled_ = false;
 };
 
 } // namespace Quic

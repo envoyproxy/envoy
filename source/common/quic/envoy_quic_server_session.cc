@@ -182,6 +182,8 @@ void EnvoyQuicServerSession::Initialize() {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_enable_reset_ssl_after_handshake")) {
     enable_reset_ssl_after_handshake();
+    // enable_reset_ssl_after_handshake() is a no-op for non-IETF versions.
+    reset_ssl_after_handshake_enabled_ = version().IsIetfQuic();
   }
   quic::QuicServerSessionBase::Initialize();
 
@@ -211,6 +213,11 @@ quic::QuicConnection* EnvoyQuicServerSession::quicConnection() {
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
+  if (reset_ssl_after_handshake_enabled_) {
+    // The SSL object is released once the peer acknowledges handshake completion; cache the
+    // presented peer certificate chain (if any) while it is still available.
+    quic_ssl_info_->cachePeerCertificateChain();
+  }
   streamInfo().downstreamTiming().onDownstreamHandshakeComplete(dispatcher_.timeSource());
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }

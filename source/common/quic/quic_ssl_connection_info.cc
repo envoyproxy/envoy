@@ -18,9 +18,19 @@ STACK_OF(X509)* QuicSslConnectionInfo::peerCertificateChain() const {
   if (peer_cert_chain_ != nullptr) {
     return peer_cert_chain_.get();
   }
+  if (peer_cert_chain_cached_) {
+    // cachePeerCertificateChain() already ran and found no peer chain; the SSL object may have
+    // been released since, so don't touch it again.
+    return nullptr;
+  }
+  SSL* ssl_handle = ssl();
+  if (ssl_handle == nullptr) {
+    // The SSL object has been released after the handshake.
+    return nullptr;
+  }
   // The chain may legitimately not be available yet if queried before the handshake delivered the
   // peer certificates; in that case the conversion is retried on the next query.
-  const STACK_OF(CRYPTO_BUFFER)* certs = SSL_get0_peer_certificates(ssl());
+  const STACK_OF(CRYPTO_BUFFER)* certs = SSL_get0_peer_certificates(ssl_handle);
   if (certs == nullptr || sk_CRYPTO_BUFFER_num(certs) == 0) {
     return nullptr;
   }
@@ -47,6 +57,11 @@ X509* QuicSslConnectionInfo::validatedPeerIssuer() const {
     return nullptr;
   }
   return validated_cert_chain_[1].get();
+}
+
+void QuicSslConnectionInfo::cachePeerCertificateChain() {
+  peerCertificateChain();
+  peer_cert_chain_cached_ = true;
 }
 
 void QuicSslConnectionInfo::onCertValidated(

@@ -19,10 +19,15 @@ public:
 
   // Ssl::ConnectionInfo
   bool peerCertificateValidated() const override { return cert_validated_; };
+  // Served through the peerCertificate() hook (instead of the SSL object directly) so that it
+  // stays answerable from the cache after the SSL object has been released.
+  bool peerCertificatePresented() const override { return peerCertificate() != nullptr; }
   // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
+  // May return nullptr: with reset-after-handshake enabled the SSL object is released once the
+  // peer acknowledges handshake completion. The values served by this class are cached from the
+  // crypto stream or from the SSL object before the release.
   SSL* ssl() const override {
     ASSERT(session_.GetCryptoStream() != nullptr);
-    ASSERT(session_.GetCryptoStream()->GetSsl() != nullptr);
     return session_.GetCryptoStream()->GetSsl();
   }
 
@@ -91,6 +96,12 @@ public:
   // validated-chain accessors. The certificates are up-ref'd into this object.
   void onCertValidated(const std::vector<bssl::UniquePtr<X509>>& validated_chain = {});
 
+  // Converts and caches the presented peer certificate chain (if any) so that peer certificate
+  // queries remain answerable after the SSL object has been released. Must be called while the
+  // SSL object is still alive; to be used when reset-after-handshake is enabled, right at
+  // handshake completion (the SSL object is released once the peer acknowledges it).
+  void cachePeerCertificateChain();
+
   // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
   OptRef<const std::vector<bssl::UniquePtr<X509>>> validatedPeerCertChain() const override {
     if (validated_cert_chain_.empty()) {
@@ -114,6 +125,9 @@ private:
   // and cached. Null if conversion hasn't happened, was queried before the handshake delivered
   // the peer chain, or failed.
   mutable bssl::UniquePtr<STACK_OF(X509)> peer_cert_chain_;
+  // Set once cachePeerCertificateChain() ran. After that the peer chain (possibly absent) is
+  // final and the SSL object, which may have been released, is never touched again.
+  bool peer_cert_chain_cached_{false};
   // The certificate chain built during verification (leaf first, issuers following). Distinct from
   // peer_cert_chain_, which is the unverified list the peer sent. The validated-issuer accessors
   // are served from this so a peer cannot control what is reported as the issuer.

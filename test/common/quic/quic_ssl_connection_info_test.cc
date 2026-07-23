@@ -23,6 +23,10 @@ public:
 
   SSL* ssl() const override { return ssl_; }
 
+  // Simulates QUICHE releasing the SSL object after the handshake completion is acknowledged
+  // (reset-after-handshake).
+  void clearSsl() { ssl_ = nullptr; }
+
 private:
   SSL* ssl_;
 };
@@ -249,6 +253,38 @@ TEST_F(QuicSslConnectionInfoTest, ValidatedIssuerIgnoresPresentedChain) {
   ssl_info_->onCertValidated(leaf_only);
   EXPECT_TRUE(ssl_info_->sha256PeerCertificateIssuerDigest().empty());
   EXPECT_TRUE(ssl_info_->serialNumberPeerCertificateIssuer().empty());
+}
+
+// When reset-after-handshake is enabled the peer chain is cached at handshake completion, so
+// peer certificate queries keep working after the SSL object has been released.
+TEST_F(QuicSslConnectionInfoTest, PeerChainCachedBeforeSslRelease) {
+  createSslPair(/*with_client_cert=*/true);
+  completeHandshake();
+
+  ssl_info_->cachePeerCertificateChain();
+  ssl_info_->clearSsl();
+
+  EXPECT_TRUE(ssl_info_->peerCertificatePresented());
+  EXPECT_EQ(TEST_SAN_URI_CERT_256_HASH, ssl_info_->sha256PeerCertificateDigest());
+  EXPECT_EQ(std::vector<std::string>{"spiffe://lyft.com/test-team"},
+            ssl_info_->uriSanPeerCertificate());
+  EXPECT_FALSE(ssl_info_->subjectPeerCertificate().empty());
+  EXPECT_EQ(1, ssl_info_->pemEncodedPeerCertificateChain().size());
+}
+
+// Same as above without a client certificate: the cache records that no chain was presented, so
+// queries after the SSL object has been released return empty instead of touching it.
+TEST_F(QuicSslConnectionInfoTest, NoPeerChainCachedBeforeSslRelease) {
+  createSslPair(/*with_client_cert=*/false);
+  completeHandshake();
+
+  ssl_info_->cachePeerCertificateChain();
+  ssl_info_->clearSsl();
+
+  EXPECT_FALSE(ssl_info_->peerCertificatePresented());
+  EXPECT_TRUE(ssl_info_->sha256PeerCertificateDigest().empty());
+  EXPECT_TRUE(ssl_info_->subjectPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info_->pemEncodedPeerCertificateChain().empty());
 }
 
 // peerCertificateValidated() only flips when the handshake reports successful validation.
