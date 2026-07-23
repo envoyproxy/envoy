@@ -1,6 +1,5 @@
 #include "source/common/json/wuffs_json/parser_config.h"
 
-#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -116,14 +115,6 @@ std::string ExtractFieldSpec::canonicalPath() const {
     }
   }
   return path;
-}
-
-int ParserConfig::requiredMaxDepth() const {
-  int max = 0;
-  for (const auto& spec : extract_fields) {
-    max = std::max(max, spec.depth());
-  }
-  return max;
 }
 
 absl::Status ParserConfig::validate() const {

@@ -612,43 +612,6 @@ TEST(CanonicalPathTest, RoundTrip) {
 }
 
 // ============================================================================
-// ParserConfig::requiredMaxDepth
-// ============================================================================
-
-TEST(ParserConfigTest, EmptySpecListReturnsZero) {
-  ParserConfig cfg;
-  EXPECT_EQ(cfg.requiredMaxDepth(), 0);
-}
-
-TEST(ParserConfigTest, SingleSpecDepth) {
-  ParserConfig cfg;
-  auto spec = parseExtractFieldSpec("model");
-  ASSERT_TRUE(spec.ok());
-  cfg.extract_fields.push_back(std::move(*spec));
-  EXPECT_EQ(cfg.requiredMaxDepth(), 1);
-}
-
-TEST(ParserConfigTest, MultipleSpecsReturnMax) {
-  ParserConfig cfg;
-  for (const auto* path : {"model", "messages[].role", "params._meta.traceparent"}) {
-    auto s = parseExtractFieldSpec(path);
-    ASSERT_TRUE(s.ok());
-    cfg.extract_fields.push_back(std::move(*s));
-  }
-  EXPECT_EQ(cfg.requiredMaxDepth(), 3);
-}
-
-TEST(ParserConfigTest, DeepestSpecDrivesMaxDepth) {
-  ParserConfig cfg;
-  for (const auto* path : {"messages[].content[]", "model"}) {
-    auto s = parseExtractFieldSpec(path);
-    ASSERT_TRUE(s.ok());
-    cfg.extract_fields.push_back(std::move(*s));
-  }
-  EXPECT_EQ(cfg.requiredMaxDepth(), 4);
-}
-
-// ============================================================================
 // ParserConfig::validate — extraction mode mutual exclusion
 // ============================================================================
 

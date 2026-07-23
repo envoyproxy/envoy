@@ -318,10 +318,6 @@ private:
   // there) — recording element byte ranges for container specs.
   //
   // Implements the three-tier body-size logic (full capture / semantic-only / reject).
-  // At filter init, derive the max_depth constructor argument from
-  // ParserConfig::requiredMaxDepth() rather than the static default, tightening the DoS bound
-  // to exactly what the policy requires (the spec-parsing utility already exists:
-  // parseExtractFieldSpec in parser_config.h).
   bool string_is_key_{false};
   bool string_capturing_{false};    // openStringCapture returned true for current value string
   bool string_chunk_active_{false}; // onStringChunk hasn't returned false yet

@@ -21,12 +21,6 @@ namespace Wuffs {
 //   "messages[].content[]"        depth=4, inner array element
 //
 // depth() returns the the JSON nesting depth of the target field.
-// ParserConfig::requiredMaxDepth() aggregates these so filter
-// init can tighten the cursor's DoS depth bound to exactly what the policy
-// requires.
-// TODO(tyxia): that needs a max_depth cursor constructor argument,
-// which does not exist yet — the cursor is fixed at its compile-time
-// kMaxTrackedDepth bound.
 struct ExtractFieldSpec {
   // One step in the path: either a dict key or an array wildcard.
   struct Segment {
@@ -48,8 +42,7 @@ struct ExtractFieldSpec {
   std::string canonicalPath() const;
 };
 
-// Parses and convert the path string from config into a valid and structured
-// ExtractFieldSpec.
+// Parses and convert the path string into a valid and structured ExtractFieldSpec.
 // Returns InvalidArgumentError when the path is empty or malformed
 // (leading/trailing/double '.', unmatched '['/']', non-empty subscript
 // content such as '[0]', '.' immediately before '[', or a key starting
@@ -59,17 +52,46 @@ struct ExtractFieldSpec {
 // cursor could never match is refused at config load instead of silently
 // matching nothing at runtime. 0 = no depth check.
 // On success, result.path == path and result.segments is populated.
+//
+// Example:
+//   parseExtractFieldSpec("messages[].role")
+//     → ExtractFieldSpec{
+//         path     = "messages[].role",
+//         segments = {{key="messages", is_array_element=false},   // dict key
+//                     {key="",         is_array_element=true},    // [] wildcard
+//                     {key="role",     is_array_element=false}},  // dict key
+//       }                                            // depth() == 3
+//
+//   parseExtractFieldSpec("model")                   // top-level scalar
+//     → segments = {{key="model"}}                   // depth() == 1
+//
+//   parseExtractFieldSpec("params._meta.traceparent") // nested dict scalar
+//     → segments = {{key="params"}, {key="_meta"}, {key="traceparent"}}
+//                                                    // depth() == 3
+//
+//   parseExtractFieldSpec("params.protocolVersion")  // MCP initialize
+//     → segments = {{key="params"}, {key="protocolVersion"}}
+//                                                    // depth() == 2
+//
+//   parseExtractFieldSpec("params.message.taskId")   // A2A task correlation
+//     → segments = {{key="params"}, {key="message"}, {key="taskId"}}
+//                                                    // depth() == 3
+//
+//   parseExtractFieldSpec("usage.total_tokens")      // OpenAI response usage
+//     → segments = {{key="usage"}, {key="total_tokens"}}
+//                                                    // depth() == 2
+//
+//   parseExtractFieldSpec("tools[].function.name")   // scalar in a dict inside
+//     → segments = {{key="tools"},                  //   each array element
+//                   {key="", is_array_element=true},
+//                   {key="function"},
+//                   {key="name"}}                    // depth() == 4
+//
 absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, int max_depth = 0);
 
-// Configuration that controls JSON decoding.
+// Configuration that controls JSON parser.
 //
-// Intended usage at filter init, once the cursor grows a max_depth constructor
-// argument.
-//   ParserConfig cfg = ...;    // populated at the time when parser is initialized.
-//   int depth = cfg.requiredMaxDepth();
-//   WuffsJsonCursor cursor(handler, track_paths,
-//                          depth > 0 ? depth : /*cursor compile-time default*/);
-//
+// Populated at filter init, before any request flows.
 struct ParserConfig {
   // Maximum raw body bytes to feed into the cursor. The outer filter should
   // check cursor.nextSourcePosition() + chunk.size() against this limit before
@@ -109,17 +131,13 @@ struct ParserConfig {
   size_t max_total_capture_bytes{0};
 
   // When true, capture every scalar value in the body (strings, numbers,
-  // booleans, nulls) keyed by its leaf dict key ("" for array elements),
-  // with no per-field routing: the handler needs no PatternSegment
-  // conversion, no matchesPatternPath() calls, and no track_paths cursor
-  // mode.
+  // booleans, nulls) keyed from depth 1 through depth kMaxTrackedDepth - 1.
   //
   // Mutually exclusive with extract_fields — exactly one extraction mode may
   // be active; validate() rejects a config that sets both.
   //
-  // TODO(tyxia): open design points for this mode — qualified naming for
-  // nested scalars (the leaf key alone is ambiguous across parents) and a
-  // depth / inside-array scope cutoff.
+  // TODO(tyxia):(1) depth / inside-array scope cutoff.
+  // (2) qualified naming for nested scalars (the leaf key alone is ambiguous across parents) and
   bool capture_all_scalars{false};
 
   // Extraction policy to extract JSON fields from the body.
@@ -130,12 +148,6 @@ struct ParserConfig {
   //
   // Mutually exclusive with capture_all_scalars (see above).
   std::vector<ExtractFieldSpec> extract_fields;
-
-  // Returns the minimum cursor max_depth needed to reach all declared fields.
-  // Returns 0 when extract_fields is empty (caller should use the cursor default).
-  // The caller is responsible for clamping the result to the cursor's
-  // compile-time depth bound (WuffsJsonCursor::kMaxTrackedDepth - 1).
-  int requiredMaxDepth() const;
 
   // Checks the inter-field invariants: capture_all_scalars and extract_fields
   // are mutually exclusive extraction modes, so a config that sets both is
