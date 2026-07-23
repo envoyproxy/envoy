@@ -120,6 +120,8 @@ namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
 public:
+  static uint64_t& unconsumedBytes(StreamImpl* stream) { return stream->unconsumed_bytes_; }
+
   static bool slowContainsStreamId(int id, ConnectionImpl& connection) {
     return connection.slowContainsStreamId(id);
   }
@@ -2593,6 +2595,28 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+}
+
+// Verify that unconsumed_bytes_ is 64-bit and does not overflow.
+TEST_P(Http2CodecImplFlowControlTest, UnconsumedBytesOverflowPrevention) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  auto* stream = server_->getStream(1);
+  ASSERT_NE(stream, nullptr);
+
+  // Directly set unconsumed_bytes_ to a value close to UINT32_MAX.
+  Http2CodecImplTestFixture::unconsumedBytes(stream) = static_cast<uint64_t>(UINT32_MAX) - 100;
+
+  // Add more bytes to simulate receiving data while read-disabled.
+  Http2CodecImplTestFixture::unconsumedBytes(stream) += 200;
+
+  // Verify that it has successfully held a value larger than UINT32_MAX without overflow/wrap-around.
+  EXPECT_EQ(Http2CodecImplTestFixture::unconsumedBytes(stream), static_cast<uint64_t>(UINT32_MAX) + 100);
 }
 
 TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {

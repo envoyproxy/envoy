@@ -299,6 +299,8 @@ protected:
       Headers, // Signifies additional headers after the initial request/response set.
     };
 
+    friend class Http2CodecImplTestFixture;
+
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
 
     // Http::MultiplexedStreamImplBase
@@ -426,7 +428,7 @@ protected:
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
-    uint32_t unconsumed_bytes_{0};
+    uint64_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
     StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
