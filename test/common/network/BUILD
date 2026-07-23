@@ -133,6 +133,22 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "happy_eyeballs_speed_test",
+    srcs = ["happy_eyeballs_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:happy_eyeballs_connection_impl_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "happy_eyeballs_speed_test_benchmark_test",
+    benchmark_binary = "happy_eyeballs_speed_test",
+)
+
 envoy_cc_test(
     name = "multi_connection_base_impl_test",
     srcs = ["multi_connection_base_impl_test.cc"],

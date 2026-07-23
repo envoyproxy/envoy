@@ -83,6 +83,208 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
 }
 
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValues) {
+  const std::string yaml = R"EOF(
+  json_format:
+    present_string: "plain"
+    present_req: "%REQ(:path)%"
+    present_code: "%RESPONSE_CODE%"
+    missing_req: "%REQ(missing-header)%"
+    number_value: 42
+    bool_value: true
+    multi_token: "%REQ(missing-header)%-%REQ(:method)%"
+    both_missing: "%REQ(missing-x)%%REQ(missing-y)%"
+    empty_nested:
+      a: "%REQ(missing-a)%"
+      b: "%REQ(missing-b)%"
+    partial_nested:
+      present: "%REQ(:method)%"
+      missing: "%REQ(missing-c)%"
+    deep:
+      deeper:
+        deepest: "%REQ(missing-d)%"
+    array_value:
+      - "%REQ(:method)%"
+      - "%REQ(missing-e)%"
+      - "plain_in_array"
+    empty_array:
+      - "%REQ(missing-f)%"
+  omit_empty_values: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  const auto out_json = formatter->format(formatter_context_, stream_info_);
+
+  // Keys with null values are omitted, nested objects that become empty are removed, empty arrays
+  // are preserved and values that resolve are kept with their type (the response code stays a
+  // number).
+  const std::string expected = R"EOF({
+    "present_string": "plain",
+    "present_req": "/bar/foo",
+    "present_code": 200,
+    "number_value": 42,
+    "bool_value": true,
+    "multi_token": "-GET",
+    "both_missing": "",
+    "partial_nested": {
+      "present": "GET"
+    },
+    "array_value": [
+      "GET",
+      "plain_in_array"
+    ],
+    "empty_array": []
+})EOF";
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValuesRootEmpty) {
+  const std::string yaml = R"EOF(
+  json_format:
+    missing_a: "%REQ(missing-a)%"
+    missing_b: "%REQ(missing-b)%"
+  omit_empty_values: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // The root object is always emitted even when every field is omitted.
+  EXPECT_TRUE(
+      TestUtility::jsonStringEqual(formatter->format(formatter_context_, stream_info_), "{}"));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValuesNullLiteral) {
+  config_.set_omit_empty_values(true);
+  auto& fields = *config_.mutable_json_format()->mutable_fields();
+  fields["present"].set_string_value("plain");
+  fields["explicit_null"].set_null_value(Protobuf::NULL_VALUE);
+  // A default-constructed value has no kind set and must be dropped like an explicit null.
+  fields["unset"] = Protobuf::Value();
+
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // A literal null or an unset value in the configuration is treated as empty and omitted.
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context_, stream_info_),
+                                           R"({"present":"plain"})"));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValuesListElements) {
+  config_.set_omit_empty_values(true);
+  auto& fields = *config_.mutable_json_format()->mutable_fields();
+  auto* elements = fields["arr"].mutable_list_value();
+  elements->add_values()->set_string_value("%REQ(:method)%");   // Present -> "GET".
+  elements->add_values()->set_string_value("%REQ(missing)%");   // Missing -> skipped.
+  elements->add_values()->set_null_value(Protobuf::NULL_VALUE); // Literal null -> skipped.
+  // A nested object whose only field is null collapses and is dropped from the array.
+  (*elements->add_values()->mutable_struct_value()->mutable_fields())["gone"].set_string_value(
+      "%REQ(missing)%");
+  // A nested object with a resolvable field is kept.
+  (*elements->add_values()->mutable_struct_value()->mutable_fields())["present"].set_string_value(
+      "%REQ(:method)%");
+
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // Missing, null-literal and fully-empty-object elements are skipped; the array is kept.
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context_, stream_info_),
+                                           R"({"arr":["GET",{"present":"GET"}]})"));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValuesEmptyContainers) {
+  const std::string yaml = R"EOF(
+  json_format:
+    present: "plain"
+    empty_object: {}
+    empty_list: []
+  omit_empty_values: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // A configuration-time empty object is dropped, but an empty array is preserved.
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context_, stream_info_),
+                                           R"({"present":"plain","empty_list":[]})"));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValuesSanitization) {
+  config_.set_omit_empty_values(true);
+  auto& fields = *config_.mutable_json_format()->mutable_fields();
+  // Keys and constant string values are JSON-sanitized.
+  fields[R"(quote"key)"].set_string_value("%REQ(:method)%");
+  fields["const"].set_string_value(R"(a"b)");
+
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context_, stream_info_),
+                                           R"({"const":"a\"b","quote\"key":"GET"})"));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest,
+       TestFromProtoConfigJsonOmitEmptyValuesPresentEmptyString) {
+  request_headers_.addCopy("x-empty", "");
+
+  const std::string yaml = R"EOF(
+  json_format:
+    empty_present: "%REQ(x-empty)%"
+    missing: "%REQ(missing-header)%"
+  omit_empty_values: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // A present-but-empty header is kept as an empty string, while a truly missing one is omitted.
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context_, stream_info_),
+                                           R"({"empty_present":""})"));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValuesInvalidFlat) {
+  const std::string yaml = R"EOF(
+  json_format:
+    invalid: "%NOT_A_REAL_COMMAND%"
+  omit_empty_values: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+  EXPECT_FALSE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_).ok());
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValuesInvalidNested) {
+  const std::string yaml = R"EOF(
+  json_format:
+    nested:
+      bad: "%NOT_A_REAL_COMMAND%"
+  omit_empty_values: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+  EXPECT_FALSE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_).ok());
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonOmitEmptyValuesInvalidList) {
+  const std::string yaml = R"EOF(
+  json_format:
+    arr:
+      - "%NOT_A_REAL_COMMAND%"
+  omit_empty_values: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+  EXPECT_FALSE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_).ok());
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest,
+       TestFromProtoConfigJsonOmitEmptyValuesDisabledByRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.json_formatter_omit_empty_values", "false"}});
+
+  const std::string yaml = R"EOF(
+  json_format:
+    missing_req: "%REQ(missing-header)%"
+  omit_empty_values: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  // With the runtime guard disabled the pre-serialized formatter is used, which keeps null keys.
+  EXPECT_TRUE(TestUtility::jsonStringEqual(formatter->format(formatter_context_, stream_info_),
+                                           R"({"missing_req":null})"));
+}
+
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension) {
   TestCommandFactory factory;
   Registry::InjectFactory<CommandParserFactory> command_register(factory);

@@ -1261,7 +1261,8 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
 
   // Process message
   EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
-  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
+  auto message_copy = std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>(*message);
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message_copy));
 
   for (int i = 0; i < 3; i++) {
     auto& host =
