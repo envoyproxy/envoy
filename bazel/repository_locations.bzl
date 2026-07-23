@@ -613,8 +613,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
     ),
     proxy_wasm_rust_sdk = dict(
-        version = "0.2.4",
-        sha256 = "e407f6aaf58437d5ea23393823163fd2b6bf4fac6adb6b8ace6561b1a7afeac6",
+        version = "0.2.5",
+        sha256 = "0ebf8b5d539d2821c72d0862f460eee6341963f7bb442abca651f1be906eab1a",
         strip_prefix = "proxy-wasm-rust-sdk-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-rust-sdk/archive/v{version}.tar.gz"],
     ),
