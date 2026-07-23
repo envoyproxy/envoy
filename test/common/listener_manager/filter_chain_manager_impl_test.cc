@@ -329,6 +329,21 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   EXPECT_FALSE(context1->drainDecision().drainClose(Network::DrainDirection::All));
 }
 
+TEST_P(FilterChainManagerImplTest, FilterChainFactoryContextDelegatesAccessors) {
+  envoy::config::listener::v3::FilterChain filter_chain = filter_chain_template_;
+  auto context = filter_chain_manager_->createFilterChainFactoryContext(&filter_chain);
+
+  EXPECT_CALL(parent_context_, direction())
+      .WillOnce(Return(envoy::config::core::v3::TrafficDirection::INBOUND));
+  EXPECT_EQ(context->direction(), envoy::config::core::v3::TrafficDirection::INBOUND);
+
+  EXPECT_CALL(parent_context_, isQuic()).WillOnce(Return(true));
+  EXPECT_TRUE(context->isQuic());
+
+  EXPECT_CALL(parent_context_, shouldBypassOverloadManager()).WillOnce(Return(true));
+  EXPECT_TRUE(context->shouldBypassOverloadManager());
+}
+
 TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
   envoy::config::listener::v3::FilterChain new_filter_chain1 = filter_chain_template_;
   new_filter_chain1.mutable_filter_chain_match()->add_server_names("example.com");
