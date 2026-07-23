@@ -751,6 +751,15 @@ public:
   std::optional<uint32_t> max_concurrent_streams_;
 };
 
+class MockRouteCache : public RouteCache {
+public:
+  MockRouteCache();
+  ~MockRouteCache() override = default;
+
+  MOCK_METHOD(bool, hasCachedRoute, (), (const));
+  MOCK_METHOD(void, refreshCachedRoute, ());
+};
+
 } // namespace Http
 
 namespace Http {
