@@ -7,6 +7,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -64,7 +65,7 @@ protected:
     ConnectionWrapper::create(coroutine_->luaState(), stream_info_);
     EXPECT_CALL(printer_, testPrint(secure ? "secure" : "plain"));
     EXPECT_CALL(printer_, testPrint(secure ? "userdata" : "nil"));
-    start("callMe");
+    EXPECT_OK(start("callMe"));
   }
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -93,7 +94,7 @@ TEST_F(LuaBufferWrapperTest, Methods) {
   EXPECT_CALL(printer_, testPrint("world"));
   EXPECT_CALL(printer_, testPrint("9"));
   EXPECT_CALL(printer_, testPrint("never"));
-  start("callMe");
+  EXPECT_OK(start("callMe"));
 }
 
 // Invalid params for the buffer wrapper getBytes() call.
@@ -108,9 +109,9 @@ TEST_F(LuaBufferWrapperTest, GetBytesInvalidParams) {
   Buffer::OwnedImpl data("hello world");
   Http::TestRequestHeaderMapImpl headers;
   BufferWrapper::create(coroutine_->luaState(), headers, data);
-  EXPECT_THROW_WITH_MESSAGE(
-      start("callMe"), LuaException,
-      "[string \"...\"]:3: index/length must be >= 0 and (index + length) must be <= buffer size");
+  EXPECT_THAT(start("callMe"),
+              StatusHelpers::HasStatusMessage("[string \"...\"]:3: index/length must be >= 0 and "
+                                              "(index + length) must be <= buffer size"));
 }
 
 // Basic methods test for the metadata wrapper.
@@ -196,7 +197,7 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
   EXPECT_CALL(printer_, testPrint("nil"));
   EXPECT_CALL(printer_, testPrint("0"));
 
-  start("callMe");
+  EXPECT_OK(start("callMe"));
 }
 
 // Iterate over the (unordered) underlying map.
@@ -240,7 +241,7 @@ TEST_F(LuaMetadataMapWrapperTest, Iterators) {
   EXPECT_CALL(printer_, testPrint("'make.nothing1' 'nothing'"));
   EXPECT_CALL(printer_, testPrint("'make.nothing2' 'nothing'"));
 
-  start("callMe");
+  EXPECT_OK(start("callMe"));
 }
 
 // Don't finish iteration.
@@ -270,9 +271,10 @@ TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
   envoy::config::core::v3::Metadata metadata = parseMetadataFromYaml(yaml);
   const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
-  EXPECT_THROW_WITH_MESSAGE(
-      start("callMe"), LuaException,
-      "[string \"...\"]:5: cannot create a second iterator before completing the first");
+  EXPECT_THAT(
+      start("callMe"),
+      StatusHelpers::HasStatusMessage(
+          "[string \"...\"]:5: cannot create a second iterator before completing the first"));
 }
 
 TEST_F(LuaConnectionWrapperTest, Secure) {

@@ -20,6 +20,8 @@ envoy_cc_library(
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
         "//source/common/protobuf",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 

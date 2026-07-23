@@ -6,6 +6,7 @@
 #include "source/extensions/filters/http/lua/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -121,10 +122,11 @@ TEST(LuaFilterConfigTest, LuaFilterWithBothDeprecatedInlineCodeAndDefaultSourceC
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException,
-      "Error: Only one of `inline_code` or `default_source_code` can be set for the Lua filter.");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status(),
+      StatusHelpers::HasStatusMessage(
+          "Error: Only one of `inline_code` or `default_source_code` can be set for the Lua "
+          "filter."));
 }
 #endif
 

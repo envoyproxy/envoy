@@ -16,9 +16,11 @@ absl::StatusOr<Http::FilterFactoryCb> LuaFilterConfig::createFilterFactoryFromPr
     const std::string& stats_prefix, DualInfo info,
     Server::Configuration::ServerFactoryContext& context) {
 
+  absl::Status creation_status = absl::OkStatus();
   FilterConfigConstSharedPtr filter_config(
       new FilterConfig{proto_config, context.threadLocal(), context.clusterManager(), context.api(),
-                       info.scope, stats_prefix, context.options().concurrency()});
+                       info.scope, stats_prefix, context.options().concurrency(), creation_status});
+  RETURN_IF_NOT_OK_REF(creation_status);
   auto& time_source = context.mainThreadDispatcher().timeSource();
   return [filter_config, &time_source](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, time_source));
@@ -28,9 +30,11 @@ absl::StatusOr<Http::FilterFactoryCb> LuaFilterConfig::createFilterFactoryFromPr
 absl::StatusOr<Envoy::Http::FilterFactoryCb> LuaFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
-  FilterConfigConstSharedPtr filter_config(
-      new FilterConfig{proto_config, context.threadLocal(), context.clusterManager(), context.api(),
-                       context.scope(), stats_prefix, context.options().concurrency()});
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigConstSharedPtr filter_config(new FilterConfig{
+      proto_config, context.threadLocal(), context.clusterManager(), context.api(), context.scope(),
+      stats_prefix, context.options().concurrency(), creation_status});
+  RETURN_IF_NOT_OK_REF(creation_status);
   auto& time_source = context.mainThreadDispatcher().timeSource();
   return [filter_config, &time_source](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, time_source));
@@ -41,7 +45,10 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 LuaFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfigPerRoute>(proto_config, context);
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<FilterConfigPerRoute>(proto_config, context, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return config;
 }
 
 /**
