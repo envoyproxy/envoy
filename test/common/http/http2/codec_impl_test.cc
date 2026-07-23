@@ -4921,7 +4921,7 @@ TEST_P(Http2CodecImplTest, BadResponseHeader) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _))
       .WillOnce(Invoke([this](ResponseHeaderMapPtr& headers, bool) -> void {
         auto result = header_validator_->validateResponseHeaders(*headers);
-        ASSERT_THAT(result, Not(IsOk()));
+        ASSERT_FALSE(result.ok());
       }));
 #else
   // The decodeHeaders on the client side will not be called due to protocol error
