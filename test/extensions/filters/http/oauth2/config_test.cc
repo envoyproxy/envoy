@@ -8,6 +8,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
@@ -17,6 +18,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
 using testing::Return;
 
@@ -75,8 +77,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(), status_message);
+  EXPECT_THAT(result, HasStatusMessage(status_message));
 }
 
 } // namespace
@@ -435,9 +436,8 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
+  EXPECT_THAT(result,
+              HasStatusMessage("token_secret is required when auth_type is not TLS_CLIENT_AUTH"));
 }
 
 TEST(ConfigTest, MissingTokenSecretNonTlsClientAuth) {
@@ -481,9 +481,8 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
+  EXPECT_THAT(result,
+              HasStatusMessage("token_secret is required when auth_type is not TLS_CLIENT_AUTH"));
 }
 
 TEST(ConfigTest, InvalidTokenSecret) {
@@ -503,7 +502,7 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
   const auto result =
       config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context);
   // Empty config is valid, config can be provided at route level.
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(ConfigTest, CreateRouteSpecificConfig) {
@@ -545,7 +544,7 @@ config:
   auto& validation_visitor = ProtobufMessage::getNullValidationVisitor();
   const auto result =
       factory.createRouteSpecificFilterConfigTyped(route_config, context, validation_visitor);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(ConfigTest, WrongCookieName) {
@@ -656,11 +655,12 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "invalid OAuth2 configuration: at most one of forward_bearer_token, "
-            "preserve_authorization_header, or forward_id_token (when forwarding the ID token on "
-            "the Authorization header) may be set, as they all use the Authorization header");
+  EXPECT_THAT(
+      result,
+      HasStatusMessage(
+          "invalid OAuth2 configuration: at most one of forward_bearer_token, "
+          "preserve_authorization_header, or forward_id_token (when forwarding the ID token on "
+          "the Authorization header) may be set, as they all use the Authorization header"));
 }
 
 // Builds a minimal valid OAuth2 config YAML with the given extra fields spliced in, then asserts
@@ -704,8 +704,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(), expected_message);
+  EXPECT_THAT(result, HasStatusMessage(expected_message));
 }
 
 constexpr absl::string_view kAuthorizationHeaderConflictMessage =
@@ -796,7 +795,7 @@ config:
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_TRUE(factory.createFilterFactoryFromProto(*proto_config, "stats", context).ok());
+  EXPECT_OK(factory.createFilterFactoryFromProto(*proto_config, "stats", context));
 }
 
 TEST(ConfigTest, ValidSameSiteConfigs) {
@@ -849,7 +848,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(ConfigTest, MissingSameSiteConfigs) {
@@ -896,7 +895,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(ConfigTest, NoCookieConfigs) {
@@ -936,7 +935,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(ConfigTest, EndSessionEndpointWithOpenId) {
@@ -978,7 +977,7 @@ TEST(ConfigTest, EndSessionEndpointWithOpenId) {
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(ConfigTest, EndSessionEndpointWithoutOpenId) {
@@ -1066,7 +1065,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(ConfigTest, InvalidCookieDomain) {
@@ -1212,7 +1211,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 } // namespace Oauth2

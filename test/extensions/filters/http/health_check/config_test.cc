@@ -22,6 +22,8 @@ namespace HttpFilters {
 namespace HealthCheck {
 namespace {
 
+using StatusHelpers::HasStatus;
+
 TEST(HealthCheckFilterConfig, HealthCheckFilter) {
   const std::string yaml_string = R"EOF(
   pass_through_mode: true
@@ -72,10 +74,9 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
-                   .status()
-                   .IgnoreError(),
-               EnvoyException);
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "cache_time_ms must not be set when path_through_mode is disabled"));
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) {
@@ -109,11 +110,10 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
 
-  EXPECT_THROW(
-      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
-          .status()
-          .IgnoreError(),
-      EnvoyException);
+  EXPECT_THAT(
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context),
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                "cache_time_ms must not be set when path_through_mode is disabled"));
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {

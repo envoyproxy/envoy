@@ -19,6 +19,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -580,7 +581,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client, typed_secret);
   const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
 
-  EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client.refvec_, "").ok());
+  EXPECT_OK(client_callback->onConfigUpdate(decoded_resources_client.refvec_, ""));
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
   EXPECT_EQ(secret_reader.hmacSecret(), "");
 
@@ -593,7 +594,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_token, typed_secret);
   const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
 
-  EXPECT_TRUE(token_callback->onConfigUpdate(decoded_resources_token.refvec_, "").ok());
+  EXPECT_OK(token_callback->onConfigUpdate(decoded_resources_token.refvec_, ""));
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
   EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
 
@@ -606,7 +607,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client_recheck, typed_secret);
   const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
 
-  EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
+  EXPECT_OK(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, ""));
   EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
   EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
 }
@@ -708,8 +709,8 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
   // Attempt to create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
-                                     scope_, "test."),
+      std::ignore = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                   secret_reader, scope_, "test."),
       EnvoyException, "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config.");
 }
 
@@ -1403,13 +1404,13 @@ TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriValidatedOnlyWhenUsed) {
 
   // End_session_endpoint is not defined: the invalid formatter is never compiled,
   // so the config loads without throwing.
-  EXPECT_NO_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                 secret_reader, scope_, "test."));
+  EXPECT_NO_THROW(std::ignore = std::make_shared<FilterConfig>(
+                      p, factory_context_.server_factory_context_, secret_reader, scope_, "test."));
 
   // End_session_endpoint is set: the invalid formatter is compiled and the config fails to load.
   p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
-  EXPECT_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                              secret_reader, scope_, "test."),
+  EXPECT_THROW(std::ignore = std::make_shared<FilterConfig>(
+                   p, factory_context_.server_factory_context_, secret_reader, scope_, "test."),
                EnvoyException);
 }
 

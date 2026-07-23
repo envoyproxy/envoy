@@ -3885,6 +3885,14 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_
   return false;
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) size_t
 envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t) {
@@ -3896,6 +3904,69 @@ envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
 __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, double*, uint64_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, char*, size_t, size_t*,
+    char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, char*, size_t, size_t*,
+    char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name: "
+      "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, char*, size_t, size_t*,
+    char*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag: "
                "not implemented in this context");
   return false;
 }

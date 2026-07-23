@@ -88,16 +88,23 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(DynamicModulesStatsSinkIntegrationTest, BasicFlush) {
   // The "found gauge server.uptime" marker proves the module decoded a gauge name through the
   // buffer-based snapshot API.
-  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
-                                 {"info", "stat sink integration test: config_new called"},
-                                 {"info", "stat sink integration test: flush called"},
-                                 {"info", "stat sink integration test: found gauge server.uptime"},
-                             }),
-                             {
-                               addStatSinkAndInitialize();
-                               timeSystem().realSleepDoNotUseWithoutScrutiny(
-                                   std::chrono::milliseconds(500));
-                             });
+  Envoy::ExpectedLogMessages expected{
+      {"info", "stat sink integration test: config_new called"},
+      {"info", "stat sink integration test: flush called"},
+      {"info", "stat sink integration test: found gauge server.uptime"},
+  };
+  if (language() == "rust") {
+    // Only the Rust SDK exposes the tag callbacks. The "reconstructed tagged gauge" marker proves
+    // the module read the tag-extracted name and the "envoy.cluster_name" tag of the always-present
+    // cluster.membership_total gauge and rebuilt the dimensional name a Prometheus-style sink would
+    // emit.
+    expected.push_back({"info", "stat sink integration test: reconstructed tagged gauge "
+                                "cluster.membership_total envoy.cluster_name=cluster_0"});
+  }
+  EXPECT_LOG_CONTAINS_ALL_OF(expected, {
+    addStatSinkAndInitialize();
+    timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
+  });
 }
 
 TEST_P(DynamicModulesStatsSinkIntegrationTest, FlushAfterTraffic) {
