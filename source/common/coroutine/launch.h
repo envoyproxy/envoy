@@ -130,8 +130,8 @@ inline DetachedHandle startRoot(RootTask root, Executor& exec) {
  * plain lambda convert to the callback type.
  */
 template <typename T>
-DetachedHandle launch(Task<T> task, Executor& exec,
-                      std::type_identity_t<absl::AnyInvocable<void(T)>> on_done) {
+[[nodiscard]] DetachedHandle launch(Task<T> task, Executor& exec,
+                                    std::type_identity_t<absl::AnyInvocable<void(T)>> on_done) {
   return Detail::startRoot(Detail::awaitTaskAndCallOnDone(std::move(task), std::move(on_done)),
                            exec);
 }
