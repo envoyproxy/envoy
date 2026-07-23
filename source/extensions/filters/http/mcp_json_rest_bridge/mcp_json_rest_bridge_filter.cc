@@ -662,12 +662,14 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
         {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Response body too large")}};
     setResponseMetadata(BridgeStatus::ResponseTooLarge,
                         getResponseCode(encoder_callbacks_->responseHeaders()));
-    sendLocalReplyInternal(
-        Http::Code::InternalServerError, BridgeStatus::ResponseTooLarge, error_json.dump(),
+    mcp_operation_ = McpOperation::OperationFailed;
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::InternalServerError, error_json.dump(),
         [](Http::ResponseHeaderMap& headers) {
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },
-        std::nullopt);
+        Grpc::Status::WellKnownGrpcStatus::Internal,
+        bridgeStatusToString(BridgeStatus::ResponseTooLarge));
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -1136,26 +1138,15 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
 void McpJsonRestBridgeFilter::sendErrorResponse(
     Http::Code response_code, BridgeStatus status, absl::string_view response_body,
     std::function<void(Http::ResponseHeaderMap&)> modify_headers, absl::string_view method,
-    const nlohmann::json& params, std::optional<Grpc::Status::GrpcStatus> grpc_status) {
+    const nlohmann::json& params, Grpc::Status::GrpcStatus grpc_status) {
   ENVOY_STREAM_LOG(error, "Sending error response with status: {}", *decoder_callbacks_,
                    bridgeStatusToString(status));
   status_ = status;
   mcp_operation_ = McpOperation::OperationFailed;
   setParsingMetadata(method, params);
 
-  sendLocalReplyInternal(response_code, status, response_body, modify_headers, grpc_status);
-}
-
-void McpJsonRestBridgeFilter::sendLocalReplyInternal(
-    Http::Code response_code, BridgeStatus status, absl::string_view response_body,
-    std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-    std::optional<Grpc::Status::GrpcStatus> grpc_status) {
-  status_ = status;
-  mcp_operation_ = McpOperation::OperationFailed;
-
-  auto final_grpc_status = grpc_status.value_or(Grpc::Status::WellKnownGrpcStatus::Internal);
-  decoder_callbacks_->sendLocalReply(response_code, response_body, modify_headers,
-                                     final_grpc_status, bridgeStatusToString(status));
+  decoder_callbacks_->sendLocalReply(response_code, response_body, modify_headers, grpc_status,
+                                     bridgeStatusToString(status));
 }
 
 void McpJsonRestBridgeFilter::setDynamicMetadata() {

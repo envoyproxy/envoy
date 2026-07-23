@@ -263,18 +263,12 @@ private:
   void mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
                               const McpJsonRestBridgePerRouteConfig* per_route_config);
 
-  // Consolidates error handling.
-  void sendErrorResponse(Http::Code response_code, BridgeStatus status,
-                         absl::string_view response_body,
-                         std::function<void(Http::ResponseHeaderMap&)> modify_headers = nullptr,
-                         absl::string_view method = "",
-                         const nlohmann::json& params = nlohmann::json::object(),
-                         std::optional<Grpc::Status::GrpcStatus> grpc_status = std::nullopt);
-
-  void sendLocalReplyInternal(Http::Code response_code, BridgeStatus status,
-                              absl::string_view response_body,
-                              std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                              std::optional<Grpc::Status::GrpcStatus> grpc_status);
+  // Handles decoding errors: sets dynamic metadata and sends a local reply.
+  void sendErrorResponse(
+      Http::Code response_code, BridgeStatus status, absl::string_view response_body,
+      std::function<void(Http::ResponseHeaderMap&)> modify_headers = nullptr,
+      absl::string_view method = "", const nlohmann::json& params = nlohmann::json::object(),
+      Grpc::Status::GrpcStatus grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal);
 
   // Validates the "id" and "method" fields of a JSON-RPC request.
   // It sends local error response and return an error status if the validation
