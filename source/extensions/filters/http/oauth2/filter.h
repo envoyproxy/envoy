@@ -155,7 +155,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Server::Configuration::CommonFactoryContext& context,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
-               const std::string& stats_prefix);
+               const std::string& stats_prefix, absl::Status& creation_status);
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
@@ -181,18 +181,20 @@ public:
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
-  const Formatter::Formatter* postLogoutRedirectUriFormatter() const {
+  const Formatter::Formatter* postLogoutRedirectUri() const {
     return post_logout_redirect_uri_formatter_.get();
   }
   bool disablePostLogoutRedirectUri() const { return disable_post_logout_redirect_uri_; }
   const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
   }
-  const std::string& redirectUri() const { return redirect_uri_; }
+  const Formatter::Formatter& redirectUri() const { return *redirect_uri_formatter_; }
   const std::vector<std::string>& allowedRedirectDomains() const {
     return allowed_redirect_domains_;
   }
-  const std::string& originalRequestUri() const { return original_request_uri_; }
+  const Formatter::Formatter* originalRequestUri() const {
+    return original_request_uri_formatter_.get();
+  }
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
@@ -271,9 +273,9 @@ private:
   const bool disable_post_logout_redirect_uri_ : 1;
   const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
-  const std::string redirect_uri_;
+  Formatter::FormatterPtr redirect_uri_formatter_;
+  Formatter::FormatterPtr original_request_uri_formatter_;
   const std::vector<std::string> allowed_redirect_domains_;
-  const std::string original_request_uri_;
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
