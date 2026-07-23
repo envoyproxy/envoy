@@ -5913,7 +5913,7 @@ max_session_keys: 2
                                                          "sessions.example.com"));
 }
 
-TEST_P(SslSocketTest, ClientSessionCacheDoesNotStoreEmptySni) {
+TEST_P(SslSocketTest, ClientSessionCacheCachesSessionWithoutSni) {
   ClientSessionCacheTestContext context(R"EOF(
 common_tls_context:
 max_session_keys: 1
@@ -5925,7 +5925,10 @@ max_session_keys: 1
   ASSERT_EQ(1, ClientContextImplPeer::newSessionKey(context.clientContext(), ssl.get(),
                                                     ClientContextImplPeer::newSession(ssl.get())));
 
-  EXPECT_TRUE(ClientContextImplPeer::cachedSniNames(context.clientContext()).empty());
+  SSL_SESSION* cached_session = ClientContextImplPeer::cachedSession(context.clientContext(), "");
+  ASSERT_NE(nullptr, cached_session);
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), ""));
+  EXPECT_EQ(1, ClientContextImplPeer::cachedSniSessionCount(context.clientContext()));
 }
 
 TEST_P(SslSocketTest, ClientSessionCacheUsesEffectiveSniPrecedence) {
@@ -6086,12 +6089,9 @@ TEST_P(SslSocketTest, ClientSessionResumptionDefault) {
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
-  sni: session.example.com
   common_tls_context:
 )EOF";
 
-  // The SNI-scoped client cache intentionally does not store sessions when no
-  // effective SNI is available, so enabled-resumption tests use an explicit SNI.
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_);
 }
 
@@ -6132,7 +6132,6 @@ TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls12) {
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
-  sni: session.example.com
   common_tls_context:
     tls_params:
       tls_minimum_protocol_version: TLSv1_0
@@ -6183,7 +6182,6 @@ TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls13) {
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
-  sni: session.example.com
   common_tls_context:
     tls_params:
       tls_minimum_protocol_version: TLSv1_3

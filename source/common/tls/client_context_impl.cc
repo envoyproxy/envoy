@@ -136,19 +136,20 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
           absl::StrCat("Failed to create upstream TLS due to failure setting SNI: ",
                        Utility::getLastCryptoError().value_or("unknown")));
     }
-
-    // BoringSSL does not expose the callback's original SNI key when it later
-    // returns a new session. Store Envoy's effective SNI on this SSL object so
-    // the new-session callback can cache the ticket under the same name that
-    // was sent in the ClientHello.
-    auto effective_sni = std::make_unique<std::string>(server_name_indication);
-    if (SSL_set_ex_data(ssl_con.get(), sslEffectiveSniIndex(), effective_sni.get()) != 1) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to create upstream TLS due to failure storing SNI: ",
-                       Utility::getLastCryptoError().value_or("unknown")));
-    }
-    effective_sni.release();
   }
+
+  // BoringSSL does not expose the callback's original SNI key when it later
+  // returns a new session. Store Envoy's effective SNI on this SSL object so
+  // the new-session callback can cache the ticket under the same name that
+  // was sent in the ClientHello. An empty string is the valid cache key for
+  // connections that do not send SNI.
+  auto effective_sni = std::make_unique<std::string>(server_name_indication);
+  if (SSL_set_ex_data(ssl_con.get(), sslEffectiveSniIndex(), effective_sni.get()) != 1) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to create upstream TLS due to failure storing SNI: ",
+                     Utility::getLastCryptoError().value_or("unknown")));
+  }
+  effective_sni.release();
 
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
@@ -225,11 +226,6 @@ ClientContextImpl::effectiveSni(const Network::TransportSocketOptionsConstShared
 }
 
 void ClientContextImpl::setSessionForSni(SSL* ssl, absl::string_view sni) {
-  // No SNI means there is no safe logical host boundary for session reuse.
-  if (sni.empty()) {
-    return;
-  }
-
   absl::WriterMutexLock lock(session_keys_mu_);
   auto it = session_keys_by_sni_.find(sni);
   if (it == session_keys_by_sni_.end() || it->second.sessions.empty()) {
@@ -291,7 +287,7 @@ int ClientContextImpl::newSessionKey(SSL* ssl, SSL_SESSION* session) {
 
   const auto* effective_sni =
       static_cast<const std::string*>(SSL_get_ex_data(ssl, sslEffectiveSniIndex()));
-  if (effective_sni == nullptr || effective_sni->empty()) {
+  if (effective_sni == nullptr) {
     SSL_SESSION_free(session);
     return 1;
   }
