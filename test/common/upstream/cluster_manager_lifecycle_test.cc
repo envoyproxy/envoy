@@ -2834,6 +2834,60 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsIdleDeleted) {
   }
 }
 
+// Verifies that when coalesce_lb_rebuilds_on_batch_update is enabled, the TLS cluster reflects
+// the correct healthy host state after updateHosts. The fix defers postThreadLocalClusterUpdate
+// from priority_update_cb_ to member_update_cb_ so that ThreadAwareLoadBalancerBase::refresh()
+// publishes its new snapshot before workers receive the TLS update.
+TEST_P(ClusterManagerLifecycleTest,
+       CoalescedLbRefreshPartitionCorrectionOnDeferredClusterInit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("fake_cluster")}));
+
+  // Use a real PrioritySetImpl so that the full update path exercises production code.
+  std::shared_ptr<MockClusterRealPrioritySet> cluster1(new NiceMock<MockClusterRealPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cluster1, initialize(_)).WillOnce(Invoke([](std::function<void()> cb) { cb(); }));
+
+  create(parseBootstrapFromV3Json(json));
+
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  // Build a host and mark it unhealthy before the first updateHosts call.
+  HostSharedPtr host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  auto hosts = std::make_shared<HostVector>(HostVector{host});
+
+  // First update: host is unhealthy, so healthy_hosts_ should be empty on the TLS cluster.
+  cluster1->priority_set_.updateHosts(
+      0, HostSetImpl::partitionHosts(hosts, HostsPerLocalityImpl::empty()), nullptr, {host}, {},
+      std::nullopt, std::nullopt);
+
+  auto* tls_cluster = cluster_manager_->getThreadLocalCluster("fake_cluster");
+  ASSERT_NE(nullptr, tls_cluster);
+  EXPECT_TRUE(tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().empty());
+
+  // Clear the HC failure, then push a second update. The TLS cluster must now see the host as
+  // healthy — verifying that the coalesced update path correctly delivers the post-refresh state.
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  cluster1->priority_set_.updateHosts(
+      0, HostSetImpl::partitionHosts(hosts, HostsPerLocalityImpl::empty()), nullptr, {host}, {},
+      std::nullopt, std::nullopt);
+
+  EXPECT_EQ(1u, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(host, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
+
+  factory_.tls_.shutdownThread();
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
