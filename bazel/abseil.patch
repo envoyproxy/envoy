@@ -37,3 +37,4 @@ index 9336d6d4..0dba5b17 100644
  
   private:
    friend class flags_internal::PrivateHandleAccessor;
+
