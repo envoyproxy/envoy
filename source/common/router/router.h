@@ -495,7 +495,16 @@ public:
     // connections can receive different cookies if they race on requests.
     std::string value;
     const Network::Connection* conn = downstreamConnection();
-    // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
+    // Async-client-driven router invocations (ext_authz, ratelimit side calls,
+    // mirror/shadow) have a null downstream connection. Previously this path
+    // would unconditionally dereference `conn` to compose the per-connection
+    // seed, which crashed the worker. Skip the connection-derived seed and degrade
+    // to a stable empty seed for those callers; the resulting cookie value is
+    // hashed identically across all such async invocations, which preserves
+    // hash-stability requirements for the cookie hash policy.
+    if (conn == nullptr) {
+      return std::string();
+    }
     value = conn->connectionInfoProvider().remoteAddress()->asString() +
             conn->connectionInfoProvider().localAddress()->asString();
 
