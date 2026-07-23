@@ -2,6 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "source/common/config/metadata.h"
 #include "source/common/upstream/load_balancer_factory_base.h"
 #include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
@@ -1166,6 +1167,62 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
   )EOF";
   initialize(yaml);
   expectSetsockoptSoKeepalive(7, 4, 1);
+}
+
+envoy::config::core::v3::Metadata eligibilityMetadata(bool eligible) {
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, "test.preconnect", "eligible")
+      .set_bool_value(eligible);
+  return metadata;
+}
+
+// A configured matcher makes only hosts whose metadata matches eligible.
+TEST_F(ClusterManagerImplTest, ShouldPreconnectHonorsEligibilityMatcher) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      preconnect_policy:
+        preconnect_enabled_metadata:
+          filter: test.preconnect
+          path:
+          - key: eligible
+          value:
+            bool_match: true
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  auto info = cluster_manager_->activeClusters().begin()->second.get().info();
+
+  auto eligible = makeTestHost(info, "tcp://127.0.0.1:80", eligibilityMetadata(true));
+  auto ineligible = makeTestHost(info, "tcp://127.0.0.1:80", eligibilityMetadata(false));
+  auto no_metadata = makeTestHost(info, "tcp://127.0.0.1:80");
+
+  EXPECT_TRUE(info->shouldPreconnect(*eligible));
+  EXPECT_FALSE(info->shouldPreconnect(*ineligible));
+  EXPECT_FALSE(info->shouldPreconnect(*no_metadata));
+}
+
+// Without a matcher, every host is eligible (default).
+TEST_F(ClusterManagerImplTest, ShouldPreconnectDefaultsToEligible) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  auto info = cluster_manager_->activeClusters().begin()->second.get().info();
+
+  auto no_metadata = makeTestHost(info, "tcp://127.0.0.1:80");
+  auto with_metadata = makeTestHost(info, "tcp://127.0.0.1:80", eligibilityMetadata(false));
+
+  EXPECT_TRUE(info->shouldPreconnect(*no_metadata));
+  EXPECT_TRUE(info->shouldPreconnect(*with_metadata));
 }
 
 class PreconnectTest : public ClusterManagerImplTest {

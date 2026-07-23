@@ -122,7 +122,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     return pending_streams_.size() > connecting_stream_capacity_;
   }
 
-  // Determine if we are trying to prefetch for global preconnect or local preconnect.
+  bool result = false;
   if (global_preconnect_ratio != 0) {
     // If global preconnecting is on, and this connection is within the global
     // preconnect limit, preconnect.
@@ -130,7 +130,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     // prefetching for the next upcoming stream, which will likely be assigned to this pool.
     // We may eventually want to track preconnect_attempts to allow more preconnecting for
     // heavily weighted upstreams or sticky picks.
-    bool result =
+    result =
         shouldConnect(pending_streams_.size(), num_active_streams_,
                       connecting_and_connected_stream_capacity_, global_preconnect_ratio, true);
     ENVOY_LOG(trace,
@@ -139,24 +139,32 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
               result, pending_streams_.size(), num_active_streams_,
               connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
               global_preconnect_ratio);
-    return result;
   } else {
     // Ensure this local pool has adequate connections for the given load.
     //
     // Local preconnect does not need to anticipate a stream. It is called as
     // new streams are established or torn down and simply attempts to maintain
     // the correct ratio of streams and anticipated capacity.
-    bool result =
-        shouldConnect(pending_streams_.size(), num_active_streams_,
-                      connecting_and_connected_stream_capacity_, perUpstreamPreconnectRatio());
+    result = shouldConnect(pending_streams_.size(), num_active_streams_,
+                           connecting_and_connected_stream_capacity_, perUpstreamPreconnectRatio());
     ENVOY_LOG(trace,
               "per-upstream shouldCreateNewConnection returns {} for pending {} active {} "
               "connecting_and_connected_capacity {} connecting_capacity {} ratio {}",
               result, pending_streams_.size(), num_active_streams_,
               connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
               perUpstreamPreconnectRatio());
-    return result;
   }
+
+  // Ineligible hosts get connections only for on-demand requests, not anticipatory ones.
+  if (!host_->cluster().shouldPreconnect(*host_)) {
+    const bool on_demand = pending_streams_.size() > connecting_stream_capacity_;
+    if (result && !on_demand) {
+      host_->cluster().trafficStats()->upstream_cx_preconnect_skipped_.inc();
+    }
+    return on_demand;
+  }
+
+  return result;
 }
 
 float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
