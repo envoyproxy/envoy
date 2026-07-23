@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -7,12 +8,14 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -40,6 +43,70 @@ struct EndpointKey {
     return H::combine(std::move(h), k.host, k.path);
   }
 };
+
+enum class BridgeStatus {
+  Ok,
+  RequestNotPost,
+  RequestTooLarge,
+  RequestParseError,
+  RequestUnsupportedProtocolVersion,
+  RequestInitializeNotValid,
+  RequestMethodNotSupported,
+  RequestMethodNotFound,
+  RequestMethodNotString,
+  RequestIdNotFound,
+  RequestToolParamsNotFound,
+  RequestToolNameNotFound,
+  RequestUnknownTool,
+  RequestToolArgumentsInvalid,
+  RequestToolTranscodingFailure,
+  RequestPassthrough,
+  ResponseTooLarge,
+  ResponseInvalidUtf8,
+  ResponseBackendError,
+  ResponseParseError,
+};
+
+absl::string_view bridgeStatusToString(BridgeStatus status);
+
+namespace BridgeStatusValues {
+inline constexpr absl::string_view STATUS = "status";
+inline constexpr absl::string_view OK = "mcp_json_rest_bridge_ok";
+inline constexpr absl::string_view REQUEST_NOT_POST = "mcp_json_rest_bridge_request_not_post";
+inline constexpr absl::string_view REQUEST_TOO_LARGE = "mcp_json_rest_bridge_request_too_large";
+inline constexpr absl::string_view REQUEST_PARSE_ERROR =
+    "mcp_json_rest_bridge_request_failed_to_parse_json_rpc";
+inline constexpr absl::string_view REQUEST_UNSUPPORTED_PROTOCOL_VERSION =
+    "mcp_json_rest_bridge_request_unsupported_protocol_version";
+inline constexpr absl::string_view REQUEST_INITIALIZE_NOT_VALID =
+    "mcp_json_rest_bridge_request_initialize_request_not_valid";
+inline constexpr absl::string_view REQUEST_METHOD_NOT_SUPPORTED =
+    "mcp_json_rest_bridge_request_method_not_supported";
+inline constexpr absl::string_view REQUEST_METHOD_NOT_FOUND =
+    "mcp_json_rest_bridge_request_method_not_found";
+inline constexpr absl::string_view REQUEST_METHOD_NOT_STRING =
+    "mcp_json_rest_bridge_request_method_not_string";
+inline constexpr absl::string_view REQUEST_ID_NOT_FOUND =
+    "mcp_json_rest_bridge_request_id_not_found";
+inline constexpr absl::string_view REQUEST_TOOL_PARAMS_NOT_FOUND =
+    "mcp_json_rest_bridge_request_tool_params_not_found";
+inline constexpr absl::string_view REQUEST_TOOL_NAME_NOT_FOUND =
+    "mcp_json_rest_bridge_request_tool_name_not_found";
+inline constexpr absl::string_view REQUEST_UNKNOWN_TOOL =
+    "mcp_json_rest_bridge_request_unknown_tool";
+inline constexpr absl::string_view REQUEST_TOOL_ARGUMENTS_INVALID =
+    "mcp_json_rest_bridge_request_tool_arguments_invalid";
+inline constexpr absl::string_view REQUEST_TOOL_TRANSCODING_FAILURE =
+    "mcp_json_rest_bridge_request_tool_transcoding_failure";
+inline constexpr absl::string_view REQUEST_PASSTHROUGH = "mcp_json_rest_bridge_request_passthrough";
+inline constexpr absl::string_view RESPONSE_TOO_LARGE = "mcp_json_rest_bridge_response_too_large";
+inline constexpr absl::string_view RESPONSE_INVALID_UTF8 =
+    "mcp_json_rest_bridge_response_invalid_utf8";
+inline constexpr absl::string_view RESPONSE_BACKEND_ERROR =
+    "mcp_json_rest_bridge_response_backend_error";
+inline constexpr absl::string_view RESPONSE_PARSE_ERROR =
+    "mcp_json_rest_bridge_response_failed_to_parse_json";
+} // namespace BridgeStatusValues
 
 /**
  * Configuration for the MCP JSON REST Bridge filter.
@@ -77,6 +144,12 @@ public:
 
   bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
                                    absl::string_view path) const;
+
+  bool shouldStoreToDynamicMetadata() const {
+    return proto_config_.request_storage_mode() ==
+           envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::
+               DYNAMIC_METADATA;
+  }
 
   bool traceContextExtraction() const { return proto_config_.has_trace_context_extraction(); }
 
@@ -190,9 +263,12 @@ private:
   void mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
                               const McpJsonRestBridgePerRouteConfig* per_route_config);
 
-  // Sends MCP error response.
-  void sendErrorResponse(Http::Code response_code, absl::string_view response_code_details,
-                         absl::string_view response_body);
+  // Handles decoding errors: sets dynamic metadata and sends a local reply.
+  void sendErrorResponse(
+      Http::Code response_code, BridgeStatus status, absl::string_view response_body,
+      std::function<void(Http::ResponseHeaderMap&)> modify_headers = nullptr,
+      absl::string_view method = "", const nlohmann::json& params = nlohmann::json::object(),
+      Grpc::Status::GrpcStatus grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal);
 
   // Validates the "id" and "method" fields of a JSON-RPC request.
   // It sends local error response and return an error status if the validation
@@ -200,7 +276,10 @@ private:
   absl::Status validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc);
 
   // Sets dynamic metadata for the filter based on the MCP request method and parameters.
-  void setDynamicMetadata(absl::string_view method, const nlohmann::json& json_rpc);
+  void setParsingMetadata(absl::string_view method, const nlohmann::json& params);
+  void setResponseMetadata(BridgeStatus status,
+                           std::optional<uint64_t> response_code = std::nullopt);
+  void setDynamicMetadata();
 
   // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
   void buildStreamingPrefixAndSuffix(bool is_error);
@@ -240,6 +319,12 @@ private:
   std::string streaming_json_prefix_;
   std::string streaming_json_suffix_;
   bool is_first_streaming_chunk_ = true;
+
+  BridgeStatus status_{BridgeStatus::Ok};
+  std::string mcp_method_;
+  Protobuf::Struct mcp_params_;
+  bool has_params_ = false;
+  std::optional<uint64_t> backend_response_code_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };
