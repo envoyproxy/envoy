@@ -13,6 +13,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_impl.h"
+#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -342,6 +343,16 @@ TEST_P(FilterChainManagerImplTest, FilterChainFactoryContextDelegatesAccessors) 
 
   EXPECT_CALL(parent_context_, shouldBypassOverloadManager()).WillOnce(Return(true));
   EXPECT_TRUE(context->shouldBypassOverloadManager());
+
+  context->scope();
+  context->prefixedScope();
+  EXPECT_EQ(&context->initManager(), &init_manager_);
+  context->messageValidationVisitor();
+  context->serverFactoryContext();
+
+  EXPECT_ENVOY_BUG(std::ignore = context->drainDecision().addOnDrainCloseCb(
+                       Network::DrainDirection::All, nullptr),
+                   "Unexpected function call");
 }
 
 TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
@@ -365,6 +376,28 @@ TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));
+
+TEST(ListenerInfoImplTest, DefaultConstructor) {
+  ListenerInfoImpl info;
+  EXPECT_TRUE(info.name().empty());
+  EXPECT_EQ(info.direction(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+  EXPECT_FALSE(info.isQuic());
+  EXPECT_FALSE(info.shouldBypassOverloadManager());
+  info.metadata();
+  info.typedMetadata();
+}
+
+TEST(ListenerInfoImplTest, FromConfig) {
+  envoy::config::listener::v3::Listener config;
+  config.set_name("test_listener");
+  config.set_traffic_direction(envoy::config::core::v3::TrafficDirection::INBOUND);
+  ListenerInfoImpl info(config);
+  EXPECT_EQ(info.name(), "test_listener");
+  EXPECT_EQ(info.direction(), envoy::config::core::v3::TrafficDirection::INBOUND);
+  EXPECT_FALSE(info.isQuic());
+  info.metadata();
+  info.typedMetadata();
+}
 
 } // namespace Server
 } // namespace Envoy
