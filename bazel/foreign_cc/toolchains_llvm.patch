@@ -38,7 +38,7 @@ index 6dfb2bb..6bbad65 100644
              )
  
 -        # Check that every defined toolchain_root or sysroot has a corresponding toolchain.
-+        # Check that every defined toolchain_root, sysroot, extra files, or cxx_cross_lib has a corresponding toolchain.
++        # Check that every defined toolchain_root, sysroot, extra_compiler_files, extra_linker_files, or cxx_cross_lib has a corresponding toolchain.
          for root in mod.tags.toolchain_root:
              if root.name not in toolchain_names:
                  fail("toolchain_root '%s' does not have a corresponding toolchain" % root.name)
