@@ -1,3 +1,4 @@
+diff --git a/BUILD b/BUILD
 --- a/BUILD
 +++ b/BUILD
 @@ -93,7 +93,7 @@
@@ -27,6 +28,7 @@
      ],
  )
  
+diff --git a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
 --- a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
 +++ b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
 @@ -109,6 +109,12 @@
@@ -37,7 +39,7 @@
 +    # hermetic cmake provided by the rules_foreign_cc toolchain rather than
 +    # relying on cmake being available on the host (it isn't on Envoy's RBE).
 +    build_script_env = {
-+        "CMAKE": "${pwd}/$(CMAKE)",
++        "CMAKE": "$${pwd}/$(CMAKE)",
 +    },
      edition = "2024",
      links = "wasmtime-c-api",
@@ -50,6 +52,7 @@
  )
  
  alias(
+diff --git a/bazel/cargo/wasmtime/remote/defs.bzl b/bazel/cargo/wasmtime/remote/defs.bzl
 --- a/bazel/cargo/wasmtime/remote/defs.bzl
 +++ b/bazel/cargo/wasmtime/remote/defs.bzl
 @@ -1301,6 +1301,8 @@

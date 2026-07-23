@@ -1,3 +1,4 @@
+diff --git a/build.rs b/build.rs
 --- a/build.rs
 +++ b/build.rs
 @@ -37,7 +37,10 @@
