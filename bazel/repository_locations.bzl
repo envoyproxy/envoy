@@ -503,8 +503,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bytecodealliance/wasm-micro-runtime/archive/{version}.tar.gz"],
     ),
     wasmtime = dict(
-        version = "45.0.2",
-        sha256 = "a95cf57008b87dbe1cdaba220ea58b75bb0b53369e166fe21e729011bd25e9e8",
+        version = "47.0.2",
+        sha256 = "0dac769484003621c9f59cd0a93ee14125efda7709d7632d0478caee1c3fa8ff",
         strip_prefix = "wasmtime-{version}",
         urls = ["https://github.com/bytecodealliance/wasmtime/archive/v{version}.tar.gz"],
     ),
