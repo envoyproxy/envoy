@@ -174,6 +174,51 @@ runtime_enabled:
                    ->value());
 }
 
+// Verify that a close event without a prior onNewConnection() call (e.g. when an earlier
+// filter in the chain stops iteration before this filter runs) does not underflow the
+// connection accounting. See https://github.com/envoyproxy/envoy/issues/22127.
+TEST_F(ConnectionLimitFilterTest, CloseWithoutOnNewConnection) {
+  initialize(R"EOF(
+stat_prefix: connection_limit_stats
+max_connections: 1
+delay: 0.2s
+)EOF");
+
+  // Close event arrives without onNewConnection() ever running.
+  ActiveFilter active_filter1(config_);
+  active_filter1.filter_.onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(0, TestUtility::findGauge(stats_store_,
+                                      "connection_limit.connection_limit_stats.active_connections")
+                   ->value());
+
+  // A subsequent connection must still be admitted, i.e. the internal connection counter must
+  // not underflow.
+  ActiveFilter active_filter2(config_);
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter2.filter_.onNewConnection());
+}
+
+// Verify that a close event does not decrement the connection accounting when the filter was
+// runtime disabled at connection creation time and therefore never incremented it. See
+// https://github.com/envoyproxy/envoy/issues/22127.
+TEST_F(ConnectionLimitFilterTest, RuntimeDisabledCloseDoesNotDecrement) {
+  initialize(R"EOF(
+stat_prefix: connection_limit_stats
+max_connections: 1
+delay: 0.2s
+runtime_enabled:
+  default_value: true
+  runtime_key: foo_key
+)EOF");
+
+  ActiveFilter active_filter(config_);
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
+  active_filter.filter_.onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(0, TestUtility::findGauge(stats_store_,
+                                      "connection_limit.connection_limit_stats.active_connections")
+                   ->value());
+}
+
 // Verify increment connection counter CAS edge case.
 TEST_F(ConnectionLimitFilterTest, IncrementCasEdgeCase) {
   initialize(R"EOF(
