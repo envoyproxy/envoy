@@ -40,36 +40,64 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
                          Network::Utility::parseInternetAddressNoThrow("255.255.255.255"));
 }
 
-struct FilterChainNameAction
+struct StaticFilterChainAction
     : public Matcher::ActionBase<Protobuf::StringValue, Configuration::FilterChainBaseAction> {
-  FilterChainNameAction(const std::string& name,
-                        std::shared_ptr<FcdsSharedFilterChainManager> shared_manager)
-      : name_(name), shared_manager_(std::move(shared_manager)) {}
-  const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
+  explicit StaticFilterChainAction(const Network::FilterChain* chain) : chain_(chain) {
+    ASSERT(chain != nullptr);
+  }
+  const Network::FilterChain* get(const FilterChainsByName&,
                                   const StreamInfo::StreamInfo&) const override {
-    if (shared_manager_ != nullptr) {
-      return shared_manager_->findThreadLocalFilterChain(name_);
-    }
-    const auto chain_match = filter_chains_by_name.find(name_);
-    if (chain_match != filter_chains_by_name.end()) {
-      return chain_match->second.get();
-    }
+    return chain_;
+  }
+  const Network::FilterChain* chain_;
+};
+
+struct DynamicFilterChainAction
+    : public Matcher::ActionBase<Protobuf::StringValue, Configuration::FilterChainBaseAction> {
+  explicit DynamicFilterChainAction(FcdsSubscriptionHandleSharedPtr&& fcds_handle)
+      : fcds_handle_(std::move(fcds_handle)) {}
+  const Network::FilterChain* get(const FilterChainsByName&,
+                                  const StreamInfo::StreamInfo&) const override {
+    return fcds_handle_->filterChain();
+  }
+  FcdsSubscriptionHandleSharedPtr fcds_handle_;
+};
+
+struct NoopFilterChainAction
+    : public Matcher::ActionBase<Protobuf::StringValue, Configuration::FilterChainBaseAction> {
+  const Network::FilterChain* get(const FilterChainsByName&,
+                                  const StreamInfo::StreamInfo&) const override {
     return nullptr;
   }
-  const std::string name_;
-  const std::shared_ptr<FcdsSharedFilterChainManager> shared_manager_;
 };
 
 class FilterChainNameActionFactory : public Matcher::ActionFactory<FilterChainActionFactoryContext>,
                                      Logger::Loggable<Logger::Id::config> {
 public:
   std::string name() const override { return "filter-chain-name"; }
+  Matcher::ActionConstSharedPtr createNewAction(const std::string& name,
+                                                FilterChainActionFactoryContext& context) {
+    if (auto it = context.filter_chains_by_name_.find(name);
+        it != context.filter_chains_by_name_.end()) {
+      return std::make_shared<StaticFilterChainAction>(it->second.get());
+    } else if (auto& fcds_manager = context.fcds_manager_; fcds_manager != nullptr) {
+      auto handle_or_error = fcds_manager->subscribe(
+          context.fcds_config_source_, name, context.fcds_callbacks_, context.init_manager_);
+      THROW_IF_NOT_OK(handle_or_error.status());
+      return std::make_shared<DynamicFilterChainAction>(std::move(handle_or_error).value());
+    }
+    return std::make_shared<NoopFilterChainAction>();
+  }
   Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
                                              FilterChainActionFactoryContext& context,
                                              ProtobufMessage::ValidationVisitor&) override {
-    std::string name = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config).value();
-    context.names_.insert(name);
-    return std::make_shared<FilterChainNameAction>(name, context.shared_manager_);
+    const std::string& name =
+        Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(config).value();
+    auto action_it = context.actions_by_name_.find(name);
+    if (action_it == context.actions_by_name_.end()) {
+      action_it = context.actions_by_name_.emplace(name, createNewAction(name, context)).first;
+    }
+    return action_it->second;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::StringValue>();
@@ -126,10 +154,9 @@ bool PerFilterChainFactoryContextImpl::shouldBypassOverloadManager() const {
 FilterChainManagerImpl::FilterChainManagerImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
     Configuration::FactoryContext& factory_context, Init::Manager& init_manager,
-    const FilterChainManagerImpl& parent_manager,
-    std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager)
+    const FilterChainManagerImpl& parent_manager)
     : addresses_(addresses), parent_context_(factory_context), origin_(&parent_manager),
-      init_manager_(init_manager), fcds_manager_(fcds_manager) {}
+      init_manager_(init_manager) {}
 
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
@@ -140,7 +167,10 @@ absl::Status FilterChainManagerImpl::addFilterChains(
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
     const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
-    FilterChainFactoryContextCreator& context_creator) {
+    FilterChainFactoryContextCreator& context_creator,
+    std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager,
+    const envoy::config::core::v3::ConfigSource& fcds_config_source,
+    FcdsClientCallbacks& fcds_callbacks) {
   Cleanup cleanup([this]() { origin_ = std::nullopt; });
   FilterChainsByMatcher filter_chains;
   uint32_t new_filter_chain_size = 0;
@@ -168,7 +198,9 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   RETURN_IF_NOT_OK(convertIPsToTries());
   RETURN_IF_NOT_OK(copyOrRebuildDefaultFilterChain(default_filter_chain,
                                                    filter_chain_factory_builder, context_creator));
-  maybeConstructMatcher(filter_chain_matcher, filter_chains_by_name, parent_context_);
+  RETURN_IF_NOT_OK(maybeConstructMatcher(filter_chain_matcher, std::move(filter_chains_by_name),
+                                         parent_context_, fcds_manager, fcds_config_source,
+                                         fcds_callbacks));
 
   const auto* origin = getOriginFilterChainManager();
   if (origin != nullptr) {
@@ -293,26 +325,45 @@ absl::Status FilterChainManagerImpl::setupFilterChainMatcher(
   return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::maybeConstructMatcher(
+absl::Status FilterChainManagerImpl::maybeConstructMatcher(
     const xds::type::matcher::v3::Matcher* filter_chain_matcher,
-    const FilterChainsByName& filter_chains_by_name,
-    Configuration::FactoryContext& parent_context) {
+    FilterChainsByName&& filter_chains_by_name, Configuration::FactoryContext& parent_context,
+    std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager,
+    const envoy::config::core::v3::ConfigSource& fcds_config_source,
+    FcdsClientCallbacks& fcds_callbacks) {
+  if (fcds_manager) {
+    if (!filter_chain_matcher) {
+      return absl::InvalidArgumentError("FCDS requires a filter chain matcher.");
+    }
+    if (parent_context.isQuic()) {
+      return absl::InvalidArgumentError("FCDS does not support QUIC filter chains");
+    }
+  }
   // Construct matcher if it is present in the listener configuration.
   // Discover FCDS filter chain names by filtering inlined names from the actions.
   if (filter_chain_matcher) {
-    filter_chains_by_name_ = filter_chains_by_name;
+    filter_chains_by_name_ = std::move(filter_chains_by_name);
     FilterChain::FilterChainNameActionValidationVisitor validation_visitor;
     FilterChainActionFactoryContext action_factory_context{
         .server_ = parent_context.serverFactoryContext(),
-        .shared_manager_ = fcds_manager_,
+        .filter_chains_by_name_ = filter_chains_by_name_,
+        // Below fields are used for FCDS subscription construction.
+        .fcds_manager_ = fcds_manager,
+        .fcds_callbacks_ = fcds_callbacks,
+        .fcds_config_source_ = fcds_config_source,
+        .init_manager_ = init_manager_,
     };
-    Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
-        action_factory_context, parent_context.serverFactoryContext(), validation_visitor);
-    matcher_ = factory.create(*filter_chain_matcher)();
-    absl::erase_if(action_factory_context.names_,
-                   [&](const std::string& name) { return filter_chains_by_name_.contains(name); });
-    fcds_names_ = std::move(action_factory_context.names_);
+    // MatchTreeFactory::create doesn't have an exception-free variant.
+    TRY_NEEDS_AUDIT {
+      Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
+          action_factory_context, parent_context.serverFactoryContext(), validation_visitor);
+      matcher_ = factory.create(*filter_chain_matcher)();
+    }
+    END_TRY CATCH(const EnvoyException& e, {
+      return absl::InvalidArgumentError(absl::StrCat("cannot create a filter chain matcher: ", e.what()));
+    });
   }
+  return absl::OkStatus();
 }
 
 absl::Status FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
@@ -1001,6 +1052,10 @@ public:
       : shared_manager_(std::move(shared_manager)), filter_chain_name_(filter_chain_name),
         callbacks_(callbacks) {}
 
+  const Network::FilterChain* filterChain() override {
+    return shared_manager_->findThreadLocalFilterChain(filter_chain_name_);
+  }
+
   ~FcdsSubscriptionHandleImpl() override {
     shared_manager_->unsubscribe(filter_chain_name_, callbacks_);
   }
@@ -1011,7 +1066,7 @@ private:
   FcdsClientCallbacks& callbacks_;
 };
 
-absl::StatusOr<FcdsSubscriptionHandlePtr>
+absl::StatusOr<FcdsSubscriptionHandleSharedPtr>
 FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSource& config_source,
                                         const std::string& filter_chain_name,
                                         FcdsClientCallbacks& callbacks,
@@ -1032,7 +1087,7 @@ FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSou
   SubscriptionState& state = *iter->second;
   state.callbacks_.insert(&callbacks);
   init_manager.add(state.api_->initTarget());
-  return std::make_unique<FcdsSubscriptionHandleImpl>(shared_from_this(), filter_chain_name,
+  return std::make_shared<FcdsSubscriptionHandleImpl>(shared_from_this(), filter_chain_name,
                                                       callbacks);
 }
 

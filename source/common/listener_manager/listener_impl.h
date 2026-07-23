@@ -450,7 +450,6 @@ private:
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
   void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
   void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);
-  absl::Status buildFilterChainSubscriptions(const envoy::config::listener::v3::Listener& config);
   absl::Status checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                                       const envoy::config::core::v3::Address& proto_address);
 
@@ -527,8 +526,6 @@ private:
   // TODO (tonya11en): Move this functionality into the overload manager.
   const std::string cx_limit_runtime_key_;
   std::shared_ptr<BasicResourceLimitImpl> open_connections_;
-
-  std::vector<FcdsSubscriptionHandlePtr> fcds_subscriptions_;
 
   // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
   // listener initialization is complete.

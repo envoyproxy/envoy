@@ -475,8 +475,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 
   filter_chain_manager_ = std::make_unique<FilterChainManagerImpl>(
-      addresses_, listener_factory_context_->parentFactoryContext(), initManager(),
-      maybeCreateFilterChainManager(config)),
+      addresses_, listener_factory_context_->parentFactoryContext(), initManager());
 
   buildAccessLog(config);
 
@@ -496,7 +495,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildProxyProtocolListenerFilter(config);
     SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
   }
-  SET_AND_RETURN_IF_NOT_OK(buildFilterChainSubscriptions(config), creation_status);
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
@@ -563,7 +561,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, *this)),
       filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
           addresses_, origin.listener_factory_context_->parentFactoryContext(), initManager(),
-          *origin.filter_chain_manager_, maybeCreateFilterChainManager(config))),
+          *origin.filter_chain_manager_)),
       reuse_port_(origin.reuse_port_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
                           [this] {
@@ -587,7 +585,6 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
     buildProxyProtocolListenerFilter(config);
     open_connections_ = origin.open_connections_;
   }
-  SET_AND_RETURN_IF_NOT_OK(buildFilterChainSubscriptions(config), creation_status);
 }
 
 absl::Status
@@ -922,7 +919,8 @@ absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,
       config.filter_chains(),
       config.has_default_filter_chain() ? &config.default_filter_chain() : nullptr, builder,
-      *filter_chain_manager_);
+      *filter_chain_manager_, maybeCreateFilterChainManager(config),
+      config.fcds_config().config_source(), *this);
 }
 
 bool ListenerImpl::reusePortBpfCpuSteeringEnabled(
@@ -1055,30 +1053,6 @@ void ListenerImpl::buildProxyProtocolListenerFilter(
         callback, "envoy.filters.listener.proxy_protocol");
     listener_filter_factories_.push_back(std::move(filter_config_provider));
   }
-}
-
-absl::Status
-ListenerImpl::buildFilterChainSubscriptions(const envoy::config::listener::v3::Listener& config) {
-  if (!config.has_fcds_config()) {
-    return absl::OkStatus();
-  }
-  if (!config.has_filter_chain_matcher()) {
-    return absl::InvalidArgumentError(
-        fmt::format("listener {}: FCDS requires a filter chain matcher.", name_));
-  }
-  if (isQuic()) {
-    return absl::InvalidArgumentError(
-        fmt::format("listener {}: FCDS does not support QUIC filter chains", name_));
-  }
-  auto shared_manager = filter_chain_manager_->fcdsManager();
-  ASSERT(shared_manager != nullptr);
-  for (const auto& name : filter_chain_manager_->fcdsNames()) {
-    auto handle_or_error =
-        shared_manager->subscribe(config.fcds_config().config_source(), name, *this, initManager());
-    RETURN_IF_NOT_OK(handle_or_error.status());
-    fcds_subscriptions_.push_back(std::move(handle_or_error).value());
-  }
-  return absl::OkStatus();
 }
 
 PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
