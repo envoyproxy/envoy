@@ -38,6 +38,7 @@ public:
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
   MOCK_METHOD(std::shared_ptr<PassthroughState>, passthroughState, ());
+  MOCK_METHOD(void, addOnPreCloseCallback, (std::function<void()> callback));
 };
 
 class MockPassthroughState : public PassthroughState {
@@ -48,6 +49,8 @@ public:
   MOCK_METHOD(void, mergeInto,
               (envoy::config::core::v3::Metadata & metadata,
                StreamInfo::FilterState& filter_state));
+  MOCK_METHOD(void, captureReverse, (const StreamInfo::FilterState& filter_state));
+  MOCK_METHOD(void, mergeReverse, (StreamInfo::FilterState & filter_state));
 };
 
 class InternalSocketTest : public testing::Test {
@@ -75,6 +78,22 @@ public:
 TEST_F(InternalSocketTest, NativeSocket) {
   NiceMock<Network::MockIoHandle> io_handle;
   initialize(io_handle);
+}
+
+// Test that closeSocket invokes mergeReverse on the shared PassthroughState
+// before delegating to the inner transport socket's closeSocket.
+TEST_F(InternalSocketTest, CloseSocketInvokesMergeReverse) {
+  auto state = std::make_shared<NiceMock<MockPassthroughState>>();
+  NiceMock<MockUserSpaceIoHandle> io_handle;
+  EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
+  EXPECT_CALL(*state, initialize(testing::_, testing::_));
+  initialize(io_handle);
+
+  // closeSocket should call mergeReverse exactly once and then forward to the
+  // wrapped transport socket's closeSocket.
+  EXPECT_CALL(*state, mergeReverse(testing::_));
+  EXPECT_CALL(*inner_socket_, closeSocket(Network::ConnectionEvent::LocalClose, false));
+  socket_->closeSocket(Network::ConnectionEvent::LocalClose, false);
 }
 
 // Test that internal transport socket updates the passthrough state for the user space sockets.
