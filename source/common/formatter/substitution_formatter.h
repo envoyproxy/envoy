@@ -19,6 +19,7 @@
 #include "source/common/json/json_streamer.h"
 #include "source/common/json/json_utility.h"
 
+#include "absl/status/statusor.h"
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -109,17 +110,47 @@ public:
   using CommandParsers = std::vector<CommandParserPtr>;
   using Formatter = FormatterProviderPtr;
   using Formatters = std::vector<Formatter>;
+  using ParsedFormatElement = absl::variant<std::string, Formatters>;
 
-  JsonFormatterImpl(const Protobuf::Struct& struct_format, bool omit_empty_values,
-                    const CommandParsers& commands = {});
+  static absl::StatusOr<std::unique_ptr<JsonFormatterImpl>>
+  create(const Protobuf::Struct& struct_format, bool omit_empty_values,
+         const CommandParsers& commands = {});
+
+  JsonFormatterImpl(bool omit_empty_values, std::vector<ParsedFormatElement>&& parsed_elements);
 
   // Formatter
   std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
 
 private:
   const bool omit_empty_values_;
-  using ParsedFormatElement = absl::variant<std::string, Formatters>;
-  std::vector<ParsedFormatElement> parsed_elements_;
+  const std::vector<ParsedFormatElement> parsed_elements_;
+};
+
+// Node of the JSON format template tree. Defined in the implementation file because its type
+// is an internal detail of the tree-structured omitting JSON formatter.
+struct JsonFormatMapNode;
+
+// JSON formatter that honors `omit_empty_values` by omitting keys whose value evaluates to
+// null and collapsing nested objects that become empty. Unlike JsonFormatterImpl, which
+// pre-serializes the whole template for maximum speed, this implementation keeps the template
+// as a tree so that the structural decision to omit a key can be made at format time. It is
+// only used when `omit_empty_values` is set, so users that do not need omission continue to
+// use the faster pre-serialized formatter.
+class OmitEmptyJsonFormatterImpl : public Formatter {
+public:
+  using CommandParsers = std::vector<CommandParserPtr>;
+
+  static absl::StatusOr<std::unique_ptr<OmitEmptyJsonFormatterImpl>>
+  create(const Protobuf::Struct& struct_format, const CommandParsers& commands = {});
+
+  explicit OmitEmptyJsonFormatterImpl(std::unique_ptr<JsonFormatMapNode> root);
+  ~OmitEmptyJsonFormatterImpl() override;
+
+  // Formatter
+  std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const std::unique_ptr<JsonFormatMapNode> root_;
 };
 
 } // namespace Formatter

@@ -924,6 +924,23 @@ TEST(InjectValidationHeaders, InjectsIfModifiedSince) {
   EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", mod_time));
 }
 
+TEST(InjectValidationHeaders, InjectsIfNoneMatchFromEtag) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  old_response_headers.setInline(CacheCustomHeaders::etag(), "\"strong-etag-value\"");
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-none-match", "\"strong-etag-value\""));
+}
+
+TEST(InjectValidationHeaders, FallsBackToDateWhenLastModifiedMissing) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  constexpr absl::string_view date = "Fri, 01 Aug 2025 09:25:10 GMT";
+  old_response_headers.setDate(date);
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", date));
+}
+
 TEST(ShouldUpdateCachedEntry, ComparesEtags) {
   Http::TestResponseHeaderMapImpl old_headers, new_headers;
   old_headers.setStatus(304);

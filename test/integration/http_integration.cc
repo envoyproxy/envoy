@@ -46,6 +46,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/time/time.h"
 #include "base_integration_test.h"
@@ -1006,7 +1007,7 @@ void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestAfterHeaders() {
   auto response = std::move(encoder_decoder.second);
   auto status = request_encoder_->encodeHeaders(headers, false);
   // Make sure we transmit headers successfully
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(status);
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   // Reset the upstream connection after the headers have been sent
   ASSERT_TRUE(fake_upstream_connection_->close());

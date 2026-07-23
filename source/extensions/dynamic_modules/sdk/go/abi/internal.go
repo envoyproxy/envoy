@@ -1351,6 +1351,16 @@ func (h *dymHttpFilterHandle) Log(level shared.LogLevel, format string, args ...
 	hostLog(level, format, args)
 }
 
+func (h *dymHttpFilterHandle) GetLogLevel() shared.LogLevel {
+	return shared.LogLevel(C.envoy_dynamic_module_callback_get_log_level())
+}
+
+func (h *dymHttpFilterHandle) IsLogLevelEnabled(level shared.LogLevel) bool {
+	return bool(C.envoy_dynamic_module_callback_log_enabled(
+		(C.envoy_dynamic_module_type_log_level)(uint32(level)),
+	))
+}
+
 func (h *dymHttpFilterHandle) HttpCallout(
 	cluster string, headers [][2]string, body []byte, timeoutMs uint64,
 	cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {

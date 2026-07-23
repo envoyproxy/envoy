@@ -21,6 +21,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/substitute.h"
@@ -256,8 +257,7 @@ public:
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
 
     EXPECT_CALL(init_watcher_, ready());
-    ASSERT_TRUE(
-        callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
+    ASSERT_OK(callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()));
     EXPECT_NE(std::nullopt, provider_->config());
     EXPECT_EQ(1UL, store_.counter(getConfigReloadCounter()).value());
     EXPECT_EQ(0UL, store_.counter(getConfigFailCounter()).value());
@@ -265,7 +265,7 @@ public:
     // Ensure that we honor resource removals.
     Protobuf::RepeatedPtrField<std::string> remove;
     *remove.Add() = "foo";
-    ASSERT_TRUE(callbacks_->onConfigUpdate({}, remove, "1").ok());
+    ASSERT_OK(callbacks_->onConfigUpdate({}, remove, "1"));
     EXPECT_EQ(2UL, store_.counter(getConfigReloadCounter()).value());
     EXPECT_EQ(0UL, store_.counter(getConfigFailCounter()).value());
   }
@@ -464,9 +464,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
         .WillOnce(Invoke([&config_discovery_test]() {
           EXPECT_TRUE(config_discovery_test.filter_factory_.created_);
         }));
-    ASSERT_TRUE(config_discovery_test.callbacks_
-                    ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
-                    .ok());
+    ASSERT_OK(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                               response.version_info()));
     EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
     EXPECT_EQ(1UL,
               config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter())
@@ -481,9 +480,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
     const auto response = config_discovery_test.createResponse("2", "foo");
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-    ASSERT_TRUE(config_discovery_test.callbacks_
-                    ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
-                    .ok());
+    ASSERT_OK(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                               response.version_info()));
 
     EXPECT_EQ(1UL,
               config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter())
@@ -595,9 +593,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
-  ASSERT_TRUE(config_discovery_test.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
-                  .ok());
+  ASSERT_OK(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                             response.version_info()));
   EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
   EXPECT_NE(std::nullopt, provider2->config());
   EXPECT_EQ(
@@ -680,9 +677,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   if (config_discovery_test.getFilterType() == "listener" ||
       config_discovery_test.getFilterType() == "upstream_network" ||
       config_discovery_test.getFilterType() == "udp_session") {
-    ASSERT_TRUE(config_discovery_test.callbacks_
-                    ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
-                    .ok());
+    ASSERT_OK(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                               response.version_info()));
     return;
   }
 

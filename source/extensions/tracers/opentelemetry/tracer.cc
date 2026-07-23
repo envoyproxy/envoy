@@ -1,5 +1,7 @@
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <string>
 
@@ -162,6 +164,13 @@ convertGrpcStatusToTraceStatusCode(::opentelemetry::proto::trace::v1::Span_SpanK
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
+  if (name == Tracing::Tags::get().HttpMethod) {
+    static constexpr std::array<absl::string_view, 10> KnownMethods{
+        "CONNECT", "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT", "QUERY", "TRACE"};
+    if (std::find(KnownMethods.begin(), KnownMethods.end(), value) == KnownMethods.end()) {
+      value = "_OTHER";
+    }
+  }
   if (name == Tracing::Tags::get().GrpcStatusCode) {
     span_.mutable_status()->set_code(convertGrpcStatusToTraceStatusCode(span_.kind(), value));
   } else if (name == Tracing::Tags::get().HttpStatusCode) {

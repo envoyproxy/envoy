@@ -26,6 +26,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -70,6 +71,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
