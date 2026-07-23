@@ -28,8 +28,6 @@ namespace Wuffs {
 //     if (auto s = cursor.feed(c.data, c.is_last); !s.ok()) { /* error */ }
 //   }
 //
-// Depth and key
-//
 // Every callback receives `depth` (1 = root container) and, for dict values,
 // `key` (the dict key to the left; "" for array elements).
 //
@@ -48,26 +46,15 @@ namespace Wuffs {
 //   closeStringCapture ("role",  depth=3, token_end)
 //   onContainerClose   (depth=3..1, ...)
 //
-// String capture
+// String capture: return true from openStringCapture to receive decoded UTF-8
+// via onStringChunk; false discards at zero cost. onStringChunk returning false
+// stops delivery but parsing continues; closeStringCapture always fires.
 //
-// Return true from openStringCapture to receive decoded UTF-8 via onStringChunk,
-// false to discard at zero cost (no allocation, no further callbacks).
-// onStringChunk returning false stops chunk delivery but parsing continues;
-// closeStringCapture always fires with token_end.
+// Container byte ranges: onContainerOpen/onContainerClose deliver token_start/
+// token_end forming a half-open [token_start, token_end) over raw body bytes.
 //
-// onStringChunk also enables fine-grained control mid-value: accumulate up to a
-// limit and keep returning true, or return false to stop early — the cursor
-// finishes parsing to the closing " either way.
-//
-// Container byte ranges
-//
-// onContainerOpen / onContainerClose deliver token_start / token_end, forming
-// a half-open range [token_start, token_end) over the raw body bytes.
-//
-// Path tracking
-//
-// With track_paths=true, call from any callback:
-//   matchesPatternPath(segments, depth) → bool     structural spec match (routing)
+// Path tracking: with track_paths=true, call matchesPatternPath(segments, depth)
+// from any callback for structural spec matching.
 //
 class WuffsJsonCursor {
 public:
@@ -122,6 +109,7 @@ public:
   class Handler {
   public:
     virtual ~Handler() = default;
+
     // Called once at the opening '"' of every non-key string value chain.
     // This is the routing decision point: the handler inspects `key` and `depth`
     // and decides whether to capture this value.
@@ -147,59 +135,37 @@ public:
     // closeStringCapture still fires with token_end.
     virtual bool onStringChunk(absl::string_view key, int depth, absl::string_view chunk) = 0;
 
-    // Called when a non-key string value chain completes (closing '"' seen).
-    // Always fires, even if openStringCapture returned false — giving every
-    // handler a [token_start, token_end) byte range for every string value
-    // without requiring content decoding.
-    // `token_end` is the byte offset immediately past the closing '"'.
+    // Called when a string value chain completes. Always fires, even if
+    // openStringCapture returned false. `token_end` is the offset past '"'.
     virtual void closeStringCapture(absl::string_view key, int depth, size_t token_end) = 0;
 
-    // Called when a dict key completes.
-    // `token_start` is the byte offset of the opening '"' of the key in the body
-    // stream. Combined with the token_end delivered by the subsequent value
-    // callback (closeStringCapture, onNumber, onBoolean, onNull, or
-    // onContainerClose), it gives the half-open byte range [token_start, token_end)
-    // covering the complete "key":value field — suitable for verbatim passthrough
-    // without DOM parsing.
-    // Return a non-OK Status to abort parsing (e.g. duplicate-key detection).
+    // Called when a dict key completes. `token_start` is the offset of the
+    // opening '"'; paired with the next value callback's token_end it spans
+    // the full "key":value field. Return non-OK to abort parsing.
     virtual absl::Status onKey(absl::string_view key, int depth, size_t token_start) = 0;
 
-    // Called for JSON number literals (integer or floating-point).
-    // `token_start` / `token_end` delimit the scalar value token in the body stream.
-    // Together with the token_start from the preceding onKey call they cover the
-    // complete "key":value field byte range.
-    // Return a non-OK Status to abort parsing.
+    // Called for number literals. Return non-OK to abort parsing.
     virtual absl::Status onNumber(absl::string_view key, absl::string_view raw, int depth,
                                   size_t token_start, size_t token_end) = 0;
 
-    // Called for JSON true / false literals.
-    // Return a non-OK Status to abort parsing.
+    // Called for true/false literals. Return non-OK to abort parsing.
     virtual absl::Status onBoolean(absl::string_view key, bool value, int depth, size_t token_start,
                                    size_t token_end) = 0;
 
-    // Called for JSON null literals.
+    // Called for null literals.
     virtual void onNull(absl::string_view key, int depth, size_t token_start, size_t token_end) = 0;
 
-    // Called after depth has been incremented for a { or [ open.
-    // `key` is the parent dict key that opened this container, or "" when
-    // the parent is an array or this is the root container.
-    // `token_start` is the byte offset of the opening { or [ in the body stream.
+    // Called after depth has been incremented for a { or [ open. `key` is the
+    // parent dict key or "" for array/root. token_start is the offset of { or [.
     //
-    // PATH TRACKING NOTE — use depth-1, NOT depth, from this callback:
-    // At the time this callback fires, key_stack_[depth] is not yet populated
-    // (no keys have been seen inside the new container), so a depth-length
-    // match would compare against a stale label. The enclosing chain at
-    // depth-1, combined with `key`, identifies this container unambiguously:
-    // to match a container spec like "messages[]", match the first depth-1
-    // segments with matchesPatternPath(segments.first(depth-1), depth-1) and
-    // compare the last segment against `key` / is_dict yourself.
-    // TODO(tyxia): add matchesContainerPatternPath(segments, key, is_dict, depth)
-    //   convenience wrapper that hides this depth-1 subtlety.
+    // matchesPatternPath note: use depth-1, not depth — key_stack_[depth] is
+    // not yet populated at this point. Match an N-segment container spec with
+    // matchesPatternPath(segments, depth-1) and compare `key`/is_dict yourself.
+    // TODO(tyxia): add matchesContainerPatternPath convenience wrapper.
     virtual void onContainerOpen(absl::string_view key, bool is_dict, int depth,
                                  size_t token_start) = 0;
 
-    // Called with the container's depth before decrement and the byte offset
-    // immediately after the closing } or ].
+    // Called with the container's depth before decrement and the offset past } or ].
     virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
@@ -214,56 +180,31 @@ public:
   // Returns non-OK on malformed JSON or internal allocation failure.
   absl::Status feed(absl::string_view chunk, bool closed);
 
-  // One level of a structural pattern-path match: a dict key or an array
-  // wildcard. `key` is ignored when is_array_element is true and must outlive
-  // the matchesPatternPath() call.
+  // One level of a structural pattern-path match: a dict key or an array wildcard.
+  // `key` must outlive the matchesPatternPath() call.
   struct PatternSegment {
     absl::string_view key;
     bool is_array_element{false};
   };
 
-  // True iff the root-to-here chain at `depth` matches `segments` exactly —
-  // one segment per level, dict labels compared as whole strings, array
-  // levels matching the wildcard regardless of index.
-  //
-  // This is the collision-free routing primitive: unlike comparing a
-  // serialized path string against a config string, a document key
-  // containing '.', '[', ']' — or an empty key — can never masquerade as
-  // nested structure, because no serialization is involved: each document
-  // label is compared atomically against exactly one segment.
+  // True iff the root-to-here chain at `depth` matches `segments` exactly.
+  // Dict labels are compared atomically (no serialization, so a document key
+  // containing '.', '[', ']' cannot masquerade as nested structure).
   // Zero allocations; O(depth) string_view compares with early exit.
-  // Must only be called from within a Handler callback while feed() is
-  // active. Requires track_paths=true at construction: without it the
-  // intermediate labels it compares are not maintained, so dict-intermediate
-  // specs would silently never match — misuse is caught by ASSERT in debug
-  // builds.
+  // Requires track_paths=true at construction; misuse is caught by ASSERT in
+  // debug builds. Must be called from within a Handler callback.
   bool matchesPatternPath(absl::Span<const PatternSegment> segments, int depth) const;
 
-  // Monotonically increasing byte offset of the next source byte to be consumed.
-  // Matches the token_start / token_end values delivered to onContainerOpen / onContainerClose.
-  // Bytes buffered in pending_bytes_ (at most kMaxPendingBytes) are not yet counted.
-  // TODO(tyxia): the outer filter should check nextSourcePosition() + chunk.size()
-  // against ParserConfig::max_body_bytes before each feed() call and return
-  // ResourceExhausted instead of feeding, rejecting an oversized chunk unparsed.
+  // Monotonically increasing offset of the next source byte to be consumed.
+  // Aligns with token_start / token_end values in callbacks.
+  // TODO(tyxia): outer filter should check nextSourcePosition() + chunk.size()
+  // against max_body_bytes before each feed() call.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
-  // Exclusive upper bound for per-depth state tracking: depths 1 through
-  // kMaxTrackedDepth-1 (currently 1–8) have full key/dup/path tracking.
-  // Value covers the deepest known OpenAI/Anthropic schema paths:
-  //   tools[i].function.parameters.properties.<arg>.type  (depth 7)
-  //   messages[i].content[j].content[k].text              (depth 7)
-  // plus one buffer level for schemas with one extra level of nesting.
-  //
+  // Exclusive upper bound for per-depth state tracking (depths 1–8).
+  // Covers the deepest known LLM API schema paths (depth 7) plus one buffer.
   // Nesting beyond kMaxTrackedDepth-1 is rejected with InvalidArgumentError.
-  // Public so config-load code can pass kMaxTrackedDepth - 1 as the
-  // max_depth argument of parseExtractFieldSpec, refusing specs the cursor
-  // could never match.
-  //
-  // TODO(tyxia): replace the fixed per-depth arrays with std::vector<T> to
-  // support dynamic depth so that max_depth_ can exceed kMaxTrackedDepth-1
-  // without losing tracking accuracy. This removes the hard compile-time cap
-  // at the cost of per-push heap allocation; evaluate against the
-  // request-path perf budget before doing so.
+  // Public so callers can pass kMaxTrackedDepth - 1 to parseExtractFieldSpec.
   static constexpr int kMaxTrackedDepth = 9;
 
 private:
@@ -281,7 +222,6 @@ private:
 
   size_t body_src_pos_{0};
   bool wuffs_done_{false};
-
   // Cap key length at 256 bytes: well above any legitimate schema field name
   // (longest observed ~25B, e.g. "input_audio_transcription") while bounding
   // per-key allocation and guarding against DoS via unbounded key lengths.
@@ -296,41 +236,21 @@ private:
   bool is_dict_[kMaxTrackedDepth]{};
   bool expecting_key_[kMaxTrackedDepth]{};
 
-  // key_stack_[d] — most recently completed key at dict depth d.
-  //                 Always maintained (not gated on track_paths_) because it
-  //                 is forwarded as the `key` argument to Handler callbacks.
-  // push_key_[d]  — key at depth d-1 that opened the container at depth d;
-  //                 captured at push time. Size kMaxTrackedDepth+1 so
-  //                 push_key_[kMaxTrackedDepth] is accessible when depth_
-  //                 reaches kMaxTrackedDepth.
-  //                 Only maintained when track_paths_=true (used by
-  //                 matchesPatternPath).
+  // key_stack_[d] — current key at depth d; always maintained; forwarded as
+  //                 the `key` argument to callbacks.
+  // push_key_[d]  — key that opened the container at depth d; maintained only
+  //                 when track_paths_=true (used by matchesPatternPath).
   std::string key_stack_[kMaxTrackedDepth]{};
   std::string push_key_[kMaxTrackedDepth + 1]{};
-  // Tracks keys seen at each dict depth to detect and reject duplicates.
-  // Cleared on container open; flat_hash_set gives O(1) insert/lookup with
-  // one contiguous backing allocation (no per-node malloc unlike std::set).
+  // duplicate-key detection.
   absl::flat_hash_set<std::string> seen_keys_[kMaxTrackedDepth]{};
 
   bool in_string_chain_{false};
-
-  // Bytes unread by Wuffs before the last short_read suspension. Wuffs rewinds
-  // iop_a_src to before an incomplete NUMBER or LITERAL token before suspending,
-  // so those bytes must be prepended to the next chunk to form a contiguous
-  // buffer. Empty between feed() calls when no token straddles a boundary.
+  // bytes rewound by Wuffs on short_read; prepended to next chunk.
   std::string pending_bytes_;
 
-  // TODO(tyxia): Implement the production Handler that accepts ParserConfig (max_body_bytes,
-  // max_scalar_capture_bytes, max_total_capture_bytes) and a list of ExtractFieldSpec; converts
-  // each spec's segments to PatternSegment once at init and routes callbacks with
-  // matchesPatternPath(segments, depth) — depth-1 plus `key` at onContainerOpen (see the note
-  // there) — recording element byte ranges for container specs.
-  //
-  // Implements the three-tier body-size logic (full capture / semantic-only / reject).
-  //
-  // Deferred: a max_depth constructor argument derived from the
-  // deepest configured spec, tightening the DoS depth bound to exactly what the
-  // policy requires instead of the static kMaxTrackedDepth default.
+  // TODO(tyxia): implement the production Handler that accepts ParserConfig and
+  // routes callbacks via matchesPatternPath, enforcing the three budget fields.
   bool string_is_key_{false};
   bool string_capturing_{false};    // openStringCapture returned true for current value string
   bool string_chunk_active_{false}; // onStringChunk hasn't returned false yet
