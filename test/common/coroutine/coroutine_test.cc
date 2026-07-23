@@ -132,7 +132,8 @@ TEST(CancellationStateTest, ClearedCallbackDoesNotFire) {
 TEST(TaskTest, ReturnsStatusOrValueThroughLaunch) {
   ManualExecutor exec;
   std::optional<absl::StatusOr<int>> result;
-  launch(returnsValue(42), exec, [&result](absl::StatusOr<int> value) { result = value; });
+  DetachedHandle handle =
+      launch(returnsValue(42), exec, [&result](absl::StatusOr<int> value) { result = value; });
   EXPECT_FALSE(result.has_value()); // lazy: nothing runs until drained.
   exec.drain();
   ASSERT_TRUE(result.has_value());
@@ -144,7 +145,8 @@ TEST(TaskTest, ReturnsStatusThroughLaunch) {
   ManualExecutor exec;
   bool body_ran = false;
   std::optional<absl::Status> result;
-  launch(returnsOk(body_ran), exec, [&result](absl::Status status) { result = std::move(status); });
+  DetachedHandle handle = launch(returnsOk(body_ran), exec,
+                                 [&result](absl::Status status) { result = std::move(status); });
   exec.drain();
   EXPECT_TRUE(body_ran);
   ASSERT_TRUE(result.has_value());
