@@ -584,7 +584,6 @@ def _cel_cpp():
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel/foreign_cc:cel-cpp.patch",
-            "@envoy//bazel/foreign_cc:cel-cpp-protobuf-v35.patch",
         ],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
