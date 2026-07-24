@@ -206,6 +206,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/kill_request @qqustc @yanavlasov
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @cpakulski
+# Rate limit JWT claim descriptor
+/*/extensions/rate_limit_descriptors/jwt_claim @TODO_ADD_MAINTAINER_HANDLES
 # hash input matcher
 /*/extensions/matching/input_matchers/consistent_hashing @donyu @mattklein123
 # runtime fraction input matcher

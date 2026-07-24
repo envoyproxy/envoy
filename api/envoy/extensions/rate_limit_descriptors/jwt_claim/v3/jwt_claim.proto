@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package envoy.extensions.rate_limit_descriptors.jwt_claim.v3;
+
+import "validate/validate.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.rate_limit_descriptors.jwt_claim.v3";
+option java_outer_classname = "JwtClaimProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/rate_limit_descriptors/jwt_claim/v3;jwt_claimv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Rate limit descriptor from JWT claim]
+// [#extension: envoy.rate_limit_descriptors.jwt_claim]
+
+// The following descriptor entry is appended with a value extracted from a
+// named claim in a JWT found in an HTTP request header.
+//
+// .. code-block:: cpp
+//
+//   ("<descriptor_key>", "<claim_value>")
+//
+// .. warning::
+//
+//    SECURITY WARNING: This extension does NOT verify JWT signatures. Any
+//    party can present a forged or expired JWT with arbitrary claims, and
+//    those claims will be used as rate limit descriptor values. This means
+//    an attacker can trivially evade or manipulate per-claim rate limits
+//    (e.g. impersonate another subject, or rotate a fake claim value on
+//    every request to bypass limiting entirely) unless the JWT's signature
+//    is verified elsewhere in the request path — for example, by an
+//    upstream mTLS-authenticated service, or by an
+//    :ref:`envoy.filters.http.jwt_authn
+//    <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`
+//    filter earlier in the same filter chain that rejects invalid tokens
+//    before this descriptor action runs.
+//
+//    DO NOT use this extension to gate access, apply differentiated rate
+//    limits by trust level, or make any authorization-adjacent decision
+//    based on the extracted claim, unless signature verification is
+//    PROVABLY performed elsewhere in the request path.
+//
+//    If you need Envoy itself to verify the JWT before rate limiting,
+//    use the :ref:`envoy.filters.http.jwt_authn
+//    <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`
+//    filter (placed before the rate limit filter) together with a
+//    :ref:`request_headers
+//    <envoy_v3_api_field_config.route.v3.RateLimit.Action.request_headers>`
+//    or :ref:`metadata
+//    <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>`
+//    descriptor action instead of this extension.
+message Descriptor {
+  // The key to use in the descriptor entry.
+  string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The name of the HTTP header containing the JWT, e.g. "authorization".
+  string header_name = 2 [(validate.rules).string = {
+    min_len: 1
+    well_known_regex: HTTP_HEADER_NAME
+    strict: false
+  }];
+
+  // The value prefix to strip before parsing the remainder as a JWT, e.g.
+  // "Bearer " (with a trailing space) for an "authorization" header
+  // formatted as "Authorization: Bearer <token>". If the header value does
+  // not start with this prefix, the descriptor is not populated (falls
+  // through to ``default_value``/``skip_if_absent`` below).
+  string value_prefix = 3
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+  // The name of the JWT claim to extract. Can be a nested claim, dot-
+  // separated, e.g. "claim.nested.key". Matches the same convention as
+  // :ref:`JwtClaimToHeader.claim_name
+  // <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.claim_name>`.
+  // Only string-valued claims are supported; non-string claims (numbers,
+  // booleans, arrays, objects) are treated as absent.
+  string claim_name = 4 [(validate.rules).string = {min_len: 1}];
+
+  // The default value to use if the header is absent, is not a
+  // structurally valid JWT, or the named claim is absent/non-string.
+  string default_value = 5;
+
+  // If true, Envoy skips this descriptor entry (rather than aborting the
+  // whole descriptor for this action list) when the header is absent, the
+  // JWT cannot be parsed, or the named claim is absent/non-string, and
+  // ``default_value`` is also empty.
+  bool skip_if_absent = 6;
+}
