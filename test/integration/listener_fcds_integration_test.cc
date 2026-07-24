@@ -462,6 +462,69 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsUpdateFailureAndLdsUnwarming) {
   ASSERT_TRUE(codec_client->waitForDisconnect(std::chrono::seconds(5)));
 }
 
+// Tests that adding, removing, and then re-adding the same filter chain
+// results in a working listener.
+TEST_P(ListenerFcdsIntegrationTest, FcdsAddRemoveAdd) {
+  // SotW gRPC subscriptions do not support dynamic resource deletion notifications
+  // from empty discovery responses. Skip the test case for SotW runs.
+  if (this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+      this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw) {
+    GTEST_SKIP();
+  }
+
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // 1. Add filter chain.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Verify connection works.
+  {
+    IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+    IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client->close();
+  }
+
+  // 2. Remove filter chain.
+  sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
+
+  // Wait for update.
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+
+  // Verify connection is rejected.
+  {
+    IntegrationCodecClientPtr codec_client = makeRawHttpConnection(
+        makeClientConnection(lookupPort(listener_name_)), std::nullopt, std::nullopt, false);
+    test_server_->waitForCounter(listenerStatPrefix("no_filter_chain_match"), Ge(1));
+    ASSERT_TRUE(codec_client->waitForDisconnect(std::chrono::seconds(5)));
+  }
+
+  // 3. Add the same filter chain again.
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "3");
+
+  // Wait for update.
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(3));
+
+  // Verify connection works again.
+  {
+    IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+    IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client->close();
+  }
+}
+
 // Tests that a listener update via LDS (which triggers a full listener update)
 // preserves existing warmed FCDS subscriptions.
 TEST_P(ListenerFcdsIntegrationTest, LdsUpdateWithFcds) {
