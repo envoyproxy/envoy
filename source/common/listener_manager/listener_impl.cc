@@ -687,6 +687,17 @@ bool ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance
   return true;
 }
 
+absl::Status ListenerImpl::doFinalPreWorkerInit() {
+  if (udp_listener_config_) {
+    RETURN_IF_NOT_OK(
+        udp_listener_config_->listener_factory_->doFinalPreWorkerInit(listenSocketFactories()));
+  }
+  for (auto& socket_factory : listenSocketFactories()) {
+    RETURN_IF_NOT_OK(socket_factory->doFinalPreWorkerInit());
+  }
+  return absl::OkStatus();
+}
+
 absl::Status
 ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
                                       uint32_t concurrency) {
@@ -716,9 +727,11 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
           "connection_balance_config is configured for QUIC listener which "
           "doesn't work with connection balancer.");
     }
+    absl::Status listener_factory_creation_status = absl::OkStatus();
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_, *listener_factory_context_);
+        validation_visitor_, *listener_factory_context_, listener_factory_creation_status);
+    RETURN_IF_NOT_OK_REF(listener_factory_creation_status);
 
     if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
       auto* quic_packet_writer_factory_factory =

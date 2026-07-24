@@ -942,9 +942,11 @@ private:
           context_ = std::make_unique<
               testing::NiceMock<Server::Configuration::MockListenerFactoryContext>>();
         }
+        absl::Status creation_status = absl::OkStatus();
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
             parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
-            *context_);
+            *context_, creation_status);
+        ASSERT(creation_status.ok());
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
 #else

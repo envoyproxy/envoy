@@ -5,7 +5,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "quiche/quic/core/connection_id_generator.h"
-#include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
 namespace Envoy {
 namespace Quic {
@@ -33,10 +32,11 @@ public:
 
   /**
    * Create a socket option with BPF program to consistently route QUIC packets to the right listen
-   * socket. Linux only.
+   * socket. Linux only, absl::UnimplementedError on other platforms.
    * @param concurrency the total number of worker threads.
+   * @returns the non null socket option or an error status.
    */
-  virtual Network::Socket::OptionConstSharedPtr
+  virtual absl::StatusOr<Network::Socket::OptionConstSharedPtr>
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) PURE;
 
   /**
@@ -50,15 +50,32 @@ public:
 using EnvoyQuicConnectionIdGeneratorFactoryPtr =
     std::unique_ptr<EnvoyQuicConnectionIdGeneratorFactory>;
 
+/**
+ * Context created during configuration load and shared by the connection ID generator factories
+ * created from it.
+ */
+class EnvoyQuicConnectionIdGeneratorContext {
+public:
+  virtual ~EnvoyQuicConnectionIdGeneratorContext() = default;
+
+  /**
+   * Create a connection ID generator factory. Called after the listen sockets are created.
+   */
+  virtual EnvoyQuicConnectionIdGeneratorFactoryPtr createQuicConnectionIdGeneratorFactory() PURE;
+};
+
+using EnvoyQuicConnectionIdGeneratorContextPtr =
+    std::unique_ptr<EnvoyQuicConnectionIdGeneratorContext>;
+
 class EnvoyQuicConnectionIdGeneratorConfigFactory : public Config::TypedFactory {
 public:
   std::string category() const override { return "envoy.quic.connection_id_generator"; }
 
   /**
-   * Returns a connection ID factory based on the given config.
+   * Returns a connection ID generator context based on the given config.
    */
-  virtual EnvoyQuicConnectionIdGeneratorFactoryPtr
-  createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config,
+  virtual EnvoyQuicConnectionIdGeneratorContextPtr
+  createQuicConnectionIdGeneratorContext(const Protobuf::Message& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Server::Configuration::FactoryContext& context) PURE;
 };

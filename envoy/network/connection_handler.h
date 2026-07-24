@@ -15,6 +15,8 @@
 
 #include "source/common/common/interval_value.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -327,6 +329,19 @@ public:
    * @return socket options specific to this factory that should be applied to all sockets.
    */
   virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
+
+  /**
+   * Perform any initialization that must occur immediately prior to using the listen socket on
+   * workers, and which requires access to listen sockets. For creating and posting eBPF programs to
+   * each reuseport group.
+   *
+   * @param listen_socket_factories supplies a span of socket groups for which active udp listeners
+   * will be created. The sockets must have their address fully resolved either from config, or by
+   * the os in case of auto-bind sockets.
+   * @return a status indicating if an error occurred.
+   */
+  virtual absl::Status doFinalPreWorkerInit(
+      absl::Span<const Network::ListenSocketFactoryPtr> listen_socket_factories) PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
