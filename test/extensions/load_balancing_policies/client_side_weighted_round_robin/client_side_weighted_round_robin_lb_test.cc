@@ -22,10 +22,12 @@ using OrcaWeightManager = Extensions::LoadBalancingPolicies::Common::OrcaWeightM
 
 class ClientSideWeightedRoundRobinLoadBalancerFriend {
 public:
-  explicit ClientSideWeightedRoundRobinLoadBalancerFriend(
+  ClientSideWeightedRoundRobinLoadBalancerFriend(
       std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb,
-      std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb)
-      : lb_(std::move(lb)), worker_lb_(std::move(worker_lb)) {}
+      std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb,
+      Extensions::LoadBalancingPolicies::Common::OrcaLoadReportHandlerSharedPtr report_handler)
+      : lb_(std::move(lb)), worker_lb_(std::move(worker_lb)),
+        report_handler_(std::move(report_handler)) {}
 
   HostSelectionResponse chooseHost(LoadBalancerContext* context) {
     return worker_lb_->chooseHost(context);
@@ -78,7 +80,7 @@ public:
                                long long non_empty_since_seconds,
                                long long last_update_time_seconds) {
     auto client_side_data = std::make_unique<OrcaHostLbPolicyData>(
-        lb_->orca_weight_manager_->reportHandler(), weight, /*non_empty_since=*/
+        report_handler_, weight, /*non_empty_since=*/
         MonotonicTime(std::chrono::seconds(non_empty_since_seconds)),
         /*last_update_time=*/
         MonotonicTime(std::chrono::seconds(last_update_time_seconds)));
@@ -87,12 +89,13 @@ public:
 
   Extensions::LoadBalancingPolicies::Common::OrcaLoadReportHandlerSharedPtr
   orcaLoadReportHandler() {
-    return lb_->orca_weight_manager_->reportHandler();
+    return report_handler_;
   }
 
 private:
   std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb_;
   std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb_;
+  Extensions::LoadBalancingPolicies::Common::OrcaLoadReportHandlerSharedPtr report_handler_;
 };
 
 namespace {
@@ -119,12 +122,20 @@ public:
         "metric2");
 
     EXPECT_CALL(mock_tls_, allocateSlot());
+    // Handler equivalent to the one the LB builds internally from the same config.
+    auto report_handler = std::make_shared<OrcaLoadReportHandler>(
+        Extensions::LoadBalancingPolicies::Common::OrcaWeightManagerConfig{
+            lb_config_.metric_names_for_computing_utilization, lb_config_.error_utilization_penalty,
+            lb_config_.blackout_period, lb_config_.weight_expiration_period,
+            lb_config_.weight_update_period},
+        simTime());
     lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancerFriend>(
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
             lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/std::nullopt));
+            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/std::nullopt),
+        std::move(report_handler));
 
     // Initialize the thread aware load balancer from config.
     ASSERT_EQ(lb_->initialize(), absl::OkStatus());
