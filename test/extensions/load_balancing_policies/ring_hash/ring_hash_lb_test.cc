@@ -1252,6 +1252,163 @@ TEST(RingHashMidBatchInitializeCrashTest, NoOobOnNewPriority) {
   EXPECT_NE(nullptr, worker_lb);
 }
 
+// Trivial hashing load balancer used only to observe how often the factory is rebuilt.
+class NoopHashingLoadBalancer : public ThreadAwareLoadBalancerBase::HashingLoadBalancer {
+public:
+  HostSelectionResponse chooseHost(uint64_t, uint32_t) const override { return {nullptr}; }
+};
+
+// Minimal thread-aware load balancer that counts createLoadBalancer() invocations. refresh()
+// calls createLoadBalancer() once per priority, so with a fixed number of priorities the number
+// of factory rebuilds (refresh() calls) can be derived from the create count.
+class RefreshCountingLoadBalancer : public ThreadAwareLoadBalancerBase {
+public:
+  RefreshCountingLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats,
+                              Runtime::Loader& runtime, Random::RandomGenerator& random)
+      : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random,
+                                    /*healthy_panic_threshold=*/50,
+                                    /*locality_weighted_balancing=*/false,
+                                    /*hash_policy=*/nullptr) {}
+
+  HashingLoadBalancerSharedPtr createLoadBalancer(const NormalizedHostWeightVector&, double,
+                                                  double) override {
+    ++create_count_;
+    return std::make_shared<NoopHashingLoadBalancer>();
+  }
+
+  uint32_t create_count_{0};
+};
+
+// Applies a host set for `priority` outside of any batch (individual update).
+void setHostsForPriority(PrioritySetImpl& priority_set, std::shared_ptr<MockClusterInfo> info,
+                         uint32_t priority, const std::string& url) {
+  HostVectorSharedPtr hosts = std::make_shared<HostVector>();
+  hosts->push_back(makeTestHost(info, url));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  priority_set.updateHosts(priority,
+                           updateHostsParams(hosts, hosts_per_locality,
+                                             std::make_shared<const HealthyHostVector>(*hosts),
+                                             hosts_per_locality),
+                           {}, *hosts, {}, std::nullopt, std::nullopt);
+}
+
+// Batch update that touches two existing priorities.
+class TwoPriorityBatchUpdateCb : public PrioritySet::BatchUpdateCb {
+public:
+  explicit TwoPriorityBatchUpdateCb(std::shared_ptr<MockClusterInfo> info) : info_(info) {}
+
+  void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+    update(host_update_cb, 0, "tcp://127.0.0.1:80");
+    update(host_update_cb, 1, "tcp://127.0.0.2:80");
+  }
+
+  void update(PrioritySet::HostUpdateCb& host_update_cb, uint32_t priority,
+              const std::string& url) {
+    HostVectorSharedPtr hosts = std::make_shared<HostVector>();
+    hosts->push_back(makeTestHost(info_, url));
+    HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(priority,
+                               updateHostsParams(hosts, hosts_per_locality,
+                                                 std::make_shared<const HealthyHostVector>(*hosts),
+                                                 hosts_per_locality),
+                               {}, *hosts, {}, std::nullopt, std::nullopt);
+  }
+
+  std::shared_ptr<MockClusterInfo> info_;
+};
+
+// With both coalesce_lb_rebuilds_on_batch_update and enable_batch_aware_update enabled, a batch
+// host update touching two priorities is coalesced into a single end-of-batch refresh, so
+// createLoadBalancer() runs exactly once per priority (twice total).
+TEST(ThreadAwareLbBatchRefreshTest, BatchUpdateCoalescesRefreshWhenBothFlagsEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"},
+       {"envoy.reloadable_features.enable_batch_aware_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  PrioritySetImpl priority_set;
+  setHostsForPriority(priority_set, info, 0, "tcp://127.0.0.1:80");
+  setHostsForPriority(priority_set, info, 1, "tcp://127.0.0.2:80");
+
+  RefreshCountingLoadBalancer lb(priority_set, stats, context.runtime_loader_,
+                                 context.api_.random_);
+  EXPECT_OK(lb.initialize());
+  // initialize() performs a single refresh over the two priorities.
+  EXPECT_EQ(2, lb.create_count_);
+
+  lb.create_count_ = 0;
+  TwoPriorityBatchUpdateCb batch_update(info);
+  priority_set.batchHostUpdate(batch_update);
+  // A single coalesced refresh at the end of the batch: one createLoadBalancer() per priority.
+  EXPECT_EQ(2, lb.create_count_);
+}
+
+// When coalesce_lb_rebuilds_on_batch_update is disabled, the factory is refreshed eagerly from the
+// per-priority callback even during a batch, so a two-priority batch triggers two refreshes and
+// createLoadBalancer() runs twice per refresh (four times total).
+TEST(ThreadAwareLbBatchRefreshTest, BatchUpdateRefreshesPerPriorityWhenCoalesceDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "false"},
+       {"envoy.reloadable_features.enable_batch_aware_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  PrioritySetImpl priority_set;
+  setHostsForPriority(priority_set, info, 0, "tcp://127.0.0.1:80");
+  setHostsForPriority(priority_set, info, 1, "tcp://127.0.0.2:80");
+
+  RefreshCountingLoadBalancer lb(priority_set, stats, context.runtime_loader_,
+                                 context.api_.random_);
+  EXPECT_OK(lb.initialize());
+  EXPECT_EQ(2, lb.create_count_);
+
+  lb.create_count_ = 0;
+  TwoPriorityBatchUpdateCb batch_update(info);
+  priority_set.batchHostUpdate(batch_update);
+  // Two eager per-priority refreshes, each rebuilding both priorities.
+  EXPECT_EQ(4, lb.create_count_);
+}
+
+// enable_batch_aware_update alone (without coalesce_lb_rebuilds_on_batch_update) must not coalesce
+// either: both flags are required to defer the refresh.
+TEST(ThreadAwareLbBatchRefreshTest, BatchUpdateRefreshesPerPriorityWhenBatchAwareDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"},
+       {"envoy.reloadable_features.enable_batch_aware_update", "false"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  PrioritySetImpl priority_set;
+  setHostsForPriority(priority_set, info, 0, "tcp://127.0.0.1:80");
+  setHostsForPriority(priority_set, info, 1, "tcp://127.0.0.2:80");
+
+  RefreshCountingLoadBalancer lb(priority_set, stats, context.runtime_loader_,
+                                 context.api_.random_);
+  EXPECT_OK(lb.initialize());
+  EXPECT_EQ(2, lb.create_count_);
+
+  lb.create_count_ = 0;
+  TwoPriorityBatchUpdateCb batch_update(info);
+  priority_set.batchHostUpdate(batch_update);
+  EXPECT_EQ(4, lb.create_count_);
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/44349.
 // Null entries in PriorityState (from non-contiguous priority levels) must not segfault.
 TEST_P(RingHashLoadBalancerTest, ValidateEndpointsSkipsNullPriorityEntries) {

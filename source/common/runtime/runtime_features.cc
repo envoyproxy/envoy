@@ -44,6 +44,14 @@ RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_re
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
+// When enabled, per-priority host updates that arrive during a main-thread batch host update are
+// posted to the worker threads as a single batched cross-thread update at the end of the batch,
+// instead of one post per priority. Combined with
+// `coalesce_lb_rebuilds_on_batch_update`, a thread-aware load balancer (e.g. ring hash, maglev)
+// then also defers its factory rebuild (refresh()) to the single end-of-batch MemberUpdateCb, so
+// the factory is rebuilt before the batched update is posted and a worker cannot snapshot a stale
+// factory after a transient health-check flap.
+RUNTIME_GUARD(envoy_reloadable_features_enable_batch_aware_update);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);

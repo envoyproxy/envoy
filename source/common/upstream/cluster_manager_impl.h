@@ -630,6 +630,17 @@ private:
                        std::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
+      // Applies a set of per-priority host updates to the priority set as a single batch (see
+      // PrioritySetImpl::batchHostUpdate()). Unlike calling updateHosts() once per priority, the
+      // priority set's end-of-batch MemberUpdateCb fires only once for the whole update, so the
+      // worker-local load balancer coalesces its rebuild across all the updated priorities. Used by
+      // the cluster manager when batch-aware updates are enabled. `updates` must not contain
+      // duplicate priorities; an empty `updates` is a no-op.
+      void updateHosts(
+          const std::vector<
+              std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
+          HostMapConstSharedPtr cross_priority_host_map);
+
       // Drains any connection pools associated with the removed hosts. All connections will be
       // closed gracefully and no new connections will be created.
       void drainConnPools(const HostVector& hosts_removed);
@@ -647,6 +658,37 @@ private:
       }
 
     private:
+      // Applies a batch of per-priority host updates to the cluster entry's priority set via
+      // PrioritySet::batchHostUpdate(). See ClusterEntry::updateHosts().
+      class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
+      public:
+        BatchUpdateHelper(
+            const std::vector<
+                std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
+            HostMapConstSharedPtr cross_priority_host_map)
+            : updates_(updates), cross_priority_host_map_(std::move(cross_priority_host_map)) {}
+
+        // PrioritySet::BatchUpdateCb
+        void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+          for (const auto& update : updates_) {
+            const auto& per_priority = update.get();
+            // Copy the update params as they are shared across all worker threads and cannot be
+            // moved from.
+            host_update_cb.updateHosts(
+                per_priority.priority_,
+                PrioritySet::UpdateHostsParams(per_priority.update_hosts_params_),
+                per_priority.locality_weights_, per_priority.hosts_added_,
+                per_priority.hosts_removed_, per_priority.weighted_priority_health_,
+                per_priority.overprovisioning_factor_, cross_priority_host_map_);
+          }
+        }
+
+      private:
+        const std::vector<
+            std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates_;
+        const HostMapConstSharedPtr cross_priority_host_map_;
+      };
+
       Http::ConnectionPool::Instance*
       httpConnPoolImpl(HostConstSharedPtr host, ResourcePriority priority,
                        std::optional<Http::Protocol> downstream_protocol,
@@ -818,6 +860,11 @@ private:
     SystemTime last_updated_;
     Common::CallbackHandlePtr member_update_cb_;
     Common::CallbackHandlePtr priority_update_cb_;
+    // Accumulates per-priority host updates while a batch host update is in progress on the main
+    // thread (see the priority update callback in onClusterInit()). At the end of the batch these
+    // are posted to the worker threads as a single batched update, avoiding one cross-thread post
+    // per priority. Empty outside of a batch update.
+    ThreadLocalClusterUpdateParams pending_batch_update_params_;
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
     const bool avoid_cds_removal_ : 1;
