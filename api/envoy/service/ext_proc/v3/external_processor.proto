@@ -232,12 +232,16 @@ message ProcessingResponse {
   // :ref:`send_body_without_waiting_for_header_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
   // is set to ``true``.
   //
-  // Upon receiving a request headers ProcessingRequest, the server can also override the Envoy ext_proc
-  // processing mode by returning a ProcessingResponse with only this field set. Subsequent ProcessingRequest
-  // and ProcessingResponse messages for headers, body, or trailers will adhere to the new mode.
-  // A ProcessingResponse message carrying a standalone mode_override only supports changing the body
-  // processing mode from STREAMED to FULL_DUPLEX_STREAMED, and the corresponding trailer processing
-  // mode to SEND.
+  // The external processing server can override the processing mode by returning a standalone `mode_override`
+  // in the `ProcessingResponse` after receiving a `ProcessingRequest` for request headers. This standalone
+  // override must be sent before the corresponding `HeadersResponse` for the request headers is sent.
+  // Subsequent messages will adhere to this new mode.
+  //
+  // Constraints:
+  // 1. Request Path: A standalone `mode_override` only supports transitioning the body processing mode from
+  //   `STREAMED` to `FULL_DUPLEX_STREAMED`, and the trailer processing mode must be set to `SEND`.
+  // 2. Response Path: There are no restrictions on processing mode changes in this case.
+  //
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 
   // [#not-implemented-hide:]
