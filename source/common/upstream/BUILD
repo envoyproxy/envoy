@@ -51,16 +51,31 @@ envoy_cc_library(
     hdrs = ["od_cds_api_impl.h"],
     deps = [
         ":cds_api_helper_lib",
+        ":od_cds_cluster_idle_timeout_lib",
+        "//envoy/common:time_interface",
         "//envoy/config:subscription_interface",
+        "//envoy/event:dispatcher_interface",
         "//envoy/protobuf:message_validator_interface",
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:resource_type_helper_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "od_cds_cluster_idle_timeout_lib",
+    srcs = ["od_cds_cluster_idle_timeout.cc"],
+    hdrs = ["od_cds_cluster_idle_timeout.h"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 

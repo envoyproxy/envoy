@@ -161,34 +161,41 @@ public:
 
   static OnDemandCdsConfig
   createOnDemandCdsConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
-                          int timeout_millis) {
+                          int timeout_millis, int cluster_idle_timeout_millis = 0) {
     OnDemandCdsConfig config;
     if (config_source.has_value()) {
       *config.mutable_source() = std::move(config_source.value());
     }
     *config.mutable_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout_millis);
+    if (cluster_idle_timeout_millis > 0) {
+      *config.mutable_cluster_idle_timeout() =
+          ProtobufUtil::TimeUtil::MillisecondsToDuration(cluster_idle_timeout_millis);
+    }
     return config;
   }
 
   template <typename OnDemandConfigType>
   static OnDemandConfigType
   createConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
-               int timeout_millis) {
+               int timeout_millis, int cluster_idle_timeout_millis = 0) {
     OnDemandConfigType on_demand;
-    *on_demand.mutable_odcds() = createOnDemandCdsConfig(std::move(config_source), timeout_millis);
+    *on_demand.mutable_odcds() = createOnDemandCdsConfig(std::move(config_source), timeout_millis,
+                                                         cluster_idle_timeout_millis);
     return on_demand;
   }
 
   static OnDemandConfig
   createOnDemandConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
-                       int timeout_millis) {
-    return createConfig<OnDemandConfig>(std::move(config_source), timeout_millis);
+                       int timeout_millis, int cluster_idle_timeout_millis = 0) {
+    return createConfig<OnDemandConfig>(std::move(config_source), timeout_millis,
+                                        cluster_idle_timeout_millis);
   }
 
   static PerRouteConfig
   createPerRouteConfig(std::optional<envoy::config::core::v3::ConfigSource> config_source,
-                       int timeout_millis) {
-    return createConfig<PerRouteConfig>(std::move(config_source), timeout_millis);
+                       int timeout_millis, int cluster_idle_timeout_millis = 0) {
+    return createConfig<PerRouteConfig>(std::move(config_source), timeout_millis,
+                                        cluster_idle_timeout_millis);
   }
 
   static OptRef<Protobuf::Map<std::string, Protobuf::Any>>
@@ -390,6 +397,120 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", {}, {});
+
+  cleanUpXdsConnection();
+  cleanupUpstreamAndDownstream();
+}
+
+// A cluster discovered via ODCDS and then reclaimed for idle is rediscovered when a later
+// request needs it again.
+TEST_P(OdCdsIntegrationTest, OnDemandClusterRediscoveredAfterIdleTimeout) {
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500,
+                        /*cluster_idle_timeout_millis=*/1000),
+                    "integration", {});
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+
+  // First request: new_cluster is discovered on demand.
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  // new_cluster goes idle and is reclaimed by the idle timeout. Reclamation both removes the
+  // cluster (tearing down its upstream connection) and unsubscribes the resource from ODCDS.
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(1));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"},
+                                           odcds_stream_.get()));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+
+  // A later request to the same cluster re-subscribes and rediscovers it from scratch.
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "2", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  cleanUpXdsConnection();
+  cleanupUpstreamAndDownstream();
+}
+
+// The idle timeout must survive a listener filter-chain update that removes the on_demand
+// filter: the ODCDS subscription (and its reaper) is owned by the ClusterManager, not the filter,
+// so a cluster discovered before the update is still reclaimed afterwards.
+TEST_P(OdCdsIntegrationTest, OnDemandClusterReclaimedAfterListenerFilterChainUpdate) {
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500,
+                        /*cluster_idle_timeout_millis=*/1000),
+                    "integration", {});
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  // Update the listener, removing the on_demand filter from the HTTP filter chain. This tears down
+  // and recreates the filter chain (destroying the on_demand filter's OdCdsApiHandle).
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  new_config_helper.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* filters = hcm.mutable_http_filters();
+    for (int i = 0; i < filters->size(); ++i) {
+      if (filters->Get(i).name() == Extensions::HttpFilters::HttpFilterNames::get().OnDemand) {
+        filters->DeleteSubrange(i, 1);
+        break;
+      }
+    }
+  });
+  new_config_helper.setLds("2");
+  test_server_->waitForCounter("listener_manager.listener_modified", testing::Ge(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", testing::Eq(0));
+
+  // Even though the on_demand filter is gone, the previously-discovered idle cluster is still
+  // reclaimed by the ClusterManager-owned reaper.
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(1));
 
   cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();

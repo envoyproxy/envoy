@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 
@@ -27,9 +29,9 @@ public:
   void SetUp() override {
     envoy::config::core::v3::ConfigSource odcds_config;
     OptRef<xds::core::v3::ResourceLocator> null_locator;
-    odcds_ =
-        *OdCdsApiImpl::create(odcds_config, null_locator, xds_manager_, cm_, notifier_,
-                              *store_.rootScope(), validation_visitor_, server_factory_context_);
+    odcds_ = *OdCdsApiImpl::create(odcds_config, null_locator, xds_manager_, cm_, notifier_,
+                                   *store_.rootScope(), validation_visitor_,
+                                   server_factory_context_, std::chrono::milliseconds::zero());
     odcds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 
