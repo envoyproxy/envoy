@@ -63,8 +63,7 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
                                  .grpcAsyncClientManager()
                                  .getOrCreateRawAsyncClientWithHashKey(
                                      config_with_hash_key, server_context.scope(), true);
-      // TODO(wbpcode): Runtime exception. Fix this to avoid throw.
-      THROW_IF_NOT_OK_REF(client_or_error.status());
+      RELEASE_ASSERT(client_or_error.ok(), "failed to create ext_authz gRPC client");
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           client_or_error.value(), timeout);
       callbacks.addStreamFilter(
