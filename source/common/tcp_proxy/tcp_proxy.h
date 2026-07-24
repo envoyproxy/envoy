@@ -584,7 +584,6 @@ public:
       return makeOptRef<const Tracing::Config>(parent_->tracing_config_);
     }
     void continueDecoding() override {}
-    void setSkipBodyOnNextContinue() override {}
     void addDecodedData(Buffer::Instance&, bool) override {}
     void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
     Http::RequestTrailerMap& addDecodedTrailers() override { return *request_trailer_map_; }
