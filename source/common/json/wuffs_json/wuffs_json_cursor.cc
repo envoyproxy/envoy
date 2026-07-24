@@ -401,7 +401,7 @@ bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segmen
   // never match. Fail loudly in debug builds instead.
   ASSERT(track_paths_, "matchesPatternPath requires track_paths=true at construction");
   // Compares: segment count must equal depth, and each level must agree
-  // in kind (dict vs array) and, for dicts, in whole-label equality.
+  // in kind (object vs array) and, for objects, in whole-label equality.
   if (depth <= 0 || depth >= kMaxTrackedDepth || static_cast<int>(segments.size()) != depth) {
     return false;
   }
