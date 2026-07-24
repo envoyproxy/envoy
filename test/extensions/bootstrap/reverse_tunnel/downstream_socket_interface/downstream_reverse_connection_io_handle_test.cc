@@ -57,6 +57,9 @@ protected:
     // Create the socket interface.
     socket_interface_ = std::make_unique<ReverseTunnelInitiator>(context_);
 
+    config_.set_stat_prefix("reverse_connections");
+    config_.set_enable_detailed_stats(true);
+
     // Create the extension.
     extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
 
@@ -107,6 +110,8 @@ protected:
   std::unique_ptr<ReverseTunnelInitiator> socket_interface_;
   std::unique_ptr<ReverseTunnelInitiatorExtension> extension_;
   std::unique_ptr<ReverseConnectionIOHandle> io_handle_;
+  std::unique_ptr<ThreadLocal::TypedSlot<DownstreamSocketThreadLocal>> tls_slot_;
+  std::shared_ptr<DownstreamSocketThreadLocal> thread_local_registry_;
 
   // Mock cluster manager.
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -166,6 +171,31 @@ protected:
                                                                  connection_key);
   }
 
+  void setupThreadLocalSlot() {
+    thread_local_registry_ =
+        std::make_shared<DownstreamSocketThreadLocal>(dispatcher_, *stats_scope_);
+    tls_slot_ = ThreadLocal::TypedSlot<DownstreamSocketThreadLocal>::makeUnique(thread_local_);
+    thread_local_.setDispatcher(&dispatcher_);
+    tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
+    extension_->setTestOnlyTLSRegistry(std::move(tls_slot_));
+  }
+
+  void addConnectedTunnel(const std::string& host, const std::string& cluster,
+                          const std::string& connection_key) {
+    io_handle_->host_to_conn_info_map_[host] = ReverseConnectionIOHandle::HostConnectionInfo{
+        host,
+        cluster,
+        {},
+        1,
+        0,
+        std::chrono::steady_clock::now(), // NO_CHECK_FORMAT(real_time)
+        std::chrono::steady_clock::time_point{},
+        {}};
+    io_handle_->host_to_conn_info_map_[host].connection_keys.insert(connection_key);
+    io_handle_->updateConnectionState(host, cluster, connection_key,
+                                      ReverseConnectionState::Connected);
+  }
+
   // Test fixtures.
   std::unique_ptr<NiceMock<Network::MockConnectionSocket>> mock_socket_;
   NiceMock<Network::MockIoHandle>* mock_io_handle_; // Raw pointer, managed by socket
@@ -199,6 +229,22 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ParentTeardownDetachesChild) {
   // Destroying the parent runs cleanup(), which detaches its registered children.
   io_handle_.reset();
   EXPECT_EQ(child->parent(), nullptr);
+}
+
+TEST_F(DownstreamReverseConnectionIOHandleTest, DestructorDecrementsConnectedGauge) {
+  setupThreadLocalSlot();
+
+  const std::string host = "192.168.1.1";
+  const std::string cluster = "test-cluster";
+  const std::string connection_key = "192.168.1.1:12345";
+  addConnectedTunnel(host, cluster, connection_key);
+
+  auto handle = createHandle(io_handle_.get(), connection_key);
+  handle.reset();
+
+  const auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map.at("test_scope.reverse_connections.host.192.168.1.1.connected"), 0);
+  EXPECT_EQ(stat_map.at("test_scope.reverse_connections.cluster.test-cluster.connected"), 0);
 }
 
 // Test close() method and all edge cases.

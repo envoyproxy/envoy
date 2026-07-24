@@ -86,6 +86,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
             connection_->id());
   connection_->addConnectionCallbacks(*this);
   connection_->connect();
+  connection_key_ = connection_->connectionInfoProvider().localAddress()->asString();
 
   // Use HTTP handshake.
   ENVOY_LOG(debug,
@@ -213,7 +214,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
     onHandshakeFailure(HandshakeFailureReason::encodeError());
   }
 
-  return connection_->connectionInfoProvider().localAddress()->asString();
+  return connection_key_;
 }
 
 void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool) {
