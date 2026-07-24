@@ -1008,9 +1008,6 @@ void ListenerManagerImpl::drainGroup(
 void ListenerManagerImpl::drainFilterChains(
     ListenerImpl& listener,
     std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains) {
-  if (draining_filter_chains.empty()) {
-    return;
-  }
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
                                               std::move(draining_filter_chains),

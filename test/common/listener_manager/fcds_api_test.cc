@@ -66,7 +66,7 @@ public:
                              Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
                              Config::OpaqueResourceDecoderSharedPtr,
                              const Config::SubscriptionOptions&) mutable
-                         -> absl::StatusOr<Config::SubscriptionPtr> {
+                             -> absl::StatusOr<Config::SubscriptionPtr> {
           fcds_callbacks_ = &callbacks;
           return std::move(subscription);
         }));
@@ -75,7 +75,7 @@ public:
     fcds_api_ = std::make_unique<FcdsApiImpl>(fcds_config.config_source(), filter_chain_name,
                                               callbacks_, cluster_manager_, scope_,
                                               validation_visitor_, creation_status);
-    EXPECT_TRUE(creation_status.ok());
+    EXPECT_OK(creation_status);
     init_manager_.add(fcds_api_->initTarget());
     init_manager_.initialize(init_watcher_);
   }
@@ -110,15 +110,15 @@ TEST_F(FcdsApiTest, OnConfigUpdateDecodesAndPropagates) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
 
   EXPECT_EQ(fcds_api_->filterChain(), nullptr);
-  EXPECT_TRUE(
-      fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1").ok());
+  EXPECT_OK(
+      fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
   EXPECT_EQ(fcds_api_->versionInfo(), "v1");
   // Still warming.
   EXPECT_EQ(fcds_api_->filterChain(), nullptr);
 
   // Ensure the idempotent update does not trigger a callback.
-  EXPECT_TRUE(
-      fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1").ok());
+  EXPECT_OK(
+      fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
 
   // Destruction unblocks the watcher.
   EXPECT_CALL(init_watcher_, ready());
@@ -137,7 +137,7 @@ TEST_F(FcdsApiTest, OnConfigUpdateRemoved) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add("chain-1");
 
-  EXPECT_TRUE(fcds_callbacks_->onConfigUpdate({}, removed_resources, "v2").ok());
+  EXPECT_OK(fcds_callbacks_->onConfigUpdate({}, removed_resources, "v2"));
   EXPECT_EQ(fcds_api_->versionInfo(), "v2");
   EXPECT_EQ(fcds_api_->filterChain(), nullptr);
 }
@@ -157,7 +157,7 @@ TEST_F(FcdsApiTest, OnConfigUpdateSotw) {
 
   const auto decoded_resources = TestUtility::decodeResources({filter_chain});
 
-  EXPECT_TRUE(fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1").ok());
+  EXPECT_OK(fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1"));
   EXPECT_EQ(fcds_api_->versionInfo(), "v1");
   // Destruction unblocks the watcher.
   EXPECT_CALL(init_watcher_, ready());
@@ -168,7 +168,7 @@ TEST_F(FcdsApiTest, OnConfigUpdateRemovedSotw) {
 
   EXPECT_EQ(fcds_api_->filterChain(), nullptr);
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_TRUE(fcds_callbacks_->onConfigUpdate({}, "v2").ok());
+  EXPECT_OK(fcds_callbacks_->onConfigUpdate({}, "v2"));
   EXPECT_EQ(fcds_api_->versionInfo(), "v2");
   EXPECT_EQ(fcds_api_->filterChain(), nullptr);
 }
@@ -228,6 +228,22 @@ TEST_F(FcdsApiTest, ErrorRemoveBadName) {
   EXPECT_THAT(fcds_callbacks_->onConfigUpdate({}, removed_resources, "v1"),
               HasStatus(absl::StatusCode::kInvalidArgument,
                         HasSubstr("invalid removed filter chain name")));
+}
+
+TEST_F(FcdsApiTest, ErrorXdsFailureUnblocks) {
+  setup("chain-1");
+
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("chain-1");
+  auto* filter = filter_chain.add_filters();
+  filter->set_name("http");
+  const auto decoded_resources = TestUtility::decodeResources({filter_chain});
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add("chain-2");
+
+  EXPECT_CALL(init_watcher_, ready());
+  EnvoyException dummy_ex("dummy exception");
+  fcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, &dummy_ex);
 }
 
 } // namespace

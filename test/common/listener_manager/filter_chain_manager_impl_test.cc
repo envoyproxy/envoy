@@ -182,12 +182,11 @@ TEST_P(FilterChainManagerImplTest, FilterChainMatchNothing) {
 TEST_P(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
   envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
   new_filter_chain.mutable_filter_chain_match()->add_server_names("foo.EXAMPLE.com");
-  EXPECT_OK(filter_chain_manager_
-                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
-                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
-                                        &new_filter_chain},
-                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
-                                    nullptr, empty_config_source_, dummy_fcds_callbacks_));
+  EXPECT_OK(filter_chain_manager_->addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&new_filter_chain}, nullptr,
+      filter_chain_factory_builder_, *filter_chain_manager_, nullptr, empty_config_source_,
+      dummy_fcds_callbacks_));
   auto filter_chain =
       findFilterChainHelper(10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
@@ -232,12 +231,12 @@ TEST_P(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage)
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(2);
-  EXPECT_OK(filter_chain_manager_
-                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
-                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
-                                        &filter_chain_messages[0], &filter_chain_messages[1]},
-                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
-                                    nullptr, empty_config_source_, dummy_fcds_callbacks_));
+  EXPECT_OK(filter_chain_manager_->addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0],
+                                                                   &filter_chain_messages[1]},
+      nullptr, filter_chain_factory_builder_, *filter_chain_manager_, nullptr, empty_config_source_,
+      dummy_fcds_callbacks_));
 }
 
 TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
@@ -252,22 +251,22 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
   }
 
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
-  EXPECT_OK(filter_chain_manager_
-                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
-                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
-                                        &filter_chain_messages[0]},
-                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
-                                    nullptr, empty_config_source_, dummy_fcds_callbacks_))
+  EXPECT_OK(filter_chain_manager_->addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0]},
+      nullptr, filter_chain_factory_builder_, *filter_chain_manager_, nullptr, empty_config_source_,
+      dummy_fcds_callbacks_));
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
   // The new filter chain manager maintains 3 filter chains, but only 2 filter chain context is
   // built because it reuse the filter chain context in the previous filter chain manager
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(2);
-  EXPECT_OK(new_filter_chain_manager
-                  .addFilterChains(GetParam() ? &matcher_ : nullptr,
-                                   std::vector<const envoy::config::listener::v3::FilterChain*>{
-                                       &filter_chain_messages[0], &filter_chain_messages[1],
-                                       &filter_chain_messages[2]},
-                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager,
-                                   nullptr, empty_config_source_, dummy_fcds_callbacks_));
+  EXPECT_OK(new_filter_chain_manager.addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{
+          &filter_chain_messages[0], &filter_chain_messages[1], &filter_chain_messages[2]},
+      nullptr, filter_chain_factory_builder_, new_filter_chain_manager, nullptr,
+      empty_config_source_, dummy_fcds_callbacks_));
 }
 
 TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
@@ -283,22 +282,20 @@ TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
   auto filter_chain = std::make_shared<Network::MockFilterChain>();
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
       .WillOnce(Return(filter_chain));
-  EXPECT_OK(filter_chain_manager_
-                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
-                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
-                                        &filter_chain_messages[0]},
-                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
-                                    nullptr, empty_config_source_, dummy_fcds_callbacks_));
+  EXPECT_OK(filter_chain_manager_->addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0]},
+      nullptr, filter_chain_factory_builder_, *filter_chain_manager_, nullptr, empty_config_source_,
+      dummy_fcds_callbacks_));
 
   FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
                                                   *filter_chain_manager_};
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
-  EXPECT_OK(new_filter_chain_manager
-                  .addFilterChains(GetParam() ? &matcher_ : nullptr,
-                                   std::vector<const envoy::config::listener::v3::FilterChain*>{
-                                       &filter_chain_messages[1]},
-                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager,
-                                   nullptr, empty_config_source_, dummy_fcds_callbacks_));
+  EXPECT_OK(new_filter_chain_manager.addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[1]},
+      nullptr, filter_chain_factory_builder_, new_filter_chain_manager, nullptr,
+      empty_config_source_, dummy_fcds_callbacks_));
 
   // The new filter chain manager is based on the previous filter chain manager, but it has a new
   // filter chain that is not in the previous filter chain manager, so we expect the previous
@@ -416,7 +413,7 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
                            Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
                            Config::OpaqueResourceDecoderSharedPtr,
                            const Config::SubscriptionOptions&) mutable
-                       -> absl::StatusOr<Config::SubscriptionPtr> {
+                           -> absl::StatusOr<Config::SubscriptionPtr> {
         fcds_callbacks = &callbacks;
         return std::move(subscription);
       }));
@@ -442,8 +439,7 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
   const auto decoded_resources = TestUtility::decodeResources({filter_chain});
   Protobuf::RepeatedPtrField<std::string> removed_resources;
 
-  EXPECT_OK(
-      fcds_callbacks->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
+  EXPECT_OK(fcds_callbacks->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
 
   const Network::FilterChain* active_chain =
       fcds_shared_manager->findThreadLocalFilterChain(filter_chain_name);
@@ -465,8 +461,7 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
       }));
 
   const auto decoded_resources_v2 = TestUtility::decodeResources({filter_chain_v2});
-  EXPECT_OK(
-      fcds_callbacks->onConfigUpdate(decoded_resources_v2.refvec_, removed_resources, "v2"));
+  EXPECT_OK(fcds_callbacks->onConfigUpdate(decoded_resources_v2.refvec_, removed_resources, "v2"));
 
   EXPECT_EQ(drained_chain.get(), active_chain);
 
