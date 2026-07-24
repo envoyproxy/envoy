@@ -311,7 +311,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-07-15"
+  release_date: "2026-07-22"
   use_category:
   - controlplane
   - dataplane_core
@@ -333,7 +333,7 @@ com_github_grpc_grpc:
   project_name: "gRPC"
   project_desc: "gRPC C core library"
   project_url: "https://grpc.io"
-  release_date: "2026-06-08"
+  release_date: "2026-07-22"
   use_category:
   - dataplane_core
   - controlplane
@@ -827,7 +827,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-06-10"
+  release_date: "2026-07-23"
   use_category:
   - build
   - controlplane
@@ -1038,7 +1038,7 @@ opentelemetry_cpp:
   project_name: "OpenTelemetry"
   project_desc: "Observability framework and toolkit designed to create and manage telemetry data such as traces, metrics, and logs."
   project_url: "https://opentelemetry.io"
-  release_date: "2026-05-13"
+  release_date: "2026-07-16"
   use_category:
   - observability_ext
   extensions:
