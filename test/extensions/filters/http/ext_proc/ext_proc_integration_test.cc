@@ -4907,7 +4907,7 @@ TEST_P(ExtProcIntegrationTest, RequestHeaderModeIgnoredInModeOverrideComparison)
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, StandAloneModeOverride) {
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideNormal) {
   LogLevelSetter save_levels(spdlog::level::trace);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
@@ -4944,6 +4944,116 @@ TEST_P(ExtProcIntegrationTest, StandAloneModeOverride) {
                                 ->mutable_body_mutation()
                                 ->mutable_streamed_response();
   streamed_response->set_body(body_str);
+  streamed_response->set_end_of_stream(true);
+  processor_stream_->sendGrpcMessage(resp_body);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithTrailers) {
+  LogLevelSetter save_levels(spdlog::level::trace);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = "hello world";
+  auto response = sendDownstreamRequestWithBodyAndTrailer(body_str);
+
+  // Process request headers message and send back only mode_override (no response_case set).
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_request_headers());
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+        return true;
+      });
+
+  ProcessingRequest request;
+  // First, ext_proc server receives the body message since processing body mode transitioned
+  // to FULL_DUPLEX_STREAMED.
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  EXPECT_TRUE(request.has_request_body());
+  EXPECT_FALSE(request.request_body().end_of_stream());
+
+  // Next, ext_proc server receives the trailers message since request trailer mode transitioned to SEND.
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  EXPECT_TRUE(request.has_request_trailers());
+
+  // The server sends back the header response first:
+  ProcessingResponse resp_headers;
+  resp_headers.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp_headers);
+
+  // Then, it streams back the body responses:
+  ProcessingResponse resp_body;
+  auto* streamed_response = resp_body.mutable_request_body()
+                                ->mutable_response()
+                                ->mutable_body_mutation()
+                                ->mutable_streamed_response();
+  streamed_response->set_body(body_str);
+  streamed_response->set_end_of_stream(false);
+  processor_stream_->sendGrpcMessage(resp_body);
+
+  // Send trailers response
+  ProcessingResponse resp_trailers;
+  resp_trailers.mutable_request_trailers();
+  processor_stream_->sendGrpcMessage(resp_trailers);
+
+  handleUpstreamRequestWithTrailer();
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithEmptyBody) {
+  LogLevelSetter save_levels(spdlog::level::trace);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("POST");
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Send empty data frame with end_stream = true
+  codec_client_->sendData(*request_encoder_, "", true);
+
+  // Process request headers message and send back only mode_override (no response_case set).
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_request_headers());
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+        return true;
+      });
+
+  ProcessingRequest request;
+  // ext_proc server receives the empty body message since processing body mode transitioned
+  // to FULL_DUPLEX_STREAMED, and end_stream is true!
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  EXPECT_TRUE(request.has_request_body());
+  EXPECT_TRUE(request.request_body().end_of_stream());
+  EXPECT_EQ(0, request.request_body().body().size());
+
+  // The server sends back the header response first:
+  ProcessingResponse resp_headers;
+  resp_headers.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp_headers);
+
+  // Then, it streams back the empty body response:
+  ProcessingResponse resp_body;
+  auto* streamed_response = resp_body.mutable_request_body()
+                                ->mutable_response()
+                                ->mutable_body_mutation()
+                                ->mutable_streamed_response();
   streamed_response->set_end_of_stream(true);
   processor_stream_->sendGrpcMessage(resp_body);
 
