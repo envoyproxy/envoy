@@ -639,12 +639,6 @@ public:
   virtual void continueDecoding() PURE;
 
   /**
-   * When called before continueDecoding(), causes the next commonContinue() invocation to skip
-   * the doData() step.
-   */
-  virtual void setSkipBodyOnNextContinue() PURE;
-
-  /**
    * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
    *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */
