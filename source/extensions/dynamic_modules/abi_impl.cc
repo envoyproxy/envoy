@@ -4864,6 +4864,22 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_get_fil
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_set_filter_state_typed: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_filter_state_typed: not "
+               "implemented in this context");
+  return false;
+}
+
 // ---------------------- Health Checker callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the health checker abi_impl.cc when the health checker extension is used.
