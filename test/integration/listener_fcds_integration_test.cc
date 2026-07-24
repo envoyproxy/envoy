@@ -172,21 +172,26 @@ public:
 
   void waitXdsStream() { waitXdsStream({listener_config_}); }
 
-  void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& listeners,
-                       const std::string& version) {
+  void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
+                       const std::vector<std::string>& removed, const std::string& version) {
     if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
         this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      sendDeltaDiscoveryResponse(Config::TestTypeUrl::get().Listener, listeners, {}, version,
-                                 lds_stream_.get());
+      sendDeltaDiscoveryResponse(Config::TestTypeUrl::get().Listener, added_or_updated, removed,
+                                 version, lds_stream_.get());
     } else {
       envoy::service::discovery::v3::DiscoveryResponse response;
       response.set_version_info(version);
       response.set_type_url(Config::TestTypeUrl::get().Listener);
-      for (const auto& listener : listeners) {
+      for (const auto& listener : added_or_updated) {
         std::ignore = response.add_resources()->PackFrom(listener);
       }
       lds_stream_->sendGrpcMessage(response);
     }
+  }
+
+  void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& listeners,
+                       const std::string& version) {
+    sendLdsResponse(listeners, {}, version);
   }
 
   void sendLdsResponse(const std::string& version) { sendLdsResponse({listener_config_}, version); }
@@ -455,6 +460,87 @@ TEST_P(ListenerFcdsIntegrationTest, LdsUpdateWithFcds) {
   EXPECT_EQ("200", response2->headers().getStatusValue());
   EXPECT_EQ("fcds body", response2->body());
   codec_client2->close();
+}
+
+TEST_P(ListenerFcdsIntegrationTest, LdsRemovalWithSharedFcds) {
+  // Use HTTP2 to test GOAWAY behavior.
+  downstream_protocol_ = Http::CodecType::HTTP2;
+
+  // Set a very short drain time so the test doesn't take long.
+  setDrainTime(std::chrono::seconds(2));
+
+  two_listeners_ = true;
+  on_server_init_function_ = [&]() {
+    waitXdsStream({listener_config_, listener_config2_});
+    // Resolve warming by sending FCDS response with 200 direct response config.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+
+  // Wait for BOTH listeners to be active and listening.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  registerTestServerPorts({listener_name_, "testing-listener-1"});
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  // Establish connection to Listener A (listener_name_).
+  IntegrationCodecClientPtr codec_client_a = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response_a = codec_client_a->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response_a->waitForEndStream());
+  EXPECT_EQ("200", response_a->headers().getStatusValue());
+
+  // Establish connection to Listener B (testing-listener-1).
+  IntegrationCodecClientPtr codec_client_b = makeHttpConnection(lookupPort("testing-listener-1"));
+  IntegrationStreamDecoderPtr response_b = codec_client_b->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response_b->waitForEndStream());
+  EXPECT_EQ("200", response_b->headers().getStatusValue());
+
+  const bool is_delta = (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                         this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta);
+
+  // Perform LDS update removing Listener A (listener_name_).
+  if (is_delta) {
+    sendLdsResponse({}, {listener_config_.name()}, "2");
+  } else {
+    sendLdsResponse({listener_config2_}, {}, "2");
+  }
+
+  // Wait for LDS update success.
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
+
+  // In both SotW and Delta, only Listener A is removed (or omitted).
+  // Listener B is untouched because its config is identical and blockLdsUpdate now blocks it.
+  // So only Listener A goes to draining.
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(1));
+
+  // Make a second request on Listener A's connection.
+  // Without the fix, this request should succeed and we should NOT see GOAWAY
+  // because the FCDS filter chain's shared context is not set to draining.
+  IntegrationStreamDecoderPtr response_a2 = codec_client_a->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response_a2->waitForEndStream());
+  EXPECT_EQ("200", response_a2->headers().getStatusValue());
+  EXPECT_FALSE(codec_client_a->sawGoAway());
+
+  // Eventually, after 2s drain timeout, the listener is destroyed and connection is closed.
+  // We wait up to 10s to be safe.
+  ASSERT_TRUE(codec_client_a->waitForDisconnect(std::chrono::seconds(10)));
+
+  // Make a second request on Listener B's connection.
+  IntegrationStreamDecoderPtr response_b2 = codec_client_b->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response_b2->waitForEndStream());
+  EXPECT_EQ("200", response_b2->headers().getStatusValue());
+  EXPECT_FALSE(codec_client_b->sawGoAway());
+
+  // Wait for draining listeners to drop to 0.
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
+
+  // Connection B must still be connected.
+  EXPECT_TRUE(codec_client_b->connected());
+
+  if (codec_client_b->connected()) {
+    codec_client_b->close();
+  }
 }
 
 class ListenerFcdsRdsIntegrationTest : public ListenerFcdsIntegrationTest {

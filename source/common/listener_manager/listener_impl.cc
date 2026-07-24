@@ -1191,12 +1191,6 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
-  // If FCDS is used, LDS updates will cause full listener update. It's expected that if FCDS is
-  // used, dynamic filter chain updates will be applied using FCDS rather than LDS.
-  if (configInternal().has_fcds_config()) {
-    return false;
-  }
-
   // Full listener update currently rejects tcp listener having 0 filter chain.
   // In place filter chain update could survive under zero filter chain but we should keep the
   // same behavior for now. This also guards the below filter chain access.

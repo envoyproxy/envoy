@@ -255,10 +255,7 @@ public:
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
   bool blockLdsUpdate(uint64_t new_hash) {
-    // Receiving LDS update with FCDS config will cause full listener update. Therefore,
-    // we should not block the update if FCDS is configured, regardless of the hash.
-    return (!configInternal().has_fcds_config() && new_hash == maybe_stale_hash_) ||
-           !added_via_api_;
+    return (new_hash == maybe_stale_hash_) || !added_via_api_;
   }
   bool blockRemove() { return !added_via_api_; }
 
