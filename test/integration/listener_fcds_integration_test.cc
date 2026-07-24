@@ -221,6 +221,14 @@ public:
     return filter_chain;
   }
 
+  envoy::config::listener::v3::FilterChain buildInvalidFilterChain(const std::string& name) {
+    envoy::config::listener::v3::FilterChain filter_chain;
+    filter_chain.set_name(name);
+    auto* filter = filter_chain.add_filters();
+    filter->set_name("envoy.filters.network.does_not_exist");
+    return filter_chain;
+  }
+
   void
   sendFcdsResponse(const std::vector<envoy::config::listener::v3::FilterChain>& added_or_updated,
                    const std::vector<std::string>& removed, const std::string& version) {
@@ -420,6 +428,33 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
 
   // The connection should be closed.
   ASSERT_TRUE(codec_client2->waitForDisconnect(std::chrono::seconds(5)));
+}
+
+// Tests that FCDS update failure during warming completes LDS warming
+// and new connections are rejected because there are no filter chains.
+TEST_P(ListenerFcdsIntegrationTest, FcdsUpdateFailureAndLdsUnwarming) {
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Resolve warming by sending FCDS response with invalid filter chain.
+    // This should cause validation failure and trigger onConfigUpdateFailed.
+    sendFcdsResponse({buildInvalidFilterChain("dynamic_filter_chain_1")}, "1");
+  };
+  initialize();
+
+  // Wait for the listener to be created. It should succeed despite FCDS failure
+  // because FCDS ready() is called on failure.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Try to connect. We expect it to be rejected because there are no filter chains.
+  IntegrationCodecClientPtr codec_client = makeRawHttpConnection(
+      makeClientConnection(lookupPort(listener_name_)), std::nullopt, std::nullopt, false);
+
+  // Wait for the no_filter_chain_match counter to increment.
+  test_server_->waitForCounter(listenerStatPrefix("no_filter_chain_match"), Ge(1));
+
+  // The connection should be closed.
+  ASSERT_TRUE(codec_client->waitForDisconnect(std::chrono::seconds(5)));
 }
 
 // Tests that a listener update via LDS (which triggers a full listener update)
