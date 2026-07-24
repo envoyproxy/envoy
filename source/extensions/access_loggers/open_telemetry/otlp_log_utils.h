@@ -6,6 +6,7 @@
 
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/formatter/http_formatter_context.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
@@ -93,7 +94,8 @@ std::vector<std::string> getFilterStateObjectsToLog(
 
 std::vector<Tracing::CustomTagConstSharedPtr> getCustomTags(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
-        config);
+        config,
+    const Formatter::CommandParserPtrVector& command_parsers = {});
 
 void addFilterStateToAttributes(const StreamInfo::StreamInfo& stream_info,
                                 const std::vector<std::string>& filter_state_objects_to_log,

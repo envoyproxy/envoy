@@ -222,7 +222,7 @@ HttpAccessLog::HttpAccessLog(
     : Common::ImplBase(std::move(filter)), tls_slot_(server_context.threadLocal().allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)), http_service_(config.http_service()),
       filter_state_objects_to_log_(getFilterStateObjectsToLog(config)),
-      custom_tags_(getCustomTags(config)) {
+      custom_tags_(getCustomTags(config, commands)) {
 
   // Get or create the headers applicator on the main thread. This is required because
   // DataSourceProvider (used by FILE_CONTENT formatter) allocates TLS slots,
