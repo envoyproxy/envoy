@@ -248,7 +248,10 @@ std::unique_ptr<HotRestartMessage> RpcStream::receiveHotRestartMessage(Blocking 
       expected_proto_length_ = be64toh(*reinterpret_cast<uint64_t*>(recv_buf_.data()));
       // Expand the buffer from its default 4096 if this message is going to be longer.
       if (expected_proto_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
-        recv_buf_.resize(expected_proto_length_.value() + sizeof(uint64_t));
+        const uint64_t new_size = expected_proto_length_.value() + sizeof(uint64_t);
+        RELEASE_ASSERT(new_size > expected_proto_length_.value(),
+                       "hot restart message length overflow");
+        recv_buf_.resize(new_size);
         cur_msg_recvd_bytes_ = recv_result.return_value_;
       }
     }
