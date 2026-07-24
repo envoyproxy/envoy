@@ -236,7 +236,8 @@ message ProcessingResponse {
   // processing mode by returning a ProcessingResponse with only this field set. Subsequent ProcessingRequest
   // and ProcessingResponse messages for headers, body, or trailers will adhere to the new mode.
   // A ProcessingResponse message carrying a standalone mode_override only supports changing the body
-  // processing mode from STREAMED to FULL_DUPLEX_STREAMED.
+  // processing mode from STREAMED to FULL_DUPLEX_STREAMED, and the corresponding trailer processing
+  // mode to SEND.
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 
   // [#not-implemented-hide:]
