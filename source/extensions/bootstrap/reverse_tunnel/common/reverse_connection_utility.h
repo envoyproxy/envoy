@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
@@ -54,6 +55,13 @@ public:
   static std::string buildTenantScopedIdentifier(absl::string_view tenant,
                                                  absl::string_view identifier);
 
+  // Build the reverse-tunnel host key "[tenant:]cluster:node" from the scoped node and cluster ids.
+  static std::string buildClusterScopedIdentifier(absl::string_view node_id,
+                                                  absl::string_view cluster_id);
+
+  // Inverse of buildClusterScopedIdentifier: the tenant-scoped {node_id, cluster_id}.
+  static std::pair<std::string, std::string> splitClusterScopedIdentifier(absl::string_view value);
+
   static void applySslQuietClose(Network::Connection& conn);
 
   /**
@@ -64,6 +72,8 @@ public:
    */
   static uint64_t addJitter(uint64_t interval_ms, uint64_t jitter_percent,
                             Random::RandomGenerator& random);
+
+  static uint64_t diffMs(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end);
 
 private:
   ReverseConnectionUtility() = delete;

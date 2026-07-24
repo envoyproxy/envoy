@@ -115,8 +115,17 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
   return std::make_unique<FixedHttpConnPoolImpl>(
       std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
       random_generator, state,
-      [](HttpConnPoolImplBase* pool) {
-        return std::make_unique<ActiveClient>(*pool, std::nullopt);
+      [](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+        // Create the connection up front so a failure (e.g. network namespace binding failure)
+        // surfaces as a graceful connection failure rather than a crash when initializing the
+        // client with a null connection.
+        Upstream::Host::CreateConnectionData data =
+            static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(pool)->host()->createConnection(
+                pool->dispatcher(), pool->socketOptions(), pool->transportSocketOptions());
+        if (data.connection_ == nullptr) {
+          return nullptr;
+        }
+        return std::make_unique<ActiveClient>(*pool, makeOptRef(data));
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(

@@ -15,5 +15,6 @@ envoy_cc_test(
     deps = [
         "//source/common/local_info:local_info_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )

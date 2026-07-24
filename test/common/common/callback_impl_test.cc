@@ -4,6 +4,7 @@
 #include "source/common/common/callback_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -33,11 +34,11 @@ TEST_F(CallbackManagerTest, All) {
 
   EXPECT_CALL(*this, called(5));
   EXPECT_CALL(*this, called(10));
-  ASSERT_TRUE(manager.runCallbacks(5).ok());
+  ASSERT_OK(manager.runCallbacks(5));
 
   handle1.reset();
   EXPECT_CALL(*this, called(10));
-  ASSERT_TRUE(manager.runCallbacks(5).ok());
+  ASSERT_OK(manager.runCallbacks(5));
 
   EXPECT_CALL(*this, called(10));
   EXPECT_CALL(*this, called(20));
@@ -46,10 +47,10 @@ TEST_F(CallbackManagerTest, All) {
     handle3.reset();
     return absl::OkStatus();
   });
-  ASSERT_TRUE(manager.runCallbacks(5).ok());
+  ASSERT_OK(manager.runCallbacks(5));
 
   EXPECT_CALL(*this, called(10));
-  ASSERT_TRUE(manager.runCallbacks(5).ok());
+  ASSERT_OK(manager.runCallbacks(5));
 }
 
 TEST_F(CallbackManagerTest, DestroyManagerBeforeHandle) {
@@ -61,7 +62,7 @@ TEST_F(CallbackManagerTest, DestroyManagerBeforeHandle) {
       return absl::OkStatus();
     });
     EXPECT_CALL(*this, called(5));
-    ASSERT_TRUE(manager.runCallbacks(5).ok());
+    ASSERT_OK(manager.runCallbacks(5));
   }
   EXPECT_NE(nullptr, handle);
   // It should be safe to destruct the handle after the manager.

@@ -7,6 +7,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -52,7 +53,7 @@ TEST_F(FilterChainTest, CreateFilterChain) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
@@ -87,7 +88,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
@@ -160,7 +161,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   Http::StreamDecoderFilterSharedPtr missing_config_filter;
@@ -188,7 +189,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -238,7 +239,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -307,7 +308,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   {
     NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;

@@ -5,6 +5,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/geoip/geoip_filter.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,9 +24,9 @@ absl::Status validateConfig(const envoy::extensions::filters::http::geoip::v3::G
 }
 } // namespace
 
-absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactory(
     const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stat_prefix, Server::Configuration::GenericFactoryContext& context) {
   // Validate configuration before creating the filter.
   auto status = validateConfig(proto_config);
   if (!status.ok()) {
@@ -41,10 +42,24 @@ absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactoryFro
           provider_config);
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
       provider_config, context.messageValidationVisitor(), geo_provider_factory);
-  auto driver = geo_provider_factory.createGeoipProviderDriver(*message, stat_prefix, context);
+  auto driver = geo_provider_factory.createGeoipProviderDriver(*message, stat_prefix,
+                                                               context.serverFactoryContext());
   return [filter_config, driver](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<GeoipFilter>(filter_config, driver));
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
+    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto_config, stat_prefix, context);
+}
+
+absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
+    const std::string& stat_prefix, Server::Configuration::ServerFactoryContext& context) {
+  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+  return createFilterFactory(proto_config, stat_prefix, generic_context);
 }
 
 /**

@@ -86,7 +86,7 @@ public:
   void initializeFilter(bool emit_dynamic_metadata = false) {
     filter_ = std::make_unique<TestProxyFilter>(
         "test.", *store_.rootScope(), runtime_, access_log_, fault_config_, drain_decision_,
-        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_);
+        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_, 100);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 

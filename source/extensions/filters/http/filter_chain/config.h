@@ -15,15 +15,15 @@ namespace FilterChain {
  * Config registration for the filter chain filter. @see NamedHttpFilterConfigFactory.
  */
 class FilterChainFilterFactory
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::filter_chain::v3::FilterChainConfig,
           envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute>,
       public Logger::Loggable<Logger::Id::filter> {
 public:
-  FilterChainFilterFactory() : FactoryBase("envoy.filters.http.filter_chain") {}
+  FilterChainFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.filter_chain") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfig& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 

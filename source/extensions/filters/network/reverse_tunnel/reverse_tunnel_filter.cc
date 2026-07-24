@@ -32,14 +32,7 @@ namespace ReverseTunnel {
 namespace {
 
 Extensions::Bootstrap::ReverseConnection::UpstreamSocketManager* getThreadLocalSocketManager() {
-  auto* base_interface =
-      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-  if (base_interface == nullptr) {
-    return nullptr;
-  }
-  const auto* acceptor =
-      dynamic_cast<const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor*>(
-          base_interface);
+  const auto* acceptor = getAcceptor();
   if (acceptor == nullptr) {
     return nullptr;
   }
@@ -169,11 +162,32 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
               : "envoy.filters.network.reverse_tunnel"),
       required_cluster_name_(proto_config.required_cluster_name()),
       use_http_upgrade_(proto_config.use_http_upgrade()),
-      skip_rebalancing_(proto_config.skip_rebalancing()) {}
+      skip_rebalancing_(proto_config.skip_rebalancing()),
+      enable_connection_limit_(proto_config.enable_connection_limit()) {}
+
+bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_id,
+                                                        absl::string_view tenant_id) const {
+  if (!enable_connection_limit_) {
+    return true;
+  }
+
+  if (auto socket_manager = getThreadLocalSocketManager()) {
+    return socket_manager->canAcceptConnection(node_id, tenant_id);
+  }
+  ENVOY_LOG(warn,
+            "reverse_tunnel: no socket manager found with connection limit enabled, rejecting.");
+  return false;
+}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
     const StreamInfo::StreamInfo& stream_info) const {
+
+  if (!validateConnectionLimit(node_id, tenant_id)) {
+    ENVOY_LOG(debug, "reverse_tunnel: connection limit reached. node_id: {}, tenant_id: {}",
+              node_id, tenant_id);
+    return false;
+  }
 
   // If no validation configured, pass validation.
   if (!node_id_formatter_ && !cluster_id_formatter_ && !tenant_id_formatter_) {

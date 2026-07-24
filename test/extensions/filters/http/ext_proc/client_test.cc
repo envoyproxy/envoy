@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "source/common/grpc/common.h"
+#include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 
@@ -76,7 +77,7 @@ protected:
   }
 
   // ExternalProcessorCallbacks
-  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) override {
+  void onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& response) override {
     last_response_ = std::move(response);
   }
 
@@ -90,7 +91,7 @@ protected:
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse&) override {}
   void onError() override {}
 
-  std::unique_ptr<ProcessingResponse> last_response_;
+  Grpc::ResponsePtr<ProcessingResponse> last_response_{nullptr};
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   std::string grpc_error_message_;
   bool grpc_closed_ = false;

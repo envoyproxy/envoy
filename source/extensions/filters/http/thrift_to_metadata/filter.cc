@@ -4,6 +4,7 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -11,15 +12,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ThriftToMetadata {
 
-Rule::Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root)
+Rule::Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root,
+           absl::Status& creation_status)
     : rule_(rule), rule_id_(rule_id), method_name_(rule.method_name()) {
   if (!rule_.has_on_present() && !rule_.has_on_missing()) {
-    throw EnvoyException("thrift to metadata filter: neither `on_present` nor `on_missing` set");
+    creation_status = absl::InvalidArgumentError(
+        "thrift to metadata filter: neither `on_present` nor `on_missing` set");
+    return;
   }
 
   if (rule_.has_on_missing() && !rule_.on_missing().has_value()) {
-    throw EnvoyException(
+    creation_status = absl::InvalidArgumentError(
         "thrift to metadata filter: cannot specify on_missing rule with empty value");
+    return;
   }
 
   if (rule_.has_field_selector()) {
@@ -117,26 +122,34 @@ ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
-    Stats::Scope& scope)
+    Stats::Scope& scope, absl::Status& creation_status)
     : rqstats_{ALL_THRIFT_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.rq"))},
       respstats_{ALL_THRIFT_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.resp"))},
       rq_trie_root_(std::make_shared<PayloadExtractor::Trie>()),
       resp_trie_root_(std::make_shared<PayloadExtractor::Trie>()),
-      request_rules_(generateRules(proto_config.request_rules(), rq_trie_root_)),
-      response_rules_(generateRules(proto_config.response_rules(), resp_trie_root_)),
+      request_rules_(generateRules(proto_config.request_rules(), rq_trie_root_, creation_status)),
+      response_rules_(
+          generateRules(proto_config.response_rules(), resp_trie_root_, creation_status)),
       transport_(ProtoUtils::getTransportType(proto_config.transport())),
       protocol_(ProtoUtils::getProtocolType(proto_config.protocol())),
       allow_content_types_(generateAllowContentTypes(proto_config.allow_content_types())),
       allow_empty_content_type_(proto_config.allow_empty_content_type()) {
+  if (!creation_status.ok()) {
+    return;
+  }
   if (request_rules_.empty() && response_rules_.empty()) {
-    throw EnvoyException("thrift_to_metadata filter: Per filter configs must at least specify "
-                         "either request or response rules");
+    creation_status =
+        absl::InvalidArgumentError("thrift_to_metadata filter: Per filter configs must at least "
+                                   "specify either request or response rules");
+    return;
   }
 
   if (proto_config.protocol() == envoy::extensions::filters::network::thrift_proxy::v3::TWITTER) {
-    throw EnvoyException("thrift_to_metadata filter: Protocol TWITTER is not supported");
+    creation_status =
+        absl::InvalidArgumentError("thrift_to_metadata filter: Protocol TWITTER is not supported");
+    return;
   }
 }
 

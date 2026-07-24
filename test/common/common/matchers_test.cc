@@ -10,6 +10,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -632,7 +633,7 @@ TEST_F(FilterStateMatcher, MatchAbsentFilterState) {
   matcher.mutable_string_match()->set_exact("exact");
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -653,7 +654,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateWithoutString) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key, std::make_shared<TestObject>(std::nullopt));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -667,7 +668,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateDifferentString) {
   filter_state.setData(key,
                        std::make_shared<TestObject>(std::make_optional<std::string>("different")));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -680,7 +681,7 @@ TEST_F(FilterStateMatcher, MatchFilterState) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key, std::make_shared<TestObject>(std::make_optional<std::string>(value)));
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -702,7 +703,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv4) {
                Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -724,7 +725,7 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv4) {
                Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.8", 456, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -746,7 +747,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv6) {
                Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db8::1", 8080, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -768,7 +769,7 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
                Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)));
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-  ASSERT_TRUE(filter_state_matcher.ok());
+  ASSERT_OK(filter_state_matcher);
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
@@ -853,7 +854,7 @@ TEST_F(FilterStateMatcher, AddressMatchWithInvertMatch) {
                                       test_case.test_ip, 456, false)));
 
     auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
-    ASSERT_TRUE(filter_state_matcher.ok());
+    ASSERT_OK(filter_state_matcher);
     EXPECT_EQ(test_case.expected_match, (*filter_state_matcher)->match(filter_state));
   }
 }

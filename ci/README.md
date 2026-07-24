@@ -237,6 +237,6 @@ See the Dockerfiles and build scripts there for building a new image.
 
 The macOS CI build is part of the [Azure Pipelines](https://dev.azure.com/cncf/envoy/_build) workflow.
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
-which is pre-installed on the [Azure Pipelines macOS image](https://github.com/actions/virtual-environments/blob/main/images/macos/macos-10.15-Readme.md).
+which is pre-installed on the [macOS runner image](https://github.com/actions/runner-images/tree/main/images/macos).
 The dependencies are cached and re-installed on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy. Note that the full version of Xcode (not just Command Line Tools) is required.

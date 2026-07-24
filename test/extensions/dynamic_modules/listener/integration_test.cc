@@ -68,6 +68,18 @@ TEST_P(DynamicModulesListenerSdkIntegrationTest, WriteToSocket) {
   tcp_client->close();
 }
 
+TEST_P(DynamicModulesListenerSdkIntegrationTest, ReadAttributes) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "the read_attributes filter is only in the rust test module";
+  }
+  initializeFilter("read_attributes");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("ping"));
+  tcp_client->waitForData("ping");
+  tcp_client->close();
+}
+
 TEST_P(DynamicModulesListenerSdkIntegrationTest, BufferRead) {
   initializeFilter("buffer_read");
 

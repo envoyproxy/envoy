@@ -273,6 +273,43 @@ TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithoutTenant) {
   EXPECT_EQ(composite, "node-1");
 }
 
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierRoundTripWithTenant) {
+  const std::string node_id = ReverseConnectionUtility::buildTenantScopedIdentifier("t", "node-1");
+  const std::string cluster_id =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("t", "cluster-1");
+
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier(node_id, cluster_id);
+  EXPECT_EQ(composite, "t:cluster-1:node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, node_id);
+  EXPECT_EQ(recovered_cluster, cluster_id);
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierRoundTripWithoutTenant) {
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier("node-1", "cluster-1");
+  EXPECT_EQ(composite, "cluster-1:node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, "node-1");
+  EXPECT_EQ(recovered_cluster, "cluster-1");
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClusterScopedIdentifierEmptyCluster) {
+  const std::string composite =
+      ReverseConnectionUtility::buildClusterScopedIdentifier("node-1", "");
+  EXPECT_EQ(composite, "node-1");
+
+  const auto [recovered_node, recovered_cluster] =
+      ReverseConnectionUtility::splitClusterScopedIdentifier(composite);
+  EXPECT_EQ(recovered_node, "node-1");
+  EXPECT_EQ(recovered_cluster, "");
+}
+
 TEST_F(ReverseConnectionUtilityTest, ApplySslQuietCloseWithoutSsl) {
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, ssl()).WillOnce(Return(nullptr));
@@ -318,6 +355,19 @@ TEST_F(ReverseConnectionUtilityTest, AddJitterStaysWithinUpperBound) {
   const uint64_t result = ReverseConnectionUtility::addJitter(10000, 15, random);
   EXPECT_GE(result, 10000);
   EXPECT_LT(result, 11500);
+}
+
+TEST_F(ReverseConnectionUtilityTest, DiffMsReturnsCorrectDuration) {
+  MonotonicTime start(std::chrono::milliseconds(1000));
+  MonotonicTime end(std::chrono::milliseconds(1500));
+
+  EXPECT_EQ(ReverseConnectionUtility::diffMs(start, end), 500);
+}
+
+TEST_F(ReverseConnectionUtilityTest, DiffMsZeroDuration) {
+  MonotonicTime t(std::chrono::milliseconds(42));
+
+  EXPECT_EQ(ReverseConnectionUtility::diffMs(t, t), 0);
 }
 
 } // namespace ReverseConnection

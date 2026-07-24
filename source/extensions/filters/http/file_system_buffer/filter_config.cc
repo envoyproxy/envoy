@@ -72,6 +72,8 @@ const BufferBehavior& selectBufferBehavior(const ProtoBufferBehavior& behavior) 
     // an exception.
     break;
   }
+  // TODO(wbpcode): Runtime exception. This is a exception happens at runtime rather than
+  // configuration loading time. Fix this to be a configuration validation error.
   throw EnvoyException("invalid BufferBehavior in FileSystemBufferFilterConfig");
 }
 
@@ -166,15 +168,16 @@ FileSystemBufferFilterMergedConfig::StreamConfig::StreamConfig(const StreamConfi
 FileSystemBufferFilterConfig::FileSystemBufferFilterConfig(
     std::shared_ptr<AsyncFileManagerFactory> factory,
     std::shared_ptr<AsyncFileManager> async_file_manager,
-    const ProtoFileSystemBufferFilterConfig& config)
+    const ProtoFileSystemBufferFilterConfig& config, absl::Status& creation_status)
     : factory_(std::move(factory)), async_file_manager_(async_file_manager), config_(config) {
   if (!config_.storage_buffer_path().value().empty()) {
     struct stat s;
     if (stat(config_.storage_buffer_path().value().c_str(), &s) != 0 ||
         (s.st_mode & S_IFDIR) == 0) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           absl::StrCat("FileSystemBufferFilterConfig: configured storage_buffer_path '",
                        config_.storage_buffer_path().value(), "' is not a directory"));
+      return;
     }
   }
 }

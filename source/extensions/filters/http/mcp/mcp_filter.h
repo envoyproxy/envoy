@@ -12,6 +12,8 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/mcp/constants.h"
+#include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
@@ -147,8 +149,9 @@ private:
   bool shouldRejectRequest() const;
   uint32_t getMaxRequestBodySize() const;
 
-  void handleParseError(absl::string_view error_msg);
+  void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   Http::FilterDataStatus completeParsing();
+  void setDynamicMetadataStatus(Protobuf::Struct metadata);
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -158,6 +161,7 @@ private:
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
+  Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
 };
 
 } // namespace Mcp

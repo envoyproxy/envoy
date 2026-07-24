@@ -278,6 +278,30 @@ pub trait EnvoyListenerFilter {
   /// Returns None if SNI is not available.
   fn get_requested_server_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
+  /// Get the value of the attribute with the given ID as a string.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_string<'a>(
+    &'a self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the value of the attribute with the given ID as an integer.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64>;
+
+  /// Get the value of the attribute with the given ID as a boolean.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool>;
+
   /// Set the requested server name (SNI) on the connection socket.
   fn set_requested_server_name(&mut self, name: &str);
 
@@ -1053,6 +1077,66 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     };
     if success && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_string(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64> {
+    let mut result: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool> {
+    let mut result: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+        self.raw,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
     } else {
       None
     }

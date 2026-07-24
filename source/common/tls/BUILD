@@ -248,7 +248,6 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = [
-        "aws_lc_compat.h",
         "utility.h",
     ],
     external_deps = ["ssl"],
@@ -273,6 +272,9 @@ envoy_cc_library(
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/synchronization",
         "@brotli//:brotlidec",
         "@brotli//:brotlienc",
     ],

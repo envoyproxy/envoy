@@ -18,6 +18,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -28,6 +29,7 @@ namespace Composite {
 namespace {
 
 using Envoy::Protobuf::util::MessageDifferencer;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 class CompositeFilterTest : public ::testing::Test {
 public:
@@ -381,7 +383,7 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
 }
 
 // For dual filter in downstream, if not overriding
-// createFilterFactoryFromProtoWithServerContext(), Envoy exception will be thrown if only
+// createHttpFilterFactoryFromProto(), Envoy exception will be thrown if only
 // server_factory_context is provided in action_context.
 TEST(ConfigTest, CreateFilterFromServerContextDual) {
   const std::string yaml_string = R"EOF(
@@ -463,7 +465,7 @@ TEST(ConfigTest, DownstreamFilterNoFactoryContext) {
 }
 
 // For downstream filter, if not overriding
-// createFilterFactoryFromProtoWithServerContext(), Envoy exception will be thrown if only
+// createHttpFilterFactoryFromProto(), Envoy exception will be thrown if only
 // server_factory_context is provided in the action_context.
 TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
   const std::string yaml_string = R"EOF(
@@ -1716,9 +1718,9 @@ public:
                                Server::Configuration::FactoryContext&) override {
     return absl::InvalidArgumentError("boom");
   }
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContext(
-      const Protobuf::Message&, const std::string&,
-      Server::Configuration::ServerFactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createHttpFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                                   Server::Configuration::ServerFactoryContext&) override {
     return nullptr;
   }
 };
@@ -1732,9 +1734,8 @@ TEST(ConfigTest, CompileNamedFilterChainsFailsOnEmptyChain) {
   CompositeFilterFactory factory;
   auto status_or_named =
       CompositeFilterFactory::compileNamedFilterChains(composite_config, "test.", factory_context);
-  EXPECT_FALSE(status_or_named.ok());
-  EXPECT_THAT(status_or_named.status().message(),
-              testing::HasSubstr("must contain at least one filter"));
+  EXPECT_THAT(status_or_named,
+              HasStatusMessage(testing::HasSubstr("must contain at least one filter")));
 }
 
 TEST(ConfigTest, CompileNamedFilterChainsFailsOnFactoryError) {
@@ -1752,9 +1753,8 @@ TEST(ConfigTest, CompileNamedFilterChainsFailsOnFactoryError) {
       failing_factory);
   auto status_or_named =
       CompositeFilterFactory::compileNamedFilterChains(composite_config, "test.", factory_context);
-  EXPECT_FALSE(status_or_named.ok());
-  EXPECT_THAT(status_or_named.status().message(),
-              testing::HasSubstr("Failed to create filter factory"));
+  EXPECT_THAT(status_or_named,
+              HasStatusMessage(testing::HasSubstr("Failed to create filter factory")));
 }
 
 TEST(FilterCallbacksWrapperTest, SingleModeRejectsMultipleFiltersAndExposesDispatcher) {

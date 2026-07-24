@@ -16,7 +16,7 @@ virtual host name, manual path rewrite, manual host rewrite, path redirect, and
 header field matches. Extensions for other test cases can be added. Details about installing the tool
 and sample tool input/output can be found at :ref:`installation <install_tools_route_table_check_tool>`.
 
-The route table check tool config is composed of an array of json test objects. Each test object is composed of
+The route table check tool config is composed of an array of JSON test objects. Each test object is composed of
 three parts.
 
 Test name

@@ -1,6 +1,11 @@
 #include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
 
+#include "source/common/protobuf/utility.h"
+
+#include "test/integration/fake_access_log.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,6 +24,7 @@ public:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
         traffic_mode: PASS_THROUGH
+        request_storage_mode: DYNAMIC_METADATA
     )EOF"
                                                      : config;
 
@@ -50,15 +56,56 @@ TEST_P(McpFilterIntegrationTest, NonPostRequestIgnored) {
 
 // Test that a valid JSON-RPC POST request passes through successfully.
 TEST_P(McpFilterIntegrationTest, ValidJsonRpcPostRequest) {
+  FakeAccessLogFactory factory;
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  bool metadata_verified = false;
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+        auto it = dynamic_metadata.find("envoy.filters.http.mcp");
+        if (it == dynamic_metadata.end()) {
+          it = dynamic_metadata.find("mcp_proxy");
+        }
+        if (it != dynamic_metadata.end()) {
+          Protobuf::Struct expected_metadata;
+          MessageUtil::loadFromJson(R"json({
+            "status": "mcp_ok",
+            "is_mcp_request": true,
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {
+              "name": "test_tool"
+            }
+          })json",
+                                    expected_metadata);
+          EXPECT_TRUE(TestUtility::protoEqual(expected_metadata, it->second))
+              << "got:\n"
+              << it->second.DebugString() << "\nexpected:\n"
+              << expected_metadata.DebugString();
+          metadata_verified = true;
+        }
+      });
+
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* access_log = hcm.add_access_log();
+    access_log->set_name("envoy.access_loggers.test");
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
   initializeFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const std::string request_body = R"({"jsonrpc": "2.0", "method": "test"})";
+  const std::string request_body =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test_tool"}})";
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
                                      {"content-type", "application/json"}},
       request_body);
 
@@ -69,10 +116,44 @@ TEST_P(McpFilterIntegrationTest, ValidJsonRpcPostRequest) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_body, upstream_request_->body().toString());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_TRUE(metadata_verified);
 }
 
 // Test that an MCP request with malformed JSON is rejected with a 400.
 TEST_P(McpFilterIntegrationTest, InvalidJsonBodyRejected) {
+  FakeAccessLogFactory factory;
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  bool metadata_verified = false;
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+        auto it = dynamic_metadata.find("envoy.filters.http.mcp");
+        if (it == dynamic_metadata.end()) {
+          it = dynamic_metadata.find("mcp_proxy");
+        }
+        if (it != dynamic_metadata.end()) {
+          Protobuf::Struct expected_metadata;
+          MessageUtil::loadFromJson(R"json({
+            "status": "mcp_parse_error",
+            "is_mcp_request": false
+          })json",
+                                    expected_metadata);
+          EXPECT_TRUE(TestUtility::protoEqual(expected_metadata, it->second))
+              << "got:\n"
+              << it->second.DebugString() << "\nexpected:\n"
+              << expected_metadata.DebugString();
+          metadata_verified = true;
+        }
+      });
+
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* access_log = hcm.add_access_log();
+    access_log->set_name("envoy.access_loggers.test");
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
   initializeFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -90,6 +171,7 @@ TEST_P(McpFilterIntegrationTest, InvalidJsonBodyRejected) {
   // The upstream should NOT receive a request because the filter sends a local reply.
   EXPECT_FALSE(upstream_request_ != nullptr);
   EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_TRUE(metadata_verified);
 }
 
 // Test no-MCP traffic is passed through without the JSON_RPC 2.0
@@ -184,11 +266,45 @@ TEST_P(McpFilterIntegrationTest, NoAcceptHeaderReject) {
 
 // Test REJECT_NO_MCP mode - non-MCP traffic rejected
 TEST_P(McpFilterIntegrationTest, RejectNoMcpModeRejectsNonMcp) {
+  FakeAccessLogFactory factory;
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  bool metadata_verified = false;
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+        auto it = dynamic_metadata.find("envoy.filters.http.mcp");
+        if (it == dynamic_metadata.end()) {
+          it = dynamic_metadata.find("mcp_proxy");
+        }
+        if (it != dynamic_metadata.end()) {
+          Protobuf::Struct expected_metadata;
+          MessageUtil::loadFromJson(R"json({
+            "status": "mcp_reject_no_mcp",
+            "is_mcp_request": false
+          })json",
+                                    expected_metadata);
+          EXPECT_TRUE(TestUtility::protoEqual(expected_metadata, it->second))
+              << "got:\n"
+              << it->second.DebugString() << "\nexpected:\n"
+              << expected_metadata.DebugString();
+          metadata_verified = true;
+        }
+      });
+
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* access_log = hcm.add_access_log();
+    access_log->set_name("envoy.access_loggers.test");
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
   initializeFilter(R"EOF(
     name: envoy.filters.http.mcp
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
       traffic_mode: REJECT_NO_MCP
+      request_storage_mode: DYNAMIC_METADATA
   )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -203,6 +319,7 @@ TEST_P(McpFilterIntegrationTest, RejectNoMcpModeRejectsNonMcp) {
   EXPECT_FALSE(upstream_request_);
   EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), testing::HasSubstr("Only MCP"));
+  EXPECT_TRUE(metadata_verified);
 }
 
 // Test REJECT_NO_MCP mode - SSE request passes

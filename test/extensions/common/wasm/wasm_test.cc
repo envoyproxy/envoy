@@ -250,6 +250,11 @@ TEST_P(WasmCommonTest, BadSignature) {
 }
 
 TEST_P(WasmCommonTest, Segv) {
+#if defined(__has_feature)
+#if __has_feature(undefined_behavior_sanitizer)
+  GTEST_SKIP() << "This test is not expected to work with UBSAN.";
+#endif
+#endif
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
@@ -287,6 +292,11 @@ TEST_P(WasmCommonTest, Segv) {
 }
 
 TEST_P(WasmCommonTest, DivByZero) {
+#if defined(__has_feature)
+#if __has_feature(undefined_behavior_sanitizer)
+  GTEST_SKIP() << "This test is not expected to work with UBSAN.";
+#endif
+#endif
   if (std::get<0>(GetParam()) != "v8") {
     return;
   }
@@ -755,8 +765,8 @@ TEST_P(WasmCommonTest, RemoteCode) {
     vm_configuration_bytes.set_value(vm_configuration);
     std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
     std::string sha256 = Extensions::Common::Wasm::sha256(code);
-    std::string sha256Hex =
-        Hex::encode(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size());
+    std::string sha256Hex = Hex::encode(absl::Span<const uint8_t>(
+        reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size()));
     vm_config->mutable_code()->mutable_remote()->set_sha256(sha256Hex);
     vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(
         "http://example.com/test.wasm");
@@ -857,8 +867,8 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   vm_configuration_string.set_value(vm_configuration);
   std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string sha256 = Extensions::Common::Wasm::sha256(code);
-  std::string sha256Hex =
-      Hex::encode(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size());
+  std::string sha256Hex = Hex::encode(
+      absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size()));
   int num_retries = 3;
   vm_config->mutable_code()->mutable_remote()->set_sha256(sha256Hex);
   vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(

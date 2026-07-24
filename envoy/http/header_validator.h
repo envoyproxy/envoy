@@ -88,7 +88,7 @@ public:
    * by the filter chain.
    * Returning the Reject value from this method causes the HTTP request to be rejected with 400
    * status, and the gRPC request with the INTERNAL (13) error code. Returning the Redirect
-   * value causes the HTTP request to be redirected to the :path presudo header in the request map.
+   * value causes the HTTP request to be redirected to the :path pseudo header in the request map.
    * The gRPC request will still be rejected with the INTERNAL (13) error code.
    */
   using RequestHeadersTransformationResult = RejectOrRedirectResult;

@@ -13,6 +13,7 @@
 #include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -145,7 +146,7 @@ public:
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
 using GrpcMuxSharedPtr = std::shared_ptr<GrpcMux>;
 
-template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
+template <class ResponseProto> using ResponseProtoPtr = ArenaWrappedProto<ResponseProto>;
 /**
  * A grouping of callbacks that a GrpcMux should provide to its GrpcStream.
  */

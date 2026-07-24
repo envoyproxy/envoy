@@ -91,7 +91,8 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     {
       auto& factory =
           Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(config.extension_filter());
-      return factory.createFilter(config.extension_filter(), context);
+      return THROW_OR_RETURN_VALUE(factory.createFilter(config.extension_filter(), context),
+                                   FilterPtr);
     }
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::FILTER_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
