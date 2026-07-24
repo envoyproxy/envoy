@@ -78,12 +78,12 @@ struct ParserConfig {
   // Maximum decoded bytes for a single scalar string value. Over-budget values
   // are dropped entirely (never truncated); parsing continues past them.
   // 0 = no per-value limit.
-  size_t max_scalar_capture_bytes{0};
+  size_t max_per_scalar_bytes{0};
 
   // Maximum total captured bytes across all scalar values in one body. A value
   // that would push the running total over the budget is dropped; a later
   // smaller value that still fits is captured. 0 = no total limit.
-  size_t max_total_capture_bytes{0};
+  size_t max_total_scalar_bytes{0};
 
   // Maximum byte span for a single captured container-element byte range. An
   // element whose [token_start, token_end) span exceeds this budget is not

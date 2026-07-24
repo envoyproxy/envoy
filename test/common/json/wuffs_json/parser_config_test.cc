@@ -36,18 +36,18 @@ public:
 // CaptureAllScalarsHandler is the executable template for capture-all mode:
 // every scalar value is recorded keyed by its leaf dict key ("" for array
 // elements) — no PatternSegment conversion, no matchesPatternPath() calls,
-// and no track_paths cursor mode. Each record is "key=value;".
+// and no track_paths cursor mode.
 class CaptureAllScalarsHandler : public MockHandler {
 public:
   explicit CaptureAllScalarsHandler(const ParserConfig& config = {})
-      : max_scalar_capture_bytes_(config.max_scalar_capture_bytes),
-        max_total_capture_bytes_(config.max_total_capture_bytes) {}
+      : max_per_scalar_bytes_(config.max_per_scalar_bytes),
+        max_total_scalar_bytes_(config.max_total_scalar_bytes) {}
 
   bool openStringCapture(absl::string_view, int, size_t) override { return true; }
   bool onStringChunk(absl::string_view, int, absl::string_view chunk) override {
     const size_t projected = pending_.size() + chunk.size();
-    if ((max_scalar_capture_bytes_ > 0 && projected > max_scalar_capture_bytes_) ||
-        (max_total_capture_bytes_ > 0 && total_captured_ + projected > max_total_capture_bytes_)) {
+    if ((max_per_scalar_bytes_ > 0 && projected > max_per_scalar_bytes_) ||
+        (max_total_scalar_bytes_ > 0 && total_captured_ + projected > max_total_scalar_bytes_)) {
       over_budget_ = true;
       pending_.clear();
       return false; // reject this value — no further chunks, no record
@@ -74,26 +74,24 @@ public:
   }
   void onNull(absl::string_view key, int, size_t, size_t) override { record(key, "null"); }
 
-  const std::string& captured() const { return captured_; }
+  using Fields = std::vector<std::pair<std::string, std::string>>;
+  const Fields& fields() const { return fields_; }
 
 private:
   void record(absl::string_view key, absl::string_view value) {
-    if (max_total_capture_bytes_ > 0 && total_captured_ + value.size() > max_total_capture_bytes_) {
+    if (max_total_scalar_bytes_ > 0 && total_captured_ + value.size() > max_total_scalar_bytes_) {
       return; // reject: recording would exceed the body-wide budget
     }
     total_captured_ += value.size();
-    captured_.append(key.data(), key.size());
-    captured_ += '=';
-    captured_.append(value.data(), value.size());
-    captured_ += ';';
+    fields_.push_back({std::string(key), std::string(value)});
   }
 
-  const size_t max_scalar_capture_bytes_; // 0 = no per-value limit
-  const size_t max_total_capture_bytes_;  // 0 = no body-wide limit
-  size_t total_captured_{0};              // value bytes recorded so far
-  bool over_budget_{false};               // current string value exceeded a budget
+  const size_t max_per_scalar_bytes_;   // 0 = no per-value limit
+  const size_t max_total_scalar_bytes_; // 0 = no body-wide limit
+  size_t total_captured_{0};            // value bytes recorded so far
+  bool over_budget_{false};             // current string value exceeded a budget
   std::string pending_;
-  std::string captured_;
+  Fields fields_;
 };
 
 // All four scalar types are captured across nesting levels, in document
@@ -104,7 +102,10 @@ TEST(CaptureAllScalarsTest, CapturesEveryScalarWithoutPathTracking) {
   constexpr absl::string_view json = R"({"model":"m","max_tokens":5,"stream":false,)"
                                      R"("id":null,"params":{"name":"n"}})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "model=m;max_tokens=5;stream=false;id=null;name=n;");
+  using F = CaptureAllScalarsHandler::Fields;
+  EXPECT_EQ(
+      h.fields(),
+      (F{{"model", "m"}, {"max_tokens", "5"}, {"stream", "false"}, {"id", "null"}, {"name", "n"}}));
 }
 
 // capture_all_scalars fires at every depth from 1 through kMaxTrackedDepth-1
@@ -123,16 +124,15 @@ TEST(CaptureAllScalarsTest, CapturesAtAllDepthsThroughBound) {
   }
   json += std::string(bound - 1, '}') + "}";
 
-  // d1=v1;d2=v2;...d8=v8;
-  std::string expected;
+  CaptureAllScalarsHandler::Fields expected;
   for (int d = 1; d <= bound; ++d) {
-    expected += "d" + std::to_string(d) + "=v" + std::to_string(d) + ";";
+    expected.push_back({"d" + std::to_string(d), "v" + std::to_string(d)});
   }
 
   CaptureAllScalarsHandler h;
   WuffsJsonCursor cursor(h);
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), expected);
+  EXPECT_EQ(h.fields(), expected);
 }
 
 // Array-element scalars arrive with key "" — the leaf-key label carries no
@@ -143,7 +143,8 @@ TEST(CaptureAllScalarsTest, ArrayElementScalarsHaveEmptyKey) {
   WuffsJsonCursor cursor(h);
   constexpr absl::string_view json = R"({"stop":["a","b"],"messages":[{"role":"user"}]})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "=a;=b;role=user;");
+  using F = CaptureAllScalarsHandler::Fields;
+  EXPECT_EQ(h.fields(), (F{{"", "a"}, {"", "b"}, {"role", "user"}}));
 }
 
 // Capture-all is chunk-boundary safe: a string value split across feed()
@@ -153,24 +154,27 @@ TEST(CaptureAllScalarsTest, StringValueSplitAcrossChunks) {
   WuffsJsonCursor cursor(h);
   ASSERT_TRUE(cursor.feed(R"({"model":"gpt-)", /*closed=*/false).ok());
   ASSERT_TRUE(cursor.feed(R"(4o","n":2})", /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "model=gpt-4o;n=2;");
+  using F = CaptureAllScalarsHandler::Fields;
+  EXPECT_EQ(h.fields(), (F{{"model", "gpt-4o"}, {"n", "2"}}));
 }
 
-// max_scalar_capture_bytes rejects each over-budget string value independently: the
+// max_per_scalar_bytes rejects each over-budget string value independently: the
 // oversized value is dropped entirely (no truncated record), parsing
 // continues past it, and later values within budget are captured in full.
 // A value exactly at the budget is still captured.
 TEST(CaptureAllScalarsTest, PerValueBudgetRejectsOversizedStrings) {
   ParserConfig cfg;
   cfg.capture_all_scalars = true;
-  cfg.max_scalar_capture_bytes = 4;
+  cfg.max_per_scalar_bytes = 4;
   ASSERT_TRUE(cfg.validate().ok());
 
   CaptureAllScalarsHandler h(cfg);
   WuffsJsonCursor cursor(h);
   constexpr absl::string_view json = R"({"model":"abcdefgh","n":1,"k":"wxyz"})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "n=1;k=wxyz;");
+  using F = CaptureAllScalarsHandler::Fields;
+  // "model":"abcdefgh" is rejected.
+  EXPECT_EQ(h.fields(), (F{{"n", "1"}, {"k", "wxyz"}}));
 }
 
 // The budget applies to the accumulated decoded size across chunk-split
@@ -180,23 +184,24 @@ TEST(CaptureAllScalarsTest, PerValueBudgetRejectsOversizedStrings) {
 TEST(CaptureAllScalarsTest, PerValueBudgetSpansChunkBoundaries) {
   ParserConfig cfg;
   cfg.capture_all_scalars = true;
-  cfg.max_scalar_capture_bytes = 4;
+  cfg.max_per_scalar_bytes = 4;
 
   CaptureAllScalarsHandler h(cfg);
   WuffsJsonCursor cursor(h);
   ASSERT_TRUE(cursor.feed(R"({"model":"abc)", /*closed=*/false).ok());
   ASSERT_TRUE(cursor.feed(R"(defgh","n":1})", /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "n=1;");
+  using F = CaptureAllScalarsHandler::Fields;
+  EXPECT_EQ(h.fields(), (F{{"n", "1"}}));
 }
 
-// max_total_capture_bytes bounds the sum of recorded value bytes across the
+// max_total_scalar_bytes bounds the sum of recorded value bytes across the
 // body. A value that would overflow the total is rejected without consuming
 // any budget, so a later smaller value that still fits is captured — the
 // budget is not a hard stop at the first overflow.
 TEST(CaptureAllScalarsTest, TotalBudgetDropsValuesThatDoNotFit) {
   ParserConfig cfg;
   cfg.capture_all_scalars = true;
-  cfg.max_total_capture_bytes = 9;
+  cfg.max_total_scalar_bytes = 9;
   ASSERT_TRUE(cfg.validate().ok());
 
   CaptureAllScalarsHandler h(cfg);
@@ -205,7 +210,8 @@ TEST(CaptureAllScalarsTest, TotalBudgetDropsValuesThatDoNotFit) {
   // "xy" = 2 fits the remaining 5 (total 6).
   constexpr absl::string_view json = R"({"a":"abcd","b":"efghij","c":"xy"})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "a=abcd;c=xy;");
+  using F = CaptureAllScalarsHandler::Fields;
+  EXPECT_EQ(h.fields(), (F{{"a", "abcd"}, {"c", "xy"}}));
 }
 
 // The total budget applies to every scalar type, not just strings: number,
@@ -213,7 +219,7 @@ TEST(CaptureAllScalarsTest, TotalBudgetDropsValuesThatDoNotFit) {
 TEST(CaptureAllScalarsTest, TotalBudgetCountsNonStringScalars) {
   ParserConfig cfg;
   cfg.capture_all_scalars = true;
-  cfg.max_total_capture_bytes = 5;
+  cfg.max_total_scalar_bytes = 5;
 
   CaptureAllScalarsHandler h(cfg);
   WuffsJsonCursor cursor(h);
@@ -221,7 +227,8 @@ TEST(CaptureAllScalarsTest, TotalBudgetCountsNonStringScalars) {
   // "1" = 1 fits (total 3); "null" = 4 would make 7 > 5, rejected.
   constexpr absl::string_view json = R"({"n":12,"b":true,"x":1,"z":null})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "n=12;x=1;");
+  using F = CaptureAllScalarsHandler::Fields;
+  EXPECT_EQ(h.fields(), (F{{"n", "12"}, {"x", "1"}}));
 }
 
 // A string is rejected against the total budget mid-chain — as soon as the
@@ -231,7 +238,7 @@ TEST(CaptureAllScalarsTest, TotalBudgetCountsNonStringScalars) {
 TEST(CaptureAllScalarsTest, TotalBudgetRejectsMidChain) {
   ParserConfig cfg;
   cfg.capture_all_scalars = true;
-  cfg.max_total_capture_bytes = 4;
+  cfg.max_total_scalar_bytes = 4;
 
   CaptureAllScalarsHandler h(cfg);
   WuffsJsonCursor cursor(h);
@@ -239,7 +246,8 @@ TEST(CaptureAllScalarsTest, TotalBudgetRejectsMidChain) {
   // value is rejected mid-chain; "1" then fits the untouched budget.
   ASSERT_TRUE(cursor.feed(R"({"k":"ab)", /*closed=*/false).ok());
   ASSERT_TRUE(cursor.feed(R"(cdef","n":1})", /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "n=1;");
+  using F = CaptureAllScalarsHandler::Fields;
+  EXPECT_EQ(h.fields(), (F{{"n", "1"}}));
 }
 
 // Per-value and total budgets compose: each value must clear both gates.
@@ -247,8 +255,8 @@ TEST(CaptureAllScalarsTest, TotalBudgetRejectsMidChain) {
 TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
   ParserConfig cfg;
   cfg.capture_all_scalars = true;
-  cfg.max_scalar_capture_bytes = 3;
-  cfg.max_total_capture_bytes = 4;
+  cfg.max_per_scalar_bytes = 3;
+  cfg.max_total_scalar_bytes = 4;
 
   CaptureAllScalarsHandler h(cfg);
   WuffsJsonCursor cursor(h);
@@ -256,7 +264,8 @@ TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
   // total (3 ≤ 4); "de" = 2 would make 5 > 4 total, rejected; "q" = 1 fits.
   constexpr absl::string_view json = R"({"a":"wxyz","b":"abc","c":"de","d":"q"})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-  EXPECT_EQ(h.captured(), "b=abc;d=q;");
+  using F = CaptureAllScalarsHandler::Fields;
+  EXPECT_EQ(h.fields(), (F{{"b", "abc"}, {"d", "q"}}));
 }
 
 // ============================================================================
