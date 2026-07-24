@@ -1618,6 +1618,16 @@ func (h *dymConfigHandle) Log(level shared.LogLevel, format string, args ...any)
 	hostLog(level, format, args)
 }
 
+func (h *dymConfigHandle) GetLogLevel() shared.LogLevel {
+	return shared.LogLevel(C.envoy_dynamic_module_callback_get_log_level())
+}
+
+func (h *dymConfigHandle) IsLogLevelEnabled(level shared.LogLevel) bool {
+	return bool(C.envoy_dynamic_module_callback_log_enabled(
+		(C.envoy_dynamic_module_type_log_level)(uint32(level)),
+	))
+}
+
 func (h *dymConfigHandle) DefineHistogram(name string,
 	tagKeys ...string) (shared.MetricID, shared.MetricsResult) {
 	// Prepare tag keys.

@@ -155,7 +155,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
     "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
-    "log_level" => Some(Box::new(LogLevelFilterConfig {})),
+    "log_level" => Some(Box::new(LogLevelFilterConfig {
+      config_log_level: get_log_level() as u32,
+      config_info_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Info),
+      config_error_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Error),
+    })),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -439,15 +443,27 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
   }
 }
 
-struct LogLevelFilterConfig {}
+struct LogLevelFilterConfig {
+  config_log_level: u32,
+  config_info_enabled: bool,
+  config_error_enabled: bool,
+}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LogLevelFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(LogLevelFilter {})
+    Box::new(LogLevelFilter {
+      config_log_level: self.config_log_level,
+      config_info_enabled: self.config_info_enabled,
+      config_error_enabled: self.config_error_enabled,
+    })
   }
 }
 
-struct LogLevelFilter {}
+struct LogLevelFilter {
+  config_log_level: u32,
+  config_info_enabled: bool,
+  config_error_enabled: bool,
+}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
   fn on_response_headers(
@@ -455,12 +471,20 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    // tests http filter handle
     let level = (get_log_level() as u32).to_string();
     envoy_filter.set_response_header("x-log-level", level.as_bytes());
     let info_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Info).to_string();
     envoy_filter.set_response_header("x-log-info-enabled", info_enabled.as_bytes());
     let error_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Error).to_string();
     envoy_filter.set_response_header("x-log-error-enabled", error_enabled.as_bytes());
+    // tests filter config handle
+    let config_level = self.config_log_level.to_string();
+    envoy_filter.set_response_header("x-config-log-level", config_level.as_bytes());
+    let config_info_enabled = self.config_info_enabled.to_string();
+    envoy_filter.set_response_header("x-config-log-info-enabled", config_info_enabled.as_bytes());
+    let config_error_enabled = self.config_error_enabled.to_string();
+    envoy_filter.set_response_header("x-config-log-error-enabled", config_error_enabled.as_bytes());
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
