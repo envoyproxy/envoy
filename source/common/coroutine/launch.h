@@ -1,6 +1,7 @@
 #pragma once
 
 #include <coroutine>
+#include <memory>
 #include <type_traits>
 #include <utility>
 
@@ -47,6 +48,20 @@ public:
 private:
   CancellationStatePtr cancel_;
 };
+
+/**
+ * How `launch()` starts the root coroutine.
+ *
+ * - `Scheduled` (default): post the start onto the executor (a thread-safe
+ *   `schedule()`), so the coroutine begins on a later event-loop iteration. Safe to
+ *   call from any thread.
+ * - `Inline`: resume the root immediately on the caller's stack, running the
+ *   coroutine synchronously up to its first suspension (or completion) before
+ *   `launch()` returns -- avoiding the `post()`. The caller MUST already be on the
+ *   executor's thread, and must tolerate `on_done` possibly running before
+ *   `launch()` returns.
+ */
+enum class StartMode { Scheduled, Inline };
 
 namespace Detail {
 
@@ -108,13 +123,22 @@ RootTask awaitTaskAndCallOnDone(Task<T> task, OnDone on_done) {
   on_done(co_await std::move(task));
 }
 
-// Give the root its context and schedule its (lazy) start. The frame self-owns
-// from here; the returned handle only carries the cancellation state.
-inline DetachedHandle startRoot(RootTask root, Executor& exec) {
+// Give the root its context and start it (lazily scheduled, or inline on the
+// caller's stack). The frame self-owns from here; the returned handle only carries
+// the cancellation state -- captured before the start, since an inline start may
+// run the coroutine to completion and self-destroy the frame before we return.
+inline DetachedHandle startRoot(RootTask root, std::shared_ptr<Executor> exec, StartMode mode) {
   auto cancel = std::make_shared<CancellationState>();
-  root.promise().context_ = std::make_shared<CoroutineContext>(&exec, cancel);
-  exec.schedule(root.release());
-  return DetachedHandle(std::move(cancel));
+  // Keep a reference before `exec` is moved into the context.
+  Executor& executor = *exec;
+  root.promise().context_ = std::make_shared<CoroutineContext>(std::move(exec), cancel);
+  DetachedHandle handle(std::move(cancel));
+  if (mode == StartMode::Inline) {
+    root.release().resume(); // Start on the caller's stack -- no post().
+  } else {
+    executor.schedule(root.release());
+  }
+  return handle;
 }
 
 } // namespace Detail
@@ -125,15 +149,23 @@ inline DetachedHandle startRoot(RootTask root, Executor& exec) {
  * delivers an aborted result). Returns a `DetachedHandle` that owns the frame and
  * can `cancel()` it.
  *
+ * `exec` is taken as a `shared_ptr` so the coroutine context can keep it alive.
+ * TODO(penguingao): revert to `Executor&` once the executor is guaranteed to
+ * outlive every coroutine it schedules (see CoroutineContext).
+ *
  * `std::type_identity_t` puts the callback parameter in a non-deduced context so
  * `T` is deduced only from `task` (an `absl::Status` or `StatusOr<U>`), letting a
  * plain lambda convert to the callback type.
+ *
+ * `mode` selects how the root starts: `Scheduled` (default, posts onto `exec`) or
+ * `Inline` (resumes on the caller's stack, avoiding a `post()`; see `StartMode`).
  */
 template <typename T>
-[[nodiscard]] DetachedHandle launch(Task<T> task, Executor& exec,
-                                    std::type_identity_t<absl::AnyInvocable<void(T)>> on_done) {
+[[nodiscard]] DetachedHandle launch(Task<T> task, std::shared_ptr<Executor> exec,
+                                    std::type_identity_t<absl::AnyInvocable<void(T)>> on_done,
+                                    StartMode mode = StartMode::Scheduled) {
   return Detail::startRoot(Detail::awaitTaskAndCallOnDone(std::move(task), std::move(on_done)),
-                           exec);
+                           std::move(exec), mode);
 }
 
 } // namespace Coroutine

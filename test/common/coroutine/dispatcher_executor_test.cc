@@ -1,5 +1,6 @@
 #include <chrono>
 #include <coroutine>
+#include <memory>
 #include <optional>
 
 #include "source/common/coroutine/dispatcher_executor.h"
@@ -27,12 +28,13 @@ class DispatcherExecutorTest : public testing::Test {
 public:
   DispatcherExecutorTest()
       : api_(Api::createApiForTest(time_system_)),
-        dispatcher_(api_->allocateDispatcher("test_thread")), executor_(*dispatcher_) {}
+        dispatcher_(api_->allocateDispatcher("test_thread")),
+        executor_(std::make_shared<DispatcherExecutor>(*dispatcher_)) {}
 
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  DispatcherExecutor executor_;
+  std::shared_ptr<DispatcherExecutor> executor_;
 };
 
 // schedule() resumes a handle via the dispatcher's post queue.
@@ -57,7 +59,7 @@ TEST_F(DispatcherExecutorTest, ScheduleAssertsHandleBelongsToExecutor) {
   // A second executor on a different dispatcher.
   Api::ApiPtr other_api = Api::createApiForTest(time_system_);
   Event::DispatcherPtr other_dispatcher = other_api->allocateDispatcher("other_thread");
-  DispatcherExecutor other(*other_dispatcher);
+  auto other = std::make_shared<DispatcherExecutor>(*other_dispatcher);
 
   EXPECT_DEBUG_DEATH(
       {
@@ -67,8 +69,8 @@ TEST_F(DispatcherExecutorTest, ScheduleAssertsHandleBelongsToExecutor) {
         Detail::RootTask root = Detail::awaitTaskAndCallOnDone(
             sleepThenReturn(std::chrono::milliseconds(0)), [](absl::Status) {});
         root.promise().context_ =
-            std::make_shared<CoroutineContext>(&other, std::make_shared<CancellationState>());
-        executor_.schedule(
+            std::make_shared<CoroutineContext>(other, std::make_shared<CancellationState>());
+        executor_->schedule(
             std::coroutine_handle<Detail::RootTask::promise_type>::from_promise(root.promise()));
       },
       "coroutine scheduled on an executor that does not match its context");

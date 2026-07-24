@@ -1,3 +1,4 @@
+#include <memory>
 #include <optional>
 
 #include "source/common/coroutine/context.h"
@@ -130,24 +131,24 @@ TEST(CancellationStateTest, ClearedCallbackDoesNotFire) {
 // Task<T> / Task<void> (milestone 3), driven via launch().
 // ---------------------------------------------------------------------------
 TEST(TaskTest, ReturnsStatusOrValueThroughLaunch) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   std::optional<absl::StatusOr<int>> result;
   DetachedHandle handle =
       launch(returnsValue(42), exec, [&result](absl::StatusOr<int> value) { result = value; });
   EXPECT_FALSE(result.has_value()); // lazy: nothing runs until drained.
-  exec.drain();
+  exec->drain();
   ASSERT_TRUE(result.has_value());
   ASSERT_TRUE(result->ok());
   EXPECT_EQ(42, **result);
 }
 
 TEST(TaskTest, ReturnsStatusThroughLaunch) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   bool body_ran = false;
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(returnsOk(body_ran), exec,
                                  [&result](absl::Status status) { result = std::move(status); });
-  exec.drain();
+  exec->drain();
   EXPECT_TRUE(body_ran);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());
@@ -163,16 +164,16 @@ TEST(TaskTest, DestroyingUnstartedTaskIsSafe) {
 }
 
 TEST(TaskTest, DeepChainPropagatesExecutorAndCancellation) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(chainLevel2(controller), exec,
                                  [&result](absl::Status status) { result = std::move(status); });
-  exec.drain();
+  exec->drain();
   // Suspended at the deepest leaf; the leaf saw the launch executor, proving the
   // executor propagated three levels down.
   EXPECT_TRUE(controller.started);
-  EXPECT_EQ(&exec, controller.observed_executor);
+  EXPECT_EQ(exec.get(), controller.observed_executor);
   EXPECT_FALSE(result.has_value());
 
   // Root cancel reaches the deepest leaf and unwinds the whole chain.
@@ -186,12 +187,12 @@ TEST(TaskTest, DeepChainPropagatesExecutorAndCancellation) {
 // LeafAwaitable + cancellation (milestone 4).
 // ---------------------------------------------------------------------------
 TEST(LeafAwaitableTest, LeafCompletesWithValue) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(awaitLeaf(controller), exec,
                                  [&result](absl::Status status) { result = std::move(status); });
-  exec.drain();
+  exec->drain();
   ASSERT_TRUE(controller.started);
   EXPECT_FALSE(result.has_value());
 
@@ -201,12 +202,12 @@ TEST(LeafAwaitableTest, LeafCompletesWithValue) {
 }
 
 TEST(LeafAwaitableTest, CancelledWhilePendingFiresOnCancelAndUnwinds) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(awaitLeaf(controller), exec,
                                  [&result](absl::Status status) { result = std::move(status); });
-  exec.drain();
+  exec->drain();
   ASSERT_TRUE(controller.started);
 
   handle.cancel();
@@ -216,26 +217,26 @@ TEST(LeafAwaitableTest, CancelledWhilePendingFiresOnCancelAndUnwinds) {
 }
 
 TEST(LeafAwaitableTest, PreCancelledScopeFailsFastWithoutStarting) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(awaitLeaf(controller), exec,
                                  [&result](absl::Status status) { result = std::move(status); });
   // Cancel before the root ever runs: the first leaf await must fail fast.
   handle.cancel();
-  exec.drain();
+  exec->drain();
   EXPECT_FALSE(controller.started); // fail-fast: onStart never called.
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(absl::IsCancelled(*result));
 }
 
 TEST(LeafAwaitableTest, CancelAfterCompleteIsNoOp) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(awaitLeaf(controller), exec,
                                  [&result](absl::Status status) { result = std::move(status); });
-  exec.drain();
+  exec->drain();
   controller.completeWith(absl::OkStatus());
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());
@@ -251,25 +252,25 @@ TEST(LeafAwaitableTest, CancelAfterCompleteIsNoOp) {
 // launch + DetachedHandle (milestone 5).
 // ---------------------------------------------------------------------------
 TEST(LaunchTest, EndToEndLeafToCallback) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(awaitLeaf(controller), exec,
                                  [&result](absl::Status status) { result = std::move(status); });
-  exec.drain();
+  exec->drain();
   controller.completeWith(absl::InvalidArgumentError("boom"));
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(absl::IsInvalidArgument(*result));
 }
 
 TEST(LaunchTest, CancelMidFlightRunsDestructorsAndStillCallsBack) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;
   bool cleaned_up = false;
   std::optional<absl::Status> result;
   DetachedHandle handle = launch(awaitLeafWithCleanup(controller, cleaned_up), exec,
                                  [&result](absl::Status status) { result = std::move(status); });
-  exec.drain();
+  exec->drain();
   ASSERT_TRUE(controller.started);
   EXPECT_FALSE(cleaned_up);
 
@@ -283,7 +284,7 @@ TEST(LaunchTest, CancelMidFlightRunsDestructorsAndStillCallsBack) {
 // The frame is self-owning, so destroying the handle from inside the done
 // callback (before the frame reaches final_suspend) must be safe.
 TEST(LaunchTest, DroppingHandleInsideOnDoneIsSafe) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   bool ran = false;
   bool called = false;
   std::optional<DetachedHandle> handle_slot;
@@ -292,7 +293,7 @@ TEST(LaunchTest, DroppingHandleInsideOnDoneIsSafe) {
     called = true;
     handle_slot.reset(); // destroy the handle mid-callback
   });
-  exec.drain();
+  exec->drain();
   EXPECT_TRUE(called);
   EXPECT_FALSE(handle_slot.has_value());
 }
@@ -300,7 +301,7 @@ TEST(LaunchTest, DroppingHandleInsideOnDoneIsSafe) {
 // Dropping the handle before the coroutine completes does not cancel or destroy
 // it: the frame self-owns and runs to completion.
 TEST(LaunchTest, DroppingHandleBeforeCompletionRunsToCompletion) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   bool ran = false;
   std::optional<absl::Status> result;
   {
@@ -308,7 +309,7 @@ TEST(LaunchTest, DroppingHandleBeforeCompletionRunsToCompletion) {
                                    [&result](absl::Status status) { result = std::move(status); });
     // handle dropped here, before draining.
   }
-  exec.drain();
+  exec->drain();
   EXPECT_TRUE(ran);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok()); // ran to completion, not cancelled.
@@ -317,17 +318,52 @@ TEST(LaunchTest, DroppingHandleBeforeCompletionRunsToCompletion) {
 // Dropping the handle while a leaf is still pending leaves the self-owned frame
 // alive; it still completes when the leaf fires.
 TEST(LaunchTest, HandleDroppedWhilePendingLeafStillCompletes) {
-  ManualExecutor exec;
+  auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;
   std::optional<absl::Status> result;
   {
     DetachedHandle handle = launch(awaitLeaf(controller), exec,
                                    [&result](absl::Status status) { result = std::move(status); });
-    exec.drain();
+    exec->drain();
     ASSERT_TRUE(controller.started); // suspended at the leaf
     // handle dropped here, while the leaf is still pending.
   }
   EXPECT_FALSE(result.has_value());
+  controller.completeWith(absl::OkStatus());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
+}
+
+// StartMode::Inline resumes the root on the caller's stack: a coroutine that never
+// suspends runs to completion before launch() returns, with nothing scheduled.
+TEST(LaunchTest, InlineStartRunsSynchronously) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool ran = false;
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(
+      returnsOk(ran), exec, [&result](absl::Status status) { result = std::move(status); },
+      StartMode::Inline);
+  // No drain(): the coroutine already completed inline, and nothing was posted.
+  EXPECT_TRUE(ran);
+  EXPECT_TRUE(exec->empty());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
+}
+
+// An inline start runs synchronously up to the first suspension (the leaf), again
+// without scheduling anything; the leaf then drives completion as usual.
+TEST(LaunchTest, InlineStartRunsUpToFirstSuspension) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(
+      awaitLeaf(controller), exec, [&result](absl::Status status) { result = std::move(status); },
+      StartMode::Inline);
+  // Ran inline to the leaf without a drain(); nothing queued, still pending.
+  EXPECT_TRUE(controller.started);
+  EXPECT_TRUE(exec->empty());
+  EXPECT_FALSE(result.has_value());
+
   controller.completeWith(absl::OkStatus());
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());

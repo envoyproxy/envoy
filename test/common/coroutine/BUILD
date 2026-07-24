@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -51,4 +53,36 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/status",
     ],
+)
+
+# Echo-server micro-benchmark: a callback state machine vs. a coroutine body, both
+# over a real dispatcher + IoHandle, driven by a shared blocking two-thread client.
+envoy_cc_benchmark_binary(
+    name = "perf_test",
+    srcs = ["perf_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:file_event_interface",
+        "//envoy/network:io_handle_interface",
+        "//envoy/thread:thread_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/common/network:default_socket_interface_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "perf_test_benchmark_test",
+    benchmark_binary = "perf_test",
 )

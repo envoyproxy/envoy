@@ -80,15 +80,18 @@ using CancellationStatePtr = std::shared_ptr<CancellationState>;
  */
 class CoroutineContext {
 public:
-  CoroutineContext(Executor* executor, CancellationStatePtr cancel)
-      : executor_(executor), cancel_(std::move(cancel)) {}
+  CoroutineContext(std::shared_ptr<Executor> executor, CancellationStatePtr cancel)
+      : executor_(std::move(executor)), cancel_(std::move(cancel)) {}
 
   Executor& executor() const { return *executor_; }
   const CancellationStatePtr& cancellation() const { return cancel_; }
 
 private:
-  // Not owned.
-  Executor* executor_;
+  // TODO(penguingao): revert to a non-owning `Executor*` once the executor is
+  // guaranteed to outlive every coroutine context that references it. Shared
+  // ownership is a temporary safety net while that lifetime invariant is being
+  // established.
+  std::shared_ptr<Executor> executor_;
   // One shared cancellation state across a `co_await` chain.
   CancellationStatePtr cancel_;
 };
