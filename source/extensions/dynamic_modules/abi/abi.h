@@ -5737,6 +5737,41 @@ bool envoy_dynamic_module_callback_listener_filter_get_filter_state(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_filter_state_typed is called by the module to
+ * set the typed filter state with the given key and Connection life span. Unlike
+ * envoy_dynamic_module_callback_listener_filter_set_filter_state which stores a raw
+ * ``Router::StringAccessor``, this uses the registered ``ObjectFactory`` for the key to create a
+ * properly typed filter state object via ``createFromBytes``, so a built-in Envoy filter that reads
+ * the key as a typed object can consume it.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param key is the key string owned by the module. This must match a registered ObjectFactory
+ * name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation was successful, false if the filter state is not accessible, no
+ * ObjectFactory is registered for the key, or the factory fails to create the object.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_filter_state_typed is called by the module to
+ * get the serialized value of a typed filter state object with the given key. The object must
+ * support ``serializeAsString()`` on the Envoy side.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param key is the key string owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored. The buffer
+ * is valid until the next call into the module on the same filter.
+ * @return true if the value was found and serialized, false if the key does not exist, the object
+ * does not support serialization, or the filter state is not accessible.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
 // ------------------------- Stream Info Operations -----------------------------
 
 /**

@@ -1759,6 +1759,14 @@ WEAK_STUB(ListenerFilterSetFilterState,
 WEAK_STUB(ListenerFilterGetFilterState,
           envoy_dynamic_module_callback_listener_filter_get_filter_state(nullptr, {nullptr, 0},
                                                                          nullptr))
+WEAK_STUB(ListenerFilterSetFilterStateTyped,
+          envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(nullptr,
+                                                                               {nullptr, 0},
+                                                                               {nullptr, 0}))
+WEAK_STUB(ListenerFilterGetFilterStateTyped,
+          envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(nullptr,
+                                                                               {nullptr, 0},
+                                                                               nullptr))
 
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))
