@@ -47,6 +47,15 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  void setupNoopMode() {
+    envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+    proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::NOOP);
+    config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+    filter_ = std::make_unique<McpFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
   void setupWithClearRouteCache(bool clear_route_cache) {
     envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
     proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -245,6 +254,55 @@ TEST_F(McpFilterTest, PerRouteOverride) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+// Test NOOP mode - non-MCP traffic passes through without rejection
+TEST_F(McpFilterTest, NoopModePassesThroughNonMcp) {
+  setupNoopMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+// Test NOOP mode - valid MCP POST is not inspected and no metadata is extracted
+TEST_F(McpFilterTest, NoopModeDoesNotInspectMcpPost) {
+  setupNoopMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  // In NOOP mode the filter continues immediately rather than buffering the body.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  // No attribute extraction should happen.
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test NOOP mode - per-route override disables an otherwise rejecting global config
+TEST_F(McpFilterTest, NoopModePerRouteOverride) {
+  setupRejectMode();
+
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::NOOP);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
+
+  // Global REJECT_NO_MCP would reject this, but the NOOP override lets it through.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
 // Test dynamic metadata is set for valid JSON-RPC
 TEST_F(McpFilterTest, DynamicMetadataSet) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
@@ -400,6 +458,10 @@ TEST_F(McpFilterTest, ConfigurationGetters) {
   setupRejectMode();
   EXPECT_EQ(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP, config_->trafficMode());
   EXPECT_TRUE(config_->shouldRejectNonMcp());
+
+  setupNoopMode();
+  EXPECT_EQ(envoy::extensions::filters::http::mcp::v3::Mcp::NOOP, config_->trafficMode());
+  EXPECT_FALSE(config_->shouldRejectNonMcp());
 }
 
 // Test POST with wrong content-type

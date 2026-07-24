@@ -146,7 +146,8 @@ private:
   bool isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const;
-  bool shouldRejectRequest() const;
+  bool shouldRejectRequest();
+  envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode();
   uint32_t getMaxRequestBodySize() const;
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
@@ -155,6 +156,9 @@ private:
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  // Traffic mode after applying any per-route override. Latched on first access in decodeHeaders;
+  // we assume the route does not change during the request, so it is resolved only once.
+  std::optional<envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode> traffic_mode_;
   uint32_t bytes_parsed_{0};
   bool parsing_complete_{false};
   bool is_exceeding_limit_{false};
