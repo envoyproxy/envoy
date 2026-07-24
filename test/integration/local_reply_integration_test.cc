@@ -52,7 +52,7 @@ body_format:
   expected_body = R"({
       "level": "TRACE",
       "user_agent": null,
-      "response_body": "upstream connect error or disconnect/reset before headers. reset reason: connection termination"
+      "response_body": "upstream connect error or disconnect/reset before headers. reset reason: remote connection termination"
   })";
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -84,17 +84,18 @@ body_format:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json-custom", response->headers().ContentType()->value().getStringView());
-  EXPECT_EQ("150", response->headers().ContentLength()->value().getStringView());
+  EXPECT_EQ("157", response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("550", response->headers().Status()->value().getStringView());
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
               "envoy; error=connection_terminated; "
-              "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_"
-              "ERROR|FROM_PEER|Closed_by_application}; UC\"");
+              "details=\"upstream_reset_before_response_started{remote_connection_termination|"
+              "QUIC_NO_ERROR|FROM_PEER|Closed_by_application}; UC\"");
   } else {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
               "envoy; error=connection_terminated; "
-              "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
+              "details=\"upstream_reset_before_response_started{remote_connection_termination}; "
+              "UC\"");
   }
   EXPECT_EQ("bar",
             response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
@@ -176,7 +177,7 @@ body_format:
 
   expected_grpc_message = R"({
       "code": 503,
-      "message":"upstream connect error or disconnect/reset before headers. reset reason: connection termination"
+      "message":"upstream connect error or disconnect/reset before headers. reset reason: remote connection termination"
 })";
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -230,7 +231,7 @@ body_format:
   // Note: there should be an %0A at the end.
   std::string expected_grpc_message =
       "upstream connect error or disconnect/reset before headers. reset reason:"
-      " connection termination:503:path=/package.service/method%0A";
+      " remote connection termination:503:path=/package.service/method%0A";
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -387,7 +388,7 @@ body_format:
   std::string expected_body = R"({
       "level": "TRACE",
       "response_flags": "UC",
-      "response_body": "upstream connect error or disconnect/reset before headers. reset reason: connection termination"
+      "response_body": "upstream connect error or disconnect/reset before headers. reset reason: remote connection termination"
       })";
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -419,7 +420,7 @@ body_format:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
-  EXPECT_EQ("154", response->headers().ContentLength()->value().getStringView());
+  EXPECT_EQ("161", response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   // Check if returned json is same as expected
   EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
@@ -483,12 +484,12 @@ mappers:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("text/plain", response->headers().ContentType()->value().getStringView());
-  EXPECT_EQ("95", response->headers().ContentLength()->value().getStringView());
+  EXPECT_EQ("102", response->headers().ContentLength()->value().getStringView());
 
   EXPECT_EQ("551", response->headers().Status()->value().getStringView());
 
   EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. reset "
-                              "reason: connection termination");
+                              "reason: remote connection termination");
 }
 
 // When the runtime guard is disabled, transport failure reason should appear in the response body.
@@ -525,11 +526,11 @@ TEST_P(LocalReplyIntegrationTest, TransportFailureReasonInBodyWhenRuntimeGuardDi
 
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
     EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. reset "
-                                "reason: connection termination, transport failure reason: "
+                                "reason: remote connection termination, transport failure reason: "
                                 "QUIC_NO_ERROR|FROM_PEER|Closed by application");
   } else {
     EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. reset "
-                                "reason: connection termination");
+                                "reason: remote connection termination");
   }
 }
 

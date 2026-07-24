@@ -3408,7 +3408,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
     EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), "http2.violation.of.messaging.rule");
   } else {
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
     // http2.violation.of.messaging.rule
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("violation"));
   }

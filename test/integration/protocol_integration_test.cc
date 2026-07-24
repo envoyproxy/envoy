@@ -2644,7 +2644,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
     test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Ge(1));
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
   }
 }
 
@@ -2697,7 +2697,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
   }
 }
 
@@ -5147,7 +5147,7 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
 
     EXPECT_EQ("503", response->headers().getStatusValue());
     EXPECT_THAT(waitForAccessLog(access_log_name_),
-                HasSubstr("upstream_reset_before_response_started{connection_termination}"));
+                HasSubstr("upstream_reset_before_response_started{remote_connection_termination}"));
   } else {
     response->waitForHeaders();
 
@@ -5354,7 +5354,7 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
             "PACKET_WRITE_ERROR|FROM_SELF|Write_failed_with_error:_9_(Bad_file_descriptor)}"));
   } else {
     EXPECT_THAT(waitForAccessLog(access_log_name_),
-                HasSubstr("upstream_reset_before_response_started{connection_termination}"));
+                HasSubstr("upstream_reset_before_response_started{remote_connection_termination}"));
   }
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -5517,7 +5517,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
     test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Ge(1));
   } else {
     // H/2 codec does not send 400 on protocol errors
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
   }
 }
 
@@ -6039,7 +6039,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailer) {
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
   }
 
   if (!use_universal_header_validator_) {

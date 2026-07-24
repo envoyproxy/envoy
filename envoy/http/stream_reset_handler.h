@@ -29,6 +29,11 @@ enum class StreamResetReason {
   ConnectionTimeout,
   // If the stream was locally reset due to connection termination.
   ConnectionTermination,
+  // If the stream was reset because the remote peer closed an established connection (e.g. the
+  // upstream sent a TCP FIN/RST after the connection was made). Behaves like ConnectionTermination
+  // for routing/retry/UC flag purposes, but is distinguished so HttpUpstream tunnels can propagate
+  // it as a remote close, and access logs can distinguish remote vs local termination.
+  RemoteConnectionTermination,
   // The stream was reset because of a resource overflow.
   Overflow,
   // Either there was an early TCP error for a CONNECT request or the peer reset with CONNECT_ERROR

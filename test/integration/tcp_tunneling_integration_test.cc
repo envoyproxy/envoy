@@ -1315,6 +1315,11 @@ TEST_P(TcpTunnelingIntegrationTest, SendDataUpstreamAfterUpstreamCloseConnection
     // HTTP/1.1 can't frame with FIN bits.
     return;
   }
+  // Disable RemoteConnectionTermination + RST mapping so a graceful upstream connection close
+  // (after end_stream) still surfaces as a half-close downstream rather than a TCP RST. This
+  // preserves the original idle-close semantics this test was written to exercise.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.emit_remote_connection_termination",
+                                    "false");
   initialize();
 
   setUpConnection(fake_upstream_connection_);
@@ -2311,7 +2316,13 @@ TEST_P(TcpTunnelingIntegrationTest, H1UpstreamCloseNoConnectionReuse) {
   ASSERT_TRUE(fake_upstream_connection_->close());
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  tcp_client_1->waitForHalfClose();
+  // For HTTP/3 the upstream close while a CONNECT tunnel is active maps to a TCP RST on the
+  // downstream rather than a half-close.
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    tcp_client_1->waitForDisconnect();
+  } else {
+    tcp_client_1->waitForHalfClose();
+  }
   tcp_client_1->close();
 
   // Establish a new connection.
@@ -2327,7 +2338,11 @@ TEST_P(TcpTunnelingIntegrationTest, H1UpstreamCloseNoConnectionReuse) {
   ASSERT_TRUE(fake_upstream_connection_->close());
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  tcp_client_2->waitForHalfClose();
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    tcp_client_2->waitForDisconnect();
+  } else {
+    tcp_client_2->waitForHalfClose();
+  }
   tcp_client_2->close();
 }
 
@@ -2484,6 +2499,103 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
 
   ASSERT_TRUE(fake_upstream_connection_->close());
   tcp_client_->waitForHalfClose();
+  tcp_client_->close();
+}
+
+// Verify that when the upstream resets an established CONNECT tunnel (as opposed to a graceful
+// FIN), the reset propagates to the downstream TCP client. This exercises the
+// CodecClient -> HttpUpstream path where the underlying upstream HTTP connection observes a
+// RemoteClose with `connected_` already true; that case maps to `RemoteConnectionTermination`
+// and is in turn mapped by HttpUpstream to RemoteClose + DetectedCloseType::RemoteReset, so the
+// downstream tcp_proxy tears down the client connection rather than just emitting a half-close.
+TEST_P(TcpTunnelingIntegrationTest, UpstreamRstPropagatesAsRemoteReset) {
+  // HTTP/1 upstreams cannot signal connection-level reset distinct from FIN in our test harness.
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_DETECTED_CLOSE_TYPE%");
+    access_log_config.set_path(access_log_filename);
+    ASSERT_TRUE(proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(proxy_config));
+      break;
+    }
+  });
+  initialize();
+
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+
+  // Force a hard reset of the upstream HTTP connection. On platforms that do not support sending
+  // a TCP RST (no SO_LINGER=0 path), this still results in a RemoteClose event with the new
+  // RemoteConnectionTermination reason at the codec level.
+  ASSERT_TRUE(fake_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+
+  // The TCP downstream observes the remote-originated termination and disconnects.
+  tcp_client_->waitForDisconnect();
+
+  // The tcp_proxy access log should show the upstream close was detected as a remote reset.
+  EXPECT_EQ(waitForAccessLog(access_log_filename), "RemoteReset");
+}
+
+// Verify that the same upstream RST does NOT propagate as a downstream RST when the existing
+// runtime guard is explicitly disabled, demonstrating the gating of the new mapping.
+TEST_P(TcpTunnelingIntegrationTest, UpstreamRstNotPropagatedWithoutHttpGuard) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.map_http_stream_reset_to_tcp_rst",
+                                    "false");
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_DETECTED_CLOSE_TYPE%");
+    access_log_config.set_path(access_log_filename);
+    ASSERT_TRUE(proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config));
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(proxy_config));
+      break;
+    }
+  });
+  initialize();
+
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+
+  ASSERT_TRUE(fake_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+
+  // With the guard disabled the upstream RST is mapped to a graceful close, so the downstream
+  // observes a half-close (FlushWrite), NOT a full disconnect (which would only happen on
+  // AbortReset propagation).
+  tcp_client_->waitForHalfClose();
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::Ne("RemoteReset"));
   tcp_client_->close();
 }
 

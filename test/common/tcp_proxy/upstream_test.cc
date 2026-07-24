@@ -160,6 +160,7 @@ TEST_P(HttpUpstreamTest, UpstreamRemoteResetProducesRemoteClose) {
       Http::StreamResetReason::RemoteReset,
       Http::StreamResetReason::RemoteRefusedStreamReset,
       Http::StreamResetReason::RemoteConnectionFailure,
+      Http::StreamResetReason::RemoteConnectionTermination,
   };
 
   for (const auto reason : remote_reasons) {
@@ -951,6 +952,42 @@ TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
+
+// Verify that CombinedUpstream::onUpstreamReset propagates remote-originated reset reasons as
+// DetectedCloseType::RemoteReset so tcp_proxy can RST the downstream.
+TEST_F(CombinedUpstreamTest, OnUpstreamRemoteResetMapsToRemoteReset) {
+  this->setup();
+  const Http::StreamResetReason remote_reasons[] = {
+      Http::StreamResetReason::RemoteReset,
+      Http::StreamResetReason::RemoteRefusedStreamReset,
+      Http::StreamResetReason::RemoteConnectionFailure,
+      Http::StreamResetReason::RemoteConnectionTermination,
+  };
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .Times(static_cast<int>(std::size(remote_reasons)));
+  for (const auto reason : remote_reasons) {
+    this->upstream_->onUpstreamReset(reason, "", *this->mock_router_upstream_request_);
+    EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::RemoteReset);
+  }
+}
+
+// Verify that CombinedUpstream::onUpstreamReset reports DetectedCloseType::Normal for
+// Envoy-originated reset reasons (so tcp_proxy emits a graceful close, not RST).
+TEST_F(CombinedUpstreamTest, OnUpstreamLocalResetReportsNormal) {
+  this->setup();
+  const Http::StreamResetReason local_reasons[] = {
+      Http::StreamResetReason::LocalReset,
+      Http::StreamResetReason::LocalRefusedStreamReset,
+      Http::StreamResetReason::ConnectionTermination,
+      Http::StreamResetReason::LocalConnectionFailure,
+  };
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .Times(static_cast<int>(std::size(local_reasons)));
+  for (const auto reason : local_reasons) {
+    this->upstream_->onUpstreamReset(reason, "", *this->mock_router_upstream_request_);
+    EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+  }
 }
 
 } // namespace
