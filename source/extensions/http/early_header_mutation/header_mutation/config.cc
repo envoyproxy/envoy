@@ -17,7 +17,8 @@ Factory::createExtension(const Protobuf::Message& message,
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::http::early_header_mutation::header_mutation::v3::HeaderMutation&>(
       *mptr, context.messageValidationVisitor());
-  return std::make_unique<HeaderMutation>(proto_config, context.serverFactoryContext());
+  return std::make_unique<HeaderMutation>(proto_config, context.serverFactoryContext(),
+                                          context.messageValidationVisitor());
 }
 
 REGISTER_FACTORY(Factory, Envoy::Http::EarlyHeaderMutationFactory);
