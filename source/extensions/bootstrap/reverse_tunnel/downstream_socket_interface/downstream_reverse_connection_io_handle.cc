@@ -33,6 +33,9 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
       "DownstreamReverseConnectionIOHandle: destroying handle for FD: {} with connection key: {}",
       fd_, connection_key_);
   if (parent_ != nullptr) {
+    if (fd_ >= 0) {
+      parent_->onDownstreamConnectionClosed(connection_key_);
+    }
     parent_->unregisterChildIoHandle(*this);
   }
   SET_SOCKET_INVALID(fd_);

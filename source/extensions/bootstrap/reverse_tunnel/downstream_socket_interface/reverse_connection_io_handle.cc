@@ -82,6 +82,11 @@ void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
 
+  for (const auto& [host, unused] : host_to_conn_info_map_) {
+    UNREFERENCED_PARAMETER(unused);
+    clearConnectionStates(host);
+  }
+
   // Detach any still-live child tunnel IoHandles so their parent() returns nullptr instead of a
   // dangling pointer after this object is destroyed.
   for (auto* child : child_io_handles_) {
@@ -515,8 +520,24 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
   if (host_it != host_to_conn_info_map_.end()) {
+    clearConnectionStates(host);
     host_it->second.connection_keys.clear();
   }
+}
+
+void ReverseConnectionIOHandle::clearConnectionStates(const std::string& host) {
+  auto host_it = host_to_conn_info_map_.find(host);
+  if (host_it == host_to_conn_info_map_.end()) {
+    return;
+  }
+
+  auto& host_info = host_it->second;
+  for (const auto& [connection_key, state] : host_info.connection_states) {
+    UNREFERENCED_PARAMETER(connection_key);
+    updateStateGauge(host, host_info.cluster_name, state, false);
+  }
+  host_info.connection_states.clear();
+  host_info.connecting_count = 0;
 }
 
 void ReverseConnectionIOHandle::maintainClusterConnections(
@@ -1176,18 +1197,23 @@ void ReverseConnectionIOHandle::onConnectionDone(
     return;
   }
 
+  connection_key = wrapper->connectionKey();
+
   // Safely get connection info if wrapper is still valid.
   auto* connection = wrapper->getConnection();
-  if (connection) {
+  if (connection_key.empty() && connection) {
     connection_key = connection->connectionInfoProvider().localAddress()->asString();
+  }
+  if (!connection_key.empty()) {
     ENVOY_LOG(debug,
               "reverse_tunnel: Processing connection event for host '{}', cluster "
               "'{}', key '{}'",
               host_address, cluster_name, connection_key);
   } else {
-    connection_key = "cleanup_" + host_address + "_" + std::to_string(rand());
-    ENVOY_LOG(debug, "reverse_tunnel: Connection already null, using fallback key '{}'",
-              connection_key);
+    ENVOY_LOG(error,
+              "reverse_tunnel: Connection key unavailable for host '{}' in cluster '{}'; "
+              "state transition cannot be correlated",
+              host_address, cluster_name);
   }
 
   // Process connection result safely.
@@ -1199,8 +1225,10 @@ void ReverseConnectionIOHandle::onConnectionDone(
     ENVOY_LOG(error, "reverse_tunnel: Connection failed - error '{}', cleaning up host {}", error,
               host_address);
 
-    updateConnectionState(host_address, cluster_name, connection_key,
-                          ReverseConnectionState::Failed);
+    if (!connection_key.empty()) {
+      updateConnectionState(host_address, cluster_name, connection_key,
+                            ReverseConnectionState::Failed);
+    }
 
     // Safely close connection if still valid.
     if (connection) {

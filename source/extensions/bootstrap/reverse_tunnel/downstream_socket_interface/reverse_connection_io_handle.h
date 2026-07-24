@@ -468,6 +468,8 @@ private:
    */
   void removeStaleHostAndCloseConnections(const std::string& host);
 
+  void clearConnectionStates(const std::string& host);
+
   /**
    * Per-host connection tracking for better management.
    * Contains all information needed to track and manage connections to a specific host.

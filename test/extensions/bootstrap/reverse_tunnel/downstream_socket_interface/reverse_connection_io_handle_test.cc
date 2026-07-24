@@ -3430,6 +3430,89 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNo
   EXPECT_TRUE(getHostToConnInfoMap().empty());
 }
 
+TEST_F(ReverseConnectionIOHandleTest, HostRemovalDecrementsConnectedGauge) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+
+  const std::string host = "192.168.1.1";
+  const std::string cluster = "test-cluster";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, cluster, 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+  io_handle_->updateConnectionState(host, cluster, connection_key,
+                                    ReverseConnectionState::Connected);
+
+  auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connected"], 1);
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connected"], 1);
+
+  removeStaleHostAndCloseConnections(host);
+
+  stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connected"], 0);
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connected"], 0);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, NullConnectionFailureDecrementsConnectingGauge) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
+      .WillRepeatedly(ReturnRef(*mock_priority_set));
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  auto mock_connection = setupMockConnection();
+  Upstream::MockHost::MockCreateConnectionData connection_data;
+  connection_data.connection_ = mock_connection.get();
+  connection_data.host_description_ = mock_host;
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).WillOnce(Return(connection_data));
+  mock_connection.release();
+
+  ASSERT_TRUE(initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host));
+  RCConnectionWrapper* wrapper = getConnectionWrappers()[0].get();
+  auto released_connection = wrapper->releaseConnection();
+  ASSERT_NE(released_connection, nullptr);
+
+  io_handle_->onConnectionDone("connection closed", wrapper, true);
+
+  const auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map.at("test_scope.reverse_connections.host.192.168.1.1.connecting"), 0);
+  EXPECT_EQ(stat_map.at("test_scope.reverse_connections.cluster.test-cluster.connecting"), 0);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, CleanupDecrementsConnectedGauge) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+
+  const std::string host = "192.168.1.1";
+  const std::string cluster = "test-cluster";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, cluster, 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+  io_handle_->updateConnectionState(host, cluster, connection_key,
+                                    ReverseConnectionState::Connected);
+
+  cleanup();
+
+  const auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map.at("test_scope.reverse_connections.host.192.168.1.1.connected"), 0);
+  EXPECT_EQ(stat_map.at("test_scope.reverse_connections.cluster.test-cluster.connected"), 0);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
