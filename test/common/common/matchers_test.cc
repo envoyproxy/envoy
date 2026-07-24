@@ -332,6 +332,24 @@ TEST_F(MetadataTest, InvertMatch) {
 
 class StringMatcher : public BaseTest {};
 
+TEST_F(StringMatcher, CreateExactMatcher) {
+  // 1. Arrange & Act: Create an exact matcher for the target string "envoy_test"
+  auto matcher = Matchers::StringMatcherImpl::createExactMatcher("envoy_test");
+
+  // 2. Assert Happy Path: Exact match must return true
+  EXPECT_TRUE(matcher.match("envoy_test"));
+
+  // 3. Assert Negative Path: Different strings or partial matches must return false
+  EXPECT_FALSE(matcher.match("envoy"));
+  EXPECT_FALSE(matcher.match("envoy_test_extra"));
+  EXPECT_FALSE(matcher.match("nginx"));
+
+  // 4. Assert Case Sensitivity: The exact matcher is created with ignore_case = false by default,
+  // so matching against an uppercase string must return false
+  EXPECT_FALSE(matcher.match("ENVOY_TEST"));
+}
+
+
 TEST_F(StringMatcher, ExactMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("exact");
