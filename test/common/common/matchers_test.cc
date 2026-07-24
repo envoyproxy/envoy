@@ -343,7 +343,6 @@ TEST_F(StringMatcher, CreateExactMatcher) {
   EXPECT_FALSE(matcher.match("ENVOY_TEST"));
 }
 
-
 TEST_F(StringMatcher, ExactMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("exact");
