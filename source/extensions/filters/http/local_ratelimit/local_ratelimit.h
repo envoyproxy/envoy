@@ -108,6 +108,7 @@ public:
   }
   bool rateLimitPerConnection() const { return rate_limit_per_connection_; }
   bool enableXRateLimitHeaders() const { return enable_x_rate_limit_headers_; }
+  bool enableRetryAfterHeader() const { return enable_retry_after_header_; }
   envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
@@ -164,6 +165,7 @@ private:
   const uint64_t stage_;
   const bool has_descriptors_;
   const bool enable_x_rate_limit_headers_;
+  const bool enable_retry_after_header_;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
   const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;

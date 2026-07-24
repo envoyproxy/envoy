@@ -56,6 +56,7 @@ public:
         enable_x_ratelimit_headers_(
             config.enable_x_ratelimit_headers() ==
             envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_03),
+        enable_retry_after_header_(config.enable_retry_after_header()),
         disable_x_envoy_ratelimited_header_(config.disable_x_envoy_ratelimited_header()),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
@@ -104,6 +105,7 @@ public:
     return !failure_mode_deny_;
   }
   bool enableXRateLimitHeaders() const { return enable_x_ratelimit_headers_; }
+  bool enableRetryAfterHeader() const { return enable_retry_after_header_; }
   bool enableXEnvoyRateLimitedHeader() const { return !disable_x_envoy_ratelimited_header_; }
   const std::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
@@ -164,6 +166,7 @@ private:
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
   const bool enable_x_ratelimit_headers_;
+  const bool enable_retry_after_header_;
   const bool disable_x_envoy_ratelimited_header_;
   const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
