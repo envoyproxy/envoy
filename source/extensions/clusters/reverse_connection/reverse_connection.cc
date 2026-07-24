@@ -36,22 +36,27 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
     return {nullptr};
   }
 
-  // Evaluate the configured host-id formatter to obtain the host identifier.
-  if (context->downstreamHeaders() == nullptr) {
-    ENVOY_LOG(error, "reverse_connection: missing downstream headers; cannot evaluate formatter.");
+  if (context->requestStreamInfo() == nullptr && context->downstreamConnection() == nullptr) {
+    ENVOY_LOG(error, "reverse_connection: chooseHost called without downstream connection or "
+                     "stream info");
     return {nullptr};
   }
-
-  // Format the host identifier using the configured formatter.
-  const Envoy::Formatter::Context formatter_context{
-      context->downstreamHeaders(),     nullptr /* response_headers */,
-      nullptr /* response_trailers */,  "" /* local_reply_body */,
-      AccessLog::AccessLogType::NotSet, nullptr /* active_span */};
 
   // Use request stream info if available, otherwise fall back to connection stream info.
   const StreamInfo::StreamInfo& stream_info = context->requestStreamInfo()
                                                   ? *context->requestStreamInfo()
                                                   : context->downstreamConnection()->streamInfo();
+
+  const Envoy::Formatter::Context formatter_context{
+      context->downstreamHeaders(),     nullptr /* response_headers */,
+      nullptr /* response_trailers */,  "" /* local_reply_body */,
+      AccessLog::AccessLogType::NotSet, nullptr /* active_span */};
+
+  if (context->downstreamHeaders() == nullptr) {
+    ENVOY_LOG(debug,
+              "reverse_connection: missing downstream headers; host_id_formatter will only be "
+              "valid if it is a constant.");
+  }
 
   const std::string host_id = parent_->host_id_formatter_->format(formatter_context, stream_info);
 

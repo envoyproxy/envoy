@@ -443,6 +443,38 @@ TEST_F(ReverseConnectionClusterTest, NoHeaders) {
   }
 }
 
+// Test host creation with no headers and constant host_id_format.
+TEST_F(ReverseConnectionClusterTest, NoHeadersAndConstantHostIdFormat) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "test-uuid-123"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // Constant host_id_format is valid with no headers.
+  {
+    NiceMock<Network::MockConnection> connection;
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    TestLoadBalancerContext lb_context(&connection, &stream_info);
+    RevConCluster::LoadBalancer lb(cluster_);
+
+    Upstream::HostConstSharedPtr host = lb.chooseHost(&lb_context).host;
+    EXPECT_NE(host, nullptr);
+    EXPECT_EQ(host->address()->logicalName(), "test-uuid-123");
+  }
+}
+
 // Test host creation failure due to missing required headers.
 TEST_F(ReverseConnectionClusterTest, MissingRequiredHeaders) {
   const std::string yaml = R"EOF(
