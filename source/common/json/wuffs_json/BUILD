@@ -21,15 +21,28 @@ cc_library(
 )
 
 envoy_cc_library(
+    name = "parser_config_lib",
+    srcs = ["parser_config.cc"],
+    hdrs = ["parser_config.h"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "wuffs_json_cursor_lib",
     srcs = ["wuffs_json_cursor.cc"],
     hdrs = ["wuffs_json_cursor.h"],
     deps = [
         ":wuffs_impl",
+        "//source/common/common:assert_lib",
         "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
         "@wuffs",
     ],
 )

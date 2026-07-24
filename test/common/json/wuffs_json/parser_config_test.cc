@@ -1,0 +1,911 @@
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "source/common/json/wuffs_json/parser_config.h"
+#include "source/common/json/wuffs_json/wuffs_json_cursor.h"
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Json {
+namespace Wuffs {
+namespace {
+
+class MockHandler : public WuffsJsonCursor::Handler {
+public:
+  bool openStringCapture(absl::string_view, int, size_t) override { return false; }
+  bool onStringChunk(absl::string_view, int, absl::string_view) override { return true; }
+  void closeStringCapture(absl::string_view, int, size_t) override {}
+  absl::Status onKey(absl::string_view, int, size_t) override { return absl::OkStatus(); }
+  absl::Status onNumber(absl::string_view, absl::string_view, int, size_t, size_t) override {
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view, bool, int, size_t, size_t) override {
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view, int, size_t, size_t) override {}
+  void onContainerOpen(absl::string_view, bool, int, size_t) override {}
+  void onContainerClose(int, size_t) override {}
+};
+
+// ============================================================================
+// capture_all_scalars mode
+// ============================================================================
+
+// CaptureAllScalarsHandler is the executable template for capture-all mode:
+// every scalar value is recorded keyed by its leaf dict key ("" for array
+// elements) — no PatternSegment conversion, no matchesPatternPath() calls,
+// and no track_paths cursor mode. Each record is "key=value;".
+class CaptureAllScalarsHandler : public MockHandler {
+public:
+  explicit CaptureAllScalarsHandler(const ParserConfig& config = {})
+      : max_scalar_capture_bytes_(config.max_scalar_capture_bytes),
+        max_total_capture_bytes_(config.max_total_capture_bytes) {}
+
+  bool openStringCapture(absl::string_view, int, size_t) override { return true; }
+  bool onStringChunk(absl::string_view, int, absl::string_view chunk) override {
+    const size_t projected = pending_.size() + chunk.size();
+    if ((max_scalar_capture_bytes_ > 0 && projected > max_scalar_capture_bytes_) ||
+        (max_total_capture_bytes_ > 0 && total_captured_ + projected > max_total_capture_bytes_)) {
+      over_budget_ = true;
+      pending_.clear();
+      return false; // reject this value — no further chunks, no record
+    }
+    pending_.append(chunk.data(), chunk.size());
+    return true;
+  }
+  void closeStringCapture(absl::string_view key, int, size_t) override {
+    if (over_budget_) {
+      over_budget_ = false;
+      return;
+    }
+    record(key, pending_);
+    pending_.clear();
+  }
+  absl::Status onNumber(absl::string_view key, absl::string_view raw, int, size_t,
+                        size_t) override {
+    record(key, raw);
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view key, bool value, int, size_t, size_t) override {
+    record(key, value ? "true" : "false");
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view key, int, size_t, size_t) override { record(key, "null"); }
+
+  const std::string& captured() const { return captured_; }
+
+private:
+  void record(absl::string_view key, absl::string_view value) {
+    if (max_total_capture_bytes_ > 0 && total_captured_ + value.size() > max_total_capture_bytes_) {
+      return; // reject: recording would exceed the body-wide budget
+    }
+    total_captured_ += value.size();
+    captured_.append(key.data(), key.size());
+    captured_ += '=';
+    captured_.append(value.data(), value.size());
+    captured_ += ';';
+  }
+
+  const size_t max_scalar_capture_bytes_; // 0 = no per-value limit
+  const size_t max_total_capture_bytes_;  // 0 = no body-wide limit
+  size_t total_captured_{0};              // value bytes recorded so far
+  bool over_budget_{false};               // current string value exceeded a budget
+  std::string pending_;
+  std::string captured_;
+};
+
+// All four scalar types are captured across nesting levels, in document
+// order, without any spec machinery or path tracking.
+TEST(CaptureAllScalarsTest, CapturesEveryScalarWithoutPathTracking) {
+  CaptureAllScalarsHandler h;
+  WuffsJsonCursor cursor(h); // track_paths not needed in capture-all mode
+  constexpr absl::string_view json = R"({"model":"m","max_tokens":5,"stream":false,)"
+                                     R"("id":null,"params":{"name":"n"}})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "model=m;max_tokens=5;stream=false;id=null;name=n;");
+}
+
+// capture_all_scalars fires at every depth from 1 through kMaxTrackedDepth-1
+// (currently 8). The JSON places one string scalar at each depth via nested
+// "nest" dict keys; all eight must appear in the output.
+TEST(CaptureAllScalarsTest, CapturesAtAllDepthsThroughBound) {
+  constexpr int bound = WuffsJsonCursor::kMaxTrackedDepth - 1; // 8
+
+  // {"d1":"v1","nest":{"d2":"v2","nest":{...{"d8":"v8"}...}}}
+  std::string json = "{";
+  for (int d = 1; d <= bound; ++d) {
+    json += "\"d" + std::to_string(d) + "\":\"v" + std::to_string(d) + "\"";
+    if (d < bound) {
+      json += ",\"nest\":{";
+    }
+  }
+  json += std::string(bound - 1, '}') + "}";
+
+  // d1=v1;d2=v2;...d8=v8;
+  std::string expected;
+  for (int d = 1; d <= bound; ++d) {
+    expected += "d" + std::to_string(d) + "=v" + std::to_string(d) + ";";
+  }
+
+  CaptureAllScalarsHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), expected);
+}
+
+// Array-element scalars arrive with key "" — the leaf-key label carries no
+// parent context (the qualified-naming design point tracked in the
+// capture_all_scalars TODO).
+TEST(CaptureAllScalarsTest, ArrayElementScalarsHaveEmptyKey) {
+  CaptureAllScalarsHandler h;
+  WuffsJsonCursor cursor(h);
+  constexpr absl::string_view json = R"({"stop":["a","b"],"messages":[{"role":"user"}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "=a;=b;role=user;");
+}
+
+// Capture-all is chunk-boundary safe: a string value split across feed()
+// calls is reassembled before the closeStringCapture record.
+TEST(CaptureAllScalarsTest, StringValueSplitAcrossChunks) {
+  CaptureAllScalarsHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(R"({"model":"gpt-)", /*closed=*/false).ok());
+  ASSERT_TRUE(cursor.feed(R"(4o","n":2})", /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "model=gpt-4o;n=2;");
+}
+
+// max_scalar_capture_bytes rejects each over-budget string value independently: the
+// oversized value is dropped entirely (no truncated record), parsing
+// continues past it, and later values within budget are captured in full.
+// A value exactly at the budget is still captured.
+TEST(CaptureAllScalarsTest, PerValueBudgetRejectsOversizedStrings) {
+  ParserConfig cfg;
+  cfg.capture_all_scalars = true;
+  cfg.max_scalar_capture_bytes = 4;
+  ASSERT_TRUE(cfg.validate().ok());
+
+  CaptureAllScalarsHandler h(cfg);
+  WuffsJsonCursor cursor(h);
+  constexpr absl::string_view json = R"({"model":"abcdefgh","n":1,"k":"wxyz"})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "n=1;k=wxyz;");
+}
+
+// The budget applies to the accumulated decoded size across chunk-split
+// deliveries, not per onStringChunk call: 3 bytes from the first feed plus 5
+// from the second exceed a 4-byte budget, so the value is rejected mid-chain
+// and the partial prefix already accumulated is discarded.
+TEST(CaptureAllScalarsTest, PerValueBudgetSpansChunkBoundaries) {
+  ParserConfig cfg;
+  cfg.capture_all_scalars = true;
+  cfg.max_scalar_capture_bytes = 4;
+
+  CaptureAllScalarsHandler h(cfg);
+  WuffsJsonCursor cursor(h);
+  ASSERT_TRUE(cursor.feed(R"({"model":"abc)", /*closed=*/false).ok());
+  ASSERT_TRUE(cursor.feed(R"(defgh","n":1})", /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "n=1;");
+}
+
+// max_total_capture_bytes bounds the sum of recorded value bytes across the
+// body. A value that would overflow the total is rejected without consuming
+// any budget, so a later smaller value that still fits is captured — the
+// budget is not a hard stop at the first overflow.
+TEST(CaptureAllScalarsTest, TotalBudgetDropsValuesThatDoNotFit) {
+  ParserConfig cfg;
+  cfg.capture_all_scalars = true;
+  cfg.max_total_capture_bytes = 9;
+  ASSERT_TRUE(cfg.validate().ok());
+
+  CaptureAllScalarsHandler h(cfg);
+  WuffsJsonCursor cursor(h);
+  // "abcd" = 4 (total 4); "efghij" = 6 would make 10 > 9, rejected;
+  // "xy" = 2 fits the remaining 5 (total 6).
+  constexpr absl::string_view json = R"({"a":"abcd","b":"efghij","c":"xy"})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "a=abcd;c=xy;");
+}
+
+// The total budget applies to every scalar type, not just strings: number,
+// boolean, and null records are counted and rejected by the same rule.
+TEST(CaptureAllScalarsTest, TotalBudgetCountsNonStringScalars) {
+  ParserConfig cfg;
+  cfg.capture_all_scalars = true;
+  cfg.max_total_capture_bytes = 5;
+
+  CaptureAllScalarsHandler h(cfg);
+  WuffsJsonCursor cursor(h);
+  // "12" = 2 (total 2); "true" = 4 would make 6 > 5, rejected;
+  // "1" = 1 fits (total 3); "null" = 4 would make 7 > 5, rejected.
+  constexpr absl::string_view json = R"({"n":12,"b":true,"x":1,"z":null})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "n=12;x=1;");
+}
+
+// A string is rejected against the total budget mid-chain — as soon as the
+// accumulating value can no longer fit the remaining budget, chunk delivery
+// stops and the partial prefix is discarded without counting against the
+// total.
+TEST(CaptureAllScalarsTest, TotalBudgetRejectsMidChain) {
+  ParserConfig cfg;
+  cfg.capture_all_scalars = true;
+  cfg.max_total_capture_bytes = 4;
+
+  CaptureAllScalarsHandler h(cfg);
+  WuffsJsonCursor cursor(h);
+  // "ab" accumulates (2 ≤ 4); the next chunk projects 2+4 = 6 > 4, so the
+  // value is rejected mid-chain; "1" then fits the untouched budget.
+  ASSERT_TRUE(cursor.feed(R"({"k":"ab)", /*closed=*/false).ok());
+  ASSERT_TRUE(cursor.feed(R"(cdef","n":1})", /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "n=1;");
+}
+
+// Per-value and total budgets compose: each value must clear both gates.
+// "abc" passes the per-value cap but pushes the total over; "de" clears both.
+TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
+  ParserConfig cfg;
+  cfg.capture_all_scalars = true;
+  cfg.max_scalar_capture_bytes = 3;
+  cfg.max_total_capture_bytes = 4;
+
+  CaptureAllScalarsHandler h(cfg);
+  WuffsJsonCursor cursor(h);
+  // "wxyz" = 4 > 3 per-value, rejected; "abc" = 3 ≤ 3 per-value and fits the
+  // total (3 ≤ 4); "de" = 2 would make 5 > 4 total, rejected; "q" = 1 fits.
+  constexpr absl::string_view json = R"({"a":"wxyz","b":"abc","c":"de","d":"q"})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "b=abc;d=q;");
+}
+
+// ============================================================================
+// Structural spec matching (matchesPatternPath)
+// ============================================================================
+
+// SpecMatchingHandler is the executable template for the production routing
+// decision: convert spec.segments to PatternSegments once at config time,
+// then ask the cursor for a structural match at each openStringCapture —
+// zero allocations, and collision-free (see the hostile-key test below).
+
+// Captures exactly the scalar values (strings, numbers, booleans, nulls)
+// whose root-to-here chain structurally matches the spec's segments; each
+// completed capture is terminated with ';'.
+class SpecMatchingHandler : public MockHandler {
+public:
+  explicit SpecMatchingHandler(const ExtractFieldSpec& spec) {
+    // Config-time conversion: string_views into the spec's stable segment
+    // keys, so the per-callback match allocates nothing. `spec` must outlive
+    // this handler.
+    for (const auto& seg : spec.segments) {
+      pattern_.push_back({seg.key, seg.is_array_element});
+    }
+  }
+
+  void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
+
+  bool openStringCapture(absl::string_view, int depth, size_t) override {
+    capturing_ = cursor_->matchesPatternPath(pattern_, depth);
+    return capturing_;
+  }
+  bool onStringChunk(absl::string_view, int, absl::string_view chunk) override {
+    captured_.append(chunk.data(), chunk.size());
+    return true;
+  }
+  void closeStringCapture(absl::string_view, int, size_t) override {
+    if (capturing_) {
+      captured_ += ';';
+      capturing_ = false;
+    }
+  }
+  absl::Status onNumber(absl::string_view, absl::string_view raw, int depth, size_t,
+                        size_t) override {
+    if (cursor_->matchesPatternPath(pattern_, depth)) {
+      captured_.append(raw.data(), raw.size());
+      captured_ += ';';
+    }
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view, bool value, int depth, size_t, size_t) override {
+    if (cursor_->matchesPatternPath(pattern_, depth)) {
+      captured_ += value ? "true" : "false";
+      captured_ += ';';
+    }
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view, int depth, size_t, size_t) override {
+    if (cursor_->matchesPatternPath(pattern_, depth)) {
+      captured_ += "null;";
+    }
+  }
+
+  const std::string& captured() const { return captured_; }
+
+private:
+  std::vector<WuffsJsonCursor::PatternSegment> pattern_;
+  const WuffsJsonCursor* cursor_{nullptr};
+  bool capturing_{false};
+  std::string captured_;
+};
+
+TEST(StructuralMatchTest, RoutesArrayElementField) {
+  auto spec = parseExtractFieldSpec("messages[].role");
+  ASSERT_TRUE(spec.ok());
+  SpecMatchingHandler h(*spec);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json =
+      R"({"model":"m","messages":[{"role":"user","content":"h"},{"role":"tool","content":"x"}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  // Both role values captured; model and content are skipped despite also
+  // being string values.
+  EXPECT_EQ(h.captured(), "user;tool;");
+}
+
+TEST(StructuralMatchTest, RoutesDepthOneScalar) {
+  auto spec = parseExtractFieldSpec("model");
+  ASSERT_TRUE(spec.ok());
+  SpecMatchingHandler h(*spec);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json = R"({"model":"m","messages":[{"role":"user"}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "m;");
+}
+
+// Dict-only chain: every intermediate label comes from the push-key of the
+// child container, not the current key.
+TEST(StructuralMatchTest, RoutesNestedDicts) {
+  auto spec = parseExtractFieldSpec("params._meta.traceparent");
+  ASSERT_TRUE(spec.ok());
+  SpecMatchingHandler h(*spec);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json =
+      R"({"params":{"name":"n","_meta":{"traceparent":"t","other":"o"}}})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  // "name" (depth 2) and "other" (sibling at depth 3) are skipped.
+  EXPECT_EQ(h.captured(), "t;");
+}
+
+// Nested arrays: the '[]' wildcard erases indices, so one spec matches the
+// target field in every element of both array levels.
+TEST(StructuralMatchTest, RoutesNestedArrays) {
+  auto spec = parseExtractFieldSpec("messages[].content[].text");
+  ASSERT_TRUE(spec.ok());
+  SpecMatchingHandler h(*spec);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json = R"({"messages":[)"
+                                     R"({"content":[{"text":"a"},{"text":"b"}]},)"
+                                     R"({"content":[{"type":"x","text":"c"}]})"
+                                     R"(]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  // All three text values across both messages[] elements and all content[]
+  // elements are captured; "type" at the same depth is skipped.
+  EXPECT_EQ(h.captured(), "a;b;c;");
+}
+
+// For collision case that {"":{"a.b":"decoy"}} produced the same (string "a.b", depth 2) pair as
+// the legitimate {"a":{"b":...}}. matchesPatternPath() compares labels per level with no
+// serialization: the decoy's "" label can never equal segment "a", and its "a.b" label can never
+// span the two segments a,b.
+TEST(StructuralMatchTest, RejectsHostileKeyCollision) {
+  auto spec = parseExtractFieldSpec("a.b");
+  ASSERT_TRUE(spec.ok());
+  ASSERT_EQ(spec->segments.size(), 2u);
+
+  {
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    // The shape the spec means: dict "a" containing key "b".
+    ASSERT_TRUE(cursor.feed(R"({"a":{"b":"legit"}})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "legit;");
+  }
+  {
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    // Hostile shape that collides under string equality (same serialized
+    // string, same depth): structural matching rejects it at level 1.
+    ASSERT_TRUE(cursor.feed(R"({"":{"a.b":"decoy"}})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), ""); // decoy not captured; hole closed
+  }
+}
+
+// Routing is not string-only: numbers, booleans, and nulls match from their
+// own callbacks. usage.total_tokens (a number in real traffic) is the
+// motivating example from the header.
+TEST(StructuralMatchTest, RoutesNonStringScalars) {
+  {
+    auto spec = parseExtractFieldSpec("usage.total_tokens");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    constexpr absl::string_view json =
+        R"({"usage":{"total_tokens":42,"cached":true},"total_tokens":7})";
+    ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+    // The depth-1 decoy with the same leaf key is skipped.
+    EXPECT_EQ(h.captured(), "42;");
+  }
+  {
+    auto spec = parseExtractFieldSpec("stream");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    ASSERT_TRUE(cursor.feed(R"({"stream":true,"id":null})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "true;");
+  }
+  {
+    auto spec = parseExtractFieldSpec("id");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    ASSERT_TRUE(cursor.feed(R"({"stream":true,"id":null})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "null;");
+  }
+}
+
+// Kind mismatch at an intermediate level: a spec's array wildcard never
+// matches a dict level and a spec's dict key never matches an array level,
+// even when the target depth and leaf key line up exactly.
+TEST(StructuralMatchTest, KindMismatchRejected) {
+  {
+    // Spec expects an array at level 2; document has a dict there.
+    auto spec = parseExtractFieldSpec("messages[].role");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    ASSERT_TRUE(cursor.feed(R"({"messages":{"inner":{"role":"x"}}})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "");
+  }
+  {
+    // Spec expects a dict key at level 2; document has an array there.
+    auto spec = parseExtractFieldSpec("params._meta.traceparent");
+    ASSERT_TRUE(spec.ok());
+    SpecMatchingHandler h(*spec);
+    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    h.setCursor(&cursor);
+    ASSERT_TRUE(cursor.feed(R"({"params":[{"traceparent":"x"}]})", /*closed=*/true).ok());
+    EXPECT_EQ(h.captured(), "");
+  }
+}
+
+// Probes matchesPatternPath's degenerate arguments directly from inside a
+// callback: depth 0, depth >= kMaxTrackedDepth, and segment count != depth
+// all return false rather than reading out of bounds or matching.
+class MatchProbeHandler : public MockHandler {
+public:
+  void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
+
+  bool openStringCapture(absl::string_view, int depth, size_t) override {
+    const std::vector<WuffsJsonCursor::PatternSegment> one = {{"a", false}};
+    matched_correct_ = cursor_->matchesPatternPath(one, depth);
+    matched_depth_zero_ = cursor_->matchesPatternPath(one, 0);
+    matched_size_mismatch_ = cursor_->matchesPatternPath(one, 2);
+    const std::vector<WuffsJsonCursor::PatternSegment> deep(WuffsJsonCursor::kMaxTrackedDepth,
+                                                            {"a", false});
+    matched_over_bound_ = cursor_->matchesPatternPath(deep, WuffsJsonCursor::kMaxTrackedDepth);
+    return false;
+  }
+
+  const WuffsJsonCursor* cursor_{nullptr};
+  bool matched_correct_{false};
+  bool matched_depth_zero_{true};
+  bool matched_size_mismatch_{true};
+  bool matched_over_bound_{true};
+};
+
+TEST(StructuralMatchTest, DegenerateDepthArgumentsReturnFalse) {
+  MatchProbeHandler h;
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  ASSERT_TRUE(cursor.feed(R"({"a":"x"})", /*closed=*/true).ok());
+  EXPECT_TRUE(h.matched_correct_); // sanity: the well-formed call matches
+  EXPECT_FALSE(h.matched_depth_zero_);
+  EXPECT_FALSE(h.matched_size_mismatch_);
+  EXPECT_FALSE(h.matched_over_bound_);
+}
+
+// Executable form of the onContainerOpen depth-1 recipe documented on the
+// cursor: when a container opens, the chain at `depth` is not yet populated,
+// so a container spec of N segments is matched with the full pattern at
+// depth-1 (== N). Captures each matching container's [token_start, token_end)
+// byte range — the production shape for messages[] element passthrough.
+class ContainerRangeHandler : public MockHandler {
+public:
+  explicit ContainerRangeHandler(const ExtractFieldSpec& spec, const ParserConfig& config = {})
+      : max_element_capture_bytes_(config.max_element_capture_bytes) {
+    for (const auto& seg : spec.segments) {
+      pattern_.push_back({seg.key, seg.is_array_element});
+    }
+  }
+
+  void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
+
+  void onContainerOpen(absl::string_view, bool, int depth, size_t token_start) override {
+    if (open_depth_ == -1 && depth - 1 == static_cast<int>(pattern_.size()) &&
+        cursor_->matchesPatternPath(pattern_, depth - 1)) {
+      open_depth_ = depth;
+      range_start_ = token_start;
+    }
+  }
+  void onContainerClose(int depth, size_t token_end) override {
+    if (depth == open_depth_) {
+      if (max_element_capture_bytes_ == 0 ||
+          token_end - range_start_ <= max_element_capture_bytes_) {
+        ranges_.emplace_back(range_start_, token_end);
+      }
+      open_depth_ = -1;
+    }
+  }
+
+  const std::vector<std::pair<size_t, size_t>>& ranges() const { return ranges_; }
+
+private:
+  const size_t max_element_capture_bytes_; // 0 = no per-element limit
+  std::vector<WuffsJsonCursor::PatternSegment> pattern_;
+  const WuffsJsonCursor* cursor_{nullptr};
+  int open_depth_{-1};
+  size_t range_start_{0};
+  std::vector<std::pair<size_t, size_t>> ranges_;
+};
+
+TEST(StructuralMatchTest, ContainerSpecCapturesElementByteRanges) {
+  auto spec = parseExtractFieldSpec("messages[]");
+  ASSERT_TRUE(spec.ok());
+  ContainerRangeHandler h(*spec);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json =
+      R"({"messages":[{"role":"user"},{"role":"tool"}],"tools":[{"x":1}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  // Both messages[] elements captured as verbatim byte ranges; the tools[]
+  // element is structurally rejected.
+  ASSERT_EQ(h.ranges().size(), 2u);
+  EXPECT_EQ(json.substr(h.ranges()[0].first, h.ranges()[0].second - h.ranges()[0].first),
+            R"({"role":"user"})");
+  EXPECT_EQ(json.substr(h.ranges()[1].first, h.ranges()[1].second - h.ranges()[1].first),
+            R"({"role":"tool"})");
+}
+
+// max_element_capture_bytes rejects container elements whose byte span exceeds
+// the budget. Parsing continues past the rejected element, and later elements
+// that fit are still captured.
+TEST(StructuralMatchTest, ElementBudgetRejectsOversizedElements) {
+  auto spec = parseExtractFieldSpec("messages[]");
+  ASSERT_TRUE(spec.ok());
+
+  ParserConfig cfg;
+  cfg.max_element_capture_bytes = 9; // {"r":"x"} == 9 bytes; {"r":"toolong"} == 15 bytes
+
+  ContainerRangeHandler h(*spec, cfg);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  // Three elements: fits (9 B), over budget (15 B), fits (9 B).
+  constexpr absl::string_view json = R"({"messages":[{"r":"x"},{"r":"toolong"},{"r":"y"}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+
+  // First and third elements captured; second rejected.
+  ASSERT_EQ(h.ranges().size(), 2u);
+  EXPECT_EQ(json.substr(h.ranges()[0].first, h.ranges()[0].second - h.ranges()[0].first),
+            R"({"r":"x"})");
+  EXPECT_EQ(json.substr(h.ranges()[1].first, h.ranges()[1].second - h.ranges()[1].first),
+            R"({"r":"y"})");
+}
+
+// An element whose byte span equals the budget exactly is still captured.
+TEST(StructuralMatchTest, ElementBudgetExactLimitIsAccepted) {
+  auto spec = parseExtractFieldSpec("messages[]");
+  ASSERT_TRUE(spec.ok());
+
+  ParserConfig cfg;
+  cfg.max_element_capture_bytes = 9; // {"r":"x"} == exactly 9 bytes
+
+  ContainerRangeHandler h(*spec, cfg);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json = R"({"messages":[{"r":"x"}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+
+  ASSERT_EQ(h.ranges().size(), 1u);
+  EXPECT_EQ(json.substr(h.ranges()[0].first, h.ranges()[0].second - h.ranges()[0].first),
+            R"({"r":"x"})");
+}
+
+// Pins the coupling asserted in the parseExtractFieldSpec doc: pass the
+// cursor's public depth bound (kMaxTrackedDepth - 1) as max_depth and config
+// load accepts exactly the specs the cursor can match. A spec at the bound
+// extracts end-to-end; one segment deeper is refused at load — and could
+// never match anyway, since the cursor rejects bodies nested past the bound.
+TEST(StructuralMatchTest, SpecAtCursorDepthBoundMatchesEndToEnd) {
+  constexpr int bound = WuffsJsonCursor::kMaxTrackedDepth - 1;
+  std::string path; // "a.a. ... .k" — exactly `bound` segments
+  for (int i = 0; i < bound - 1; ++i) {
+    path += "a.";
+  }
+  path += "k";
+  auto spec = parseExtractFieldSpec(path, bound);
+  ASSERT_TRUE(spec.ok());
+  EXPECT_EQ(static_cast<int>(spec->segments.size()), bound);
+
+  // One segment deeper is refused at config load.
+  EXPECT_FALSE(parseExtractFieldSpec("x." + path, bound).ok());
+
+  SpecMatchingHandler h(*spec);
+  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  h.setCursor(&cursor);
+  std::string json; // {"a":{"a": ... {"k":"v"} ... }} — value at depth == bound
+  for (int i = 0; i < bound - 1; ++i) {
+    json += R"({"a":)";
+  }
+  json += R"({"k":"v"})";
+  json += std::string(bound - 1, '}');
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "v;");
+}
+
+// ============================================================================
+// ParserConfig::max_body_bytes contract
+// ============================================================================
+
+// max_body_bytes directs the outer filter to enforce a body-size cap by
+// tracking the sum of chunk.size() across feed() calls. nextSourcePosition()
+// is NOT suitable for this check: it tracks tokenized bytes and lags behind
+// received bytes when a NUMBER token straddles a chunk boundary (the tail
+// goes into pending_bytes_ and is not counted until the next feed()).
+TEST(MaxBodyBytesContractTest, NextSourcePositionAccumulatesAcrossChunks) {
+  MockHandler h;
+  WuffsJsonCursor cursor(h);
+  constexpr absl::string_view part1 = R"({"a":true,)";
+  constexpr absl::string_view part2 = R"("b":"xy",)";
+  constexpr absl::string_view part3 = R"("c":null})";
+  ASSERT_TRUE(cursor.feed(part1, /*closed=*/false).ok());
+  EXPECT_EQ(cursor.nextSourcePosition(), part1.size());
+  ASSERT_TRUE(cursor.feed(part2, /*closed=*/false).ok());
+  EXPECT_EQ(cursor.nextSourcePosition(), part1.size() + part2.size());
+  ASSERT_TRUE(cursor.feed(part3, /*closed=*/true).ok());
+  EXPECT_EQ(cursor.nextSourcePosition(), part1.size() + part2.size() + part3.size());
+}
+
+// The outer filter enforces max_body_bytes by accumulating chunk.size() before
+// each feed() call. An oversized body is rejected before its offending chunk
+// is parsed.
+TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
+  ParserConfig cfg;
+  cfg.max_body_bytes = 12;
+
+  MockHandler h;
+  WuffsJsonCursor cursor(h);
+  const std::vector<absl::string_view> chunks = {R"({"a":true,)", R"("b":null})"}; // 10 + 9 bytes
+
+  bool rejected = false;
+  size_t received_bytes = 0;
+  for (size_t i = 0; i < chunks.size(); ++i) {
+    received_bytes += chunks[i].size();
+    if (received_bytes > cfg.max_body_bytes) {
+      rejected = true; // filter would return ResourceExhausted here, chunk unparsed
+      break;
+    }
+    ASSERT_TRUE(cursor.feed(chunks[i], /*closed=*/i + 1 == chunks.size()).ok());
+  }
+
+  EXPECT_TRUE(rejected);
+  // Only the first chunk was fed: position shows the second never reached the cursor.
+  EXPECT_EQ(cursor.nextSourcePosition(), chunks[0].size());
+}
+
+// ============================================================================
+// parseExtractFieldSpec — valid paths
+// ============================================================================
+
+TEST(ParseExtractFieldSpecTest, DepthOneScalar) {
+  auto result = parseExtractFieldSpec("model");
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(result->segments.size(), 1u);
+  EXPECT_EQ(result->segments[0].key, "model");
+  EXPECT_FALSE(result->segments[0].is_array_element);
+}
+
+TEST(ParseExtractFieldSpecTest, DepthOneArray) {
+  auto result = parseExtractFieldSpec("messages[]");
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(result->segments.size(), 2u);
+  EXPECT_EQ(result->segments[0].key, "messages");
+  EXPECT_FALSE(result->segments[0].is_array_element);
+  EXPECT_TRUE(result->segments[1].is_array_element);
+}
+
+TEST(ParseExtractFieldSpecTest, DepthTwoScalarInArray) {
+  auto result = parseExtractFieldSpec("messages[].role");
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(result->segments.size(), 3u);
+  EXPECT_EQ(result->segments[0].key, "messages");
+  EXPECT_TRUE(result->segments[1].is_array_element);
+  EXPECT_EQ(result->segments[2].key, "role");
+}
+
+TEST(ParseExtractFieldSpecTest, DepthThreeNestedDicts) {
+  auto result = parseExtractFieldSpec("params._meta.traceparent");
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(result->segments.size(), 3u);
+  EXPECT_EQ(result->segments[0].key, "params");
+  EXPECT_EQ(result->segments[1].key, "_meta");
+  EXPECT_EQ(result->segments[2].key, "traceparent");
+}
+
+TEST(ParseExtractFieldSpecTest, NestedArrays) {
+  auto result = parseExtractFieldSpec("messages[].content[]");
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(result->segments.size(), 4u);
+  EXPECT_EQ(result->segments[0].key, "messages");
+  EXPECT_TRUE(result->segments[1].is_array_element);
+  EXPECT_EQ(result->segments[2].key, "content");
+  EXPECT_TRUE(result->segments[3].is_array_element);
+}
+
+TEST(ParseExtractFieldSpecTest, RootArray) {
+  // "[].role" is syntactically valid even if unusual in practice.
+  auto result = parseExtractFieldSpec("[].role");
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(result->segments.size(), 2u);
+  EXPECT_TRUE(result->segments[0].is_array_element);
+  EXPECT_EQ(result->segments[1].key, "role");
+}
+
+TEST(ParseExtractFieldSpecTest, UnderscorePrefixedKey) {
+  auto result = parseExtractFieldSpec("_meta");
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(result->segments.size(), 1u);
+  EXPECT_EQ(result->segments[0].key, "_meta");
+}
+
+// ============================================================================
+// parseExtractFieldSpec — malformed paths
+// ============================================================================
+
+TEST(ParseExtractFieldSpecTest, EmptyPathRejected) { EXPECT_FALSE(parseExtractFieldSpec("").ok()); }
+
+TEST(ParseExtractFieldSpecTest, LeadingDotRejected) {
+  EXPECT_FALSE(parseExtractFieldSpec(".model").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, TrailingDotRejected) {
+  EXPECT_FALSE(parseExtractFieldSpec("model.").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, DoubleDotRejected) {
+  EXPECT_FALSE(parseExtractFieldSpec("params..name").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, DotBeforeArrayRejected) {
+  // The canonical pattern-path syntax never contains '.[]' — '[]' always directly follows
+  // the parent key.
+  EXPECT_FALSE(parseExtractFieldSpec("messages.[]").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, UnmatchedOpenBracketRejected) {
+  EXPECT_FALSE(parseExtractFieldSpec("messages[").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, UnmatchedCloseBracketRejected) {
+  EXPECT_FALSE(parseExtractFieldSpec("messages]").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, NonEmptySubscriptRejected) {
+  // Only '[]' is valid — '[0]', '[key]', '[*]' are not supported.
+  EXPECT_FALSE(parseExtractFieldSpec("messages[0]").ok());
+  EXPECT_FALSE(parseExtractFieldSpec("messages[key]").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, NestedBracketsRejected) {
+  EXPECT_FALSE(parseExtractFieldSpec("a[[]]").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, KeyAfterBracketWithoutDotRejected) {
+  // The canonical pattern-path syntax always separates an array wildcard from
+  // a following dict key with '.' ("a[].b", never "a[]b") — a bare key after
+  // ']' is a typo.
+  EXPECT_FALSE(parseExtractFieldSpec("a[]b").ok());
+  EXPECT_FALSE(parseExtractFieldSpec("messages[]role").ok());
+}
+
+TEST(ParseExtractFieldSpecTest, BackslashReservedRejected) {
+  // '\' is reserved for a future escape syntax for document keys containing
+  // '.', '[', ']' — reserving it now keeps that extension non-breaking.
+  auto result = parseExtractFieldSpec(R"(params.\_meta)");
+  ASSERT_FALSE(result.ok());
+  EXPECT_FALSE(result.status().message().empty());
+  EXPECT_FALSE(parseExtractFieldSpec(R"(a\.b)").ok());
+  EXPECT_FALSE(parseExtractFieldSpec(R"(a\\b)").ok());
+}
+
+// Executable form of the documented LIMITATION on ExtractFieldSpec: '.'
+// always splits segments, so a spec written for a single document key that
+// contains dots (the MCP reverse-DNS _meta convention) parses "successfully"
+// into nested segments that can never structurally match that key — a silent
+// no-match, not a config error. Lifting this needs either the reserved '\'
+// escape syntax or a structured segment-list config representation.
+TEST(ParseExtractFieldSpecTest, DottedDocumentKeyIsNotAddressable) {
+  auto result = parseExtractFieldSpec("params._meta.vendor.example.com/token");
+  ASSERT_TRUE(result.ok());
+  // Parsed as 5 nested dict keys, NOT as {params, _meta, "vendor.example.com/token"}.
+  ASSERT_EQ(result->segments.size(), 5u);
+  EXPECT_EQ(result->segments[2].key, "vendor");
+  EXPECT_EQ(result->segments[3].key, "example");
+  EXPECT_EQ(result->segments[4].key, "com/token");
+}
+
+TEST(ParseExtractFieldSpecTest, BracketAfterBracketAccepted) {
+  // '[' directly after ']' stays legal: "a[][]" is a dict key whose value is
+  // an array of arrays (depth 3: key, outer wildcard, inner wildcard).
+  auto result = parseExtractFieldSpec("a[][]");
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(result->segments.size(), 3u);
+}
+
+TEST(ParseExtractFieldSpecTest, DepthBoundEnforced) {
+  // 9 segments — one past the cursor's matchable bound of
+  // kMaxTrackedDepth - 1 (currently 8), the value the doc says to pass.
+  constexpr absl::string_view kNineSegments = "a.b.c.d.e.f.g.h.i";
+  // At the exact segment count: accepted.
+  EXPECT_TRUE(parseExtractFieldSpec(kNineSegments, WuffsJsonCursor::kMaxTrackedDepth).ok());
+  // Over bound: rejected with an informative error.
+  auto result = parseExtractFieldSpec(kNineSegments, WuffsJsonCursor::kMaxTrackedDepth - 1);
+  ASSERT_FALSE(result.ok());
+  EXPECT_FALSE(result.status().message().empty());
+  // Default (0) means no depth check.
+  EXPECT_TRUE(parseExtractFieldSpec(kNineSegments).ok());
+}
+
+// Error messages must be non-empty and contain relevant context (not just "false").
+TEST(ParseExtractFieldSpecTest, ErrorMessageIsInformative) {
+  auto result = parseExtractFieldSpec("messages.[]");
+  ASSERT_FALSE(result.ok());
+  EXPECT_FALSE(result.status().message().empty());
+}
+
+// ============================================================================
+// ParserConfig::validate — extraction mode mutual exclusion
+// ============================================================================
+
+TEST(ParserConfigValidateTest, DefaultConfigIsValid) {
+  ParserConfig cfg;
+  EXPECT_TRUE(cfg.validate().ok());
+}
+
+TEST(ParserConfigValidateTest, CaptureAllAloneIsValid) {
+  ParserConfig cfg;
+  cfg.capture_all_scalars = true;
+  EXPECT_TRUE(cfg.validate().ok());
+}
+
+TEST(ParserConfigValidateTest, SpecsAloneAreValid) {
+  ParserConfig cfg;
+  auto spec = parseExtractFieldSpec("model");
+  ASSERT_TRUE(spec.ok());
+  cfg.extract_fields.push_back(std::move(*spec));
+  EXPECT_TRUE(cfg.validate().ok());
+}
+
+TEST(ParserConfigValidateTest, CaptureAllWithSpecsRejected) {
+  ParserConfig cfg;
+  cfg.capture_all_scalars = true;
+  auto spec = parseExtractFieldSpec("model");
+  ASSERT_TRUE(spec.ok());
+  cfg.extract_fields.push_back(std::move(*spec));
+  auto status = cfg.validate();
+  ASSERT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_FALSE(status.message().empty());
+}
+
+} // namespace
+} // namespace Wuffs
+} // namespace Json
+} // namespace Envoy
