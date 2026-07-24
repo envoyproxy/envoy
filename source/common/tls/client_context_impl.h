@@ -62,7 +62,15 @@ protected:
       absl::Status& creation_status);
 
 private:
-  int newSessionKey(SSL_SESSION* session);
+  struct SessionKey {
+    std::string server_name;
+    bssl::UniquePtr<SSL_SESSION> session;
+  };
+
+  friend class ClientContextConfigImplTest;
+
+  static int sslServerNameIndex();
+  int newSessionKey(SSL* ssl, SSL_SESSION* session);
 
   const std::string server_name_indication_;
   const bool auto_host_sni_;
@@ -70,7 +78,7 @@ private:
 
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
-  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
+  std::deque<SessionKey> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
   bool session_keys_single_use_{false};
   Ssl::UpstreamTlsCertificateSelectorPtr tls_certificate_selector_;
 };

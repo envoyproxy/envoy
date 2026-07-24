@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -9,10 +10,12 @@
 #include "source/common/common/base64.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/ssl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/tls/cert_validator/default_validator.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
@@ -61,6 +64,10 @@ public:
     }};
   }
 
+  int storeSessionKey(ClientContextImpl& context, SSL* ssl, SSL_SESSION* session) {
+    return context.newSessionKey(ssl, session);
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   ContextManagerImpl manager_{server_factory_context_};
 };
@@ -76,6 +83,35 @@ TEST_F(ClientContextConfigImplTest, EmptyServerNameIndication) {
   tls_context.set_sni(std::string("a\000b", 3));
   EXPECT_EQ(ClientContextConfigImpl::create(tls_context, factory_context).status().message(),
             "SNI names containing NULL-byte are not allowed");
+}
+
+TEST_F(ClientContextConfigImplTest, SessionKeysAreScopedToServerName) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.mutable_max_session_keys()->set_value(2);
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::IsolatedStoreImpl store;
+  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto* client_context_impl = dynamic_cast<ClientContextImpl*>(context.get());
+  ASSERT_NE(client_context_impl, nullptr);
+
+  auto host_a = client_context_impl->newSsl(
+      std::make_shared<Network::TransportSocketOptionsImpl>("host-a.example"), nullptr);
+  ASSERT_TRUE(host_a.ok());
+  SSL_SESSION* session = SSL_SESSION_new();
+  ASSERT_NE(session, nullptr);
+  ASSERT_EQ(storeSessionKey(*client_context_impl, host_a->get(), session), 1);
+
+  auto host_b = client_context_impl->newSsl(
+      std::make_shared<Network::TransportSocketOptionsImpl>("host-b.example"), nullptr);
+  ASSERT_TRUE(host_b.ok());
+  EXPECT_EQ(SSL_get_session(host_b->get()), nullptr);
+
+  auto host_a_again = client_context_impl->newSsl(
+      std::make_shared<Network::TransportSocketOptionsImpl>("host-a.example"), nullptr);
+  ASSERT_TRUE(host_a_again.ok());
+  EXPECT_EQ(SSL_get_session(host_a_again->get()), session);
+
+  auto cleanup = cleanUpHelper(context);
 }
 
 // Validate that it is an error configure `auto_sni_san_validation` without configuring
