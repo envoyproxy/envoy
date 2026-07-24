@@ -27,12 +27,14 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::An;
 using testing::Const;
@@ -2168,20 +2170,20 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
 
   // Parse the JSON output — this verifies the result is valid JSON, including after the append.
   auto json_or = Json::Factory::loadFromString(result);
-  ASSERT_TRUE(json_or.ok()) << json_or.status().message();
+  ASSERT_OK(json_or);
   auto array = json_or.value()->asObjectArray();
-  ASSERT_TRUE(array.ok());
+  ASSERT_OK(array);
   ASSERT_EQ(2, array.value().size());
 
   // Verify the existing (first) object survived the append intact.
   auto& first = array.value()[0];
   auto first_by = first->getStringArray("by");
-  ASSERT_TRUE(first_by.ok());
+  ASSERT_OK(first_by);
   ASSERT_EQ(1, first_by.value().size());
   EXPECT_EQ(existing_by, first_by.value()[0]);
   EXPECT_EQ(existing_hash, first->getString("hash").value());
   auto first_uri = first->getStringArray("uri");
-  ASSERT_TRUE(first_uri.ok());
+  ASSERT_OK(first_uri);
   ASSERT_EQ(1, first_uri.value().size());
   EXPECT_EQ(existing_uri, first_uri.value()[0]);
 
@@ -2189,29 +2191,27 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
   auto& obj = array.value()[1];
 
   auto by = obj->getStringArray("by");
-  ASSERT_TRUE(by.ok());
+  ASSERT_OK(by);
   ASSERT_EQ(local_uri_sans.size(), by.value().size());
   for (size_t i = 0; i < local_uri_sans.size(); i++) {
     EXPECT_EQ(local_uri_sans[i], by.value()[i]);
   }
 
   auto hash = obj->getString("hash");
-  ASSERT_TRUE(hash.ok());
-  EXPECT_EQ(expected_sha, hash.value());
+  ASSERT_THAT(hash, IsOkAndHolds(expected_sha));
 
   auto subject = obj->getString("subject");
-  ASSERT_TRUE(subject.ok());
-  EXPECT_EQ(peer_subject, subject.value());
+  ASSERT_THAT(subject, IsOkAndHolds(peer_subject));
 
   auto uri = obj->getStringArray("uri");
-  ASSERT_TRUE(uri.ok());
+  ASSERT_OK(uri);
   ASSERT_EQ(peer_uri_sans.size(), uri.value().size());
   for (size_t i = 0; i < peer_uri_sans.size(); i++) {
     EXPECT_EQ(peer_uri_sans[i], uri.value()[i]);
   }
 
   auto dns = obj->getStringArray("dns");
-  ASSERT_TRUE(dns.ok());
+  ASSERT_OK(dns);
   ASSERT_EQ(expected_dns.size(), dns.value().size());
   // Control characters (< 0x80) roundtrip correctly: the JSON serializer escapes them as \u00XX
   // and the parser decodes them back to the same single byte.
@@ -2226,11 +2226,10 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
   EXPECT_EQ(expected_dns[2], dns.value()[2]);
 
   auto cert = obj->getString("cert");
-  ASSERT_TRUE(cert.ok());
-  EXPECT_EQ(expected_pem, cert.value());
+  ASSERT_THAT(cert, IsOkAndHolds(expected_pem));
 
   auto chain = obj->getStringArray("chain");
-  ASSERT_TRUE(chain.ok());
+  ASSERT_OK(chain);
   ASSERT_EQ(expected_chain_pems.size(), chain.value().size());
   for (size_t i = 0; i < expected_chain_pems.size(); i++) {
     EXPECT_EQ(expected_chain_pems[i], chain.value()[i]);

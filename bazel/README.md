@@ -342,6 +342,46 @@ bazel build envoy --config=docker-clang
 Tests can be run in docker sandbox too. Note that the network environment, such as IPv6, may be different in the docker sandbox so you may want
 set different options. See below to configure test IP versions.
 
+## Building with host-provided toolchains
+
+By default, Envoy's Bazel build downloads hermetic versions of several toolchains (Go, CMake/Make/Ninja,
+and Python). Downstream projects that embed Envoy may prefer to use the versions already installed on
+the build host instead.
+
+The `use_host_tools` parameter can be passed to `envoy_dependency_imports` and `envoy_dependencies_extra`
+in your WORKSPACE file to achieve this:
+
+```starlark
+envoy_dependency_imports(use_host_tools = True)
+envoy_dependencies_extra(use_host_tools = True)
+```
+
+When `use_host_tools = True`:
+
+- **Go**: Uses the Go SDK installed on the host (equivalent to `go_version = "host"`).
+- **CMake/Make/Ninja**: Uses the host-installed versions instead of downloading them
+  via `rules_foreign_cc`.
+- **Python**: Disables the hermetic Python toolchain and registers the host Python
+  autodetecting toolchain instead.
+
+Additionally, to use a host-installed Clang/LLVM toolchain instead of the hermetic one downloaded
+by Bazel, add the following to your `user.bazelrc`:
+
+```
+build --repo_env=BAZEL_USE_HOST_SYSROOT=True
+build --repo_env=BAZEL_LLVM_PATH=/usr
+build --config=clang-local
+```
+
+`BAZEL_LLVM_PATH` should point to the root of your LLVM installation.
+
+**Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
+hermetic toolchain versions are the only configuration tested in CI. Using host tools may result
+in build failures or unexpected behavior depending on the versions installed. This option is
+provided as a convenience for downstream repositories that build inside controlled environments
+(e.g. container-based CI) where tools are pre-installed at known versions. Upstream Envoy builds
+are unaffected when the parameter is omitted.
+
 ## Linking against libc++ on Linux
 
 When using `--config=clang`, Envoy is automatically linked against libc++. No additional configuration is needed.

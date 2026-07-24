@@ -152,6 +152,10 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
+// scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
+// TODO: flip to true after sufficient testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_stats_explicit_tags);
 // TODO: Flip to true after sufficient testing to enable formatter support for rate limit action
 // descriptor_value fields by default.
 FALSE_RUNTIME_GUARD(

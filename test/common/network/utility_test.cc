@@ -26,14 +26,19 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::DoAll;
 using testing::Eq;
 using testing::Invoke;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -66,31 +71,31 @@ StatusOr<Interface> getLocalNetworkInterface() {
 }
 
 TEST(NetworkUtility, resolveUrl) {
-  EXPECT_FALSE(Utility::resolveUrl("foo").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("abc://foo").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://1.2.3.4:1234/").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:8001/").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:0/foo").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3.3").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3.3.3:0").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3:0").status().ok());
+  EXPECT_THAT(Utility::resolveUrl("foo").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("abc://foo").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://1.2.3.4:1234/").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://127.0.0.1:8001/").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://127.0.0.1:0/foo").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://127.0.0.1:").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://192.168.3.3").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://192.168.3.3.3:0").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://192.168.3:0").status(), Not(IsOk()));
 
-  EXPECT_FALSE(Utility::resolveUrl("udp://1.2.3.4:1234/").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:8001/").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:0/foo").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3.3").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3.3.3:0").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3:0").status().ok());
+  EXPECT_THAT(Utility::resolveUrl("udp://1.2.3.4:1234/").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://127.0.0.1:8001/").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://127.0.0.1:0/foo").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://127.0.0.1:").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://192.168.3.3").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://192.168.3.3.3:0").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://192.168.3:0").status(), Not(IsOk()));
 
-  EXPECT_FALSE(Utility::resolveUrl("tcp://[::1]").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://[:::1]:1").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://foo:0").status().ok());
+  EXPECT_THAT(Utility::resolveUrl("tcp://[::1]").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://[:::1]:1").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://foo:0").status(), Not(IsOk()));
 
-  EXPECT_FALSE(Utility::resolveUrl("udp://[::1]").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://[:::1]:1").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://foo:0").status().ok());
+  EXPECT_THAT(Utility::resolveUrl("udp://[::1]").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://[:::1]:1").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://foo:0").status(), Not(IsOk()));
 
   EXPECT_EQ("", (*Utility::resolveUrl("unix://"))->asString());
   EXPECT_EQ("foo", (*Utility::resolveUrl("unix://foo"))->asString());
@@ -129,8 +134,8 @@ TEST(NetworkUtility, urlFromDatagramAddress) {
 }
 
 TEST(NetworkUtility, socketTypeFromUrl) {
-  EXPECT_FALSE(Utility::socketTypeFromUrl("foo").ok());
-  EXPECT_FALSE(Utility::socketTypeFromUrl("abc://foo").ok());
+  EXPECT_THAT(Utility::socketTypeFromUrl("foo"), Not(IsOk()));
+  EXPECT_THAT(Utility::socketTypeFromUrl("abc://foo"), Not(IsOk()));
 
   EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://"));
   EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://foo"));
@@ -878,8 +883,7 @@ TEST_F(ExecInNetnsTest, Basic) {
   // Now check basic functionality to ensure the function is called from a "different netns".
   std::function<std::string()> func = [&]() -> std::string { return getCurrentNetns(); };
   auto result = Utility::execInNetworkNamespace(func, "ns1");
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), "ns1");
+  EXPECT_THAT(result, IsOkAndHolds("ns1"));
 
   // Make sure the netns reverted back to the netns the execInNetworkNamespace function was called
   // from. When the netns was noted before making the jump, it used the fd of "/proc/self/ns/net"
@@ -888,8 +892,7 @@ TEST_F(ExecInNetnsTest, Basic) {
 
   // Try another netns.
   result = Utility::execInNetworkNamespace(func, "ns2");
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), "ns2");
+  EXPECT_THAT(result, IsOkAndHolds("ns2"));
 
   // Make sure the netns reverted back.
   EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
@@ -910,8 +913,7 @@ TEST_F(ExecInNetnsTest, OpenFail) {
 
   // Expecting failure.
   auto result = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
-  EXPECT_FALSE(result.ok());
-  EXPECT_TRUE(result.status().message().starts_with("failed to open netns file"));
+  EXPECT_THAT(result, HasStatusMessage(testing::StartsWith("failed to open netns file")));
 }
 
 TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {

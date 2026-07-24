@@ -1,0 +1,24 @@
+  export filter status and backend response code to dynamic metadata
+
+    Export the MCP JSON REST Bridge filter's execution status to dynamic
+    metadata to allow downstream consumers to track the result of the mapping
+    operation.
+
+    - Introduce `BridgeStatusValues` constants representing various success (OK),
+      pass-through, and error states.
+    - Export the status to dynamic metadata. The status defaults to OK on success,
+      and is updated to the specific error status on failures.
+    - Record a specific status `mcp_json_rest_bridge_request_passthrough`
+      in dynamic metadata when the filter falls back to pass-through mode due to
+      missing configuration (e.g., an unconfigured `tools/list` request).
+    - Export `backend_response_code` to dynamic metadata when the backend returns
+      a response (both on success and failures), aiding in debugging.
+    - Consolidate error handling in `sendErrorResponse` and `sendLocalReplyInternal`
+      helpers which handle local reply generation, status updates, and metadata writing.
+    - Delay dynamic metadata writing until the success path is determined to prevent
+      spurious "OK" status writes on requests that fail validation.
+    - Prioritize HTTP status codes over JSON parse errors when reporting backend
+      failures in the tools list response mapping.
+    - Add and update unit tests to verify the new dynamic metadata status and
+      response code export across various scenarios, and fix missing headers in
+      existing tests.

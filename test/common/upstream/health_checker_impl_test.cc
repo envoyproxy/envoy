@@ -41,18 +41,21 @@
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -4272,14 +4275,14 @@ TEST(PayloadMatcher, loadJsonBytes) {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("4");
 
-    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(repeated_payload).status().ok());
+    EXPECT_THAT(PayloadMatcher::loadProtoBytes(repeated_payload).status(), Not(IsOk()));
   }
 
   {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("gg");
 
-    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(repeated_payload).status().ok());
+    EXPECT_THAT(PayloadMatcher::loadProtoBytes(repeated_payload).status(), Not(IsOk()));
   }
 }
 
@@ -4307,7 +4310,7 @@ TEST(PayloadMatcher, loadSinglePayload) {
     envoy::config::core::v3::HealthCheck::Payload single_payload;
     single_payload.set_text("gg");
 
-    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(single_payload).status().ok());
+    EXPECT_THAT(PayloadMatcher::loadProtoBytes(single_payload).status(), Not(IsOk()));
   }
 }
 

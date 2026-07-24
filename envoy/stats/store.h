@@ -245,6 +245,14 @@ public:
   virtual void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) PURE;
 
   /**
+   * Selects whether scopes created by this store use the explicit-tags logic, which propagates
+   * scope-level tags onto every stat. Must be called during single-threaded startup, before
+   * scopes other than the root scope are created and before initializeThreading(); flipping it
+   * afterwards is unsupported.
+   */
+  virtual void setUseExplicitTags(bool use_explicit_tags) PURE;
+
+  /**
    * Initialize the store for threading. This will be called once after all worker threads have
    * been initialized. At this point the store can initialize itself for multi-threaded operation.
    */

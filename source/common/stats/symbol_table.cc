@@ -718,6 +718,40 @@ void SymbolTable::populateList(const StatName* names, uint32_t num_names, StatNa
   list.moveStorageIntoList(mem_block.release());
 }
 
+void SymbolTable::populateList(StatName tagged_name, StatName base_name, StatNameTagSpan name_tags,
+                               StatNameList& list) {
+  const size_t stat_name_count = name_tags.size() * 2 + 2;
+
+  RELEASE_ASSERT(stat_name_count < 256, "Maximum number elements in a StatNameList exceeded");
+
+  // One byte for the number of names, plus the size of each name.
+  size_t total_size_bytes = 1;
+  total_size_bytes += tagged_name.size() + base_name.size();
+  for (const auto& tag : name_tags) {
+    total_size_bytes += tag.first.size() + tag.second.size();
+  }
+
+  // Now allocate the exact number of bytes required and move the encodings into storage.
+  MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
+  mem_block.appendOne(stat_name_count);
+  Encoding::appendToMemBlock(tagged_name, mem_block);
+  Encoding::appendToMemBlock(base_name, mem_block);
+  incRefCount(tagged_name);
+  incRefCount(base_name);
+  for (const auto& tag : name_tags) {
+    Encoding::appendToMemBlock(tag.first, mem_block);
+    Encoding::appendToMemBlock(tag.second, mem_block);
+    incRefCount(tag.first);
+    incRefCount(tag.second);
+  }
+
+  // This assertion double-checks the arithmetic where we computed total_size_bytes. After appending
+  // all the encoded data into the allocated byte array, we should have exhausted all the memory we
+  // thought we needed.
+  ASSERT(mem_block.capacityRemaining() == 0);
+  list.moveStorageIntoList(mem_block.release());
+}
+
 StatNameList::~StatNameList() { ASSERT(!populated()); }
 
 void StatNameList::iterate(const std::function<bool(StatName)>& f) const {

@@ -5,8 +5,10 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/integration/fake_access_log.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -122,10 +124,51 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InitializedSuccess) {
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
+  FakeAccessLogFactory factory;
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  bool metadata_verified = false;
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+        auto it = dynamic_metadata.find("envoy.filters.http.mcp_json_rest_bridge");
+        if (it != dynamic_metadata.end()) {
+          Protobuf::Struct expected_metadata;
+          MessageUtil::loadFromJson(R"json({
+            "status": "mcp_json_rest_bridge_ok",
+            "method": "tools/call",
+            "backend_response_code": 200,
+            "params": {
+              "name": "create_api_key",
+              "arguments": {
+                "parent": "projects/foo",
+                "key": {
+                  "displayName": "bar"
+                }
+              }
+            }
+          })json",
+                                    expected_metadata);
+          EXPECT_TRUE(TestUtility::protoEqual(expected_metadata, it->second))
+              << "got:\n"
+              << it->second.DebugString() << "\nexpected:\n"
+              << expected_metadata.DebugString();
+          metadata_verified = true;
+        }
+      });
+
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* access_log = hcm.add_access_log();
+    access_log->set_name("envoy.access_loggers.test");
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      request_storage_mode: DYNAMIC_METADATA
       tool_config:
         tools:
           - name: "create_api_key"
@@ -197,6 +240,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
     }
   })";
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
+  EXPECT_TRUE(metadata_verified);
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithTrailersTranscoding) {
@@ -283,11 +327,41 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithTrailersTranscoding) {
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallRequestBodyExceedsLimit) {
+  FakeAccessLogFactory factory;
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  bool metadata_verified = false;
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+        auto it = dynamic_metadata.find("envoy.filters.http.mcp_json_rest_bridge");
+        if (it != dynamic_metadata.end()) {
+          Protobuf::Struct expected_metadata;
+          MessageUtil::loadFromJson(R"json({
+            "status": "mcp_json_rest_bridge_request_too_large"
+          })json",
+                                    expected_metadata);
+          EXPECT_TRUE(TestUtility::protoEqual(expected_metadata, it->second))
+              << "got:\n"
+              << it->second.DebugString() << "\nexpected:\n"
+              << expected_metadata.DebugString();
+          metadata_verified = true;
+        }
+      });
+
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* access_log = hcm.add_access_log();
+    access_log->set_name("envoy.access_loggers.test");
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
       max_request_body_size: 10
+      request_storage_mode: DYNAMIC_METADATA
       tool_config:
         tools:
           - name: "create_api_key"
@@ -332,14 +406,56 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallRequestBodyExceedsLimit) {
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
           R"json({"jsonrpc":"2.0","id":null,"error":{"code":-32000,"message":"Request body too large"}})json"));
+  EXPECT_TRUE(metadata_verified);
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallResponseBodyExceedsLimit) {
+  FakeAccessLogFactory factory;
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  bool metadata_verified = false;
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+        auto it = dynamic_metadata.find("envoy.filters.http.mcp_json_rest_bridge");
+        if (it != dynamic_metadata.end()) {
+          Protobuf::Struct expected_metadata;
+          MessageUtil::loadFromJson(R"json({
+            "status": "mcp_json_rest_bridge_response_too_large",
+            "backend_response_code": 200,
+            "method": "tools/call",
+            "params": {
+              "name": "create_api_key",
+              "arguments": {
+                "parent": "projects/foo",
+                "key": {
+                  "displayName": "bar"
+                }
+              }
+            }
+          })json",
+                                    expected_metadata);
+          EXPECT_TRUE(TestUtility::protoEqual(expected_metadata, it->second))
+              << "got:\n"
+              << it->second.DebugString() << "\nexpected:\n"
+              << expected_metadata.DebugString();
+          metadata_verified = true;
+        }
+      });
+
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* access_log = hcm.add_access_log();
+    access_log->set_name("envoy.access_loggers.test");
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
       max_response_body_size: 10
+      request_storage_mode: DYNAMIC_METADATA
       tool_config:
         tools:
           - name: "create_api_key"
@@ -398,6 +514,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallResponseBodyExceedsLimit) {
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
           R"json({"jsonrpc":"2.0","id":321,"error":{"code":-32000,"message":"Response body too large"}})json"));
+  EXPECT_TRUE(metadata_verified);
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsListTranscoding) {

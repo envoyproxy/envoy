@@ -268,13 +268,15 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     throw MalformedArgvException(message);
   }
 
-  if (!concurrency.isSet() && cpuset_threads_) {
-    // The 'concurrency' command line option wasn't set but the 'cpuset-threads'
-    // option was set. Use the number of CPUs assigned to the process cpuset, if
-    // that can be known.
+  if (!concurrency.isSet()) {
+    // Default to the platform CPU count, regardless of --cpuset-threads. On Linux this is the
+    // min of hardware threads, CPU affinity, and cgroup CPU limit; hardware threads elsewhere.
+    if (cpuset_threads.isSet() && !skip_deprecated_logs.getValue()) {
+      ENVOY_LOG(warn, "--cpuset-threads is now the default behavior and no longer required.");
+    }
     concurrency_ = OptionsImplPlatform::getCpuCount();
   } else {
-    if (concurrency.isSet() && cpuset_threads_ && cpuset_threads.isSet()) {
+    if (cpuset_threads.isSet()) {
       ENVOY_LOG(warn, "Both --concurrency and --cpuset-threads options are set; not applying "
                       "--cpuset-threads.");
     }

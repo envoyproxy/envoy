@@ -36,6 +36,9 @@
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::testing::Not;
 using namespace std::chrono_literals;
 
 namespace Envoy {
@@ -294,7 +297,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
   source_any.set_type_url("type.googleapis.com/bad.type.url");
   source_any.set_value("asdf");
   auto status = MessageUtil::getJsonStringFromMessage(source_any, true).status();
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
@@ -1459,8 +1462,7 @@ TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
     Protobuf::Any source_any;
     std::ignore = source_any.PackFrom(source);
     auto result = MessageUtil::knownAnyToBytes(source_any);
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(*result, R"({"key":"value"})");
+    ASSERT_THAT(result, IsOkAndHolds(R"({"key":"value"})"));
   }
   {
     envoy::config::cluster::v3::Filter filter;
@@ -1510,7 +1512,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     Protobuf::Any source_any;
     std::ignore = source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
-    ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
+    ASSERT_OK(MessageUtil::unpackTo(source_any, dst));
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
@@ -1519,7 +1521,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     Protobuf::Any source_any;
     std::ignore = source_any.PackFrom(source);
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
+    ASSERT_OK(MessageUtil::unpackTo(source_any, dst));
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }
@@ -1780,34 +1782,33 @@ TEST(DurationUtilTest, NoThrow) {
     duration.set_seconds(5);
     duration.set_nanos(10000000);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_TRUE(result.ok());
-    EXPECT_TRUE(result.value() == 5010);
+    EXPECT_THAT(result, IsOkAndHolds(5010));
   }
   // Below are out-of-range tests
   {
     Protobuf::Duration duration;
     duration.set_seconds(-1);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   {
     Protobuf::Duration duration;
     duration.set_nanos(-1);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   // Invalid number of nanoseconds.
   {
     Protobuf::Duration duration;
     duration.set_nanos(1000000000);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   {
     Protobuf::Duration duration;
     duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   // Invalid number of seconds.
   {
@@ -1816,7 +1817,7 @@ TEST(DurationUtilTest, NoThrow) {
         (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
     duration.set_seconds(kMaxInt64Nanoseconds + 1);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   // Max valid seconds and nanoseconds.
   {
@@ -1826,7 +1827,7 @@ TEST(DurationUtilTest, NoThrow) {
     duration.set_seconds(kMaxInt64Nanoseconds);
     duration.set_nanos(999999999);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_TRUE(result.ok());
+    EXPECT_OK(result);
   }
   // Invalid combined seconds and nanoseconds.
   {
@@ -1836,7 +1837,7 @@ TEST(DurationUtilTest, NoThrow) {
     duration.set_seconds(kMaxInt64Nanoseconds);
     duration.set_nanos(999999999);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
 }
 

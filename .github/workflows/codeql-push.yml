@@ -31,7 +31,6 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - uses: envoyproxy/toolshed/actions/bind-mounts@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
-      if: ! github.event.repository.private
       with:
         mounts: |
           - src: /mnt/workspace
@@ -54,16 +53,14 @@ jobs:
         else
             TO_OTHER=HEAD^1
         fi
-        if git diff --name-only HEAD "${TO_OTHER}" -- source/common/ include/ | grep -q .; then
+        if git diff --name-only HEAD "${TO_OTHER}" -- source/common/ envoy/ | grep -q .; then
             echo "CPP_CHANGED=true" >> "$GITHUB_ENV"
         else
             echo "CPP_CHANGED=false" >> "$GITHUB_ENV"
         fi
 
     - name: Free disk space
-      if: |
-        env.CPP_CHANGED == 'true'
-        && github.event.repository.private
+      if: env.CPP_CHANGED == 'true'
       uses: envoyproxy/toolshed/actions/diskspace@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         to_remove: |
@@ -79,7 +76,7 @@ jobs:
                 if [[ -n "$line" ]]; then
                     bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
                 fi
-            done < <(git diff --name-only HEAD "${1}" -- source/common/* include/*)
+            done < <(git diff --name-only HEAD "${1}" -- source/common/* envoy/*)
         }
         if [[ "$GIT_EVENT" == "pull_request" ]]; then
             git fetch "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2> /dev/null
@@ -97,7 +94,7 @@ jobs:
     - name: Set default build target
       if: env.CPP_CHANGED == 'true' && env.BUILD_TARGETS == ''
       run: |
-        echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" > $GITHUB_ENV
+        echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" >> $GITHUB_ENV
 
     - name: Initialize CodeQL
       if: env.CPP_CHANGED == 'true'
