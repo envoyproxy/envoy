@@ -555,7 +555,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for RecreateStreamFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // SAFETY: this hook does not touch `envoy_filter` again after recreate_stream succeeds.
     assert!(unsafe {
-      envoy_filter.recreate_stream(Some(&[(":status", b"302"), ("location", b"/recreated")]))
+      envoy_filter.recreate_stream(Some(&[(":status", b"302"), ("location", b"/recreated"),]))
     });
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }

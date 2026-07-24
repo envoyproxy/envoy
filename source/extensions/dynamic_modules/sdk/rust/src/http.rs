@@ -2020,13 +2020,13 @@ pub trait EnvoyHttpFilter {
   /// # Safety
   ///
   /// When this returns `true`, Envoy synchronously destroys the current filter chain, including
-  /// the Envoy filter that backs `self` before this call returns. The caller MUST return 
-  /// `StopIteration` from the current event hook and MUST NOT touch `self` (or the [`HttpFilter`] 
-  /// that invoked the hook) again afterwards. 
+  /// the Envoy filter that backs `self` before this call returns. The caller MUST return
+  /// `StopIteration` from the current event hook and MUST NOT touch `self` (or the [`HttpFilter`]
+  /// that invoked the hook) again afterwards.
   unsafe fn recreate_stream<'a>(&mut self, headers: Option<&'a [(&'a str, &'a [u8])]>) -> bool;
 
-  /// Safe counterpart to [`EnvoyHttpFilter::recreate_stream`]: request recreation from a
-  /// request-path hook and the SDK performs it after the hook returns.
+  /// Safe counterpart to [`EnvoyHttpFilter::recreate_stream`]: request recreation from an event
+  /// hook and the SDK performs it after the hook returns, once no reference to the filter remains.
   fn request_stream_recreation(&mut self);
 
   /// Clear only the cluster selection for the current route without clearing the entire route
@@ -4024,20 +4024,23 @@ impl EnvoyHttpFilterImpl {
     }
   }
 
-  /// Perform a recreation requested via [`EnvoyHttpFilter::request_stream_recreation`], if any,
-  /// returning `true` if one was performed (the trampoline must then return `StopIteration`).
+  /// Perform a recreation requested via [`EnvoyHttpFilter::request_stream_recreation`], if any.
+  ///
+  /// Returns `true` only if Envoy actually recreated the stream (and therefore destroyed the
+  /// filter); the trampoline must then return `StopIteration`. Returns `false` if no recreation was
+  /// requested, or if Envoy declined it (e.g. the request body was not fully received) — in that
+  /// case the filter is still alive and the hook's own status must be honored.
   ///
   /// # Safety
   ///
-  /// Recreation frees the filter, so this must be called from a request-path trampoline only after
-  /// the filter hook has returned and no reference to the filter (`&mut self`) remains.
+  /// Recreation frees the filter, so this must be called from an event trampoline only after the
+  /// filter hook has returned and no reference to the filter (`&mut self`) remains.
   pub(crate) unsafe fn take_and_perform_recreation(&mut self) -> bool {
     if !self.recreate_requested {
       return false;
     }
     self.recreate_requested = false;
-    self.recreate_stream(None);
-    true
+    self.recreate_stream(None)
   }
 
   /// Implement the common logic for getting all headers/trailers.
@@ -4580,7 +4583,15 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
     let filter = &mut **filter;
-    filter.on_response_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+    let mut envoy = EnvoyHttpFilterImpl::new(envoy_ptr);
+    let status = filter.on_response_headers(&mut envoy, end_of_stream);
+    // See on_request_headers: recreate_stream is also reachable on the response path (e.g. internal
+    // redirects driven from upstream headers), so honor a deferred recreation here too.
+    // SAFETY: the hook has returned, so no reference to the filter remains.
+    if unsafe { envoy.take_and_perform_recreation() } {
+      return abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration;
+    }
+    status
   }))
   .unwrap_or_else(|panic| {
     crate::log_ffi_panic(
@@ -4604,7 +4615,14 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
     let filter = &mut **filter;
-    filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+    let mut envoy = EnvoyHttpFilterImpl::new(envoy_ptr);
+    let status = filter.on_response_body(&mut envoy, end_of_stream);
+    // See on_request_headers: perform any deferred recreation now that `filter` is unborrowed.
+    // SAFETY: the hook has returned, so no reference to the filter remains.
+    if unsafe { envoy.take_and_perform_recreation() } {
+      return abi::envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationNoBuffer;
+    }
+    status
   }))
   .unwrap_or_else(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_http_filter_response_body", panic);
@@ -4624,7 +4642,14 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
     let filter = &mut **filter;
-    filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
+    let mut envoy = EnvoyHttpFilterImpl::new(envoy_ptr);
+    let status = filter.on_response_trailers(&mut envoy);
+    // See on_request_headers: perform any deferred recreation now that `filter` is unborrowed.
+    // SAFETY: the hook has returned, so no reference to the filter remains.
+    if unsafe { envoy.take_and_perform_recreation() } {
+      return abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::StopIteration;
+    }
+    status
   }))
   .unwrap_or_else(|panic| {
     crate::log_ffi_panic(
@@ -4673,13 +4698,11 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
     } else {
       None
     };
-    filter.on_http_callout_done(
-      &mut EnvoyHttpFilterImpl::new(envoy_ptr),
-      callout_id,
-      result,
-      headers,
-      body,
-    )
+    let mut envoy = EnvoyHttpFilterImpl::new(envoy_ptr);
+    filter.on_http_callout_done(&mut envoy, callout_id, result, headers, body);
+    // This hook has no status to return, but a filter may still request recreation from it.
+    // SAFETY: the hook has returned, so no reference to the filter remains.
+    unsafe { envoy.take_and_perform_recreation() };
   }))
   .map_err(|panic| {
     crate::log_ffi_panic(

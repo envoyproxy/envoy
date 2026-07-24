@@ -3987,6 +3987,9 @@ pub extern "C" fn envoy_dynamic_module_callback_http_send_response(
 }
 
 static RECREATE_STREAM_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
+/// Controls the bool returned by the recreate_stream FFI stub, so tests can simulate Envoy
+/// declining the recreation (e.g. request body not fully received).
+static RECREATE_STREAM_RESULT: AtomicBool = AtomicBool::new(true);
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_http_filter_recreate_stream(
@@ -3995,7 +3998,7 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_recreate_stream(
   _headers_size: usize,
 ) -> bool {
   RECREATE_STREAM_CALL_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-  true
+  RECREATE_STREAM_RESULT.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 static RESET_STREAM_CALLED: AtomicBool = AtomicBool::new(false);
@@ -4071,55 +4074,131 @@ fn test_http_filter_state_object_round_trip() {
   assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
 }
 
+/// A filter that requests recreation from every event hook using only the safe API, and always
+/// returns the "continue" status so the trampoline's StopIteration override is observable.
+struct RecreatingFilter;
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for RecreatingFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.request_stream_recreation();
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_filter.request_stream_recreation();
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  fn on_http_callout_done(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
+    envoy_filter.request_stream_recreation();
+  }
+}
+
+struct RecreatingFilterConfig;
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for RecreatingFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(RecreatingFilter)
+  }
+}
+
+fn new_recreating_filter() -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
+  let mut filter_config = RecreatingFilterConfig;
+  envoy_dynamic_module_on_http_filter_new_impl(
+    &mut EnvoyHttpFilterImpl::new(std::ptr::null_mut()),
+    &mut filter_config,
+  )
+}
+
+// The SDK must perform a deferred request_stream_recreation() from the request path AND the
+// response path, after the hook returns (never inline), overriding the hook's status with a stop
+// so the destroyed stream is not iterated further.
 #[test]
 fn test_request_stream_recreation_deferred_to_trampoline() {
   use std::sync::atomic::Ordering;
+  RECREATE_STREAM_RESULT.store(true, Ordering::SeqCst);
 
-  // A filter that requests recreation from a request-path hook using only the safe API, then
-  // returns Continue. If the SDK honored the request inline it would free the filter here; instead
-  // the trampoline must perform it after this hook returns and override the status to stop.
-  struct RecreatingFilter;
-  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for RecreatingFilter {
-    fn on_request_headers(
-      &mut self,
-      envoy_filter: &mut EHF,
-      _end_of_stream: bool,
-    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
-      envoy_filter.request_stream_recreation();
-      abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
-    }
-  }
-
-  struct RecreatingFilterConfig;
-  impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for RecreatingFilterConfig {
-    fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-      Box::new(RecreatingFilter)
-    }
-  }
-
+  // Request path: on_request_headers.
   RECREATE_STREAM_CALL_COUNT.store(0, Ordering::SeqCst);
-
-  let mut filter_config = RecreatingFilterConfig;
-  let filter = envoy_dynamic_module_on_http_filter_new_impl(
-    &mut EnvoyHttpFilterImpl::new(std::ptr::null_mut()),
-    &mut filter_config,
-  );
-
-  // The recreation FFI has not fired during construction.
+  let filter = new_recreating_filter();
+  // Not recreated during construction.
   assert_eq!(RECREATE_STREAM_CALL_COUNT.load(Ordering::SeqCst), 0);
-
   let status =
     unsafe { envoy_dynamic_module_on_http_filter_request_headers(std::ptr::null_mut(), filter, true) };
-
-  // The trampoline performed the deferred recreation exactly once, after the hook returned, and
-  // overrode the hook's Continue with StopIteration for the now-destroyed stream.
   assert_eq!(RECREATE_STREAM_CALL_COUNT.load(Ordering::SeqCst), 1);
   assert_eq!(
     status,
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   );
+  unsafe { envoy_dynamic_module_on_http_filter_destroy(filter) };
+
+  // Response path: on_response_headers.
+  RECREATE_STREAM_CALL_COUNT.store(0, Ordering::SeqCst);
+  let filter = new_recreating_filter();
+  let status = unsafe {
+    envoy_dynamic_module_on_http_filter_response_headers(std::ptr::null_mut(), filter, true)
+  };
+  assert_eq!(RECREATE_STREAM_CALL_COUNT.load(Ordering::SeqCst), 1);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
+  );
+  unsafe { envoy_dynamic_module_on_http_filter_destroy(filter) };
+
+  // Callout hook: has no status to override, but the recreation must still be performed once.
+  RECREATE_STREAM_CALL_COUNT.store(0, Ordering::SeqCst);
+  let filter = new_recreating_filter();
+  unsafe {
+    envoy_dynamic_module_on_http_filter_http_callout_done(
+      std::ptr::null_mut(),
+      filter,
+      0,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      std::ptr::null(),
+      0,
+      std::ptr::null(),
+      0,
+    );
+  }
+  assert_eq!(RECREATE_STREAM_CALL_COUNT.load(Ordering::SeqCst), 1);
+  unsafe { envoy_dynamic_module_on_http_filter_destroy(filter) };
+}
+
+// If Envoy declines the recreation (recreate_stream returns false), the filter is NOT destroyed, so
+// the trampoline must honor the hook's own status rather than forcing StopIteration.
+#[test]
+fn test_request_stream_recreation_declined_keeps_hook_status() {
+  use std::sync::atomic::Ordering;
+  RECREATE_STREAM_RESULT.store(false, Ordering::SeqCst);
+  RECREATE_STREAM_CALL_COUNT.store(0, Ordering::SeqCst);
+
+  let filter = new_recreating_filter();
+  let status = unsafe {
+    envoy_dynamic_module_on_http_filter_request_headers(std::ptr::null_mut(), filter, true)
+  };
+
+  // The FFI was attempted once, but since it returned false the hook's Continue is preserved.
+  assert_eq!(RECREATE_STREAM_CALL_COUNT.load(Ordering::SeqCst), 1);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  );
 
   unsafe { envoy_dynamic_module_on_http_filter_destroy(filter) };
+  RECREATE_STREAM_RESULT.store(true, Ordering::SeqCst);
 }
 
 static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
