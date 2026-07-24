@@ -333,6 +333,36 @@ TEST_F(ConfigTest, SetBoolValueInvalid) {
   EXPECT_EQ(nullptr, value);
 }
 
+TEST_F(ConfigTest, SetBoolValueFromHeaderValid) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(x-redirect-enabled)%"
+  )YAML"});
+  header_map_.addCopy("x-redirect-enabled", "1");
+  update();
+  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
+  ASSERT_NE(nullptr, value);
+  EXPECT_TRUE(value->value());
+}
+
+TEST_F(ConfigTest, SetBoolValueFromHeaderValidFalse) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(x-redirect-enabled)%"
+  )YAML"});
+  header_map_.addCopy("x-redirect-enabled", "false");
+  update();
+  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
+  ASSERT_NE(nullptr, value);
+  EXPECT_FALSE(value->value());
+}
+
 TEST_F(ConfigTest, SetBoolValueFromHeaderInvalid) {
   initialize({R"YAML(
     object_key: my_key
