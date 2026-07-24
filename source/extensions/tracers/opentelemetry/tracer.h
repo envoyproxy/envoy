@@ -40,7 +40,7 @@ public:
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler, uint64_t max_cache_size);
+         SamplerSharedPtr sampler, uint64_t max_cache_size, bool set_instrumentation_scope = true);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -76,6 +76,7 @@ private:
   const ResourceConstSharedPtr resource_;
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
+  const bool set_instrumentation_scope_{true};
 };
 
 /**
