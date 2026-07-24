@@ -10,8 +10,14 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/utility.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::HasSubstr;
+using ::testing::Not;
 using ::testing::PrintToString;
 
 namespace Envoy {
@@ -79,7 +85,7 @@ TEST(TruncateIpAddressAndLength, Various) {
 }
 
 TEST(IsInRange, Various) {
-  { EXPECT_FALSE(CidrRange::create("foo").status().ok()); }
+  { EXPECT_THAT(CidrRange::create("foo").status(), Not(IsOk())); }
 
   {
     CidrRange rng = *CidrRange::create("10.255.255.255/0");
@@ -193,7 +199,9 @@ TEST(CidrRangeTest, OperatorIsEqual) {
   }
 }
 
-TEST(CidrRangeTest, InvalidCidrRange) { EXPECT_FALSE(CidrRange::create("foo").status().ok()); }
+TEST(CidrRangeTest, InvalidCidrRange) {
+  EXPECT_THAT(CidrRange::create("foo").status(), Not(IsOk()));
+}
 
 TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   InstanceConstSharedPtr ptr = Utility::parseInternetAddressNoThrow("1.2.3.5");
@@ -206,10 +214,12 @@ TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.5")));
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
-  EXPECT_FALSE(CidrRange::create(ptr, -1).status().ok()); // Invalid length.
+  EXPECT_THAT(CidrRange::create(ptr, -1).status(),
+              HasStatusMessage(HasSubstr("malformed IP address")));
 
   ptr.reset();
-  EXPECT_FALSE(CidrRange::create(ptr, 10).status().ok()); // Invalid address.
+  EXPECT_THAT(CidrRange::create(ptr, 10).status(),
+              HasStatusMessage(HasSubstr("malformed IP address")));
 }
 
 TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
@@ -223,9 +233,11 @@ TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.5")));
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
-  EXPECT_FALSE(CidrRange::create("1.2.3.4", -10).status().ok()); // Invalid length.
+  EXPECT_THAT(CidrRange::create("1.2.3.4", -10).status(),
+              HasStatusMessage(HasSubstr("malformed IP address: 1.2.3.4")));
 
-  EXPECT_FALSE(CidrRange::create("bogus", 31).status().ok()); // Invalid address.
+  EXPECT_THAT(CidrRange::create("bogus", 31).status(),
+              HasStatusMessage(HasSubstr("malformed IP address: bogus")));
 }
 
 TEST(Ipv4CidrRangeTest, StringCtor) {
@@ -238,10 +250,13 @@ TEST(Ipv4CidrRangeTest, StringCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.5")));
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.6")));
 
-  EXPECT_FALSE(CidrRange::create("1.2.3.4/-10").status().ok()); // Invalid length.
-  EXPECT_FALSE(CidrRange::create("bogus/31").status().ok());    // Invalid address.
-  EXPECT_FALSE(CidrRange::create("/31").status().ok());         // Missing address.
-  EXPECT_FALSE(CidrRange::create("1.2.3.4/").status().ok());    // Missing length.
+  EXPECT_THAT(CidrRange::create("1.2.3.4/-10").status(),
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
+  EXPECT_THAT(CidrRange::create("bogus/31").status(),
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
+  EXPECT_THAT(CidrRange::create("/31").status(), HasStatusMessage(HasSubstr("Invalid CIDR range")));
+  EXPECT_THAT(CidrRange::create("1.2.3.4/").status(),
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
 }
 
 TEST(Ipv4CidrRangeTest, BigRange) {
@@ -271,9 +286,11 @@ TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("abcd::345")));
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("abcd::346")));
 
-  EXPECT_FALSE(CidrRange::create(ptr, -1).status().ok()); // Invalid length.
+  EXPECT_THAT(CidrRange::create(ptr, -1).status(),
+              HasStatusMessage(HasSubstr("malformed IP address")));
   ptr.reset();
-  EXPECT_FALSE(CidrRange::create(ptr, 127).status().ok()); // Invalid address.
+  EXPECT_THAT(CidrRange::create(ptr, 127).status(),
+              HasStatusMessage(HasSubstr("malformed IP address")));
 }
 
 TEST(Ipv6CidrRange, StringAndLengthCtor) {
@@ -287,8 +304,10 @@ TEST(Ipv6CidrRange, StringAndLengthCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffff")));
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("::1:0")));
 
-  EXPECT_FALSE(CidrRange::create("::ffff", -2).status().ok()); // Invalid length.
-  EXPECT_FALSE(CidrRange::create("bogus", 122).status().ok()); // Invalid address.
+  EXPECT_THAT(CidrRange::create("::ffff", -2).status(),
+              HasStatusMessage(HasSubstr("malformed IP address: ::ffff")));
+  EXPECT_THAT(CidrRange::create("bogus", 122).status(),
+              HasStatusMessage(HasSubstr("malformed IP address: bogus")));
 }
 
 TEST(Ipv6CidrRange, StringCtor) {
@@ -301,10 +320,14 @@ TEST(Ipv6CidrRange, StringCtor) {
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffff")));
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("::1:00")));
 
-  EXPECT_FALSE(CidrRange::create("::fc1f/-10").status().ok());   // Invalid length.
-  EXPECT_FALSE(CidrRange::create("::fc1f00/118").status().ok()); // Invalid address.
-  EXPECT_FALSE(CidrRange::create("/118").status().ok());         // Missing address.
-  EXPECT_FALSE(CidrRange::create("::fc1f/").status().ok());      // Missing length.
+  EXPECT_THAT(CidrRange::create("::fc1f/-10").status(),
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
+  EXPECT_THAT(CidrRange::create("::fc1f00/118").status(),
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
+  EXPECT_THAT(CidrRange::create("/118").status(),
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
+  EXPECT_THAT(CidrRange::create("::fc1f/").status(),
+              HasStatusMessage(HasSubstr("Invalid CIDR range")));
 }
 
 TEST(Ipv6CidrRange, BigRange) {
@@ -336,7 +359,7 @@ makeCidrRangeList(const std::vector<std::pair<std::string, uint32_t>>& ranges) {
 }
 
 TEST(IpListTest, Errors) {
-  { EXPECT_FALSE(IpList::create(makeCidrRangeList({{"foo", 0}})).status().ok()); }
+  { EXPECT_THAT(IpList::create(makeCidrRangeList({{"foo", 0}})).status(), Not(IsOk())); }
 }
 
 TEST(IpListTest, SpecificAddressAllowed) {

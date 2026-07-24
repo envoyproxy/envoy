@@ -4,9 +4,12 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -279,7 +282,7 @@ TEST_F(QuicClientTransportSocketFactoryTest, TlsCertificateSelector) {
   }));
   auto factory_or_error = Quic::QuicClientTransportSocketFactory::create(
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
-  EXPECT_FALSE(factory_or_error.ok());
+  EXPECT_THAT(factory_or_error, Not(IsOk()));
 }
 
 TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
