@@ -659,6 +659,9 @@ auths
 authz
 automata
 autoscale
+awaitable
+awaitables
+awaiter
 backend
 backends
 backgrounded
@@ -1166,6 +1169,7 @@ netmask
 netns
 NLB
 NLMSG
+nodiscard
 nonblocking
 noncopyable
 nonresponsive
