@@ -159,4 +159,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
+      uses: github/codeql-action/analyze@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a  # codeql-bundle-v4.36.3
