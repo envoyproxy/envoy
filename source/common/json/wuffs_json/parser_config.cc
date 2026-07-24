@@ -1,7 +1,9 @@
 #include "source/common/json/wuffs_json/parser_config.h"
 
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -10,12 +12,15 @@
 namespace Envoy {
 namespace Json {
 namespace Wuffs {
+namespace {
 
-absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, int max_depth) {
+using Segment = std::optional<std::string>;
+
+// Rejects structural problems detectable before character-by-character parsing.
+absl::Status validatePathSyntax(absl::string_view path) {
   if (path.empty()) {
     return absl::InvalidArgumentError("extract_field_spec: path must not be empty");
   }
-
   if (path.front() == '.') {
     return absl::InvalidArgumentError("extract_field_spec: path must not start with '.'");
   }
@@ -28,81 +33,142 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, i
     return absl::InvalidArgumentError(
         "extract_field_spec: '\\' is reserved for future escape syntax");
   }
+  return absl::OkStatus();
+}
 
-  ExtractFieldSpec out;
-  std::string current_key;
-  bool in_array = false;
+absl::Status appendSegment(std::vector<Segment>& segments, Segment segment, int max_depth) {
+  segments.push_back(std::move(segment));
+  if (max_depth > 0 && segments.size() > static_cast<size_t>(max_depth)) {
+    return absl::InvalidArgumentError(absl::StrCat("extract_field_spec: path depth ",
+                                                   segments.size(),
+                                                   " exceeds maximum supported depth ", max_depth));
+  }
+  return absl::OkStatus();
+}
 
-  for (size_t i = 0; i < path.size(); ++i) {
-    const char c = path[i];
-    switch (c) {
+class ExtractFieldSpecParser {
+public:
+  ExtractFieldSpecParser(absl::string_view path, int max_depth)
+      : path_(path), max_depth_(max_depth) {}
+
+  absl::StatusOr<std::vector<Segment>> parse() {
+    for (size_t i = 0; i < path_.size(); ++i) {
+      if (auto status = consume(i); !status.ok()) {
+        return status;
+      }
+    }
+    if (in_array_) {
+      return absl::InvalidArgumentError("extract_field_spec: unterminated '[' in path");
+    }
+    if (auto status = flushKey(path_.size()); !status.ok()) {
+      return status;
+    }
+    if (segments_.empty()) {
+      return absl::InvalidArgumentError("extract_field_spec: path contains no segments");
+    }
+    return std::move(segments_);
+  }
+
+private:
+  absl::Status consume(size_t i) {
+    switch (path_[i]) {
     case '[':
-      if (in_array) {
-        return absl::InvalidArgumentError("extract_field_spec: nested '[' in path");
-      }
-      // '.' immediately before '[' is invalid: the canonical pattern-path
-      // syntax never contains '.[]' — '[]' always directly follows the
-      // parent dict key.
-      if (i > 0 && path[i - 1] == '.') {
-        return absl::InvalidArgumentError(
-            "extract_field_spec: '.' before '[' is not valid; use 'key[]' not 'key.[]'");
-      }
-      if (!current_key.empty()) {
-        out.segments.push_back({std::move(current_key), false});
-        current_key.clear();
-      }
-      in_array = true;
-      break;
+      return openArray(i);
     case ']':
-      if (!in_array) {
-        return absl::InvalidArgumentError("extract_field_spec: unexpected ']' in path");
-      }
-      out.segments.push_back({"", true});
-      in_array = false;
-      break;
+      return closeArray();
     case '.':
-      if (in_array) {
-        return absl::InvalidArgumentError("extract_field_spec: '.' inside '[]' in path");
-      }
-      if (!current_key.empty()) {
-        out.segments.push_back({std::move(current_key), false});
-        current_key.clear();
-      } else if (i > 0 && path[i - 1] == '.') {
-        return absl::InvalidArgumentError(
-            absl::StrCat("extract_field_spec: consecutive '.' at position ", i, " in path"));
-      }
-      // Separator after ']' or between dict keys — fall through.
-      break;
+      return separator(i);
     default:
-      if (in_array) {
-        return absl::InvalidArgumentError(
-            "extract_field_spec: only '[]' wildcard is supported, not '[...]'");
-      }
-      // A key may not start directly after ']': the canonical pattern-path
-      // syntax always has a '.' separator between an array wildcard and a
-      // following dict key ("a[].b", never "a[]b").
-      if (i > 0 && path[i - 1] == ']') {
-        return absl::InvalidArgumentError("extract_field_spec: missing '.' between ']' and key");
-      }
-      current_key += c;
-      break;
+      return keyCharacter(i);
     }
   }
 
-  if (in_array) {
-    return absl::InvalidArgumentError("extract_field_spec: unterminated '[' in path");
+  absl::Status openArray(size_t i) {
+    if (in_array_) {
+      return absl::InvalidArgumentError("extract_field_spec: nested '[' in path");
+    }
+    // '.' immediately before '[' is invalid: the canonical pattern-path
+    // syntax never contains '.[]' — '[]' always directly follows the parent dict key.
+    if (i > 0 && path_[i - 1] == '.') {
+      return absl::InvalidArgumentError(
+          "extract_field_spec: '.' before '[' is not valid; use 'key[]' not 'key.[]'");
+    }
+    if (auto status = flushKey(i); !status.ok()) {
+      return status;
+    }
+    in_array_ = true;
+    return absl::OkStatus();
   }
-  if (!current_key.empty()) {
-    out.segments.push_back({std::move(current_key), false});
+
+  absl::Status closeArray() {
+    if (!in_array_) {
+      return absl::InvalidArgumentError("extract_field_spec: unexpected ']' in path");
+    }
+    if (auto status = appendSegment(segments_, std::nullopt, max_depth_); !status.ok()) {
+      return status;
+    }
+    in_array_ = false;
+    return absl::OkStatus();
   }
-  if (out.segments.empty()) {
-    return absl::InvalidArgumentError("extract_field_spec: path contains no segments");
+
+  absl::Status separator(size_t i) {
+    if (in_array_) {
+      return absl::InvalidArgumentError("extract_field_spec: '.' inside '[]' in path");
+    }
+    if (!has_key_ && i > 0 && path_[i - 1] == '.') {
+      return absl::InvalidArgumentError(
+          absl::StrCat("extract_field_spec: consecutive '.' at position ", i, " in path"));
+    }
+    return flushKey(i);
   }
-  if (max_depth > 0 && static_cast<int>(out.segments.size()) > max_depth) {
-    return absl::InvalidArgumentError(absl::StrCat("extract_field_spec: path depth ",
-                                                   out.segments.size(),
-                                                   " exceeds maximum supported depth ", max_depth));
+
+  absl::Status keyCharacter(size_t i) {
+    if (in_array_) {
+      return absl::InvalidArgumentError(
+          "extract_field_spec: only '[]' wildcard is supported, not '[...]'");
+    }
+    // A key may not start directly after ']': the canonical pattern-path
+    // syntax always has a '.' separator between an array wildcard and a
+    // following dict key ("a[].b", never "a[]b").
+    if (i > 0 && path_[i - 1] == ']') {
+      return absl::InvalidArgumentError("extract_field_spec: missing '.' between ']' and key");
+    }
+    if (!has_key_) {
+      segment_start_ = i;
+      has_key_ = true;
+    }
+    return absl::OkStatus();
   }
+
+  absl::Status flushKey(size_t end) {
+    if (!has_key_) {
+      return absl::OkStatus();
+    }
+    has_key_ = false;
+    return appendSegment(segments_, std::string(path_.substr(segment_start_, end - segment_start_)),
+                         max_depth_);
+  }
+
+  absl::string_view path_;
+  const int max_depth_;
+  std::vector<Segment> segments_;
+  bool in_array_{false};
+  bool has_key_{false};
+  size_t segment_start_{0};
+};
+
+} // namespace
+
+absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, int max_depth) {
+  if (auto status = validatePathSyntax(path); !status.ok()) {
+    return status;
+  }
+  auto segments = ExtractFieldSpecParser(path, max_depth).parse();
+  if (!segments.ok()) {
+    return segments.status();
+  }
+  ExtractFieldSpec out;
+  out.segments = std::move(*segments);
   return out;
 }
 

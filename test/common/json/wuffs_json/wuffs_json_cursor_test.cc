@@ -545,6 +545,101 @@ TEST(WuffsJsonCursorTest, ExceedMaxDepthRejected) {
 
 // Path-tracking tests
 
+// Helper: feed a complete JSON string with no path tracking (PathCapturingHandler
+// builds paths entirely from its own per-depth state).
+absl::Status parsePaths(absl::string_view json, WuffsJsonCursor::Handler& h) {
+  WuffsJsonCursor cursor(h);
+  return cursor.feed(json, /*closed=*/true);
+}
+
+// Handler that records the fully-qualified path (with numeric array indices) for
+// every leaf value (string, number, boolean, null).
+//
+// Maintains per-depth container state in its own callbacks so it can build paths
+// like "messages[0].role" without any additional cursor API.
+class PathCapturingHandler : public WuffsJsonCursor::Handler {
+public:
+  std::vector<std::string> paths;
+
+  bool openStringCapture(absl::string_view, int, size_t) override { return false; }
+  bool onStringChunk(absl::string_view, int, absl::string_view) override { return true; }
+  void closeStringCapture(absl::string_view key, int depth, size_t) override { record(key, depth); }
+  absl::Status onKey(absl::string_view, int, size_t) override { return absl::OkStatus(); }
+  absl::Status onNumber(absl::string_view key, absl::string_view, int d, size_t, size_t) override {
+    record(key, d);
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view key, bool, int d, size_t, size_t) override {
+    record(key, d);
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view key, int d, size_t, size_t) override { record(key, d); }
+
+  void onContainerOpen(absl::string_view key, bool is_dict, int depth, size_t) override {
+    if (depth <= kMaxDepth) {
+      is_array_[depth] = !is_dict;
+      array_index_[depth] = 0;
+      push_key_[depth] = std::string(key);
+    }
+  }
+
+  void onContainerClose(int depth, size_t) override {
+    // Advance the parent array's element counter when a child container closes.
+    if (depth > 1 && depth - 1 <= kMaxDepth && is_array_[depth - 1]) {
+      ++array_index_[depth - 1];
+    }
+  }
+
+protected:
+  static constexpr int kMaxDepth = WuffsJsonCursor::kMaxTrackedDepth;
+  bool is_array_[kMaxDepth + 1]{};
+  int array_index_[kMaxDepth + 1]{};
+  std::string push_key_[kMaxDepth + 1];
+
+  // Returns the array-index segment for depth d, e.g. "[0]".
+  // Overridden by PatternCapturingHandler to produce "[]".
+  virtual std::string arraySegment(int depth) const {
+    return '[' + std::to_string(array_index_[depth]) + ']';
+  }
+
+  void record(absl::string_view key, int depth) {
+    std::string path;
+    for (int d = 1; d <= depth; ++d) {
+      if (!is_array_[d]) {
+        continue;
+      }
+      if (!push_key_[d].empty()) {
+        if (!path.empty()) {
+          path += '.';
+        }
+        path += push_key_[d];
+      }
+      path += arraySegment(d);
+    }
+    if (!key.empty()) {
+      if (!path.empty()) {
+        path += '.';
+      }
+      path += std::string(key);
+    }
+    paths.push_back(std::move(path));
+    // Advance this depth's array index after recording a scalar element.
+    if (depth <= kMaxDepth && is_array_[depth]) {
+      ++array_index_[depth];
+    }
+  }
+};
+
+// Like PathCapturingHandler but uses "[]" instead of "[n]" — a structural pattern
+// path that is identical for every element in the same array position.
+class PatternCapturingHandler : public PathCapturingHandler {
+public:
+  const WuffsJsonCursor* cursor{nullptr};
+
+protected:
+  std::string arraySegment(int /*depth*/) const override { return "[]"; }
+};
+
 // Scalar elements in an array must each get a distinct 0-based index.
 // Before the fix, array_index_ was only incremented on container close, so
 // [1,2,3] would report [0] for every element.

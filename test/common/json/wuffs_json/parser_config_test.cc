@@ -278,7 +278,8 @@ public:
     // keys, so the per-callback match allocates nothing. `spec` must outlive
     // this handler.
     for (const auto& seg : spec.segments) {
-      pattern_.push_back({seg.key, seg.is_array_element});
+      pattern_.push_back({seg.has_value() ? absl::string_view(*seg) : absl::string_view{},
+                          ExtractFieldSpec::is_array_element(seg)});
     }
   }
 
@@ -522,7 +523,8 @@ public:
   explicit ContainerRangeHandler(const ExtractFieldSpec& spec, const ParserConfig& config = {})
       : max_element_capture_bytes_(config.max_element_capture_bytes) {
     for (const auto& seg : spec.segments) {
-      pattern_.push_back({seg.key, seg.is_array_element});
+      pattern_.push_back({seg.has_value() ? absl::string_view(*seg) : absl::string_view{},
+                          ExtractFieldSpec::is_array_element(seg)});
     }
   }
 
@@ -708,45 +710,45 @@ TEST(ParseExtractFieldSpecTest, DepthOneScalar) {
   auto result = parseExtractFieldSpec("model");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 1u);
-  EXPECT_EQ(result->segments[0].key, "model");
-  EXPECT_FALSE(result->segments[0].is_array_element);
+  EXPECT_EQ(result->segments[0].value(), "model");
+  EXPECT_FALSE(ExtractFieldSpec::is_array_element(result->segments[0]));
 }
 
 TEST(ParseExtractFieldSpecTest, DepthOneArray) {
   auto result = parseExtractFieldSpec("messages[]");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 2u);
-  EXPECT_EQ(result->segments[0].key, "messages");
-  EXPECT_FALSE(result->segments[0].is_array_element);
-  EXPECT_TRUE(result->segments[1].is_array_element);
+  EXPECT_EQ(result->segments[0].value(), "messages");
+  EXPECT_FALSE(ExtractFieldSpec::is_array_element(result->segments[0]));
+  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[1]));
 }
 
 TEST(ParseExtractFieldSpecTest, DepthTwoScalarInArray) {
   auto result = parseExtractFieldSpec("messages[].role");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 3u);
-  EXPECT_EQ(result->segments[0].key, "messages");
-  EXPECT_TRUE(result->segments[1].is_array_element);
-  EXPECT_EQ(result->segments[2].key, "role");
+  EXPECT_EQ(result->segments[0].value(), "messages");
+  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[1]));
+  EXPECT_EQ(result->segments[2].value(), "role");
 }
 
 TEST(ParseExtractFieldSpecTest, DepthThreeNestedDicts) {
   auto result = parseExtractFieldSpec("params._meta.traceparent");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 3u);
-  EXPECT_EQ(result->segments[0].key, "params");
-  EXPECT_EQ(result->segments[1].key, "_meta");
-  EXPECT_EQ(result->segments[2].key, "traceparent");
+  EXPECT_EQ(result->segments[0].value(), "params");
+  EXPECT_EQ(result->segments[1].value(), "_meta");
+  EXPECT_EQ(result->segments[2].value(), "traceparent");
 }
 
 TEST(ParseExtractFieldSpecTest, NestedArrays) {
   auto result = parseExtractFieldSpec("messages[].content[]");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 4u);
-  EXPECT_EQ(result->segments[0].key, "messages");
-  EXPECT_TRUE(result->segments[1].is_array_element);
-  EXPECT_EQ(result->segments[2].key, "content");
-  EXPECT_TRUE(result->segments[3].is_array_element);
+  EXPECT_EQ(result->segments[0].value(), "messages");
+  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[1]));
+  EXPECT_EQ(result->segments[2].value(), "content");
+  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[3]));
 }
 
 TEST(ParseExtractFieldSpecTest, RootArray) {
@@ -754,15 +756,15 @@ TEST(ParseExtractFieldSpecTest, RootArray) {
   auto result = parseExtractFieldSpec("[].role");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 2u);
-  EXPECT_TRUE(result->segments[0].is_array_element);
-  EXPECT_EQ(result->segments[1].key, "role");
+  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[0]));
+  EXPECT_EQ(result->segments[1].value(), "role");
 }
 
 TEST(ParseExtractFieldSpecTest, UnderscorePrefixedKey) {
   auto result = parseExtractFieldSpec("_meta");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 1u);
-  EXPECT_EQ(result->segments[0].key, "_meta");
+  EXPECT_EQ(result->segments[0].value(), "_meta");
 }
 
 // ============================================================================
@@ -836,9 +838,9 @@ TEST(ParseExtractFieldSpecTest, DottedDocumentKeyIsNotAddressable) {
   ASSERT_TRUE(result.ok());
   // Parsed as 5 nested dict keys, NOT as {params, _meta, "vendor.example.com/token"}.
   ASSERT_EQ(result->segments.size(), 5u);
-  EXPECT_EQ(result->segments[2].key, "vendor");
-  EXPECT_EQ(result->segments[3].key, "example");
-  EXPECT_EQ(result->segments[4].key, "com/token");
+  EXPECT_EQ(result->segments[2].value(), "vendor");
+  EXPECT_EQ(result->segments[3].value(), "example");
+  EXPECT_EQ(result->segments[4].value(), "com/token");
 }
 
 TEST(ParseExtractFieldSpecTest, BracketAfterBracketAccepted) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,52 +15,55 @@ namespace Wuffs {
 
 // Parsed representation of the JSON field path used for customized target extraction.
 struct ExtractFieldSpec {
-  struct Segment {
-    std::string key; // non-empty when is_array_element is false
-    bool is_array_element{false};
-  };
+  // Each segment is either a dict key (present) or an [] wildcard (absent).
+  std::vector<std::optional<std::string>> segments;
 
-  // Parsed representation. Depth is represented by segments.size().
-  std::vector<Segment> segments;
+  static bool is_array_element(const std::optional<std::string>& seg) { return !seg.has_value(); }
 };
 
 // Parse and convert the path string into a valid and structured ExtractFieldSpec.
-// Returns InvalidArgumentError on empty/malformed input, or if '\' appears
-// (reserved for a future key-escape syntax). When max_depth > 0, also rejects
-// paths deeper than max_depth — pass kMaxTrackedDepth - 1 to refuse specs the
-// cursor can never match. 0 = no depth check.
+// Returns InvalidArgumentError on empty/malformed input).
+//
+// How to write a path:
+//   Navigate through your JSON until you reach the value to extract:
+//     - If the current level is a JSON object: write the field name (e.g. "params")
+//     - If the current level is a JSON array: write the field name followed by '[]'
+//       (e.g. "messages[]") — this applies the rest of the path to each element
+//     - Separate levels with '.'
+//
+// Syntax constraints:
+//   - Field names are non-empty and cannot contain '.', '[', ']', or '\'.
+//   - '[]' must immediately follow a field name or another '[]', never a '.'.
+//   - A field name after '[]' must be preceded by '.'.
+//   - '\' is reserved for a future escape syntax and is rejected.
 //
 // Example:
 //   parseExtractFieldSpec("messages[].role")
-//     → segments = {{key="messages", is_array_element=false},     // dict key
-//                     {key="",         is_array_element=true},    // [] wildcard
-//                     {key="role",     is_array_element=false}},  // dict key
-//                                                                 // depth 3
+//     → segments = {"messages",  // dict key
+//                   nullopt,     // [] wildcard
+//                   "role"},     // dict key
+//                                // depth 3
 //
 //   parseExtractFieldSpec("model")                   // top-level scalar
-//     → segments = {{key="model"}}                   // depth 1
+//     → segments = {"model"}                         // depth 1
 //
 //   parseExtractFieldSpec("params._meta.traceparent") // nested dict scalar
-//     → segments = {{key="params"}, {key="_meta"}, {key="traceparent"}}
-//                                                    // depth 3
+//     → segments = {"params", "_meta", "traceparent"} // depth 3
 //
 //   parseExtractFieldSpec("params.protocolVersion")  // MCP initialize
-//     → segments = {{key="params"}, {key="protocolVersion"}}
-//                                                    // depth 2
+//     → segments = {"params", "protocolVersion"}     // depth 2
 //
 //   parseExtractFieldSpec("params.message.taskId")   // A2A task correlation
-//     → segments = {{key="params"}, {key="message"}, {key="taskId"}}
-//                                                    // depth 3
+//     → segments = {"params", "message", "taskId"}   // depth 3
 //
 //   parseExtractFieldSpec("usage.total_tokens")      // OpenAI response usage
-//     → segments = {{key="usage"}, {key="total_tokens"}}
-//                                                    // depth 2
+//     → segments = {"usage", "total_tokens"}         // depth 2
 //
 //   parseExtractFieldSpec("tools[].function.name")   // scalar in a dict inside
-//     → segments = {{key="tools"},                   // each array element
-//                   {key="", is_array_element=true},
-//                   {key="function"},
-//                   {key="name"}}                    // depth 4
+//     → segments = {"tools",     // each array element
+//                   nullopt,
+//                   "function",
+//                   "name"}      // depth 4
 //
 // Note: keys containing '.', '[]', or "" cannot be addressed — '.' always
 // splits segments, so "vendor.example.com/token" parses as three segments
