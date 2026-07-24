@@ -4907,6 +4907,50 @@ TEST_P(ExtProcIntegrationTest, RequestHeaderModeIgnoredInModeOverrideComparison)
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverride) {
+  LogLevelSetter save_levels(spdlog::level::trace);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = "hello world";
+  auto response = sendDownstreamRequestWithBody(body_str, std::nullopt);
+
+  // Process request headers message and send back only mode_override (no response_case set).
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_request_headers());
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+        return true;
+      });
+
+  ProcessingRequest request;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  EXPECT_TRUE(request.has_request_body());
+  EXPECT_TRUE(request.request_body().end_of_stream());
+
+  // The server sends back the header response first:
+  ProcessingResponse resp_headers;
+  resp_headers.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp_headers);
+
+  // Then, it streams back the body responses:
+  ProcessingResponse resp_body;
+  auto* streamed_response = resp_body.mutable_request_body()
+                                ->mutable_response()
+                                ->mutable_body_mutation()
+                                ->mutable_streamed_response();
+  streamed_response->set_body(body_str);
+  streamed_response->set_end_of_stream(true);
+  processor_stream_->sendGrpcMessage(resp_body);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, BufferedModeOverSizeRequestLocalReply) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
