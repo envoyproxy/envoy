@@ -62,6 +62,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CTX_use_certificate \
   --uncomment-func-decl SSL_CTX_use_certificate_file \
   --uncomment-func-decl SSL_CTX_set1_curves_list \
+  --uncomment-func-decl SSL_CTX_set1_groups_list \
   --uncomment-func-decl SSL_CTX_set_verify \
   --uncomment-func-decl SSL_CTX_set_verify_depth \
   --uncomment-func-decl SSL_CTX_set_tlsext_ticket_key_cb \
@@ -99,6 +100,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CTX_set_select_certificate_cb \
   --uncomment-func-decl SSL_CTX_set_keylog_callback \
   --uncomment-func-decl SSL_CIPHER_get_min_version \
+  --uncomment-func-decl SSL_get_negotiated_group \
   --uncomment-func-decl SSL_get_peer_full_cert_chain \
   --uncomment-func-decl SSL_set_ocsp_response \
   --uncomment-func-decl SSL_set_enforce_rsa_key_usage \
@@ -252,5 +254,54 @@ cat >> "$1" <<'EOF'
 #endif
 #ifndef SSL_ERROR_WANT_CERTIFICATE_VERIFY
 #define SSL_ERROR_WANT_CERTIFICATE_VERIFY 16
+#endif
+
+// BoringSSL-only SSL_R_* reason codes (no OpenSSL equivalent).
+// Values use a 10000+ range to avoid collisions with OpenSSL's SSL_R_*
+// numbering (which densely covers 100-422 and 1010-1120).
+#ifndef SSL_R_CIPHER_OR_HASH_UNAVAILABLE
+#define SSL_R_CIPHER_OR_HASH_UNAVAILABLE 10001
+#endif
+#ifndef SSL_R_DECODE_ERROR
+#define SSL_R_DECODE_ERROR 10002
+#endif
+#ifndef SSL_R_NEGOTIATED_BOTH_NPN_AND_ALPN
+#define SSL_R_NEGOTIATED_BOTH_NPN_AND_ALPN 10003
+#endif
+#ifndef SSL_R_NO_CIPHERS_PASSED
+#define SSL_R_NO_CIPHERS_PASSED 10004
+#endif
+#ifndef SSL_R_UNSUPPORTED_CIPHER
+#define SSL_R_UNSUPPORTED_CIPHER 10005
+#endif
+#ifndef SSL_R_UNSUPPORTED_PROTOCOL_FOR_CUSTOM_KEY
+#define SSL_R_UNSUPPORTED_PROTOCOL_FOR_CUSTOM_KEY 10006
+#endif
+#ifndef SSL_R_EXCESS_HANDSHAKE_DATA
+#define SSL_R_EXCESS_HANDSHAKE_DATA 10007
+#endif
+#ifndef SSL_R_INVALID_ALPN_PROTOCOL
+#define SSL_R_INVALID_ALPN_PROTOCOL 10008
+#endif
+#ifndef SSL_R_ALPN_MISMATCH_ON_EARLY_DATA
+#define SSL_R_ALPN_MISMATCH_ON_EARLY_DATA 10009
+#endif
+#ifndef SSL_R_WRONG_VERSION_ON_EARLY_DATA
+#define SSL_R_WRONG_VERSION_ON_EARLY_DATA 10010
+#endif
+#ifndef SSL_R_NO_SUPPORTED_VERSIONS_ENABLED
+#define SSL_R_NO_SUPPORTED_VERSIONS_ENABLED 10011
+#endif
+#ifndef SSL_R_SECOND_SERVERHELLO_VERSION_MISMATCH
+#define SSL_R_SECOND_SERVERHELLO_VERSION_MISMATCH 10012
+#endif
+#ifndef SSL_R_CIPHER_MISMATCH_ON_EARLY_DATA
+#define SSL_R_CIPHER_MISMATCH_ON_EARLY_DATA 10013
+#endif
+#ifndef SSL_R_INVALID_ALPN_PROTOCOL_LIST
+#define SSL_R_INVALID_ALPN_PROTOCOL_LIST 10014
+#endif
+#ifndef SSL_R_TLSV1_ALERT_CERTIFICATE_REQUIRED
+#define SSL_R_TLSV1_ALERT_CERTIFICATE_REQUIRED 10015
 #endif
 EOF
