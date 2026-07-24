@@ -32,6 +32,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -170,8 +171,8 @@ TEST_F(SslContextImplTest, TestCipherSuitesDeduplication) {
   EXPECT_EQ(cfg1->cipherSuites(), "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256");
   EXPECT_EQ(cfg2->cipherSuites(), "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256");
 
-  EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg1).ok());
-  EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg2).ok());
+  EXPECT_OK(manager_.createSslClientContext(*store_.rootScope(), *cfg1));
+  EXPECT_OK(manager_.createSslClientContext(*store_.rootScope(), *cfg2));
 }
 
 // Validates that TLS contexts referencing identical CRL content share a single
@@ -1229,7 +1230,7 @@ session_ticket_keys:
 )EOF";
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
@@ -1976,7 +1977,7 @@ protected:
     absl::Status creation_status = absl::OkStatus();
     context_ = std::make_unique<TestContextImpl>(*store_.rootScope(), *client_context_config_,
                                                  server_factory_context_, creation_status);
-    EXPECT_TRUE(creation_status.ok());
+    EXPECT_OK(creation_status);
   }
 
   Stats::TestUtil::TestStore store_;
@@ -2118,7 +2119,7 @@ common_tls_context:
   absl::Status creation_status = absl::OkStatus();
   TestContextImpl context(*store.rootScope(), *server_context_config, server_factory_context_,
                           creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
 
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
@@ -2151,7 +2152,7 @@ common_tls_context:
   absl::Status creation_status = absl::OkStatus();
   TestContextImpl context(*store.rootScope(), *client_context_config, server_factory_context_,
                           creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
 
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
