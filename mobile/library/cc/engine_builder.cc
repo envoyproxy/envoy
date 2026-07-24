@@ -799,12 +799,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   alpn_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
   alpn_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   auto* h2_options = alpn_options.mutable_auto_config()->mutable_http2_protocol_options();
-  if (h2_connection_keepalive_idle_interval_milliseconds_ > 1000) {
+  if (h2_connection_keepalive_idle_interval_milliseconds_ > 0) {
     h2_options->mutable_connection_keepalive()->mutable_connection_idle_interval()->set_seconds(
         h2_connection_keepalive_idle_interval_milliseconds_ / 1000);
-  } else {
     h2_options->mutable_connection_keepalive()->mutable_connection_idle_interval()->set_nanos(
-        h2_connection_keepalive_idle_interval_milliseconds_ * 1000 * 1000);
+        (h2_connection_keepalive_idle_interval_milliseconds_ % 1000) * 1000000);
   }
   h2_options->mutable_connection_keepalive()->mutable_timeout()->set_seconds(
       h2_connection_keepalive_timeout_seconds_);
@@ -909,8 +908,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           num_timeouts_to_trigger_port_migration_);
     }
     if (keepalive_initial_interval_ms_ > 0) {
-      quic_protocol_options->mutable_connection_keepalive()->mutable_initial_interval()->set_nanos(
-          keepalive_initial_interval_ms_ * 1000 * 1000);
+      auto* initial_interval =
+          quic_protocol_options->mutable_connection_keepalive()->mutable_initial_interval();
+      initial_interval->set_seconds(keepalive_initial_interval_ms_ / 1000);
+      initial_interval->set_nanos((keepalive_initial_interval_ms_ % 1000) * 1000000);
     }
     if (max_concurrent_streams_ > 0) {
       quic_protocol_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams_);
