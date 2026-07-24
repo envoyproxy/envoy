@@ -528,21 +528,26 @@ void bmCoroutineEcho(::benchmark::State& state, Pace pace) {
 // Balanced: full writer_batch x high grid. Slow-reader / slow-writer: the throttle
 // dominates throughput, so fix writer_batch (16k) and sweep the high watermark to
 // show how it governs how far the buffer backs up (or how often it starves).
+
+// balanced reader and writer
 BENCHMARK_CAPTURE(bmCallbackEcho, balanced, Pace::Balanced)
     ->Ranges({{1 << 10, 1 << 16}, {1 << 10, 1 << 16}})
     ->Unit(::benchmark::kMicrosecond);
-BENCHMARK_CAPTURE(bmCallbackEcho, slow_reader, Pace::SlowReader)
-    ->Ranges({{1 << 14, 1 << 14}, {1 << 10, 1 << 16}})
-    ->Unit(::benchmark::kMicrosecond);
-BENCHMARK_CAPTURE(bmCallbackEcho, slow_writer, Pace::SlowWriter)
-    ->Ranges({{1 << 12, 1 << 16}, {1 << 10, 1 << 16}})
-    ->Unit(::benchmark::kMicrosecond);
-
 BENCHMARK_CAPTURE(bmCoroutineEcho, balanced, Pace::Balanced)
     ->Ranges({{1 << 10, 1 << 16}, {1 << 10, 1 << 16}})
     ->Unit(::benchmark::kMicrosecond);
+
+// slow reader
+BENCHMARK_CAPTURE(bmCallbackEcho, slow_reader, Pace::SlowReader)
+    ->Ranges({{1 << 14, 1 << 14}, {1 << 10, 1 << 16}})
+    ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(bmCoroutineEcho, slow_reader, Pace::SlowReader)
     ->Ranges({{1 << 14, 1 << 14}, {1 << 10, 1 << 16}})
+    ->Unit(::benchmark::kMicrosecond);
+
+// slow writer
+BENCHMARK_CAPTURE(bmCallbackEcho, slow_writer, Pace::SlowWriter)
+    ->Ranges({{1 << 12, 1 << 16}, {1 << 10, 1 << 16}})
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(bmCoroutineEcho, slow_writer, Pace::SlowWriter)
     ->Ranges({{1 << 12, 1 << 16}, {1 << 10, 1 << 16}})

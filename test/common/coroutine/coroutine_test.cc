@@ -245,12 +245,19 @@ TEST(LeafAwaitableTest, CompleteDuringOnCancelIsEnvoyBugAndSwallowed) {
 #if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
   // In release/coverage builds the ENVOY_BUG only logs, so cancel() ran to
   // completion in-process: the OkStatus from complete() was swallowed and the
-  // chain finished with the cancellation status instead. (In debug builds
-  // EXPECT_ENVOY_BUG forks and is fatal, so these post-conditions are unobservable
-  // from the parent.)
+  // chain finished with the cancellation status instead.
   EXPECT_TRUE(controller.cancelled);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(absl::IsCancelled(*result));
+#else
+  // In debug builds EXPECT_ENVOY_BUG forks and is fatal, so the parent process
+  // never ran cancel(): the coroutine is still suspended at the leaf. Complete it
+  // normally so the self-owned frame unwinds and is destroyed -- otherwise it (and
+  // the context/executor it keeps alive) leaks, which asan flags.
+  EXPECT_FALSE(result.has_value());
+  controller.completeWith(absl::OkStatus());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
 #endif
 }
 
