@@ -20,6 +20,19 @@ static constexpr const char* MMDB_ISP_ORG_LOOKUP_ARGS[] = {"organization"};
 static constexpr const char* MMDB_ANON_LOOKUP_ARGS[] = {"is_anonymous", "is_anonymous_vpn",
                                                         "is_hosting_provider", "is_tor_exit_node",
                                                         "is_public_proxy"};
+static constexpr const char* MMDB_CITY_GEONAME_ID_LOOKUP_ARGS[] = {"city", "geoname_id"};
+static constexpr const char* MMDB_LATITUDE_LOOKUP_ARGS[] = {"location", "latitude"};
+static constexpr const char* MMDB_LONGITUDE_LOOKUP_ARGS[] = {"location", "longitude"};
+static constexpr const char* MMDB_TIME_ZONE_LOOKUP_ARGS[] = {"location", "time_zone"};
+static constexpr const char* MMDB_POSTAL_CODE_LOOKUP_ARGS[] = {"postal", "code"};
+static constexpr const char* MMDB_REGION_NAME_LOOKUP_ARGS[] = {"subdivisions", "0", "names", "en"};
+static constexpr const char* MMDB_REGION_GEONAME_ID_LOOKUP_ARGS[] = {"subdivisions", "0",
+                                                                     "geoname_id"};
+static constexpr const char* MMDB_SUBREGION_GEONAME_ID_LOOKUP_ARGS[] = {"subdivisions", "1",
+                                                                        "geoname_id"};
+static constexpr const char* MMDB_COUNTRY_GEONAME_ID_LOOKUP_ARGS[] = {"country", "geoname_id"};
+static constexpr const char* MMDB_CONTINENT_GEONAME_ID_LOOKUP_ARGS[] = {"continent", "geoname_id"};
+static constexpr const char* MMDB_METRO_CODE_LOOKUP_ARGS[] = {"location", "metro_code"};
 
 static constexpr absl::string_view CITY_DB_TYPE = "city_db";
 static constexpr absl::string_view ISP_DB_TYPE = "isp_db";
@@ -60,6 +73,17 @@ GeoipProviderConfig::GeoipProviderConfig(
     anon_proxy_header_ = getOptionalString(keys.anon_proxy());
     isp_header_ = getOptionalString(keys.isp());
     apple_private_relay_header_ = getOptionalString(keys.apple_private_relay());
+    city_geoname_id_header_ = getOptionalString(keys.city_geoname_id());
+    latitude_header_ = getOptionalString(keys.latitude());
+    longitude_header_ = getOptionalString(keys.longitude());
+    time_zone_header_ = getOptionalString(keys.time_zone());
+    postal_code_header_ = getOptionalString(keys.postal_code());
+    region_name_header_ = getOptionalString(keys.region_name());
+    region_geoname_id_header_ = getOptionalString(keys.region_geoname_id());
+    subregion_geoname_id_header_ = getOptionalString(keys.subregion_geoname_id());
+    country_geoname_id_header_ = getOptionalString(keys.country_geoname_id());
+    continent_geoname_id_header_ = getOptionalString(keys.continent_geoname_id());
+    metro_code_header_ = getOptionalString(keys.metro_code());
   } else if (common_config.has_geo_headers_to_add()) {
     // Fall back to deprecated geo_headers_to_add for backward compatibility.
     const auto& headers = common_config.geo_headers_to_add();
@@ -205,11 +229,24 @@ void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
 void GeoipProvider::lookupInCityDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  // Country lookup falls back to City DB only if Country DB is not configured.
+  // Country-level lookups fall back to City DB only if Country DB is not configured.
   const bool should_lookup_country_from_city_db =
-      !config_->isCountryDbPathSet() && config_->isLookupEnabledForHeader(config_->countryHeader());
+      !config_->isCountryDbPathSet() &&
+      (config_->isLookupEnabledForHeader(config_->countryHeader()) ||
+       config_->isLookupEnabledForHeader(config_->countryGeonameIdHeader()) ||
+       config_->isLookupEnabledForHeader(config_->continentGeonameIdHeader()));
+  const bool city_extra_fields_enabled =
+      config_->isLookupEnabledForHeader(config_->cityGeonameIdHeader()) ||
+      config_->isLookupEnabledForHeader(config_->latitudeHeader()) ||
+      config_->isLookupEnabledForHeader(config_->longitudeHeader()) ||
+      config_->isLookupEnabledForHeader(config_->timeZoneHeader()) ||
+      config_->isLookupEnabledForHeader(config_->postalCodeHeader()) ||
+      config_->isLookupEnabledForHeader(config_->regionNameHeader()) ||
+      config_->isLookupEnabledForHeader(config_->regionGeonameIdHeader()) ||
+      config_->isLookupEnabledForHeader(config_->subregionGeonameIdHeader()) ||
+      config_->isLookupEnabledForHeader(config_->metroCodeHeader());
   if (config_->isLookupEnabledForHeader(config_->cityHeader()) ||
-      config_->isLookupEnabledForHeader(config_->regionHeader()) ||
+      config_->isLookupEnabledForHeader(config_->regionHeader()) || city_extra_fields_enabled ||
       should_lookup_country_from_city_db) {
     int mmdb_error;
     auto city_db_ptr = getCityDb();
@@ -238,11 +275,72 @@ void GeoipProvider::lookupInCityDb(
                                   config_->regionHeader().value(), MMDB_REGION_LOOKUP_ARGS[0],
                                   MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2]);
         }
-        // Country lookup from City DB only when Country DB is not configured.
-        if (should_lookup_country_from_city_db) {
+        if (config_->isLookupEnabledForHeader(config_->cityGeonameIdHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
-                                  MMDB_COUNTRY_LOOKUP_ARGS[1]);
+                                  config_->cityGeonameIdHeader().value(),
+                                  MMDB_CITY_GEONAME_ID_LOOKUP_ARGS[0],
+                                  MMDB_CITY_GEONAME_ID_LOOKUP_ARGS[1]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->latitudeHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->latitudeHeader().value(), MMDB_LATITUDE_LOOKUP_ARGS[0],
+                                  MMDB_LATITUDE_LOOKUP_ARGS[1]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->longitudeHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->longitudeHeader().value(), MMDB_LONGITUDE_LOOKUP_ARGS[0],
+                                  MMDB_LONGITUDE_LOOKUP_ARGS[1]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->timeZoneHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->timeZoneHeader().value(), MMDB_TIME_ZONE_LOOKUP_ARGS[0],
+                                  MMDB_TIME_ZONE_LOOKUP_ARGS[1]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->postalCodeHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->postalCodeHeader().value(),
+                                  MMDB_POSTAL_CODE_LOOKUP_ARGS[0], MMDB_POSTAL_CODE_LOOKUP_ARGS[1]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->regionNameHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->regionNameHeader().value(),
+                                  MMDB_REGION_NAME_LOOKUP_ARGS[0], MMDB_REGION_NAME_LOOKUP_ARGS[1],
+                                  MMDB_REGION_NAME_LOOKUP_ARGS[2], MMDB_REGION_NAME_LOOKUP_ARGS[3]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->regionGeonameIdHeader())) {
+          populateGeoLookupResult(
+              mmdb_lookup_result, lookup_result, config_->regionGeonameIdHeader().value(),
+              MMDB_REGION_GEONAME_ID_LOOKUP_ARGS[0], MMDB_REGION_GEONAME_ID_LOOKUP_ARGS[1],
+              MMDB_REGION_GEONAME_ID_LOOKUP_ARGS[2]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->subregionGeonameIdHeader())) {
+          populateGeoLookupResult(
+              mmdb_lookup_result, lookup_result, config_->subregionGeonameIdHeader().value(),
+              MMDB_SUBREGION_GEONAME_ID_LOOKUP_ARGS[0], MMDB_SUBREGION_GEONAME_ID_LOOKUP_ARGS[1],
+              MMDB_SUBREGION_GEONAME_ID_LOOKUP_ARGS[2]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->metroCodeHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->metroCodeHeader().value(),
+                                  MMDB_METRO_CODE_LOOKUP_ARGS[0], MMDB_METRO_CODE_LOOKUP_ARGS[1]);
+        }
+        // Country-level lookups from City DB only when Country DB is not configured.
+        if (should_lookup_country_from_city_db) {
+          if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
+            populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                    config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
+                                    MMDB_COUNTRY_LOOKUP_ARGS[1]);
+          }
+          if (config_->isLookupEnabledForHeader(config_->countryGeonameIdHeader())) {
+            populateGeoLookupResult(
+                mmdb_lookup_result, lookup_result, config_->countryGeonameIdHeader().value(),
+                MMDB_COUNTRY_GEONAME_ID_LOOKUP_ARGS[0], MMDB_COUNTRY_GEONAME_ID_LOOKUP_ARGS[1]);
+          }
+          if (config_->isLookupEnabledForHeader(config_->continentGeonameIdHeader())) {
+            populateGeoLookupResult(
+                mmdb_lookup_result, lookup_result, config_->continentGeonameIdHeader().value(),
+                MMDB_CONTINENT_GEONAME_ID_LOOKUP_ARGS[0], MMDB_CONTINENT_GEONAME_ID_LOOKUP_ARGS[1]);
+          }
         }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit(CITY_DB_TYPE);
@@ -421,7 +519,9 @@ void GeoipProvider::lookupInIspDb(
 void GeoipProvider::lookupInCountryDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
+  if (config_->isLookupEnabledForHeader(config_->countryHeader()) ||
+      config_->isLookupEnabledForHeader(config_->countryGeonameIdHeader()) ||
+      config_->isLookupEnabledForHeader(config_->continentGeonameIdHeader())) {
     // Country DB takes precedence if configured, otherwise fall back to City DB.
     if (!config_->isCountryDbPathSet()) {
       // Country lookup will be handled by lookupInCityDb.
@@ -449,8 +549,21 @@ void GeoipProvider::lookupInCountryDb(
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
       if (status == MMDB_SUCCESS) {
-        populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->countryHeader().value(),
-                                MMDB_COUNTRY_LOOKUP_ARGS[0], MMDB_COUNTRY_LOOKUP_ARGS[1]);
+        if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
+                                  MMDB_COUNTRY_LOOKUP_ARGS[1]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->countryGeonameIdHeader())) {
+          populateGeoLookupResult(
+              mmdb_lookup_result, lookup_result, config_->countryGeonameIdHeader().value(),
+              MMDB_COUNTRY_GEONAME_ID_LOOKUP_ARGS[0], MMDB_COUNTRY_GEONAME_ID_LOOKUP_ARGS[1]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->continentGeonameIdHeader())) {
+          populateGeoLookupResult(
+              mmdb_lookup_result, lookup_result, config_->continentGeonameIdHeader().value(),
+              MMDB_CONTINENT_GEONAME_ID_LOOKUP_ARGS[0], MMDB_CONTINENT_GEONAME_ID_LOOKUP_ARGS[1]);
+        }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit(COUNTRY_DB_TYPE);
         }
@@ -585,8 +698,15 @@ void GeoipProvider::populateGeoLookupResult(
     } else if (entry_data.has_data && entry_data.type == MMDB_DATA_TYPE_UINT32 &&
                entry_data.uint32 > 0) {
       result_value = std::to_string(entry_data.uint32);
+    } else if (entry_data.has_data && entry_data.type == MMDB_DATA_TYPE_UINT16 &&
+               entry_data.uint16 > 0) {
+      // Used for the metro code.
+      result_value = std::to_string(entry_data.uint16);
     } else if (entry_data.has_data && entry_data.type == MMDB_DATA_TYPE_BOOLEAN) {
       result_value = entry_data.boolean ? "true" : "false";
+    } else if (entry_data.has_data && entry_data.type == MMDB_DATA_TYPE_DOUBLE) {
+      // Used for latitude/longitude; fmt produces the shortest round-trip representation.
+      result_value = fmt::format("{}", entry_data.double_value);
     }
     if (!result_value.empty()) {
       lookup_result.insert(std::make_pair(result_key, result_value));
