@@ -66,8 +66,10 @@ envoy_cc_library(
     hdrs = ["dispatcher_executor.h"],
     deps = [
         ":executor_lib",
+        ":task_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 

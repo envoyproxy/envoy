@@ -141,6 +141,15 @@ struct PromiseBase {
   std::coroutine_handle<> continuation_{};
 };
 
+// Recover the shared `PromiseBase` from a type-erased coroutine handle. Valid
+// because every coroutine promise (TaskPromise<T>, RootTask::promise_type) derives
+// from PromiseBase as its sole base at offset 0, so the frame's promise subobject
+// *is* a PromiseBase. This is the seam that lets an executor inspect the context of
+// a handle handed to `schedule()` (e.g. to assert it belongs to that executor).
+inline PromiseBase& promiseBase(std::coroutine_handle<> handle) {
+  return std::coroutine_handle<PromiseBase>::from_address(handle.address()).promise();
+}
+
 // At final_suspend, transfer control back to the awaiting caller via symmetric
 // transfer. A root has no continuation, so it suspends via noop_coroutine() so that it survives
 // for the non-coroutine caller to inspect the result before destroying it.

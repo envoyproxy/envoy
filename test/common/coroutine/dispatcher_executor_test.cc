@@ -1,4 +1,5 @@
 #include <chrono>
+#include <coroutine>
 #include <optional>
 
 #include "source/common/coroutine/dispatcher_executor.h"
@@ -47,6 +48,30 @@ TEST_F(DispatcherExecutorTest, ScheduleResumesThroughDispatcher) {
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
   EXPECT_TRUE(done);
+}
+
+// schedule() asserts (in debug builds) that the handle's context executor is this
+// one: build a root whose context points at a *different* executor and hand it to
+// `executor_`, which must trip the assertion.
+TEST_F(DispatcherExecutorTest, ScheduleAssertsHandleBelongsToExecutor) {
+  // A second executor on a different dispatcher.
+  Api::ApiPtr other_api = Api::createApiForTest(time_system_);
+  Event::DispatcherPtr other_dispatcher = other_api->allocateDispatcher("other_thread");
+  DispatcherExecutor other(*other_dispatcher);
+
+  EXPECT_DEBUG_DEATH(
+      {
+        // `root` keeps owning the frame (we take a handle via from_promise rather
+        // than release()), so it is destroyed at scope exit -- no leak in release
+        // builds where the assertion is compiled out.
+        Detail::RootTask root = Detail::awaitTaskAndCallOnDone(
+            sleepThenReturn(std::chrono::milliseconds(0)), [](absl::Status) {});
+        root.promise().context_ =
+            std::make_shared<CoroutineContext>(&other, std::make_shared<CancellationState>());
+        executor_.schedule(
+            std::coroutine_handle<Detail::RootTask::promise_type>::from_promise(root.promise()));
+      },
+      "coroutine scheduled on an executor that does not match its context");
 }
 
 // TimerAwaitable completes when simulated time reaches the deadline.
