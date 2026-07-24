@@ -639,17 +639,17 @@ std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
   return crldps;
 }
 
-absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
 Utility::compliancePolicyFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
   switch (params.compliance_policies_size()) {
   case 0:
-    return absl::nullopt;
+    return std::nullopt;
   case 1:
     return params.compliance_policies(0);
   default:
     IS_ENVOY_BUG("more than one policies are not supported");
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 

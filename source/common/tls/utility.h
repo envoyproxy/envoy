@@ -200,7 +200,7 @@ std::vector<std::string> getCertificateCrlDpsForLogging(X509* cert);
  * Extracts at most one CompliancePolicy from a TlsParameters proto. Returns nullopt when none are
  * set, and the first policy when exactly one is set. Logs an ENVOY_BUG for > 1.
  */
-absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
 compliancePolicyFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params);
 
