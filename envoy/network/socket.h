@@ -290,6 +290,7 @@ public:
 
   /**
    * @return roundTripTime of the connection
+   * TODO(wbpcode): support better precision for round trip time, e.g. std::chrono::nanoseconds.
    */
   virtual const std::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
 
