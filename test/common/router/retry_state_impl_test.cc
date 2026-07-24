@@ -1520,6 +1520,43 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
   }
 }
 
+TEST_F(RouterRetryStateImplTest, ParseNoHealthyUpstream) {
+  // RETRY_ON_NO_HEALTHY_UPSTREAM = 0x10000
+  std::string config = "no-healthy-upstream";
+  auto result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, RetryPolicy::RETRY_ON_NO_HEALTHY_UPSTREAM);
+  EXPECT_TRUE(result.second);
+
+  // Combined with other conditions.
+  config = "5xx,no-healthy-upstream,connect-failure";
+  result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_NO_HEALTHY_UPSTREAM |
+                              RetryPolicy::RETRY_ON_CONNECT_FAILURE);
+
+  EXPECT_TRUE(result.second);
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyNoHealthyUpstreamRetry) {
+  // shouldRetryNoHealthyUpstream returns Yes when the condition is set.
+  Http::TestRequestheadermapImpl request_headers{{"x-envoy-retry-on", "no-healthy-upstream"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryNoHealthyUpstream(callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyNoHealthyUpstreamNoRetryWithoutCondition) {
+  // Only "5xx" configured, no "no-healthy-upstream".
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetryNoHealthyUpstream(callback_));
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

@@ -355,6 +355,220 @@ TEST_P(CompositeClusterIntegrationTest, RequestDetailsPreservedThroughRetries) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
+TEST_P(CompositeClusterIntegrationTest, RetryOnNoHealthyUpstream) {
+  setNumRetries(2);
+  setEnableAttemptCountHeaders(true);
+
+  // Override the config to make cluster_0 have zero endpoints.
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Clear existing clusters (base initialize() will re-add them, so we do this
+    // in a second modifier that runs after the base.)
+    bootstrap.mutable_static_resources()->clear_clusters();
+
+    // cluster_0: empty endpoints (simulates DNS returning nothing / all hosts removed)
+    auto* cluster_0 = bootstrap.mutable_static_resources()->add_clusters();
+    cluster_0->set_name("cluster_0");
+    cluster_0->mutable_connect_timeout()->set_seconds(5);
+    cluster_0->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+    auto* load_assignment_0 = cluster_0->mutable_load_assignment();
+    load_assignment_0->set_cluster_name("cluster_0");
+    // Deliberately add no endpoints - this is the "no healthy upstream" scenario.
+
+    // cluster_1: healthy, has an endpoint
+    auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
+    cluster_1->set_name("cluster_1");
+    cluster_1->mutable_connect_timeout()->set_seconds(5);
+    cluster_1->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster_1->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+    auto* load_assignment_1 = cluster_1->mutable_load_assignment();
+    load_assignment_1->set_cluster_name("cluster_1");
+    auto* endpoint_1 = load_assignment_1->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    endpoint_1->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(GetParam()));
+    endpoint_1->mutable_address()->mutable_socket_address()->set_port_value(
+        fake_upstreams_[1]->localAddress()->ip()->port());
+
+    // cluster_2: healthy, has an endpoint
+    auto* cluster_2 = bootstrap.mutable_static_resources()->add_clusters();
+    cluster_2->set_name("cluster_2");
+    cluster_2->mutable_connect_timeout()->set_seconds(5);
+    cluster_2->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster_2->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+    auto* load_assignment_2 = cluster_2->mutable_load_assignment();
+    load_assignment_2->set_cluster_name("cluster_2");
+    auto* endpoint_2 = load_assignment_2->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    endpoint_2->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(GetParam()));
+    endpoint_2->mutable_address()->mutable_socket_address()->set_port_value(
+        fake_upstreams_[2]->localAddress()->ip()->port());
+
+    // Composite cluster referencing all three clusters
+    auto* composite_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    composite_cluster->set_name("composite");
+    composite_cluster->mutable_connect_timeout()->set_seconds(5);
+    composite_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    composite_cluster->mutable_cluster_type()->set_name("envoy.clusters.composite");
+
+    envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
+    composite_config.add_clusters()->set_name("cluster_0");
+    composite_config.add_clusters()->set_name("cluster_1");
+    composite_config.add_clusters()->set_name("cluster_2");
+    std::ignore = composite_cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
+        composite_config);
+  });
+
+  // Set retry_on to include "no-healthy-upstream".
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_route()->set_cluster("composite");
+
+        auto* retry_policy = route->mutable_route()->mutable_retry_policy();
+        retry_policy->set_retry_on("no-healthy-upstream");
+        retry_policy->mutable_num_retries()->set_value(2);
+
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_host->set_include_request_attempt_count(true);
+        virtual_host->set_include_attempt_count_in_response(true);
+      });
+  setUpstreamCount(3);
+  HttpIntegrationTest::initialize();
+  test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(4));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "test.example.com"}},
+      0);
+
+  // cluster_0 has zero endpoints -> no_healthy_upstream -> retry fires.
+  // Request should skip cluster_0 entirely and arrive at cluster_1.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Verify this is attempt 2 (attempt 1 was the no_healthy_upstream on cluster_0)
+  EXPECT_EQ("2", upstream_request_->headers().getEnvoyAttemptCountValue());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("2", response->headers().getEnvoyAttemptCountValue());
+
+  // Verify cluster_0 was never contacted (no endpoint to contact).
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  // Verify cluster_1 handled the request.
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
+
+  // Verify the retry stat was incremented.
+  EXPECT_EQ(1, test_server_->counter("cluster.composite.upstream_rq_retry")->value());
+}
+
+// Verifies that without "no-healthy-upstream" in retry_on, zero-endpoint
+// sub-clusters still produce 503 with no retry (backwards compatibility).
+TEST_P(CompositeClusterIntegrationTest, NoRetryWithoutNoHealthyUpstreamCondition) {
+  setNumRetries(2);
+
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()->clear_clusters();
+
+    // cluster_0: empty endpoints
+    auto* cluster_0 = bootstrap.mutable_static_resources()->add_clusters();
+    cluster_0->set_name("cluster_0");
+    cluster_0->mutable_connect_timeout()->set_seconds(5);
+    cluster_0->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+    cluster_0->mutable_load_assignment()->set_cluster_name("cluster_0");
+
+    // cluster_1: healthy
+    auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
+    cluster_1->set_name("cluster_1");
+    cluster_1->mutable_connect_timeout()->set_seconds(5);
+    cluster_1->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster_1->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+    auto* load_assignment_1 = cluster_1->mutable_load_assignment();
+    load_assignment_1->set_cluster_name("cluster_1");
+    auto* endpoint_1 = load_assignment_1->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    endpoint_1->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(GetParam()));
+    endpoint_1->mutable_address()->mutable_socket_address()->set_port_value(
+        fake_upstreams_[1]->localAddress()->ip()->port());
+
+    // cluster_2: healthy
+    auto* cluster_2 = bootstrap.mutable_static_resources()->add_clusters();
+    cluster_2->set_name("cluster_2");
+    cluster_2->mutable_connect_timeout()->set_seconds(5);
+    cluster_2->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster_2->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+    auto* load_assignment_2 = cluster_2->mutable_load_assignment();
+    load_assignment_2->set_cluster_name("cluster_2");
+    auto* endpoint_2 = load_assignment_2->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    endpoint_2->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(GetParam()));
+    endpoint_2->mutable_address()->mutable_socket_address()->set_port_value(
+        fake_upstreams_[2]->localAddress()->ip()->port());
+
+    // Composite cluster
+    auto* composite_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    composite_cluster->set_name("composite");
+    composite_cluster->mutable_connect_timeout()->set_seconds(5);
+    composite_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    composite_cluster->mutable_cluster_type()->set_name("envoy.clusters.composite");
+
+    envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
+    composite_config.add_clusters()->set_name("cluster_0");
+    composite_config.add_clusters()->set_name("cluster_1");
+    composite_config.add_clusters()->set_name("cluster_2");
+    std::ignore = composite_cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
+        composite_config);
+  });
+
+  // Only "5xx" in retry_on — does NOT include "no-healthy-upstream".
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_route()->set_cluster("composite");
+
+        auto* retry_policy = route->mutable_route()->mutable_retry_policy();
+        retry_policy->set_retry_on("5xx");
+        retry_policy->mutable_num_retries()->set_value(2);
+      });
+
+  setUpstreamCount(3);
+  HttpIntegrationTest::initialize();
+  test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(4));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "test.example.com"}},
+      0);
+
+  // Without "no-healthy-upstream" retry condition, should get 503 immediately.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  // Verify NO clusters were contacted (immediate rejection).
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
+
+  // Verify no retries were attempted.
+  EXPECT_EQ(0, test_server_->counter("cluster.composite.upstream_rq_retry")->value());
+}
 
 } // namespace Composite
 } // namespace Clusters

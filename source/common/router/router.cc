@@ -1038,6 +1038,16 @@ GenericConnPoolPtr Filter::createConnPoolOrHandleFailure(Upstream::HostConstShar
   }
 
   if (generic_conn_pool == nullptr) {
+    // Check if retry is possible before giving up. This enables composite cluster
+    // failover when a sub-cluster has no healthy hosts.
+    if (retry_state_ && !downstream_response_started_) {
+      RetryStatus retry_status = retry_state_->shouldRetryNoHealthyUpstream(
+          [this]() { doRetry(false, true, TimeoutRetry::No); });
+      if (retry_status == RetryStatus::Yes) {
+        pending_retries_++;
+        return nullptr;
+      }
+    }
     sendNoHealthyUpstreamResponse(selection_details, failure_status);
     cleanup();
     return nullptr;

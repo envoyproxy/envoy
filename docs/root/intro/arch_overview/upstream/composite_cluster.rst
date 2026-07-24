@@ -71,8 +71,12 @@ For the composite cluster to function correctly, configure an appropriate
 .. code-block:: yaml
 
   retry_policy:
-    retry_on: "5xx,gateway-error,connect-failure,refused-stream"
+    retry_on: "5xx,gateway-error,connect-failure,refused-stream,no-healthy-upstream"
     num_retries: 2  # Enables attempts 1, 2, and 3 (3 total attempts)
+
+The ``no-healthy-upstream`` condition is critical for composite cluster failover. Without it,
+if a sub-cluster has zero endpoints (e.g., DNS resolution returns empty or all hosts are ejected),
+the request fails immediately with a 503 instead of retrying to the next sub-cluster.
 
 Important considerations
 ------------------------
@@ -89,6 +93,12 @@ Important considerations
 * **Sub-cluster health**: Unlike the aggregate cluster, the composite cluster does not consider
   sub-cluster health when selecting which cluster to use. Each retry attempt targets a specific
   cluster based on attempt count, regardless of whether that cluster has healthy endpoints available.
+* **No-healthy-upstream retry condition**: When a sub-cluster has zero healthy endpoints (e.g., DNS
+  resolution returns empty), the load balancer cannot select a host and the request fails immediately
+  with ``no_healthy_upstream``. By default, this response is **not** retried. To enable failover to
+  the next sub-cluster in this scenario, include ``no-healthy-upstream`` in the retry policy's
+  ``retry_on`` field. Without this condition, the composite cluster cannot fail over when a
+  sub-cluster's endpoint list is empty.
 
 Comparison with aggregate cluster
 ---------------------------------
