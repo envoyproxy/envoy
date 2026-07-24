@@ -1,0 +1,402 @@
+#pragma once
+
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <cmath>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "envoy/common/random_generator.h"
+#include "envoy/common/time.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
+#include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/locality.h"
+#include "envoy/upstream/upstream.h"
+
+#include "source/common/common/logger.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/status.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace LoadBalancingPolicies {
+namespace LoadAwareLocality {
+
+#define ALL_LOAD_AWARE_LOCALITY_STATS(COUNTER)                                                     \
+  COUNTER(all_overloaded_total)                                                                    \
+  COUNTER(local_preferred_total)                                                                   \
+  COUNTER(probe_active_total)                                                                      \
+  COUNTER(recompute_total)                                                                         \
+  COUNTER(spill_active_total)                                                                      \
+  COUNTER(stale_locality_total)
+
+struct LoadAwareLocalityStats {
+  ALL_LOAD_AWARE_LOCALITY_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+// Per-host ORCA data written by workers and read by the main-thread weight computation.
+// The release/acquire timestamp store publishes the preceding utilization store.
+class LocalityLbHostData : public Upstream::HostLbPolicyData {
+public:
+  // Out-of-band sentinel so monotonic time 0 remains a valid report timestamp.
+  static constexpr MonotonicTime kNeverReported = MonotonicTime::min();
+
+  LocalityLbHostData(TimeSource& time_source,
+                     std::shared_ptr<const std::vector<std::string>> metric_names)
+      : time_source_(time_source), metric_names_(std::move(metric_names)) {}
+
+  bool receivesOrcaLoadReport() const override { return true; }
+
+  absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
+                                const StreamInfo::StreamInfo&) override;
+
+  double utilization() const { return utilization_.load(std::memory_order_relaxed); }
+  MonotonicTime lastUpdateTime() const { return last_update_time_.load(std::memory_order_acquire); }
+
+private:
+  void storeUtilization(double util, MonotonicTime now) {
+    if (!std::isfinite(util)) {
+      return;
+    }
+    utilization_.store(std::clamp(util, 0.0, 1.0), std::memory_order_relaxed);
+    last_update_time_.store(now, std::memory_order_release);
+  }
+
+  static_assert(std::atomic<double>::is_always_lock_free,
+                "std::atomic<double> must be lock-free for safe cross-thread utilization updates");
+  static_assert(std::atomic<MonotonicTime>::is_always_lock_free,
+                "std::atomic<MonotonicTime> must be lock-free for safe cross-thread freshness "
+                "updates");
+  std::atomic<double> utilization_{0.0};
+  std::atomic<MonotonicTime> last_update_time_{kNeverReported};
+  TimeSource& time_source_;
+  const std::shared_ptr<const std::vector<std::string>> metric_names_;
+};
+
+// Shared between config and worker factory; must outlive the child LB.
+using LoadBalancerConfigSharedPtr = std::shared_ptr<Upstream::LoadBalancerConfig>;
+
+/**
+ * Load balancer config for the load-aware locality policy.
+ */
+class LoadAwareLocalityLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  LoadAwareLocalityLbConfig(Upstream::TypedLoadBalancerFactory& endpoint_picking_policy_factory,
+                            LoadBalancerConfigSharedPtr endpoint_picking_policy_config,
+                            std::chrono::milliseconds weight_update_period,
+                            double utilization_variance_threshold, double ewma_alpha,
+                            double remote_probe_fraction,
+                            std::chrono::milliseconds weight_expiration_period,
+                            std::vector<std::string> metric_names_for_computing_utilization,
+                            Event::Dispatcher& main_thread_dispatcher,
+                            ThreadLocal::SlotAllocator& tls_slot_allocator)
+      : endpoint_picking_policy_factory_(endpoint_picking_policy_factory),
+        endpoint_picking_policy_config_(std::move(endpoint_picking_policy_config)),
+        weight_update_period_(weight_update_period),
+        utilization_variance_threshold_(utilization_variance_threshold), ewma_alpha_(ewma_alpha),
+        remote_probe_fraction_(remote_probe_fraction),
+        weight_expiration_period_(weight_expiration_period),
+        metric_names_for_computing_utilization_(std::move(metric_names_for_computing_utilization)),
+        main_thread_dispatcher_(main_thread_dispatcher), tls_slot_allocator_(tls_slot_allocator) {}
+
+  Upstream::TypedLoadBalancerFactory& endpointPickingPolicyFactory() const {
+    return endpoint_picking_policy_factory_;
+  }
+  std::string endpointPickingPolicyName() const { return endpoint_picking_policy_factory_.name(); }
+  const LoadBalancerConfigSharedPtr& endpointPickingPolicyConfig() const {
+    return endpoint_picking_policy_config_;
+  }
+  std::chrono::milliseconds weightUpdatePeriod() const { return weight_update_period_; }
+  double utilizationVarianceThreshold() const { return utilization_variance_threshold_; }
+  double ewmaAlpha() const { return ewma_alpha_; }
+  double remoteProbeFraction() const { return remote_probe_fraction_; }
+  std::chrono::milliseconds weightExpirationPeriod() const { return weight_expiration_period_; }
+  const std::vector<std::string>& metricNamesForComputingUtilization() const {
+    return metric_names_for_computing_utilization_;
+  }
+  Event::Dispatcher& mainThreadDispatcher() const { return main_thread_dispatcher_; }
+  ThreadLocal::SlotAllocator& tlsSlotAllocator() const { return tls_slot_allocator_; }
+  absl::Status validateEndpoints(const Upstream::PriorityState& priorities) const override {
+    return endpoint_picking_policy_config_ != nullptr
+               ? endpoint_picking_policy_config_->validateEndpoints(priorities)
+               : absl::OkStatus();
+  }
+
+private:
+  Upstream::TypedLoadBalancerFactory& endpoint_picking_policy_factory_;
+  const LoadBalancerConfigSharedPtr endpoint_picking_policy_config_;
+  const std::chrono::milliseconds weight_update_period_;
+  const double utilization_variance_threshold_;
+  const double ewma_alpha_;
+  const double remote_probe_fraction_;
+  const std::chrono::milliseconds weight_expiration_period_;
+  const std::vector<std::string> metric_names_for_computing_utilization_;
+  Event::Dispatcher& main_thread_dispatcher_;
+  ThreadLocal::SlotAllocator& tls_slot_allocator_;
+};
+
+// Key locality state by identity rather than HostsPerLocality position so add/remove index shifts
+// cannot map main-thread snapshots to the wrong worker-local membership. Named to avoid shadowing
+// Upstream::LocalityWeightsMap, which is a different type.
+using LocalityRoutingWeightsMap =
+    absl::flat_hash_map<envoy::config::core::v3::Locality, double, Upstream::LocalityHash,
+                        Upstream::LocalityEqualTo>;
+
+// EWMA state uses the same identity key: present-with-no-valid-hosts is stale; absent is cold.
+using LocalityEwmaMap = LocalityRoutingWeightsMap;
+
+struct PriorityRoutingWeights {
+  enum class SelectionSource : uint8_t { Healthy = 0, Degraded = 1, AllHosts = 2 };
+  static constexpr size_t kSourceCount = 3;
+
+  struct SourceWeights {
+    LocalityRoutingWeightsMap weights;
+    // Does not affect the routing decision (fully encoded in weights); read on the hot path only to
+    // pick the zone-routing stat counter.
+    bool all_local{false};
+  };
+
+  std::array<SourceWeights, kSourceCount> by_source;
+
+  const LocalityRoutingWeightsMap& weightsFor(SelectionSource s) const {
+    return by_source[static_cast<size_t>(s)].weights;
+  }
+  bool allLocalFor(SelectionSource s) const { return by_source[static_cast<size_t>(s)].all_local; }
+};
+
+// Advisory per-priority locality weights. Priority/health/panic selection stays live on workers.
+struct RoutingWeightsSnapshot {
+  std::vector<PriorityRoutingWeights> priority_weights;
+};
+
+using RoutingWeightsSnapshotConstSharedPtr = std::shared_ptr<const RoutingWeightsSnapshot>;
+
+struct ThreadLocalShim : public ThreadLocal::ThreadLocalObject {
+  RoutingWeightsSnapshotConstSharedPtr routing_weights;
+};
+
+class WorkerLocalLb;
+
+// Factory shared across workers; publishes routing-weight snapshots via TLS.
+class WorkerLocalLbFactory : public Upstream::LoadBalancerFactory {
+public:
+  WorkerLocalLbFactory(Upstream::LoadBalancerFactorySharedPtr child_worker_factory,
+                       LoadBalancerConfigSharedPtr child_config,
+                       const Upstream::ClusterInfo& cluster_info, Runtime::Loader& runtime,
+                       Envoy::Random::RandomGenerator& random,
+                       ThreadLocal::SlotAllocator& tls_slot_allocator);
+
+  // Upstream::LoadBalancerFactory
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override;
+  bool recreateOnHostChangeDeprecated() const override { return false; }
+
+  void updateRoutingWeights(RoutingWeightsSnapshotConstSharedPtr snapshot) {
+    tls_->runOnAllThreads([snapshot = std::move(snapshot)](OptRef<ThreadLocalShim> shim) {
+      if (shim.has_value()) {
+        shim->routing_weights = snapshot;
+      }
+    });
+  }
+
+  // SAFETY: Must only be called on a thread that owns a TLS slot instance (worker or main
+  // thread). The shim object is created once per thread at factory construction and never
+  // replaced (updateRoutingWeights mutates its field), and the factory outlives any worker LB it
+  // created, so callers on their own thread may cache the returned pointer for their lifetime.
+  const ThreadLocalShim* tlsShim() const {
+    auto shim = tls_->get();
+    return shim.ptr();
+  }
+
+  Upstream::LoadBalancerPtr
+  createWorkerChildLb(Upstream::PrioritySetImpl& per_locality_priority_set);
+
+  // Whether the child policy requires the worker LB to be recreated on host membership changes.
+  bool recreateChildOnHostChange() const;
+
+  Envoy::Random::RandomGenerator& random() const { return random_; }
+  Runtime::Loader& runtime() const { return runtime_; }
+  uint32_t healthyPanicThreshold() const { return healthy_panic_threshold_; }
+  Upstream::ClusterLbStats& lbStats() const { return cluster_info_.lbStats(); }
+
+private:
+  // Worker factory of the child ThreadAwareLoadBalancer (owned by the main-thread LB). Shared
+  // ownership keeps it valid on workers after the child LB is destroyed, per the
+  // ThreadAwareLoadBalancer factory contract.
+  Upstream::LoadBalancerFactorySharedPtr child_worker_factory_;
+  // Co-owns the child endpoint-picking config so it outlives the child LB on worker threads, even
+  // when the LoadAwareLocalityLbConfig that also owns it is destroyed first.
+  LoadBalancerConfigSharedPtr child_config_;
+  const Upstream::ClusterInfo& cluster_info_;
+  Envoy::Random::RandomGenerator& random_;
+  Runtime::Loader& runtime_;
+  uint32_t healthy_panic_threshold_;
+
+  std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
+};
+
+struct PerSourceLocalityState {
+  std::unique_ptr<Upstream::PrioritySetImpl> priority_set;
+  Upstream::LoadBalancerPtr lb;
+};
+
+struct PerLocalityState {
+  std::array<PerSourceLocalityState, PriorityRoutingWeights::kSourceCount> by_source;
+  // Empty for a locality with no hosts.
+  envoy::config::core::v3::Locality locality;
+
+  PerSourceLocalityState& stateFor(PriorityRoutingWeights::SelectionSource s) {
+    return by_source[static_cast<size_t>(s)];
+  }
+  const PerSourceLocalityState& stateFor(PriorityRoutingWeights::SelectionSource s) const {
+    return by_source[static_cast<size_t>(s)];
+  }
+};
+
+struct PerPriorityLocalityState {
+  std::vector<PerLocalityState> localities;
+  // Whether index 0 is the local locality on this worker.
+  bool has_local_locality{false};
+  // Index-aligned cumulative routing weights (prefix sums) derived from the snapshot once per
+  // publish, so the per-pick path binary-searches by locality index instead of hashing locality
+  // identity. Rebuilt on snapshot or topology change.
+  std::array<std::vector<double>, PriorityRoutingWeights::kSourceCount> source_weights;
+};
+
+// Worker-local LB: picks live priority/source, then delegates to a per-locality child LB.
+class WorkerLocalLb : public Upstream::LoadBalancerBase {
+public:
+  WorkerLocalLb(WorkerLocalLbFactory& factory, const Upstream::PrioritySet& priority_set);
+  ~WorkerLocalLb() override;
+
+  // Upstream::LoadBalancer
+  Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
+  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext* context) override;
+
+private:
+  void buildPerPriorityLocalities();
+
+  void buildPerLocality(uint32_t priority, const Upstream::HostSet& host_set);
+
+  // allow_rebuild gates topology rebuilds for empty-delta in-place host updates.
+  void syncPriority(uint32_t priority, bool allow_rebuild);
+
+  void updateLocalityHosts(PerSourceLocalityState& state, const Upstream::HostVector& hosts,
+                           bool is_local, const Upstream::HostVector& hosts_added,
+                           const Upstream::HostVector& hosts_removed);
+
+  void syncLocalityState(PerLocalityState& state, const Upstream::HostSet& host_set,
+                         size_t locality_index, bool recreate_child);
+
+  struct PrioritySourcePick {
+    uint32_t priority;
+    PriorityRoutingWeights::SelectionSource source;
+    // The pick's single random draw; chooseLocality derives its target from this so each peek
+    // stashes exactly one entry, keeping the preconnect gate and peek/choose replay aligned.
+    uint64_t hash;
+    bool in_panic;
+  };
+
+  struct LocalityLbSelection {
+    Upstream::LoadBalancer* lb{nullptr};
+    const RoutingWeightsSnapshot* snapshot{nullptr};
+    size_t locality_idx{0};
+  };
+
+  PrioritySourcePick resolvePrioritySource(Upstream::LoadBalancerContext* context, bool peeking);
+
+  LocalityLbSelection selectLocalityLb(const PrioritySourcePick& pick);
+
+  void recordZoneRoutingStats(const PrioritySourcePick& pick, const LocalityLbSelection& selection);
+
+  // Returns 0 for single locality, no/stale snapshot, or zero effective total.
+  size_t chooseLocality(uint32_t priority, PriorityRoutingWeights::SelectionSource source,
+                        uint64_t hash);
+
+  // Rebuilds per-priority index-aligned weights when the published snapshot changes (or a topology
+  // change reset built_snapshot_), so chooseLocality reads by index instead of hashing per pick.
+  void refreshLocalityWeights(const RoutingWeightsSnapshot* snapshot);
+
+  // Falls back to any usable child LB when the routing snapshot lags membership.
+  Upstream::LoadBalancer* pickLocalityLb(const std::vector<PerLocalityState>& per_locality,
+                                         PriorityRoutingWeights::SelectionSource source,
+                                         size_t preferred_idx, size_t& actual_idx) const;
+
+  WorkerLocalLbFactory& factory_;
+  // Lazily cached per-thread shim so the per-pick snapshot read is a plain pointer load instead
+  // of a virtual TLS lookup plus shared_ptr copy; see tlsShim() for the lifetime contract.
+  const ThreadLocalShim* shim_{nullptr};
+  std::vector<PerPriorityLocalityState> per_priority_locality_;
+  // Snapshot the index-aligned weights in per_priority_locality_ were built from; reset to force a
+  // rebuild after a topology change.
+  RoutingWeightsSnapshotConstSharedPtr built_snapshot_;
+  // Destroyed explicitly in the destructor before other members so the callback doesn't fire
+  // during destruction and access freed per-locality state.
+  Envoy::Common::CallbackHandlePtr priority_sync_cb_;
+};
+
+// Main-thread LB: computes locality weights and publishes snapshots to workers.
+class LoadAwareLocalityLoadBalancer : public Upstream::ThreadAwareLoadBalancer,
+                                      protected Logger::Loggable<Logger::Id::upstream> {
+public:
+  LoadAwareLocalityLoadBalancer(OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                const Upstream::ClusterInfo& cluster_info,
+                                const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
+                                Envoy::Random::RandomGenerator& random, TimeSource& time_source);
+  ~LoadAwareLocalityLoadBalancer() override;
+
+  // Upstream::ThreadAwareLoadBalancer
+  Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
+  absl::Status initialize() override;
+
+private:
+  void computeLocalityRoutingWeights();
+
+  void addLbPolicyDataToHosts(const Upstream::HostVector& hosts);
+
+  struct SourceComputeResult {
+    bool all_overloaded{false};
+    bool local_preferred{false};
+    bool probe_active{false};
+    bool spill_active{false};
+    uint32_t stale_localities{0};
+  };
+
+  SourceComputeResult
+  computeSourceWeights(const Upstream::HostsPerLocality& all_hosts_per_locality,
+                       const std::vector<Upstream::HostVector>& eligible_hosts_per_locality,
+                       MonotonicTime now, LocalityRoutingWeightsMap& weights_map, bool& all_local,
+                       LocalityEwmaMap& ewma_state);
+
+  const Upstream::PrioritySet& priority_set_;
+  LoadAwareLocalityStats lb_stats_;
+  TimeSource& time_source_;
+  double utilization_variance_threshold_;
+  double ewma_alpha_;
+  double remote_probe_fraction_;
+  std::chrono::milliseconds weight_expiration_period_;
+  std::shared_ptr<const std::vector<std::string>> metric_names_;
+  // Per-source, per-priority EWMA state keyed by locality identity (main thread only).
+  std::array<std::vector<LocalityEwmaMap>, PriorityRoutingWeights::kSourceCount> ewma_state_;
+  Event::TimerPtr weight_update_timer_;
+  std::chrono::milliseconds weight_update_period_;
+  std::string child_factory_name_;
+  // Child ThreadAwareLoadBalancer owned here so any priority-set callback handles it registers
+  // are created and destroyed on the main thread; workers hold only its worker factory.
+  Upstream::ThreadAwareLoadBalancerPtr child_thread_aware_lb_;
+  std::shared_ptr<WorkerLocalLbFactory> factory_;
+  Envoy::Common::CallbackHandlePtr priority_update_cb_;
+};
+
+} // namespace LoadAwareLocality
+} // namespace LoadBalancingPolicies
+} // namespace Extensions
+} // namespace Envoy
