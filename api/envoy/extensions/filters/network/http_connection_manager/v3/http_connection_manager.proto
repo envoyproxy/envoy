@@ -283,7 +283,7 @@ message HttpConnectionManager {
     repeated config.core.v3.CidrRange cidr_ranges = 2;
   }
 
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message SetCurrentClientCertDetails {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager."
@@ -312,6 +312,9 @@ message HttpConnectionManager {
     // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
     // false.
     bool uri = 5;
+
+    // Whether to forward the issuer of the client cert. Defaults to false.
+    bool issuer = 8;
 
     // The format for the header. When the :ref:`forward_client_cert_details
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`

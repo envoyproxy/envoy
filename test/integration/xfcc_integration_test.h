@@ -35,6 +35,9 @@ public:
       "Subject=\""
       "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,"
       "OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US\"";
+  const std::string client_issuer_ =
+      "Issuer=\""
+      "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US\"";
   const std::string client_uri_san_ =
       "URI=spiffe://lyft.com/frontend-team;URI=http://frontend.lyft.com";
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
