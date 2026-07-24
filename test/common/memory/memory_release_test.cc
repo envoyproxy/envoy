@@ -1,5 +1,6 @@
 #include "source/common/memory/stats.h"
 
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

@@ -223,7 +223,7 @@ public:
   void createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
                          const absl::string_view authorization_credential,
                          const absl::string_view long_date,
-                         const absl::optional<std::string> session_token,
+                         const std::optional<std::string> session_token,
                          const std::map<std::string, std::string>& signed_headers,
                          const uint16_t expiration_time) {
     return signer_->createQueryParams(query_params, authorization_credential, long_date,
@@ -231,7 +231,7 @@ public:
   };
 
   void addRequiredHeaders(Http::RequestHeaderMap& headers, const std::string long_date,
-                          const absl::optional<std::string> session_token,
+                          const std::optional<std::string> session_token,
                           const absl::string_view override_region) {
     signer_->addRequiredHeaders(headers, long_date, session_token, override_region);
   }
@@ -266,7 +266,7 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusHeaderSigning) {
   auto signer_friend = SigV4SignerImplFriend(&headersigner_);
 
   signer_friend.addRequiredHeaders(message_.headers(), long_date_,
-                                   absl::optional<std::string>(token_), region_);
+                                   std::optional<std::string>(token_), region_);
 
   const auto calculated_canonical_headers =
       Utility::canonicalizeHeaders(message_.headers(), {}, {});
@@ -331,7 +331,7 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
 
   signer_friend.createQueryParams(
       query_params, signer_friend.createAuthorizationCredential(akid_, calculated_credential_scope),
-      long_date_, token_.empty() ? absl::optional<std::string>(absl::nullopt) : token_,
+      long_date_, token_.empty() ? std::optional<std::string>(std::nullopt) : token_,
       calculated_canonical_headers, expiration_);
 
   message_.headers().setPath(query_params.replaceQueryString(message_.headers().Path()->value()));

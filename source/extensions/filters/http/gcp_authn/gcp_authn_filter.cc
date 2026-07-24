@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -23,7 +24,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,16 +41,16 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
   }
 }
 
-absl::optional<envoy::extensions::filters::http::gcp_authn::v3::Audience>
+std::optional<envoy::extensions::filters::http::gcp_authn::v3::Audience>
 retrieveAudience(Upstream::ThreadLocalCluster* cluster) {
   if (cluster == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
   const auto filter_it = filter_metadata.find(std::string(FilterName));
   if (filter_it == filter_metadata.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
@@ -58,47 +58,56 @@ retrieveAudience(Upstream::ThreadLocalCluster* cluster) {
     return audience;
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 } // namespace
 
 using ::Envoy::Router::RouteConstSharedPtr;
 using Http::FilterHeadersStatus;
-using JwtVerify::Status;
 
-absl::optional<std::string>
+FilterConfig::FilterConfig(const FilterConfigProto& config,
+                           Server::Configuration::ServerFactoryContext& context,
+                           const std::string& stats_prefix, Stats::Scope& scope)
+    : config_(config), context_(context),
+      stats_{ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))} {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.cache_config(), cache_size, 0) > 0) {
+    token_cache_ = std::make_shared<TokenCache>(config.cache_config(), context);
+  }
+}
+
+std::optional<std::string>
 GcpAuthnFilter::getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) {
   if (cluster == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   auto match_data = cluster->info()->transportSocketMatcher().resolve(nullptr, nullptr);
   auto& factory = match_data.factory_;
   auto client_context_config_opt = factory.clientContextConfig();
   if (!client_context_config_opt.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   const Ssl::ClientContextConfig& client_context_config = client_context_config_opt.value();
   const auto tls_certs = client_context_config.tlsCertificates();
   if (tls_certs.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   const auto& cert_config = tls_certs[0].get();
   const std::string& cert_pem = cert_config.certificateChain();
   if (cert_pem.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  auto fingerprint_or_error = cert_fingerprinter_->getFingerprintFromPem(cert_pem);
+  auto fingerprint_or_error = fingerprinter_->getFingerprintFromPem(cert_pem);
   if (!fingerprint_or_error.ok()) {
     ENVOY_LOG(warn, "Failed to calculate certificate fingerprint: {}",
               fingerprint_or_error.status().message());
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  stats_.client_cert_fingerprint_calculated_.inc();
+  filter_config_->stats().client_cert_fingerprint_calculated_.inc();
   return fingerprint_or_error.value();
 }
 
@@ -114,12 +123,12 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   initiating_call_ = true;
 
   Envoy::Upstream::ThreadLocalCluster* cluster =
-      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
+      filter_config_->context().clusterManager().getThreadLocalCluster(
           route->routeEntry()->clusterName());
 
   auto audience_opt = retrieveAudience(cluster);
   if (!audience_opt.has_value()) {
-    stats_.retrieve_audience_failed_.inc();
+    filter_config_->stats().retrieve_audience_failed_.inc();
     state_ = State::Complete;
     return FilterHeadersStatus::Continue;
   }
@@ -127,7 +136,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   audience_ = audience_opt.value();
 
   // Resolve fingerprint if bound token is requested. Note client_cert_fingerprint_ remains
-  // absl::nullopt by default for unbound tokens.
+  // std::nullopt by default for unbound tokens.
   if (audience_.has_bound_jwt() || audience_.has_bound_access_token()) {
     client_cert_fingerprint_ = getClientCertFingerprint(cluster);
     if (!client_cert_fingerprint_.has_value()) {
@@ -137,7 +146,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,
           "Failed to fetch bound token: client certificate fingerprint is unavailable.", nullptr,
-          absl::nullopt, "bound_token_fingerprint_unavailable");
+          std::nullopt, "bound_token_fingerprint_unavailable");
       return FilterHeadersStatus::StopAllIterationAndWatermark;
     }
   }
@@ -146,7 +155,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   if (jwt_token_cache_ != nullptr) {
     auto token = jwt_token_cache_->lookUp(audience_, client_cert_fingerprint_);
     if (token.has_value()) {
-      addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
+      addTokenToRequest(hdrs, token.value(), filter_config_->config().token_header());
       state_ = State::Complete;
       return FilterHeadersStatus::Continue;
     }
@@ -165,7 +174,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     client_->fetchUnboundJwt(audience_, *this);
   } else {
     ENVOY_LOG(warn, "Audience is configured but no token is specified, continuing without token.");
-    stats_.empty_audience_.inc();
+    filter_config_->stats().empty_audience_.inc();
     state_ = State::Complete;
     return FilterHeadersStatus::Continue;
   }
@@ -173,10 +182,6 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   initiating_call_ = false;
   return state_ == State::Complete ? FilterHeadersStatus::Continue
                                    : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-}
-
-void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  decoder_callbacks_ = &callbacks;
 }
 
 void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
@@ -187,7 +192,8 @@ void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
       // `Authorization: Bearer ID_TOKEN` header).
       GcpToken token_val = *token;
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_val.token, filter_config_->token_header());
+        addTokenToRequest(*request_header_map_, token_val.token,
+                          filter_config_->config().token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }

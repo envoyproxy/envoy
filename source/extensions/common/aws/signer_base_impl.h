@@ -132,12 +132,12 @@ protected:
   void createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
                          const absl::string_view authorization_credential,
                          const absl::string_view long_date,
-                         const absl::optional<std::string> session_token,
+                         const std::optional<std::string> session_token,
                          const std::map<std::string, std::string>& signed_headers,
                          const uint16_t expiration_time) const;
 
   void addRequiredHeaders(Http::RequestHeaderMap& headers, const std::string long_date,
-                          const absl::optional<std::string> session_token,
+                          const std::optional<std::string> session_token,
                           const absl::string_view override_region);
 
   std::vector<Matchers::StringMatcherPtr>

@@ -62,77 +62,77 @@ public:
         {
           "",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
+          {false, false, false, false, std::nullopt, std::nullopt, std::nullopt}
         },
         // Valid cache-control headers
         {
           "max-age=3600, min-fresh=10, no-transform, only-if-cached, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, true, true, Seconds(3600), Seconds(10), absl::nullopt}
+          {false, true, true, true, Seconds(3600), Seconds(10), std::nullopt}
         },
         {
           "min-fresh=100, max-stale, no-cache",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, false, false, false, absl::nullopt, Seconds(100), SystemTime::duration::max()}
+          {true, false, false, false, std::nullopt, Seconds(100), SystemTime::duration::max()}
         },
         {
           "max-age=10, max-stale=50",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         // Quoted arguments are interpreted correctly
         {
           "max-age=\"3600\", min-fresh=\"10\", no-transform, only-if-cached, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, true, true, Seconds(3600), Seconds(10), absl::nullopt}
+          {false, true, true, true, Seconds(3600), Seconds(10), std::nullopt}
         },
         {
           "max-age=\"10\", max-stale=\"50\", only-if-cached",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, true, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, true, Seconds(10), std::nullopt, Seconds(50)}
         },
         // Unknown directives are ignored
         {
           "max-age=10, max-stale=50, unknown-directive",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive-with-arg=arg1",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive-with-quoted-arg=\"arg1\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive, unknown-directive-with-quoted-arg=\"arg1\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         // Invalid durations are ignored
         {
           "max-age=five, min-fresh=30, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, false, false, absl::nullopt, Seconds(30), absl::nullopt}
+          {false, true, false, false, std::nullopt, Seconds(30), std::nullopt}
         },
         {
           "max-age=five, min-fresh=30s, max-stale=-2",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
+          {false, false, false, false, std::nullopt, std::nullopt, std::nullopt}
         },
         {
           "max-age=\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
+          {false, false, false, false, std::nullopt, std::nullopt, std::nullopt}
         },
         // Invalid parts of the header are ignored
         {
           "no-cache, ,,,fjfwioen3298, max-age=20, min-fresh=30=40",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, false, false, false, Seconds(20), absl::nullopt, absl::nullopt}
+          {true, false, false, false, Seconds(20), std::nullopt, std::nullopt}
         },
         // If a directive argument contains a comma by mistake
         // the part before the comma will be interpreted as the argument
@@ -140,7 +140,7 @@ public:
         {
           "no-cache, max-age=10,0, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, true, false, false, Seconds(10), absl::nullopt, absl::nullopt}
+          {true, true, false, false, Seconds(10), std::nullopt, std::nullopt}
         },
     );
     // clang-format on
@@ -203,7 +203,7 @@ public:
         {
           "",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, absl::nullopt}
+          {false, false, false, false, false, std::nullopt}
         },
         // Valid cache-control headers
         {
@@ -224,7 +224,7 @@ public:
         {
           "private",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, true, false, false, false, absl::nullopt}
+          {false, true, false, false, false, std::nullopt}
         },
         {
           "public, max-age=0",
@@ -272,17 +272,17 @@ public:
         {
           "max-age=five",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, absl::nullopt}
+          {false, false, false, false, false, std::nullopt}
         },
         {
           "max-age=10s, private",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, true, false, false, false, absl::nullopt}
+          {false, true, false, false, false, std::nullopt}
         },
         {
           "s-maxage=\"50s\", max-age=\"zero\", no-cache",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, false, false, false, false, absl::nullopt}
+          {true, false, false, false, false, std::nullopt}
         },
         {
           "s-maxage=five, max-age=10, no-transform",
@@ -292,7 +292,7 @@ public:
         {
           "max-age=\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, absl::nullopt}
+          {false, false, false, false, false, std::nullopt}
         },
         // Invalid parts of the header are ignored
         {
@@ -657,9 +657,9 @@ TEST(CreateVaryIdentifier, IsStableForAllowListOrder) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
 
-  absl::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
+  std::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
       vary_allow_list1, {"accept", "accept-language", "", "width"}, request_headers);
-  absl::optional<std::string> vary_identifier2 = VaryHeaderUtils::createVaryIdentifier(
+  std::optional<std::string> vary_identifier2 = VaryHeaderUtils::createVaryIdentifier(
       vary_allow_list2, {"accept", "accept-language", "width"}, request_headers);
 
   ASSERT_TRUE(vary_identifier1.has_value());
@@ -799,11 +799,11 @@ TEST(CreateVaryIdentifier, DifferentHeadersSameValue) {
                                 factory_context);
 
   Http::TestRequestHeaderMapImpl request_headers1{{"accept", "foo"}};
-  absl::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
+  std::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
       vary_allow_list, {"accept", "accept-language"}, request_headers1);
 
   Http::TestRequestHeaderMapImpl request_headers2{{"accept-language", "foo"}};
-  absl::optional<std::string> vary_identifier2 = VaryHeaderUtils::createVaryIdentifier(
+  std::optional<std::string> vary_identifier2 = VaryHeaderUtils::createVaryIdentifier(
       vary_allow_list, {"accept", "accept-language", "width"}, request_headers2);
 
   ASSERT_TRUE(vary_identifier1.has_value());
@@ -830,7 +830,7 @@ TEST(CreateVaryIdentifier, DisallowedHeader) {
                                 factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"disallowed"}, request_headers),
-            absl::nullopt);
+            std::nullopt);
 }
 
 TEST(CreateVaryIdentifier, DisallowedHeaderWithAllowedHeader) {
@@ -841,7 +841,7 @@ TEST(CreateVaryIdentifier, DisallowedHeaderWithAllowedHeader) {
 
   EXPECT_EQ(
       VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"disallowed,width"}, request_headers),
-      absl::nullopt);
+      std::nullopt);
 }
 
 envoy::extensions::filters::http::cache_v2::v3::CacheV2Config getConfig() {
@@ -924,6 +924,23 @@ TEST(InjectValidationHeaders, InjectsIfModifiedSince) {
   EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", mod_time));
 }
 
+TEST(InjectValidationHeaders, InjectsIfNoneMatchFromEtag) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  old_response_headers.setInline(CacheCustomHeaders::etag(), "\"strong-etag-value\"");
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-none-match", "\"strong-etag-value\""));
+}
+
+TEST(InjectValidationHeaders, FallsBackToDateWhenLastModifiedMissing) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  constexpr absl::string_view date = "Fri, 01 Aug 2025 09:25:10 GMT";
+  old_response_headers.setDate(date);
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", date));
+}
+
 TEST(ShouldUpdateCachedEntry, ComparesEtags) {
   Http::TestResponseHeaderMapImpl old_headers, new_headers;
   old_headers.setStatus(304);
@@ -933,6 +950,142 @@ TEST(ShouldUpdateCachedEntry, ComparesEtags) {
   EXPECT_TRUE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
   new_headers.setInline(CacheCustomHeaders::etag(), "def");
   EXPECT_FALSE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(ShouldUpdateCachedEntry, NoEtagInResponseAllowsUpdate) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  old_headers.setInline(CacheCustomHeaders::etag(), "abc");
+  EXPECT_TRUE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(ShouldUpdateCachedEntry, EtagInResponseButNotCachedBlocksUpdate) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  new_headers.setInline(CacheCustomHeaders::etag(), "abc");
+  EXPECT_FALSE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(MakeKey, SetsFieldsCorrectly) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/foo?bar=baz"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "x.com"}};
+  Key key = CacheHeadersUtils::makeKey(headers, "my_cluster");
+  EXPECT_EQ(key.cluster_name(), "my_cluster");
+  EXPECT_EQ(key.host(), "x.com");
+  EXPECT_EQ(key.path(), "/foo?bar=baz");
+  EXPECT_EQ(key.scheme(), Key::HTTPS);
+}
+
+TEST(MakeKey, HttpScheme) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {":method", "GET"}, {":scheme", "http"}, {":authority", "example.com"}};
+  Key key = CacheHeadersUtils::makeKey(headers, "cluster");
+  EXPECT_EQ(key.scheme(), Key::HTTP);
+}
+
+TEST(RequestCacheControl, QuotedMaxAge) {
+  RequestCacheControl cc("max-age=\"3600\"");
+  EXPECT_TRUE(cc.max_age_.has_value());
+  EXPECT_EQ(cc.max_age_.value(), Seconds(3600));
+}
+
+TEST(InjectValidationHeaders, BothEtagAndInvalidLastModified) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  old_response_headers.setInline(CacheCustomHeaders::etag(), "\"etag-value\"");
+  old_response_headers.setInline(CacheCustomHeaders::lastModified(), "garbage-date");
+  constexpr absl::string_view date = "Fri, 01 Aug 2025 09:25:10 GMT";
+  old_response_headers.setDate(date);
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-none-match", "\"etag-value\""));
+  EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", date));
+}
+
+TEST(ResponseCacheControl, SMaxageTakesPrecedenceOverMaxAge) {
+  ResponseCacheControl cc("s-maxage=100, max-age=200");
+  EXPECT_TRUE(cc.max_age_.has_value());
+  EXPECT_EQ(cc.max_age_.value(), Seconds(100));
+}
+
+TEST(ResponseCacheControl, ProxyRevalidateSetsNoStale) {
+  ResponseCacheControl cc("proxy-revalidate");
+  EXPECT_TRUE(cc.no_stale_);
+  EXPECT_FALSE(cc.must_validate_);
+  EXPECT_FALSE(cc.no_store_);
+}
+
+TEST(RequestCacheControl, MaxStaleWithoutValue) {
+  RequestCacheControl cc("max-stale");
+  EXPECT_TRUE(cc.max_stale_.has_value());
+  EXPECT_EQ(cc.max_stale_.value(), SystemTime::duration::max());
+}
+
+TEST(ShouldUpdateCachedEntry, NeitherHasEtag) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  EXPECT_TRUE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(ShouldUpdateCachedEntry, MatchingEtagsAllowUpdate) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  old_headers.setInline(CacheCustomHeaders::etag(), "\"same\"");
+  new_headers.setInline(CacheCustomHeaders::etag(), "\"same\"");
+  EXPECT_TRUE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(ShouldUpdateCachedEntry, MismatchedEtagsBlockUpdate) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  old_headers.setInline(CacheCustomHeaders::etag(), "\"old\"");
+  new_headers.setInline(CacheCustomHeaders::etag(), "\"new\"");
+  EXPECT_FALSE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(InjectValidationHeaders, BothEtagAndValidLastModified) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  old_response_headers.setInline(CacheCustomHeaders::etag(), "\"etag-value\"");
+  constexpr absl::string_view mod_time = "Fri, 01 Aug 2025 09:25:10 GMT";
+  old_response_headers.setInline(CacheCustomHeaders::lastModified(), mod_time);
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-none-match", "\"etag-value\""));
+  EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", mod_time));
+}
+
+TEST(ResponseCacheControl, MustRevalidateSetsNoStale) {
+  ResponseCacheControl cc("must-revalidate");
+  EXPECT_TRUE(cc.no_stale_);
+  EXPECT_FALSE(cc.must_validate_);
+  EXPECT_FALSE(cc.no_store_);
+}
+
+TEST(RequestCacheControl, QuotedMinFresh) {
+  RequestCacheControl cc("min-fresh=\"60\"");
+  EXPECT_TRUE(cc.min_fresh_.has_value());
+  EXPECT_EQ(cc.min_fresh_.value(), Seconds(60));
+}
+
+TEST(ResponseCacheControl, NoTransformAlone) {
+  ResponseCacheControl cc("no-transform");
+  EXPECT_TRUE(cc.no_transform_);
+  EXPECT_FALSE(cc.must_validate_);
+  EXPECT_FALSE(cc.no_store_);
+  EXPECT_FALSE(cc.no_stale_);
+  EXPECT_FALSE(cc.is_public_);
+}
+
+TEST(RequestCacheControl, OnlyIfCachedAlone) {
+  RequestCacheControl cc("only-if-cached");
+  EXPECT_TRUE(cc.only_if_cached_);
+  EXPECT_FALSE(cc.must_validate_);
+  EXPECT_FALSE(cc.no_store_);
+  EXPECT_FALSE(cc.no_transform_);
 }
 
 } // namespace

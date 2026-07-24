@@ -87,7 +87,7 @@ TEST_F(DnsFilterUtilsTest, GetAddressRecordTypeTest) {
   const Network::Address::InstanceConstSharedPtr pipe =
       *Network::Address::PipeInstance::create(pipe_path, 600);
   auto addr_type = getAddressRecordType(pipe);
-  EXPECT_EQ(addr_type, absl::nullopt);
+  EXPECT_EQ(addr_type, std::nullopt);
 
   const auto ipv6addr = Network::Utility::parseInternetAddressNoThrow("fec0:1::1", 0);
   addr_type = getAddressRecordType(ipv6addr);

@@ -2,11 +2,11 @@
 
 #include <functional>
 #include <map>
+#include <optional>
 
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {

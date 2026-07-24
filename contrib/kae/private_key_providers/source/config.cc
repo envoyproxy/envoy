@@ -37,6 +37,7 @@ KaePrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
           *message, private_key_provider_context.messageValidationVisitor());
 
 #ifdef KAE_DISABLED
+  static_cast<void>(conf);
   throw EnvoyException("Arm64 architecture is required for KAE.");
 #else
   LibUadkCryptoSharedPtr libuadk = std::make_shared<LibUadkCryptoImpl>();

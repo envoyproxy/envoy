@@ -4,6 +4,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -55,7 +56,7 @@ sink_config:
                                                 moduleName());
       envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink sink_config;
       TestUtility::loadFromYaml(sink_yaml, sink_config);
-      sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
@@ -87,16 +88,23 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(DynamicModulesStatsSinkIntegrationTest, BasicFlush) {
   // The "found gauge server.uptime" marker proves the module decoded a gauge name through the
   // buffer-based snapshot API.
-  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
-                                 {"info", "stat sink integration test: config_new called"},
-                                 {"info", "stat sink integration test: flush called"},
-                                 {"info", "stat sink integration test: found gauge server.uptime"},
-                             }),
-                             {
-                               addStatSinkAndInitialize();
-                               timeSystem().realSleepDoNotUseWithoutScrutiny(
-                                   std::chrono::milliseconds(500));
-                             });
+  Envoy::ExpectedLogMessages expected{
+      {"info", "stat sink integration test: config_new called"},
+      {"info", "stat sink integration test: flush called"},
+      {"info", "stat sink integration test: found gauge server.uptime"},
+  };
+  if (language() == "rust") {
+    // Only the Rust SDK exposes the tag callbacks. The "reconstructed tagged gauge" marker proves
+    // the module read the tag-extracted name and the "envoy.cluster_name" tag of the always-present
+    // cluster.membership_total gauge and rebuilt the dimensional name a Prometheus-style sink would
+    // emit.
+    expected.push_back({"info", "stat sink integration test: reconstructed tagged gauge "
+                                "cluster.membership_total envoy.cluster_name=cluster_0"});
+  }
+  EXPECT_LOG_CONTAINS_ALL_OF(expected, {
+    addStatSinkAndInitialize();
+    timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
+  });
 }
 
 TEST_P(DynamicModulesStatsSinkIntegrationTest, FlushAfterTraffic) {

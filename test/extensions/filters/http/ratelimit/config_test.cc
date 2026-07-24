@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/ratelimit/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
@@ -113,7 +114,8 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
   RateLimitFilterConfig factory;
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimit empty_proto_config =
-      *dynamic_cast<envoy::extensions::filters::http::ratelimit::v3::RateLimit*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ratelimit::v3::RateLimit>(
           factory.createEmptyConfigProto().get());
 
   EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context).value(),
@@ -148,7 +150,7 @@ TEST(RateLimitFilterConfigTest, PerRouteRateLimits) {
   auto status_or_error = factory.createRouteSpecificFilterConfig(
       proto_config, factory_context,
       factory_context.validation_context_.static_validation_visitor_);
-  EXPECT_TRUE(status_or_error.ok());
+  EXPECT_OK(status_or_error);
   EXPECT_NE(nullptr, status_or_error.value());
 }
 
@@ -179,7 +181,7 @@ TEST(RateLimitFilterConfigTest, PerRouteRateLimitsWithLimitOverride) {
   auto status_or_error = factory.createRouteSpecificFilterConfig(
       proto_config, factory_context,
       factory_context.validation_context_.static_validation_visitor_);
-  EXPECT_TRUE(status_or_error.ok());
+  EXPECT_OK(status_or_error);
   EXPECT_NE(nullptr, status_or_error.value());
 }
 

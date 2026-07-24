@@ -74,7 +74,7 @@ TestEngineAndServer::TestEngineAndServer(
           ->set_enable_trailers(true);
     }
     cluster.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-    cluster.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+    std::ignore = cluster.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 
     if (type == TestServerType::HTTP3) {
       protocol_options.mutable_explicit_http_config()->mutable_http3_protocol_options();
@@ -82,23 +82,25 @@ TestEngineAndServer::TestEngineAndServer(
       h3_inner_socket.mutable_upstream_tls_context()->CopyFrom(tls_context);
       ::envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
           h3_proxy_socket;
-      h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_inner_socket);
+      std::ignore = h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(
+          h3_inner_socket);
       h3_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
       cluster.mutable_transport_socket()->set_name("envoy.transport_sockets.http_11_proxy");
-      cluster.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
+      std::ignore =
+          cluster.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     }
   } else {
     cluster.mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
     ::envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
-    cluster.mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer);
+    std::ignore = cluster.mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer);
     protocol_options.mutable_explicit_http_config()
         ->mutable_http_protocol_options()
         ->set_enable_trailers(true);
   }
 
-  (*cluster.mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(protocol_options);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(protocol_options);
 
   engine_builder.addCluster(std::move(cluster));
 

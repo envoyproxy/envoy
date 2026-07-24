@@ -6,6 +6,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -16,7 +17,11 @@ namespace StatSinks {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::NiceMock;
+using ::testing::Not;
 
 class DynamicModuleStatsSinkFactoryTest : public testing::Test {
 public:
@@ -32,6 +37,9 @@ public:
   DynamicModuleStatsSinkFactory factory_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
+
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
 
 TEST_F(DynamicModuleStatsSinkFactoryTest, FactoryName) {
   EXPECT_EQ(DynamicModuleStatsSinkName, factory_.name());
@@ -75,8 +83,11 @@ sink_config:
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_TRUE(sink_or_error.ok()) << sink_or_error.status().message();
-  EXPECT_NE(nullptr, sink_or_error.value());
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()));
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_sink"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "config_init_error", "test_sink"));
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
@@ -88,8 +99,7 @@ TEST_F(DynamicModuleStatsSinkFactoryTest, ValidConfigLocalFile) {
   proto_config.set_sink_name("test_sink");
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_TRUE(sink_or_error.ok()) << sink_or_error.status().message();
-  EXPECT_NE(nullptr, sink_or_error.value());
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()));
 }
 
 // Remote module sources are not supported for stats sinks (no init manager is wired up).
@@ -103,7 +113,7 @@ TEST_F(DynamicModuleStatsSinkFactoryTest, RemoteSourceRejected) {
   proto_config.set_sink_name("test_sink");
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
+  EXPECT_THAT(sink_or_error, Not(IsOk()));
 }
 
 // An empty sink_config is allowed and the module receives zero bytes.
@@ -119,8 +129,7 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_TRUE(sink_or_error.ok()) << sink_or_error.status().message();
-  EXPECT_NE(nullptr, sink_or_error.value());
+  ASSERT_THAT(sink_or_error, IsOkAndHolds(::testing::NotNull()));
 }
 
 // A Struct config is JSON-serialized before being handed to the module.
@@ -141,7 +150,7 @@ sink_config:
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  ASSERT_TRUE(sink_or_error.ok()) << sink_or_error.status().message();
+  ASSERT_OK(sink_or_error);
 }
 
 // A sink_config Any that claims to be a StringValue but carries truncated wire bytes makes
@@ -157,9 +166,10 @@ TEST_F(DynamicModuleStatsSinkFactoryTest, MalformedSinkConfig) {
   any->set_value("\x0a");
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()),
-              testing::HasSubstr("Failed to parse sink config"));
+  EXPECT_THAT(sink_or_error, HasStatusMessage(testing::HasSubstr("Failed to parse sink config")));
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test_sink"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_sink"));
 }
 
 // A bogus module name produces a clear "Failed to load dynamic module" error.
@@ -174,9 +184,9 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()),
-              testing::HasSubstr("Failed to load dynamic module"));
+  EXPECT_THAT(sink_or_error, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "module_load_error", "test_sink"));
 }
 
 // Module loaded OK but its on_stat_sink_config_new returns nullptr.
@@ -192,9 +202,12 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()),
-              testing::HasSubstr("Failed to initialize dynamic module stats sink config"));
+  EXPECT_THAT(sink_or_error, HasStatusMessage(testing::HasSubstr(
+                                 "Failed to initialize dynamic module stats sink config")));
+
+  // The module loads fine but its config creation fails, so this is counted as config_init_error.
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test_sink"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test_sink"));
 }
 
 // Each of the four required symbols is missing in turn. Each produces a clear
@@ -211,8 +224,7 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()), testing::ContainsRegex("config_new"));
+  EXPECT_THAT(sink_or_error, HasStatusMessage(testing::ContainsRegex("config_new")));
 }
 
 TEST_F(DynamicModuleStatsSinkFactoryTest, MissingConfigDestroy) {
@@ -227,9 +239,7 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()),
-              testing::ContainsRegex("config_destroy"));
+  EXPECT_THAT(sink_or_error, HasStatusMessage(testing::ContainsRegex("config_destroy")));
 }
 
 TEST_F(DynamicModuleStatsSinkFactoryTest, MissingFlush) {
@@ -244,8 +254,7 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()), testing::ContainsRegex("flush"));
+  EXPECT_THAT(sink_or_error, HasStatusMessage(testing::ContainsRegex("flush")));
 }
 
 TEST_F(DynamicModuleStatsSinkFactoryTest, MissingHistogramComplete) {
@@ -260,9 +269,7 @@ sink_name: test_sink
   TestUtility::loadFromYaml(yaml, proto_config);
 
   auto sink_or_error = factory_.createStatsSink(proto_config, context_);
-  EXPECT_FALSE(sink_or_error.ok());
-  EXPECT_THAT(std::string(sink_or_error.status().message()),
-              testing::ContainsRegex("histogram_complete"));
+  EXPECT_THAT(sink_or_error, HasStatusMessage(testing::ContainsRegex("histogram_complete")));
 }
 
 } // namespace

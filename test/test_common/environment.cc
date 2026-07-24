@@ -184,7 +184,7 @@ void TestEnvironment::createSymlink(const std::string& target, const std::string
 #endif
 }
 
-absl::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string& var) {
+std::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string& var) {
   const char* path = std::getenv(var.c_str());
   if (path == nullptr) {
     return {};

@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/cache_v2/cache_entry_utils.h"
 
 #include "test/test_common/enum_test_utils.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

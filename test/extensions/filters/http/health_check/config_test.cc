@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/health_check/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -20,6 +21,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 TEST(HealthCheckFilterConfig, HealthCheckFilter) {
   const std::string yaml_string = R"EOF(
@@ -71,10 +74,9 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
-                   .status()
-                   .IgnoreError(),
-               EnvoyException);
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "cache_time_ms must not be set when path_through_mode is disabled"));
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) {
@@ -93,9 +95,8 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
-                  .status()
-                  .ok());
+  EXPECT_OK(
+      factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context).status());
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
@@ -109,11 +110,10 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
 
-  EXPECT_THROW(
-      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
-          .status()
-          .IgnoreError(),
-      EnvoyException);
+  EXPECT_THAT(
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context),
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                "cache_time_ms must not be set when path_through_mode is disabled"));
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {
@@ -125,27 +125,26 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto)
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
-  EXPECT_TRUE(
+  EXPECT_OK(
       healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
-          .status()
-          .ok());
+          .status());
 }
 
 TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::filters::http::health_check::v3::HealthCheck config =
-      *dynamic_cast<envoy::extensions::filters::http::health_check::v3::HealthCheck*>(
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::health_check::v3::HealthCheck>(
           healthCheckFilterConfig.createEmptyConfigProto().get());
 
   config.mutable_pass_through_mode()->set_value(false);
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.mutable_string_match()->set_exact("foo");
-  EXPECT_TRUE(
+  EXPECT_OK(
       healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
-          .status()
-          .ok());
+          .status());
 }
 
 void testHealthCheckHeaderMatch(
@@ -154,8 +153,8 @@ void testHealthCheckHeaderMatch(
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ProtobufTypes::MessagePtr config_msg = healthCheckFilterConfig.createEmptyConfigProto();
-  auto config = dynamic_cast<envoy::extensions::filters::http::health_check::v3::HealthCheck*>(
-      config_msg.get());
+  auto config = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::health_check::v3::HealthCheck>(config_msg.get());
   ASSERT_NE(config, nullptr);
 
   *config = input_config;
@@ -296,7 +295,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   HealthCheckFilterConfig factory;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

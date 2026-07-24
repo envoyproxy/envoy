@@ -97,6 +97,7 @@ envoy_cc_library(
         ":status_lib",
         ":utility_lib",
         "//envoy/event:deferred_deletable",
+        "//envoy/http:client_codec_factory_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
@@ -592,7 +593,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/container:node_hash_set",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@quiche//:http2_adapter_http2_protocol",
@@ -635,7 +635,6 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@abseil-cpp//absl/types:optional",
         "@googleurl//url",
     ],
 )
@@ -698,7 +697,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
-        "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
     ],
 )

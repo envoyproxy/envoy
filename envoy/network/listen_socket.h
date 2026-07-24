@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -13,7 +14,6 @@
 #include "envoy/network/socket.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
@@ -59,31 +59,31 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 
   /**
-   * @param ja3Hash Connection ja3 fingerprint hash of the downstream connection.
+   * @param ja3Hash Connection `ja3` fingerprint hash of the downstream connection.
    */
   virtual void setJA3Hash(absl::string_view ja3_hash) PURE;
 
   /**
-   * @param ja4Hash Connection ja3 fingerprint hash of the downstream connection.
+   * @param ja4Hash Connection `ja4` fingerprint hash of the downstream connection.
    */
   virtual void setJA4Hash(absl::string_view ja4_hash) PURE;
 
   /**
-   * @return Connection ja3 fingerprint hash of the downstream connection, if any.
+   * @return Connection `ja3` fingerprint hash of the downstream connection, if any.
    */
   virtual absl::string_view ja3Hash() const PURE;
 
   /**
-   * @return Connection ja4 fingerprint hash of the downstream connection, if any.
+   * @return Connection `ja4` fingerprint hash of the downstream connection, if any.
    */
   virtual absl::string_view ja4Hash() const PURE;
 
   /**
-   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  @return std::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.
    */
-  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
+  virtual std::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
 
   /**
    * @return the current congestion window in bytes, or unset if not available or not
@@ -91,7 +91,7 @@ public:
    * @note some congestion controller's cwnd is measured in number of packets, in that case the
    * return value is cwnd(in packets) times the connection's MSS.
    */
-  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+  virtual std::optional<uint64_t> congestionWindowInBytes() const PURE;
 
   /**
    * Dump debug state of the object in question to the provided ostream.

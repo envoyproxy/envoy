@@ -25,10 +25,24 @@ void EventReporter::onServerInitialized() {
 }
 
 void EventReporter::reportConnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
-                                          absl::string_view tenant_id) {
-  auto ptr = std::make_shared<ReverseTunnelEvent::Connected>(
-      ReverseTunnelEvent::Connected{std::string(node_id), std::string(cluster_id),
-                                    std::string(tenant_id), Envoy::SystemTime::clock::now()});
+                                          absl::string_view tenant_id, int64_t initiation_time_ms) {
+  // Use the DP-side initiation timestamp when available; fall back to the injected time source
+  // for backward compatibility with older DP Envoys that don't send the header.
+  //
+  // initiation_time_ms is external, header-derived input. Converting an arbitrarily large
+  // millisecond count into SystemTime's finer-grained duration (nanoseconds on most platforms)
+  // would multiply by 1e6 and overflow int64 -> signed-overflow UB. Reject non-positive or
+  // out-of-range values and fall back to the time source instead.
+  constexpr int64_t max_representable_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(Envoy::SystemTime::duration::max())
+          .count();
+  const Envoy::SystemTime created_at =
+      (initiation_time_ms > 0 && initiation_time_ms <= max_representable_ms)
+          ? Envoy::SystemTime(std::chrono::duration_cast<Envoy::SystemTime::duration>(
+                std::chrono::milliseconds(initiation_time_ms)))
+          : context_.timeSource().systemTime();
+  auto ptr = std::make_shared<ReverseTunnelEvent::Connected>(ReverseTunnelEvent::Connected{
+      std::string(node_id), std::string(cluster_id), std::string(tenant_id), created_at});
 
   context_.mainThreadDispatcher().post(
       [this, ptr = std::move(ptr)]() mutable { this->addConnection(std::move(ptr)); });

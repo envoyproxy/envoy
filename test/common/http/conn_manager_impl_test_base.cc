@@ -26,7 +26,7 @@ public:
     return parent_.requestIDExtension();
   }
   const AccessLog::InstanceSharedPtrVector& accessLogs() override { return parent_.accessLogs(); }
-  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+  const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return parent_.accessLogFlushInterval();
   }
   bool flushAccessLogOnNewRequest() override { return parent_.flushAccessLogOnNewRequest(); }
@@ -46,11 +46,11 @@ public:
   bool alwaysSetRequestIdInResponse() const override {
     return parent_.alwaysSetRequestIdInResponse();
   }
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+  std::optional<std::chrono::milliseconds> idleTimeout() const override {
     return parent_.idleTimeout();
   }
   bool isRoutable() const override { return parent_.isRoutable(); }
-  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+  std::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return parent_.maxConnectionDuration();
   }
   bool http1SafeMaxConnectionDuration() const override {
@@ -61,7 +61,7 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override {
     return parent_.streamIdleTimeout();
   }
-  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+  std::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
     return parent_.streamFlushTimeout();
   }
   std::chrono::milliseconds requestTimeout() const override { return parent_.requestTimeout(); }
@@ -71,7 +71,7 @@ public:
   std::chrono::milliseconds delayedCloseTimeout() const override {
     return parent_.delayedCloseTimeout();
   }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+  std::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return parent_.maxStreamDuration();
   }
   Router::RouteConfigProvider* routeConfigProvider() override {
@@ -88,7 +88,7 @@ public:
   serverHeaderTransformation() const override {
     return parent_.serverHeaderTransformation();
   }
-  const absl::optional<std::string>& schemeToSet() const override { return parent_.schemeToSet(); }
+  const std::optional<std::string>& schemeToSet() const override { return parent_.schemeToSet(); }
   bool shouldSchemeMatchUpstream() const override { return parent_.shouldSchemeMatchUpstream(); }
   ConnectionManagerStats& stats() override { return parent_.stats(); }
   ConnectionManagerTracingStats& tracingStats() override { return parent_.tracingStats(); }
@@ -108,7 +108,7 @@ public:
     return parent_.forwardClientCertMatcher();
   }
   const Network::Address::Instance& localAddress() override { return parent_.localAddress(); }
-  const absl::optional<std::string>& userAgent() override { return parent_.userAgent(); }
+  const std::optional<std::string>& userAgent() override { return parent_.userAgent(); }
   Tracing::TracerSharedPtr tracer() override { return parent_.tracer(); }
   const TracingConnectionManagerConfig* tracingConfig() override { return parent_.tracingConfig(); }
   ConnectionManagerListenerStats& listenerStats() override { return parent_.listenerStats(); }
@@ -353,7 +353,7 @@ void HttpConnectionManagerImplMixin::setUpEncoderAndDecoder(bool request_with_da
 }
 
 void HttpConnectionManagerImplMixin::startRequest(bool end_stream,
-                                                  absl::optional<std::string> body) {
+                                                  std::optional<std::string> body) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -391,7 +391,7 @@ void HttpConnectionManagerImplMixin::sendRequestHeadersAndData() {
 
 ResponseHeaderMap* HttpConnectionManagerImplMixin::sendResponseHeaders(
     ResponseHeaderMapPtr&& response_headers,
-    absl::optional<StreamInfo::CoreResponseFlag> response_flag, std::string response_code_details) {
+    std::optional<StreamInfo::CoreResponseFlag> response_flag, std::string response_code_details) {
   ResponseHeaderMap* altered_response_headers = nullptr;
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))

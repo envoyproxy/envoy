@@ -33,10 +33,7 @@ parseHttpConnectionManagerFromYaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
-  HttpConnectionManagerConfigTest() {
-    ON_CALL(context_, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info_));
-  }
-  NiceMock<Network::MockListenerInfo> listener_info_;
+  HttpConnectionManagerConfigTest() {}
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_{
       context_.server_factory_context_.mainThreadDispatcher().timeSource()};

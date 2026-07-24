@@ -24,6 +24,7 @@
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -344,7 +345,7 @@ protected:
     auto message_ptr =
         server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"](name_matcher);
     const auto& listeners_config_dump =
-        dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
+        Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::ListenersConfigDump>(*message_ptr);
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
@@ -391,8 +392,8 @@ protected:
                                                  bool multiple_addresses = false) {
     InSequence s;
 
-    EXPECT_CALL(*worker_, start(_, _));
-    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+    EXPECT_CALL(*worker_, start(_, _, _));
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
@@ -440,8 +441,8 @@ protected:
                                                          const std::string& message) {
     InSequence s;
 
-    EXPECT_CALL(*worker_, start(_, _));
-    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+    EXPECT_CALL(*worker_, start(_, _, _));
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 

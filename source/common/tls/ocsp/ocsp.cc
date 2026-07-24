@@ -88,7 +88,7 @@ ResponseData::ResponseData(std::vector<SingleResponse> single_responses)
     : single_responses_(std::move(single_responses)) {}
 
 SingleResponse::SingleResponse(CertId cert_id, Envoy::SystemTime this_update,
-                               absl::optional<Envoy::SystemTime> next_update)
+                               std::optional<Envoy::SystemTime> next_update)
     : cert_id_(cert_id), this_update_(this_update), next_update_(next_update) {}
 
 CertId::CertId(std::string serial_number) : serial_number_(serial_number) {}
@@ -144,7 +144,7 @@ bool OcspResponseWrapperImpl::matchesCertificate(X509& cert) const {
 
 bool OcspResponseWrapperImpl::isExpired() {
   auto& next_update = response_->response_->getNextUpdate();
-  return next_update == absl::nullopt || next_update < time_source_.systemTime();
+  return next_update == std::nullopt || next_update < time_source_.systemTime();
 }
 
 uint64_t OcspResponseWrapperImpl::secondsUntilExpiration() const {

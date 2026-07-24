@@ -133,7 +133,7 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
     return delegated_callbacks_.setFilterConfigName(name);
   }
   OptRef<const Router::Route> route() const override { return delegated_callbacks_.route(); }
-  absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
+  std::optional<bool> filterDisabled(absl::string_view config_name) const override {
     return delegated_callbacks_.filterDisabled(config_name);
   }
   const StreamInfo::StreamInfo& streamInfo() const override {

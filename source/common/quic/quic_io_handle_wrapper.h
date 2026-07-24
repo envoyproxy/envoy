@@ -33,7 +33,7 @@ public:
     return io_handle_.readv(max_length, slices, num_slice);
   }
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length) override {
+                               std::optional<uint64_t> max_length) override {
     if (closed_) {
       return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
@@ -116,7 +116,7 @@ public:
   Api::SysCallIntResult setBlocking(bool blocking) override {
     return io_handle_.setBlocking(blocking);
   }
-  absl::optional<int> domain() override { return io_handle_.domain(); }
+  std::optional<int> domain() override { return io_handle_.domain(); }
   absl::StatusOr<Network::Address::InstanceConstSharedPtr> localAddress() override {
     return io_handle_.localAddress();
   }
@@ -134,11 +134,11 @@ public:
   void activateFileEvents(uint32_t events) override { io_handle_.activateFileEvents(events); }
   void enableFileEvents(uint32_t events) override { io_handle_.enableFileEvents(events); }
   void resetFileEvents() override { return io_handle_.resetFileEvents(); };
-  absl::optional<std::string> interfaceName() override { return io_handle_.interfaceName(); }
+  std::optional<std::string> interfaceName() override { return io_handle_.interfaceName(); }
 
   Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
-  absl::optional<uint64_t> congestionWindowInBytes() const override {
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
+  std::optional<uint64_t> congestionWindowInBytes() const override {
     // QUIC should get congestion window from QuicFilterManagerConnectionImpl, which implements the
     // Envoy::Network::Connection::congestionWindowInBytes interface.
     IS_ENVOY_BUG("QuicIoHandleWrapper does not implement congestionWindowInBytes.");

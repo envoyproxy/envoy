@@ -13,7 +13,7 @@ InitDumpHandler::InitDumpHandler(Server::Instance& server) : HandlerContextBase(
 Http::Code InitDumpHandler::handlerInitDump(Http::ResponseHeaderMap& response_headers,
                                             Buffer::Instance& response,
                                             AdminStream& admin_stream) const {
-  const absl::optional<std::string> mask =
+  const std::optional<std::string> mask =
       Utility::nonEmptyQueryParam(admin_stream.queryParams(), "mask");
 
   envoy::admin::v3::UnreadyTargetsDumps dump = *dumpUnreadyTargets(mask);
@@ -25,7 +25,7 @@ Http::Code InitDumpHandler::handlerInitDump(Http::ResponseHeaderMap& response_he
 }
 
 std::unique_ptr<envoy::admin::v3::UnreadyTargetsDumps>
-InitDumpHandler::dumpUnreadyTargets(const absl::optional<std::string>& component) const {
+InitDumpHandler::dumpUnreadyTargets(const std::optional<std::string>& component) const {
   auto unready_targets_dumps = std::make_unique<envoy::admin::v3::UnreadyTargetsDumps>();
 
   if (component.has_value()) {

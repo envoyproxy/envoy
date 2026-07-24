@@ -32,21 +32,21 @@ using FormatterContext = Formatter::Context;
 
 class StringValueFormatterProvider : public FormatterProvider {
 public:
-  using ValueExtractor = std::function<absl::optional<std::string>(const FormatterContext&,
-                                                                   const StreamInfo::StreamInfo&)>;
+  using ValueExtractor = std::function<std::optional<std::string>(const FormatterContext&,
+                                                                  const StreamInfo::StreamInfo&)>;
 
-  StringValueFormatterProvider(ValueExtractor f, absl::optional<size_t> max_length = absl::nullopt)
+  StringValueFormatterProvider(ValueExtractor f, std::optional<size_t> max_length = std::nullopt)
       : value_extractor_(f), max_length_(max_length) {}
 
   // FormatterProvider
-  absl::optional<std::string> format(const FormatterContext& context,
-                                     const StreamInfo::StreamInfo& stream_info) const override;
+  std::optional<std::string> format(const FormatterContext& context,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const FormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   ValueExtractor value_extractor_;
-  absl::optional<size_t> max_length_;
+  std::optional<size_t> max_length_;
 };
 
 class GenericStatusCodeFormatterProvider : public FormatterProvider {
@@ -54,8 +54,8 @@ public:
   GenericStatusCodeFormatterProvider() = default;
 
   // FormatterProvider
-  absl::optional<std::string> format(const FormatterContext& context,
-                                     const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const FormatterContext& context,
+                                    const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const FormatterContext& context,
                               const StreamInfo::StreamInfo&) const override;
 };

@@ -59,7 +59,7 @@ public:
     const Http::Code code = Runtime::runtimeFeatureEnabled(TestRuntimeFeature)
                                 ? Http::Code::NoContent
                                 : static_cast<Http::Code>(418);
-    decoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt, "");
+    decoder_callbacks_->sendLocalReply(code, "", nullptr, std::nullopt, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 };

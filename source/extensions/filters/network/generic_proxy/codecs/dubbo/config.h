@@ -41,7 +41,7 @@ public:
   // Request
   absl::string_view protocol() const override { return DubboProtocolName; }
   void forEach(IterateCallback callback) const override;
-  absl::optional<absl::string_view> get(absl::string_view key) const override;
+  std::optional<absl::string_view> get(absl::string_view key) const override;
   void set(absl::string_view key, absl::string_view val) override;
   absl::string_view host() const override { return inner_metadata_->request().service(); }
   absl::string_view path() const override { return inner_metadata_->request().service(); }

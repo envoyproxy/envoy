@@ -39,6 +39,7 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

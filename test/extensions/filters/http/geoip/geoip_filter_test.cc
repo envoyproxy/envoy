@@ -4,7 +4,7 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/http/geoip/geoip_filter.h"
 
-#include "test/extensions/filters/http/geoip/mocks.h"
+#include "test/mocks/geoip/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
@@ -44,7 +44,7 @@ MATCHER_P2(HasExpectedHeader, expected_header, expected_value, "") {
 class GeoipFilterTest : public testing::Test {
 public:
   GeoipFilterTest()
-      : dummy_factory_(new DummyGeoipProviderFactory()),
+      : dummy_factory_(new Geolocation::DummyGeoipProviderFactory()),
         dummy_driver_(dummy_factory_->getDriver()) {}
 
   void initializeFilter(const std::string& yaml) {
@@ -67,8 +67,8 @@ public:
   NiceMock<Stats::MockStore> stats_;
   GeoipFilterConfigSharedPtr config_;
   GeoipFilterSharedPtr filter_;
-  std::unique_ptr<DummyGeoipProviderFactory> dummy_factory_;
-  MockDriverSharedPtr dummy_driver_;
+  std::unique_ptr<Geolocation::DummyGeoipProviderFactory> dummy_factory_;
+  Geolocation::MockDriverSharedPtr dummy_driver_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
@@ -83,7 +83,7 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -117,7 +117,7 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -149,7 +149,7 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -185,7 +185,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -246,7 +246,7 @@ TEST_F(GeoipFilterTest, GeoHeaderNotAppendedOnEmptyLookup) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -277,7 +277,7 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
       provider:
           name: "envoy.geoip_providers.dummy"
           typed_config:
-            "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+            "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
   )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -305,7 +305,7 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderSuccessfulLookup) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -339,7 +339,7 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderWithIpv6) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -373,7 +373,7 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnMissingHeader) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -407,7 +407,7 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnInvalidIp) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;

@@ -44,6 +44,8 @@ envoy_cc_library(
     deps = [
         "//envoy/access_log:access_log_interface",
         "//envoy/api:api_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/stats:store_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",

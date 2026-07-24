@@ -43,11 +43,11 @@ public:
       if (inner_tls_) {
         envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls;
         inner_socket.set_name("tls");
-        inner_socket.mutable_typed_config()->PackFrom(tls);
+        std::ignore = inner_socket.mutable_typed_config()->PackFrom(tls);
       } else {
         envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
         inner_socket.set_name("raw");
-        inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+        std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       }
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
@@ -55,7 +55,7 @@ public:
           proxy_proto_transport;
       proxy_proto_transport.mutable_transport_socket()->MergeFrom(inner_socket);
       proxy_proto_transport.mutable_config()->MergeFrom(proxy_proto_config);
-      transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
 
       if (health_checks_) {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -268,14 +268,14 @@ public:
       envoy::config::core::v3::TransportSocket inner_socket;
       envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
       inner_socket.set_name("raw");
-      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+      std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
           proxy_proto_transport;
       proxy_proto_transport.mutable_transport_socket()->MergeFrom(inner_socket);
       proxy_proto_transport.mutable_config()->MergeFrom(proxy_proto_config);
-      transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
 
       if (health_checks_) {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -448,7 +448,7 @@ public:
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
         auto* ppv_filter = listener->add_listener_filters();
         ppv_filter->set_name("envoy.listener.proxy_protocol");
-        ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
+        std::ignore = ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
       });
     }
 
@@ -459,7 +459,7 @@ public:
       envoy::config::core::v3::TransportSocket inner_socket;
       envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
       inner_socket.set_name("raw");
-      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+      std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
 
       envoy::config::core::v3::ProxyProtocolConfig proxy_protocol;
       proxy_protocol.set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
@@ -491,7 +491,7 @@ public:
           entry->set_value(std::string(tlv.second.begin(), tlv.second.end()));
         }
         Protobuf::Any typed_metadata;
-        typed_metadata.PackFrom(tlvs_metadata);
+        std::ignore = typed_metadata.PackFrom(tlvs_metadata);
         const std::string metadata_key =
             Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
         metadata->mutable_typed_filter_metadata()->emplace(
@@ -510,7 +510,7 @@ public:
           proxy_proto_transport;
       proxy_proto_transport.mutable_transport_socket()->MergeFrom(inner_socket);
       proxy_proto_transport.mutable_config()->MergeFrom(proxy_protocol);
-      transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
     });
 
     BaseIntegrationTest::initialize();
@@ -932,7 +932,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTcpProxyTLVs
     auto* tlv = tcp_proxy_config.add_proxy_protocol_tlvs();
     tlv->set_type(tlv_type);
     tlv->set_value("tst");
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
 

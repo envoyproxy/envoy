@@ -1,0 +1,13 @@
+# Protobuf v35 added [[nodiscard]] to ParseFromArray.
+diff --git a/proxy_wasm_api.h b/proxy_wasm_api.h
+--- a/proxy_wasm_api.h
++++ b/proxy_wasm_api.h
+@@ -111,7 +111,7 @@
+   // Returns a protobuf of type T parsed from buffer contents.
+   template <typename T> T proto() {
+     T p;
+-    p.ParseFromArray(data_, size_);
++    static_cast<void>(p.ParseFromArray(data_, size_));
+     return p;
+   }
+

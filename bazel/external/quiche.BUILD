@@ -5143,6 +5143,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform",
+        ":quiche_common_platform_client_stats",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
         "@abseil-cpp//absl/algorithm:container",
@@ -5504,6 +5505,7 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":common_http_http_header_block_lib",
         ":quiche_common_callbacks",

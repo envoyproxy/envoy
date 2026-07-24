@@ -89,7 +89,7 @@ protected:
   struct PendingQueryInfo {
     std::unique_ptr<PendingQuery> pending_query_;
     // Empty means it will retry indefinitely until it succeeds.
-    absl::optional<uint32_t> num_retries_;
+    std::optional<uint32_t> num_retries_;
   };
 
   // Parse a getaddrinfo() response and determine the final address list. We could potentially avoid

@@ -232,7 +232,7 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
 }
 
 absl::Status HdsDelegate::processMessage(
-    std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
+    Grpc::ResponsePtr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
   std::vector<HdsClusterPtr> hds_clusters;
@@ -292,7 +292,7 @@ absl::Status HdsDelegate::processMessage(
 }
 
 void HdsDelegate::onReceiveMessage(
-    std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
+    Grpc::ResponsePtr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
 
@@ -550,7 +550,7 @@ void HdsCluster::updateHosts(
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
   priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                            hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
+                            hosts_added, hosts_removed, std::nullopt, std::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
@@ -579,7 +579,7 @@ void HdsCluster::initialize(std::function<absl::Status()> callback) {
     }
     // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                              *hosts_, {}, absl::nullopt, absl::nullopt);
+                              *hosts_, {}, std::nullopt, std::nullopt);
 
     initialized_ = true;
   }

@@ -106,9 +106,9 @@ std::vector<ContentParser::MetadataAction> JsonContentParserImpl::getAllDeferred
     // This allows users to handle missing values even when parse errors occur,
     // if they choose not to configure on_error handling.
     if (any_parse_error_ && rule.rule_.has_on_error()) {
-      actions.push_back(keyValuePairToAction(rule.rule_.on_error(), absl::nullopt));
+      actions.push_back(keyValuePairToAction(rule.rule_.on_error(), std::nullopt));
     } else if (rule.selector_not_found_ && rule.rule_.has_on_missing()) {
-      actions.push_back(keyValuePairToAction(rule.rule_.on_missing(), absl::nullopt));
+      actions.push_back(keyValuePairToAction(rule.rule_.on_missing(), std::nullopt));
     }
   }
 
@@ -168,7 +168,7 @@ JsonContentParserImpl::extractValueFromJson(const Envoy::Json::ObjectSharedPtr& 
 
 ContentParser::MetadataAction JsonContentParserImpl::keyValuePairToAction(
     const KeyValuePair& kv_pair,
-    const absl::optional<Envoy::Json::ValueType>& extracted_value) const {
+    const std::optional<Envoy::Json::ValueType>& extracted_value) const {
   ContentParser::MetadataAction action;
 
   // Namespace: Parser is responsible for applying the default namespace.

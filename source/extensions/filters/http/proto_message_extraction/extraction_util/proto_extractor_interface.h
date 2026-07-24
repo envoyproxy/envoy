@@ -26,10 +26,10 @@ using FieldPathToExtractType =
 
 // Metadata that can be captured during message extraction.
 struct ExtractedMessageMetadata {
-  absl::optional<int> num_response_items;
-  absl::optional<std::string> target_resource;
-  absl::optional<std::string> target_resource_callback;
-  absl::optional<std::string> resource_location;
+  std::optional<int> num_response_items;
+  std::optional<std::string> target_resource;
+  std::optional<std::string> target_resource_callback;
+  std::optional<std::string> resource_location;
   Protobuf::Struct extracted_message;
 };
 

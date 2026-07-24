@@ -1,9 +1,10 @@
+#include <optional>
+
 #include "source/extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/test_runtime.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -39,8 +40,8 @@ public:
   double pressure() const { return *pressure_; }
 
 private:
-  absl::optional<double> pressure_;
-  absl::optional<EnvoyException> error_;
+  std::optional<double> pressure_;
+  std::optional<EnvoyException> error_;
 };
 
 TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {

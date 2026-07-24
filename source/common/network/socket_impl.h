@@ -66,9 +66,9 @@ public:
       application_protocols_.emplace_back(protocol);
     }
   }
-  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+  std::optional<uint64_t> connectionID() const override { return connection_id_; }
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
-  absl::optional<absl::string_view> interfaceName() const override { return interface_name_; }
+  std::optional<absl::string_view> interfaceName() const override { return interface_name_; }
   void enableSettingInterfaceName(const bool enable) override {
     allow_syscall_for_interface_name_ = enable;
   }
@@ -85,7 +85,7 @@ public:
   void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
   absl::string_view ja4Hash() const override { return ja4_hash_; }
   void setJA4Hash(const absl::string_view ja4_hash) override { ja4_hash_ = std::string(ja4_hash); }
-  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+  const std::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return round_trip_time_;
   }
   void setRoundTripTime(std::chrono::milliseconds round_trip_time) override {
@@ -112,13 +112,13 @@ private:
   Address::InstanceConstSharedPtr direct_remote_address_;
   std::string server_name_;
   std::vector<std::string> application_protocols_;
-  absl::optional<uint64_t> connection_id_;
+  std::optional<uint64_t> connection_id_;
   bool allow_syscall_for_interface_name_{false};
-  absl::optional<std::string> interface_name_;
+  std::optional<std::string> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   std::string ja3_hash_;
   std::string ja4_hash_;
-  absl::optional<std::chrono::milliseconds> round_trip_time_;
+  std::optional<std::chrono::milliseconds> round_trip_time_;
   FilterChainInfoConstSharedPtr filter_chain_info_;
   ListenerInfoConstSharedPtr listener_info_;
 };
@@ -181,7 +181,7 @@ public:
   const OptionsSharedPtr& options() const override { return options_; }
   Socket::Type socketType() const override { return sock_type_; }
   Address::Type addressType() const override { return addr_type_; }
-  absl::optional<Address::IpVersion> ipVersion() const override;
+  std::optional<Address::IpVersion> ipVersion() const override;
 
 protected:
   SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,

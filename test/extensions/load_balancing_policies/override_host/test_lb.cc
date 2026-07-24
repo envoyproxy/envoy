@@ -66,7 +66,7 @@ private:
       return {};
     }
 
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(LoadBalancerContext*, const Host&, std::vector<uint8_t>&) override {
       return std::nullopt;
     }

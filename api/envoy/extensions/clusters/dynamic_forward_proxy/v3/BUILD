@@ -8,6 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/config/cluster/v3:pkg",
         "//envoy/config/core/v3:pkg",
+        "//envoy/extensions/clusters/dns/v3:pkg",
         "//envoy/extensions/common/dynamic_forward_proxy/v3:pkg",
         "@xds//udpa/annotations:pkg",
     ],

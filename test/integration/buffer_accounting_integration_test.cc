@@ -621,7 +621,7 @@ public:
 
           auto* filter_chain = listener->add_filter_chains();
           auto* filter = filter_chain->add_filters();
-          filter->mutable_typed_config()->PackFrom(proxy_config);
+          std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
           filter->set_name("envoy.filters.network.tcp_proxy");
 
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
@@ -1182,7 +1182,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
     if (tee.response_body_.length() > 9000) {
       encoder_cbs->sendLocalReply(Http::Code::InternalServerError, "Response size was over 9000!",
-                                  nullptr, absl::nullopt, "");
+                                  nullptr, std::nullopt, "");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
     return Http::FilterDataStatus::Continue;

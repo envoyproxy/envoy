@@ -81,7 +81,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
                                   .setVerifyDepth(1));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   ASSERT_TRUE(codec->connected());
   test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
@@ -101,7 +101,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedNoDepthWithTrustRoo
                                   .setTrustRootOnly(true));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   ASSERT_TRUE(codec->connected());
   test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
@@ -122,7 +122,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedDepthWithTrustRootO
                                   .setVerifyDepth(3));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   ASSERT_TRUE(codec->connected());
   test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), Ge(1));
   EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
@@ -143,7 +143,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOn
                                   .setVerifyDepth(2));
   initialize();
   auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), std::nullopt);
   test_server_->waitForCounter(listenerStatPrefix("ssl.fail_verify_error"), Ge(1));
   ASSERT_TRUE(codec->waitForDisconnect());
 }

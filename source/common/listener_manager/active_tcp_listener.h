@@ -79,7 +79,7 @@ public:
   void post(Network::ConnectionSocketPtr&& socket) override;
   void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                       bool hand_off_restored_destination_connections, bool rebalanced,
-                      const absl::optional<std::string>& network_namespace) override;
+                      const std::optional<std::string>& network_namespace) override;
 
   void newActiveConnection(const Network::FilterChain& filter_chain,
                            Network::ServerConnectionPtr server_conn_ptr,
@@ -103,6 +103,6 @@ public:
   Network::Address::InstanceConstSharedPtr listen_address_;
 };
 
-using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
+using ActiveTcpListenerOptRef = std::optional<std::reference_wrapper<ActiveTcpListener>>;
 } // namespace Server
 } // namespace Envoy

@@ -113,7 +113,7 @@ private:
   // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
   std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
-  uint32_t worker_index_;
+  uint32_t worker_index_ = 0;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -146,6 +146,29 @@ private:
 
   absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleListenerFilter::HttpCalloutCallback>>
       http_callouts_;
+};
+
+/**
+ * Adapts a shared_ptr-owned DynamicModuleListenerFilter to the unique_ptr that the listener
+ * filter manager requires. Shared ownership is needed because the async HTTP callout and
+ * scheduler paths call shared_from_this. Every ListenerFilter method forwards to the filter.
+ */
+class SharedListenerFilterAdapter : public Network::ListenerFilter {
+public:
+  explicit SharedListenerFilterAdapter(DynamicModuleListenerFilterSharedPtr filter)
+      : filter_(std::move(filter)) {}
+
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
+    return filter_->onAccept(cb);
+  }
+  Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override {
+    return filter_->onData(buffer);
+  }
+  void onClose() override { filter_->onClose(); }
+  size_t maxReadBytes() const override { return filter_->maxReadBytes(); }
+
+private:
+  const DynamicModuleListenerFilterSharedPtr filter_;
 };
 
 /**

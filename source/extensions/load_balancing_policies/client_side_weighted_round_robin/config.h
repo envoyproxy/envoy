@@ -36,7 +36,8 @@ public:
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
-    const auto& lb_config = dynamic_cast<const ClientSideWeightedRoundRobinLbProto&>(config);
+    const auto& lb_config =
+        Envoy::Protobuf::DynamicCastMessage<ClientSideWeightedRoundRobinLbProto>(config);
     return Upstream::LoadBalancerConfigPtr{new Upstream::ClientSideWeightedRoundRobinLbConfig(
         lb_config, context.mainThreadDispatcher(), context.threadLocal())};
   }

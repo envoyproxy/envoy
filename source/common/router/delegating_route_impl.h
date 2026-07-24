@@ -43,7 +43,7 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return base_route_->typedMetadata();
   }
-  absl::optional<bool> filterDisabled(absl::string_view name) const override {
+  std::optional<bool> filterDisabled(absl::string_view name) const override {
     return base_route_->filterDisabled(name);
   }
   const std::string& routeName() const override { return base_route_->routeName(); }
@@ -109,14 +109,14 @@ public:
   uint64_t requestBodyBufferLimit() const override;
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;
   std::chrono::milliseconds timeout() const override;
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override;
-  absl::optional<std::chrono::milliseconds> flushTimeout() const override;
+  std::optional<std::chrono::milliseconds> idleTimeout() const override;
+  std::optional<std::chrono::milliseconds> flushTimeout() const override;
   bool usingNewTimeouts() const override;
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override;
-  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override;
-  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override;
-  absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override;
-  absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override;
+  std::optional<std::chrono::milliseconds> maxStreamDuration() const override;
+  std::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override;
+  std::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override;
+  std::optional<std::chrono::milliseconds> maxGrpcTimeout() const override;
+  std::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override;
   bool autoHostRewrite() const override;
   bool appendXfh() const override;
   const MetadataMatchCriteria* metadataMatchCriteria() const override;

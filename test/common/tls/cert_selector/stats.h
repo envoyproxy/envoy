@@ -14,6 +14,8 @@ namespace Tls {
   COUNTER(cert_selection_async_finished)                                                           \
   COUNTER(cert_selection_sleep)                                                                    \
   COUNTER(cert_selection_sleep_finished)                                                           \
+  COUNTER(cert_selection_cancel)                                                                   \
+  COUNTER(cert_selection_cancelled)                                                                \
   COUNTER(cert_selection_failed)
 
 /**

@@ -1,13 +1,12 @@
 #pragma once
 
 #include <limits>
+#include <optional>
 
 #include "envoy/common/resource.h"
 #include "envoy/runtime/runtime.h"
 
 #include "source/common/common/assert.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -54,7 +53,7 @@ protected:
 private:
   uint64_t max_;
   Runtime::Loader* runtime_{nullptr};
-  const absl::optional<std::string> runtime_key_;
+  const std::optional<std::string> runtime_key_;
 };
 
 } // namespace Envoy

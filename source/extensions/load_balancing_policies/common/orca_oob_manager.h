@@ -4,8 +4,10 @@
 #include <memory>
 
 #include "envoy/common/random_generator.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/load_balancing_policies/common/v3/common.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -41,6 +43,24 @@ struct OrcaOobStats {
   ALL_ORCA_OOB_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+// Default ORCA OOB load reporting interval.
+constexpr uint64_t kDefaultOobReportingPeriodMs = 10000;
+
+// Resolved configuration consumed by OrcaOobManager.
+struct OrcaOobManagerConfig {
+  std::chrono::milliseconds reporting_period{kDefaultOobReportingPeriodMs};
+  uint32_t port_value{0};
+  std::string authority;
+  // Endpoint metadata carrying transport_socket_match_criteria under the
+  // "envoy.transport_socket_match" key; nullptr when unset.
+  std::shared_ptr<const envoy::config::core::v3::Metadata> transport_socket_match_metadata;
+};
+
+// Populates the connection-override fields of `config` from `proto`.
+void applyOrcaOobConnectionOverrides(
+    const envoy::extensions::load_balancing_policies::common::v3::OrcaOobReportingConfig& proto,
+    OrcaOobManagerConfig& config);
+
 /**
  * Cluster-level manager owning per-host ORCA OOB streams. Modeled on
  * source/extensions/health_checkers/grpc/health_checker_impl.h: per-host nested OobSession holds
@@ -51,10 +71,9 @@ struct OrcaOobStats {
  */
 class OrcaOobManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  OrcaOobManager(std::chrono::milliseconds reporting_period,
-                 const Upstream::PrioritySet& priority_set, Event::Dispatcher& dispatcher,
-                 Random::RandomGenerator& random, Stats::Scope& stats_scope,
-                 OrcaLoadReportHandlerSharedPtr report_handler);
+  OrcaOobManager(OrcaOobManagerConfig config, const Upstream::PrioritySet& priority_set,
+                 Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                 Stats::Scope& stats_scope, OrcaLoadReportHandlerSharedPtr report_handler);
   virtual ~OrcaOobManager();
 
   // Iterate priority set, open a session per existing host, register member-update callback.
@@ -125,7 +144,7 @@ private:
     void onRpcComplete(Grpc::Status::GrpcStatus status, absl::string_view message, bool end_stream);
     void onReport(const xds::data::orca::v3::OrcaLoadReport& report);
     void resetState();
-    std::string authority() const;
+    std::string authority(const Network::Address::Instance& dial_address) const;
 
     OrcaOobManager& parent_;
     const Upstream::HostConstSharedPtr host_;
@@ -152,7 +171,7 @@ private:
 
   static OrcaOobStats generateOrcaOobStats(Stats::Scope& scope);
 
-  const std::chrono::milliseconds reporting_period_;
+  const OrcaOobManagerConfig config_;
   const Upstream::PrioritySet& priority_set_;
   OrcaLoadReportHandlerSharedPtr report_handler_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;

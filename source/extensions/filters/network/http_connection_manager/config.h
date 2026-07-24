@@ -158,7 +158,7 @@ public:
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
     return flush_log_on_tunnel_successfully_established_;
   }
-  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+  const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return access_log_flush_interval_;
   }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
@@ -173,21 +173,21 @@ public:
   bool alwaysSetRequestIdInResponse() const override { return always_set_request_id_in_response_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  std::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
-  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override;
+  std::optional<std::chrono::milliseconds> maxConnectionDuration() const override;
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
-  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+  std::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
     return stream_flush_timeout_;
   }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds requestHeadersTimeout() const override {
     return request_headers_timeout_;
   }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+  std::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
   }
   Router::RouteConfigProvider* routeConfigProvider() override {
@@ -204,7 +204,7 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
-  const absl::optional<std::string>& schemeToSet() const override { return scheme_to_set_; }
+  const std::optional<std::string>& schemeToSet() const override { return scheme_to_set_; }
   bool shouldSchemeMatchUpstream() const override { return should_scheme_match_upstream_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -228,7 +228,7 @@ public:
     return tracing_config_.get();
   }
   const Network::Address::Instance& localAddress() override;
-  const absl::optional<std::string>& userAgent() override { return user_agent_; }
+  const std::optional<std::string>& userAgent() override { return user_agent_; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
   bool streamErrorOnInvalidHttpMessaging() const override {
@@ -303,7 +303,7 @@ private:
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_;
-  absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
+  std::optional<std::chrono::milliseconds> access_log_flush_interval_;
   bool flush_log_on_tunnel_successfully_established_{false};
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
@@ -329,20 +329,20 @@ private:
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
-  absl::optional<std::string> scheme_to_set_;
+  std::optional<std::string> scheme_to_set_;
   bool should_scheme_match_upstream_;
   Tracing::TracerSharedPtr tracer_{std::make_shared<Tracing::NullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
-  absl::optional<std::string> user_agent_;
+  std::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
   const uint32_t max_request_headers_count_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_;
-  absl::optional<double> max_connection_duration_jitter_percentage_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> max_connection_duration_;
+  std::optional<double> max_connection_duration_jitter_percentage_;
   const bool http1_safe_max_connection_duration_;
-  absl::optional<std::chrono::milliseconds> max_stream_duration_;
+  std::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
-  absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
+  std::optional<std::chrono::milliseconds> stream_flush_timeout_;
   std::chrono::milliseconds request_timeout_;
   std::chrono::milliseconds request_headers_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;
@@ -351,7 +351,7 @@ private:
   Router::ScopeKeyBuilderPtr scope_key_builder_;
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
-  absl::optional<double> drain_timeout_jitter_percentage_;
+  std::optional<double> drain_timeout_jitter_percentage_;
   bool generate_request_id_;
   const bool preserve_external_request_id_;
   const bool always_set_request_id_in_response_;

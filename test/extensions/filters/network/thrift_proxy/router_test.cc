@@ -277,7 +277,7 @@ public:
     EXPECT_EQ(&connection_, router_->downstreamConnection());
 
     // Not yet implemented:
-    EXPECT_EQ(absl::optional<uint64_t>(), router_->computeHashKey());
+    EXPECT_EQ(std::optional<uint64_t>(), router_->computeHashKey());
     EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
     EXPECT_EQ(nullptr, router_->downstreamHeaders());
   }
@@ -346,7 +346,7 @@ public:
     EXPECT_EQ(&connection_, router_->downstreamConnection());
 
     // Not yet implemented:
-    EXPECT_EQ(absl::optional<uint64_t>(), router_->computeHashKey());
+    EXPECT_EQ(std::optional<uint64_t>(), router_->computeHashKey());
     EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
     EXPECT_EQ(nullptr, router_->downstreamHeaders());
 
@@ -1036,7 +1036,7 @@ TEST_P(ThriftRouterRainidayTest, NoHealthyHosts) {
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _))
-      .WillOnce(Return(absl::nullopt));
+      .WillOnce(Return(std::nullopt));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {

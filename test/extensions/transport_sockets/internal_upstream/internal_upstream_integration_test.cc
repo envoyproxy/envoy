@@ -8,6 +8,7 @@
 #include "source/extensions/transport_sockets/internal_upstream/config.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 
@@ -53,7 +54,7 @@ public:
       config.mutable_buffer_size_kb()->set_value(buffer_size_);
     }
     auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
-    bootstrap_extension->mutable_typed_config()->PackFrom(config);
+    std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(config);
     bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
   }
   void initialize() override {

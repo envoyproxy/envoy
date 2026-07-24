@@ -48,7 +48,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
     data.onRequestHeaders(request_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -69,7 +69,7 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
     data.onRequestTrailers(request_trailers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -93,7 +93,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -117,7 +117,7 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
     data.onResponseTrailers(response_trailers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -131,7 +131,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
     HttpRequestQueryParamsDataInput input("arg");
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   {
@@ -158,7 +158,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
     const auto result = input.get(data);
 
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   {
@@ -169,7 +169,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
     const auto result = input.get(data);
 
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -181,7 +181,7 @@ TEST(MatchingData, FilterStateInput) {
     Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   stream_info.filterState()->setData("unknown_key",
@@ -192,7 +192,7 @@ TEST(MatchingData, FilterStateInput) {
     Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
     const auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 
   stream_info.filterState()->setData(

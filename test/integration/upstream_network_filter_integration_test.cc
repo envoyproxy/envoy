@@ -41,7 +41,7 @@ public:
           filter->set_name(name);
           auto configuration = test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
           configuration.set_bytes_to_drain(bytes_to_drain);
-          filter->mutable_typed_config()->PackFrom(configuration);
+          std::ignore = filter->mutable_typed_config()->PackFrom(configuration);
         });
   }
 
@@ -86,7 +86,7 @@ public:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
       config.set_stat_prefix("tcp_stats");
       config.set_cluster("cluster_0");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
 
     BaseIntegrationTest::initialize();
@@ -139,7 +139,7 @@ public:
         auto default_configuration =
             test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
         default_configuration.set_bytes_to_drain(default_bytes_to_drain_);
-        discovery->mutable_default_config()->PackFrom(default_configuration);
+        std::ignore = discovery->mutable_default_config()->PackFrom(default_configuration);
       }
 
       discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -188,7 +188,7 @@ public:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
       config.set_stat_prefix("tcp_stats");
       config.set_cluster("cluster_0");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
 
     // Use gRPC LDS instead of default file LDS.
@@ -287,7 +287,7 @@ public:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
-    response.add_resources()->PackFrom(listener_config_);
+    std::ignore = response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }
 
@@ -302,12 +302,12 @@ public:
     resource.set_name(name);
     auto configuration = test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
     configuration.set_bytes_to_drain(bytes_to_drain);
-    typed_config.mutable_typed_config()->PackFrom(configuration);
-    resource.mutable_resource()->PackFrom(typed_config);
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
     }
-    response.add_resources()->PackFrom(resource);
+    std::ignore = response.add_resources()->PackFrom(resource);
     if (!second_connection) {
       ecds_stream_->sendGrpcMessage(response);
     } else {
@@ -539,13 +539,13 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigD
 
   // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
   test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
-  filter_config.typed_config().UnpackTo(&network_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_EQ(5, network_filter_config.bytes_to_drain());
 }
 
@@ -609,18 +609,18 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(5, config_dump.configs_size());
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
   // Verify the first filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
-  filter_config.typed_config().UnpackTo(&network_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, network_filter_config));
   // Verify the second filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(1).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(1).ecds_filter().UnpackTo(&filter_config));
-  filter_config.typed_config().UnpackTo(&network_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, network_filter_config));
 }
 
@@ -648,13 +648,13 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(1, config_dump.configs_size());
   envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig ecds_msg;
-  config_dump.configs(0).UnpackTo(&ecds_msg);
+  std::ignore = config_dump.configs(0).UnpackTo(&ecds_msg);
   EXPECT_EQ("1", ecds_msg.version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
   test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
-  filter_config.typed_config().UnpackTo(&network_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_EQ(4, network_filter_config.bytes_to_drain());
 }
 
@@ -752,7 +752,7 @@ public:
       filter->set_name("envoy.test.access_log_filter_custom");
       // Need valid config type matching the factory
       test::integration::filters::TestNetworkFilterConfig config;
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
 
     // Setup generic tcp proxy downstream
@@ -764,7 +764,7 @@ public:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
       config.set_stat_prefix("tcp_stats");
       config.set_cluster("cluster_0");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
 
     BaseIntegrationTest::initialize();

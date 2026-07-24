@@ -90,7 +90,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   - Body: {"data": "updated value"}
 //     (Only the "payload" field from arguments is used as the body. Other arguments not in the
 //     path, like 'resource_id', become query parameters.)
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message McpJsonRestBridge {
   // Where to store parsed MCP request attributes.
   enum RequestStorageMode {
@@ -142,6 +142,10 @@ message McpJsonRestBridge {
   // will be extracted from ``_meta``.
   // Ref: `Request Meta SEP <https://modelcontextprotocol.io/seps/414-request-meta>`_
   TraceContextExtractionOptions trace_context_extraction = 6;
+
+  // When set to true, the filter will not clear the route cache after transcoding.
+  // This allows the route to be re-selected based on the updated request path or method.
+  bool disable_clear_route_cache = 7;
 }
 
 // Options for trace context extraction.
@@ -177,12 +181,12 @@ message ServerInfo {
   google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
-// [#not-implemented-hide:]
 // Configuration for sending locally-generated responses to tools/list requests.
 message ToolsListLocal {
 }
 
 // Configuration for the MCP tool capability of the server.
+// [#next-free-field: 6]
 message ServerToolConfig {
   // List of MCP tools configurations.
   repeated ToolConfig tools = 1;
@@ -203,14 +207,16 @@ message ServerToolConfig {
     // https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
     HttpRule tool_list_http_rule = 3;
 
-    // [#not-implemented-hide:]
     // If provided: The extension sends a local response, according to each tool's
     // ToolsListSpecificConfig.
     ToolsListLocal tool_list_local = 4;
   }
+
+  // [#not-implemented-hide:]
+  // Default server info for tools without specific ones.
+  McpServerInfo default_server_info = 5;
 }
 
-// [#not-implemented-hide:]
 // Configuration for a tool's entry in tools/list responses.
 message ToolsListSpecificConfig {
   // Optional, human-readable name of the tool for display purposes.
@@ -242,7 +248,6 @@ message ToolConfig {
   // The HTTP configuration rules that apply to the normal backend.
   HttpRule http_rule = 2;
 
-  // [#not-implemented-hide:]
   // Config for this tool's entry in a local tools/list response. Used when tool_list_local is set
   // in the ServerToolConfig.
   ToolsListSpecificConfig tool_list_config = 3;
@@ -318,5 +323,5 @@ message HttpRule {
 
 // Per-route override configuration for the MCP JSON REST Bridge filter.
 message McpJsonRestBridgePerRoute {
-  ServerToolConfig tool_config = 1;
+  repeated ServerToolConfig tool_config = 1;
 }

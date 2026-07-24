@@ -71,7 +71,7 @@ public:
       // Add header-based hash policy.
       auto* hash_policy = options.add_hash_policy();
       hash_policy->mutable_header()->set_header_name("x-user-id");
-      options_any.PackFrom(options);
+      std::ignore = options_any.PackFrom(options);
     });
   }
 
@@ -92,7 +92,7 @@ public:
       options.mutable_explicit_http_config()->mutable_http2_protocol_options();
       auto* mirror_policy = options.add_request_mirror_policies();
       mirror_policy->set_cluster("cluster_1");
-      options_any.PackFrom(options);
+      std::ignore = options_any.PackFrom(options);
     });
   }
 
@@ -171,7 +171,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterMirroringWithRuntimeFra
     mirror_policy->mutable_runtime_fraction()->mutable_default_value()->set_numerator(50);
     mirror_policy->mutable_runtime_fraction()->mutable_default_value()->set_denominator(
         envoy::type::v3::FractionalPercent::HUNDRED);
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   initialize();
@@ -217,7 +217,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterMirroringWithHeaderMuta
     // Remove a header from shadow requests.
     auto* mutation2 = mirror_policy->add_request_headers_mutations();
     mutation2->set_remove("x-remove-me");
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   initialize();
@@ -299,7 +299,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterMirroringDisabledShadow
     auto* mirror_policy = options.add_request_mirror_policies();
     mirror_policy->set_cluster("cluster_1");
     mirror_policy->set_disable_shadow_host_suffix_append(true);
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   initialize();
@@ -385,7 +385,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, PrecedenceClusterOnlyMirroring
     options.mutable_explicit_http_config()->mutable_http2_protocol_options();
     auto* mirror_policy = options.add_request_mirror_policies();
     mirror_policy->set_cluster("cluster_1");
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   // Do NOT configure route-level mirror policy.
@@ -435,7 +435,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, PrecedenceClusterOverridesRout
     options.mutable_explicit_http_config()->mutable_http2_protocol_options();
     auto* mirror_policy = options.add_request_mirror_policies();
     mirror_policy->set_cluster("cluster_2");
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   // Configure route-level mirror policy to cluster_1.
@@ -500,7 +500,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest,
     auto* mirror_policy_2 = options.add_request_mirror_policies();
     mirror_policy_2->set_cluster("cluster_4");
 
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   // Configure route-level mirror policies to cluster_1 and cluster_2.
@@ -625,7 +625,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, PrecedenceClusterOnlyHashPolic
     // Add header-based hash policy.
     auto* hash_policy = options.add_hash_policy();
     hash_policy->mutable_header()->set_header_name("x-user-id");
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   // Do NOT configure route-level hash policy.
@@ -664,7 +664,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, PrecedenceClusterOverridesRout
 
     auto* hash_policy = options.add_hash_policy();
     hash_policy->mutable_header()->set_header_name("x-cluster-user");
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   // Configure route-level hash policy on x-route-user.
@@ -747,7 +747,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterHashPolicyWithMaglev) {
         // Add header-based hash policy.
         auto* hash_policy = options.add_hash_policy();
         hash_policy->mutable_header()->set_header_name("x-account-id");
-        options_any.PackFrom(options);
+        std::ignore = options_any.PackFrom(options);
       });
 
   initialize();
@@ -790,7 +790,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterHashPolicySourceIp) {
 
     auto* hash_policy = options.add_hash_policy();
     hash_policy->mutable_connection_properties()->set_source_ip(true);
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   initialize();
@@ -834,7 +834,7 @@ TEST_P(ClusterHttpProtocolOptionsIntegrationTest, ClusterMultipleHashPolicies) {
     auto* hash_policy2 = options.add_hash_policy();
     hash_policy2->mutable_header()->set_header_name("x-fallback");
 
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   initialize();
@@ -893,7 +893,7 @@ public:
       retry_policy->set_retry_on("5xx");
       retry_policy->mutable_num_retries()->set_value(2);
       retry_policy->mutable_per_try_timeout()->set_seconds(10);
-      options_any.PackFrom(options);
+      std::ignore = options_any.PackFrom(options);
     });
   }
 
@@ -960,7 +960,7 @@ TEST_P(ClusterRetryPolicyIntegrationTest, PrecedenceClusterOnlyRetryPolicy) {
     auto* retry_policy = options.mutable_retry_policy();
     retry_policy->set_retry_on("connect-failure");
     retry_policy->mutable_num_retries()->set_value(1);
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   // Do NOT configure route-level retry policy.
@@ -1042,7 +1042,7 @@ TEST_P(ClusterRetryPolicyIntegrationTest, PrecedenceClusterOverridesRouteRetryPo
     auto* retry_policy = options.mutable_retry_policy();
     retry_policy->set_retry_on("reset");
     retry_policy->mutable_num_retries()->set_value(1);
-    options_any.PackFrom(options);
+    std::ignore = options_any.PackFrom(options);
   });
 
   // Configure route-level retry policy for 5xx.

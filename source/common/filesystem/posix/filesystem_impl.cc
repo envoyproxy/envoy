@@ -138,9 +138,9 @@ static FileType typeFromStat(const struct stat& s) {
   return FileType::Other;
 }
 
-static constexpr absl::optional<SystemTime> systemTimeFromTimespec(const struct timespec& t) {
+static constexpr std::optional<SystemTime> systemTimeFromTimespec(const struct timespec& t) {
   if (t.tv_sec == 0) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return timespecToChrono(t);
 }

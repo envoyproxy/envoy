@@ -48,7 +48,7 @@ public:
 
   MOCK_METHOD(const std::string, proxyHost, (const StreamInfo::StreamInfo& stream_info), (const));
   MOCK_METHOD(const std::string, targetHost, (const StreamInfo::StreamInfo& stream_info), (const));
-  MOCK_METHOD(const absl::optional<uint32_t>&, proxyPort, (), (const));
+  MOCK_METHOD(const std::optional<uint32_t>&, proxyPort, (), (const));
   MOCK_METHOD(uint32_t, defaultTargetPort, (), (const));
   MOCK_METHOD(bool, usePost, (), (const));
   MOCK_METHOD(const std::string&, postPath, (), (const));
@@ -69,7 +69,7 @@ public:
 
   std::string default_proxy_host_ = "default.host.com";
   std::string default_target_host_ = "default.target.host";
-  const absl::optional<uint32_t> default_proxy_port_ = 10;
+  const std::optional<uint32_t> default_proxy_port_ = 10;
   uint32_t default_target_port_{20};
   std::string post_path_ = "/default/post";
   Http::HeaderEvaluator& header_evaluator_;

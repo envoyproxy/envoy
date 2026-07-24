@@ -35,6 +35,8 @@ envoy_cc_test(
     deps = [
         "//test/mocks/event:event_mocks",
         "//test/mocks/io:io_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ] + select({
         "//bazel:linux": [

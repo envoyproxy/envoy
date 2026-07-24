@@ -1,7 +1,14 @@
 #include "contrib/istio/filters/network/peer_metadata/source/peer_metadata.h"
 
+#include <optional>
+
+#include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/uint64_accessor.h"
+
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
@@ -15,16 +22,16 @@ using CelState = ::Envoy::Extensions::Filters::Common::Expr::CelState;
 using CelStateType = ::Envoy::Extensions::Filters::Common::Expr::CelStateType;
 
 std::string baggageValue(const LocalInfo::LocalInfo& local_info) {
-  const auto obj = Istio::Common::convertStructToWorkloadMetadata(local_info.node().metadata());
+  const auto obj = ::Istio::Common::convertStructToWorkloadMetadata(local_info.node().metadata());
   return obj->baggage();
 }
 
-absl::optional<absl::string_view> internalListenerName(const Network::Address::Instance& address) {
+std::optional<absl::string_view> internalListenerName(const Network::Address::Instance& address) {
   const auto internal = address.envoyInternalAddress();
   if (internal != nullptr) {
     return internal->addressId();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 bool allowedInternalListener(const Network::Address::Instance& address) {
@@ -43,12 +50,41 @@ bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
   return value.bool_value();
 }
 
+std::optional<std::string> getRegistryKey(const StreamInfo::FilterState& filter_state) {
+  const auto* connection_id = filter_state.getDataReadOnly<Router::StringAccessor>(
+      Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
+  if (connection_id == nullptr) {
+    return std::nullopt;
+  }
+  return std::string(connection_id->asString());
+}
+
+// Layered-runtime boolean key that, when true, disables the thread-local registry hand-off. The
+// registry allocates an Envoy thread-local slot, and Envoy's thread-local storage is backed by
+// process-static memory whose slots are indexed by a per-instance counter. Integration tests that
+// run multiple Envoy instances in a single process would therefore shift slot indices and corrupt
+// other extensions' thread-local data. Those tests use the legacy data-stream-preamble hand-off
+// (no downstream connection ID in filter state), so the registry is never needed and can be
+// disabled via this key (set through the bootstrap layered_runtime static layer).
+constexpr char DisableRegistryRuntimeKey[] = "envoy.contrib.peer_metadata.disable_tls_registry";
+
+// Returns the process-wide registry, or nullptr when disabled via the runtime key above so that no
+// Envoy thread-local slot is allocated.
+Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr
+maybeGetRegistry(Server::Configuration::ServerFactoryContext& context) {
+  if (context.runtime().snapshot().getBoolean(DisableRegistryRuntimeKey, false)) {
+    return nullptr;
+  }
+  return Filters::Common::PeerMetadataShared::getRegistry(context);
+}
+
 } // namespace
 
 const uint32_t PeerMetadataHeader::magic_number = 0xabcd1234;
 
-Filter::Filter(const Config& config, const LocalInfo::LocalInfo& local_info)
-    : config_(config), baggage_(baggageValue(local_info)) {}
+Filter::Filter(const Config& config, const LocalInfo::LocalInfo& local_info,
+               Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry)
+    : config_(config), baggage_(baggageValue(local_info)), registry_(std::move(registry)) {}
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
   return Network::FilterStatus::Continue;
@@ -76,11 +112,16 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& buffer, bool) {
     // for peer metadata anymore, if the upstream sent it, we'd have it by
     // now. So we can check if the peer metadata is available or not, and if
     // no peer metadata available, we can give up waiting for it.
-    absl::optional<Protobuf::Any> peer_metadata = discoverPeerMetadata();
-    if (peer_metadata) {
-      propagatePeerMetadata(*peer_metadata);
-    } else {
-      propagateNoPeerMetadata();
+    ASSERT(read_callbacks_);
+    std::optional<Envoy::Protobuf::Any> peer_metadata = discoverPeerMetadata();
+    // Default: hand off via the thread-local registry. Otherwise we fallback
+    // to "byte stream data".
+    if (!storeInRegistry(peer_metadata)) {
+      if (peer_metadata) {
+        propagatePeerMetadata(*peer_metadata);
+      } else {
+        propagateNoPeerMetadata();
+      }
     }
     state_ = PeerMetadataState::PassThrough;
     break;
@@ -115,7 +156,12 @@ bool Filter::disableDiscovery() const {
   return discoveryDisabled(metadata);
 }
 
-absl::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
+// discoveryPeerMetadata is called to check if the baggage HTTP2 CONNECT
+// response headers have been populated already in the filter state.
+//
+// NOTE: It's safe to call this function during any step of processing - it
+// will not do anything if the filter is not in the right state.
+std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
   ENVOY_LOG(trace, "Trying to discover peer metadata from filter state set by TCP Proxy");
   ASSERT(write_callbacks_);
 
@@ -126,7 +172,7 @@ absl::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
           TcpProxy::TunnelResponseHeaders::key());
   if (!state) {
     ENVOY_LOG(trace, "TCP Proxy didn't set expected filter state");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   const Http::HeaderMap& headers = state->value();
@@ -135,7 +181,7 @@ absl::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
     ENVOY_LOG(
         trace,
         "TCP Proxy saved response headers to the filter state, but there is no baggage header");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ENVOY_LOG(trace,
@@ -151,21 +197,41 @@ absl::optional<Protobuf::Any> Filter::discoverPeerMetadata() {
     }
   }
 
-  std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
-      Istio::Common::convertBaggageToWorkloadMetadata(baggage[0]->value().getStringView(),
-                                                      identity);
+  std::unique_ptr<::Istio::Common::WorkloadMetadataObject> metadata =
+      ::Istio::Common::convertBaggageToWorkloadMetadata(baggage[0]->value().getStringView(),
+                                                        identity);
 
-  Protobuf::Struct data = Istio::Common::convertWorkloadMetadataToStruct(*metadata);
-  Protobuf::Any wrapped;
-  wrapped.PackFrom(data);
+  Envoy::Protobuf::Struct data = ::Istio::Common::convertWorkloadMetadataToStruct(*metadata);
+  Envoy::Protobuf::Any wrapped;
+  std::ignore = wrapped.PackFrom(data);
   return wrapped;
 }
 
-void Filter::propagatePeerMetadata(const Protobuf::Any& peer_metadata) {
+bool Filter::storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata) {
+  ASSERT(read_callbacks_);
+  std::optional<std::string> key =
+      getRegistryKey(*read_callbacks_->connection().streamInfo().filterState());
+  if (!key) {
+    return false;
+  }
+  if (registry_ == nullptr) {
+    ENVOY_LOG(debug, "No instance for registry");
+    return false;
+  }
+  if (peer_metadata) {
+    registry_->setValue(*key, peer_metadata->SerializeAsString());
+  }
+  return true;
+}
+
+void Filter::propagatePeerMetadata(const Envoy::Protobuf::Any& peer_metadata) {
   ENVOY_LOG(trace, "Sending peer metadata downstream with the data stream");
   ASSERT(write_callbacks_);
 
   if (state_ != PeerMetadataState::WaitingForData) {
+    // It's only safe and correct to send the peer metadata downstream with
+    // the data if we haven't done that already, otherwise the downstream
+    // could be very confused by the data they received.
     ENVOY_LOG(trace, "Filter has already sent the peer metadata downstream");
     return;
   }
@@ -189,23 +255,31 @@ void Filter::propagateNoPeerMetadata() {
   write_callbacks_->injectWriteDataToFilterChain(buffer, false);
 }
 
-UpstreamFilter::UpstreamFilter() = default;
+UpstreamFilter::UpstreamFilter(
+    Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry)
+    : registry_(std::move(registry)) {}
 
 Network::FilterStatus UpstreamFilter::onData(Buffer::Instance& buffer, bool end_stream) {
-  ENVOY_LOG(trace, "Read {} bytes from the upstream connection", buffer.length());
-
   switch (state_) {
-  case PeerMetadataState::WaitingForData:
+  case PeerMetadataState::WaitingForData: {
     if (disableDiscovery()) {
       state_ = PeerMetadataState::PassThrough;
       break;
     }
-    if (consumePeerMetadata(buffer, end_stream)) {
+    // Default: look up peer metadata handed off via the thread-local registry.
+    // When the registry hand-off is unavailable (no downstream connection ID in
+    // filter state), fall back to parsing and stripping the peer metadata
+    // preamble from the data stream.
+    if (tryRegistryLookup()) {
+      state_ = PeerMetadataState::PassThrough;
+    } else if (consumePeerMetadata(buffer, end_stream)) {
       state_ = PeerMetadataState::PassThrough;
     } else {
+      // Waiting for more data to complete the preamble.
       return Network::FilterStatus::StopIteration;
     }
     break;
+  }
   default:
     break;
   }
@@ -219,6 +293,21 @@ void UpstreamFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks&
   callbacks_ = &callbacks;
 }
 
+// We want to enable baggage based peer metadata discovery if all of the following is true
+// - the upstream host is an internal listener, and specifically connect_originate or
+//   inner_connect_originate internal listener - those are the only listeners that
+//   support baggage-based peer metadata discovery
+// - communication with upstream happens in plain text, e.g., there is no TLS upstream
+//   transport socket or PROXY transport socket there - we need it in the current
+//   implemetation of the baggage-based peer metadata discovery because we inject peer
+//   metadata into the data stream and transport sockets that modify the data stream
+//   interfere with that (NOTE: in the future release we are planning to lift this
+//   limitation by communicating over shared memory instead).
+//
+// We can easily check if the upstream host is an internal listener, so checking the first
+// condition is easy. We can't easily check the second condition in the filter itself, so
+// instead we rely on istiod providing that information in form of the host metadata on the
+// endpoint or cluster level.
 bool UpstreamFilter::disableDiscovery() const {
   ASSERT(callbacks_);
 
@@ -249,9 +338,33 @@ bool UpstreamFilter::disableDiscovery() const {
   return false;
 }
 
+bool UpstreamFilter::tryRegistryLookup() {
+  ASSERT(callbacks_);
+  std::optional<std::string> key =
+      getRegistryKey(*callbacks_->connection().streamInfo().filterState());
+  if (!key) {
+    return false;
+  }
+  if (registry_ == nullptr) {
+    ENVOY_LOG(debug, "No instance for registry");
+    return false;
+  }
+  auto value = registry_->getValue(*key);
+  if (!value.has_value()) {
+    ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", *key);
+    populateNoPeerMetadata();
+    return true;
+  }
+
+  registry_->removeValue(*key);
+  populatePeerMetadataFromProto(*value);
+  ENVOY_LOG(trace, "Successfully retrieved peer metadata from registry");
+  return true;
+}
+
 bool UpstreamFilter::consumePeerMetadata(Buffer::Instance& buffer, bool end_stream) {
   ENVOY_LOG(trace, "Trying to consume peer metadata from the data stream");
-  using namespace Istio::Common;
+  using namespace ::Istio::Common;
 
   ASSERT(callbacks_);
 
@@ -304,22 +417,7 @@ bool UpstreamFilter::consumePeerMetadata(Buffer::Instance& buffer, bool end_stre
   absl::string_view data{static_cast<const char*>(buffer.linearize(peer_metadata_size)),
                          peer_metadata_size};
   data = data.substr(sizeof(PeerMetadataHeader));
-  Protobuf::Any any;
-  if (!any.ParseFromArray(data.data(), data.size())) {
-    ENVOY_LOG(trace, "Failed to parse peer metadata proto from the data stream");
-    populateNoPeerMetadata();
-    return true;
-  }
-
-  Protobuf::Struct peer_metadata;
-  if (!any.UnpackTo(&peer_metadata)) {
-    ENVOY_LOG(trace, "Failed to unpack peer metadata struct");
-    populateNoPeerMetadata();
-    return true;
-  }
-
-  std::unique_ptr<WorkloadMetadataObject> workload = convertStructToWorkloadMetadata(peer_metadata);
-  populatePeerMetadata(*workload);
+  populatePeerMetadataFromProto(data);
   buffer.drain(peer_metadata_size);
   ENVOY_LOG(trace, "Successfully consumed peer metadata from the data stream");
   return true;
@@ -332,15 +430,44 @@ const CelStatePrototype& UpstreamFilter::peerInfoPrototype() {
   return *prototype;
 }
 
-void UpstreamFilter::populatePeerMetadata(const Istio::Common::WorkloadMetadataObject& peer) {
+void UpstreamFilter::populatePeerMetadataFromProto(absl::string_view serialized) {
+  Envoy::Protobuf::Any any;
+  if (!any.ParseFromArray(serialized.data(), serialized.size())) {
+    ENVOY_LOG(error, "Failed to parse peer metadata proto");
+    populateNoPeerMetadata();
+    return;
+  }
+
+  Envoy::Protobuf::Struct peer_metadata;
+  if (!any.UnpackTo(&peer_metadata)) {
+    ENVOY_LOG(error, "Failed to unpack peer metadata struct");
+    populateNoPeerMetadata();
+    return;
+  }
+
+  std::unique_ptr<::Istio::Common::WorkloadMetadataObject> workload =
+      ::Istio::Common::convertStructToWorkloadMetadata(peer_metadata);
+  populatePeerMetadata(*workload);
+}
+
+void UpstreamFilter::populatePeerMetadata(const ::Istio::Common::WorkloadMetadataObject& peer) {
   ENVOY_LOG(trace, "Populating peer metadata in the upstream filter state");
   ASSERT(callbacks_);
 
-  auto proto = Istio::Common::convertWorkloadMetadataToStruct(peer);
+  auto proto = ::Istio::Common::convertWorkloadMetadataToStruct(peer);
   auto cel = std::make_shared<CelState>(peerInfoPrototype());
   cel->setValue(absl::string_view(proto.SerializeAsString()));
   callbacks_->connection().streamInfo().filterState()->setData(
-      Istio::Common::UpstreamPeer, std::move(cel), StreamInfo::FilterState::LifeSpan::Connection);
+      ::Istio::Common::UpstreamPeer, std::move(cel), StreamInfo::FilterState::LifeSpan::Connection);
+  // Also store the WorkloadMetadataObject under the *_obj key, mirroring the
+  // metadata_exchange network filter. istio.stats reads the object directly
+  // (peerInfoRead/peerInfo prefer it); its CelState fallback uses BaggageToken
+  // keys that are incompatible with convertWorkloadMetadataToStruct's output, so
+  // without this the peer identity is lost over HBONE.
+  callbacks_->connection().streamInfo().filterState()->setData(
+      ::Istio::Common::UpstreamPeerObj,
+      std::make_shared<::Istio::Common::WorkloadMetadataObject>(peer),
+      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void UpstreamFilter::populateNoPeerMetadata() {
@@ -348,7 +475,7 @@ void UpstreamFilter::populateNoPeerMetadata() {
   ASSERT(callbacks_);
 
   callbacks_->connection().streamInfo().filterState()->setData(
-      Istio::Common::NoPeer, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
+      ::Istio::Common::NoPeer, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
       StreamInfo::FilterState::LifeSpan::Connection);
 }
 
@@ -359,15 +486,22 @@ ConfigFactory::ConfigFactory()
 absl::StatusOr<Network::FilterFactoryCb>
 ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
                                                  Server::Configuration::FactoryContext& context) {
-  return [config, &context](Network::FilterManager& filter_manager) -> void {
+  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry =
+      maybeGetRegistry(context.serverFactoryContext());
+  return [config, &context,
+          registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
     const auto& local_info = context.serverFactoryContext().localInfo();
-    filter_manager.addFilter(std::make_shared<Filter>(config, local_info));
+    filter_manager.addFilter(std::make_shared<Filter>(config, local_info, registry));
   };
 }
 
 Network::FilterFactoryCb UpstreamConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& config, Server::Configuration::UpstreamFactoryContext&) {
-  return createFilterFactory(dynamic_cast<const UpstreamConfig&>(config));
+    const Protobuf::Message&, Server::Configuration::UpstreamFactoryContext& context) {
+  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry =
+      maybeGetRegistry(context.serverFactoryContext());
+  return [registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<UpstreamFilter>(registry));
+  };
 }
 
 ProtobufTypes::MessagePtr UpstreamConfigFactory::createEmptyConfigProto() {
@@ -384,12 +518,6 @@ bool UpstreamConfigFactory::isTerminalFilterByProto(const Protobuf::Message&,
   // it'd be the first filter to see and process the data coming back,
   // because it has to remove the preamble set by the network filter.
   return true;
-}
-
-Network::FilterFactoryCb UpstreamConfigFactory::createFilterFactory(const UpstreamConfig&) {
-  return [](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<UpstreamFilter>());
-  };
 }
 
 namespace {

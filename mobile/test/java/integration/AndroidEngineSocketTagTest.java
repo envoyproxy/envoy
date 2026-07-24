@@ -84,6 +84,8 @@ public class AndroidEngineSocketTagTest {
     assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
     assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
     assertThat(response.getEnvoyError()).isNull();
+
+    engine.drainConnectionsBySocketTag(2);
   }
 
   private Response sendRequest(RequestScenario requestScenario) throws Exception {

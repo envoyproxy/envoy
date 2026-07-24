@@ -55,7 +55,7 @@ public:
    */
   struct MutateRequestHeadersResult {
     Network::Address::InstanceConstSharedPtr final_remote_address;
-    absl::optional<OriginalIPRejectRequestOptions> reject_request;
+    std::optional<OriginalIPRejectRequestOptions> reject_request;
   };
 
   /**
@@ -126,9 +126,9 @@ public:
   static NormalizePathAction maybeNormalizePath(RequestHeaderMap& request_headers,
                                                 const ConnectionManagerConfig& config);
 
-  static absl::optional<uint32_t> maybeNormalizeHost(RequestHeaderMap& request_headers,
-                                                     const ConnectionManagerConfig& config,
-                                                     uint32_t port);
+  static std::optional<uint32_t> maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                                    const ConnectionManagerConfig& config,
+                                                    uint32_t port);
 
   /**
    * Mutate request headers if request needs to be traced.

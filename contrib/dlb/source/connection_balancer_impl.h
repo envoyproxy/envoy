@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -33,7 +34,7 @@ public:
   void post(Network::ConnectionSocketPtr&& socket) override;
 
   void onAcceptWorker(Network::ConnectionSocketPtr&&, bool, bool,
-                      const absl::optional<std::string>&) override {}
+                      const std::optional<std::string>&) override {}
 
   // Create Dlb event and callback.
   void setDlbEvent();
@@ -55,8 +56,8 @@ private:
 
 // The dir should always be "/dev" in production.
 // For test it is a temporary directory.
-// Return Dlb device id, absl::nullopt means error.
-static absl::optional<uint> detectDlbDevice(const uint config_id, const std::string& dir) {
+// Return Dlb device id, std::nullopt means error.
+static std::optional<uint> detectDlbDevice(const uint config_id, const std::string& dir) {
   uint device_id = config_id;
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat buffer;
@@ -74,10 +75,10 @@ static absl::optional<uint> detectDlbDevice(const uint config_id, const std::str
       }
     }
     if (i == 64) {
-      return absl::nullopt;
+      return std::nullopt;
     }
   }
-  return absl::optional<uint>{device_id};
+  return std::optional<uint>{device_id};
 }
 
 class DlbConnectionBalanceFactory : public Envoy::Network::ConnectionBalanceFactory,

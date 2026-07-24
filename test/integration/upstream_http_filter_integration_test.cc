@@ -55,9 +55,9 @@ public:
               (*cluster->mutable_typed_extension_protocol_options())
                   ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
       *protocol_options.add_http_filters() = config;
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(protocol_options);
     });
   }
 
@@ -69,9 +69,9 @@ public:
           HttpFilterProto& router_filter = *hcm.mutable_http_filters()->rbegin();
           ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
           envoy::extensions::filters::http::router::v3::Router router;
-          router_filter.typed_config().UnpackTo(&router);
+          std::ignore = router_filter.typed_config().UnpackTo(&router);
           *router.add_upstream_http_filters() = config;
-          router_filter.mutable_typed_config()->PackFrom(router);
+          std::ignore = router_filter.mutable_typed_config()->PackFrom(router);
         });
   }
 
@@ -83,7 +83,7 @@ public:
     configuration.set_header_key(key);
     configuration.set_header_value(value);
     filter_config.set_disabled(disabled);
-    filter_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 
@@ -91,7 +91,7 @@ public:
     HttpFilterProto filter_config;
     filter_config.set_name("envoy.filters.http.upstream_codec");
     auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
-    filter_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 
@@ -145,7 +145,7 @@ public:
   void addStaticNoConfigFilter(const std::string& name) {
     HttpFilterProto filter_config;
     filter_config.set_name(name);
-    filter_config.mutable_typed_config()->PackFrom(Envoy::Protobuf::Struct());
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(Envoy::Protobuf::Struct());
     if (useRouterFilters()) {
       addStaticRouterFilter(filter_config);
     } else {
@@ -157,7 +157,7 @@ public:
   void addStaticTypedConfigFilter(const std::string& name, const ProtoConfig& config) {
     HttpFilterProto filter_config;
     filter_config.set_name(name);
-    filter_config.mutable_typed_config()->PackFrom(config);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(config);
     if (useRouterFilters()) {
       addStaticRouterFilter(filter_config);
     } else {
@@ -440,7 +440,7 @@ public:
       auto default_configuration = test::integration::filters::AddHeaderFilterConfig();
       default_configuration.set_header_key(default_header_key_);
       default_configuration.set_header_value(default_header_value_);
-      discovery->mutable_default_config()->PackFrom(default_configuration);
+      std::ignore = discovery->mutable_default_config()->PackFrom(default_configuration);
     }
 
     discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -476,9 +476,9 @@ public:
       auto* filter = protocol_options.add_http_filters();
       setDynamicFilterConfig(filter, name, apply_without_warming, set_default_config, rate_limit,
                              second_connection);
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(protocol_options);
     });
   }
 
@@ -492,11 +492,11 @@ public:
           HttpFilterProto& router_filter = *hcm.mutable_http_filters(0);
           ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
           envoy::extensions::filters::http::router::v3::Router router;
-          router_filter.typed_config().UnpackTo(&router);
+          std::ignore = router_filter.typed_config().UnpackTo(&router);
           auto* filter = router.add_upstream_http_filters();
           setDynamicFilterConfig(filter, name, apply_without_warming, set_default_config,
                                  rate_limit, second_connection);
-          router_filter.mutable_typed_config()->PackFrom(router);
+          std::ignore = router_filter.mutable_typed_config()->PackFrom(router);
         });
   }
 
@@ -625,7 +625,7 @@ public:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
-    response.add_resources()->PackFrom(listener_config_);
+    std::ignore = response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }
 
@@ -637,11 +637,11 @@ public:
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(val);
-    typed_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(configuration);
 
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
-    resource.mutable_resource()->PackFrom(typed_config);
+    std::ignore = resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
     }
@@ -649,7 +649,7 @@ public:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
-    response.add_resources()->PackFrom(resource);
+    std::ignore = response.add_resources()->PackFrom(resource);
 
     if (!second_connection) {
       ecds_stream_->sendGrpcMessage(response);
@@ -920,13 +920,13 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithConfigDump)
 
   // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump);
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
   test::integration::filters::AddHeaderFilterConfig http_filter_config;
-  filter_config.typed_config().UnpackTo(&http_filter_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&http_filter_config);
   EXPECT_EQ(default_header_key_, http_filter_config.header_key());
   EXPECT_EQ("xds-val", http_filter_config.header_value());
 }

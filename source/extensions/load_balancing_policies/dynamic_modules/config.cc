@@ -4,6 +4,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
@@ -83,13 +84,21 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
   std::string config_bytes;
   if (typed_config.has_lb_policy_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(typed_config.lb_policy_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    if (!config_or_error.ok()) {
+      Envoy::Extensions::DynamicModules::incrementLoadFailure(
+          context, typed_config.lb_policy_name(),
+          Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
+      return config_or_error.status();
+    }
     config_bytes = std::move(config_or_error.value());
   }
   auto lb_config_or_error =
       DynamicModuleLbConfig::create(typed_config.lb_policy_name(), config_bytes, metrics_namespace,
                                     std::move(dynamic_module), context.serverScope());
   if (!lb_config_or_error.ok()) {
+    Envoy::Extensions::DynamicModules::incrementLoadFailure(
+        context, typed_config.lb_policy_name(),
+        Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
     return absl::InvalidArgumentError(
         fmt::format("failed to create load balancer config for module '{}': {}",
                     module_config.name(), lb_config_or_error.status().message()));

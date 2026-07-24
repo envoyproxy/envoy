@@ -17,14 +17,14 @@ struct GcpToken {
   GcpToken() = default;
   GcpToken(std::string token, uint64_t expires_at,
            envoy::extensions::filters::http::gcp_authn::v3::Audience audience,
-           absl::optional<std::string> fingerprint = absl::nullopt)
+           std::optional<std::string> fingerprint = std::nullopt)
       : token(std::move(token)), expires_at(expires_at), audience(std::move(audience)),
         fingerprint(std::move(fingerprint)) {}
 
   std::string token;
   uint64_t expires_at{0}; // Expiration time in seconds since epoch.
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  absl::optional<std::string> fingerprint;
+  std::optional<std::string> fingerprint;
 
   bool operator==(const GcpToken& other) const {
     return token == other.token && expires_at == other.expires_at &&

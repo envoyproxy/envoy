@@ -40,7 +40,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
   return true;
 }
 
-const absl::optional<RouteConfigProvider::ConfigInfo>&
+const std::optional<RouteConfigProvider::ConfigInfo>&
 RouteConfigUpdateReceiverImpl::configInfo() const {
   return config_info_;
 }

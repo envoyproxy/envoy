@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <optional>
 
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -14,7 +15,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -135,7 +135,7 @@ TEST_F(HttpFilterTest, StreamingBodiesInObservabilityMode) {
 
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
   // In observability mode, content length is not removed as there is no mutation from ext_proc
   // server.
   EXPECT_EQ(request_headers_.getContentLengthValue(), absl::StrCat(content_length));
@@ -159,7 +159,7 @@ TEST_F(HttpFilterTest, StreamingBodiesInObservabilityMode) {
 
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
+  processResponseHeaders(false, std::nullopt);
   EXPECT_EQ(response_headers_.getContentLengthValue(), absl::StrCat(content_length));
 
   Buffer::OwnedImpl want_response_body;
@@ -219,19 +219,19 @@ TEST_F(HttpFilterTest, StreamingAllDataInObservabilityMode) {
   request_headers_.setMethod("POST");
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  processRequestHeaders(false, std::nullopt);
 
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  processRequestTrailers(absl::nullopt);
+  processRequestTrailers(std::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(true, absl::nullopt);
+  processResponseHeaders(true, std::nullopt);
   sendChunkResponseData(chunk_number * 2, true);
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  processResponseTrailers(absl::nullopt, false);
+  processResponseTrailers(std::nullopt, false);
   deferred_close_timer_ = new Event::MockTimer(&dispatcher_);
   // Deferred close timer is expected to be enabled by `DeferredDeletableStream`'s deferredClose(),
   // which is triggered by filter onDestroy() function.

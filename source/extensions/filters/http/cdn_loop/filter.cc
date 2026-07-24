@@ -34,11 +34,11 @@ Http::FilterHeadersStatus CdnLoopFilter::decodeHeaders(Http::RequestHeaderMap& h
             countCdnLoopOccurrences(header_entry->value().getStringView(), cdn_id_);
         !count.ok()) {
       decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, ParseErrorMessage, nullptr,
-                                         absl::nullopt, ParseErrorDetails);
+                                         std::nullopt, ParseErrorDetails);
       return Http::FilterHeadersStatus::StopIteration;
     } else if (*count > max_allowed_occurrences_) {
       decoder_callbacks_->sendLocalReply(Http::Code::BadGateway, LoopDetectedMessage, nullptr,
-                                         absl::nullopt, LoopDetectedDetails);
+                                         std::nullopt, LoopDetectedDetails);
       return Http::FilterHeadersStatus::StopIteration;
     }
   }

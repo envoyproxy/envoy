@@ -64,7 +64,7 @@ private:
     FaultImpl(FaultType fault_type, std::chrono::milliseconds delay_ms,
               const std::vector<std::string> commands,
               envoy::type::v3::FractionalPercent default_value,
-              absl::optional<std::string> runtime_key)
+              std::optional<std::string> runtime_key)
         : fault_type_(fault_type), delay_ms_(delay_ms), commands_(commands),
           default_value_(default_value), runtime_key_(runtime_key) {} // For testing only
 
@@ -72,7 +72,7 @@ private:
     std::chrono::milliseconds delayMs() const override { return delay_ms_; };
     const std::vector<std::string> commands() const override { return commands_; };
     envoy::type::v3::FractionalPercent defaultValue() const override { return default_value_; };
-    absl::optional<std::string> runtimeKey() const override { return runtime_key_; };
+    std::optional<std::string> runtimeKey() const override { return runtime_key_; };
 
   private:
     static std::vector<std::string> buildCommands(
@@ -82,7 +82,7 @@ private:
     std::chrono::milliseconds delay_ms_;
     const std::vector<std::string> commands_;
     envoy::type::v3::FractionalPercent default_value_;
-    absl::optional<std::string> runtime_key_;
+    std::optional<std::string> runtime_key_;
   };
 
   static FaultMap

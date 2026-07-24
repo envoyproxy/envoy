@@ -26,7 +26,7 @@ public:
                   TimeSource& time_source, const envoy::config::core::v3::UdpSocketConfig& config);
   ~UdpListenerImpl() override;
   uint32_t packetsDropped() { return packets_dropped_; }
-  bool paused() const { return parent_drained_callback_registrar_ != absl::nullopt; }
+  bool paused() const { return parent_drained_callback_registrar_ != std::nullopt; }
   void unpause();
 
   // Network::Listener

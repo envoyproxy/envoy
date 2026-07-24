@@ -184,7 +184,7 @@ envoy.filters.network.peer_metadata:
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
   type_urls:
-  - envoy.extensions.filters.network.peer_metadata.v3.Config
+  - envoy.extensions.network_filters.peer_metadata.Config
 envoy.filters.network.metadata_exchange:
   categories:
   - envoy.filters.network

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 
 namespace Envoy {
 namespace Extensions {

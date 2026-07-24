@@ -289,7 +289,7 @@ public:
    * @return The unix socket peer credentials of the remote client. Note that this is only
    * supported for unix socket connections.
    */
-  virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
+  virtual std::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
 
   /**
    * Set the stats to update for various connection state changes. Note that for performance reasons
@@ -416,11 +416,11 @@ public:
   virtual bool startSecureTransport() PURE;
 
   /**
-   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  @return std::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.
    */
-  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
+  virtual std::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
 
   /**
    * Try to configure the connection's initial congestion window.
@@ -443,7 +443,7 @@ public:
    * @note some congestion controller's cwnd is measured in number of packets, in that case the
    * return value is cwnd(in packets) times the connection's MSS.
    */
-  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+  virtual std::optional<uint64_t> congestionWindowInBytes() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

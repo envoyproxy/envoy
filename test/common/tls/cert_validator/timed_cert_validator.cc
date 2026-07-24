@@ -66,7 +66,7 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
       });
   validation_timer_->enableTimer(validation_time_out_ms_);
   return {ValidationResults::ValidationStatus::Pending,
-          Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, absl::nullopt};
+          Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt, std::nullopt};
 }
 
 REGISTER_FACTORY(TimedCertValidatorFactory, CertValidatorFactory);

@@ -29,7 +29,7 @@ public:
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* ppv_filter = listener->add_listener_filters();
       ppv_filter->set_name("local_ratelimit");
-      ppv_filter->mutable_typed_config()->PackFrom(local_ratelimit);
+      std::ignore = ppv_filter->mutable_typed_config()->PackFrom(local_ratelimit);
     });
     config_helper_.renameListener("tcp_proxy");
     initialize();

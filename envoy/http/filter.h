@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
@@ -22,8 +23,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/scope_tracked_object_stack.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -238,6 +237,11 @@ public:
   // Returns a handle to the upstream stream's stream info.
   virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
 
+  // Returns the WebTransport session of the *downstream* stream paired with this upstream request,
+  // if any. Used by the upstream WebTransport codec to obtain the downstream session so it can
+  // bridge the two. Defaults to an empty OptRef for non-WebTransport streams.
+  virtual OptRef<WebTransportSession> downstreamWebTransportSession() { return {}; }
+
   // Returns a handle to the generic upstream.
   virtual OptRef<Router::GenericUpstream> upstream() PURE;
 
@@ -314,7 +318,7 @@ public:
   virtual void
   requestRouteConfigUpdate(RouteCache& route_cache,
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
-                           absl::optional<Router::ConfigConstSharedPtr> route_config,
+                           std::optional<Router::ConfigConstSharedPtr> route_config,
                            Event::Dispatcher& dispatcher, RequestHeaderMap& request_headers) PURE;
   virtual void
   requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
@@ -355,7 +359,7 @@ public:
    * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
    * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
    * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
-   * absl::optional ptrs instead of null ptrs.
+   * std::optional ptrs instead of null ptrs.
    */
   virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
 
@@ -400,6 +404,14 @@ public:
    * method.
    */
   virtual void refreshRouteCluster() PURE;
+
+  /**
+   * Re-initialize the cached cluster info using the currently selected target cluster
+   * name from the matched route, without invoking cluster re-selection in specifiers.
+   * Useful to pull newly fetched cluster metadata (like from on-demand discovery) into
+   * the active stream.
+   */
+  virtual void recreateClusterInfo() PURE;
 
   /**
    * Schedules a request for a RouteConfiguration update from the management server.
@@ -520,7 +532,7 @@ public:
 
   /**
    * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
-   * absl::nullopt.
+   * std::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 
@@ -602,6 +614,17 @@ public:
  */
 class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
 public:
+  /**
+   * @return the WebTransport session of the stream this decoder filter chain is bound to, if any.
+   *
+   * For the downstream HTTP connection manager this returns the downstream codec stream's
+   * WebTransport session. It lets the upstream WebTransport codec obtain the downstream session
+   * (via the router/upstream-callbacks chain) and bridge the two directly, without going through
+   * filter state. Filters/chains not carrying a WebTransport session inherit the default empty
+   * OptRef.
+   */
+  virtual OptRef<WebTransportSession> webTransportSession() { return {}; }
+
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
    * can only be called if the filter has previously returned StopIteration from decodeHeaders()
@@ -715,7 +738,7 @@ public:
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 
   /**
@@ -815,6 +838,30 @@ public:
    * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
    */
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
+
+  /**
+   * This routine can be called by a filter to subscribe to watermark events on the upstream request
+   * path, i.e. the aggregate back-pressure raised toward the request source via
+   * onDecoderFilterAboveWriteBufferHighWatermark() (notably by the router's UpstreamRequest when
+   * the upstream cannot accept the request body fast enough).
+   *
+   * A filter that produces request data of its own (e.g. by replaying a buffered body via
+   * injectDecodedDataToFilterChain()) should subscribe so it can pause production while the
+   * upstream is backed up, since the connection-manager's read-disable of the downstream codec does
+   * not stop such a filter.
+   *
+   * Immediately after subscribing, the filter will get a high watermark callback for each
+   * outstanding high watermark.
+   */
+  virtual void addUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& callbacks) PURE;
+
+  /**
+   * This routine can be called by a filter to stop subscribing to upstream request watermark
+   * events.
+   *
+   * It is not safe to call this from under the stack of an UpstreamWatermarkCallbacks callback.
+   */
+  virtual void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& callbacks) PURE;
 
   /**
    * @return the account, if any, used by this stream.
@@ -926,7 +973,7 @@ public:
     // The error code which (barring reset) will be sent to the client.
     Http::Code code_;
     // The gRPC status set in local reply.
-    absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+    std::optional<Grpc::Status::GrpcStatus> grpc_status_;
     // The details of why a local reply is being sent.
     absl::string_view details_;
     // True if a reset will occur rather than the local reply (some prior filter
@@ -1132,7 +1179,7 @@ public:
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
   /**
    * Adds new metadata to be encoded.
@@ -1365,9 +1412,9 @@ public:
    * Check whether the filter chain is disabled for this stream.
    * @param name the name of the filter chain to check.
    *
-   * @return absl::optional<bool> whether the filter chain is disabled for this stream.
+   * @return std::optional<bool> whether the filter chain is disabled for this stream.
    */
-  virtual absl::optional<bool> filterDisabled(absl::string_view name) const PURE;
+  virtual std::optional<bool> filterDisabled(absl::string_view name) const PURE;
 
   /**
    * @return const StreamInfo::StreamInfo& the stream info for this stream.

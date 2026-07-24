@@ -34,6 +34,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -44,6 +45,8 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using ::testing::_;
 using ::testing::ContainerEq;
 using ::testing::ContainsRegex;
@@ -52,6 +55,7 @@ using ::testing::Eq;
 using ::testing::IsEmpty;
 using ::testing::MockFunction;
 using ::testing::NiceMock;
+using ::testing::Not;
 using ::testing::Pair;
 using ::testing::Return;
 using ::testing::ReturnRef;
@@ -70,7 +74,7 @@ public:
         config_(config) {}
 
   void setupRouteConfig(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
-    absl::optional<std::string> corpus_path =
+    std::optional<std::string> corpus_path =
         TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
       static uint32_t n;
@@ -127,7 +131,7 @@ Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
 Http::TestRequestHeaderMapImpl
 genHeaders(const std::string& host, const std::string& path, const std::string& method,
            const std::string& scheme,
-           absl::optional<std::pair<std::string, std::string>> random_value_pair) {
+           std::optional<std::pair<std::string, std::string>> random_value_pair) {
   auto hdrs =
       Http::TestRequestHeaderMapImpl{{":authority", host},         {":path", path},
                                      {":method", method},          {"x-safe", "safe"},
@@ -148,7 +152,7 @@ genHeaders(const std::string& host, const std::string& path, const std::string& 
 
 struct OptionalGenHeadersArg {
   std::string scheme = "http";
-  absl::optional<std::pair<std::string, std::string>> random_value_pair;
+  std::optional<std::pair<std::string, std::string>> random_value_pair;
 };
 
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
@@ -1504,9 +1508,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(invalid_route), factory_context_, true,
                         creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
-  EXPECT_TRUE(
-      absl::StrContains(creation_status_.message(), "Failed to create path rewrite formatter: "));
+  EXPECT_THAT(creation_status_,
+              HasStatusMessage(testing::HasSubstr("Failed to create path rewrite formatter: ")));
 }
 
 TEST_F(RouteMatcherTest, TestRoutesWithInvalidHostRewriteFormatter) {
@@ -1526,9 +1529,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(invalid_route), factory_context_, true,
                         creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
-  EXPECT_TRUE(
-      absl::StrContains(creation_status_.message(), "Failed to create host rewrite formatter: "));
+  EXPECT_THAT(creation_status_,
+              HasStatusMessage(testing::HasSubstr("Failed to create host rewrite formatter: ")));
 }
 
 // Virtual cluster that contains neither pattern nor regex. This must be checked while pattern is
@@ -3259,7 +3261,7 @@ virtual_hosts:
     return *config_;
   }
 
-  absl::optional<uint64_t> generateHash(const std::vector<absl::string_view>& header_values) {
+  std::optional<uint64_t> generateHash(const std::vector<absl::string_view>& header_values) {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Http::LowerCaseString key(std::string("foo_header"));
     for (auto& value : header_values) {
@@ -3657,7 +3659,7 @@ public:
   }
   class NonHashable : public StreamInfo::FilterState::Object {};
   class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
-    absl::optional<uint64_t> hash() const override { return 12345; };
+    std::optional<uint64_t> hash() const override { return 12345; };
   };
 
 protected:
@@ -4124,7 +4126,8 @@ virtual_hosts:
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
               Server::Configuration::CommonFactoryContext&) -> ClusterSpecifierPluginSharedPtr {
-            const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
+            const auto& typed_config =
+                Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(config);
             if (auto iter = typed_config.fields().find("a"); iter == typed_config.fields().end()) {
               return nullptr;
             } else if (iter->second.string_value() == "test1") {
@@ -4202,7 +4205,8 @@ virtual_hosts:
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
               Server::Configuration::CommonFactoryContext&) -> ClusterSpecifierPluginSharedPtr {
-            const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
+            const auto& typed_config =
+                Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(config);
             if (auto iter = typed_config.fields().find("a"); iter == typed_config.fields().end()) {
               return nullptr;
             } else if (iter->second.string_value() == "test1") {
@@ -4322,12 +4326,12 @@ virtual_hosts:
 
   {
     EXPECT_EQ(
-        absl::make_optional(std::chrono::milliseconds(10)),
+        std::make_optional(std::chrono::milliseconds(10)),
         config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->grpcTimeoutOffset());
   }
-  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                               ->routeEntry()
-                               ->grpcTimeoutOffset());
+  EXPECT_EQ(std::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->grpcTimeoutOffset());
 }
 
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(GrpcTimeoutOffsetOfDynamicRoute)) {
@@ -4359,19 +4363,19 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl reqeust_headers = genHeaders("www.lyft.com", "/", "GET");
     reqeust_headers.addCopy(Http::LowerCaseString("reqeust_to"), "dynamic_grpc_service");
-    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(20)),
+    EXPECT_EQ(std::make_optional(std::chrono::milliseconds(20)),
               config.route(reqeust_headers, 0)->routeEntry()->grpcTimeoutOffset());
-    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(200)),
+    EXPECT_EQ(std::make_optional(std::chrono::milliseconds(200)),
               config.route(reqeust_headers, 0)->routeEntry()->maxGrpcTimeout());
   }
   {
 
-    EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(10)),
+    EXPECT_EQ(std::make_optional(std::chrono::milliseconds(10)),
               config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                   ->routeEntry()
                   ->grpcTimeoutOffset());
     EXPECT_EQ(
-        absl::make_optional(std::chrono::milliseconds(100)),
+        std::make_optional(std::chrono::milliseconds(100)),
         config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->maxGrpcTimeout());
   }
 }
@@ -5397,51 +5401,51 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(50),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(50),
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
                 ->baseInterval());
 
-  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                               ->routeEntry()
-                               ->retryPolicy()
-                               ->maxInterval());
+  EXPECT_EQ(std::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->retryPolicy()
+                              ->maxInterval());
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(100),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(100),
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
                 ->baseInterval());
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(500),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(500),
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
                 ->maxInterval());
 
   // Sub-millisecond interval converted to 1 ms.
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(1),
             config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
                 ->baseInterval());
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(1),
             config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
                 ->maxInterval());
 
-  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
-                               ->routeEntry()
-                               ->retryPolicy()
-                               ->baseInterval());
+  EXPECT_EQ(std::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                              ->routeEntry()
+                              ->retryPolicy()
+                              ->baseInterval());
 
-  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
-                               ->routeEntry()
-                               ->retryPolicy()
-                               ->maxInterval());
+  EXPECT_EQ(std::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                              ->routeEntry()
+                              ->retryPolicy()
+                              ->maxInterval());
 }
 
 // Test invalid route-specific retry back-off configs.
@@ -5721,7 +5725,7 @@ internal_only_headers:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_, Not(IsOk()));
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateDomainConfig) {
@@ -5747,7 +5751,7 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_, Not(IsOk()));
 }
 
 // Test to detect if hostname matches are case-insensitive
@@ -6054,7 +6058,7 @@ virtual_hosts:
  */
 static Http::TestRequestHeaderMapImpl genRedirectHeaders(const std::string& host,
                                                          const std::string& path, bool ssl,
-                                                         absl::optional<bool> internal) {
+                                                         std::optional<bool> internal) {
   std::string scheme = ssl ? "https" : "http";
   Http::TestRequestHeaderMapImpl headers{
       {":authority", host}, {":path", path}, {":scheme", scheme}, {"x-forwarded-proto", scheme}};
@@ -6289,7 +6293,7 @@ virtual_hosts:
   }
   {
     Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
-        "api.lyft.com", "/foo", false, absl::nullopt /* no x-envoy-internal header */);
+        "api.lyft.com", "/foo", false, std::nullopt /* no x-envoy-internal header */);
     EXPECT_EQ("https://api.lyft.com/foo",
               config.route(headers, 0)
                   ->directResponseEntry()
@@ -7239,7 +7243,7 @@ virtual_hosts:
 
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                                 creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_, Not(IsOk()));
 }
 
 TEST_F(RouteMatcherTest, TestWeightedClusterHeaderManipulation) {
@@ -8037,7 +8041,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
-  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), absl::nullopt);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), std::nullopt);
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
@@ -9307,7 +9311,7 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   // path_rewrite with header substitution
   {
@@ -9378,7 +9382,7 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   // CEL header substitution: header present
   {
@@ -9427,7 +9431,7 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("redirect.lyft.com", "/api/resource", false, false);
@@ -10342,7 +10346,7 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ(absl::nullopt, route_entry->idleTimeout());
+  EXPECT_EQ(std::nullopt, route_entry->idleTimeout());
 }
 
 TEST_F(RouteConfigurationV2, ZeroIdleTimeout) {
@@ -12365,7 +12369,7 @@ virtual_hosts:
 
   const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
   EXPECT_FALSE(route1->filterDisabled("test.filter").value());
-  EXPECT_EQ(route1->filterDisabled("unknown.filter"), absl::nullopt);
+  EXPECT_EQ(route1->filterDisabled("unknown.filter"), std::nullopt);
 
   const auto route2 = config.route(genHeaders("host1", "/route2", "GET"), 0);
   EXPECT_TRUE(route2->filterDisabled("test.filter").value());
@@ -12735,7 +12739,7 @@ virtual_hosts:
     EXPECT_EQ(nullptr, accepted_route->decorator());
     EXPECT_EQ(nullptr, accepted_route->tracingConfig());
     EXPECT_EQ(nullptr, accepted_route->mostSpecificPerFilterConfig("any"));
-    EXPECT_EQ(absl::nullopt, accepted_route->filterDisabled("any"));
+    EXPECT_EQ(std::nullopt, accepted_route->filterDisabled("any"));
     EXPECT_TRUE(accepted_route->perFilterConfigs("any").empty());
 
     accepted_route->metadata();
@@ -12874,7 +12878,7 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
@@ -12900,7 +12904,7 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();

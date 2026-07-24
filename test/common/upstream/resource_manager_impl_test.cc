@@ -33,7 +33,7 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1, 0, 100,
-      clusterCircuitBreakersStats(store), absl::nullopt, absl::nullopt, absl::nullopt, dispatcher);
+      clusterCircuitBreakersStats(store), std::nullopt, std::nullopt, std::nullopt, dispatcher);
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -96,7 +96,7 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   auto stats = clusterCircuitBreakersStats(store);
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, 3, 100, stats,
-      absl::nullopt, absl::nullopt, absl::nullopt, dispatcher);
+      std::nullopt, std::nullopt, std::nullopt, dispatcher);
 
   // Test remaining_cx_ gauge
   EXPECT_EQ(1U, resource_manager.connections().max());

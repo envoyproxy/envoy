@@ -25,7 +25,7 @@ TEST(HealthCheckEventFileSinkFactory, createHealthCheckEventSink) {
   envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink config;
   config.set_event_log_path("test_path");
   Envoy::Protobuf::Any typed_config;
-  typed_config.PackFrom(config);
+  std::ignore = typed_config.PackFrom(config);
 
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
   EXPECT_NE(factory->createHealthCheckEventSink(typed_config, context), nullptr);
@@ -36,8 +36,8 @@ TEST(HealthCheckEventFileSinkFactory, createEmptyHealthCheckEventSink) {
       "envoy.health_check.event_sink.file");
   EXPECT_NE(factory, nullptr);
   auto empty_proto = factory->createEmptyConfigProto();
-  auto config = *dynamic_cast<
-      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink*>(
+  auto config = *Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink>(
       empty_proto.get());
   EXPECT_TRUE(config.event_log_path().empty());
 }

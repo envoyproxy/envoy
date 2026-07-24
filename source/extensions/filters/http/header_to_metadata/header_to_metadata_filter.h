@@ -70,9 +70,9 @@ public:
   /**
    * Called to extract the value of a given header or cookie.
    * @param http header map.
-   * @return absl::optional<std::string> the extracted header or cookie.
+   * @return std::optional<std::string> the extracted header or cookie.
    */
-  virtual absl::optional<std::string> extract(Http::HeaderMap& map) const PURE;
+  virtual std::optional<std::string> extract(Http::HeaderMap& map) const PURE;
 
   /**
    * @return a string representation of either a cookie or a header passed in the request.
@@ -86,7 +86,7 @@ public:
   // ValueSelector.
   explicit HeaderValueSelector(Http::LowerCaseString header, bool remove)
       : header_(std::move(header)), remove_(std::move(remove)) {}
-  absl::optional<std::string> extract(Http::HeaderMap& map) const override;
+  std::optional<std::string> extract(Http::HeaderMap& map) const override;
   std::string toString() const override { return fmt::format("header '{}'", header_.get()); }
   ~HeaderValueSelector() override = default;
 
@@ -100,7 +100,7 @@ class CookieValueSelector : public ValueSelector {
 public:
   // ValueSelector.
   explicit CookieValueSelector(std::string cookie) : cookie_(std::move(cookie)) {}
-  absl::optional<std::string> extract(Http::HeaderMap& map) const override;
+  std::optional<std::string> extract(Http::HeaderMap& map) const override;
   std::string toString() const override { return fmt::format("cookie '{}'", cookie_); }
   ~CookieValueSelector() override = default;
 
@@ -112,14 +112,14 @@ class Rule {
 public:
   static absl::StatusOr<Rule> create(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
-  const absl::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
+  const std::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
   std::unique_ptr<const ValueSelector> selector_;
 
 private:
   Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& creation_status);
 
   const ProtoRule rule_;
-  absl::optional<Matcher::RegexReplace> regex_replace_;
+  std::optional<Matcher::RegexReplace> regex_replace_;
 };
 
 using HeaderToMetadataRules = std::vector<Rule>;
@@ -142,7 +142,7 @@ public:
   const HeaderToMetadataRules& responseRules() const { return response_rules_; }
   bool doResponse() const { return response_set_; }
   bool doRequest() const { return request_set_; }
-  const absl::optional<HeaderToMetadataFilterStats>& stats() const { return stats_; }
+  const std::optional<HeaderToMetadataFilterStats>& stats() const { return stats_; }
 
   /**
    * Increment the appropriate statistic for the given event and traffic direction.
@@ -187,7 +187,7 @@ private:
   bool response_set_;
   bool request_set_;
   // Mutable to allow stats charging from const contexts.
-  mutable absl::optional<HeaderToMetadataFilterStats> stats_;
+  mutable std::optional<HeaderToMetadataFilterStats> stats_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

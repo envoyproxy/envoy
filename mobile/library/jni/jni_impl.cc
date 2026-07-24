@@ -109,7 +109,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 
   auto* engine =
       new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
-                                /*network_thread_priority*/ absl::nullopt);
+                                /*network_thread_priority*/ std::nullopt);
   engine->disableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change == JNI_TRUE);
   return reinterpret_cast<jlong>(engine);
 }
@@ -167,6 +167,14 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
   std::string stats = engine->dumpStats();
   Envoy::JNI::JniHelper jni_helper(env);
   return jni_helper.newStringUtf(stats.c_str()).release();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_drainConnectionsBySocketTag(JNIEnv*, jclass,
+                                                                             jlong engine_handle,
+                                                                             jint tag) {
+  auto engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
+  engine->drainConnectionsBySocketTag(static_cast<uint32_t>(tag));
 }
 
 // JvmCallbackContext

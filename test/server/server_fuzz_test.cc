@@ -14,7 +14,9 @@
 #include "test/mocks/server/hot_restart.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 namespace Envoy {
 namespace Server {

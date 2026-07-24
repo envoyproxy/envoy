@@ -13,6 +13,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/addr_family_aware_socket_option_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 #include "fmt/ostream.h"

@@ -53,7 +53,7 @@ inline TypedExtensionConfig getDownstreamExtension() {
 
   TypedExtensionConfig ext;
   ext.set_name(downstreamExtension);
-  ext.mutable_typed_config()->PackFrom(cfg);
+  std::ignore = ext.mutable_typed_config()->PackFrom(cfg);
 
   return ext;
 }
@@ -68,11 +68,11 @@ inline TypedExtensionConfig getUpstreamExtension(const EventReporterConfig& conf
       "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter";
   auto* reporter = cfg.mutable_reporter_config();
   reporter->set_name(reporterName);
-  reporter->mutable_typed_config()->PackFrom(config);
+  std::ignore = reporter->mutable_typed_config()->PackFrom(config);
 
   TypedExtensionConfig ext;
   ext.set_name(upstreamExtension);
-  ext.mutable_typed_config()->PackFrom(cfg);
+  std::ignore = ext.mutable_typed_config()->PackFrom(cfg);
 
   return ext;
 }
@@ -134,7 +134,7 @@ inline Listener getUpstreamListener(absl::string_view anyhost) {
   ReverseTunnel rtFilter;
   rtFilter.mutable_ping_interval()->set_seconds(300); // No ping timeouts.
 
-  filter->mutable_typed_config()->PackFrom(rtFilter);
+  std::ignore = filter->mutable_typed_config()->PackFrom(rtFilter);
 
   return listener;
 }
@@ -172,9 +172,9 @@ inline Listener getDownstreamListener(const std::string& name, int num_listeners
   auto* http_filter = hcm.add_http_filters();
   http_filter->set_name("envoy.filters.http.router");
   envoy::extensions::filters::http::router::v3::Router router_cfg;
-  http_filter->mutable_typed_config()->PackFrom(router_cfg);
+  std::ignore = http_filter->mutable_typed_config()->PackFrom(router_cfg);
 
-  filter->mutable_typed_config()->PackFrom(hcm);
+  std::ignore = filter->mutable_typed_config()->PackFrom(hcm);
 
   return listener;
 }
@@ -218,9 +218,9 @@ Cluster getHttp2Cluster(Cluster& cluster) {
   ConfigHelper::HttpProtocolOptions http2_options;
   http2_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
 
-  (*cluster.mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(http2_options);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(http2_options);
 
   return cluster;
 }

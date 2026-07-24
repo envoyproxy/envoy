@@ -65,6 +65,10 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
       limit_override_.emplace(
           new Envoy::Router::DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
       break;
+    case ProtoRateLimit::Override::OverrideSpecifierCase::kRateLimit:
+      limit_override_.emplace(
+          new Envoy::Router::StaticRateLimitOverride(config.limit().rate_limit()));
+      break;
     case ProtoRateLimit::Override::OverrideSpecifierCase::OVERRIDE_SPECIFIER_NOT_SET:
       PANIC_DUE_TO_CORRUPT_ENUM;
     }

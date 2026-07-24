@@ -27,7 +27,7 @@ public:
           // Load extension.
           auto* new_extension = hcm.add_early_header_mutation_extensions();
           new_extension->set_name("test");
-          new_extension->mutable_typed_config()->PackFrom(proto_mutation);
+          std::ignore = new_extension->mutable_typed_config()->PackFrom(proto_mutation);
 
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)

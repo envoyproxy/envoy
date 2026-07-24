@@ -13,7 +13,7 @@ namespace Router {
 class RouterOutlierDetectionProcessTest
     : public RouterTestBase,
       public ::testing::WithParamInterface<
-          std::tuple<uint64_t, absl::optional<bool>, absl::optional<uint64_t>>> {
+          std::tuple<uint64_t, std::optional<bool>, std::optional<uint64_t>>> {
 public:
   RouterOutlierDetectionProcessTest()
       : RouterTestBase(false, true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
@@ -53,21 +53,21 @@ INSTANTIATE_TEST_SUITE_P(
     RouterOutlierDetectionTestSuite, RouterOutlierDetectionProcessTest,
     ::testing::Values(
         // No matching defined in protocol options. Report the original code to outlier detector.
-        std::make_tuple(300, absl::nullopt, absl::optional<uint64_t>(300)),
+        std::make_tuple(300, std::nullopt, std::optional<uint64_t>(300)),
         // Matching in protocol options took place and did not match the defined matcher.
         // Success (code 200) should be reported to the outlier detection.
-        std::make_tuple(300, absl::optional<bool>(false), absl::optional<uint64_t>(200)),
+        std::make_tuple(300, std::optional<bool>(false), std::optional<uint64_t>(200)),
         // Matching in protocol options took place and  matched the defined matcher.
         // Failure (code 500) should be reported to the outlier detection.
-        std::make_tuple(300, absl::optional<bool>(true), absl::optional<uint64_t>(500)),
+        std::make_tuple(300, std::optional<bool>(true), std::optional<uint64_t>(500)),
         // Matching in protocol options took place and matched the defined matcher.
         // Since it is 5xx code, the original 5xx code should be reported
         // to the outlier detection.
-        std::make_tuple(503, absl::optional<bool>(true), absl::optional<uint64_t>(503)),
+        std::make_tuple(503, std::optional<bool>(true), std::optional<uint64_t>(503)),
         // Matching in protocol options took place and did not matched the defined matcher.
         // Even though it is 5xx code, it should be reported as success
         // to the outlier detection.
-        std::make_tuple(503, absl::optional<bool>(false), absl::optional<uint64_t>(200))));
+        std::make_tuple(503, std::optional<bool>(false), std::optional<uint64_t>(200))));
 
 } // namespace Router
 } // namespace Envoy

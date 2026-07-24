@@ -22,11 +22,10 @@ AppleProxyResolver::~AppleProxyResolver() {
 }
 
 SystemProxySettingsReadCallback AppleProxyResolver::proxySettingsUpdater() {
-  return SystemProxySettingsReadCallback(
-      [this](absl::optional<SystemProxySettings> proxy_settings) {
-        absl::MutexLock l(mutex_);
-        proxy_settings_ = std::move(proxy_settings);
-      });
+  return SystemProxySettingsReadCallback([this](std::optional<SystemProxySettings> proxy_settings) {
+    absl::MutexLock l(mutex_);
+    proxy_settings_ = std::move(proxy_settings);
+  });
 }
 
 void AppleProxyResolver::start() {
@@ -86,7 +85,7 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
               });
             });
       },
-      /* options= */ absl::nullopt, /* crash_on_failure=*/false);
+      /* options= */ std::nullopt, /* crash_on_failure=*/false);
   Thread::ThreadId thread_id = thread->pthreadId();
   pac_resolution_threads_[thread_id] = std::move(thread);
 

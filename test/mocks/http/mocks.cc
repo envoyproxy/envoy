@@ -99,12 +99,12 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, sendLocalReply(_, _, _, _, _))
       .WillByDefault(Invoke([this](Code code, absl::string_view body,
                                    std::function<void(ResponseHeaderMap & headers)> modify_headers,
-                                   const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                   const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                                    absl::string_view details) {
         sendLocalReply_(code, body, modify_headers, grpc_status, details);
       }));
   ON_CALL(*this, routeConfig())
-      .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
+      .WillByDefault(Return(std::optional<Router::ConfigConstSharedPtr>()));
   ON_CALL(*this, upstreamOverrideHost())
       .WillByDefault(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
@@ -131,7 +131,7 @@ MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
 void MockStreamDecoderFilterCallbacks::sendLocalReply_(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   Utility::sendLocalReply(
       stream_destroyed_,
       Utility::EncodeFunctions{

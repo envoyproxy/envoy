@@ -232,7 +232,8 @@ void StartTlsIntegrationTest::initialize() {
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.starttls");
-    cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(starttls_config);
+    std::ignore =
+        cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(starttls_config);
   });
 
   // Modifications to ConfigHelper::baseConfig.

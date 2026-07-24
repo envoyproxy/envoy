@@ -42,14 +42,24 @@ public:
         IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
     EXPECT_CALL(tls_allocator_, allocateSlot());
   }
+  ~ClientConnectionFactoryTest() override { restoreRegistryTlsSlot(); }
+
   void setupTlsSlot() {
     tls_slot_ =
         ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
             tls_allocator_);
     tls_slot_->set([r = registry_](Event::Dispatcher&) { return r; });
-    // TODO: restore the original value via RAII.
+    publishTlsSlot();
+  }
+
+  void publishTlsSlot() {
     Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
         tls_slot_.get();
+  }
+
+  void restoreRegistryTlsSlot() {
+    Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
+        original_registry_tls_slot_;
   }
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -57,6 +67,8 @@ public:
   std::shared_ptr<ThreadLocalRegistryImpl> registry_{std::make_shared<ThreadLocalRegistryImpl>()};
   ThreadLocal::MockInstance tls_allocator_;
   std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalRegistryImpl>> tls_slot_;
+  ThreadLocal::TypedSlot<ThreadLocalRegistryImpl>* const original_registry_tls_slot_{
+      Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_};
 
   // Owned by IoHandleImpl.
   NiceMock<Event::MockSchedulableCallback>* schedulable_cb_;
@@ -88,8 +100,7 @@ TEST_F(ClientConnectionFactoryTest,
           tls_allocator_);
   // This slot set publish a nullptr.
   tls_slot_->set([](Event::Dispatcher&) { return nullptr; });
-  Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
-      tls_slot_.get();
+  publishTlsSlot();
   auto client_conn = dispatcher_->createClientConnection(
       std::make_shared<Network::Address::EnvoyInternalInstance>(listener_addr),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,

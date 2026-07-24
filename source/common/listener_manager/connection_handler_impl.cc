@@ -18,12 +18,12 @@ namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                                             absl::optional<uint32_t> worker_index)
+                                             std::optional<uint32_t> worker_index)
     : worker_index_(worker_index), dispatcher_(dispatcher),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                                             absl::optional<uint32_t> worker_index,
+                                             std::optional<uint32_t> worker_index,
                                              OverloadManager& overload_manager,
                                              OverloadManager& null_overload_manager)
     : worker_index_(worker_index), dispatcher_(dispatcher), overload_manager_(overload_manager),
@@ -37,7 +37,7 @@ void ConnectionHandlerImpl::decNumConnections() {
   --num_handler_connections_;
 }
 
-void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
+void ConnectionHandlerImpl::addListener(std::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config, Runtime::Loader& runtime,
                                         Random::RandomGenerator& random) {
   if (overridden_listener.has_value()) {
@@ -85,9 +85,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         config.shouldBypassOverloadManager()
             ? (null_overload_manager_
                    ? makeOptRef(null_overload_manager_->getThreadLocalOverloadState())
-                   : absl::nullopt)
+                   : std::nullopt)
             : (overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
-                                 : absl::nullopt);
+                                 : std::nullopt);
     for (auto& socket_factory : config.listenSocketFactories()) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
@@ -220,7 +220,7 @@ ConnectionHandlerImpl::findPerAddressActiveListenerDetails(
     }
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Network::UdpListenerCallbacksOptRef
@@ -233,7 +233,7 @@ ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
     ASSERT(listener->get().udpListener().has_value());
     return listener->get().udpListener();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 void ConnectionHandlerImpl::removeFilterChains(
@@ -356,19 +356,19 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::tcpListener() {
   auto* val = absl::get_if<std::reference_wrapper<ActiveTcpListener>>(&typed_listener_);
-  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+  return (val != nullptr) ? std::make_optional(*val) : std::nullopt;
 }
 
 ConnectionHandlerImpl::UdpListenerCallbacksOptRef
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::udpListener() {
   auto* val = absl::get_if<std::reference_wrapper<Network::UdpListenerCallbacks>>(&typed_listener_);
-  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+  return (val != nullptr) ? std::make_optional(*val) : std::nullopt;
 }
 
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
   auto* val = absl::get_if<std::reference_wrapper<Network::InternalListener>>(&typed_listener_);
-  return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
+  return (val != nullptr) ? makeOptRef(val->get()) : std::nullopt;
 }
 
 ConnectionHandlerImpl::ActiveListenerDetailsOptRef
@@ -376,7 +376,7 @@ ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
   if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
     return *iter->second;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Network::BalancedConnectionHandlerOptRef
@@ -389,7 +389,7 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
     ASSERT(active_listener->get().tcpListener().has_value());
     return active_listener->get().tcpListener().value().get();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Network::ListenerPtr ConnectionHandlerImpl::createListener(
@@ -436,7 +436,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
                                                details->typed_listener_))
                        .value()
                        .get())
-             : absl::nullopt;
+             : std::nullopt;
 }
 
 REGISTER_FACTORY(ConnectionHandlerFactoryImpl, ConnectionHandlerFactory);

@@ -122,7 +122,8 @@ public:
     return static_cast<uint64_t>(token_bucket_.remainingTokens());
   }
   uint64_t resetSeconds() const override {
-    return static_cast<uint64_t>(std::ceil(token_bucket_.nextTokenAvailable().count() / 1000));
+    return static_cast<uint64_t>(
+        std::chrono::ceil<std::chrono::seconds>(token_bucket_.nextTokenAvailable()).count());
   }
 
 private:
@@ -158,6 +159,7 @@ private:
 
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
   const bool always_consume_default_token_bucket_{};
+  bool always_deny_default_{false};
 };
 
 class AlwaysDenyLocalRateLimiter : public LocalRateLimiter {

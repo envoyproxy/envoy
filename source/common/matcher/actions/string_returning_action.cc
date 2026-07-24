@@ -2,7 +2,7 @@
 
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
 #include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/formatter/substitution_format_string.h"
@@ -67,7 +67,7 @@ public:
                                              StringReturningActionFactoryContext&,
                                              ProtobufMessage::ValidationVisitor&) override {
     // validate function doesn't exist for StringValue, so just cast.
-    const auto& config = dynamic_cast<const Protobuf::StringValue&>(proto_config);
+    const auto& config = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(proto_config);
     return std::make_shared<StringReturningDirectActionImpl>(config);
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

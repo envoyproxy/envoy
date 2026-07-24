@@ -77,6 +77,7 @@ envoy_extension_cc_test(
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

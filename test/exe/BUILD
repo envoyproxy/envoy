@@ -100,6 +100,8 @@ envoy_cc_test(
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )
 
@@ -143,6 +145,7 @@ envoy_cc_test(
     tags = ["backtrace"],
     deps = [
         "//source/exe:terminate_handler_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )

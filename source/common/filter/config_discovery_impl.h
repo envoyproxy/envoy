@@ -117,7 +117,7 @@ public:
   }
 
   absl::Status onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
-    absl::optional<FactoryCb> cb;
+    std::optional<FactoryCb> cb;
     if (default_configuration_) {
       auto cb_or_error = instantiateFilterFactory(*default_configuration_);
       RETURN_IF_NOT_OK_REF(cb_or_error.status());
@@ -145,7 +145,7 @@ private:
   virtual absl::StatusOr<FactoryCb>
   instantiateFilterFactory(const Protobuf::Message& message) const PURE;
 
-  void update(absl::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
+  void update(std::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
     // This call must not capture 'this' as it is invoked on all workers asynchronously.
     main_config_->tls_->runOnAllThreads(
         [config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
@@ -161,8 +161,8 @@ private:
   }
 
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig() : config_{absl::nullopt} {}
-    absl::optional<FactoryCb> config_{};
+    ThreadLocalConfig() : config_{std::nullopt} {}
+    std::optional<FactoryCb> config_{};
   };
 
   // Currently applied configuration to ensure that the main thread deletes the last reference to
@@ -173,7 +173,7 @@ private:
         : tls_(std::make_unique<ThreadLocal::TypedSlot<ThreadLocalConfig>>(tls)) {
       tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
     }
-    absl::optional<FactoryCb> current_config_{absl::nullopt};
+    std::optional<FactoryCb> current_config_{std::nullopt};
     ThreadLocal::TypedSlotPtr<ThreadLocalConfig> tls_;
   };
   const std::string stat_prefix_;

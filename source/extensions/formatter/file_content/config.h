@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/formatter/file_content/v3/file_content.pb.h"
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/server/factory_context.h"
 
 namespace Envoy {

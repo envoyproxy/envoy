@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -16,7 +17,6 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gtest/gtest.h"
 #include "gtest/gtest_pred_impl.h"
 

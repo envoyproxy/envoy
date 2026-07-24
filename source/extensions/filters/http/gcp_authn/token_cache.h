@@ -27,9 +27,9 @@ public:
 
   TokenCacheImpl() = delete;
 
-  absl::optional<std::string>
+  std::optional<std::string>
   lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-         const absl::optional<std::string>& fingerprint);
+         const std::optional<std::string>& fingerprint);
   void insert(std::unique_ptr<GcpToken> token);
 
   uint64_t capacity() { return lru_cache_.maxSize(); }
@@ -58,8 +58,8 @@ private:
 
 struct TokenCache {
   TokenCache(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& cache_config,
-             Envoy::Server::Configuration::FactoryContext& context)
-      : tls(context.serverFactoryContext().threadLocal()) {
+             Envoy::Server::Configuration::ServerFactoryContext& context)
+      : tls(context.threadLocal()) {
     tls.set([cache_config](Envoy::Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalCache>(cache_config, dispatcher.timeSource());
     });

@@ -680,7 +680,7 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
     metadata.setContext(std::move(context));
 
     auto response =
-        DirectResponseUtil::localResponse(metadata, ResponseStatus::Ok, absl::nullopt, "anything");
+        DirectResponseUtil::localResponse(metadata, ResponseStatus::Ok, std::nullopt, "anything");
 
     EXPECT_EQ(MessageType::Response, response->messageType());
     EXPECT_EQ(12345, response->requestId());

@@ -39,7 +39,7 @@ public:
   const std::string& cipherSuites() const override { return *cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const std::string& signatureAlgorithms() const override { return signature_algorithms_; }
-  absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+  std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
   compliancePolicy() const override {
     return compliance_policy_;
   }
@@ -134,7 +134,7 @@ private:
   const std::string tls_keylog_path_;
   std::unique_ptr<Network::Address::IpList> tls_keylog_local_;
   std::unique_ptr<Network::Address::IpList> tls_keylog_remote_;
-  const absl::optional<
+  const std::optional<
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
       compliance_policy_;
 };
@@ -161,7 +161,7 @@ public:
   OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>
   tlsCertificateSelectorFactory() const override {
     return tls_certificate_selector_factory_ ? makeOptRef(*tls_certificate_selector_factory_)
-                                             : absl::nullopt;
+                                             : std::nullopt;
   }
 
 private:

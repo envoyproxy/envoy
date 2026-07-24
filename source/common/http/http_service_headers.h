@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/http_service.pb.h"
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/factory_context.h"
 

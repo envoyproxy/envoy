@@ -64,7 +64,7 @@ public:
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
   void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+      ResponseProtoPtr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
       ControlPlaneStats& control_plane_stats) override;
 
   void onStreamEstablished() override;
@@ -194,7 +194,7 @@ private:
   // First, prioritizes ACKs over non-ACK subscription interest updates.
   // Then, prioritizes non-ACK updates in the order the various types
   // of subscriptions were activated.
-  absl::optional<std::string> whoWantsToSendDiscoveryRequest();
+  std::optional<std::string> whoWantsToSendDiscoveryRequest();
 
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -26,7 +27,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "load_balancer.h"
 
 namespace Envoy {
@@ -46,7 +46,7 @@ using ::Envoy::Upstream::LoadBalancerPtr;
 using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
 OverrideHostLbConfig::OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
-                                           absl::optional<Config::MetadataKey>&& selected_host_key,
+                                           std::optional<Config::MetadataKey>&& selected_host_key,
                                            TypedLoadBalancerFactory* fallback_load_balancer_factory,
                                            LoadBalancerConfigPtr&& fallback_load_balancer_config)
     : fallback_picker_lb_config_{fallback_load_balancer_factory,
@@ -58,10 +58,9 @@ OverrideHostLbConfig::OverrideSource
 OverrideHostLbConfig::OverrideSource::make(const OverrideHost::OverrideHostSource& config) {
   return OverrideHostLbConfig::OverrideSource{
       !config.header().empty()
-          ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(config.header()))
-          : absl::nullopt,
-      config.has_metadata() ? absl::optional<Config::MetadataKey>(config.metadata())
-                            : absl::nullopt};
+          ? std::optional<Http::LowerCaseString>(Http::LowerCaseString(config.header()))
+          : std::nullopt,
+      config.has_metadata() ? std::optional<Config::MetadataKey>(config.metadata()) : std::nullopt};
 }
 
 absl::StatusOr<std::vector<OverrideHostLbConfig::OverrideSource>>
@@ -88,7 +87,7 @@ OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& con
       makeOverrideSources(config.override_host_sources());
   RETURN_IF_NOT_OK(override_host_sources.status());
 
-  absl::optional<Config::MetadataKey> selected_host_key;
+  std::optional<Config::MetadataKey> selected_host_key;
   if (config.has_selected_host_key()) {
     selected_host_key.emplace(config.selected_host_key());
   }
@@ -229,7 +228,7 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
   context->requestStreamInfo()->setDynamicMetadata(metadata_key.key_, updated_metadata);
 }
 
-absl::optional<absl::string_view>
+std::optional<absl::string_view>
 OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromMetadata(
     const ::envoy::config::core::v3::Metadata& metadata, const Config::MetadataKey& metadata_key) {
   const Protobuf::Value& metadata_value = Config::Metadata::metadataValue(&metadata, metadata_key);
@@ -237,18 +236,18 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromMetadata(
   if (metadata_value.has_string_value()) {
     return absl::string_view{metadata_value.string_value()};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
-absl::optional<absl::string_view>
+std::optional<absl::string_view>
 OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromHeader(
     const Envoy::Http::RequestHeaderMap* header_map, const Http::LowerCaseString& header_name) {
   if (!header_map) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   HeaderMap::GetResult result = header_map->get(header_name);
   if (result.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Use only the first value of the header, if it happens to be have multiple.
@@ -267,7 +266,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext
     // This is checked by config validation
     ASSERT(override_source.header_name.has_value() != override_source.metadata_key.has_value());
 
-    absl::optional<absl::string_view> hosts;
+    std::optional<absl::string_view> hosts;
     if (override_source.header_name.has_value()) {
       hosts = getSelectedHostsFromHeader(context->downstreamHeaders(),
                                          override_source.header_name.value());

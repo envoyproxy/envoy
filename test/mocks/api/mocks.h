@@ -126,6 +126,7 @@ public:
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(bool, supportsIpTransparent, (Network::Address::IpVersion version), (const));
   MOCK_METHOD(bool, supportsMptcp, (), (const));
+  MOCK_METHOD(bool, supportsReusePortBpfCpuSteering, (), (const));
   MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
   MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));
   MOCK_METHOD(SysCallIntResult, getaddrinfo,

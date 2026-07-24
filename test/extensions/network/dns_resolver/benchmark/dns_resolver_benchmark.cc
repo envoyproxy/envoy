@@ -26,7 +26,7 @@ createCaresTypedConfig(const std::string& server_address, uint16_t port) {
 
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   typed_config.set_name("envoy.network.dns_resolver.cares");
-  typed_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_config.mutable_typed_config()->PackFrom(cares);
   return typed_config;
 }
 
@@ -46,7 +46,7 @@ createHickoryTypedConfig(const std::string& server_address, uint16_t port) {
 
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   typed_config.set_name("envoy.network.dns_resolver.hickory");
-  typed_config.mutable_typed_config()->PackFrom(hickory);
+  std::ignore = typed_config.mutable_typed_config()->PackFrom(hickory);
   return typed_config;
 }
 

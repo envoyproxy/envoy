@@ -59,7 +59,7 @@ TEST(HttpDynamicModuleDataInputTest, GetWithAllHeaders) {
   EXPECT_EQ(result.availability(), ::Envoy::Matcher::DataAvailability::AllDataAvailable);
 
   auto match_data = result.customData<DynamicModuleMatchData>();
-  ASSERT_NE(absl::nullopt, match_data);
+  ASSERT_NE(std::nullopt, match_data);
 
   EXPECT_NE(nullptr, match_data->request_headers_);
   EXPECT_NE(nullptr, match_data->response_headers_);
@@ -76,7 +76,7 @@ TEST(HttpDynamicModuleDataInputTest, GetWithRequestHeadersOnly) {
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), ::Envoy::Matcher::DataAvailability::AllDataAvailable);
   auto match_data = result.customData<DynamicModuleMatchData>();
-  ASSERT_NE(absl::nullopt, match_data);
+  ASSERT_NE(std::nullopt, match_data);
 
   EXPECT_NE(nullptr, match_data->request_headers_);
   EXPECT_EQ(nullptr, match_data->response_headers_);
@@ -91,7 +91,7 @@ TEST(HttpDynamicModuleDataInputTest, GetWithNoHeaders) {
   EXPECT_EQ(result.availability(), ::Envoy::Matcher::DataAvailability::AllDataAvailable);
 
   auto match_data = result.customData<DynamicModuleMatchData>();
-  ASSERT_NE(absl::nullopt, match_data);
+  ASSERT_NE(std::nullopt, match_data);
 
   EXPECT_EQ(nullptr, match_data->request_headers_);
   EXPECT_EQ(nullptr, match_data->response_headers_);

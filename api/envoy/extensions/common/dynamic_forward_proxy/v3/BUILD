@@ -10,6 +10,7 @@ api_proto_package(
         "//envoy/config/cluster/v3:pkg",
         "//envoy/config/common/key_value/v3:pkg",
         "//envoy/config/core/v3:pkg",
+        "//envoy/type/matcher/v3:pkg",
         "@xds//udpa/annotations:pkg",
     ],
 )

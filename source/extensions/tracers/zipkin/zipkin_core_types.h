@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
@@ -15,7 +16,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -207,7 +207,7 @@ public:
 private:
   uint64_t timestamp_{0};
   std::string value_;
-  absl::optional<Endpoint> endpoint_;
+  std::optional<Endpoint> endpoint_;
 };
 
 /**
@@ -295,7 +295,7 @@ public:
 private:
   std::string key_;
   std::string value_;
-  absl::optional<Endpoint> endpoint_;
+  std::optional<Endpoint> endpoint_;
   AnnotationType annotation_type_{};
 };
 
@@ -582,14 +582,14 @@ private:
   uint64_t trace_id_{0};
   std::string name_;
   uint64_t id_{0};
-  absl::optional<uint64_t> parent_id_;
+  std::optional<uint64_t> parent_id_;
   bool debug_{false};
   bool sampled_{false};
   std::vector<Annotation> annotations_;
   std::vector<BinaryAnnotation> binary_annotations_;
-  absl::optional<int64_t> timestamp_;
-  absl::optional<int64_t> duration_;
-  absl::optional<uint64_t> trace_id_high_;
+  std::optional<int64_t> timestamp_;
+  std::optional<int64_t> duration_;
+  std::optional<uint64_t> trace_id_high_;
   int64_t monotonic_start_time_{0};
   TimeSource& time_source_;
   TracerInterface& tracer_;

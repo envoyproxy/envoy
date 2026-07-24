@@ -22,8 +22,9 @@ message TokenBucket {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.TokenBucket";
 
   // The maximum tokens that the bucket can hold. This is also the number of tokens that the bucket
-  // initially contains.
-  uint32 max_tokens = 1 [(validate.rules).uint32 = {gt: 0}];
+  // initially contains. A value of 0 means the bucket will always be empty and all requests will
+  // be rate limited (i.e., always reject).
+  uint32 max_tokens = 1 [(validate.rules).uint32 = {gte: 0}];
 
   // The number of tokens added to the bucket during each fill interval. If not specified, defaults
   // to a single token.

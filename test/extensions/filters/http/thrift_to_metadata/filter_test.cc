@@ -11,6 +11,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -113,7 +114,9 @@ response_rules:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope());
+    absl::Status creation_status = absl::OkStatus();
+    config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope(), creation_status);
+    ASSERT_OK(creation_status);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -168,7 +171,7 @@ response_rules:
   writeMessage(Buffer::OwnedImpl& buffer, NetworkFilters::ThriftProxy::TransportType transport_type,
                NetworkFilters::ThriftProxy::ProtocolType protocol_type,
                NetworkFilters::ThriftProxy::MessageType message_type,
-               absl::optional<NetworkFilters::ThriftProxy::ReplyType> reply_type = absl::nullopt) {
+               std::optional<NetworkFilters::ThriftProxy::ReplyType> reply_type = std::nullopt) {
     Buffer::OwnedImpl proto_buffer;
     ProtocolConverterSharedPtr protocol_converter = std::make_shared<ProtocolConverter>();
     ProtocolPtr protocol = createProtocol(protocol_type);

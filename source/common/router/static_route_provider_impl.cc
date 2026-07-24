@@ -27,7 +27,7 @@ Rds::ConfigConstSharedPtr StaticRouteConfigProviderImpl::config() const {
   return vhds_context_ ? vhds_context_->tls_->config_ : base_.config();
 }
 
-const absl::optional<RouteConfigProvider::ConfigInfo>&
+const std::optional<RouteConfigProvider::ConfigInfo>&
 StaticRouteConfigProviderImpl::configInfo() const {
   if (vhds_context_) {
     return vhds_context_->config_update_info_->configInfo();

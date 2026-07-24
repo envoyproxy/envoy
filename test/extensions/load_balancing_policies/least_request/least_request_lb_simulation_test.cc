@@ -74,7 +74,7 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
       updateHostsParams(updated_hosts, updated_locality_hosts,
                         std::make_shared<const HealthyHostVector>(*updated_hosts),
                         updated_locality_hosts),
-      {}, hosts, {}, absl::nullopt);
+      {}, hosts, {}, std::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterLbStatNames stat_names(stats_store.symbolTable());

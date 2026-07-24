@@ -25,7 +25,7 @@ public:
 
   void requestRouteConfigUpdate(RouteCache& route_cache,
                                 Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
-                                absl::optional<Router::ConfigConstSharedPtr> route_config,
+                                std::optional<Router::ConfigConstSharedPtr> route_config,
                                 Event::Dispatcher& dispatcher,
                                 RequestHeaderMap& request_headers) override;
   void

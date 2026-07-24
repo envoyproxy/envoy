@@ -25,9 +25,9 @@ class ReverseBridgeIntegrationTest : public testing::TestWithParam<Network::Addr
 public:
   ReverseBridgeIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
-  void initialize() override { initialize(absl::nullopt); }
+  void initialize() override { initialize(std::nullopt); }
 
-  void initialize(const absl::optional<std::string> response_size_header) {
+  void initialize(const std::optional<std::string> response_size_header) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
 
     const std::string filter = fmt::format(
@@ -46,8 +46,9 @@ typed_config:
     envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute
         route_config;
     route_config.set_disabled(true);
-    (*vhost.mutable_routes(0)->mutable_typed_per_filter_config())["grpc_http1_reverse_bridge"]
-        .PackFrom(route_config);
+    std::ignore =
+        (*vhost.mutable_routes(0)->mutable_typed_per_filter_config())["grpc_http1_reverse_bridge"]
+            .PackFrom(route_config);
     config_helper_.addVirtualHost(vhost);
 
     HttpIntegrationTest::initialize();
@@ -206,7 +207,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
 TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
   upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
 
-  initialize(absl::make_optional("custom-response-size-header"));
+  initialize(std::make_optional("custom-response-size-header"));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -275,7 +276,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
 TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamWithholdResponse) {
   upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
 
-  initialize(absl::make_optional("custom-response-size-header"));
+  initialize(std::make_optional("custom-response-size-header"));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

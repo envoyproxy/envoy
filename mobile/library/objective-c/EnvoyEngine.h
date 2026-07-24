@@ -68,6 +68,8 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (NSString *)dumpStats;
 
+- (void)drainConnectionsBySocketTag:(uint32_t)tag;
+
 - (void)terminate;
 
 - (void)resetConnectivityState;

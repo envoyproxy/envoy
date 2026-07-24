@@ -22,11 +22,11 @@ Config::createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
   auto* value = getenv(environment_config.name().data());
   if (value != nullptr) {
     return [s = std::string(value)]() {
-      return std::make_unique<Input>(absl::make_optional<absl::string_view>(s));
+      return std::make_unique<Input>(std::make_optional<absl::string_view>(s));
     };
   }
 
-  return []() { return std::make_unique<Input>(absl::nullopt); };
+  return []() { return std::make_unique<Input>(std::nullopt); };
 }
 
 /**

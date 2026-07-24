@@ -29,13 +29,13 @@ public:
       return Http::HeaderMap::Iterate::Break;
     });
   };
-  absl::optional<absl::string_view> get(absl::string_view key) const override {
+  std::optional<absl::string_view> get(absl::string_view key) const override {
     const Http::LowerCaseString lower_key{key};
     const auto entry = headerMap().get(lower_key);
     if (!entry.empty()) {
       return entry[0]->value().getStringView();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
   void set(absl::string_view key, absl::string_view val) override {
     headerMap().setCopy(Http::LowerCaseString(key), std::string(val));
@@ -257,9 +257,9 @@ public:
   virtual Http::HeaderMap& headerMap() PURE;
 
   virtual void onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
-                                 absl::optional<StartTime> start_time) PURE;
+                                 std::optional<StartTime> start_time) PURE;
   virtual void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
-                                 absl::optional<StartTime> start_time) PURE;
+                                 std::optional<StartTime> start_time) PURE;
   virtual void onDecodingSuccess(CommonFramePtr frame) PURE;
   virtual void onDecodingFailure() PURE;
 
@@ -324,9 +324,9 @@ public:
     return response_frame;
   }
 
-  void onDecodingSuccess(ResponseHeaderFramePtr, absl::optional<StartTime>) override {}
+  void onDecodingSuccess(ResponseHeaderFramePtr, std::optional<StartTime>) override {}
   void onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
-                         absl::optional<StartTime> start_time) override {
+                         std::optional<StartTime> start_time) override {
     if (callbacks_->connection().has_value()) {
       callbacks_->onDecodingSuccess(std::move(request_header_frame), std::move(start_time));
     }
@@ -351,7 +351,7 @@ public:
   // TODO(wbpcode): send 400 bad request to client as response and then call the callback.
   void onDecodingFailure() override { callbacks_->onDecodingFailure(); }
 
-  absl::optional<ActiveRequest> active_request_;
+  std::optional<ActiveRequest> active_request_;
   ServerCodecCallbacks* callbacks_{};
 };
 
@@ -383,9 +383,9 @@ public:
   }
   EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;
 
-  void onDecodingSuccess(RequestHeaderFramePtr, absl::optional<StartTime>) override {}
+  void onDecodingSuccess(RequestHeaderFramePtr, std::optional<StartTime>) override {}
   void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
-                         absl::optional<StartTime> start_time) override {
+                         std::optional<StartTime> start_time) override {
     if (callbacks_->connection().has_value()) {
       callbacks_->onDecodingSuccess(std::move(response_header_frame), std::move(start_time));
     }
@@ -409,7 +409,7 @@ public:
   }
   void onDecodingFailure() override { callbacks_->onDecodingFailure(); }
 
-  absl::optional<ExpectResponse> expect_response_;
+  std::optional<ExpectResponse> expect_response_;
 
   ClientCodecCallbacks* callbacks_{};
 };

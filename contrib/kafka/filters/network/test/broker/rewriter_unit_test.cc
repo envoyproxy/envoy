@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "source/common/buffer/buffer_impl.h"
 
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
@@ -81,11 +83,11 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteMetadataResponse) {
   MetadataResponse mr = {brokers, {}};
 
   auto config = std::make_shared<MockBrokerFilterConfig>();
-  absl::optional<HostAndPort> r1 = {{"nh1", 4444}};
+  std::optional<HostAndPort> r1 = {{"nh1", 4444}};
   EXPECT_CALL(*config, findBrokerAddressOverride(b1.node_id_)).WillOnce(Return(r1));
-  absl::optional<HostAndPort> r2 = absl::nullopt;
+  std::optional<HostAndPort> r2 = std::nullopt;
   EXPECT_CALL(*config, findBrokerAddressOverride(b2.node_id_)).WillOnce(Return(r2));
-  absl::optional<HostAndPort> r3 = {{"nh3", 6666}};
+  std::optional<HostAndPort> r3 = {{"nh3", 6666}};
   EXPECT_CALL(*config, findBrokerAddressOverride(b3.node_id_)).WillOnce(Return(r3));
   ResponseRewriterImpl testee{config};
 
@@ -108,13 +110,13 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteFindCoordinatorResponse) {
   fcr.coordinators_ = {c1, c2, c3};
 
   auto config = std::make_shared<MockBrokerFilterConfig>();
-  absl::optional<HostAndPort> fcrhp = {{"nh1", 4444}};
+  std::optional<HostAndPort> fcrhp = {{"nh1", 4444}};
   EXPECT_CALL(*config, findBrokerAddressOverride(fcr.node_id_)).WillOnce(Return(fcrhp));
-  absl::optional<HostAndPort> cr1 = {{"nh1", 4444}};
+  std::optional<HostAndPort> cr1 = {{"nh1", 4444}};
   EXPECT_CALL(*config, findBrokerAddressOverride(c1.node_id_)).WillOnce(Return(cr1));
-  absl::optional<HostAndPort> cr2 = absl::nullopt;
+  std::optional<HostAndPort> cr2 = std::nullopt;
   EXPECT_CALL(*config, findBrokerAddressOverride(c2.node_id_)).WillOnce(Return(cr2));
-  absl::optional<HostAndPort> cr3 = {{"nh3", 6666}};
+  std::optional<HostAndPort> cr3 = {{"nh3", 6666}};
   EXPECT_CALL(*config, findBrokerAddressOverride(c3.node_id_)).WillOnce(Return(cr3));
   ResponseRewriterImpl testee{config};
 
@@ -130,18 +132,18 @@ TEST(ResponseRewriterImplUnitTest, ShouldRewriteFindCoordinatorResponse) {
 
 TEST(ResponseRewriterImplUnitTest, ShouldRewriteDescribeClusterResponse) {
   // given
-  DescribeClusterBroker b1 = {13, "host1", 1111, absl::nullopt, {}};
-  DescribeClusterBroker b2 = {42, "host2", 2222, absl::nullopt, {}};
-  DescribeClusterBroker b3 = {77, "host3", 3333, absl::nullopt, {}};
+  DescribeClusterBroker b1 = {13, "host1", 1111, std::nullopt, {}};
+  DescribeClusterBroker b2 = {42, "host2", 2222, std::nullopt, {}};
+  DescribeClusterBroker b3 = {77, "host3", 3333, std::nullopt, {}};
   std::vector<DescribeClusterBroker> brokers = {b1, b2, b3};
-  DescribeClusterResponse dcr = {0, 0, absl::nullopt, "", 0, brokers, 0, {}};
+  DescribeClusterResponse dcr = {0, 0, std::nullopt, "", 0, brokers, 0, {}};
 
   auto config = std::make_shared<MockBrokerFilterConfig>();
-  absl::optional<HostAndPort> cr1 = {{"nh1", 4444}};
+  std::optional<HostAndPort> cr1 = {{"nh1", 4444}};
   EXPECT_CALL(*config, findBrokerAddressOverride(b1.broker_id_)).WillOnce(Return(cr1));
-  absl::optional<HostAndPort> cr2 = absl::nullopt;
+  std::optional<HostAndPort> cr2 = std::nullopt;
   EXPECT_CALL(*config, findBrokerAddressOverride(b2.broker_id_)).WillOnce(Return(cr2));
-  absl::optional<HostAndPort> cr3 = {{"nh3", 6666}};
+  std::optional<HostAndPort> cr3 = {{"nh3", 6666}};
   EXPECT_CALL(*config, findBrokerAddressOverride(b3.broker_id_)).WillOnce(Return(cr3));
   ResponseRewriterImpl testee{config};
 

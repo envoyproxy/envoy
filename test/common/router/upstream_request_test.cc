@@ -267,7 +267,7 @@ public:
     last_host_ = host;
     if (reject_connection_) {
       callbacks_->sendLocalReply(Http::Code::Forbidden, "Connection rejected", nullptr,
-                                 absl::nullopt, "upstream_filter_rejection");
+                                 std::nullopt, "upstream_filter_rejection");
     }
   }
   void onUpstreamConnectionEstablished() override {}

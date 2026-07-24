@@ -202,7 +202,7 @@ protected:
   // Either reset the stream or close the connection according to
   // should_close_connection and configured http3 options.
   virtual void
-  onStreamError(absl::optional<bool> should_close_connection,
+  onStreamError(std::optional<bool> should_close_connection,
                 quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) PURE;
 
   // TODO(danzh) remove this once QUICHE enforces content-length consistency.
@@ -298,7 +298,7 @@ private:
   Event::SchedulableCallbackPtr async_stream_blockage_change_;
 
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
-  absl::optional<size_t> content_length_;
+  std::optional<size_t> content_length_;
   size_t received_content_bytes_{0};
   http2::adapter::HeaderValidator header_validator_;
   size_t received_metadata_bytes_{0};

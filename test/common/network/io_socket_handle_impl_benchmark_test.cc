@@ -32,7 +32,7 @@ std::vector<sockaddr_storage> getSockAddrSampleAddresses(const int count) {
 class IoSocketHandleImplTestWrapper {
 public:
   explicit IoSocketHandleImplTestWrapper(const int cache_size)
-      : io_handle_(-1, false, absl::nullopt, cache_size) {}
+      : io_handle_(-1, false, std::nullopt, cache_size) {}
 
   Address::InstanceConstSharedPtr getOrCreateEnvoyAddressInstances(const sockaddr_storage& ss) {
     return io_handle_.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss));

@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/external/responses.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/metadata.h"
 #include "gmock/gmock.h"
@@ -21,7 +23,7 @@ public:
 
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
-  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
+  MOCK_METHOD(std::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
   MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
 };
@@ -36,16 +38,15 @@ TEST(MetadataTest, shouldBeAlwaysReadyForAnswer) {
   // First topic is going to have configuration present (42 partitions for each topic).
   const ClusterConfig topic1config = {"", 42, {}, {}};
   EXPECT_CALL(configuration, computeClusterConfigForTopic("topic1"))
-      .WillOnce(Return(absl::make_optional(topic1config)));
+      .WillOnce(Return(std::make_optional(topic1config)));
   // Second topic is not going to have configuration present.
-  EXPECT_CALL(configuration, computeClusterConfigForTopic("topic2"))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(configuration, computeClusterConfigForTopic("topic2")).WillOnce(Return(std::nullopt));
   const RequestHeader header = {METADATA_REQUEST_API_KEY, METADATA_REQUEST_MAX_VERSION, 0,
-                                absl::nullopt};
+                                std::nullopt};
   const MetadataRequestTopic t1 = MetadataRequestTopic{"topic1"};
   const MetadataRequestTopic t2 = MetadataRequestTopic{"topic2"};
   // Third topic is not going to have an explicit name.
-  const MetadataRequestTopic t3 = MetadataRequestTopic{Uuid{13, 42}, absl::nullopt, TaggedFields{}};
+  const MetadataRequestTopic t3 = MetadataRequestTopic{Uuid{13, 42}, std::nullopt, TaggedFields{}};
   const MetadataRequest data = {{t1, t2, t3}};
   const auto message = std::make_shared<Request<MetadataRequest>>(header, data);
   MetadataRequestHolder testee = {filter, configuration, message};

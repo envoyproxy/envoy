@@ -45,7 +45,7 @@ TEST_F(ConfigValidationTest, AccessLogConfigurationIsAccepted) {
   envoy::extensions::access_loggers::stream::v3::StdoutAccessLog stdout_access_log;
   stdout_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
       "%DYNAMIC_METADATA(envoy.reverse_tunnel.lifecycle:event)%\n");
-  access_log->mutable_typed_config()->PackFrom(stdout_access_log);
+  std::ignore = access_log->mutable_typed_config()->PackFrom(stdout_access_log);
 
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(testing::ReturnRef(ProtobufMessage::getStrictValidationVisitor()));

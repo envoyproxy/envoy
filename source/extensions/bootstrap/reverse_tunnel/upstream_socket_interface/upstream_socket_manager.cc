@@ -218,8 +218,20 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   fd_to_ping_send_timer_map_[fd]->enableTimer(
       std::chrono::milliseconds(pingIntervalWithJitterMs()));
 
+  // Note the reverse connection start time.
+  fd_to_start_time_map_[fd] = dispatcher_.timeSource().monotonicTime();
+
   ENVOY_LOG(debug, "reverse_tunnel: added socket to maps. node: {} connection key: {} fd: {}.",
             scoped_node_id, connectionKey, fd);
+}
+
+bool UpstreamSocketManager::canAcceptConnection(absl::string_view node_id,
+                                                absl::string_view tenant_id) const {
+  const std::string scoped_node_id =
+      maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, node_id);
+  auto it = node_to_active_fd_count_.find(scoped_node_id);
+  const uint32_t count = it == node_to_active_fd_count_.end() ? 0 : it->second;
+  return count < max_connections_per_node_;
 }
 
 Network::ConnectionSocketPtr
@@ -277,6 +289,13 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
     }
   }
 
+  auto start_time = findStartTime(fd);
+  auto extension = getUpstreamExtension();
+  if (extension && start_time.has_value()) {
+    extension->updateUpgradeTime(*start_time, dispatcher_.timeSource().monotonicTime());
+  }
+  fd_to_start_time_map_.erase(fd);
+
   return socket;
 }
 
@@ -302,6 +321,11 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
   // Key not found in cluster map, treat it as a node ID and return it directly.
   ENVOY_LOG(trace, "reverse_tunnel: key '{}' treated as node ID; returning as-is.", key);
   return key;
+}
+
+std::string UpstreamSocketManager::getClusterForNode(absl::string_view node_id) const {
+  const auto it = node_to_cluster_map_.find(node_id);
+  return it != node_to_cluster_map_.end() ? it->second : std::string();
 }
 
 const ReverseTunnelLifecycleInfo* UpstreamSocketManager::getLifecycleInfo(int fd) const {
@@ -430,6 +454,15 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     fd_to_event_map_.erase(fd);
     fd_to_timer_map_.erase(fd);
     fd_to_ping_send_timer_map_.erase(fd);
+
+    // Update the cx_idle_expire_time_ histogram with this info.
+    auto start_time = findStartTime(fd);
+    auto extension = getUpstreamExtension();
+    if (extension && start_time.has_value()) {
+      extension->updateIdleExpireTime(*start_time, dispatcher_.timeSource().monotonicTime());
+    }
+    fd_to_start_time_map_.erase(fd);
+
   } else {
     // FD not found in idle pool, this is a used socket.
     // The socket will be closed by the owning UpstreamReverseConnectionIOHandle.
@@ -526,7 +559,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   const auto ping_size =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::PING_MESSAGE
           .size();
-  Api::IoCallUint64Result result = io_handle.read(buffer, absl::make_optional(ping_size));
+  Api::IoCallUint64Result result = io_handle.read(buffer, std::make_optional(ping_size));
   if (!result.ok()) {
     ENVOY_LOG(debug, "reverse_tunnel: Read error on FD: {}: error - {}", fd,
               result.err_->getErrorDetails());
@@ -660,13 +693,10 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
 }
 
 uint64_t UpstreamSocketManager::pingIntervalWithJitterMs() {
-  uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  // 15% upward jitter, matching the HTTP/2 keepalive pattern.
   constexpr uint64_t jitter_percent = 15;
-  uint64_t jitter_mod = jitter_percent * interval_ms / 100;
-  if (jitter_mod > 0) {
-    interval_ms += random_generator_->random() % jitter_mod;
-  }
-  return interval_ms;
+  const uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  return ReverseConnectionUtility::addJitter(interval_ms, jitter_percent, *random_generator_);
 }
 
 void UpstreamSocketManager::rearmPingSendTimer(int fd) {
@@ -742,6 +772,16 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   if (it != socket_managers_.end()) {
     socket_managers_.erase(it);
   }
+}
+
+OptRef<const MonotonicTime> UpstreamSocketManager::findStartTime(int fd) const {
+  auto it = fd_to_start_time_map_.find(fd);
+  if (it == fd_to_start_time_map_.end()) {
+    ENVOY_LOG(error, "reverse_tunnel: findStartTime: fd {} not found in fd_to_start_time_map_.",
+              fd);
+    return {};
+  }
+  return it->second;
 }
 
 } // namespace ReverseConnection.

@@ -358,7 +358,7 @@ TEST_P(CacheIntegrationTest, RequestNoCacheProvokesValidationAndOnSuccessReadsFr
   // Response with a 304 status, implying validation succeeded.
   Http::TestResponseHeaderMapImpl response_headers_304{
       {":status", "304"}, {"last-modified", "Mon, 01 Jan 1970 00:30:00 GMT"}};
-  simulateUpstreamResponse(response_headers_304, absl::nullopt, no_trailers_, true)();
+  simulateUpstreamResponse(response_headers_304, std::nullopt, no_trailers_, true)();
   // Additional upstream request should be a validation, so should have if-modified-since
   EXPECT_THAT(upstream_request_->headers(), AllOf(ContainsHeader("cache-control", "no-cache"),
                                                   ContainsHeader("if-modified-since", _)));
@@ -542,7 +542,7 @@ TEST_P(CacheIntegrationTest, TemporarilyUncacheableEventuallyCaches) {
     Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
-        simulateUpstreamResponse(response_headers, absl::nullopt, response_trailers));
+        simulateUpstreamResponse(response_headers, std::nullopt, response_trailers));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_THAT(response_decoder->body(), Eq(""));
     EXPECT_THAT(response_decoder->trailers(), Pointee(IsSupersetOfHeaders(response_trailers)));
@@ -722,7 +722,7 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
 
   // Send first request, and get response from upstream.
   {
-    // Since it is a head request, no need to encodeData => the response_body is absl::nullopt.
+    // Since it is a head request, no need to encodeData => the response_body is std::nullopt.
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers, simulateUpstreamResponse(response_headers, no_body_, no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));

@@ -52,8 +52,8 @@ void AggregateClusterLoadBalancer::addMemberUpdateCallbackForCluster(
           });
 }
 
-PriorityContextPtr
-AggregateClusterLoadBalancer::linearizePrioritySet(OptRef<const std::string> excluded_cluster) {
+PriorityContextPtr AggregateClusterLoadBalancer::linearizePrioritySet(
+    std::optional<absl::string_view> excluded_cluster) {
   PriorityContextPtr priority_context = std::make_unique<PriorityContext>();
   uint32_t next_priority_after_linearizing = 0;
 
@@ -65,7 +65,7 @@ AggregateClusterLoadBalancer::linearizePrioritySet(OptRef<const std::string> exc
   //    [C_0.P_0, C_0.P_1, C_0.P_2, C_1.P_0, C_1.P_1, C_2.P_0, C_2.P_1, C_2.P_2, C_2.P_3]
   // and the traffic will be distributed among these priorities.
   for (const auto& cluster : *clusters_) {
-    if (excluded_cluster.has_value() && excluded_cluster.value().get() == cluster) {
+    if (excluded_cluster.has_value() && excluded_cluster.value() == cluster) {
       continue;
     }
     auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
@@ -101,7 +101,7 @@ AggregateClusterLoadBalancer::linearizePrioritySet(OptRef<const std::string> exc
   return priority_context;
 }
 
-void AggregateClusterLoadBalancer::refresh(OptRef<const std::string> excluded_cluster) {
+void AggregateClusterLoadBalancer::refresh(std::optional<absl::string_view> excluded_cluster) {
   PriorityContextPtr priority_context = linearizePrioritySet(excluded_cluster);
   if (!priority_context->priority_set_.hostSetsPerPriority().empty()) {
     load_balancer_ = std::make_unique<LoadBalancerImpl>(
@@ -123,7 +123,7 @@ void AggregateClusterLoadBalancer::onClusterAddOrUpdate(
   }
 }
 
-void AggregateClusterLoadBalancer::onClusterRemoval(const std::string& cluster_name) {
+void AggregateClusterLoadBalancer::onClusterRemoval(absl::string_view cluster_name) {
   //  The onClusterRemoval callback is called before the thread local cluster is removed. There
   //  will be a dangling pointer to the thread local cluster if the deleted cluster is not skipped
   //  when we refresh the load balancer.
@@ -134,7 +134,7 @@ void AggregateClusterLoadBalancer::onClusterRemoval(const std::string& cluster_n
   }
 }
 
-absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToLinearizedPriority(
+std::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToLinearizedPriority(
     const Upstream::HostDescription& host) const {
   auto it = priority_context_.cluster_and_priority_to_linearized_priority_.find(
       std::make_pair(host.cluster().name(), host.priority()));
@@ -143,7 +143,7 @@ absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToL
     return it->second;
   } else {
     // The HostSet can change due to CDS/EDS updates between retries.
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 
@@ -187,14 +187,14 @@ AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* con
   return nullptr;
 }
 
-absl::optional<Upstream::SelectedPoolAndConnection>
+std::optional<Upstream::SelectedPoolAndConnection>
 AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
                                                        const Upstream::Host& host,
                                                        std::vector<uint8_t>& hash_key) {
   if (load_balancer_) {
     return load_balancer_->selectExistingConnection(context, host, hash_key);
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>

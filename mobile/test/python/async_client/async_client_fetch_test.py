@@ -28,7 +28,7 @@ class TestAsyncClientFetch(unittest.TestCase):
         # factory to keep constructor logic consistent without sharing instances
         builder = (
             EngineBuilder()
-            .set_log_level(LogLevel.trace)
+            .set_log_level(LogLevel.info)
             .add_runtime_guard("getaddrinfo_no_ai_flags", True)
         )
         return builder
@@ -227,6 +227,21 @@ class TestAsyncClientFetch(unittest.TestCase):
                         json={"foo": "bar"},
                         data="some data",
                     )
+
+        asyncio.run(run())
+
+    def test_non_existent_listener(self):
+        """Verify that using a non-existent listener name fails."""
+
+        async def run():
+            async with AsyncClient(
+                self._make_client_builder(), listener_name="non_existent_listener"
+            ) as client:
+                with self.assertRaises(ClientResponseError) as cm:
+                    await client.get(f"{self._echo_server_url}/")
+                self.assertIsNotNone(cm.exception.envoy_error)
+                self.assertIn("Listener not found", cm.exception.envoy_error.message)
+                self.assertIn("non_existent_listener", cm.exception.envoy_error.message)
 
         asyncio.run(run())
 

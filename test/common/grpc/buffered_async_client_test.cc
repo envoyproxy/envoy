@@ -56,7 +56,7 @@ public:
             buffer_size, *method_descriptor_, callback_, *client_, *dispatcher_, ttl);
   }
 
-  void bufferNewMessage(absl::optional<uint32_t> expected_message_id) {
+  void bufferNewMessage(std::optional<uint32_t> expected_message_id) {
     helloworld::HelloRequest request;
     request.set_name("Alice");
     EXPECT_EQ(expected_message_id, buffered_client_->bufferMessage(request));
@@ -153,7 +153,7 @@ TEST_F(BufferedAsyncClientTest, BufferLimitExceeded) {
   EXPECT_CALL(http_stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
 
   prepareBufferedClient(0, std::chrono::milliseconds(1000));
-  bufferNewMessage(absl::nullopt);
+  bufferNewMessage(std::nullopt);
 
   EXPECT_EQ(0, buffered_client_->sendBufferedMessages().size());
   EXPECT_TRUE(buffered_client_->hasActiveStream());

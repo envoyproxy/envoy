@@ -70,11 +70,11 @@ void CacheFilter::onDestroy() {
   lookup_result_.reset();
 }
 
-absl::optional<absl::string_view> CacheFilter::clusterName() {
+std::optional<absl::string_view> CacheFilter::clusterName() {
   const auto route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry = route ? route->routeEntry() : nullptr;
   if (route_entry == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return route_entry->clusterName();
 }
@@ -83,20 +83,20 @@ OptRef<Http::AsyncClient> CacheFilter::asyncClient(absl::string_view cluster_nam
   Upstream::ThreadLocalCluster* thread_local_cluster =
       config_->clusterManager().getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return thread_local_cluster->httpAsyncClient();
 }
 
 void CacheFilter::sendNoRouteResponse() {
-  decoder_callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, std::nullopt,
                                      "cache_no_route");
 }
 
 void CacheFilter::sendNoClusterResponse(absl::string_view cluster_name) {
   ENVOY_STREAM_LOG(debug, "upstream cluster '{}' was not available to cache", *decoder_callbacks_,
                    cluster_name);
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, std::nullopt,
                                      "cache_no_cluster");
 }
 
@@ -124,7 +124,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
 
-  absl::optional<absl::string_view> original_cluster_name = clusterName();
+  std::optional<absl::string_view> original_cluster_name = clusterName();
   absl::string_view cluster_name;
   if (config_->overrideUpstreamCluster().empty()) {
     if (!original_cluster_name) {

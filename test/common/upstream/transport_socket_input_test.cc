@@ -40,7 +40,7 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInput_NoEndpointMetadata) {
   TransportSocketMatchingData data(nullptr, nullptr);
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, EndpointMetadataInput_StringAndNonString) {
@@ -74,7 +74,7 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInput_EmptyString) {
   TransportSocketMatchingData data(&endpoint_md, nullptr);
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, EndpointMetadataInputFactory_WithFilterAndPath) {
@@ -133,7 +133,7 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInput_NoLocalityMetadata) {
   TransportSocketMatchingData data(nullptr, nullptr);
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInput_StringValue) {
@@ -172,7 +172,7 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInput_EmptyString) {
   TransportSocketMatchingData data(nullptr, &locality_md);
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInputFactory_WithFilterAndPath) {
@@ -255,7 +255,7 @@ TEST_F(TransportSocketInputTest, BothEndpointAndLocalityMetadata) {
 class TestFilterStateObject : public StreamInfo::FilterState::Object {
 public:
   explicit TestFilterStateObject(std::string value) : value_(std::move(value)) {}
-  absl::optional<std::string> serializeAsString() const override { return value_; }
+  std::optional<std::string> serializeAsString() const override { return value_; }
 
 private:
   std::string value_;
@@ -264,13 +264,13 @@ private:
 // Filter state object that returns nullopt on serialization.
 class NonSerializableFilterStateObject : public StreamInfo::FilterState::Object {
 public:
-  absl::optional<std::string> serializeAsString() const override { return absl::nullopt; }
+  std::optional<std::string> serializeAsString() const override { return std::nullopt; }
 };
 
 // Filter state object that returns empty string on serialization.
 class EmptySerializableFilterStateObject : public StreamInfo::FilterState::Object {
 public:
-  absl::optional<std::string> serializeAsString() const override { return ""; }
+  std::optional<std::string> serializeAsString() const override { return ""; }
 };
 
 TEST_F(TransportSocketInputTest, FilterStateInput_NoFilterState) {
@@ -278,7 +278,7 @@ TEST_F(TransportSocketInputTest, FilterStateInput_NoFilterState) {
   TransportSocketMatchingData data(nullptr, nullptr, nullptr);
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInput_WithValue) {
@@ -307,7 +307,7 @@ TEST_F(TransportSocketInputTest, FilterStateInput_MissingKey) {
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInput_NonSerializable) {
@@ -322,7 +322,7 @@ TEST_F(TransportSocketInputTest, FilterStateInput_NonSerializable) {
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInput_EmptyString) {
@@ -337,7 +337,7 @@ TEST_F(TransportSocketInputTest, FilterStateInput_EmptyString) {
   TransportSocketMatchingData data(nullptr, nullptr, filter_state.get());
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), DataAvailability::AllDataAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST_F(TransportSocketInputTest, FilterStateInputFactory) {

@@ -79,10 +79,10 @@ DynamicModuleLoadBalancer::lifetimeCallbacks() {
   return {};
 }
 
-absl::optional<Upstream::SelectedPoolAndConnection>
+std::optional<Upstream::SelectedPoolAndConnection>
 DynamicModuleLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext*,
                                                     const Upstream::Host&, std::vector<uint8_t>&) {
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 bool DynamicModuleLoadBalancer::setHostData(uint32_t priority, size_t index, uintptr_t data) {

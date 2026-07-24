@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <list>
+#include <random>
 #include <regex>
 #include <stdexcept>
 #include <string>
@@ -36,9 +37,11 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"

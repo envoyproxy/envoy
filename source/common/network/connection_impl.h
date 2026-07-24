@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/scope_tracker.h"
@@ -13,8 +14,6 @@
 #include "source/common/event/libevent.h"
 #include "source/common/network/connection_impl_base.h"
 #include "source/common/stream_info/stream_info_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 class RandomPauseFilter;
@@ -91,7 +90,7 @@ public:
   ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
     return socket_->connectionInfoProviderSharedPtr();
   }
-  absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
+  std::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override {
     // SSL info may be overwritten by a filter in the provider.
     return socket_->connectionInfoProvider().sslConnection();
@@ -116,10 +115,10 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override;
   bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
-  absl::optional<uint64_t> congestionWindowInBytes() const override;
+  std::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

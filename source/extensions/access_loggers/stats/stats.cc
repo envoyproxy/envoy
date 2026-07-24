@@ -79,8 +79,8 @@ public:
 
 AccessLogState::~AccessLogState() {
   for (const auto& p : inflight_gauges_) {
-    Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
-        p.first.statName(), p.first.tags(), p.second.import_mode_);
+    Stats::Gauge& gauge_stat = parent_->scope().gaugeFromTaggedName(
+        p.first.statName(), Stats::Scope::toTagSpan(p.first.tags()), {}, p.second.import_mode_);
     gauge_stat.sub(p.second.value_);
   }
 }
@@ -103,7 +103,9 @@ void AccessLogState::addInflightGauge(Stats::StatName stat_name,
     it = new_it;
   }
   it->second.value_ += value;
-  parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
+  parent_->scope()
+      .gaugeFromTaggedName(stat_name, Stats::Scope::toTagSpan(tags), {}, import_mode)
+      .add(value);
 }
 
 void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
@@ -115,8 +117,8 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
 
   GaugeKey key{stat_name, tags};
 
-  Stats::Gauge& gauge_stat =
-      parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+  Stats::Gauge& gauge_stat = parent_->scope().gaugeFromTaggedName(
+      stat_name, Stats::Scope::toTagSpan(tags), {}, import_mode);
 
   auto it = inflight_gauges_.find(key);
   const bool was_found = (it != inflight_gauges_.end());
@@ -143,7 +145,7 @@ void GaugeKey::makeOwned() {
          "Both borrowed and owned tags are present in GaugeKey::makeOwned");
   if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
     owned_tags_ = borrowed_tags_.value().get();
-    borrowed_tags_ = absl::nullopt;
+    borrowed_tags_ = std::nullopt;
   }
 }
 
@@ -335,10 +337,9 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
 }
 
 namespace {
-absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
-                                        const Formatter::Context& context,
-                                        const StreamInfo::StreamInfo& stream_info,
-                                        bool is_percent) {
+std::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
+                                       const Formatter::Context& context,
+                                       const StreamInfo::StreamInfo& stream_info, bool is_percent) {
   Protobuf::Value computed_value = formatter.formatValue(context, stream_info);
   double value;
   if (computed_value.has_number_value()) {
@@ -348,13 +349,13 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
       ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
                               "Stats access logger formatted a string that isn't a number: {}",
                               computed_value.string_value());
-      return absl::nullopt;
+      return std::nullopt;
     }
   } else {
     ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
                             "Stats access logger computed non-number value: {}",
                             computed_value.DebugString());
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   if (is_percent) {
@@ -378,7 +379,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       continue;
     }
 
-    absl::optional<uint64_t> computed_value_opt =
+    std::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
                        histogram.unit_ == Stats::Histogram::Unit::Percent);
     if (!computed_value_opt.has_value()) {
@@ -387,8 +388,8 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value = *computed_value_opt;
 
-    auto& histogram_stat =
-        scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.unit_);
+    auto& histogram_stat = scope_->histogramFromTaggedName(
+        histogram.stat_.name_, Stats::Scope::toTagSpan(tags), {}, histogram.unit_);
     histogram_stat.recordValue(value);
   }
 
@@ -401,7 +402,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
-      absl::optional<uint64_t> computed_value_opt =
+      std::optional<uint64_t> computed_value_opt =
           getFormatValue(*counter.value_formatter_, context, stream_info, false);
       if (!computed_value_opt.has_value()) {
         continue;
@@ -412,7 +413,8 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       value = counter.value_fixed_;
     }
 
-    auto& counter_stat = scope_->counterFromStatNameWithTags(counter.stat_.name_, tags);
+    auto& counter_stat =
+        scope_->counterFromTaggedName(counter.stat_.name_, Stats::Scope::toTagSpan(tags), {});
     counter_stat.add(value);
   }
 
@@ -436,7 +438,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
 
   uint64_t value;
   if (gauge.value_formatter_ != nullptr) {
-    absl::optional<uint64_t> computed_value_opt =
+    std::optional<uint64_t> computed_value_opt =
         getFormatValue(*gauge.value_formatter_, context, stream_info, false);
     if (!computed_value_opt.has_value()) {
       return;
@@ -453,8 +455,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
                                              : Stats::Gauge::ImportMode::Accumulate;
 
   if (op == Gauge::OperationType::SET) {
-    Stats::Gauge& gauge_stat =
-        scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+    Stats::Gauge& gauge_stat = scope_->gaugeFromTaggedName(
+        gauge.stat_.name_, Stats::Scope::toTagSpan(tags), {}, import_mode);
     gauge_stat.set(value);
   } else if (op == Gauge::OperationType::PAIRED_ADD ||
              op == Gauge::OperationType::PAIRED_SUBTRACT) {

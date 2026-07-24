@@ -79,7 +79,7 @@ void HttpBodyUtils::appendHttpBodyEnvelope(
     ::google::api::HttpBody body;
     body.set_content_type(std::move(content_type));
     if (!unknown_params.key().empty()) {
-      body.add_extensions()->PackFrom(unknown_params);
+      std::ignore = body.add_extensions()->PackFrom(unknown_params);
     }
 
     uint64_t envelope_size = body.ByteSizeLong() +
@@ -112,7 +112,7 @@ void HttpBodyUtils::appendHttpBodyEnvelope(
       coded_stream.WriteTag(field_number);
       coded_stream.WriteVarint64(message_size);
     }
-    body.SerializeToCodedStream(&coded_stream);
+    std::ignore = body.SerializeToCodedStream(&coded_stream);
     coded_stream.WriteTag(http_body_field_number);
     coded_stream.WriteVarint64(content_length);
   }

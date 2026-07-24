@@ -480,7 +480,7 @@ void CompactProtocolImpl::writeFieldBegin(Buffer::Instance& buffer, const std::s
 
 void CompactProtocolImpl::writeFieldBeginInternal(
     Buffer::Instance& buffer, FieldType field_type, int16_t field_id,
-    absl::optional<CompactFieldType> field_type_override) {
+    std::optional<CompactFieldType> field_type_override) {
   CompactFieldType compact_field_type;
   if (field_type_override.has_value()) {
     compact_field_type = field_type_override.value();

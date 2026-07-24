@@ -40,7 +40,7 @@ public:
   };
 
   void setup(std::string upsteam_host = "localhost", std::string cluster_name = "",
-             absl::optional<BufferConfig> buffer_config = absl::nullopt, uint32_t max_hosts = 1024,
+             std::optional<BufferConfig> buffer_config = std::nullopt, uint32_t max_hosts = 1024,
              uint32_t max_pending_requests = 1024) {
     setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
 

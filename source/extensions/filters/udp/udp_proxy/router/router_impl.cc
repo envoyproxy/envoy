@@ -43,7 +43,7 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
     action->set_name("route");
     envoy::extensions::filters::udp::udp_proxy::v3::Route route;
     route.set_cluster(config.cluster());
-    action->mutable_typed_config()->PackFrom(route);
+    std::ignore = action->mutable_typed_config()->PackFrom(route);
   } else {
     matcher = config.matcher();
   }

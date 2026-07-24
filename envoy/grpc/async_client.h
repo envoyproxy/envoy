@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <optional>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
@@ -12,8 +13,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Grpc {

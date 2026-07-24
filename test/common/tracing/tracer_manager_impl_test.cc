@@ -65,7 +65,7 @@ TEST_F(TracerManagerImplTest, ShouldReturnWhenNoTracingProviderHasBeenConfigured
 TEST_F(TracerManagerImplTest, ShouldUseProperTracerFactory) {
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
-  tracing_config.mutable_typed_config()->PackFrom(Protobuf::Struct());
+  std::ignore = tracing_config.mutable_typed_config()->PackFrom(Protobuf::Struct());
 
   auto tracer = tracer_manager_.getOrCreateTracer(&tracing_config);
 
@@ -79,7 +79,8 @@ TEST_F(TracerManagerImplTest, ShouldUseProperTracerFactory) {
 TEST_F(TracerManagerImplTest, ShouldCacheAndReuseTracers) {
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
-  tracing_config.mutable_typed_config()->PackFrom(MessageUtil::keyValueStruct("key1", "value1"));
+  std::ignore = tracing_config.mutable_typed_config()->PackFrom(
+      MessageUtil::keyValueStruct("key1", "value1"));
 
   auto http_tracer_one = tracer_manager_.getOrCreateTracer(&tracing_config);
   // Expect a new Tracer to be added to the cache.
@@ -96,7 +97,7 @@ TEST_F(TracerManagerImplTest, ShouldCacheAndReuseTracers) {
 TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
   envoy::config::trace::v3::Tracing_Http tracing_config_one;
   tracing_config_one.set_name("envoy.tracers.sample");
-  tracing_config_one.mutable_typed_config()->PackFrom(
+  std::ignore = tracing_config_one.mutable_typed_config()->PackFrom(
       MessageUtil::keyValueStruct("key1", "value1"));
 
   auto http_tracer_one = tracer_manager_.getOrCreateTracer(&tracing_config_one);
@@ -105,7 +106,7 @@ TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
 
   envoy::config::trace::v3::Tracing_Http tracing_config_two;
   tracing_config_two.set_name("envoy.tracers.sample");
-  tracing_config_two.mutable_typed_config()->PackFrom(
+  std::ignore = tracing_config_two.mutable_typed_config()->PackFrom(
       MessageUtil::keyValueStruct("key2", "value2"));
 
   auto http_tracer_two = tracer_manager_.getOrCreateTracer(&tracing_config_two);
@@ -119,7 +120,7 @@ TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
 TEST_F(TracerManagerImplTest, ShouldFailIfTracerProviderIsUnknown) {
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("invalid");
-  tracing_config.mutable_typed_config()->PackFrom(Protobuf::Value());
+  std::ignore = tracing_config.mutable_typed_config()->PackFrom(Protobuf::Value());
 
   EXPECT_THROW_WITH_MESSAGE(tracer_manager_.getOrCreateTracer(&tracing_config), EnvoyException,
                             "Didn't find a registered implementation for 'invalid' "
@@ -129,10 +130,10 @@ TEST_F(TracerManagerImplTest, ShouldFailIfTracerProviderIsUnknown) {
 TEST_F(TracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) {
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
-  tracing_config.mutable_typed_config()->PackFrom(ValueUtil::stringValue("value"));
+  std::ignore = tracing_config.mutable_typed_config()->PackFrom(ValueUtil::stringValue("value"));
 
   Protobuf::Any expected_any_proto;
-  expected_any_proto.PackFrom(ValueUtil::stringValue("value"));
+  std::ignore = expected_any_proto.PackFrom(ValueUtil::stringValue("value"));
   EXPECT_THROW_WITH_MESSAGE(tracer_manager_.getOrCreateTracer(&tracing_config), EnvoyException,
                             "Didn't find a registered implementation for 'envoy.tracers.sample' "
                             "with type URL: 'google.protobuf.Value'");
@@ -142,11 +143,11 @@ class TracerManagerImplCacheTest : public testing::Test {
 public:
   TracerManagerImplCacheTest() {
     tracing_config_one_.set_name("envoy.tracers.mock");
-    tracing_config_one_.mutable_typed_config()->PackFrom(
+    std::ignore = tracing_config_one_.mutable_typed_config()->PackFrom(
         MessageUtil::keyValueStruct("key1", "value1"));
 
     tracing_config_two_.set_name("envoy.tracers.mock");
-    tracing_config_two_.mutable_typed_config()->PackFrom(
+    std::ignore = tracing_config_two_.mutable_typed_config()->PackFrom(
         MessageUtil::keyValueStruct("key2", "value2"));
   }
 

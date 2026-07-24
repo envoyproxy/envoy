@@ -30,7 +30,8 @@ public:
       return;
     }
 
-    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
+    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name,
+                                                Stats::Scope::toTagSpan(tags),
                                                 logger_->scope().symbolTable());
     Stats::StatName joined_name = joiner.nameWithTags();
     auto it = inflight_gauges_.find(joined_name);
@@ -49,7 +50,8 @@ public:
       return;
     }
 
-    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
+    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name,
+                                                Stats::Scope::toTagSpan(tags),
                                                 logger_->scope().symbolTable());
     Stats::StatName joined_name = joiner.nameWithTags();
     auto it = inflight_gauges_.find(joined_name);

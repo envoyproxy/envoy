@@ -47,8 +47,9 @@ public:
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext&,
              const Protobuf::Message& config) override {
-    ASSERT(dynamic_cast<const LeastRequestLbProto*>(&config) != nullptr);
-    const LeastRequestLbProto& typed_config = dynamic_cast<const LeastRequestLbProto&>(config);
+    ASSERT(Envoy::Protobuf::DynamicCastMessage<LeastRequestLbProto>(&config) != nullptr);
+    const LeastRequestLbProto& typed_config =
+        Envoy::Protobuf::DynamicCastMessage<LeastRequestLbProto>(config);
     return Upstream::LoadBalancerConfigPtr{new TypedLeastRequestLbConfig(typed_config)};
   }
 

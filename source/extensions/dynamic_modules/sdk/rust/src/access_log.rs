@@ -120,6 +120,65 @@ impl ConfigContext {
     }
   }
 
+  /// Increment a counter by the given value from the config context.
+  ///
+  /// Unlike [`MetricsContext::increment_counter`], this can be called outside of a log event, for
+  /// example from a scheduled background task.
+  pub fn increment_counter(&self, handle: CounterHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_increment_counter(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Set a gauge to the given value from the config context.
+  pub fn set_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_set_gauge(self.envoy_ptr, handle.id, value)
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Increment a gauge by the given value from the config context.
+  pub fn increment_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_increment_gauge(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Decrement a gauge by the given value from the config context.
+  pub fn decrement_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_decrement_gauge(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Record a value in a histogram from the config context.
+  pub fn record_histogram(&self, handle: HistogramHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_record_histogram_value(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
   /// Get the raw Envoy pointer. Used internally.
   #[doc(hidden)]
   pub fn envoy_ptr(&self) -> *mut c_void {

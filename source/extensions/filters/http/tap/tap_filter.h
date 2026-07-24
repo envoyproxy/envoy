@@ -21,6 +21,7 @@ namespace TapFilter {
  */
 // clang-format off
 #define ALL_TAP_FILTER_STATS(COUNTER)                                                           \
+  COUNTER(rq_sampled_out)                                                                       \
   COUNTER(rq_tapped)
 // clang-format on
 
@@ -100,9 +101,12 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     HttpTapConfigSharedPtr config = config_->currentConfig();
     if (config != nullptr) {
-      tapper_ = config->createPerRequestTapper(config_->getTapConfig(), callbacks);
-    } else {
-      tapper_ = nullptr;
+      if (config->shouldRecord()) {
+        tapper_ = config->createPerRequestTapper(config_->getTapConfig(), callbacks);
+      } else {
+        // Sampling rejected this request. Track for observability.
+        config_->stats().rq_sampled_out_.inc();
+      }
     }
   }
 

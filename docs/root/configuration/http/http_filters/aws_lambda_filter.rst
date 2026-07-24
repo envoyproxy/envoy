@@ -101,7 +101,7 @@ Below are some examples that show how the filter can be used in different deploy
 Example configuration
 ---------------------
 
-In this configuration, the filter applies to all routes in the filter chain of the http connection manager:
+In this configuration, the filter applies to all routes in the filter chain of the HTTP connection manager:
 
 .. literalinclude:: _include/aws-lambda-filter.yaml
     :language: yaml

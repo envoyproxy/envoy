@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/exception.h"
 
@@ -32,7 +33,7 @@ struct RequestContext {
   /**
    * Request header that gets filled in during the parse.
    */
-  RequestHeader request_header_{-1, -1, -1, absl::nullopt};
+  RequestHeader request_header_{-1, -1, -1, std::nullopt};
 
   /**
    * Bytes left to consume.

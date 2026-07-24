@@ -13,9 +13,9 @@ public:
   IPAddressObject(Network::Address::InstanceConstSharedPtr address)
       : Address::InstanceAccessor(address) {}
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     const auto ip = getIp();
-    return ip ? absl::make_optional(ip->asString()) : absl::nullopt;
+    return ip ? std::make_optional(ip->asString()) : std::nullopt;
   }
 };
 

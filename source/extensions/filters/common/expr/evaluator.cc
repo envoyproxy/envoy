@@ -39,8 +39,8 @@ const ActivationLookupTable& getActivationTokens() {
 
 } // namespace
 
-absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
-                                                     Protobuf::Arena* arena) const {
+std::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
+                                                    Protobuf::Arena* arena) const {
   const auto& tokens = getActivationTokens();
   const auto token = tokens.find(name);
   if (token == tokens.end()) {
@@ -258,7 +258,7 @@ CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
   return Create(builder, new_expr);
 }
 
-absl::optional<CelValue> CompiledExpression::evaluate(
+std::optional<CelValue> CompiledExpression::evaluate(
     Protobuf::Arena& arena, const ::Envoy::LocalInfo::LocalInfo* local_info,
     const StreamInfo::StreamInfo& info, const ::Envoy::Http::RequestHeaderMap* request_headers,
     const ::Envoy::Http::ResponseHeaderMap* response_headers,

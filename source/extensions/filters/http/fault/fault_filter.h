@@ -63,7 +63,7 @@ public:
   }
   const std::string& upstreamCluster() const { return upstream_cluster_; }
   const absl::flat_hash_set<std::string>& downstreamNodes() const { return downstream_nodes_; }
-  absl::optional<uint64_t> maxActiveFaults() const { return max_active_faults_; }
+  std::optional<uint64_t> maxActiveFaults() const { return max_active_faults_; }
   const Filters::Common::Fault::FaultRateLimitConfig* responseRateLimit() const {
     return response_rate_limit_.get();
   }
@@ -99,7 +99,7 @@ private:
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
   const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
   absl::flat_hash_set<std::string> downstream_nodes_; // Inject failures for specific downstream
-  absl::optional<uint64_t> max_active_faults_;
+  std::optional<uint64_t> max_active_faults_;
 
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
   const std::string delay_percent_runtime_;
@@ -155,7 +155,7 @@ private:
 using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;
 
 using AbortHttpAndGrpcStatus =
-    std::pair<absl::optional<Http::Code>, absl::optional<Grpc::Status::GrpcStatus>>;
+    std::pair<std::optional<Http::Code>, std::optional<Grpc::Status::GrpcStatus>>;
 /**
  * A filter that is capable of faulting an entire request before dispatching it upstream.
  */
@@ -199,18 +199,18 @@ private:
   void resetTimerState();
   void postDelayInjection(const Http::RequestHeaderMap& request_headers);
   void abortWithStatus(Http::Code http_status_code,
-                       absl::optional<Grpc::Status::GrpcStatus> grpc_status_code);
+                       std::optional<Grpc::Status::GrpcStatus> grpc_status_code);
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
   bool isAbortEnabled(const Http::RequestHeaderMap& request_headers);
   bool isDelayEnabled(const Http::RequestHeaderMap& request_headers);
   bool isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers);
   bool isResponseRateLimitConfigured();
-  absl::optional<std::chrono::milliseconds>
+  std::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
   AbortHttpAndGrpcStatus abortStatus(const Http::RequestHeaderMap& request_headers);
-  absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
-  absl::optional<Grpc::Status::GrpcStatus>
+  std::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
+  std::optional<Grpc::Status::GrpcStatus>
   abortGrpcStatus(const Http::RequestHeaderMap& request_headers);
   // Attempts to increase the number of active faults. Returns false if we've reached the maximum
   // number of allowed faults, in which case no fault should be performed.

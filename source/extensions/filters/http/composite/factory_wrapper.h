@@ -35,9 +35,9 @@ struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   absl::string_view filterConfigName() const override { return {}; }
   void setFilterConfigName(absl::string_view) override {}
-  OptRef<const Router::Route> route() const override { return absl::nullopt; }
-  absl::optional<bool> filterDisabled(absl::string_view) const override { return absl::nullopt; }
-  Http::RequestHeaderMapOptRef requestHeaders() const override { return absl::nullopt; }
+  OptRef<const Router::Route> route() const override { return std::nullopt; }
+  std::optional<bool> filterDisabled(absl::string_view) const override { return std::nullopt; }
+  Http::RequestHeaderMapOptRef requestHeaders() const override { return std::nullopt; }
   const StreamInfo::StreamInfo& streamInfo() const override;
 
   Filter& filter_;
@@ -47,7 +47,7 @@ struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
       absl::variant<Http::StreamDecoderFilterSharedPtr, Http::StreamEncoderFilterSharedPtr,
                     Http::StreamFilterSharedPtr>;
   // For single filter mode we store the filter to inject.
-  absl::optional<FilterAlternative> filter_to_inject_;
+  std::optional<FilterAlternative> filter_to_inject_;
   // For filter chain mode we store all filters in order.
   std::vector<Http::StreamFilterSharedPtr> filters_to_inject_;
   AccessLog::InstanceSharedPtrVector access_loggers_;

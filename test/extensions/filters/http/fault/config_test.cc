@@ -63,7 +63,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJsonWithServerContext) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

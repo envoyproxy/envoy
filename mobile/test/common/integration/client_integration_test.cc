@@ -18,6 +18,7 @@
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/test_common/registry.h"
+#include "source/common/common/logger.h"
 #include "test/test_common/test_random_generator.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -45,14 +46,14 @@ namespace {
 // www.lyft.com -> fake test upstream.
 class TestKeyValueStore : public Envoy::Platform::KeyValueStore {
 public:
-  absl::optional<std::string> read(const std::string&) override {
+  std::optional<std::string> read(const std::string&) override {
     ASSERT(!value_.empty());
     return value_;
   }
   void save(std::string, std::string) override {}
   void remove(const std::string&) override {}
-  void addOrUpdate(absl::string_view, absl::string_view, absl::optional<std::chrono::seconds>) {}
-  absl::optional<absl::string_view> get(absl::string_view) { return {}; }
+  void addOrUpdate(absl::string_view, absl::string_view, std::optional<std::chrono::seconds>) {}
+  std::optional<absl::string_view> get(absl::string_view) { return {}; }
   void flush() {}
   void iterate(::Envoy::KeyValueStore::ConstIterateCb) const {}
   void setValue(std::string value) { value_ = value; }
@@ -86,7 +87,11 @@ public:
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
   }
 
+  ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(spdlog::level::info); }
+
   void initialize() override {
+    builder_.setLogLevel(log_level_);
+    Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(log_level_));
     builder_.enableWorkerThread(getUseWorkerThread());
     if (getUseWorkerThread()) {
       // Platform cert validation is disabled when using worker thread. The engine will use the
@@ -95,10 +100,10 @@ public:
     }
     // Integration test starts upstreams before Envoy which can cause a data race.
     builder_.enableLogger(false);
-    builder_.setLogLevel(Logger::Logger::trace);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
     builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
+    builder_.addRuntimeGuard("getaddrinfo_no_ai_flags", true);
 
     if (getCodecType() == Http::CodecType::HTTP3) {
       setUpstreamProtocol(Http::CodecType::HTTP3);
@@ -212,6 +217,7 @@ public:
   }
 
 protected:
+  Logger::Logger::Levels log_level_ = Logger::Logger::info;
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
   bool add_fake_dns_ = false;
@@ -303,10 +309,11 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
   envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
   config.add_non_existent_domains("doesnotexist");
-  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  std::ignore = dns_resolver_config.mutable_typed_config()->PackFrom(config);
   builder_.setDnsResolver(dns_resolver_config);
 
   builder_.setDisableDnsRefreshOnFailure(true);
+  log_level_ = Logger::Logger::debug;
   initialize();
 
   default_request_headers_.setHost("doesnotexist");
@@ -333,6 +340,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(true);
+  log_level_ = Logger::Logger::debug;
   initialize();
 
   internalEngine()->onDefaultNetworkChanged(1);
@@ -353,6 +361,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
+  log_level_ = Logger::Logger::trace;
   initialize();
 
   // Set the network type to WIFI. This should trigger a network change.
@@ -413,7 +422,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
         }
       });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
-
+  log_level_ = Logger::Logger::trace;
   initialize();
 
   // A new WIFI network appears and becomes the default network. Even though
@@ -1046,7 +1055,7 @@ TEST_P(ClientIntegrationTest, InvalidDomain) {
   dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
   envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
   config.add_non_existent_domains("www.doesnotexist.com");
-  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  std::ignore = dns_resolver_config.mutable_typed_config()->PackFrom(config);
   builder_.setDnsResolver(dns_resolver_config);
 
   initialize();
@@ -1102,7 +1111,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
   envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
   config.add_non_existent_domains("www.doesnotexist.com");
-  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  std::ignore = dns_resolver_config.mutable_typed_config()->PackFrom(config);
   builder_.setDnsResolver(dns_resolver_config);
 
   initialize();
@@ -2170,6 +2179,107 @@ TEST_P(ClientIntegrationTest, SconeValuePropagationMultipleUpdates) {
   upstream_request_->encodeData(0, true);
 
   terminal_callback_.waitReady();
+}
+
+TEST_P(ClientIntegrationTest, DrainConnectionsBySocketTag) {
+  autonomous_upstream_ = false;
+  builder_.enableSocketTagging(true);
+  builder_.enableStatsCollection(true);
+  initialize();
+
+  Platform::EngineSharedPtr engine;
+  {
+    absl::MutexLock l(engine_lock_);
+    engine = engine_;
+  }
+
+  auto send_request_with_tag = [&](int tag_value, ConditionalInitializer& terminal,
+                                   std::string& status) {
+    Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+    Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+    request_headers.addCopy(Http::LowerCaseString("x-envoy-mobile-socket-tag"),
+                            absl::StrCat("0,", tag_value));
+
+    EnvoyStreamCallbacks callbacks;
+    callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool, envoy_stream_intel) {
+      status = absl::StrCat(headers.getStatusValue());
+    };
+    callbacks.on_data_ = [](const Buffer::Instance&, uint64_t, bool, envoy_stream_intel) {};
+    callbacks.on_complete_ = [&terminal](envoy_stream_intel, envoy_final_stream_intel) {
+      terminal.setReady();
+    };
+    callbacks.on_error_ = [&terminal](const EnvoyError&, envoy_stream_intel,
+                                      envoy_final_stream_intel) { terminal.setReady(); };
+    callbacks.on_cancel_ = [&terminal](envoy_stream_intel, envoy_final_stream_intel) {
+      terminal.setReady();
+    };
+
+    Platform::StreamSharedPtr stream = createNewStream(std::move(callbacks));
+    stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(request_headers), false);
+    stream->sendData(std::make_unique<Buffer::OwnedImpl>(std::move(request_data)));
+    stream->close(Http::Utility::createRequestTrailerMapPtr());
+    return stream;
+  };
+
+  // 1. First request to establish a connection with socket tag 12345
+  ConditionalInitializer terminal1;
+  std::string status1;
+  auto s1 = send_request_with_tag(12345, terminal1, status1);
+
+  FakeHttpConnectionPtr fake_upstream_connection1;
+  FakeStreamPtr fake_stream1;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        fake_upstream_connection1));
+  ASSERT_TRUE(
+      fake_upstream_connection1->waitForNewStream(*BaseIntegrationTest::dispatcher_, fake_stream1));
+  ASSERT_TRUE(fake_stream1->waitForEndStream(*BaseIntegrationTest::dispatcher_));
+  fake_stream1->encodeHeaders(Http::TestResponseHeaderMapImpl({{":status", "200"}}), false);
+  fake_stream1->encodeData(100, true);
+  terminal1.waitReady();
+  ASSERT_EQ(status1, "200");
+
+  // 2. Second request to the same host with a different socket tag 67890
+  ConditionalInitializer terminal2;
+  std::string status2;
+  auto s2 = send_request_with_tag(67890, terminal2, status2);
+
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  FakeStreamPtr fake_stream2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        fake_upstream_connection2));
+  ASSERT_TRUE(
+      fake_upstream_connection2->waitForNewStream(*BaseIntegrationTest::dispatcher_, fake_stream2));
+  ASSERT_TRUE(fake_stream2->waitForEndStream(*BaseIntegrationTest::dispatcher_));
+  fake_stream2->encodeHeaders(Http::TestResponseHeaderMapImpl({{":status", "200"}}), false);
+  fake_stream2->encodeData(100, true);
+  terminal2.waitReady();
+  ASSERT_EQ(status2, "200");
+
+  // 3. Drain only the connections matching the first socket tag 12345
+  engine->drainConnectionsBySocketTag(12345);
+  // Directly verify server-side connection 1 disconnects
+  ASSERT_TRUE(fake_upstream_connection1->waitForDisconnect());
+  // Verify server-side connection 2 remains fully open and connected
+  EXPECT_TRUE(fake_upstream_connection2->connected());
+
+  // 4. Third request to the same host with the second socket tag 67890
+  ConditionalInitializer terminal3;
+  std::string status3;
+  auto s3 = send_request_with_tag(67890, terminal3, status3);
+
+  FakeStreamPtr fake_stream3;
+  ASSERT_TRUE(
+      fake_upstream_connection2->waitForNewStream(*BaseIntegrationTest::dispatcher_, fake_stream3));
+  ASSERT_TRUE(fake_stream3->waitForEndStream(*BaseIntegrationTest::dispatcher_));
+  fake_stream3->encodeHeaders(Http::TestResponseHeaderMapImpl({{":status", "200"}}), false);
+  fake_stream3->encodeData(100, true);
+  terminal3.waitReady();
+
+  ASSERT_EQ(status3, "200");
+  if (fake_upstream_connection2 != nullptr) {
+    ASSERT_TRUE(fake_upstream_connection2->close());
+    ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+  }
 }
 } // namespace
 } // namespace Envoy

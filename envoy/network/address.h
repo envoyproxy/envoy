@@ -283,7 +283,7 @@ public:
   /**
    * @return filepath of the network namespace for the address.
    */
-  virtual absl::optional<std::string> networkNamespace() const PURE;
+  virtual std::optional<std::string> networkNamespace() const PURE;
 
   /**
    * @return a copy of the address with the linux network namespace overridden for IPv4/v6

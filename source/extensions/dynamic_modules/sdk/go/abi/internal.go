@@ -1351,6 +1351,16 @@ func (h *dymHttpFilterHandle) Log(level shared.LogLevel, format string, args ...
 	hostLog(level, format, args)
 }
 
+func (h *dymHttpFilterHandle) GetLogLevel() shared.LogLevel {
+	return shared.LogLevel(C.envoy_dynamic_module_callback_get_log_level())
+}
+
+func (h *dymHttpFilterHandle) IsLogLevelEnabled(level shared.LogLevel) bool {
+	return bool(C.envoy_dynamic_module_callback_log_enabled(
+		(C.envoy_dynamic_module_type_log_level)(uint32(level)),
+	))
+}
+
 func (h *dymHttpFilterHandle) HttpCallout(
 	cluster string, headers [][2]string, body []byte, timeoutMs uint64,
 	cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {
@@ -1682,6 +1692,86 @@ func (h *dymConfigHandle) DefineCounter(name string,
 	runtime.KeepAlive(tagKeys)
 	runtime.KeepAlive(tagKeyViews)
 	return shared.MetricID(metricID), shared.MetricsResult(result)
+}
+
+func (h *dymConfigHandle) RecordHistogramValue(id shared.MetricID,
+	value uint64, tagsValues ...string) shared.MetricsResult {
+	// Prepare tag values.
+	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
+	ret := C.envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+		h.hostConfigPtr,
+		(C.size_t)(uint64(id)),
+		unsafe.SliceData(tagValueViews),
+		(C.size_t)(len(tagValueViews)),
+		(C.uint64_t)(value),
+	)
+	runtime.KeepAlive(tagsValues)
+	runtime.KeepAlive(tagValueViews)
+	return shared.MetricsResult(ret)
+}
+
+func (h *dymConfigHandle) SetGaugeValue(id shared.MetricID,
+	value uint64, tagsValues ...string) shared.MetricsResult {
+	// Prepare tag values.
+	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
+	ret := C.envoy_dynamic_module_callback_http_filter_config_set_gauge(
+		h.hostConfigPtr,
+		(C.size_t)(uint64(id)),
+		unsafe.SliceData(tagValueViews),
+		(C.size_t)(len(tagValueViews)),
+		(C.uint64_t)(value),
+	)
+	runtime.KeepAlive(tagsValues)
+	runtime.KeepAlive(tagValueViews)
+	return shared.MetricsResult(ret)
+}
+
+func (h *dymConfigHandle) IncrementGaugeValue(id shared.MetricID,
+	value uint64, tagsValues ...string) shared.MetricsResult {
+	// Prepare tag values.
+	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
+	ret := C.envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+		h.hostConfigPtr,
+		(C.size_t)(uint64(id)),
+		unsafe.SliceData(tagValueViews),
+		(C.size_t)(len(tagValueViews)),
+		(C.uint64_t)(value),
+	)
+	runtime.KeepAlive(tagsValues)
+	runtime.KeepAlive(tagValueViews)
+	return shared.MetricsResult(ret)
+}
+
+func (h *dymConfigHandle) DecrementGaugeValue(id shared.MetricID,
+	value uint64, tagsValues ...string) shared.MetricsResult {
+	// Prepare tag values.
+	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
+	ret := C.envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+		h.hostConfigPtr,
+		(C.size_t)(uint64(id)),
+		unsafe.SliceData(tagValueViews),
+		(C.size_t)(len(tagValueViews)),
+		(C.uint64_t)(value),
+	)
+	runtime.KeepAlive(tagsValues)
+	runtime.KeepAlive(tagValueViews)
+	return shared.MetricsResult(ret)
+}
+
+func (h *dymConfigHandle) IncrementCounterValue(id shared.MetricID,
+	value uint64, tagsValues ...string) shared.MetricsResult {
+	// Prepare tag values.
+	tagValueViews := stringArrayToModuleBufferSlice(tagsValues)
+	ret := C.envoy_dynamic_module_callback_http_filter_config_increment_counter(
+		h.hostConfigPtr,
+		(C.size_t)(uint64(id)),
+		unsafe.SliceData(tagValueViews),
+		(C.size_t)(len(tagValueViews)),
+		(C.uint64_t)(value),
+	)
+	runtime.KeepAlive(tagsValues)
+	runtime.KeepAlive(tagValueViews)
+	return shared.MetricsResult(ret)
 }
 
 func (h *dymConfigHandle) HttpCallout(

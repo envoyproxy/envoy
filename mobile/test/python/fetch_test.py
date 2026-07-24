@@ -34,7 +34,7 @@ class TestFetchRequest(unittest.TestCase):
         engine_running = threading.Event()
         engine = (
             EngineBuilder()
-            .set_log_level(LogLevel.trace)
+            .set_log_level(LogLevel.info)
             .add_runtime_guard("dns_cache_set_ip_version_to_remove", True)
             .add_runtime_guard("getaddrinfo_no_ai_flags", True)
             .set_on_engine_running(lambda: engine_running.set())

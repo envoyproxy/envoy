@@ -6,6 +6,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,11 +21,13 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
       const envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog&>(
       config, context.messageValidationVisitor());
 
+  Envoy::Server::Configuration::ServerFactoryContext& server_context =
+      context.serverFactoryContext();
   const auto& module_config = proto_config.dynamic_module_config();
   // Access loggers do not support remote module sources, so no init manager or async callback is
   // passed; only the synchronous local-file and by-name paths can succeed here.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, proto_config.logger_name(), context.serverFactoryContext());
+      module_config, proto_config.logger_name(), server_context);
   if (!load_result.ok()) {
     throw EnvoyException(std::string(load_result.status().message()));
   }
@@ -35,6 +38,9 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
   if (proto_config.has_logger_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.logger_config());
     if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          server_context, proto_config.logger_name(),
+          Extensions::DynamicModules::ConfigInitErrorStat);
       throw EnvoyException("Failed to parse logger config: " +
                            std::string(config_or_error.status().message()));
     }
@@ -48,9 +54,12 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
 
   auto access_log_config = newDynamicModuleAccessLogConfig(
       proto_config.logger_name(), logger_config_str, metrics_namespace, std::move(dynamic_module),
-      context.serverFactoryContext().scope());
+      server_context.scope());
 
   if (!access_log_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        server_context, proto_config.logger_name(),
+        Extensions::DynamicModules::ConfigInitErrorStat);
     throw EnvoyException("Failed to create access logger config: " +
                          std::string(access_log_config.status().message()));
   }
@@ -60,13 +69,11 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
   // is added. This is the legacy behavior for backward compatibility.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
-    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
-        metrics_namespace);
+    server_context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
-  return std::make_shared<DynamicModuleAccessLog>(std::move(filter),
-                                                  std::move(access_log_config.value()),
-                                                  context.serverFactoryContext().threadLocal());
+  return std::make_shared<DynamicModuleAccessLog>(
+      std::move(filter), std::move(access_log_config.value()), server_context.threadLocal());
 }
 
 ProtobufTypes::MessagePtr DynamicModuleAccessLogFactory::createEmptyConfigProto() {

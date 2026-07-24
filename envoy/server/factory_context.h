@@ -292,20 +292,31 @@ public:
   ~FactoryContext() override = default;
 
   /**
-   * @return Stats::Scope& the listener's stats scope.
-   */
-  virtual Stats::Scope& listenerScope() PURE;
-
-  /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
    *         they should be doing graceful closes on connections when possible.
    */
   virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
-   * @return ListenerInfo description of the listener.
+   * @return envoy::config::core::v3::TrafficDirection the direction of the
+   * downstream traffic relative to the local proxy.
    */
-  virtual const Network::ListenerInfo& listenerInfo() const PURE;
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
+
+  /**
+   * @return whether the filter is applied to a Quic listener.
+   */
+  virtual bool isQuic() const PURE;
+
+  /**
+   * @return bool whether the filter should bypass overload manager actions.
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
+
+  /**
+   * @return Stats::Scope& same as scope() but with the specific parent prefix.
+   */
+  virtual Stats::Scope& prefixedScope() PURE;
 };
 
 /**
@@ -341,7 +352,18 @@ public:
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
  * and connections. It can be used to create ListenerFilterChain.
  */
-class ListenerFactoryContext : public virtual FactoryContext {};
+class ListenerFactoryContext : public virtual FactoryContext {
+public:
+  /**
+   * @return Stats::Scope& the listener's stats scope.
+   */
+  virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * @return ListenerInfo description of the listener.
+   */
+  virtual const Network::ListenerInfo& listenerInfo() const PURE;
+};
 
 /**
  * FactoryContext for ProtocolOptionsFactory.

@@ -38,13 +38,13 @@ public:
         config.set_priority(10);
         config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
         config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
-        cluster_type.mutable_typed_config()->PackFrom(config);
+        std::ignore = cluster_type.mutable_typed_config()->PackFrom(config);
       } else {
         test::integration::clusters::CustomStaticConfig2 config;
         config.set_priority(10);
         config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
         config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
-        cluster_type.mutable_typed_config()->PackFrom(config);
+        std::ignore = cluster_type.mutable_typed_config()->PackFrom(config);
       }
 
       cluster_0->mutable_cluster_type()->CopyFrom(cluster_type);

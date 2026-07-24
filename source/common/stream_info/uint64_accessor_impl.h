@@ -19,7 +19,7 @@ public:
     return message;
   }
 
-  absl::optional<std::string> serializeAsString() const override { return std::to_string(value_); }
+  std::optional<std::string> serializeAsString() const override { return std::to_string(value_); }
 
   // From UInt64Accessor.
   void increment() override { value_++; }

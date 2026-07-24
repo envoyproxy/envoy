@@ -135,19 +135,6 @@ private:
 };
 
 /**
- * Handler for HELLO command
- * Sends HELLO to all shards to verify cluster-wide protocol consistency.
- * and sanitizes the 'id' field in the response to null.
- */
-class HelloResponseHandler : public BaseAggregateResponseHandler {
-public:
-  explicit HelloResponseHandler(uint32_t shard_count) : BaseAggregateResponseHandler(shard_count) {}
-
-private:
-  void processAggregatedResponses(ClusterScopeCmdRequest& request) override;
-};
-
-/**
  * Factory class for creating appropriate response handlers
  */
 class ClusterResponseHandlerFactory {

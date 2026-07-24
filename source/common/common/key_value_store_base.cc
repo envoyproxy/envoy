@@ -9,8 +9,8 @@ namespace Envoy {
 namespace {
 
 // Removes a length prefixed token from |contents| and returns the token,
-// or returns absl::nullopt on failure.
-absl::optional<absl::string_view> getToken(absl::string_view& contents, std::string& error) {
+// or returns std::nullopt on failure.
+std::optional<absl::string_view> getToken(absl::string_view& contents, std::string& error) {
   const auto it = contents.find('\n');
   if (it == contents.npos) {
     error = "Bad file: no newline";
@@ -58,9 +58,9 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
 bool KeyValueStoreBase::parseContents(absl::string_view contents) {
   std::string error;
   while (!contents.empty()) {
-    absl::optional<absl::string_view> key = getToken(contents, error);
-    absl::optional<absl::string_view> value;
-    absl::optional<std::chrono::seconds> ttl = absl::nullopt;
+    std::optional<absl::string_view> key = getToken(contents, error);
+    std::optional<absl::string_view> value;
+    std::optional<std::chrono::seconds> ttl = std::nullopt;
     if (key.has_value()) {
       value = getToken(contents, error);
     }
@@ -92,7 +92,7 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
 }
 
 void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view,
-                                    absl::optional<std::chrono::seconds> ttl) {
+                                    std::optional<std::chrono::seconds> ttl) {
   ENVOY_BUG(!under_iterate_, "addOrUpdate under the stack of iterate");
   std::string key(key_view);
   std::string value(value_view);
@@ -101,7 +101,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
     ASSERT(false);
     return;
   }
-  absl::optional<std::chrono::seconds> absolute_ttl = absl::nullopt;
+  std::optional<std::chrono::seconds> absolute_ttl = std::nullopt;
   if (ttl) {
     absolute_ttl.emplace(ttl.value() + std::chrono::duration_cast<std::chrono::seconds>(
                                            time_source_.systemTime().time_since_epoch()));
@@ -147,7 +147,7 @@ void KeyValueStoreBase::remove(absl::string_view key) {
   }
 }
 
-absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) {
+std::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) {
   auto it = store_.find(std::string(key));
   if (it == store_.end()) {
     return {};

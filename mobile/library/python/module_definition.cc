@@ -93,7 +93,7 @@ PYBIND11_MODULE(envoy_engine, m) {
           },
           [](Envoy::EnvoyError& e, py::object val) {
             if (val.is_none()) {
-              e.attempt_count_ = absl::nullopt;
+              e.attempt_count_ = std::nullopt;
             } else {
               e.attempt_count_ = val.cast<int>();
             }
@@ -164,10 +164,12 @@ PYBIND11_MODULE(envoy_engine, m) {
   // -- Engine --
 
   py::class_<Envoy::Platform::Engine, Envoy::Platform::EngineSharedPtr>(m, "Engine")
-      .def("stream_client", &Envoy::Platform::Engine::streamClient)
+      .def("stream_client", &Envoy::Platform::Engine::streamClient, py::arg("listener_name") = "")
       .def("terminate", &Envoy::Platform::Engine::terminate,
            py::call_guard<py::gil_scoped_release>())
       .def("dump_stats", &Envoy::Platform::Engine::dumpStats,
+           py::call_guard<py::gil_scoped_release>())
+      .def("drain_connections_by_socket_tag", &Envoy::Platform::Engine::drainConnectionsBySocketTag,
            py::call_guard<py::gil_scoped_release>());
 
   // -- EngineBuilder --

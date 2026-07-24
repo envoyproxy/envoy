@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iomanip>
+#include <optional>
 #include <sstream>
 #include <vector>
 
@@ -10,7 +11,6 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "openssl/bytestring.h"
 #include "openssl/ssl.h"
 
@@ -77,11 +77,11 @@ struct CertId {
  */
 struct SingleResponse {
   SingleResponse(CertId cert_id, Envoy::SystemTime this_update,
-                 absl::optional<Envoy::SystemTime> next_update);
+                 std::optional<Envoy::SystemTime> next_update);
 
   const CertId cert_id_;
   const Envoy::SystemTime this_update_;
-  const absl::optional<Envoy::SystemTime> next_update_;
+  const std::optional<Envoy::SystemTime> next_update_;
 };
 
 /**
@@ -129,7 +129,7 @@ public:
    *
    * @return The end of the validity window for this response.
    */
-  virtual const absl::optional<Envoy::SystemTime>& getNextUpdate() PURE;
+  virtual const std::optional<Envoy::SystemTime>& getNextUpdate() PURE;
 };
 
 using ResponsePtr = std::unique_ptr<Response>;
@@ -154,7 +154,7 @@ public:
   const Envoy::SystemTime& getThisUpdate() override {
     return data_.single_responses_[0].this_update_;
   }
-  const absl::optional<Envoy::SystemTime>& getNextUpdate() override {
+  const std::optional<Envoy::SystemTime>& getNextUpdate() override {
     return data_.single_responses_[0].next_update_;
   }
 

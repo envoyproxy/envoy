@@ -56,7 +56,7 @@ TEST_F(TokenCacheTest, ValidToken) {
   token->audience = audience;
 
   token_cache_->insert(std::move(token));
-  auto found_token = token_cache_->lookUp(audience, absl::nullopt);
+  auto found_token = token_cache_->lookUp(audience, std::nullopt);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
@@ -71,7 +71,7 @@ TEST_F(TokenCacheTest, ExpiredToken) {
   token->audience = audience;
 
   token_cache_->insert(std::move(token));
-  auto found_token = token_cache_->lookUp(audience, absl::nullopt);
+  auto found_token = token_cache_->lookUp(audience, std::nullopt);
   EXPECT_FALSE(found_token.has_value());
 }
 
@@ -92,7 +92,7 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   token->audience = audience;
 
   token_cache_->insert(std::move(token));
-  auto found_token = token_cache_->lookUp(audience, absl::nullopt);
+  auto found_token = token_cache_->lookUp(audience, std::nullopt);
   EXPECT_FALSE(found_token.has_value());
 
   // Set the time to exp_time - 1s.
@@ -103,7 +103,7 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   token2->audience = audience;
 
   token_cache_->insert(std::move(token2));
-  found_token = token_cache_->lookUp(audience, absl::nullopt);
+  found_token = token_cache_->lookUp(audience, std::nullopt);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
@@ -123,7 +123,7 @@ TEST_F(TokenCacheTest, TokenWithoutExpiration) {
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(ExpTime + 315360000));
 
   // The lookup should still find the token since it has no expiration!
-  auto found_token = token_cache_->lookUp(audience, absl::nullopt);
+  auto found_token = token_cache_->lookUp(audience, std::nullopt);
   EXPECT_TRUE(found_token.has_value());
   EXPECT_EQ(found_token.value(), "foo");
 }
@@ -155,8 +155,8 @@ TEST_F(TokenCacheTest, LruEviction) {
   small_cache->insert(std::move(t2));
 
   // Verify both are present.
-  EXPECT_TRUE(small_cache->lookUp(req1, absl::nullopt).has_value());
-  EXPECT_TRUE(small_cache->lookUp(req2, absl::nullopt).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req1, std::nullopt).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req2, std::nullopt).has_value());
 
   // Insert third entry, which should trigger eviction of the least recently used entry (req1).
   auto t3 = std::make_unique<GcpToken>();
@@ -166,9 +166,9 @@ TEST_F(TokenCacheTest, LruEviction) {
   small_cache->insert(std::move(t3));
 
   // Verify req1 is evicted, while req2 and req3 are still present.
-  EXPECT_FALSE(small_cache->lookUp(req1, absl::nullopt).has_value());
-  EXPECT_TRUE(small_cache->lookUp(req2, absl::nullopt).has_value());
-  EXPECT_TRUE(small_cache->lookUp(req3, absl::nullopt).has_value());
+  EXPECT_FALSE(small_cache->lookUp(req1, std::nullopt).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req2, std::nullopt).has_value());
+  EXPECT_TRUE(small_cache->lookUp(req3, std::nullopt).has_value());
 }
 
 TEST_F(TokenCacheTest, BoundJwtFingerprintAwareCache) {

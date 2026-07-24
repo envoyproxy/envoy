@@ -261,7 +261,7 @@ public:
    */
   void incResponseLocalException(
       const Upstream::ClusterInfo& cluster,
-      absl::optional<ConnectionPool::PoolFailureReason> reason = absl::nullopt) const {
+      std::optional<ConnectionPool::PoolFailureReason> reason = std::nullopt) const {
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_);
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_);
 
@@ -507,12 +507,12 @@ protected:
     bool passthrough_supported;
     TransportType transport;
     ProtocolType protocol;
-    absl::optional<Upstream::TcpPoolData> conn_pool_data;
+    std::optional<Upstream::TcpPoolData> conn_pool_data;
   };
 
   struct PrepareUpstreamRequestResult {
-    absl::optional<AppException> exception;
-    absl::optional<UpstreamRequestInfo> upstream_request_info;
+    std::optional<AppException> exception;
+    std::optional<UpstreamRequestInfo> upstream_request_info;
   };
 
   PrepareUpstreamRequestResult prepareUpstreamRequest(const std::string& cluster_name,
@@ -526,7 +526,7 @@ protected:
       stats().routerStats().unknown_cluster_.inc();
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("unknown cluster '{}'", cluster_name)),
-              absl::nullopt};
+              std::nullopt};
     }
 
     cluster_ = cluster->info();
@@ -553,7 +553,7 @@ protected:
       }
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("maintenance mode for cluster '{}'", cluster_name)),
-              absl::nullopt};
+              std::nullopt};
     }
 
     const std::shared_ptr<const ProtocolOptionsConfig> options =
@@ -574,7 +574,7 @@ protected:
       }
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("no healthy upstream for '{}'", cluster_name)),
-              absl::nullopt};
+              std::nullopt};
     }
 
     const auto passthrough_supported =
@@ -583,7 +583,7 @@ protected:
         protocol == final_protocol && final_protocol != ProtocolType::Twitter;
     UpstreamRequestInfo result = {passthrough_supported, final_transport, final_protocol,
                                   conn_pool_data};
-    return {absl::nullopt, result};
+    return {std::nullopt, result};
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster_;

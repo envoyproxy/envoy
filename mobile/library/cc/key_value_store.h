@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "absl/types/optional.h"
+#include <optional>
 #include "library/common/extensions/key_value/platform/c_types.h"
 
 namespace Envoy {
@@ -21,9 +21,9 @@ public:
   /**
    * Returns the value associated with the provided key, if any.
    * @param key supplies a key to return the value of.
-   * @return the value, if the key is in the store, absl::nullopt otherwise.
+   * @return the value, if the key is in the store, std::nullopt otherwise.
    */
-  virtual absl::optional<std::string> read(const std::string& key) PURE;
+  virtual std::optional<std::string> read(const std::string& key) PURE;
 
   /**
    * Adds or updates a key:value pair in the store.

@@ -80,7 +80,7 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::UpstreamFactoryContext&) override {
-    auto config = dynamic_cast<const Protobuf::StringValue&>(proto_config);
+    auto config = Envoy::Protobuf::DynamicCastMessage<Protobuf::StringValue>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));
     };
@@ -101,7 +101,7 @@ class ClusterFilterIntegrationTestBase : public testing::TestWithParam<Network::
 public:
   ClusterFilterIntegrationTestBase() : factory_(*this), registration_(factory_) {}
 
-  void initialize() { on_new_connection_called_after_on_write_.store(absl::optional<bool>{}); }
+  void initialize() { on_new_connection_called_after_on_write_.store(std::optional<bool>{}); }
 
   // TestParent
   void onNewConnectionCalled(bool on_write_called) override {
@@ -124,7 +124,7 @@ public:
 
 private:
   // Atomic so that this may be safely accessed from multiple threads
-  std::atomic<absl::optional<bool>> on_new_connection_called_after_on_write_;
+  std::atomic<std::optional<bool>> on_new_connection_called_after_on_write_;
 };
 
 class ClusterFilterTcpIntegrationTest : public ClusterFilterIntegrationTestBase,
@@ -141,7 +141,7 @@ public:
       filter->set_name("envoy.upstream.polite");
       Protobuf::StringValue config;
       config.set_value("surely ");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
     ClusterFilterIntegrationTestBase::initialize();
     BaseIntegrationTest::initialize();
@@ -201,7 +201,7 @@ public:
       filter->set_name("envoy.upstream.polite");
       Protobuf::StringValue config;
       config.set_value("");
-      filter->mutable_typed_config()->PackFrom(config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
     });
     ClusterFilterIntegrationTestBase::initialize();
     HttpIntegrationTest::initialize();

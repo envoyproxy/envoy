@@ -1,6 +1,6 @@
 #include "test/test_common/contention.h"
 
-#include "test/test_common/utility.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 namespace Envoy {
 namespace Thread {

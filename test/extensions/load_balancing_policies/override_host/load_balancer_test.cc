@@ -20,6 +20,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -62,7 +63,7 @@ protected:
         factory_.create(*lb_config_, *cluster_info_, main_thread_priority_set_,
                         server_factory_context_.runtime_loader_,
                         server_factory_context_.api_.random_, server_factory_context_.time_system_);
-    ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+    ASSERT_OK(thread_aware_lb_->initialize());
     thread_local_lb_factory_ = thread_aware_lb_->factory();
     load_balancer_ = thread_local_lb_factory_->create(lb_params_);
   }
@@ -76,7 +77,7 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }
@@ -93,7 +94,7 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     config.add_override_host_sources()->set_header(primary_header_name);
     setMetadataHostSource(config.add_override_host_sources(), primary_header_name);
@@ -109,7 +110,7 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     setMetadataHostSource(config.add_override_host_sources(), primary_header_name);
     config.add_override_host_sources()->set_header(primary_header_name);
@@ -127,7 +128,7 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }
@@ -146,7 +147,7 @@ protected:
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }
@@ -549,7 +550,6 @@ TEST_F(OverrideHostLoadBalancerTest, WrongHeaderName) {
 }
 
 TEST_F(OverrideHostLoadBalancerTest, NullptrFromFallbackLb) {
-  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   thread_local_priority_set_.getMockHostSet(0);
   // Do not populate any hosts, so that the fallback LB returns nullptr.
@@ -867,7 +867,7 @@ private:
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       return {};
     }
-    absl::optional<Envoy::Upstream::SelectedPoolAndConnection>
+    std::optional<Envoy::Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Envoy::Upstream::LoadBalancerContext*, const Envoy::Upstream::Host&,
                              std::vector<uint8_t>&) override {
       return std::nullopt;

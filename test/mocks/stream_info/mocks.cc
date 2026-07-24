@@ -131,7 +131,7 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, currentDuration()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
-    end_time_ = absl::make_optional<std::chrono::nanoseconds>(
+    end_time_ = std::make_optional<std::chrono::nanoseconds>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(ts_.systemTime() - start_time_)
             .count());
   }));
@@ -192,7 +192,7 @@ MockStreamInfo::MockStreamInfo()
     return *filter_state_;
   }));
   ON_CALL(*this, setVirtualClusterName(_))
-      .WillByDefault(Invoke([this](const absl::optional<std::string>& virtual_cluster_name) {
+      .WillByDefault(Invoke([this](const std::optional<std::string>& virtual_cluster_name) {
         virtual_cluster_name_ = virtual_cluster_name;
       }));
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));

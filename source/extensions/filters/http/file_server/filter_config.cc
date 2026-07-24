@@ -59,7 +59,7 @@ FileServerConfig::pathMapping(absl::string_view path) const {
   return path_mappings_.findLongestPrefix(path);
 }
 
-absl::optional<std::filesystem::path>
+std::optional<std::filesystem::path>
 FileServerConfig::applyPathMapping(absl::string_view path_with_query,
                                    const ProtoFileServerConfig::PathMapping& mapping) {
   std::pair<absl::string_view, absl::string_view> split = absl::StrSplit(path_with_query, '?');
@@ -68,7 +68,7 @@ FileServerConfig::applyPathMapping(absl::string_view path_with_query,
     if (mapping.request_path_prefix().ends_with('/')) {
       // Avoid accepting a value that parses away a double-slash at the join-point.
       // (Other double-slashes will be rejected by the lexically_normal check.)
-      return absl::nullopt;
+      return std::nullopt;
     }
     // filesystem::path operator / treats the second operand starting with a / as
     // meaning replace the entire path, and we don't want to do that.
@@ -77,7 +77,7 @@ FileServerConfig::applyPathMapping(absl::string_view path_with_query,
   if (kept_path.starts_with('/')) {
     // We don't want to remove more than one slash, to avoid foo/bar, foo//bar
     // and foo///bar all acting valid.
-    return absl::nullopt;
+    return std::nullopt;
   }
   std::filesystem::path file_path =
       std::filesystem::path{mapping.file_path_prefix()} / std::filesystem::path{kept_path};
@@ -85,7 +85,7 @@ FileServerConfig::applyPathMapping(absl::string_view path_with_query,
       !file_path.string().starts_with(mapping.file_path_prefix())) {
     // Ensure we're not accidentally looking outside the designated filesystem prefix
     // in any way controlled by the client. (Symlink escapes are up to the filesystem owner.)
-    return absl::nullopt;
+    return std::nullopt;
   }
   return file_path;
 }
@@ -110,7 +110,7 @@ absl::string_view FileServerConfig::contentTypeForPath(const std::filesystem::pa
 OptRef<const ProtoFileServerConfig::DirectoryBehavior>
 FileServerConfig::directoryBehavior(size_t index) const {
   if (index >= directory_behaviors_.size()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return directory_behaviors_[index];
 }

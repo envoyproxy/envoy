@@ -181,7 +181,7 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
 
   if (type_ == Http::CodecType::HTTP1) {
     request_encoder_->enableTcpTunneling();
-    ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
+    ASSERT(request_encoder_->http1StreamEncoderOptions() != std::nullopt);
   } else {
     const std::string& scheme =
         is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
@@ -381,7 +381,7 @@ HttpConnPool::HttpConnPool(Upstream::HostConstSharedPtr host,
                            Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
     : config_(config), type_(type), decoder_filter_callbacks_(&stream_decoder_callbacks),
       upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info) {
-  absl::optional<Http::Protocol> protocol;
+  std::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;
   } else if (type_ == Http::CodecType::HTTP2) {
@@ -389,7 +389,7 @@ HttpConnPool::HttpConnPool(Upstream::HostConstSharedPtr host,
   }
   if (Runtime::runtimeFeatureEnabled(
           "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
-    absl::optional<Envoy::Http::Protocol> upstream_protocol = protocol;
+    std::optional<Envoy::Http::Protocol> upstream_protocol = protocol;
     generic_conn_pool_ = createConnPool(host, thread_local_cluster, context, upstream_protocol);
     return;
   }
@@ -399,7 +399,7 @@ HttpConnPool::HttpConnPool(Upstream::HostConstSharedPtr host,
 
 std::unique_ptr<Router::GenericConnPool> HttpConnPool::createConnPool(
     Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& cluster,
-    Upstream::LoadBalancerContext* context, absl::optional<Http::Protocol> protocol) {
+    Upstream::LoadBalancerContext* context, std::optional<Http::Protocol> protocol) {
   Router::GenericConnPoolFactory* factory = nullptr;
   factory = Envoy::Config::Utility::getFactoryByName<Router::GenericConnPoolFactory>(
       "envoy.filters.connection_pools.http.generic");
@@ -470,7 +470,7 @@ void HttpConnPool::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPt
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
+                               StreamInfo::StreamInfo& info, std::optional<Http::Protocol>) {
   if (info.downstreamAddressProvider().connectionID() &&
       downstream_info_.downstreamAddressProvider().connectionID()) {
     // info.downstreamAddressProvider() is being called to get the upstream connection ID,

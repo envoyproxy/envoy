@@ -22,8 +22,8 @@ absl::Status validateWeightedClusterSpecifier(const ClusterWeightProto& cluster)
 }
 
 template <class T>
-absl::optional<size_t> pickClusterIndex(absl::Span<T> weighed_clusters, uint64_t random_value,
-                                        uint64_t total_cluster_weight, Runtime::Loader& loader) {
+std::optional<size_t> pickClusterIndex(absl::Span<T> weighed_clusters, uint64_t random_value,
+                                       uint64_t total_cluster_weight, Runtime::Loader& loader) {
   // The total_cluster_weight can be cached and be used directly only in the case that all
   // following conditions are met:
   // * the runtime key prefix is not configured which means the cluster weight is static and will
@@ -39,13 +39,13 @@ absl::optional<size_t> pickClusterIndex(absl::Span<T> weighed_clusters, uint64_t
       cluster_weights.push_back(cluster_weight);
       if (cluster_weight > std::numeric_limits<uint32_t>::max() - total_cluster_weight) {
         IS_ENVOY_BUG("Sum of weight cannot overflow 2^32");
-        return absl::nullopt;
+        return std::nullopt;
       }
       total_cluster_weight += cluster_weight;
     }
     if (total_cluster_weight == 0) {
       IS_ENVOY_BUG("Sum of weight cannot be zero");
-      return absl::nullopt;
+      return std::nullopt;
     }
   }
 
@@ -69,7 +69,7 @@ absl::optional<size_t> pickClusterIndex(absl::Span<T> weighed_clusters, uint64_t
   }
 
   IS_ENVOY_BUG("unexpected");
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>>
@@ -231,8 +231,8 @@ public:
     return transforms;
   }
 
-  absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
-    absl::optional<bool> result = config_->per_filter_configs_->disabled(config_name);
+  std::optional<bool> filterDisabled(absl::string_view config_name) const override {
+    std::optional<bool> result = config_->per_filter_configs_->disabled(config_name);
     if (result.has_value()) {
       return result.value();
     }
@@ -275,7 +275,7 @@ private:
       used_cluster_indices_.clear();
     }
 
-    absl::optional<size_t> cluster_index;
+    std::optional<size_t> cluster_index;
 
     if (used_cluster_indices_.empty()) {
       // If all clusters are eligible for selection, we can directly pick cluster from the full list
@@ -339,7 +339,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteCons
                                                           const Http::RequestHeaderMap& headers,
                                                           const StreamInfo::StreamInfo& stream_info,
                                                           uint64_t random) const {
-  absl::optional<uint64_t> random_value_from_hash;
+  std::optional<uint64_t> random_value_from_hash;
   // Only use hash policy if explicitly enabled via use_hash_policy field.
   if (use_hash_policy_) {
     const auto* route_hash_policy = parent->hashPolicy();
@@ -350,7 +350,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteCons
     }
   }
 
-  absl::optional<uint64_t> random_value_from_header;
+  std::optional<uint64_t> random_value_from_header;
   // Retrieve the random value from the header if corresponding header name is specified.
   // weighted_clusters_config_ is known not to be nullptr here. If it were, pickWeightedCluster
   // would not be called.
@@ -380,7 +380,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteCons
       : random_value_from_hash.has_value() ? random_value_from_hash.value()
                                            : random;
 
-  absl::optional<size_t> cluster_index = pickClusterIndex(
+  std::optional<size_t> cluster_index = pickClusterIndex(
       absl::MakeConstSpan(weighted_clusters_), random_value, total_cluster_weight_, loader_);
   if (!cluster_index.has_value()) {
     return nullptr;

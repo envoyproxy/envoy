@@ -32,7 +32,6 @@ envoy_cc_library(
     hdrs = ["gcp_authn_client.h"],
     deps = [
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )

@@ -29,6 +29,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/memory:stats_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )

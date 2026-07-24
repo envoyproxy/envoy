@@ -10,7 +10,7 @@ TtlManager::TtlManager(std::function<void(const std::vector<std::string>&)> call
     ScopedTtlUpdate scoped_update(*this);
 
     std::vector<std::string> expired;
-    last_scheduled_time_ = absl::nullopt;
+    last_scheduled_time_ = std::nullopt;
 
     const auto now = time_source_.monotonicTime();
     auto itr = ttls_.begin();

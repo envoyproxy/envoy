@@ -20,13 +20,13 @@ namespace Network {
 class Win32SocketHandleImpl : public IoSocketHandleImpl {
 public:
   explicit Win32SocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                                 absl::optional<int> domain = absl::nullopt)
+                                 std::optional<int> domain = std::nullopt)
       : IoSocketHandleImpl(fd, socket_v6only, domain) {}
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length) override;
+                               std::optional<uint64_t> max_length) override;
 
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 

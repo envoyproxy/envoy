@@ -47,17 +47,17 @@ XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
   if (!xff_trusted_cidrs_.empty()) {
     if (!Envoy::Http::Utility::remoteAddressIsTrustedProxy(*params.downstream_remote_address.get(),
                                                            xff_trusted_cidrs_)) {
-      return {nullptr, false, absl::nullopt, false};
+      return {nullptr, false, std::nullopt, false};
     }
     // Check XFF for last IP that isn't in `xff_trusted_cidrs`
     auto ret = Envoy::Http::Utility::getLastNonTrustedAddressFromXFF(params.request_headers,
                                                                      xff_trusted_cidrs_);
-    return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt, skip_xff_append_};
+    return {ret.address_, ret.allow_trusted_address_checks_, std::nullopt, skip_xff_append_};
   }
 
   auto ret =
       Envoy::Http::Utility::getLastAddressFromXFF(params.request_headers, xff_num_trusted_hops_);
-  return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt, skip_xff_append_};
+  return {ret.address_, ret.allow_trusted_address_checks_, std::nullopt, skip_xff_append_};
 }
 
 } // namespace Xff

@@ -30,7 +30,7 @@ public:
 
   virtual void onConnectionClose(Network::ConnectionEvent event) PURE;
   virtual void onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                                 absl::optional<StartTime> start_time = {}) PURE;
+                                 std::optional<StartTime> start_time = {}) PURE;
   virtual void onDecodingSuccess(ResponseCommonFramePtr common_frame) PURE;
   virtual void onDecodingFailure(absl::string_view reason) PURE;
 };
@@ -105,7 +105,7 @@ public:
 
   // ClientCodecCallbacks
   void onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                         absl::optional<StartTime> start_time = {}) override {
+                         std::optional<StartTime> start_time = {}) override {
     request_manager_.onDecodingSuccess(std::move(header_frame), std::move(start_time));
   }
   void onDecodingSuccess(ResponseCommonFramePtr common_frame) override {
@@ -150,7 +150,7 @@ public:
   void removeUpstreamRequest(uint64_t stream_id);
   void onConnectionClose(Network::ConnectionEvent event);
 
-  void onDecodingSuccess(ResponseHeaderFramePtr header_frame, absl::optional<StartTime> start_time);
+  void onDecodingSuccess(ResponseHeaderFramePtr header_frame, std::optional<StartTime> start_time);
   void onDecodingSuccess(ResponseCommonFramePtr common_frame);
   void onDecodingFailure(absl::string_view reason);
 
@@ -168,7 +168,7 @@ public:
 
   // ClientCodecCallbacks
   void onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                         absl::optional<StartTime> start_time = {});
+                         std::optional<StartTime> start_time = {});
   void onDecodingSuccess(ResponseCommonFramePtr common_frame);
   void onDecodingFailure(absl::string_view reason);
 
@@ -377,7 +377,7 @@ private:
 
   Network::Connection& downstream_conn_;
   EventWatcher connection_event_watcher_;
-  absl::optional<bool> upstream_conn_ok_;
+  std::optional<bool> upstream_conn_ok_;
 
   // This ensure the requests that are waiting upstream connection will be list in the order in
   // which the requests were received. By this way, the protocols that require the requests and

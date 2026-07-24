@@ -78,7 +78,7 @@ private:
 
   std::vector<::envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>
       hcm_http_filters_;
-  absl::optional<::envoy::config::route::v3::RouteConfiguration> route_configuration_;
+  std::optional<::envoy::config::route::v3::RouteConfiguration> route_configuration_;
   std::vector<::envoy::config::cluster::v3::Cluster> clusters_;
 };
 

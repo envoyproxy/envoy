@@ -101,9 +101,9 @@ public:
     return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   // Unix domain socket is not supported.
-  absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
+  std::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
@@ -144,10 +144,10 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
-  absl::optional<uint64_t> congestionWindowInBytes() const override;
+  std::optional<uint64_t> congestionWindowInBytes() const override;
   const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
 
   // Network::FilterManagerConnection
@@ -239,7 +239,7 @@ private:
   // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
-  absl::optional<Network::ConnectionCloseType> close_type_during_initialize_;
+  std::optional<Network::ConnectionCloseType> close_type_during_initialize_;
 };
 
 } // namespace Quic

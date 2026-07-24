@@ -1,5 +1,6 @@
 """Utilities for mapping httpx requests and responses to Envoy Mobile."""
 
+import itertools
 from typing import Dict, List, Optional, Union
 from urllib.parse import urlparse
 import httpx
@@ -9,10 +10,18 @@ from .async_client.utils import (
     normalize_timeout_to_ms,
 )
 
+_tag_generator = itertools.count(1)
+
+
+def get_next_socket_tag() -> int:
+    """Generate a unique 32-bit socket tag for connection pool isolation."""
+    return next(_tag_generator) & 0xFFFFFFFF
+
 
 def get_envoy_headers(
     request: httpx.Request,
     timeout: Optional[Union[int, float]] = None,
+    socket_tag: Optional[int] = None,
 ) -> Dict[str, Union[str, List[str]]]:
     """Map an httpx.Request to Envoy-compatible headers.
 
@@ -46,10 +55,25 @@ def get_envoy_headers(
 
     # Add normalized user headers
     for key, values in norm_headers.items():
-        # Avoid overriding pseudo-headers
-        if key.startswith(":"):
+        # Avoid overriding pseudo-headers and avoid duplicate host headers.
+        # Envoy Mobile automatically sets the correct upstream authority/host headers.
+        if key.startswith(":") or key.lower() == "host":
+            continue
+        # Avoid HTTP/1.1 connection-specific headers, which are forbidden in HTTP/2.
+        # Envoy Mobile will handle and set corresponding upstream connection headers properly on its own.
+        if key.lower() in {
+            "connection",
+            "keep-alive",
+            "proxy-connection",
+            "transfer-encoding",
+            "upgrade",
+        }:
             continue
         header_dict[key] = values if len(values) > 1 else values[0]
+
+    # Add socket tag header if specified
+    if socket_tag is not None:
+        header_dict["x-envoy-mobile-socket-tag"] = f"0,{socket_tag}"
 
     return header_dict
 

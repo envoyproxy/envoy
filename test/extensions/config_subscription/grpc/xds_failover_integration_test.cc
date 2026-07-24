@@ -100,7 +100,8 @@ public:
             TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
       }
       ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
+      std::ignore =
+          ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
       if (failover_defined_) {
         // Configure the API to use a failover gRPC service.
         auto* failover_grpc_service = ads_config->add_grpc_services();
@@ -127,8 +128,9 @@ public:
               TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
         }
         failover_ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-        failover_ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(
-            failover_context);
+        std::ignore =
+            failover_ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(
+                failover_context);
       }
     });
     HttpIntegrationTest::initialize();

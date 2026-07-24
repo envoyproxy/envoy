@@ -100,15 +100,15 @@ CacheInfo FileSystemHttpCache::cacheInfo() const {
   return info;
 }
 
-absl::optional<Key>
+std::optional<Key>
 FileSystemHttpCache::makeVaryKey(const Key& base, const VaryAllowList& vary_allow_list,
                                  const absl::btree_set<absl::string_view>& vary_header_values,
                                  const Http::RequestHeaderMap& request_headers) {
-  const absl::optional<std::string> vary_identifier =
+  const std::optional<std::string> vary_identifier =
       VaryHeaderUtils::createVaryIdentifier(vary_allow_list, vary_header_values, request_headers);
   if (!vary_identifier.has_value()) {
     // Skip the insert if we are unable to create a vary key.
-    return absl::nullopt;
+    return std::nullopt;
   }
   Key vary_key = base;
   vary_key.add_custom_fields(vary_identifier.value());

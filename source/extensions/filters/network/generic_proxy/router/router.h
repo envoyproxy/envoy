@@ -64,7 +64,7 @@ public:
   void onUpstreamSuccess() override;
   void onConnectionClose(Network::ConnectionEvent event) override;
   void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
-                         absl::optional<StartTime> start_time = {}) override;
+                         std::optional<StartTime> start_time = {}) override;
   void onDecodingSuccess(ResponseCommonFramePtr response_common_frame) override;
   void onDecodingFailure(absl::string_view reason) override;
 
@@ -89,7 +89,7 @@ public:
   OptRef<const Tracing::Config> tracing_config_;
   Tracing::SpanPtr span_;
 
-  absl::optional<MonotonicTime> connecting_start_time_;
+  std::optional<MonotonicTime> connecting_start_time_;
 
   const uint64_t stream_id_{};
   const bool expects_response_{};
@@ -169,7 +169,7 @@ private:
 
   void kickOffNewUpstreamRequest();
   void completeAndSendLocalReply(absl::Status status, absl::string_view details,
-                                 absl::optional<StreamInfo::CoreResponseFlag> flag = {});
+                                 std::optional<StreamInfo::CoreResponseFlag> flag = {});
 
   // Clean up all the upstream requests, statuses and timers. All further events will be
   // ignored.
@@ -179,7 +179,7 @@ private:
   void mayRequestStreamEnd(bool stream_end_stream);
 
   // Check if retry is allowed.
-  bool couldRetry(absl::optional<StreamResetReason> reason) {
+  bool couldRetry(std::optional<StreamResetReason> reason) {
     // If the upstream connection is bound to the downstream connection and resetting happens,
     // we should not retry the request because the downstream connection will be closed.
     if (reason.has_value() && config_->bindUpstreamConnection()) {

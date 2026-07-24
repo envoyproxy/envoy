@@ -44,12 +44,13 @@
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
 #endif
+#include <optional>
+
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/worker_impl.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -355,7 +356,7 @@ private:
   // by initialize().
   absl::Status initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
                                  ComponentFactory& component_factory);
-  void loadServerFlags(const absl::optional<std::string>& flags_path);
+  void loadServerFlags(const std::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
   void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});

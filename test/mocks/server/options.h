@@ -28,6 +28,7 @@ public:
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
   MOCK_METHOD(bool, ignoreUnknownDynamicFields, (), (const));
   MOCK_METHOD(bool, skipDeprecatedLogs, (), (const));
+  MOCK_METHOD(bool, logStacktraceSingleEntry, (), (const));
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
@@ -62,7 +63,7 @@ public:
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
-  absl::optional<uint32_t> bootstrap_version_;
+  std::optional<uint32_t> bootstrap_version_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
   bool ignore_unknown_dynamic_fields_{};

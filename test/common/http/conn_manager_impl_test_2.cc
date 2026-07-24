@@ -546,7 +546,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoJitter) {
   delete codec_;
 
   max_connection_duration_ = std::chrono::milliseconds(10000);
-  // max_connection_duration_jitter_percentage_ is absl::nullopt by default
+  // max_connection_duration_jitter_percentage_ is std::nullopt by default
 
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1441,7 +1441,7 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
         EXPECT_EQ(route2.get(), decoder_filters_[1]->callbacks_->route().ptr());
         EXPECT_EQ(route2.get(), decoder_filters_[1]->callbacks_->streamInfo().route().ptr());
         // RDS & CDS consistency problem: route2 points to fake_cluster2, which doesn't exist.
-        EXPECT_EQ(absl::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
+        EXPECT_EQ(std::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
         decoder_filters_[1]->callbacks_->downstreamCallbacks()->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
@@ -1516,7 +1516,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_FALSE(decoder_filters_[1]->callbacks_->route().has_value());
-        EXPECT_EQ(absl::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
+        EXPECT_EQ(std::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
 
         EXPECT_FALSE(decoder_filters_[1]->callbacks_->streamInfo().route().has_value());
         EXPECT_FALSE(decoder_filters_[1]->callbacks_->streamInfo().virtualHost().has_value());
@@ -1557,6 +1557,57 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_EQ(2U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
+
+  // Send a full response.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+}
+
+// A filter that subscribes via addUpstreamWatermarkCallbacks() is notified when the upstream backs
+// up (onDecoderFilterAboveWriteBufferHighWatermark) and drains, in addition to the codec being
+// read-disabled. This is what lets a filter producing its own request data pace against the
+// upstream.
+TEST_F(HttpConnectionManagerImplTest, ForwardsUpstreamWatermarkToSubscribers) {
+  setup();
+  setUpEncoderAndDecoder(false, false);
+  sendRequestHeadersAndData();
+
+  NiceMock<MockUpstreamWatermarkCallbacks> watermark_callbacks;
+  ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
+  decoder_filters_[0]->callbacks_->addUpstreamWatermarkCallbacks(watermark_callbacks);
+
+  auto& stream = response_encoder_.stream_;
+
+  // Upstream backs up: the codec is read-disabled and the subscriber is notified.
+  EXPECT_CALL(stream, readDisable(true));
+  EXPECT_CALL(watermark_callbacks, onAboveWriteBufferHighWatermark());
+  decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+
+  // Upstream drains: reads are re-enabled and the subscriber is notified.
+  EXPECT_CALL(stream, readDisable(false));
+  EXPECT_CALL(watermark_callbacks, onBelowWriteBufferLowWatermark());
+  decoder_filters_[0]->callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+
+  // Raise the watermark again, then verify a late subscriber is brought up to the current
+  // back-pressure state immediately on registration.
+  EXPECT_CALL(stream, readDisable(true));
+  EXPECT_CALL(watermark_callbacks, onAboveWriteBufferHighWatermark());
+  decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+
+  NiceMock<MockUpstreamWatermarkCallbacks> late_subscriber;
+  EXPECT_CALL(late_subscriber, onAboveWriteBufferHighWatermark());
+  decoder_filters_[0]->callbacks_->addUpstreamWatermarkCallbacks(late_subscriber);
+
+  // Clean up the subscriptions before the stream is torn down.
+  decoder_filters_[0]->callbacks_->removeUpstreamWatermarkCallbacks(watermark_callbacks);
+  decoder_filters_[0]->callbacks_->removeUpstreamWatermarkCallbacks(late_subscriber);
 
   // Send a full response.
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true));
@@ -2000,7 +2051,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt, "");
+                                                        std::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2042,7 +2093,7 @@ TEST_F(HttpConnectionManagerImplTest, LocalReplyStopsDecoding) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt, "");
+                                                        std::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2073,7 +2124,7 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
-                                                        absl::nullopt, "");
+                                                        std::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2431,7 +2482,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitterZeroPercent) {
 // Verify that when drain jitter is not set, the base drain timeout is used unchanged.
 TEST_F(HttpConnectionManagerImplTest, DrainTimeoutNoJitter) {
   max_connection_duration_ = std::chrono::milliseconds(10000);
-  // drain_timeout_jitter_percentage_ is absl::nullopt by default
+  // drain_timeout_jitter_percentage_ is std::nullopt by default
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(std::chrono::milliseconds(10000), _));
   setup();

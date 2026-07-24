@@ -38,7 +38,7 @@ bool SotwSubscriptionState::subscriptionUpdatePending() const {
 }
 
 void SotwSubscriptionState::markStreamFresh(bool) {
-  last_good_nonce_ = absl::nullopt;
+  last_good_nonce_ = std::nullopt;
   update_pending_ = true;
   clearDynamicContextChanged();
 }

@@ -192,7 +192,7 @@ public:
   PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
-               const envoy::config::core::v3::Metadata* metadata, bool singleton);
+               bool singleton);
 
   std::shared_ptr<Context> createContext();
   Wasm* wasm();

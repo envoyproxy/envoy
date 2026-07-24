@@ -119,7 +119,7 @@ public:
   }
 
   UpstreamRequestCallbacks* notifyDecodingSuccess(ResponseHeaderFramePtr&& response,
-                                                  absl::optional<StartTime> start_time = {}) {
+                                                  std::optional<StartTime> start_time = {}) {
     ASSERT(filter_->upstreamRequestsSize() != 0);
     auto upstream_request = mock_generic_upstream_->requests_.begin()->second;
     upstream_request->onDecodingSuccess(std::move(response), start_time);

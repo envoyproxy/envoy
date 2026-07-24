@@ -111,7 +111,7 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
 
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port, bool v6only,
-                                     absl::optional<std::string> network_namespace) {
+                                     std::optional<std::string> network_namespace) {
   StatusOr<sockaddr_in> sa4 = IpAddressParsing::parseIPv4(ip_address, port);
   if (sa4.ok()) {
     return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
@@ -128,7 +128,7 @@ Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t por
 
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only,
-                                            absl::optional<std::string> network_namespace) {
+                                            std::optional<std::string> network_namespace) {
   if (ip_address.empty()) {
     return nullptr;
   }

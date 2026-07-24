@@ -18,10 +18,9 @@ namespace {
 TEST(ConfigTest, EmptyUpstreamAddresses) {
   DefaultUpstreamLocalAddressSelectorFactory factory;
   std::vector<UpstreamLocalAddress> upstream_local_addresses;
-  EXPECT_EQ(factory.createLocalAddressSelector(upstream_local_addresses, absl::nullopt)
-                .status()
-                .message(),
-            "Bootstrap's upstream binding config has no valid source address.");
+  EXPECT_EQ(
+      factory.createLocalAddressSelector(upstream_local_addresses, std::nullopt).status().message(),
+      "Bootstrap's upstream binding config has no valid source address.");
 }
 
 TEST(ConfigTest, NullUpstreamAddress) {
@@ -31,7 +30,7 @@ TEST(ConfigTest, NullUpstreamAddress) {
       UpstreamLocalAddress{nullptr, std::make_shared<Network::ConnectionSocket::Options>()});
   // This should be exception free.
   UpstreamLocalAddressSelectorConstSharedPtr selector =
-      factory.createLocalAddressSelector(upstream_local_addresses, absl::nullopt).value();
+      factory.createLocalAddressSelector(upstream_local_addresses, std::nullopt).value();
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 } // namespace

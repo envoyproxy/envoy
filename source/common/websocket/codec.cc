@@ -12,10 +12,10 @@
 namespace Envoy {
 namespace WebSocket {
 
-absl::optional<std::vector<uint8_t>> Encoder::encodeFrameHeader(const Frame& frame) {
+std::optional<std::vector<uint8_t>> Encoder::encodeFrameHeader(const Frame& frame) {
   if (std::find(kFrameOpcodes.begin(), kFrameOpcodes.end(), frame.opcode_) == kFrameOpcodes.end()) {
     ENVOY_LOG(debug, "Failed to encode websocket frame with invalid opcode: {}", frame.opcode_);
-    return absl::nullopt;
+    return std::nullopt;
   }
   std::vector<uint8_t> output;
   // Set flags and opcode
@@ -74,7 +74,7 @@ void Decoder::frameDataEnd(std::vector<Frame>& output) {
 }
 
 void Decoder::resetDecoder() {
-  frame_ = {false, 0, absl::nullopt, 0, nullptr};
+  frame_ = {false, 0, std::nullopt, 0, nullptr};
   state_ = State::FrameHeaderFlagsAndOpcode;
   length_ = 0;
   num_remaining_extended_length_bytes_ = 0;
@@ -182,8 +182,8 @@ uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
   return bytes_decoded;
 }
 
-absl::optional<std::vector<Frame>> Decoder::decode(const Buffer::Instance& input) {
-  absl::optional<std::vector<Frame>> output = std::vector<Frame>();
+std::optional<std::vector<Frame>> Decoder::decode(const Buffer::Instance& input) {
+  std::optional<std::vector<Frame>> output = std::vector<Frame>();
   for (const Buffer::RawSlice& slice : input.getRawSlices()) {
     absl::Span<const uint8_t> data(reinterpret_cast<uint8_t*>(slice.mem_), slice.len_);
     while (!data.empty() || state_ == State::FrameFinished) {
@@ -192,7 +192,7 @@ absl::optional<std::vector<Frame>> Decoder::decode(const Buffer::Instance& input
       case State::FrameHeaderFlagsAndOpcode:
         bytes_decoded = doDecodeFlagsAndOpcode(data);
         if (bytes_decoded == 0) {
-          return absl::nullopt;
+          return std::nullopt;
         }
         break;
       case State::FrameHeaderMaskFlagAndLength:
@@ -215,7 +215,7 @@ absl::optional<std::vector<Frame>> Decoder::decode(const Buffer::Instance& input
       data.remove_prefix(bytes_decoded);
     }
   }
-  return !output->empty() ? std::move(output) : absl::nullopt;
+  return !output->empty() ? std::move(output) : std::nullopt;
 }
 
 } // namespace WebSocket

@@ -22,6 +22,7 @@ Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
       config, factory_context.messageValidationVisitor());
 
 #ifdef HYPERSCAN_DISABLED
+  static_cast<void>(hyperscan_config);
   throw EnvoyException("X86_64 architecture is required for Hyperscan.");
 #else
   // Hyperscan's API requires vectors of expressions, flags and IDs for matching database

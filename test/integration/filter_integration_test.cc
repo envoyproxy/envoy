@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/logging.h"
 
 namespace Envoy {
 namespace {

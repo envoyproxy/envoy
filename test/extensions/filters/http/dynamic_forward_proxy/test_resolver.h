@@ -21,7 +21,7 @@ public:
 
   using GetAddrInfoDnsResolver::GetAddrInfoDnsResolver;
 
-  static void unblockResolve(absl::optional<std::string> dns_override = {}) {
+  static void unblockResolve(std::optional<std::string> dns_override = {}) {
     while (1) {
       absl::MutexLock guard(resolution_mutex_);
       if (blocked_resolutions_.empty()) {
@@ -41,7 +41,7 @@ public:
     PendingQuery* raw_new_query = new_query.get();
     absl::MutexLock guard(resolution_mutex_);
     blocked_resolutions_.push_back(
-        [&, query = std::move(new_query)](absl::optional<std::string> dns_override) mutable {
+        [&, query = std::move(new_query)](std::optional<std::string> dns_override) mutable {
           absl::MutexLock guard(mutex_);
           if (dns_override.has_value()) {
             *const_cast<std::string*>(&query->dns_name_) = dns_override.value();
@@ -55,7 +55,7 @@ public:
   }
 
   static absl::Mutex resolution_mutex_;
-  static std::list<absl::AnyInvocable<void(absl::optional<std::string> dns_override)>>
+  static std::list<absl::AnyInvocable<void(std::optional<std::string> dns_override)>>
       blocked_resolutions_ ABSL_GUARDED_BY(resolution_mutex_);
 };
 

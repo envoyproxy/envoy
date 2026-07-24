@@ -16,6 +16,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -158,14 +159,14 @@ vhds:
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
   resource->set_name("foo/example.com");
-  resource->mutable_resource()->PackFrom(vhost);
+  std::ignore = resource->mutable_resource()->PackFrom(vhost);
 
   auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(resources, "name");
 
   // VhdsSubscription::onConfigUpdate will call provider.onConfigUpdate() which will post to worker
   // thread (Second post).
-  EXPECT_TRUE(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   EXPECT_TRUE(cb_called);
   auto config_impl = std::static_pointer_cast<const ConfigImpl>(provider.configCast());
@@ -246,7 +247,7 @@ vhds:
 
   auto* res1 = resources.Add();
   res1->set_name("foo/example1.com");
-  res1->mutable_resource()->PackFrom(vhost1);
+  std::ignore = res1->mutable_resource()->PackFrom(vhost1);
 
   envoy::config::route::v3::VirtualHost vhost2;
   vhost2.set_name("vhost2");
@@ -256,7 +257,7 @@ vhds:
 
   auto* res2 = resources.Add();
   res2->set_name("foo/example2.com");
-  res2->mutable_resource()->PackFrom(vhost2);
+  std::ignore = res2->mutable_resource()->PackFrom(vhost2);
 
   server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   auto decoded_resources =
@@ -266,7 +267,7 @@ vhds:
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
       .Times(2)
       .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
-  EXPECT_TRUE(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   EXPECT_TRUE(cb1_called);
   EXPECT_TRUE(cb2_called);

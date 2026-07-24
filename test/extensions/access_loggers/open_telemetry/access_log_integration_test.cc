@@ -109,7 +109,7 @@ public:
           auto* value = attr_config->add_values();
           value->set_key("response_code_details");
           value->mutable_value()->set_string_value("%RESPONSE_CODE_DETAILS%");
-          access_log->mutable_typed_config()->PackFrom(config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();
@@ -338,7 +338,7 @@ public:
 
           auto* body_config = config.mutable_body();
           body_config->set_string_value("%REQ(:METHOD)% %PROTOCOL% %RESPONSE_CODE%");
-          access_log->mutable_typed_config()->PackFrom(config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();

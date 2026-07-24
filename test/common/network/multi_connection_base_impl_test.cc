@@ -1179,7 +1179,7 @@ TEST_F(MultiConnectionBaseImplTest, UnixSocketPeerCredentials) {
   connectFirstAttempt();
 
   EXPECT_CALL(*createdConnections()[0], unixSocketPeerCredentials())
-      .WillOnce(Return(absl::optional<Connection::UnixDomainSocketPeerCredentials>()));
+      .WillOnce(Return(std::optional<Connection::UnixDomainSocketPeerCredentials>()));
   EXPECT_FALSE(impl_->unixSocketPeerCredentials().has_value());
 }
 
@@ -1247,7 +1247,7 @@ TEST_F(MultiConnectionBaseImplTest, LastRoundTripTime) {
 
   connectFirstAttempt();
 
-  absl::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
+  std::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
   EXPECT_CALL(*createdConnections()[0], lastRoundTripTime()).WillOnce(Return(rtt));
   EXPECT_EQ(rtt, impl_->lastRoundTripTime());
 }

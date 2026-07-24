@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
@@ -16,8 +18,6 @@
 #include "source/common/common/macros.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,12 +43,12 @@ public:
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt,
+                std::optional<uint64_t> buffer_size = std::nullopt,
                 const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat());
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt,
+                std::optional<uint64_t> buffer_size = std::nullopt,
                 const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat())
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
@@ -126,11 +126,14 @@ protected:
                 const std::string& prefix = getDefaultPrefix());
 
 private:
+  // 16KiB intermediate buffer for flushing.
+  static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
+
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
     TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher);
     ~TlsSink() override;
 
-    void beginFlush(bool expect_empty_buffer);
+    void beginFlush(bool expect_empty_buffer, uint64_t slice_size = FLUSH_SLICE_SIZE_BYTES);
     void commonFlush(const std::string& name, uint64_t value, char stat_type);
     void flushCounter(const std::string& name, uint64_t delta);
     void flushGauge(const std::string& name, uint64_t value);
@@ -149,15 +152,12 @@ private:
     Event::Dispatcher& dispatcher_;
     Network::ClientConnectionPtr connection_;
     Buffer::OwnedImpl buffer_;
-    absl::optional<Buffer::ReservationSingleSlice> current_buffer_reservation_;
+    std::optional<Buffer::ReservationSingleSlice> current_buffer_reservation_;
     char* current_slice_mem_{};
   };
 
   // Somewhat arbitrary 16MiB limit for buffered stats.
   static constexpr uint32_t MAX_BUFFERED_STATS_BYTES = (1024 * 1024 * 16);
-
-  // 16KiB intermediate buffer for flushing.
-  static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
 
   // Prefix for all flushed stats.
   const std::string prefix_;

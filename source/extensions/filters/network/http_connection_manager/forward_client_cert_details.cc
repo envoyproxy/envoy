@@ -70,9 +70,9 @@ Matcher::ActionConstSharedPtr
 ForwardClientCertActionFactory::createAction(const Protobuf::Message& config,
                                              ForwardClientCertActionFactoryContext&,
                                              ProtobufMessage::ValidationVisitor&) {
-  const auto& typed_config =
-      dynamic_cast<const envoy::extensions::filters::network::http_connection_manager::v3::
-                       HttpConnectionManager::ForwardClientCertConfig&>(config);
+  const auto& typed_config = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+          ForwardClientCertConfig>(config);
 
   return std::make_shared<ForwardClientCertAction>(
       convertForwardClientCertDetailsType(typed_config.forward_client_cert_details()),

@@ -7,7 +7,7 @@ namespace Upstream {
 
 class LoadBalancerContextBase : public LoadBalancerContext {
 public:
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
+  std::optional<uint64_t> computeHashKey() override { return {}; }
 
   const Network::Connection* downstreamConnection() const override { return nullptr; }
 

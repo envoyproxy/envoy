@@ -57,7 +57,8 @@ public:
         server->mutable_mcp_cluster()->set_cluster(absl::StrCat("cluster_", i));
       }
 
-      multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(multicluster_config);
+      std::ignore = multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
+          multicluster_config);
     });
 
     // Configure the route to use MCP multicluster.

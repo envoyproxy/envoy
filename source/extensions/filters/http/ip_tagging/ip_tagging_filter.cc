@@ -221,7 +221,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
 OptRef<const Http::LowerCaseString> IpTaggingFilterConfig::ipTagHeader() const {
   if (ip_tag_header_.get().empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return ip_tag_header_;
 }

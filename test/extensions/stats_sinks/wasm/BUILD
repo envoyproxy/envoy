@@ -51,6 +51,5 @@ envoy_extension_cc_test(
         "//test/extensions/stats_sinks/wasm/test_data:test_context_cpp_plugin",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:wasm_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )

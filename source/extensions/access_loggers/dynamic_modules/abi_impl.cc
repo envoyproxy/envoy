@@ -19,7 +19,7 @@ using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
 namespace {
 
 // Helper to convert MonotonicTime to nanoseconds duration from start time.
-int64_t monotonicTimeToNanos(const absl::optional<MonotonicTime>& time,
+int64_t monotonicTimeToNanos(const std::optional<MonotonicTime>& time,
                              const MonotonicTime& start_time) {
   if (!time.has_value()) {
     return -1;

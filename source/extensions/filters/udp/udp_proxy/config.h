@@ -56,7 +56,7 @@ public:
     return target_host_formatter_->format({}, stream_info);
   }
 
-  const absl::optional<uint32_t>& proxyPort() const override { return proxy_port_; };
+  const std::optional<uint32_t>& proxyPort() const override { return proxy_port_; };
   uint32_t defaultTargetPort() const override { return target_port_; };
   bool usePost() const override { return use_post_; };
   const std::string& postPath() const override { return post_path_; }
@@ -94,7 +94,7 @@ public:
 private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr proxy_host_formatter_;
-  absl::optional<uint32_t> proxy_port_;
+  std::optional<uint32_t> proxy_port_;
   Formatter::FormatterPtr target_host_formatter_;
   const uint32_t target_port_;
   bool use_post_;
@@ -152,7 +152,7 @@ public:
   bool flushAccessLogOnTunnelConnected() const override {
     return flush_access_log_on_tunnel_connected_;
   }
-  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const override {
+  const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() const override {
     return access_log_flush_interval_;
   }
   Random::RandomGenerator& randomGenerator() const override { return random_generator_; }
@@ -191,7 +191,7 @@ private:
   const bool use_original_src_ip_;
   const bool use_per_packet_load_balancing_;
   bool flush_access_log_on_tunnel_connected_;
-  absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
+  std::optional<std::chrono::milliseconds> access_log_flush_interval_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;

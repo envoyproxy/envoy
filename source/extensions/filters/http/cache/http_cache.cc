@@ -125,7 +125,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                              ResponseMetadata&& metadata,
-                                             absl::optional<uint64_t> content_length) const {
+                                             std::optional<uint64_t> content_length) const {
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;

@@ -6,6 +6,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -26,7 +27,7 @@ public:
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
     secret.set_name(name);
     secret.mutable_generic_secret()->mutable_secret()->set_inline_string(value);
-    ASSERT_TRUE(context_.server_factory_context_.secretManager().addStaticSecret(secret).ok());
+    ASSERT_OK(context_.server_factory_context_.secretManager().addStaticSecret(secret));
   }
 
   envoy::config::core::v3::SubstitutionFormatString config_;
@@ -136,7 +137,7 @@ TEST_F(GenericSecretFormatterTest, FormatValueReturnsStringValue) {
   GenericSecretFormatterFactory factory;
   auto parser = factory.createCommandParserFromProto(proto_config, context_);
 
-  auto provider = parser->parse("SECRET", "my-token", absl::nullopt);
+  auto provider = parser->parse("SECRET", "my-token", std::nullopt).value();
   ASSERT_NE(nullptr, provider);
 
   auto value = provider->formatValue(formatter_context_, stream_info_);
@@ -153,7 +154,7 @@ TEST_F(GenericSecretFormatterTest, ParseIgnoresOtherCommands) {
   GenericSecretFormatterFactory factory;
   auto parser = factory.createCommandParserFromProto(proto_config, context_);
 
-  auto provider = parser->parse("NOT_SECRET", "my-token", absl::nullopt);
+  auto provider = parser->parse("NOT_SECRET", "my-token", std::nullopt).value();
   EXPECT_EQ(nullptr, provider);
 }
 

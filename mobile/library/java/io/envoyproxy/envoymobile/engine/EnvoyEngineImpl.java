@@ -60,6 +60,12 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   @Override
+  public void drainConnectionsBySocketTag(int tag) {
+    checkIsTerminated();
+    JniLibrary.drainConnectionsBySocketTag(engineHandle, tag);
+  }
+
+  @Override
   public long getEngineHandle() {
     checkIsTerminated();
     return engineHandle;

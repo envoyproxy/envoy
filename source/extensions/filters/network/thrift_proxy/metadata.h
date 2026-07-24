@@ -4,6 +4,7 @@
 #include <cstring>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -15,7 +16,6 @@
 #include "source/extensions/filters/network/thrift_proxy/tracing.h"
 
 #include "absl/strings/str_replace.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +51,7 @@ private:
 /**
  * MessageMetadata encapsulates metadata about Thrift messages. The various fields are considered
  * optional since they may come from either the transport or protocol in some cases. Unless
- * otherwise noted, accessor methods throw absl::bad_optional_access if the corresponding value has
+ * otherwise noted, accessor methods throw std::bad_optional_access if the corresponding value has
  * not been set.
  */
 class MessageMetadata {
@@ -162,22 +162,22 @@ public:
 
   bool isRequest() const { return is_request_; }
 
-  absl::optional<int64_t> traceId() const { return trace_id_; }
+  std::optional<int64_t> traceId() const { return trace_id_; }
   void setTraceId(int64_t trace_id) { trace_id_ = trace_id; }
 
-  absl::optional<int64_t> traceIdHigh() const { return trace_id_high_; }
+  std::optional<int64_t> traceIdHigh() const { return trace_id_high_; }
   void setTraceIdHigh(int64_t trace_id_high) { trace_id_high_ = trace_id_high; }
 
-  absl::optional<int64_t> spanId() const { return span_id_; }
+  std::optional<int64_t> spanId() const { return span_id_; }
   void setSpanId(int64_t span_id) { span_id_ = span_id; }
 
-  absl::optional<int64_t> parentSpanId() const { return parent_span_id_; }
+  std::optional<int64_t> parentSpanId() const { return parent_span_id_; }
   void setParentSpanId(int64_t parent_span_id) { parent_span_id_ = parent_span_id; }
 
-  absl::optional<int64_t> flags() const { return flags_; }
+  std::optional<int64_t> flags() const { return flags_; }
   void setFlags(int64_t flags) { flags_ = flags; }
 
-  absl::optional<bool> sampled() const { return sampled_; }
+  std::optional<bool> sampled() const { return sampled_; }
   void setSampled(bool sampled) { sampled_ = sampled; }
 
 private:
@@ -256,26 +256,26 @@ private:
       copy->setSampled(sampled_opt.value());
     }
   }
-  absl::optional<uint32_t> frame_size_;
-  absl::optional<ProtocolType> proto_;
-  absl::optional<std::string> method_name_;
-  absl::optional<int16_t> header_flags_;
-  absl::optional<int32_t> seq_id_;
-  absl::optional<MessageType> msg_type_;
-  absl::optional<ReplyType> reply_type_;
+  std::optional<uint32_t> frame_size_;
+  std::optional<ProtocolType> proto_;
+  std::optional<std::string> method_name_;
+  std::optional<int16_t> header_flags_;
+  std::optional<int32_t> seq_id_;
+  std::optional<MessageType> msg_type_;
+  std::optional<ReplyType> reply_type_;
   Http::RequestHeaderMapPtr request_headers_{nullptr};
   Http::ResponseHeaderMapPtr response_headers_{nullptr};
-  absl::optional<AppExceptionType> app_ex_type_;
-  absl::optional<std::string> app_ex_msg_;
+  std::optional<AppExceptionType> app_ex_type_;
+  std::optional<std::string> app_ex_msg_;
   bool protocol_upgrade_message_{false};
   bool is_draining_{false};
   SpanList spans_;
-  absl::optional<int64_t> trace_id_;
-  absl::optional<int64_t> trace_id_high_;
-  absl::optional<int64_t> span_id_;
-  absl::optional<int64_t> parent_span_id_;
-  absl::optional<int64_t> flags_;
-  absl::optional<bool> sampled_;
+  std::optional<int64_t> trace_id_;
+  std::optional<int64_t> trace_id_high_;
+  std::optional<int64_t> span_id_;
+  std::optional<int64_t> parent_span_id_;
+  std::optional<int64_t> flags_;
+  std::optional<bool> sampled_;
   const bool is_request_;
   const bool preserve_keys_;
 };

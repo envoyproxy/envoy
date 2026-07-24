@@ -324,7 +324,7 @@ TEST_F(CELAccessLogFilterConfigTest, ForceHitLines38_39InConfigCC) {
   // Create the ExtensionFilter wrapper.
   envoy::config::accesslog::v3::ExtensionFilter extension_filter;
   extension_filter.set_name("cel");
-  extension_filter.mutable_typed_config()->PackFrom(cel_filter_config);
+  std::ignore = extension_filter.mutable_typed_config()->PackFrom(cel_filter_config);
 
   // Test filter creation with cel_config using PackFrom method.
   auto filter = factory_.createFilter(extension_filter, context_);

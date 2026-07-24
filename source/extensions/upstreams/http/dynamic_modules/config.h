@@ -22,9 +22,8 @@ public:
   Router::GenericConnPoolPtr createGenericConnPool(
       Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
       Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-      Upstream::ResourcePriority priority,
-      absl::optional<Envoy::Http::Protocol> downstream_protocol, Upstream::LoadBalancerContext* ctx,
-      const Protobuf::Message& config) const override;
+      Upstream::ResourcePriority priority, std::optional<Envoy::Http::Protocol> downstream_protocol,
+      Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) const override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::upstreams::http::dynamic_modules::v3::Config>();
   }

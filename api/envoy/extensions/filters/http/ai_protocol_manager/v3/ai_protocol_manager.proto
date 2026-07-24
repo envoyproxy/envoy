@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ai_protocol_manager.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ai_protocol_manager.v3";
+option java_outer_classname = "AiProtocolManagerProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ai_protocol_manager/v3;ai_protocol_managerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AI Protocol Manager]
+// AI Protocol Manager filter
+// :ref:`configuration overview <config_http_filters_ai_protocol_manager>`.
+// [#extension: envoy.filters.http.ai_protocol_manager]
+
+// Configuration for the AI Protocol Manager filter.
+message AiProtocolManager {
+}

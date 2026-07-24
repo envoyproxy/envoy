@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -32,7 +33,7 @@ REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
 REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
 
 std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
-                                       absl::optional<std::chrono::nanoseconds> timing) {
+                                       std::optional<std::chrono::nanoseconds> timing) {
   EXPECT_TRUE(timing);
   EXPECT_LE(last, timing.value());
   return timing.value();
@@ -47,7 +48,9 @@ protected:
         // with --config=docker-clang
         sizeof(stream_info) == 776 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 728)
+        sizeof(stream_info) == 728 ||
+        // with protobuf v35
+        sizeof(stream_info) == 736 || sizeof(stream_info) == 760)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -412,7 +415,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 TEST_F(StreamInfoImplTest, CodecStreamId) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
                              FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(absl::nullopt, stream_info.codecStreamId());
+  EXPECT_EQ(std::nullopt, stream_info.codecStreamId());
   stream_info.setCodecStreamId(12345);
   EXPECT_EQ(12345, stream_info.codecStreamId());
 }
@@ -460,7 +463,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.addPacketsRetransmitted(1);
 
   // setFrom
-  s1.setVirtualClusterName(absl::optional<std::string>("bar"));
+  s1.setVirtualClusterName(std::optional<std::string>("bar"));
   s1.setResponseCode(200);
   s1.setResponseCodeDetails("OK");
   s1.setConnectionTerminationDetails("baz");
@@ -570,7 +573,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   std::string json;
   const auto test_struct = stream_info.dynamicMetadata().filter_metadata().at("com.test");
   const auto status = Protobuf::util::MessageToJsonString(test_struct, &json);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   // check json contains the key and values we set
   EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
   EXPECT_TRUE(json.find("\"another_key\":\"another_value\"") != std::string::npos);

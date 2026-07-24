@@ -1,4 +1,5 @@
 #include <chrono>
+#include <optional>
 #include <type_traits>
 
 #include "envoy/tcp/conn_pool.h"
@@ -239,7 +240,7 @@ public:
 
     EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
         .WillRepeatedly(
-            Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+            Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
                        SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
               host = "10.0.0.11";
               return QueryStatus::Pending;
@@ -408,7 +409,7 @@ TEST_F(SipRouterTest, NoTcpConnPool) {
   initializeMetadata(MsgType::Request);
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _))
-      .WillOnce(Return(absl::nullopt));
+      .WillOnce(Return(std::nullopt));
   try {
     startRequest(FilterStatus::Continue);
   } catch (const AppException& ex) {
@@ -430,7 +431,7 @@ TEST_F(SipRouterTest, NoTcpConnPoolEmptyDest) {
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _))
-      .WillOnce(Return(absl::nullopt));
+      .WillOnce(Return(std::nullopt));
   try {
     startRequest(FilterStatus::Continue);
   } catch (const AppException& ex) {
@@ -451,7 +452,7 @@ TEST_F(SipRouterTest, QueryPending) {
   metadata_->resetAffinityIteration();
   EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+          Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
                      SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Pending;
@@ -469,7 +470,7 @@ TEST_F(SipRouterTest, QueryStop) {
   metadata_->resetAffinityIteration();
   EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+          Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
                      SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "";
             return QueryStatus::Stop;

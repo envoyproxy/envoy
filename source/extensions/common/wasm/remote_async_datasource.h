@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -13,8 +15,6 @@
 #include "source/common/config/remote_data_fetcher.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 

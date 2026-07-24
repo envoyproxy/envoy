@@ -31,10 +31,10 @@ Buffer::InstancePtr makeBuffer(absl::string_view data) {
 
 TEST(WebSocketCodecTest, EncodeFrameHeader) {
   Encoder encoder;
-  absl::optional<std::vector<uint8_t>> header = absl::nullopt;
+  std::optional<std::vector<uint8_t>> header = std::nullopt;
   std::vector<uint8_t> expected_header;
 
-  header = encoder.encodeFrameHeader({true, kFrameOpcodeText, absl::nullopt, 5, nullptr});
+  header = encoder.encodeFrameHeader({true, kFrameOpcodeText, std::nullopt, 5, nullptr});
   ASSERT_TRUE(header.has_value());
   EXPECT_EQ(header->size(), 2);
   expected_header = {0x81, 0x05};
@@ -55,7 +55,7 @@ TEST(WebSocketCodecTest, EncodeFrameHeader) {
   EXPECT_EQ(header, expected_header);
 
   header->clear();
-  header = encoder.encodeFrameHeader({true, kFrameOpcodeBinary, absl::nullopt, 256, nullptr});
+  header = encoder.encodeFrameHeader({true, kFrameOpcodeBinary, std::nullopt, 256, nullptr});
   ASSERT_TRUE(header.has_value());
   EXPECT_EQ(header->size(), 4);
   expected_header = {0x82, 0x7e, 0x01, 0x00};
@@ -69,7 +69,7 @@ TEST(WebSocketCodecTest, EncodeFrameHeader) {
   EXPECT_EQ(header, expected_header);
 
   header->clear();
-  header = encoder.encodeFrameHeader({true, kFrameOpcodeBinary, absl::nullopt, 77777, nullptr});
+  header = encoder.encodeFrameHeader({true, kFrameOpcodeBinary, std::nullopt, 77777, nullptr});
   ASSERT_TRUE(header.has_value());
   EXPECT_EQ(header->size(), 10);
   expected_header = {0x82, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2f, 0xd1};
@@ -87,10 +87,10 @@ TEST(WebSocketCodecTest, EncodeFrameHeader) {
 // Encode frame with invalid opcode
 TEST(WebSocketCodecTest, EncodeInvalidFrame) {
   Encoder encoder;
-  absl::optional<std::vector<uint8_t>> header = absl::nullopt;
+  std::optional<std::vector<uint8_t>> header = std::nullopt;
   std::vector<uint8_t> expected_header;
 
-  header = encoder.encodeFrameHeader({true, 0xc, absl::nullopt, 10, nullptr});
+  header = encoder.encodeFrameHeader({true, 0xc, std::nullopt, 10, nullptr});
   ASSERT_FALSE(header.has_value());
 }
 
@@ -107,9 +107,9 @@ TEST(WebSocketCodecTest, DecodeSingleUnmaskedFrame) {
   Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
+                             {true, kFrameOpcodeText, std::nullopt, 5, makeBuffer("Hello")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, DecodeSingleUnmaskedFrameExceptPayload) {
@@ -117,9 +117,9 @@ TEST(WebSocketCodecTest, DecodeSingleUnmaskedFrameExceptPayload) {
   Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
 
   Decoder decoder(0);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
   EXPECT_TRUE(
-      areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 5, nullptr}));
+      areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, std::nullopt, 5, nullptr}));
 }
 
 // A fragmented unmasked text message
@@ -139,14 +139,14 @@ TEST(WebSocketCodecTest, DecodeTwoUnmaskedFrames) {
   Buffer::addSeq(buffer, {0x80, 0x02, 0x6c, 0x6f});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(2, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("Hel")}));
+                             {false, kFrameOpcodeText, std::nullopt, 3, makeBuffer("Hel")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[1],
-                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("lo")}));
+                             {true, kFrameOpcodeContinuation, std::nullopt, 2, makeBuffer("lo")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // A fragmented and unfragmented text message
@@ -157,15 +157,15 @@ TEST(WebSocketCodecTest, DecodeThreeFrames) {
   Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(3, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("Hel")}));
+                             {false, kFrameOpcodeText, std::nullopt, 3, makeBuffer("Hel")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[1],
-                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("lo")}));
-  EXPECT_TRUE(areFramesEqual(frames.value()[2], {true, kFrameOpcodeText, absl::nullopt, 5,
+                             {true, kFrameOpcodeContinuation, std::nullopt, 2, makeBuffer("lo")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[2], {true, kFrameOpcodeText, std::nullopt, 5,
                                                  makeBuffer("\x48\x65\x6c\x6c\x6f")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
@@ -176,16 +176,16 @@ TEST(WebSocketCodecTest, DecodeThreeFramesExceptPayload) {
   Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
 
   Decoder decoder(0);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(3, frames->size());
   EXPECT_TRUE(
-      areFramesEqual(frames.value()[0], {false, kFrameOpcodeText, absl::nullopt, 3, nullptr}));
+      areFramesEqual(frames.value()[0], {false, kFrameOpcodeText, std::nullopt, 3, nullptr}));
   EXPECT_TRUE(areFramesEqual(frames.value()[1],
-                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, nullptr}));
+                             {true, kFrameOpcodeContinuation, std::nullopt, 2, nullptr}));
   EXPECT_TRUE(
-      areFramesEqual(frames.value()[2], {true, kFrameOpcodeText, absl::nullopt, 5, nullptr}));
+      areFramesEqual(frames.value()[2], {true, kFrameOpcodeText, std::nullopt, 5, nullptr}));
 }
 
 // A single-frame masked text message ("Hello")
@@ -209,7 +209,7 @@ TEST(WebSocketCodecTest, DecodeSingleMaskedFrame) {
   Buffer::addSeq(buffer, {0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -230,12 +230,12 @@ TEST(WebSocketCodecTest, DecodePingFrames) {
   Buffer::addSeq(buffer, {0x8a, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(2, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodePing, absl::nullopt, 5, makeBuffer("Hello")}));
+                             {true, kFrameOpcodePing, std::nullopt, 5, makeBuffer("Hello")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodePong, 0x37fa213d, 5,
                                                  makeBuffer("\x7f\x9f\x4d\x51\x58")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
@@ -268,12 +268,12 @@ TEST(WebSocketCodecTest, Decode16BitBinaryUnmaskedFrame) {
   Buffer::addSeq(buffer, payload);
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(
-      frames.value()[0], {true, kFrameOpcodeBinary, absl::nullopt, 256,
+      frames.value()[0], {true, kFrameOpcodeBinary, std::nullopt, 256,
                           std::make_unique<Buffer::OwnedImpl>(payload.begin(), payload.size())}));
 }
 
@@ -296,7 +296,7 @@ TEST(WebSocketCodecTest, Decode16BitBinaryMaskedFrame) {
   Buffer::addSeq(buffer, payload);
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -320,7 +320,7 @@ TEST(WebSocketCodecTest, Decode16BitBinaryMaskedFrameExceptPayload) {
        0xc5, 0xb4, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2, 0x1d, 0xe1, 0x8c, 0xde, 0xa8, 0x35});
 
   Decoder decoder(0);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -341,7 +341,7 @@ TEST(WebSocketCodecTest, Decode64BitBinaryUnmaskedFrame) {
   }
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -352,7 +352,7 @@ TEST(WebSocketCodecTest, Decode64BitBinaryUnmaskedFrame) {
                                    0x8c, 0xde, 0xa8, 0x35, 0xde});
   }
   EXPECT_TRUE(areFramesEqual(
-      frames.value()[0], {true, kFrameOpcodeBinary, absl::nullopt, 65536,
+      frames.value()[0], {true, kFrameOpcodeBinary, std::nullopt, 65536,
                           std::make_unique<Buffer::OwnedImpl>(payload.data(), payload.size())}));
 }
 
@@ -362,7 +362,7 @@ TEST(WebSocketCodecTest, DecodeIncompleteFrameWithgOnlyFrameHeader) {
   Buffer::addSeq(buffer, {0x81, 0x05});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
   ASSERT_FALSE(frames.has_value());
 }
 
@@ -372,7 +372,7 @@ TEST(WebSocketCodecTest, DecodeIncompleteFrameUptoPartialLength) {
   Buffer::addSeq(buffer, {0x82, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
   ASSERT_FALSE(frames.has_value());
 }
 
@@ -382,7 +382,7 @@ TEST(WebSocketCodecTest, DecodeIncompleteFrameUptoPartialMaskingKey) {
   Buffer::addSeq(buffer, {0x82, 0xfe, 0x00, 0x7e, 0xa1, 0xe8, 0xd7});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
   ASSERT_FALSE(frames.has_value());
 }
 
@@ -392,14 +392,14 @@ TEST(WebSocketCodecTest, DecodeIncompleteFrameWithPartialPayload) {
   Buffer::addSeq(buffer, {0x89, 0x05, 0x48, 0x65, 0x6c, 0x6c});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
   ASSERT_FALSE(frames.has_value());
 }
 
 // Check frame decoding iteratively
 TEST(WebSocketCodecTest, DecodeFrameIteratively) {
   // A complete frame - 0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f
-  absl::optional<std::vector<Frame>> frames = absl::nullopt;
+  std::optional<std::vector<Frame>> frames = std::nullopt;
   Decoder decoder(kDefaultPayloadBufferLength);
 
   Buffer::OwnedImpl frame_part_1;
@@ -422,13 +422,13 @@ TEST(WebSocketCodecTest, DecodeFrameIteratively) {
 
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
+                             {true, kFrameOpcodeText, std::nullopt, 5, makeBuffer("Hello")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, DecodeTwoFramesInterleavedInDecodeCalls) {
   // frame-1: 0x01 0x03 0x48 0x65 0x6c (contains "Hel")
   // frame-2: 0x80 0x02 0x6c 0x6f (contains "lo")
-  absl::optional<std::vector<Frame>> frames = absl::nullopt;
+  std::optional<std::vector<Frame>> frames = std::nullopt;
   Decoder decoder(kDefaultPayloadBufferLength);
 
   Buffer::OwnedImpl frame_1_part_1;
@@ -455,7 +455,7 @@ TEST(WebSocketCodecTest, DecodeTwoFramesInterleavedInDecodeCalls) {
 
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("Hel")}));
+                             {false, kFrameOpcodeText, std::nullopt, 3, makeBuffer("Hel")}));
 
   // frame-2 completes decoding
   frames = decoder.decode(frame_2_part_2);
@@ -463,7 +463,7 @@ TEST(WebSocketCodecTest, DecodeTwoFramesInterleavedInDecodeCalls) {
 
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("lo")}));
+                             {true, kFrameOpcodeContinuation, std::nullopt, 2, makeBuffer("lo")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // Frame spans over two slices
@@ -475,7 +475,7 @@ TEST(WebSocketCodecTest, DecodeFrameSpansOverTwoSlices) {
   ASSERT_EQ(2, buffer.getRawSlices().size());
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -492,7 +492,7 @@ TEST(WebSocketCodecTest, DecodeFrameCompleteAndIncompleteFrame) {
   // with missing payload bytes 0x58, 0x79, 0x51
   Buffer::addSeq(buffer, {0x00, 0x85, 0x3c, 0x33, 0x2a, 0x16, 0x1c, 0x55});
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -521,7 +521,7 @@ TEST(WebSocketCodecTest, DecodeFrameSpansOverTwoSlicesSplitByLength) {
   ASSERT_EQ(2, buffer.getRawSlices().size());
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -555,7 +555,7 @@ TEST(WebSocketCodecTest, Decode64BitBinaryMaskedFrame) {
   }
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -581,7 +581,7 @@ TEST(WebSocketCodecTest, Decode64BitBinaryMaskedFrameExceptPayload) {
   }
 
   Decoder decoder(0);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -595,7 +595,7 @@ TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadMasked7BitLength) {
   Buffer::addSeq(buffer, {0x81, 0x80, 0x4f, 0x5a, 0x12, 0xe2});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -607,12 +607,12 @@ TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadNonMasked7BitLength) {
   Buffer::addSeq(buffer, {0x81, 0x00});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(
-      areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 0, nullptr}));
+      areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, std::nullopt, 0, nullptr}));
 }
 
 TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadMasked16BitLength) {
@@ -620,7 +620,7 @@ TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadMasked16BitLength) {
   Buffer::addSeq(buffer, {0x81, 0xfe, 0x00, 0x00, 0x3c, 0x33, 0x2a, 0x16});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -637,12 +637,12 @@ TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadNonMasked16BitLength) {
                          });
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(
-      areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 0, nullptr}));
+      areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, std::nullopt, 0, nullptr}));
 }
 
 TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadMasked64BitLength) {
@@ -651,7 +651,7 @@ TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadMasked64BitLength) {
       buffer, {0x81, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0xfa, 0x4f, 0x5a});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -663,12 +663,12 @@ TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadNonMasked64BitLength) {
   Buffer::addSeq(buffer, {0x81, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(
-      areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 0, nullptr}));
+      areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, std::nullopt, 0, nullptr}));
 }
 
 TEST(WebSocketCodecTest, DecodeFramesWhenMaxPayloadBufferLengthSet) {
@@ -679,14 +679,14 @@ TEST(WebSocketCodecTest, DecodeFramesWhenMaxPayloadBufferLengthSet) {
   Buffer::addSeq(buffer, {0x80, 0x02, 0x6c, 0x6f});
 
   Decoder decoder(1);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(2, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("H")}));
+                             {false, kFrameOpcodeText, std::nullopt, 3, makeBuffer("H")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[1],
-                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("l")}));
+                             {true, kFrameOpcodeContinuation, std::nullopt, 2, makeBuffer("l")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, Decode16BitFrameWhenMaxPayloadBufferLengthSet) {
@@ -708,7 +708,7 @@ TEST(WebSocketCodecTest, Decode16BitFrameWhenMaxPayloadBufferLengthSet) {
 
   // Only 10 bytes length
   Decoder decoder(10);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -729,7 +729,7 @@ TEST(WebSocketCodecTest, Decode64BitFrameWhenMaxPayloadBufferLengthSet) {
   }
 
   Decoder decoder(20);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -743,19 +743,19 @@ TEST(WebSocketCodecTest, Decode64BitFrameWhenMaxPayloadBufferLengthSet) {
 TEST(WebSocketCodecTest, DecodeClosingFrame) {
   Encoder encoder;
   Buffer::OwnedImpl buffer;
-  absl::optional<std::vector<uint8_t>> header;
+  std::optional<std::vector<uint8_t>> header;
 
-  header = encoder.encodeFrameHeader({false, kFrameOpcodeClose, absl::nullopt, 0, nullptr});
+  header = encoder.encodeFrameHeader({false, kFrameOpcodeClose, std::nullopt, 0, nullptr});
   ASSERT_TRUE(header.has_value());
   buffer.add(header->data(), header->size());
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(
-      areFramesEqual(frames.value()[0], {false, kFrameOpcodeClose, absl::nullopt, 0, nullptr}));
+      areFramesEqual(frames.value()[0], {false, kFrameOpcodeClose, std::nullopt, 0, nullptr}));
 }
 
 TEST(WebSocketCodecTest, DecodeInvalidFrame) {
@@ -766,7 +766,7 @@ TEST(WebSocketCodecTest, DecodeInvalidFrame) {
   buffer.add("Hey");
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_FALSE(frames.has_value());
 }
@@ -774,54 +774,54 @@ TEST(WebSocketCodecTest, DecodeInvalidFrame) {
 TEST(WebSocketCodecTest, EncodeAndDecodeFrame) {
   Encoder encoder;
   Buffer::OwnedImpl buffer;
-  absl::optional<std::vector<uint8_t>> header;
+  std::optional<std::vector<uint8_t>> header;
 
-  header = encoder.encodeFrameHeader({true, kFrameOpcodeText, absl::nullopt, 5, nullptr});
+  header = encoder.encodeFrameHeader({true, kFrameOpcodeText, std::nullopt, 5, nullptr});
   ASSERT_TRUE(header.has_value());
   buffer.add(header->data(), header->size());
   buffer.add("Hello");
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
+                             {true, kFrameOpcodeText, std::nullopt, 5, makeBuffer("Hello")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, DecodeMultipleValidNonMaskedFrames) {
   Encoder encoder;
   Buffer::OwnedImpl buffer;
-  absl::optional<std::vector<uint8_t>> header = absl::nullopt;
+  std::optional<std::vector<uint8_t>> header = std::nullopt;
 
-  header = encoder.encodeFrameHeader({false, kFrameOpcodeText, absl::nullopt, 5, nullptr});
+  header = encoder.encodeFrameHeader({false, kFrameOpcodeText, std::nullopt, 5, nullptr});
   ASSERT_TRUE(header.has_value());
   buffer.add(header->data(), header->size());
   buffer.add("Text ");
 
   header->clear();
-  header = encoder.encodeFrameHeader({true, kFrameOpcodeContinuation, absl::nullopt, 9, nullptr});
+  header = encoder.encodeFrameHeader({true, kFrameOpcodeContinuation, std::nullopt, 9, nullptr});
   ASSERT_TRUE(header.has_value());
   buffer.add(header->data(), header->size());
   buffer.add("Response!");
 
   Decoder decoder(kDefaultPayloadBufferLength);
   std::string text_payload;
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(2, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {false, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Text ")}));
-  EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodeContinuation, absl::nullopt, 9,
+                             {false, kFrameOpcodeText, std::nullopt, 5, makeBuffer("Text ")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodeContinuation, std::nullopt, 9,
                                                  makeBuffer("Response!")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, DecodeValidMaskedFrame) {
   Encoder encoder;
   Buffer::OwnedImpl buffer;
-  absl::optional<std::vector<uint8_t>> header;
+  std::optional<std::vector<uint8_t>> header;
   std::vector<uint8_t> payload = {0x7f, 0x9f, 0x4d, 0x51, 0x58};
 
   header = encoder.encodeFrameHeader({true, kFrameOpcodePong, 0x37fa213d, 5, nullptr});
@@ -830,7 +830,7 @@ TEST(WebSocketCodecTest, DecodeValidMaskedFrame) {
   buffer.add(payload.data(), payload.size());
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
@@ -841,7 +841,7 @@ TEST(WebSocketCodecTest, DecodeValidMaskedFrame) {
 TEST(WebSocketCodecTest, DecodeValidMultipleMaskedFrames) {
   Encoder encoder;
   Buffer::OwnedImpl buffer;
-  absl::optional<std::vector<uint8_t>> header = absl::nullopt;
+  std::optional<std::vector<uint8_t>> header = std::nullopt;
   std::vector<uint8_t> payload;
 
   // "hello "
@@ -870,7 +870,7 @@ TEST(WebSocketCodecTest, DecodeValidMultipleMaskedFrames) {
   buffer.add(payload.data(), payload.size());
 
   Decoder decoder(kDefaultPayloadBufferLength);
-  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+  std::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(3, frames->size());

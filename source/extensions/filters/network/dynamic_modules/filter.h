@@ -58,7 +58,7 @@ public:
 
   // Temporary storage for the serialized typed filter state value returned by
   // get_filter_state_typed. Valid until the end of the current event hook.
-  absl::optional<std::string> last_serialized_filter_state_;
+  std::optional<std::string> last_serialized_filter_state_;
 
   // Test-only setter for callbacks.
   void setCallbacksForTest(Network::ReadFilterCallbacks* read_callbacks) {

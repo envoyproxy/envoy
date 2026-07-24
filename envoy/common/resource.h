@@ -1,10 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 #include "envoy/common/pure.h"
-
-#include "absl/types/optional.h"
 
 #pragma once
 
@@ -48,6 +47,6 @@ public:
   virtual uint64_t count() const PURE;
 };
 
-using ResourceLimitOptRef = absl::optional<std::reference_wrapper<ResourceLimit>>;
+using ResourceLimitOptRef = std::optional<std::reference_wrapper<ResourceLimit>>;
 
 } // namespace Envoy

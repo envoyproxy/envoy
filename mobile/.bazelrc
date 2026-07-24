@@ -43,6 +43,7 @@ build --define disable_known_issue_asserts=true
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
+build --cxxopt=-Wno-nullability-completeness
 build --define=signal_trace=disabled
 
 # Override PGV validation with NOP functions for binary size savings.

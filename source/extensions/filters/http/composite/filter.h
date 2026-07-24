@@ -50,7 +50,7 @@ public:
 
   ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return Json::Factory::loadFromProtobufStruct(*buildProtoStruct())->asJsonString();
   }
 

@@ -28,7 +28,7 @@ public:
   HashableString(absl::string_view value) : StringAccessorImpl(value) {}
 
   // Hashable
-  absl::optional<uint64_t> hash() const override { return HashUtil::xxHash64(asString()); }
+  std::optional<uint64_t> hash() const override { return HashUtil::xxHash64(asString()); }
 };
 
 class GenericHashableStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {

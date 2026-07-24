@@ -57,8 +57,7 @@ void TraceContextHandler::setRef(TraceContext& trace_context, absl::string_view 
   }
 }
 
-absl::optional<absl::string_view>
-TraceContextHandler::get(const TraceContext& trace_context) const {
+std::optional<absl::string_view> TraceContextHandler::get(const TraceContext& trace_context) const {
   auto header_map = trace_context.requestHeaders();
   if (!header_map.has_value()) {
     return trace_context.get(key_);
@@ -67,13 +66,13 @@ TraceContextHandler::get(const TraceContext& trace_context) const {
   if (handle_.has_value()) {
     auto* entry = header_map->getInline(handle_.value());
     if (entry == nullptr) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return entry->value().getStringView();
   } else {
     auto results = header_map->get(key_);
     if (results.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return results[0]->value().getStringView();
   }

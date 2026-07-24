@@ -1,3 +1,4 @@
+// NOLINT(namespace-envoy)
 #include <memory>
 #include <vector>
 
@@ -13,7 +14,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 namespace Istio {
 namespace Common {
 namespace {
@@ -21,29 +21,29 @@ namespace {
 TEST(HashableStringTest, TestHashableStringIsHashable) {
   using FilterStateValue =
       envoy::extensions::filters::common::set_filter_state::v3::FilterStateValue;
-  using Config = Extensions::Filters::Common::SetFilterState::Config;
+  using Config = Envoy::Extensions::Filters::Common::SetFilterState::Config;
 
-  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  Http::TestRequestHeaderMapImpl header_map;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Envoy::Server::Configuration::MockGenericFactoryContext> context;
+  Envoy::Http::TestRequestHeaderMapImpl header_map;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   FilterStateValue proto;
-  TestUtility::loadFromYaml(R"YAML(
+  Envoy::TestUtility::loadFromYaml(R"YAML(
     object_key: key
     factory_key: istio.hashable_string
     format_string:
       text_format_source:
         inline_string: "value"
   )YAML",
-                            proto);
+                                   proto);
   std::vector<FilterStateValue> protos{{proto}};
 
   auto config = std::make_shared<Config>(
-      Protobuf::RepeatedPtrField<FilterStateValue>(protos.begin(), protos.end()),
-      StreamInfo::FilterState::LifeSpan::FilterChain, context);
+      Envoy::Protobuf::RepeatedPtrField<FilterStateValue>(protos.begin(), protos.end()),
+      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain, context);
   config->updateFilterState({&header_map}, stream_info);
 
-  const auto* s = stream_info.filterState()->getDataReadOnly<Hashable>("key");
+  const auto* s = stream_info.filterState()->getDataReadOnly<Envoy::Hashable>("key");
   ASSERT_NE(s, nullptr);
 
   const HashableString* h = dynamic_cast<const HashableString*>(s);
@@ -55,4 +55,3 @@ TEST(HashableStringTest, TestHashableStringIsHashable) {
 } // namespace
 } // namespace Common
 } // namespace Istio
-} // namespace Envoy

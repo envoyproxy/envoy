@@ -151,7 +151,7 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, CircuitBreakerInvokedUpstreamTls) {
   setup(1024, 0);
 
   codec_client_ = makeRawHttpConnection(
-      makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("localhost")), absl::nullopt);
+      makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("localhost")), std::nullopt);
   ASSERT_FALSE(codec_client_->connected());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_rq_pending_overflow")->value());
 }
@@ -220,7 +220,7 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, DnsCacheQueryFailureStatistics) {
   codec_client_ =
       makeRawHttpConnection(makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni(
                                 "invalid.doesnotexist.example.com")),
-                            absl::nullopt);
+                            std::nullopt);
   ASSERT_FALSE(codec_client_->connected());
 
   // Verify DNS failure statistics.
@@ -305,7 +305,7 @@ typed_config:
   // Attempt connection with hostname that should trigger DNS timeout.
   codec_client_ = makeRawHttpConnection(
       makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("slowresolve.example.com")),
-      absl::nullopt);
+      std::nullopt);
   ASSERT_FALSE(codec_client_->connected());
 
   // Verify DNS timeout statistics.

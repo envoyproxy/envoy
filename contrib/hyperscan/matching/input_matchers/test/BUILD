@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
     ] + select({
         "//bazel:linux_x86_64": [

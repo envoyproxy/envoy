@@ -173,7 +173,7 @@ void Stats::dumpStatsToLog() {
 #endif
 }
 
-absl::optional<std::string> Stats::dumpStats() {
+std::optional<std::string> Stats::dumpStats() {
 #if defined(TCMALLOC)
   return tcmalloc::MallocExtension::GetStats();
 #elif defined(GPERFTOOLS_TCMALLOC)
@@ -189,7 +189,7 @@ absl::optional<std::string> Stats::dumpStats() {
       &output, nullptr);
   return output;
 #else
-  return absl::nullopt;
+  return std::nullopt;
 #endif
 }
 

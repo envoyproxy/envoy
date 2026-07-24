@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/formatter/generic_secret/v3/generic_secret.pb.h"
-#include "envoy/formatter/substitution_formatter_base.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/factory_context.h"
 

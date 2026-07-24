@@ -70,7 +70,7 @@ public:
   GrpcJsonReverseTranscoderConfig(
       const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
           GrpcJsonReverseTranscoder& transcoder_config,
-      Api::Api& api);
+      Api::Api& api, absl::Status& creation_status);
 
   // Takes the value of the path header of a gRPC request and returns its path descriptor.
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -93,9 +93,9 @@ public:
   absl::StatusOr<std::string> ChangeBodyFieldName(absl::string_view path,
                                                   absl::string_view body_field) const;
 
-  absl::optional<uint32_t> max_request_body_size_;
-  absl::optional<uint32_t> max_response_body_size_;
-  absl::optional<std::string> api_version_header_;
+  std::optional<uint32_t> max_request_body_size_;
+  std::optional<uint32_t> max_response_body_size_;
+  std::optional<std::string> api_version_header_;
 
 private:
   Protobuf::DescriptorPool descriptor_pool_;

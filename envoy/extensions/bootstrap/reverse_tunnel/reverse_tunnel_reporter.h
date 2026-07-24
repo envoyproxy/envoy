@@ -28,9 +28,12 @@ public:
    * @param node_id ID reported by the connecting node.
    * @param cluster_id cluster which the node belongs to.
    * @param tenant_id tenant identifier associated with the node.
+   * @param initiation_time_ms epoch milliseconds when the tunnel was initiated at the downstream
+   *        (DP) envoy. 0 means the timestamp was not provided (e.g. older DP envoys that don't
+   *        send the initiation-time header).
    */
   virtual void reportConnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
-                                     absl::string_view tenant_id) PURE;
+                                     absl::string_view tenant_id, int64_t initiation_time_ms) PURE;
 
   /**
    * Record that a reverse tunnel has been torn down.

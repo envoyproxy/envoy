@@ -28,10 +28,9 @@ class ConnectionHandler : public Network::TcpConnectionHandler,
 class ConnectionHandlerFactory : public Config::UntypedFactory {
 public:
   virtual std::unique_ptr<ConnectionHandler>
-  createConnectionHandler(Event::Dispatcher& dispatcher,
-                          absl::optional<uint32_t> worker_index) PURE;
+  createConnectionHandler(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index) PURE;
   virtual std::unique_ptr<ConnectionHandler>
-  createConnectionHandler(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
+  createConnectionHandler(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index,
                           OverloadManager& overload_manager,
                           OverloadManager& null_overload_manager) PURE;
 

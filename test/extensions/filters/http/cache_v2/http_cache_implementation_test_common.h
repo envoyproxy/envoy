@@ -60,12 +60,12 @@ protected:
 
   virtual CacheReaderPtr
   insert(Key key, const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body,
-         const absl::optional<Http::TestResponseTrailerMapImpl> trailers = absl::nullopt);
+         const std::optional<Http::TestResponseTrailerMapImpl> trailers = std::nullopt);
 
   CacheReaderPtr
   insert(absl::string_view request_path, const Http::TestResponseHeaderMapImpl& headers,
          const absl::string_view body,
-         const absl::optional<Http::TestResponseTrailerMapImpl> trailers = absl::nullopt);
+         const std::optional<Http::TestResponseTrailerMapImpl> trailers = std::nullopt);
 
   std::pair<std::string, EndStream> getBody(CacheReader& reader, uint64_t start, uint64_t end);
 

@@ -19,32 +19,32 @@ public:
   GeoipProviderConfig(const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
                       const std::string& stat_prefix, Stats::Scope& scope);
 
-  const absl::optional<std::string>& cityDbPath() const { return city_db_path_; }
-  const absl::optional<std::string>& ispDbPath() const { return isp_db_path_; }
-  const absl::optional<std::string>& anonDbPath() const { return anon_db_path_; }
-  const absl::optional<std::string>& asnDbPath() const { return asn_db_path_; }
-  const absl::optional<std::string>& countryDbPath() const { return country_db_path_; }
+  const std::optional<std::string>& cityDbPath() const { return city_db_path_; }
+  const std::optional<std::string>& ispDbPath() const { return isp_db_path_; }
+  const std::optional<std::string>& anonDbPath() const { return anon_db_path_; }
+  const std::optional<std::string>& asnDbPath() const { return asn_db_path_; }
+  const std::optional<std::string>& countryDbPath() const { return country_db_path_; }
 
-  bool isLookupEnabledForHeader(const absl::optional<std::string>& header);
+  bool isLookupEnabledForHeader(const std::optional<std::string>& header);
   bool isAsnDbPathSet() const { return asn_db_path_.has_value(); }
   bool isIspDbPathSet() const { return isp_db_path_.has_value(); }
   bool isCountryDbPathSet() const { return country_db_path_.has_value(); }
   bool isCityDbPathSet() const { return city_db_path_.has_value(); }
 
-  const absl::optional<std::string>& countryHeader() const { return country_header_; }
-  const absl::optional<std::string>& cityHeader() const { return city_header_; }
-  const absl::optional<std::string>& regionHeader() const { return region_header_; }
-  const absl::optional<std::string>& asnHeader() const { return asn_header_; }
-  const absl::optional<std::string>& asnOrgHeader() const { return asn_org_header_; }
+  const std::optional<std::string>& countryHeader() const { return country_header_; }
+  const std::optional<std::string>& cityHeader() const { return city_header_; }
+  const std::optional<std::string>& regionHeader() const { return region_header_; }
+  const std::optional<std::string>& asnHeader() const { return asn_header_; }
+  const std::optional<std::string>& asnOrgHeader() const { return asn_org_header_; }
 
-  const absl::optional<std::string>& anonHeader() const { return anon_header_; }
-  const absl::optional<std::string>& anonVpnHeader() const { return anon_vpn_header_; }
-  const absl::optional<std::string>& anonHostingHeader() const { return anon_hosting_header_; }
-  const absl::optional<std::string>& anonTorHeader() const { return anon_tor_header_; }
-  const absl::optional<std::string>& anonProxyHeader() const { return anon_proxy_header_; }
+  const std::optional<std::string>& anonHeader() const { return anon_header_; }
+  const std::optional<std::string>& anonVpnHeader() const { return anon_vpn_header_; }
+  const std::optional<std::string>& anonHostingHeader() const { return anon_hosting_header_; }
+  const std::optional<std::string>& anonTorHeader() const { return anon_tor_header_; }
+  const std::optional<std::string>& anonProxyHeader() const { return anon_proxy_header_; }
 
-  const absl::optional<std::string>& ispHeader() const { return isp_header_; }
-  const absl::optional<std::string>& applePrivateRelayHeader() const {
+  const std::optional<std::string>& ispHeader() const { return isp_header_; }
+  const std::optional<std::string>& applePrivateRelayHeader() const {
     return apple_private_relay_header_;
   }
 
@@ -82,26 +82,26 @@ public:
   Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
 
 private:
-  absl::optional<std::string> city_db_path_;
-  absl::optional<std::string> isp_db_path_;
-  absl::optional<std::string> anon_db_path_;
-  absl::optional<std::string> asn_db_path_;
-  absl::optional<std::string> country_db_path_;
+  std::optional<std::string> city_db_path_;
+  std::optional<std::string> isp_db_path_;
+  std::optional<std::string> anon_db_path_;
+  std::optional<std::string> asn_db_path_;
+  std::optional<std::string> country_db_path_;
 
-  absl::optional<std::string> country_header_;
-  absl::optional<std::string> city_header_;
-  absl::optional<std::string> region_header_;
-  absl::optional<std::string> asn_header_;
-  absl::optional<std::string> asn_org_header_;
+  std::optional<std::string> country_header_;
+  std::optional<std::string> city_header_;
+  std::optional<std::string> region_header_;
+  std::optional<std::string> asn_header_;
+  std::optional<std::string> asn_org_header_;
 
-  absl::optional<std::string> anon_header_;
-  absl::optional<std::string> anon_vpn_header_;
-  absl::optional<std::string> anon_hosting_header_;
-  absl::optional<std::string> anon_tor_header_;
-  absl::optional<std::string> anon_proxy_header_;
+  std::optional<std::string> anon_header_;
+  std::optional<std::string> anon_vpn_header_;
+  std::optional<std::string> anon_hosting_header_;
+  std::optional<std::string> anon_tor_header_;
+  std::optional<std::string> anon_proxy_header_;
 
-  absl::optional<std::string> isp_header_;
-  absl::optional<std::string> apple_private_relay_header_;
+  std::optional<std::string> isp_header_;
+  std::optional<std::string> apple_private_relay_header_;
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;

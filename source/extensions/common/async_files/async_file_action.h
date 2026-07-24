@@ -61,7 +61,7 @@ public:
   void onComplete() final { std::move(on_complete_)(std::move(result_.value())); }
 
 protected:
-  absl::optional<T> result_;
+  std::optional<T> result_;
   // Implementation of the actual action.
   virtual T executeImpl() PURE;
 

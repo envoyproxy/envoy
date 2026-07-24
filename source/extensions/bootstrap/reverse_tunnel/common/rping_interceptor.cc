@@ -8,7 +8,7 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 Api::IoCallUint64Result RpingInterceptor::read(Buffer::Instance& buffer,
-                                               absl::optional<uint64_t> max_length) {
+                                               std::optional<uint64_t> max_length) {
   // Perform the actual read first.
   Api::IoCallUint64Result result = IoSocketHandleImpl::read(buffer, max_length);
   ENVOY_LOG(trace, "RpingInterceptor: read result: {}", result.return_value_);

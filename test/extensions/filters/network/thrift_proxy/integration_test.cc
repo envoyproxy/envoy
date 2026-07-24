@@ -75,7 +75,7 @@ public:
   void initializeCall(DriverMode mode) {
     std::tie(transport_, protocol_, multiplexed_, std::ignore) = GetParam();
 
-    absl::optional<std::string> service_name;
+    std::optional<std::string> service_name;
     if (multiplexed_) {
       service_name = "svcname";
     }
@@ -99,7 +99,7 @@ public:
   void initializeOneway() {
     std::tie(transport_, protocol_, multiplexed_, std::ignore) = GetParam();
 
-    absl::optional<std::string> service_name;
+    std::optional<std::string> service_name;
     if (multiplexed_) {
       service_name = "svcname";
     }

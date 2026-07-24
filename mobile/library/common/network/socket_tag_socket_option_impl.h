@@ -18,8 +18,10 @@ public:
   // Socket::Option
   bool setOption(Network::Socket& socket,
                  envoy::config::core::v3::SocketOption::SocketState state) const override;
+  static void generateHashKey(uid_t uid, uint32_t traffic_stats_tag,
+                              std::vector<uint8_t>& hash_key);
   void hashKey(std::vector<uint8_t>& hash_key) const override;
-  absl::optional<Details>
+  std::optional<Details>
   getOptionDetails(const Network::Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;
   bool isSupported() const override;

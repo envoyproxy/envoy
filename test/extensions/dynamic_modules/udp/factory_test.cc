@@ -26,6 +26,9 @@ public:
   DynamicModuleUdpListenerFilterConfigFactory factory_;
 };
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ValidConfig) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
   const std::string yaml = R"EOF(
@@ -97,6 +100,9 @@ filter_name: test_filter
 
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(proto_config, context),
                           EnvoyException, "Failed to load.*");
+
+  EXPECT_EQ(1U, failureCounter(context.server_factory_context_.serverScope(), "module_load_error",
+                               "test_filter"));
 }
 
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ModuleWithoutUdpSupport) {

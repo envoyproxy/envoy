@@ -11,6 +11,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -176,7 +177,8 @@ protected:
                               const std::string& descriptor_path = kApiKeysDescriptorRelativePath) {
     loadDescriptors(config, descriptor_path);
     absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config =
-        ProtoApiScrubberFilterConfig::create(config, factory_context_);
+        ProtoApiScrubberFilterConfig::create(config, server_factory_context_,
+                                             factory_context_.scope());
     ASSERT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     ASSERT_NE(filter_config.value(), nullptr);
     filter_config_ = std::move(filter_config.value());
@@ -852,7 +854,7 @@ TEST_F(RequestFieldCheckerTest, MapType) {
   map_entry_type.set_name("test.extensions.filters.http.proto_api_scrubber.ScrubRequest.TagsEntry");
   auto* option = map_entry_type.add_options();
   option->set_name("map_entry");
-  option->mutable_value()->PackFrom(Protobuf::BoolValue()); // Value not strictly checked by logic.
+  std::ignore = option->mutable_value()->PackFrom(Protobuf::BoolValue());
 
   // Test the CheckField call for a map value.
   // Path: ["tags", "some_random_key"]
@@ -1131,7 +1133,7 @@ TEST_F(ResponseFieldCheckerTest, MapType) {
   option->set_name("map_entry");
   Protobuf::BoolValue bool_val;
   bool_val.set_value(true);
-  option->mutable_value()->PackFrom(bool_val);
+  std::ignore = option->mutable_value()->PackFrom(bool_val);
 
   // Test the CheckField call
   // The proto_scrubber library passes:

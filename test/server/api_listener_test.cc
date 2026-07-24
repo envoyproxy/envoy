@@ -131,7 +131,7 @@ api_listener:
       ->mutable_eds_config()
       ->mutable_path_config_source()
       ->set_path("eds path");
-  expected_any_proto.PackFrom(expected_cluster_proto);
+  std::ignore = expected_any_proto.PackFrom(expected_cluster_proto);
   HttpApiListenerFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.create(config, server_, config.name()).IgnoreError(), EnvoyException,

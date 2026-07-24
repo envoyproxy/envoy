@@ -34,10 +34,10 @@ private:
   const bool apply_on_stream_done_ = false;
   const Envoy::RateLimit::XRateLimitOption x_ratelimit_option_{};
   Formatter::FormatterProviderPtr hits_addend_provider_;
-  absl::optional<uint64_t> hits_addend_;
+  std::optional<uint64_t> hits_addend_;
   bool is_negative_hits_ = false;
   std::vector<Envoy::RateLimit::DescriptorProducerPtr> actions_;
-  absl::optional<Envoy::Router::RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
+  std::optional<Envoy::Router::RateLimitOverrideActionPtr> limit_override_ = std::nullopt;
 };
 
 class RateLimitConfig : Logger::Loggable<Envoy::Logger::Id::config> {

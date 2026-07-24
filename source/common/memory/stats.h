@@ -68,7 +68,7 @@ public:
   /**
    * Get detailed stats about current memory allocation. Returns nullopt if not supported.
    */
-  static absl::optional<std::string> dumpStats();
+  static std::optional<std::string> dumpStats();
 };
 
 /**

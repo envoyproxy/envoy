@@ -7,7 +7,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/test_filters.pb.h"
-#include "test/test_common/utility.h"
+#include "test/test_common/test_random_generator.h"
 
 namespace Envoy {
 

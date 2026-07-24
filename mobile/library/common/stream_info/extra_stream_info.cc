@@ -6,8 +6,7 @@ namespace Envoy {
 namespace StreamInfo {
 namespace {
 
-void setFromOptional(int64_t& to_set, const absl::optional<MonotonicTime>& time,
-                     int64_t offset_ms) {
+void setFromOptional(int64_t& to_set, const std::optional<MonotonicTime>& time, int64_t offset_ms) {
   if (time.has_value()) {
     to_set = offset_ms +
              std::chrono::duration_cast<std::chrono::milliseconds>(time.value().time_since_epoch())

@@ -79,7 +79,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           config_.get()->stripFailureResponse()
               ? ""
               : absl::StrCat("Failed JWT authentication: ", error_msg),
-          nullptr, absl::nullopt, generateRcDetails(error_msg));
+          nullptr, std::nullopt, generateRcDetails(error_msg));
       return Http::FilterHeadersStatus::StopIteration;
     }
   } else {
@@ -125,7 +125,7 @@ void Filter::onComplete(const Status& status) {
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
     if (config_.get()->stripFailureResponse()) {
-      decoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt,
+      decoder_callbacks_->sendLocalReply(code, "", nullptr, std::nullopt,
                                          generateRcDetails(JwtVerify::getStatusString(status)));
       return;
     }
@@ -138,7 +138,7 @@ void Filter::onComplete(const Status& status) {
           }
           headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
         },
-        absl::nullopt, generateRcDetails(JwtVerify::getStatusString(status)));
+        std::nullopt, generateRcDetails(JwtVerify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();

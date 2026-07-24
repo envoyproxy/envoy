@@ -92,7 +92,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
     // Make the refresh rate fast to hit the R/W race.
     dns_cluster.mutable_dns_refresh_rate()->set_nanos(1000001);
     dns_cluster.set_all_addresses_in_single_endpoint(true);
-    cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(dns_cluster);
+    std::ignore = cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(dns_cluster);
   });
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

@@ -55,23 +55,23 @@ protected:
 };
 
 TEST_F(PlatformStoreTest, Basic) {
-  EXPECT_EQ(absl::nullopt, store_->get("foo"));
-  store_->addOrUpdate("foo", "bar", absl::nullopt);
+  EXPECT_EQ(std::nullopt, store_->get("foo"));
+  store_->addOrUpdate("foo", "bar", std::nullopt);
   EXPECT_EQ("bar", store_->get("foo").value());
-  store_->addOrUpdate("foo", "eep", absl::nullopt);
+  store_->addOrUpdate("foo", "eep", std::nullopt);
   EXPECT_EQ("eep", store_->get("foo").value());
   store_->remove("foo");
-  EXPECT_EQ(absl::nullopt, store_->get("foo"));
+  EXPECT_EQ(std::nullopt, store_->get("foo"));
 }
 
 TEST_F(PlatformStoreTest, Persist) {
-  store_->addOrUpdate("foo", "bar", absl::nullopt);
-  store_->addOrUpdate("by\nz", "ee\np", absl::nullopt);
+  store_->addOrUpdate("foo", "bar", std::nullopt);
+  store_->addOrUpdate("by\nz", "ee\np", std::nullopt);
   ASSERT_TRUE(flush_timer_->enabled_);
   flush_timer_->invokeCallback(); // flush
   EXPECT_TRUE(flush_timer_->enabled_);
   // Not flushed as 5ms didn't pass.
-  store_->addOrUpdate("baz", "eep", absl::nullopt);
+  store_->addOrUpdate("baz", "eep", std::nullopt);
 
   save_interval_ = std::chrono::seconds(0);
   createStore();
@@ -86,7 +86,7 @@ TEST_F(PlatformStoreTest, Persist) {
   store_->iterate(validate);
 
   // This will flush due to 0ms flush interval
-  store_->addOrUpdate("baz", "eep", absl::nullopt);
+  store_->addOrUpdate("baz", "eep", std::nullopt);
   createStore();
   EXPECT_TRUE(store_->get("baz").has_value());
 
@@ -97,8 +97,8 @@ TEST_F(PlatformStoreTest, Persist) {
 }
 
 TEST_F(PlatformStoreTest, Iterate) {
-  store_->addOrUpdate("foo", "bar", absl::nullopt);
-  store_->addOrUpdate("baz", "eep", absl::nullopt);
+  store_->addOrUpdate("foo", "bar", std::nullopt);
+  store_->addOrUpdate("baz", "eep", std::nullopt);
 
   int full_counter = 0;
   KeyValueStore::ConstIterateCb validate = [&full_counter](const std::string& key,

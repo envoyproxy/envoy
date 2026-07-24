@@ -40,6 +40,22 @@ TEST_P(AccessLogIntegrationTest, CoalesceFormatterFirstValueAvailable) {
   EXPECT_THAT(log, HasSubstr("host=sni.lyft.com"));
 }
 
+// The LISTENER_NAME formatter logs the name of the listener that accepted the connection.
+TEST_P(AccessLogIntegrationTest, ListenerName) {
+  useAccessLog("LISTENER_NAME=%LISTENER_NAME%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // The default HttpIntegrationTest listener is named "http".
+  EXPECT_THAT(log, HasSubstr("LISTENER_NAME=http"));
+}
+
 // Test COALESCE formatter with fallback when first operator returns null.
 TEST_P(AccessLogIntegrationTest, CoalesceFormatterFallback) {
   // Use a header that won't be present as first operator, fallback to :authority.
@@ -155,7 +171,8 @@ TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
         v.set_string_value("%REQ(X-FORWARDED-FOR)%");
         auto fields = json->mutable_fields();
         (*fields)["x_forwarded_for"] = v;
-        access_log_config_to_clobber->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore =
+            access_log_config_to_clobber->mutable_typed_config()->PackFrom(access_log_config);
       });
   testRouterDownstreamDisconnectBeforeRequestComplete();
   const std::string log = waitForAccessLog(access_log_name_);

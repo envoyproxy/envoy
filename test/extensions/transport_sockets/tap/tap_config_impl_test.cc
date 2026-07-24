@@ -47,6 +47,7 @@ public:
   MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
   MOCK_METHOD(bool, streaming, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, (), (const));
+  MOCK_METHOD(bool, shouldRecord, (), (const));
 };
 
 class PerSocketTapperImplTest : public testing::Test {

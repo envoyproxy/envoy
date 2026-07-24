@@ -49,7 +49,7 @@ TEST_F(EnvoyDeterministicConnectionIdGeneratorTest, NextConnectionIdLengthIsCorr
   const char connection_id_bytes[255] = {};
   for (uint8_t i = 0; i < sizeof(connection_id_bytes) - 1; ++i) {
     QuicConnectionId connection_id(connection_id_bytes, i);
-    absl::optional<QuicConnectionId> replacement_connection_id =
+    std::optional<QuicConnectionId> replacement_connection_id =
         generator_.GenerateNextConnectionId(connection_id);
     ASSERT_TRUE(replacement_connection_id.has_value());
     EXPECT_EQ(connection_id_length_, replacement_connection_id->length());
@@ -60,13 +60,13 @@ TEST_F(EnvoyDeterministicConnectionIdGeneratorTest, NextConnectionIdHasEntropy) 
   // Make sure all these test connection IDs have different replacements.
   for (uint64_t i = 0; i < 256; ++i) {
     QuicConnectionId connection_id_i = TestConnectionId(i);
-    absl::optional<QuicConnectionId> new_i = generator_.GenerateNextConnectionId(connection_id_i);
+    std::optional<QuicConnectionId> new_i = generator_.GenerateNextConnectionId(connection_id_i);
     ASSERT_TRUE(new_i.has_value());
     EXPECT_NE(connection_id_i, *new_i);
     for (uint64_t j = i + 1; j <= 256; ++j) {
       QuicConnectionId connection_id_j = TestConnectionId(j);
       EXPECT_NE(connection_id_i, connection_id_j);
-      absl::optional<QuicConnectionId> new_j = generator_.GenerateNextConnectionId(connection_id_j);
+      std::optional<QuicConnectionId> new_j = generator_.GenerateNextConnectionId(connection_id_j);
       ASSERT_TRUE(new_j.has_value());
       EXPECT_NE(*new_i, *new_j);
     }

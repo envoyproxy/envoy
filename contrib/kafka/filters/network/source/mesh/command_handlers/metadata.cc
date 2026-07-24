@@ -1,5 +1,7 @@
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/metadata.h"
 
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/external/responses.h"
 
 namespace Envoy {
@@ -42,7 +44,7 @@ AbstractResponseSharedPtr MetadataRequestHolder::computeAnswer() const {
       }
       const std::string& topic_name = *(topic.name_);
       std::vector<MetadataResponsePartition> topic_partitions;
-      const absl::optional<ClusterConfig> cluster_config =
+      const std::optional<ClusterConfig> cluster_config =
           configuration_.computeClusterConfigForTopic(topic_name);
       if (!cluster_config) {
         // Someone is requesting topics that are not known to our configuration.

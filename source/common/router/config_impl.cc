@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -56,8 +57,8 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -378,8 +379,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
   // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
   // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
   // disabled.
-  trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
-                                              : absl::nullopt;
+  trace_sampled_ = config.has_trace_sampled() ? std::optional<bool>(config.trace_sampled().value())
+                                              : std::nullopt;
 
   // Create HeaderMutations directly from HeaderMutation rules
   if (!config.request_headers_mutations().empty()) {
@@ -1357,8 +1358,8 @@ absl::Status RouteEntryImplBase::validateClusters(const Upstream::ClusterManager
   return absl::OkStatus();
 }
 
-absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
-  absl::optional<bool> result = per_filter_configs_->disabled(config_name);
+std::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
+  std::optional<bool> result = per_filter_configs_->disabled(config_name);
   if (result.has_value()) {
     return result.value();
   }
@@ -1709,8 +1710,8 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
 
-absl::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
-  absl::optional<bool> result = per_filter_configs_->disabled(config_name);
+std::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
+  std::optional<bool> result = per_filter_configs_->disabled(config_name);
   if (result.has_value()) {
     return result.value();
   }
@@ -2025,8 +2026,17 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   }
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
-  // Lower-case the value of the host header, as hostnames are case insensitive.
-  const std::string host = absl::AsciiStrToLower(host_header_value);
+  // Lower-case the value of the host header, as hostnames are case insensitive. Hosts on the wire
+  // are overwhelmingly lower-case already (DNS names normalize to lower-case per RFC 3986 3.2.2),
+  // so scan first and only build a lower-cased copy when an upper-case byte is present. This keeps
+  // the common path allocation-free instead of always constructing a std::string.
+  absl::string_view host = host_header_value;
+  std::string lowercase_host;
+  if (std::any_of(host_header_value.begin(), host_header_value.end(),
+                  [](char c) { return absl::ascii_isupper(static_cast<unsigned char>(c)); })) {
+    lowercase_host = absl::AsciiStrToLower(host_header_value);
+    host = lowercase_host;
+  }
   const auto iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();

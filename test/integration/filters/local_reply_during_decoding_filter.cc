@@ -61,7 +61,7 @@ public:
       header_local_reply_skipped_ = true;
       return Http::FilterHeadersStatus::Continue;
     }
-    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, std::nullopt,
                                        "");
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -69,8 +69,8 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     ASSERT(header_local_reply_skipped_);
     if (local_reply_during_data_) {
-      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr,
-                                         absl::nullopt, "");
+      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, std::nullopt,
+                                         "");
     }
     return Http::FilterDataStatus::Continue;
   }
@@ -82,7 +82,7 @@ public:
 
 private:
   Http::RequestHeaderMap* request_headers_{};
-  absl::optional<bool> latched_end_stream_;
+  std::optional<bool> latched_end_stream_;
   bool header_local_reply_skipped_ = false;
   bool local_reply_during_data_ = false;
 };

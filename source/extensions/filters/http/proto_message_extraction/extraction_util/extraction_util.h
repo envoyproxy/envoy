@@ -60,7 +60,7 @@ std::string GetLabelName(absl::string_view value);
 // NOLINTNEXTLINE(readability-identifier-naming)
 const absl::flat_hash_map<std::string, ExtractedMessageDirective>& StringToDirectiveMap();
 
-absl::optional<ExtractedMessageDirective>
+std::optional<ExtractedMessageDirective>
 // NOLINTNEXTLINE(readability-identifier-naming)
 ExtractedMessageDirectiveFromString(absl::string_view directive);
 

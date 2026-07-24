@@ -138,7 +138,7 @@ public:
   }
 
   Buffer::RawSliceVector
-  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override {
+  getRawSlices(std::optional<uint64_t> max_slices = std::nullopt) const override {
     ASSERT(!max_slices.has_value() || max_slices.value() >= 1);
     return {{const_cast<char*>(start()), size_}};
   }

@@ -16,7 +16,7 @@ void CustomStatNamespacesImpl::registerStatNamespace(const absl::string_view nam
   namespaces_.insert(std::string(name));
 };
 
-absl::optional<absl::string_view>
+std::optional<absl::string_view>
 CustomStatNamespacesImpl::stripRegisteredPrefix(const absl::string_view stat_name) const {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (!namespaces_.empty()) {
@@ -26,7 +26,7 @@ CustomStatNamespacesImpl::stripRegisteredPrefix(const absl::string_view stat_nam
       return stat_name.substr(pos + 1);
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 };
 
 } // namespace Stats

@@ -33,7 +33,7 @@ public:
           TestUtility::loadFromYaml(route_config, proto_config);
 
           Protobuf::Any per_route_config;
-          per_route_config.PackFrom(proto_config);
+          std::ignore = per_route_config.PackFrom(proto_config);
           route->mutable_typed_per_filter_config()->insert({"transform", per_route_config});
         });
   }

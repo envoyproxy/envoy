@@ -17,9 +17,9 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   bool end_stream = false;
-  absl::optional<Api::IoError::IoErrorCode> err = absl::nullopt;
+  std::optional<Api::IoError::IoErrorCode> err = std::nullopt;
   do {
-    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, absl::nullopt);
+    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, std::nullopt);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.return_value_);
@@ -51,7 +51,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
 IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   PostIoAction action;
   uint64_t bytes_written = 0;
-  absl::optional<Api::IoError::IoErrorCode> err = absl::nullopt;
+  std::optional<Api::IoError::IoErrorCode> err = std::nullopt;
   ASSERT(!shutdown_ || buffer.length() == 0);
   do {
     if (buffer.length() == 0) {

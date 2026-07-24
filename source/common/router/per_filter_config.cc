@@ -121,14 +121,14 @@ const RouteSpecificFilterConfig* PerFilterConfigs::get(absl::string_view name) c
   return it == configs_.end() ? nullptr : it->second.config_.get();
 }
 
-absl::optional<bool> PerFilterConfigs::disabled(absl::string_view name) const {
+std::optional<bool> PerFilterConfigs::disabled(absl::string_view name) const {
   // Quick exit if there are no configs.
   if (configs_.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   const auto it = configs_.find(name);
-  return it != configs_.end() ? absl::optional<bool>{it->second.disabled_} : absl::nullopt;
+  return it != configs_.end() ? std::optional<bool>{it->second.disabled_} : std::nullopt;
 }
 
 } // namespace Router

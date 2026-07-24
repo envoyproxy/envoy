@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/typed_config.h"
@@ -9,8 +10,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {

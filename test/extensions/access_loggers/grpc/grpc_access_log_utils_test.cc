@@ -98,7 +98,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   EXPECT_EQ(common_access_log.mutable_custom_tags()->at("format-key"), "format-value");
   auto any = (*(common_access_log.mutable_filter_state_objects()))["downstream_peer"];
   Protobuf::BytesValue gotState;
-  any.UnpackTo(&gotState);
+  std::ignore = any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }
 
@@ -137,7 +137,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromUpstream) {
   EXPECT_EQ(common_access_log.mutable_custom_tags()->at("format-key"), "format-value");
   auto any = (*(common_access_log.mutable_filter_state_objects()))["upstream_peer"];
   Protobuf::BytesValue gotState;
-  any.UnpackTo(&gotState);
+  std::ignore = any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_upstream_peer");
 }
 
@@ -184,7 +184,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
   EXPECT_EQ(common_access_log.mutable_custom_tags()->at("format-key"), "format-value");
   auto any = (*(common_access_log.mutable_filter_state_objects()))["same_key"];
   Protobuf::BytesValue gotState;
-  any.UnpackTo(&gotState);
+  std::ignore = any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }
 #endif // USE_CEL

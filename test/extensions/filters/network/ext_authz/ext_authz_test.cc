@@ -664,11 +664,11 @@ TEST_F(ExtAuthzFilterTest, MetadataContext) {
 
   // Verify that typed metadata specified in typed_metadata_context_namespaces is passed
   helloworld::HelloRequest hello;
-  check_request.attributes()
-      .metadata_context()
-      .typed_filter_metadata()
-      .at("blues.piano")
-      .UnpackTo(&hello);
+  std::ignore = check_request.attributes()
+                    .metadata_context()
+                    .typed_filter_metadata()
+                    .at("blues.piano")
+                    .UnpackTo(&hello);
   EXPECT_EQ("jelly roll morton", hello.name());
 
   Filters::Common::ExtAuthz::Response response{};

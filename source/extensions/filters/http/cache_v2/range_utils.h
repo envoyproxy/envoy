@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <iosfwd>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,7 +21,6 @@
 #include "source/extensions/filters/http/cache_v2/key.pb.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -110,13 +110,13 @@ namespace RangeUtils {
 // length to assess whether the range request can be satisfied. nullopt
 // indicates that this request should not be treated as a range request
 // (either it is invalid and ignored, or not a range request at all).
-absl::optional<RangeDetails>
-createRangeDetails(const Envoy::Http::RequestHeaderMap& request_headers, uint64_t content_length);
-absl::optional<RangeDetails> createRangeDetails(const absl::string_view range_header,
-                                                const uint64_t content_length);
+std::optional<RangeDetails> createRangeDetails(const Envoy::Http::RequestHeaderMap& request_headers,
+                                               uint64_t content_length);
+std::optional<RangeDetails> createRangeDetails(const absl::string_view range_header,
+                                               const uint64_t content_length);
 
 // Simple utility to extract the range header from the request header map.
-absl::optional<absl::string_view> getRangeHeader(const Envoy::Http::RequestHeaderMap& headers);
+std::optional<absl::string_view> getRangeHeader(const Envoy::Http::RequestHeaderMap& headers);
 
 // Create RangeDetails indicating if the range request is satisfiable, and, if
 // so, create adjusted byte ranges to fit the provided content_length.
@@ -128,8 +128,8 @@ RangeDetails createAdjustedRangeDetails(const std::vector<RawByteRange>& request
 // header value. If there is no range header, multiple range headers, the
 // header value is malformed, or there are more ranges than
 // max_byte_range_specs, returns nullopt.
-absl::optional<std::vector<RawByteRange>> parseRangeHeader(absl::string_view range_header,
-                                                           uint64_t max_byte_range_specs);
+std::optional<std::vector<RawByteRange>> parseRangeHeader(absl::string_view range_header,
+                                                          uint64_t max_byte_range_specs);
 } // namespace RangeUtils
 } // namespace CacheV2
 } // namespace HttpFilters

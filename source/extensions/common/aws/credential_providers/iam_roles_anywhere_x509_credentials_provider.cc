@@ -68,7 +68,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
       return status;
     }
   } else {
-    certificate_chain_data_source_provider_ = absl::nullopt;
+    certificate_chain_data_source_provider_ = std::nullopt;
   }
 
   auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
@@ -341,7 +341,7 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
               "key (algorithm: {}) with expiration time {}",
               cert_algorithm == X509Credentials::PublicKeySignatureAlgorithm::RSA ? "RSA" : "ECDSA",
               fmt::format("{:%Y-%m-%d %H:%M}", expiration_time));
-    cached_credentials_ = X509Credentials(cert_der_b64, cert_algorithm, cert_serial, absl::nullopt,
+    cached_credentials_ = X509Credentials(cert_der_b64, cert_algorithm, cert_serial, std::nullopt,
                                           private_key_pem, expiration_time);
   }
 }

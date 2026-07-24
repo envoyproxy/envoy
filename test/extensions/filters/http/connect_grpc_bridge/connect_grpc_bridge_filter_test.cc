@@ -42,7 +42,7 @@ protected:
 
   void addStatusDetails(google::rpc::Status& status, const Protobuf::Message& message) {
     Protobuf::Any any;
-    any.PackFrom(message);
+    std::ignore = any.PackFrom(message);
     *status.add_details() = any;
   }
 

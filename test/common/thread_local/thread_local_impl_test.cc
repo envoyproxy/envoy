@@ -5,6 +5,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"
 

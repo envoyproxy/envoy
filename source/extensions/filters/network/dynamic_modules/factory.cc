@@ -4,6 +4,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
@@ -15,18 +16,24 @@ absl::StatusOr<Network::FilterFactoryCb>
 DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, FactoryContext& context) {
 
+  Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
   const auto& module_config = proto_config.dynamic_module_config();
   // Network filters do not support remote module sources, so no init manager or async callback is
   // passed; only the synchronous local-file and by-name paths can succeed here.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, proto_config.filter_name(), context.serverFactoryContext());
+      module_config, proto_config.filter_name(), server_context);
   RETURN_IF_NOT_OK_REF(load_result.status());
   auto dynamic_module = std::move(load_result->loaded);
 
   std::string config;
   if (proto_config.has_filter_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          server_context, proto_config.filter_name(),
+          Extensions::DynamicModules::ConfigInitErrorStat);
+      return config_or_error.status();
+    }
     config = std::move(config_or_error.value());
   }
 
@@ -41,11 +48,13 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
       filter_config =
           Envoy::Extensions::DynamicModules::NetworkFilters::newDynamicModuleNetworkFilterConfig(
               proto_config.filter_name(), config, metrics_namespace, std::move(dynamic_module),
-              context.serverFactoryContext().clusterManager(),
-              context.serverFactoryContext().scope(),
-              context.serverFactoryContext().mainThreadDispatcher());
+              server_context.clusterManager(), server_context.scope(),
+              server_context.mainThreadDispatcher());
 
   if (!filter_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        server_context, proto_config.filter_name(),
+        Extensions::DynamicModules::ConfigInitErrorStat);
     return absl::InvalidArgumentError("Failed to create filter config: " +
                                       std::string(filter_config.status().message()));
   }
@@ -55,8 +64,7 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // is added. This is the legacy behavior for backward compatibility.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
-    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
-        metrics_namespace);
+    server_context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
   return [config = filter_config.value()](Network::FilterManager& filter_manager) -> void {

@@ -210,7 +210,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   }
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
-      dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+      Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources[0].get().resource());
   if (cluster_load_assignment.cluster_name() != edsServiceName()) {
     const auto msg = fmt::format("Unexpected EDS cluster (expecting {}): {}", edsServiceName(),
@@ -403,7 +403,7 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
 
     prioritySet().updateHosts(
         priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-        host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt, absl::nullopt);
+        host_set->localityWeights(), {}, hosts_to_remove, std::nullopt, std::nullopt);
   }
 }
 
@@ -442,7 +442,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
               info_->name(), host_set.hosts().size(), host_set.priority());
 
     priority_state_manager.updateClusterPrioritySet(
-        priority, std::move(current_hosts_copy), hosts_added, hosts_removed, absl::nullopt,
+        priority, std::move(current_hosts_copy), hosts_added, hosts_removed, std::nullopt,
         weighted_priority_health, overprovisioning_factor);
     return true;
   }
@@ -466,7 +466,8 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
           "Did not receive EDS response on time, using cached ClusterLoadAssignment for cluster {}",
           edsServiceName());
       envoy::config::endpoint::v3::ClusterLoadAssignment cached_load_assignment =
-          dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(*cached_resource);
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+              *cached_resource);
       info_->configUpdateStats().assignment_use_cached_.inc();
       using_cached_resource_ = true;
       update(std::move(cached_load_assignment));

@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <variant>
 
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
@@ -19,7 +20,6 @@
 #include "source/common/matcher/value_input_matcher.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Matcher {
@@ -52,14 +52,14 @@ template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatch
  */
 template <class DataType> class AnyMatcher : public MatchTree<DataType> {
 public:
-  explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
+  explicit AnyMatcher(std::optional<OnMatch<DataType>> on_no_match)
       : on_no_match_(std::move(on_no_match)) {}
 
   ActionMatchResult match(const DataType& data,
                           SkippedMatchCb skipped_match_cb = nullptr) override {
     return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
-  const absl::optional<OnMatch<DataType>> on_no_match_;
+  const std::optional<OnMatch<DataType>> on_no_match_;
 };
 
 /**
@@ -149,12 +149,12 @@ public:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  absl::optional<OnMatchFactoryCb<DataType>>
+  std::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch& on_match) override {
     return createOnMatchBase(on_match);
   }
 
-  absl::optional<OnMatchFactoryCb<DataType>>
+  std::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch& on_match) override {
     return createOnMatchBase(on_match);
   }
@@ -166,7 +166,7 @@ private:
 
     return [on_no_match]() {
       return std::make_unique<AnyMatcher<DataType>>(
-          on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+          on_no_match ? std::make_optional((*on_no_match)()) : std::nullopt);
     };
   }
   template <class MatcherType>
@@ -183,7 +183,7 @@ private:
     auto on_no_match = createOnMatch(config.on_no_match());
     return [matcher_factories, on_no_match]() {
       auto list_matcher = std::make_unique<ListMatcher<DataType>>(
-          on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+          on_no_match ? std::make_optional((*on_no_match)()) : std::nullopt);
 
       for (const auto& matcher : matcher_factories) {
         list_matcher->addMatcher(matcher.first(), matcher.second());
@@ -276,12 +276,12 @@ private:
   }
 
   using MapCreationFunction = std::function<absl::StatusOr<std::unique_ptr<MapMatcher<DataType>>>(
-      DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match)>;
+      DataInputPtr<DataType>&& data_input, std::optional<OnMatch<DataType>> on_no_match)>;
 
   template <template <class> class MapMatcherType, class MapType>
   MatchTreeFactoryCb<DataType>
   createMapMatcher(const MapType& map, DataInputFactoryCb<DataType> data_input,
-                   absl::optional<OnMatchFactoryCb<DataType>>& on_no_match,
+                   std::optional<OnMatchFactoryCb<DataType>>& on_no_match,
                    MapCreationFunction creation_function) {
     std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
     match_children.reserve(map.map().size());
@@ -293,7 +293,7 @@ private:
 
     return [match_children, data_input, on_no_match, creation_function]() {
       auto matcher_or_error = creation_function(
-          data_input(), on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+          data_input(), on_no_match ? std::make_optional((*on_no_match)()) : std::nullopt);
       THROW_IF_NOT_OK_REF(matcher_or_error.status());
       auto multimap_matcher = std::move(*matcher_or_error);
       for (const auto& children : match_children) {
@@ -304,7 +304,7 @@ private:
   }
 
   template <class OnMatchType>
-  absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
+  std::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
     on_match_validation_visitor_.validateOnMatch(on_match);
     if (const std::vector<absl::Status>& errors = on_match_validation_visitor_.errors();
         !errors.empty()) {
@@ -331,7 +331,7 @@ private:
       };
     }
 
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   template <class SinglePredicateType>

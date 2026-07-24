@@ -6,6 +6,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/stat_sinks/dynamic_modules/sink.h"
 
@@ -33,6 +34,8 @@ absl::StatusOr<Stats::SinkPtr> DynamicModuleStatsSinkFactory::createStatsSink(
   if (proto_config.has_sink_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.sink_config());
     if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          server, proto_config.sink_name(), Extensions::DynamicModules::ConfigInitErrorStat);
       return absl::InvalidArgumentError("Failed to parse sink config: " +
                                         std::string(config_or_error.status().message()));
     }
@@ -42,6 +45,8 @@ absl::StatusOr<Stats::SinkPtr> DynamicModuleStatsSinkFactory::createStatsSink(
   auto sink_config = newDynamicModuleStatsSinkConfig(proto_config.sink_name(), sink_config_str,
                                                      std::move(dynamic_module), server);
   if (!sink_config.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        server, proto_config.sink_name(), Extensions::DynamicModules::ConfigInitErrorStat);
     return sink_config.status();
   }
 

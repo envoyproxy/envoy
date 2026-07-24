@@ -41,11 +41,11 @@ FaultAbortConfig::FaultAbortConfig(
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
     provider_ =
         std::make_unique<FixedAbortProvider>(static_cast<Http::Code>(abort_config.http_status()),
-                                             absl::nullopt, abort_config.percentage());
+                                             std::nullopt, abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kGrpcStatus:
     provider_ = std::make_unique<FixedAbortProvider>(
-        absl::nullopt, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()),
+        std::nullopt, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()),
         abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
@@ -56,9 +56,9 @@ FaultAbortConfig::FaultAbortConfig(
   }
 }
 
-absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode(
+std::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode(
     const Http::RequestHeaderMap* request_headers) const {
-  absl::optional<Http::Code> ret = absl::nullopt;
+  std::optional<Http::Code> ret = std::nullopt;
   auto header = request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortRequest);
   if (header.empty()) {
     return ret;
@@ -78,18 +78,18 @@ absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode
   return ret;
 }
 
-absl::optional<Grpc::Status::GrpcStatus> FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(
+std::optional<Grpc::Status::GrpcStatus> FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(
     const Http::RequestHeaderMap* request_headers) const {
   auto header = request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest);
   if (header.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   uint64_t code;
   // This is an implicitly untrusted header, so per the API documentation only the first
   // value is used.
   if (!absl::SimpleAtoi(header[0]->value().getStringView(), &code)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return static_cast<Grpc::Status::GrpcStatus>(code);
@@ -114,18 +114,18 @@ FaultDelayConfig::FaultDelayConfig(
   }
 }
 
-absl::optional<std::chrono::milliseconds> FaultDelayConfig::HeaderDelayProvider::duration(
+std::optional<std::chrono::milliseconds> FaultDelayConfig::HeaderDelayProvider::duration(
     const Http::RequestHeaderMap* request_headers) const {
   const auto header = request_headers->get(HeaderNames::get().DelayRequest);
   if (header.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   uint64_t value;
   // This is an implicitly untrusted header, so per the API documentation only the first
   // value is used.
   if (!absl::SimpleAtoi(header[0]->value().getStringView(), &value)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return std::chrono::milliseconds(value);
@@ -147,22 +147,22 @@ FaultRateLimitConfig::FaultRateLimitConfig(
   }
 }
 
-absl::optional<uint64_t> FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps(
+std::optional<uint64_t> FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps(
     const Http::RequestHeaderMap* request_headers) const {
   const auto header = request_headers->get(HeaderNames::get().ThroughputResponse);
   if (header.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   uint64_t value;
   // This is an implicitly untrusted header, so per the API documentation only the first
   // value is used.
   if (!absl::SimpleAtoi(header[0]->value().getStringView(), &value)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   if (value == 0) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return value;

@@ -811,9 +811,9 @@ matcher_list:
 }
 
 TEST_F(MatcherTest, RecursiveMatcherNoMatch) {
-  ListMatcher<TestData> matcher(absl::nullopt);
+  ListMatcher<TestData> matcher(std::nullopt);
 
-  matcher.addMatcher(createSingleMatcher(absl::nullopt, [](auto) { return false; }),
+  matcher.addMatcher(createSingleMatcher(std::nullopt, [](auto) { return false; }),
                      stringOnMatch<TestData>("match"));
 
   ActionMatchResult recursive_result = evaluateMatch(matcher, TestData());
@@ -821,10 +821,10 @@ TEST_F(MatcherTest, RecursiveMatcherNoMatch) {
 }
 
 TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
-  ListMatcher<TestData> matcher(absl::nullopt);
+  ListMatcher<TestData> matcher(std::nullopt);
 
   matcher.addMatcher(createSingleMatcher(
-                         absl::nullopt, [](auto) { return false; }, DataAvailability::NotAvailable),
+                         std::nullopt, [](auto) { return false; }, DataAvailability::NotAvailable),
                      stringOnMatch<TestData>("match"));
 
   ActionMatchResult recursive_result = evaluateMatch(matcher, TestData());
@@ -1115,12 +1115,12 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
 
 // Ensure that a nested matcher that has an internal failure surfaces the error.
 TEST_P(MatcherAmbiguousTest, KeepMatchingWithFailingNestedMatcher) {
-  auto matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
+  auto matcher = std::make_shared<ListMatcher<TestData>>(std::nullopt);
 
   matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                       stringOnMatch<TestData>("match", /*keep_matching=*/true));
 
-  auto nested_matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
+  auto nested_matcher = std::make_shared<ListMatcher<TestData>>(std::nullopt);
   nested_matcher->addMatcher(
       createSingleMatcher(
           "string", [](auto) { return true; }, DataAvailability::NotAvailable),

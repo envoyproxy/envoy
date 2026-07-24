@@ -79,7 +79,7 @@ void copyOkResponseMutations(ResponsePtr& response,
 }
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
+                               const std::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.auth.v3.Authorization.Check")) {}
@@ -105,8 +105,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   request_ = async_client_->send(service_method_, request, *this, parent_span, options);
 }
 
-void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckResponse>&& response,
-                               Tracing::Span& span) {
+void GrpcClientImpl::onSuccess(
+    Grpc::ResponsePtr<envoy::service::auth::v3::CheckResponse>&& response, Tracing::Span& span) {
   ENVOY_LOG(trace, "Received CheckResponse: {}", response->DebugString());
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
   authz_response->grpc_status = response->status().code();

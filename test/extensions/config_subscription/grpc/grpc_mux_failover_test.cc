@@ -35,7 +35,7 @@ protected:
               primary_callbacks_ = callbacks;
               return std::move(primary_stream_owner_);
             },
-            /*failover_stream_creator=*/absl::nullopt,
+            /*failover_stream_creator=*/std::nullopt,
             /*grpc_mux_callbacks=*/grpc_mux_callbacks_,
             /*dispatcher=*/dispatcher_) {}
 

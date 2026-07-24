@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,8 +20,6 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_utility.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -40,6 +39,24 @@ public:
 
 private:
   const Envoy::Config::MetadataKey metadata_key_;
+};
+
+/**
+ * Populate rate limit override from a static configuration value.
+ */
+class StaticRateLimitOverride : public RateLimitOverrideAction {
+public:
+  StaticRateLimitOverride(
+      const envoy::config::route::v3::RateLimit::Override::RateLimitOverride& config)
+      : requests_per_unit_(config.requests_per_unit()), unit_(config.unit()) {}
+
+  // Router::RateLimitOverrideAction
+  bool populateOverride(RateLimit::Descriptor& descriptor,
+                        const envoy::config::core::v3::Metadata* metadata) const override;
+
+private:
+  const uint32_t requests_per_unit_;
+  const envoy::type::v3::RateLimitUnit unit_;
 };
 
 /**
@@ -311,7 +328,7 @@ private:
   const std::string disable_key_;
   const uint64_t stage_;
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
-  absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
+  std::optional<RateLimitOverrideActionPtr> limit_override_ = std::nullopt;
   const bool apply_on_stream_done_ = false;
   const RateLimit::XRateLimitOption x_ratelimit_option_{};
 };

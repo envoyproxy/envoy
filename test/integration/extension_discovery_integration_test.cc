@@ -109,12 +109,12 @@ public:
                                   "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
                   )EOF");
 
-              discovery->mutable_default_config()->PackFrom(default_configuration);
+              std::ignore = discovery->mutable_default_config()->PackFrom(default_configuration);
             } else {
               const auto default_configuration =
                   TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
                       "code: 403");
-              discovery->mutable_default_config()->PackFrom(default_configuration);
+              std::ignore = discovery->mutable_default_config()->PackFrom(default_configuration);
             }
           }
           discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -279,7 +279,7 @@ public:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TestTypeUrl::get().Listener);
-    response.add_resources()->PackFrom(listener_config_);
+    std::ignore = response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }
 
@@ -291,12 +291,12 @@ public:
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
     }
-    resource.mutable_resource()->PackFrom(typed_config);
+    std::ignore = resource.mutable_resource()->PackFrom(typed_config);
 
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
-    response.add_resources()->PackFrom(resource);
+    std::ignore = response.add_resources()->PackFrom(resource);
     ecds_stream->sendGrpcMessage(response);
   }
 
@@ -309,12 +309,12 @@ public:
       const auto configuration =
           TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
               yaml_config);
-      typed_config.mutable_typed_config()->PackFrom(configuration);
+      std::ignore = typed_config.mutable_typed_config()->PackFrom(configuration);
     } else {
       const auto configuration =
           TestUtility::parseYaml<test::integration::filters::SetIsTerminalFilterConfig>(
               yaml_config);
-      typed_config.mutable_typed_config()->PackFrom(configuration);
+      std::ignore = typed_config.mutable_typed_config()->PackFrom(configuration);
     }
     sendEcdsResponse(typed_config, name, version, ttl, ecds_stream_);
   }
@@ -325,7 +325,7 @@ public:
     typed_config.set_name(name);
     auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
     configuration.set_drain_bytes(drain_bytes);
-    typed_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(configuration);
     sendEcdsResponse(typed_config, name, version, false, ecds2_stream_);
   }
 
@@ -630,8 +630,10 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfigInvalid) {
   hcm_config.mutable_http_filters(0)->mutable_config_discovery()->mutable_type_urls()->Clear();
   hcm_config.mutable_http_filters(0)->mutable_config_discovery()->add_type_urls(
       "type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig");
-  listener_config_.mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config()->PackFrom(
-      hcm_config);
+  std::ignore = listener_config_.mutable_filter_chains(0)
+                    ->mutable_filters(0)
+                    ->mutable_typed_config()
+                    ->PackFrom(hcm_config);
 
   sendLdsResponse("updated");
   test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
@@ -910,25 +912,25 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ConfigDumpWithTwoSubscriptionTypes) {
 
   // Unpack the HTTP filter.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump_http;
-  config_dump.configs(2).UnpackTo(&ecds_config_dump_http);
+  std::ignore = config_dump.configs(2).UnpackTo(&ecds_config_dump_http);
   EXPECT_EQ("1", ecds_config_dump_http.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig http_filter_config;
   EXPECT_TRUE(ecds_config_dump_http.ecds_filters(0).ecds_filter().UnpackTo(&http_filter_config));
   EXPECT_EQ("foo", http_filter_config.name());
   test::integration::filters::SetResponseCodeFilterConfig http_config;
-  http_filter_config.typed_config().UnpackTo(&http_config);
+  std::ignore = http_filter_config.typed_config().UnpackTo(&http_config);
   EXPECT_EQ("/private", http_config.prefix());
   EXPECT_EQ(403, http_config.code());
 
   // Unpack the listener filter.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump_listener;
-  config_dump.configs(3).UnpackTo(&ecds_config_dump_listener);
+  std::ignore = config_dump.configs(3).UnpackTo(&ecds_config_dump_listener);
   EXPECT_EQ("2", ecds_config_dump_listener.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump_listener.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
   test::integration::filters::TestTcpListenerFilterConfig listener_config;
-  filter_config.typed_config().UnpackTo(&listener_config);
+  std::ignore = filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ(7, listener_config.drain_bytes());
 }
 

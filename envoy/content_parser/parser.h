@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -9,7 +10,6 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace ContentParser {
@@ -23,7 +23,7 @@ namespace ContentParser {
 struct MetadataAction {
   std::string namespace_; // Must be non-empty (parser applies defaults)
   std::string key;
-  absl::optional<Protobuf::Value> value; // If empty, value extraction failed
+  std::optional<Protobuf::Value> value; // If empty, value extraction failed
   bool preserve_existing = false;
 };
 
@@ -38,7 +38,7 @@ struct ParseResult {
   bool stop_processing = false;
 
   // Error message if parsing failed (e.g., invalid JSON). Empty if no error.
-  absl::optional<std::string> error_message;
+  std::optional<std::string> error_message;
 };
 
 /**

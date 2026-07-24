@@ -195,7 +195,7 @@ bool RoleBasedAccessControlFilter::evaluateShadowEngine(const Http::RequestHeade
 
 // Evaluates the enforced engine policy and returns the appropriate filter status
 Http::FilterHeadersStatus
-RoleBasedAccessControlFilter::evaluateEnforcedEngine(Http::RequestHeaderMap& headers,
+RoleBasedAccessControlFilter::evaluateEnforcedEngine(const Http::RequestHeaderMap& headers,
                                                      Protobuf::Struct& metrics) const {
   const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine == nullptr) {
@@ -231,7 +231,7 @@ RoleBasedAccessControlFilter::evaluateEnforcedEngine(Http::RequestHeaderMap& hea
   }
 
   ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
-  callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr, absl::nullopt,
+  callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr, std::nullopt,
                              Filters::Common::RBAC::responseDetail(log_policy_id));
   config_->stats().denied_.inc();
   if (!effective_policy_id.empty() && per_rule_stats_enabled) {

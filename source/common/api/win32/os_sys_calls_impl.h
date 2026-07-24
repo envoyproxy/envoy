@@ -34,6 +34,7 @@ public:
   bool supportsUdpGso() const override;
   bool supportsIpTransparent(Network::Address::IpVersion version) const override;
   bool supportsMptcp() const override;
+  bool supportsReusePortBpfCpuSteering() const override;
   SysCallIntResult close(os_fd_t fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,

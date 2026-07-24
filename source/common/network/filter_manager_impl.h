@@ -219,7 +219,7 @@ private:
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<ActiveWriteFilterPtr> downstream_filters_;
   State state_;
-  absl::optional<ConnectionCloseAction> latched_close_action_;
+  std::optional<ConnectionCloseAction> latched_close_action_;
   AccessLog::InstanceSharedPtrVector access_logs_;
 };
 
