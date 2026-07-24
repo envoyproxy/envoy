@@ -104,6 +104,20 @@ TEST_P(FilterIntegrationTest, OnLocalReply) {
     ASSERT_TRUE(response->waitForReset());
     ASSERT_FALSE(response->complete());
   }
+  // The illegal Content-Length value will cause a local reply to be sent before the
+  // filter chain is constructed. In that case the filter manager will construct the filter chain
+  // just before calling onLocalReply.
+  // HTTP2 just resets the stream instead, so we don't test it.
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+  {
+    default_request_headers_.addCopy("Content-Length", "-1");
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString{"saw-on-local-reply"}).empty());
+  }
 }
 
 TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
