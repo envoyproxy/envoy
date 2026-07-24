@@ -683,8 +683,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
     toolchains_llvm = dict(
-        version = "1.7.0",
-        sha256 = "85c341e957ba58482892a8088e4a34391d15bd98917f0993ecb62f008d6986d6",
+        version = "1.8.0",
+        sha256 = "3b05826f256040f91c24dcaad673eb1c91e4cc93f4043d0205f2512327640205",
         strip_prefix = "toolchains_llvm-v{version}",
         urls = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
     ),
