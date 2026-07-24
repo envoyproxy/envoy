@@ -394,6 +394,11 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
+  // Validate that the stat prefix for HCM listener stats is
+  // "filter_chain.dynamic_filter_chain_1.http.fcds_test".
+  test_server_->waitForCounter(
+      "filter_chain.dynamic_filter_chain_1.http.fcds_test.downstream_rq_2xx", Ge(1));
+
   // Now perform in-place FCDS update removing the filter chain.
   // We send an empty list of filter chains, which means dynamic_filter_chain_1 is removed.
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
