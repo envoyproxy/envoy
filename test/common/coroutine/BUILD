@@ -32,6 +32,7 @@ envoy_cc_test(
         "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:leaf_awaitable_lib",
         "//source/common/coroutine:task_lib",
+        "//test/test_common:utility_lib",
         "@abseil-cpp//absl/cleanup",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",

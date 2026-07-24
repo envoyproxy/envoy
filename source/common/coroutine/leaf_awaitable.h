@@ -30,9 +30,13 @@ namespace Coroutine {
  * `absl::Status` itself or `absl::StatusOr<X>`); the body then propagates that
  * status to a normal `co_return`.
  *
- * Contract for derived types: `onStart()` must arrange asynchronous completion.
- * It must not call `complete()` synchronously within `onStart()` -- the frame is
- * mid-suspend at that point and resuming it inline would be undefined.
+ * Contract for derived types:
+ *   - `onStart()` must arrange asynchronous completion. It must not call
+ *     `complete()` synchronously within `onStart()` -- the frame is mid-suspend at
+ *     that point and resuming it inline would be undefined.
+ *   - `onCancel()` must cancel the pending op and must not call `complete()`: the
+ *     cancel path already delivers the aborted value, so a `complete()` here would
+ *     resume the parent twice (a use-after-free). It is guarded by an ENVOY_BUG.
  */
 template <typename T> class LeafAwaitable {
   static_assert(std::is_constructible_v<T, absl::Status>,
@@ -47,6 +51,7 @@ public:
     continuation_ = continuation;
     // Register the cancel action while this is the pending leaf.
     context_->cancellation()->setCancelCallback([this] {
+      cancelling_ = true;
       onCancel();
       finish(abortedValue());
     });
@@ -71,7 +76,13 @@ protected:
   virtual void onCancel() PURE; // cancel the pending op (honor its cancel contract).
 
   // Called by derived when the real event fires.
-  void complete(T value) { finish(std::move(value)); }
+  void complete(T value) {
+    if (!cancelling_) {
+      finish(std::move(value));
+    } else {
+      IS_ENVOY_BUG("complete() should not be called during onCancel(). Ignoring the value.");
+    }
+  }
 
   CoroutineContext& context() { return *context_; }
 
@@ -94,6 +105,7 @@ private:
     }
   }
 
+  bool cancelling_ = false;
   bool finished_ = false;
   std::optional<T> result_;
   std::coroutine_handle<> continuation_{};

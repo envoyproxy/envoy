@@ -7,6 +7,7 @@
 #include "source/common/coroutine/task.h"
 
 #include "test/common/coroutine/manual_executor.h"
+#include "test/test_common/utility.h"
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/status/status.h"
@@ -25,6 +26,9 @@ namespace {
 struct LeafController {
   bool started = false;
   bool cancelled = false;
+  // When set, the leaf's onCancel() erroneously calls complete() -- a contract
+  // violation used to exercise the ENVOY_BUG guard in LeafAwaitable::complete().
+  bool complete_during_on_cancel = false;
   Executor* observed_executor = nullptr;
   // Valid while the leaf is the pending op; invoking it delivers a value.
   absl::AnyInvocable<void(absl::Status)> completer;
@@ -52,6 +56,12 @@ protected:
   void onCancel() override {
     controller_.cancelled = true;
     controller_.completer = nullptr;
+    if (controller_.complete_during_on_cancel) {
+      // Illegal: completing here would make finish() resume the parent, which can
+      // destroy this leaf before the cancel path's own finish() runs (UAF). The
+      // guard must turn this into a no-op (ENVOY_BUG), not a second finish().
+      complete(absl::OkStatus());
+    }
   }
 
 private:
@@ -214,6 +224,34 @@ TEST(LeafAwaitableTest, CancelledWhilePendingFiresOnCancelAndUnwinds) {
   EXPECT_TRUE(controller.cancelled);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(absl::IsCancelled(*result));
+}
+
+// Calling complete() from within onCancel() is a contract violation: it must be
+// flagged by ENVOY_BUG and swallowed. In a release build (where the bug only logs)
+// the value passed to complete() is dropped and the chain still finishes with the
+// cancellation status -- the guard prevents a second finish()/double-resume (UAF).
+TEST(LeafAwaitableTest, CompleteDuringOnCancelIsEnvoyBugAndSwallowed) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+  controller.complete_during_on_cancel = true;
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(awaitLeaf(controller), exec,
+                                 [&result](absl::Status status) { result = std::move(status); });
+  exec->drain();
+  ASSERT_TRUE(controller.started);
+
+  EXPECT_ENVOY_BUG(handle.cancel(), "complete() should not be called during onCancel()");
+
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+  // In release/coverage builds the ENVOY_BUG only logs, so cancel() ran to
+  // completion in-process: the OkStatus from complete() was swallowed and the
+  // chain finished with the cancellation status instead. (In debug builds
+  // EXPECT_ENVOY_BUG forks and is fatal, so these post-conditions are unobservable
+  // from the parent.)
+  EXPECT_TRUE(controller.cancelled);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(absl::IsCancelled(*result));
+#endif
 }
 
 TEST(LeafAwaitableTest, PreCancelledScopeFailsFastWithoutStarting) {
