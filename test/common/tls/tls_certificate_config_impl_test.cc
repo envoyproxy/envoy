@@ -87,6 +87,32 @@ TEST_F(TlsCertificateConfigImplTest, CertLevelTLSv1_0And1_1Parsed) {
   EXPECT_EQ(TlsProto::TLSv1_1, params->max_protocol_version);
 }
 
+TEST_F(TlsCertificateConfigImplTest, CertLevelEcdhCurvesAndMaxVersionParsed) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_3
+        ecdh_curves: "P-384:P-256"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+
+  const Ssl::TlsParams* params = cfg->tlsCertificates()[0].get().tlsParams();
+  using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  ASSERT_NE(nullptr, params);
+  EXPECT_EQ(TlsProto::TLSv1_2, params->min_protocol_version);
+  EXPECT_EQ(TlsProto::TLSv1_3, params->max_protocol_version);
+  EXPECT_EQ("P-384:P-256", params->ecdh_curves);
+}
+
 TEST_F(TlsCertificateConfigImplTest, CertLevelCompliancePolicyParsed) {
   using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
   const std::string yaml = R"EOF(

@@ -6,10 +6,9 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
-#include "source/common/common/utility.h"
 #include "source/common/config/datasource.h"
+#include "source/common/tls/utility.h"
 
-#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "openssl/ssl.h"
 
@@ -132,7 +131,6 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     }
   }
   if (config.has_tls_params()) {
-    using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
     const auto& p = config.tls_params();
     if (p.compliance_policies_size() > 1) {
       creation_status = absl::InvalidArgumentError(
@@ -146,62 +144,11 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
         .ecdh_curves = absl::StrJoin(p.ecdh_curves(), ":"),
         .signature_algorithms = absl::StrJoin(p.signature_algorithms(), ":"),
         .compliance_policy =
-            p.compliance_policies_size() > 0
-                ? std::optional<TlsProto::CompliancePolicy>(p.compliance_policies(0))
-                : std::nullopt,
+            Extensions::TransportSockets::Tls::Utility::compliancePolicyFromProto(p),
     };
     bssl::UniquePtr<SSL_CTX> validation_ctx(SSL_CTX_new(TLS_method()));
-    if (!tls_params_->cipher_suites.empty() &&
-        !SSL_CTX_set_strict_cipher_list(validation_ctx.get(), tls_params_->cipher_suites.c_str())) {
-      std::vector<absl::string_view> ciphers =
-          StringUtil::splitToken(tls_params_->cipher_suites, ":+![|]", false);
-      std::vector<std::string> bad_ciphers;
-      for (const auto& cipher : ciphers) {
-        std::string cipher_str(cipher);
-        if (absl::StartsWith(cipher_str, "-")) {
-          cipher_str.erase(cipher_str.begin());
-        }
-        if (!SSL_CTX_set_strict_cipher_list(validation_ctx.get(), cipher_str.c_str())) {
-          bad_ciphers.push_back(cipher_str);
-        }
-      }
-      creation_status = absl::InvalidArgumentError(fmt::format(
-          "Failed to initialize cipher suites {}. The following ciphers were rejected when tried "
-          "individually: {}",
-          tls_params_->cipher_suites, absl::StrJoin(bad_ciphers, ", ")));
-      return;
-    }
-    if (!tls_params_->ecdh_curves.empty() &&
-        !SSL_CTX_set1_curves_list(validation_ctx.get(), tls_params_->ecdh_curves.c_str())) {
-      creation_status = absl::InvalidArgumentError(
-          absl::StrCat("Failed to initialize ECDH curves ", tls_params_->ecdh_curves));
-      return;
-    }
-    if (!tls_params_->signature_algorithms.empty() &&
-        !SSL_CTX_set1_sigalgs_list(validation_ctx.get(),
-                                   tls_params_->signature_algorithms.c_str())) {
-      creation_status = absl::InvalidArgumentError(absl::StrCat(
-          "Failed to initialize TLS signature algorithms ", tls_params_->signature_algorithms));
-      return;
-    }
-    if (tls_params_->compliance_policy.has_value()) {
-      using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
-      switch (tls_params_->compliance_policy.value()) {
-      case TlsProto::FIPS_202205:
-        if (SSL_CTX_set_compliance_policy(validation_ctx.get(),
-                                          ssl_compliance_policy_fips_202205) != 1) {
-          creation_status = absl::InvalidArgumentError(
-              "Failed to apply FIPS_202205 compliance policy in per-certificate tls_params");
-          return;
-        }
-        break;
-      // New policy values must be explicitly handled here before being accepted.
-      default:
-        creation_status =
-            absl::InvalidArgumentError("Unknown compliance policy in per-certificate tls_params");
-        return;
-      }
-    }
+    creation_status =
+        Extensions::TransportSockets::Tls::Utility::validateTlsParamsProto(p, validation_ctx.get());
   }
 }
 

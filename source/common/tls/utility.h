@@ -3,11 +3,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/parsed_x509_name.h"
 
 #include "source/common/common/utility.h"
 
+#include "absl/status/status.h"
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -194,6 +196,22 @@ std::vector<std::string> getCertificateSansForLogging(X509* cert);
  * @return std::vector returns the list of CRL distribution points as strings.
  */
 std::vector<std::string> getCertificateCrlDpsForLogging(X509* cert);
+
+/**
+ * Extracts at most one CompliancePolicy from a TlsParameters proto. Returns nullopt when none are
+ * set, and the first policy when exactly one is set. Logs an ENVOY_BUG for > 1.
+ */
+absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+compliancePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params);
+
+/**
+ * Validates cipher_suites, ecdh_curves, signature_algorithms, and compliance_policy in params
+ * against ssl_ctx. Returns an error status if any field is rejected by BoringSSL.
+ */
+absl::Status
+validateTlsParamsProto(const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params,
+                       SSL_CTX* ssl_ctx);
 
 } // namespace Utility
 } // namespace Tls
