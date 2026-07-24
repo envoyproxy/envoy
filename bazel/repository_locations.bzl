@@ -571,8 +571,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
     cel_cpp = dict(
-        version = "0.14.0",
-        sha256 = "0a4f9a1c0bcc83629eb30d1c278883d32dec0f701efcdabd7bebf33fef8dab71",
+        version = "0.15.0",
+        sha256 = "095e560911ce84cefb886ad9540ca961fd6d7879de441a864e877e6e5f132b02",
         strip_prefix = "cel-cpp-{version}",
         urls = ["https://github.com/google/cel-cpp/archive/v{version}.tar.gz"],
     ),
