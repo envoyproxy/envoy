@@ -149,7 +149,8 @@ protected:
   // Helper to create a DownstreamReverseConnectionIOHandle.
   std::unique_ptr<DownstreamReverseConnectionIOHandle>
   createHandle(ReverseConnectionIOHandle* parent = nullptr,
-               const std::string& connection_key = "test_connection_key") {
+               const std::string& connection_key = "test_connection_key",
+               uint64_t connection_id = 0) {
     // Create a new mock socket for each handle to avoid releasing the shared one.
     auto new_mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     auto new_mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
@@ -163,7 +164,7 @@ protected:
 
     auto socket_ptr = std::unique_ptr<Network::ConnectionSocket>(new_mock_socket.release());
     return std::make_unique<DownstreamReverseConnectionIOHandle>(std::move(socket_ptr), parent,
-                                                                 connection_key);
+                                                                 connection_key, connection_id);
   }
 
   // Test fixtures.
@@ -250,7 +251,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, OnPingMessageWritesRpingToSocket
 
   auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
   auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-      std::move(socket_ptr), io_handle_.get(), "test_ping_key");
+      std::move(socket_ptr), io_handle_.get(), "test_ping_key", /*connection_id=*/1);
 
   handle->onPingMessage();
 
@@ -285,7 +286,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
     // Create handle with the socket.
     auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
     auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-        std::move(socket_ptr), io_handle_.get(), "test_key");
+        std::move(socket_ptr), io_handle_.get(), "test_key", /*connection_id=*/1);
 
     // Write RPING to the other end of the socket pair.
     ssize_t written = write(fds[1], rping_msg.data(), rping_msg.size());
@@ -324,7 +325,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
     auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-        std::move(socket_ptr), io_handle_.get(), "test_key2");
+        std::move(socket_ptr), io_handle_.get(), "test_key2", /*connection_id=*/2);
 
     const std::string app_data = "GET /path HTTP/1.1\r\n";
     const std::string combined = rping_msg + app_data;
@@ -364,7 +365,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
     auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-        std::move(socket_ptr), io_handle_.get(), "test_key3");
+        std::move(socket_ptr), io_handle_.get(), "test_key3", /*connection_id=*/3);
 
     const std::string http_data = "GET /path HTTP/1.1\r\n";
 
@@ -411,7 +412,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadPartialDataAndStateTransitio
 
     auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
     auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-        std::move(socket_ptr), io_handle_.get(), "test_key");
+        std::move(socket_ptr), io_handle_.get(), "test_key", /*connection_id=*/1);
 
     // Write partial RPING (first 3 bytes).
     const std::string partial_rping = rping_msg.substr(0, 3);
@@ -443,7 +444,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadPartialDataAndStateTransitio
 
     auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
     auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-        std::move(socket_ptr), io_handle_.get(), "test_key2");
+        std::move(socket_ptr), io_handle_.get(), "test_key2", /*connection_id=*/2);
 
     const std::string http_data = "GET /path";
 
@@ -489,7 +490,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
 
     auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
     auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-        std::move(socket_ptr), io_handle_.get(), "test_key");
+        std::move(socket_ptr), io_handle_.get(), "test_key", /*connection_id=*/1);
 
     // First, disable echo by sending HTTP data.
     const std::string http_data = "HTTP/1.1";
@@ -536,7 +537,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadEchoDisabledAndErrorHandling
 
     auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
     auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-        std::move(socket_ptr), io_handle_.get(), "test_key2");
+        std::move(socket_ptr), io_handle_.get(), "test_key2", /*connection_id=*/2);
 
     // Close write end to simulate EOF.
     close(fds[1]);
@@ -565,7 +566,8 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, CloseAndDestructorNoDoubleClose)
   EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_socket->io_handle_));
 
   auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose");
+      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose",
+      /*connection_id=*/7);
   handle->close();
   handle.reset();
 
@@ -587,7 +589,8 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, DoubleCloseCallNoDoubleClose) {
   EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_socket->io_handle_));
 
   auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose");
+      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose",
+      /*connection_id=*/7);
   handle->close();
   handle->close();
   handle.reset();
@@ -610,7 +613,8 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, DoubleShutdownCallNoDoubleClose)
   EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_socket->io_handle_));
 
   auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose");
+      std::move(mock_socket), io_handle_.get(), "CloseAndDestructorNoDoubleClose",
+      /*connection_id=*/7);
   handle->shutdown(0);
   handle->shutdown(0);
 

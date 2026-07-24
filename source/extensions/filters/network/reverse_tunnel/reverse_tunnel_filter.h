@@ -158,7 +158,9 @@ private:
 
   // Process reverse tunnel connection.
   void processAcceptedConnection(absl::string_view node_id, absl::string_view cluster_id,
-                                 absl::string_view tenant_id, int64_t initiation_time_ms);
+                                 absl::string_view tenant_id, int64_t initiation_time_ms,
+                                 absl::string_view initiator_worker_id,
+                                 absl::string_view initiator_connection_id);
 
   ReverseTunnelFilterConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{nullptr};

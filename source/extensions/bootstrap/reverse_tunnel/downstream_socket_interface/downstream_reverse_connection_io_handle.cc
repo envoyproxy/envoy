@@ -13,9 +13,9 @@ namespace ReverseConnection {
 // DownstreamReverseConnectionIOHandle constructor implementation
 DownstreamReverseConnectionIOHandle::DownstreamReverseConnectionIOHandle(
     Network::ConnectionSocketPtr socket, ReverseConnectionIOHandle* parent,
-    const std::string& connection_key)
+    const std::string& connection_key, uint64_t connection_id)
     : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), owned_socket_(std::move(socket)),
-      parent_(parent), connection_key_(connection_key) {
+      parent_(parent), connection_key_(connection_key), connection_id_(connection_id) {
   ENVOY_LOG(debug,
             "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {} for "
             "connection key: {}",
@@ -67,7 +67,7 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
   // Notify the parent that this downstream connection has been closed.
   // This can trigger re-initiation of the reverse connection if needed.
   if (parent_) {
-    parent_->onDownstreamConnectionClosed(connection_key_);
+    parent_->onDownstreamConnectionClosed(connection_key_, connection_id_);
     ENVOY_LOG(
         debug,
         "DownstreamReverseConnectionIOHandle: notified parent of connection closure for key: {}",

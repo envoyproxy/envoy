@@ -112,6 +112,23 @@ inline const Http::LowerCaseString& reverseTunnelInitiationTimeHeader() {
   return kHeader;
 }
 
+// Identifies the initiator worker thread that opened the tunnel (the worker dispatcher name, e.g.
+// "worker_2"). Distinguishes tunnels originating from different workers of the same initiator.
+inline const Http::LowerCaseString& reverseTunnelWorkerIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-worker-id")};
+  return kHeader;
+}
+
+// The initiator's per-connection identifier (Envoy's monotonic connection id) for the outbound
+// handshake connection. Combined with the worker id, distinguishes individual tunnels from the
+// same initiator instance.
+inline const Http::LowerCaseString& reverseTunnelConnectionIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-connection-id")};
+  return kHeader;
+}
+
 class ReverseConnectionMessageHandlerFactory {
 public:
   static std::shared_ptr<class PingMessageHandler> createPingHandler();

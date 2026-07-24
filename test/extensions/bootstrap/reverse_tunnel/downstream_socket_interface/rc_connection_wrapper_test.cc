@@ -746,6 +746,50 @@ TEST_F(RCConnectionWrapperTest, ConnectHonorsSuppliedInitiationTime) {
   EXPECT_EQ(timestamp_ms, supplied_ms);
 }
 
+// Test that connect() includes the worker-id and connection-id handshake headers, sourced from the
+// connection's dispatcher name and connection id respectively.
+TEST_F(RCConnectionWrapperTest, ConnectIncludesWorkerAndConnectionIdHeaders) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(98765));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_address,
+                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+        static auto mock_provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
+        return *mock_provider;
+      }));
+
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  const std::string encoded_request = captured_buffer.toString();
+
+  // The worker id is the connection's dispatcher name ("worker_0" in this fixture).
+  EXPECT_NE(encoded_request.find("x-envoy-reverse-tunnel-worker-id: worker_0"), std::string::npos)
+      << "worker-id header not found in handshake request: " << encoded_request;
+  // The connection id is the mocked connection id.
+  EXPECT_NE(encoded_request.find("x-envoy-reverse-tunnel-connection-id: 98765"), std::string::npos)
+      << "connection-id header not found in handshake request: " << encoded_request;
+}
+
 // Test RCConnectionWrapper::connect() method with connection write failure.
 TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWriteFailure) {
   // Create a mock connection that fails to write.

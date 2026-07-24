@@ -2348,7 +2348,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   }
 
   // Step 4: Simulate downstream connection closure.
-  io_handle_->onDownstreamConnectionClosed(connection_key);
+  io_handle_->onDownstreamConnectionClosed(connection_key, /*connection_id=*/12345);
 
   // Verify connection key is removed from host tracking.
   host_it = getHostToConnInfoMap().find("192.168.1.1");
@@ -3426,7 +3426,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNo
   io_handle_ = createTestIOHandle(config);
   ASSERT_NE(io_handle_, nullptr);
 
-  io_handle_->onDownstreamConnectionClosed("203.0.113.9:9999");
+  io_handle_->onDownstreamConnectionClosed("203.0.113.9:9999", /*connection_id=*/0);
   EXPECT_TRUE(getHostToConnInfoMap().empty());
 }
 

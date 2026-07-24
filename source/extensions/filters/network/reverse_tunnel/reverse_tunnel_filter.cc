@@ -538,7 +538,21 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     }
   }
 
-  parent_.processAcceptedConnection(node_id, cluster_id, tenant_id, initiation_time_ms);
+  // Extract the initiator's worker and connection identifiers if present. Both are optional so
+  // older initiators that do not advertise them are handled gracefully (empty values).
+  const auto initiator_worker_vals =
+      headers_->get(Bootstrap::ReverseConnection::reverseTunnelWorkerIdHeader());
+  const absl::string_view initiator_worker_id =
+      initiator_worker_vals.empty() ? absl::string_view{}
+                                    : initiator_worker_vals[0]->value().getStringView();
+  const auto initiator_connection_vals =
+      headers_->get(Bootstrap::ReverseConnection::reverseTunnelConnectionIdHeader());
+  const absl::string_view initiator_connection_id =
+      initiator_connection_vals.empty() ? absl::string_view{}
+                                        : initiator_connection_vals[0]->value().getStringView();
+
+  parent_.processAcceptedConnection(node_id, cluster_id, tenant_id, initiation_time_ms,
+                                    initiator_worker_id, initiator_connection_id);
   parent_.stats_.accepted_.inc();
 
   // Close the listener-side connection so tunnel bytes go to the duped fd, not back into
@@ -553,7 +567,9 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
                                                     absl::string_view cluster_id,
                                                     absl::string_view tenant_id,
-                                                    int64_t initiation_time_ms) {
+                                                    int64_t initiation_time_ms,
+                                                    absl::string_view initiator_worker_id,
+                                                    absl::string_view initiator_connection_id) {
   ENVOY_CONN_LOG(debug,
                  "reverse_tunnel: connection accepted for node '{}' in cluster '{}' (tenant: '{}')",
                  read_callbacks_->connection(), node_id, cluster_id, tenant_id);
@@ -617,7 +633,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
   socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
                                       std::move(wrapped_socket), ping_seconds,
-                                      /* rebalanced= */ config_->skipRebalancing(), tenant_id);
+                                      /* rebalanced= */ config_->skipRebalancing(), tenant_id,
+                                      initiator_worker_id, initiator_connection_id);
   ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                  connection);
 
