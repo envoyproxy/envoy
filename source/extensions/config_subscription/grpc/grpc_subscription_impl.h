@@ -32,6 +32,7 @@ public:
   void
   updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) override;
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) override;
+  void accept(const absl::flat_hash_set<std::string>& patterns) override;
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                               const std::string& version_info) override;
@@ -53,6 +54,10 @@ private:
   SubscriptionStats stats_;
   const std::string type_url_;
   GrpcMuxWatchPtr watch_;
+  // accept() patterns declared before start() (i.e. before watch_ exists). They are applied to the
+  // watch in start(), before the gRPC stream is started, so the routing filter is in effect before
+  // any resource can be delivered. Empty once applied (or if accept() was never called early).
+  absl::flat_hash_set<std::string> deferred_accept_patterns_;
   Event::Dispatcher& dispatcher_;
   // NOTE: if another subscription of the same type_url has already been started, this value will be
   // ignored in favor of the other subscription's.

@@ -53,9 +53,6 @@ public:
                            OpaqueResourceDecoderSharedPtr resource_decoder,
                            const SubscriptionOptions& options) override;
 
-  void requestOnDemandUpdate(const std::string& type_url,
-                             const absl::flat_hash_set<std::string>& for_update) override;
-
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
@@ -104,11 +101,11 @@ public:
   }
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, const bool use_namespace_matching,
-                      Event::Dispatcher& dispatcher, CustomConfigValidators* config_validators,
+    SubscriptionStuff(const std::string& type_url, Event::Dispatcher& dispatcher,
+                      CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
                       EdsResourcesCacheOptRef eds_resources_cache)
-        : watch_map_(use_namespace_matching, type_url, config_validators, eds_resources_cache),
+        : watch_map_(type_url, config_validators, eds_resources_cache),
           sub_state_(type_url, watch_map_, dispatcher, xds_config_tracker) {
       // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
       ASSERT(
@@ -151,6 +148,14 @@ private:
       parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
+    void append(const absl::flat_hash_set<std::string>& resources) override {
+      parent_.appendWatch(type_url_, watch_, resources, options_);
+    }
+
+    void accept(const absl::flat_hash_set<std::string>& patterns) override {
+      parent_.accept(type_url_, watch_, patterns);
+    }
+
   private:
     const std::string type_url_;
     Watch* watch_;
@@ -178,9 +183,23 @@ private:
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
 
+  // Additionally adds resources to the given watch's interest, updating both the watch-map routing
+  // and the subscription (see GrpcMuxWatch::append).
+  void appendWatch(const std::string& type_url, Watch* watch,
+                   const absl::flat_hash_set<std::string>& resources,
+                   const SubscriptionOptions& options);
+  // Registers glob interest for the given watch; routing only, never affects the subscription
+  // (see GrpcMuxWatch::accept).
+  void accept(const std::string& type_url, Watch* watch,
+              const absl::flat_hash_set<std::string>& patterns);
+
+  // Normalizes xdstp:// resource names for the transport; non-xdstp names are returned unchanged.
+  absl::flat_hash_set<std::string>
+  effectiveResources(const absl::flat_hash_set<std::string>& resources,
+                     const SubscriptionOptions& options);
+
   // Adds a subscription for the type_url to the subscriptions map and order list.
-  SubscriptionsMap::iterator addSubscription(const std::string& type_url,
-                                             bool use_namespace_matching);
+  SubscriptionsMap::iterator addSubscription(const std::string& type_url);
 
   void trySendDiscoveryRequests();
 

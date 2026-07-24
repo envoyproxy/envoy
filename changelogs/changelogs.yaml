@@ -52,6 +52,8 @@ areas:
     title: circuit_breaker
   composite:
     title: composite
+  config:
+    title: config
   dns_resolver:
     title: dns_resolver
   dynamic_modules:
