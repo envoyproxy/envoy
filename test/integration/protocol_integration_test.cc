@@ -657,6 +657,29 @@ TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
+// Verifies the upstream peer certificate details are available to access log formatters over
+// TLS upstream connections of every protocol. Over HTTP/3 upstreams these previously logged
+// empty values because the QUIC connection info did not expose the peer certificate.
+TEST_P(ProtocolIntegrationTest, UpstreamPeerCertAccessLog) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    // HTTP/3 upstreams are always TLS; enable TLS explicitly for the TCP-based upstreams.
+    upstream_tls_ = true;
+    config_helper_.configureUpstreamTls();
+  }
+  useAccessLog("%UPSTREAM_PEER_SUBJECT%;%UPSTREAM_PEER_ISSUER%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  // The subject and issuer of the fake upstream's TLS certificate.
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("Test Upstream Server"));
+  EXPECT_THAT(log, HasSubstr("Test Upstream CA"));
+}
+
 TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
