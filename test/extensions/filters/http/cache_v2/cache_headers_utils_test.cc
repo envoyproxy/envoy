@@ -952,6 +952,142 @@ TEST(ShouldUpdateCachedEntry, ComparesEtags) {
   EXPECT_FALSE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
 }
 
+TEST(ShouldUpdateCachedEntry, NoEtagInResponseAllowsUpdate) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  old_headers.setInline(CacheCustomHeaders::etag(), "abc");
+  EXPECT_TRUE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(ShouldUpdateCachedEntry, EtagInResponseButNotCachedBlocksUpdate) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  new_headers.setInline(CacheCustomHeaders::etag(), "abc");
+  EXPECT_FALSE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(MakeKey, SetsFieldsCorrectly) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/foo?bar=baz"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "x.com"}};
+  Key key = CacheHeadersUtils::makeKey(headers, "my_cluster");
+  EXPECT_EQ(key.cluster_name(), "my_cluster");
+  EXPECT_EQ(key.host(), "x.com");
+  EXPECT_EQ(key.path(), "/foo?bar=baz");
+  EXPECT_EQ(key.scheme(), Key::HTTPS);
+}
+
+TEST(MakeKey, HttpScheme) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {":method", "GET"}, {":scheme", "http"}, {":authority", "example.com"}};
+  Key key = CacheHeadersUtils::makeKey(headers, "cluster");
+  EXPECT_EQ(key.scheme(), Key::HTTP);
+}
+
+TEST(RequestCacheControl, QuotedMaxAge) {
+  RequestCacheControl cc("max-age=\"3600\"");
+  EXPECT_TRUE(cc.max_age_.has_value());
+  EXPECT_EQ(cc.max_age_.value(), Seconds(3600));
+}
+
+TEST(InjectValidationHeaders, BothEtagAndInvalidLastModified) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  old_response_headers.setInline(CacheCustomHeaders::etag(), "\"etag-value\"");
+  old_response_headers.setInline(CacheCustomHeaders::lastModified(), "garbage-date");
+  constexpr absl::string_view date = "Fri, 01 Aug 2025 09:25:10 GMT";
+  old_response_headers.setDate(date);
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-none-match", "\"etag-value\""));
+  EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", date));
+}
+
+TEST(ResponseCacheControl, SMaxageTakesPrecedenceOverMaxAge) {
+  ResponseCacheControl cc("s-maxage=100, max-age=200");
+  EXPECT_TRUE(cc.max_age_.has_value());
+  EXPECT_EQ(cc.max_age_.value(), Seconds(100));
+}
+
+TEST(ResponseCacheControl, ProxyRevalidateSetsNoStale) {
+  ResponseCacheControl cc("proxy-revalidate");
+  EXPECT_TRUE(cc.no_stale_);
+  EXPECT_FALSE(cc.must_validate_);
+  EXPECT_FALSE(cc.no_store_);
+}
+
+TEST(RequestCacheControl, MaxStaleWithoutValue) {
+  RequestCacheControl cc("max-stale");
+  EXPECT_TRUE(cc.max_stale_.has_value());
+  EXPECT_EQ(cc.max_stale_.value(), SystemTime::duration::max());
+}
+
+TEST(ShouldUpdateCachedEntry, NeitherHasEtag) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  EXPECT_TRUE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(ShouldUpdateCachedEntry, MatchingEtagsAllowUpdate) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  old_headers.setInline(CacheCustomHeaders::etag(), "\"same\"");
+  new_headers.setInline(CacheCustomHeaders::etag(), "\"same\"");
+  EXPECT_TRUE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(ShouldUpdateCachedEntry, MismatchedEtagsBlockUpdate) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  old_headers.setInline(CacheCustomHeaders::etag(), "\"old\"");
+  new_headers.setInline(CacheCustomHeaders::etag(), "\"new\"");
+  EXPECT_FALSE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+}
+
+TEST(InjectValidationHeaders, BothEtagAndValidLastModified) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  old_response_headers.setInline(CacheCustomHeaders::etag(), "\"etag-value\"");
+  constexpr absl::string_view mod_time = "Fri, 01 Aug 2025 09:25:10 GMT";
+  old_response_headers.setInline(CacheCustomHeaders::lastModified(), mod_time);
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-none-match", "\"etag-value\""));
+  EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", mod_time));
+}
+
+TEST(ResponseCacheControl, MustRevalidateSetsNoStale) {
+  ResponseCacheControl cc("must-revalidate");
+  EXPECT_TRUE(cc.no_stale_);
+  EXPECT_FALSE(cc.must_validate_);
+  EXPECT_FALSE(cc.no_store_);
+}
+
+TEST(RequestCacheControl, QuotedMinFresh) {
+  RequestCacheControl cc("min-fresh=\"60\"");
+  EXPECT_TRUE(cc.min_fresh_.has_value());
+  EXPECT_EQ(cc.min_fresh_.value(), Seconds(60));
+}
+
+TEST(ResponseCacheControl, NoTransformAlone) {
+  ResponseCacheControl cc("no-transform");
+  EXPECT_TRUE(cc.no_transform_);
+  EXPECT_FALSE(cc.must_validate_);
+  EXPECT_FALSE(cc.no_store_);
+  EXPECT_FALSE(cc.no_stale_);
+  EXPECT_FALSE(cc.is_public_);
+}
+
+TEST(RequestCacheControl, OnlyIfCachedAlone) {
+  RequestCacheControl cc("only-if-cached");
+  EXPECT_TRUE(cc.only_if_cached_);
+  EXPECT_FALSE(cc.must_validate_);
+  EXPECT_FALSE(cc.no_store_);
+  EXPECT_FALSE(cc.no_transform_);
+}
+
 } // namespace
 } // namespace CacheV2
 } // namespace HttpFilters
