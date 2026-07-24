@@ -545,8 +545,7 @@ TEST_F(HttpFilterTest, FullDuplexStreamedNoBodyDuplicationOnRetryBuffer) {
 
   processRequestTrailers(std::nullopt, false);
 
-  // the filter must returning Continue without processing 
-  // to prevent body duplication.
+  // the filter must return Continue without processing to prevent body duplication.
   Buffer::OwnedImpl replayed_data("hello world");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(replayed_data, false));
 
@@ -593,8 +592,7 @@ TEST_F(HttpFilterTest, FullDuplexStreamedNoBodyDuplicationOnRetryBufferNoTrailer
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
-  // the filter must returning Continue without processing 
-  // to prevent body duplication.
+  // the filter must return Continue without processing to prevent body duplication.
   Buffer::OwnedImpl replayed_data("hello world");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(replayed_data, true));
 
