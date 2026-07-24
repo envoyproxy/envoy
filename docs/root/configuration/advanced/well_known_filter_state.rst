@@ -152,6 +152,21 @@ configuration with a :ref:`factory lookup key
   <arch_overview_advanced_filter_state_sharing>`. Please use with care as it can lead to significant
   increase in the number of upstream connections when used with HTTP upstreams.
 
+``envoy.bool``
+  A generic boolean object factory for creating filter state entries with boolean values.
+  Accepts the following case-insensitive values: ``true``, ``t``, ``yes``, ``y``, ``1`` for true;
+  ``false``, ``f``, ``no``, ``n``, ``0`` for false. Invalid values default to false.
+
+  Example configuration:
+
+  .. code-block:: yaml
+
+    object_key: my.custom.gate
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "true"
+
 ``envoy.network.ip``
   A factory to create IP addresses from ``IPv4`` and ``IPv6`` address strings.
 

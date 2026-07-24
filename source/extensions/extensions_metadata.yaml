@@ -1271,6 +1271,13 @@ envoy.internal_redirect_predicates.allow_listed_routes:
   status: stable
   type_urls:
   - envoy.extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig
+envoy.internal_redirect_predicates.filter_state:
+  categories:
+  - envoy.internal_redirect_predicates
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.internal_redirect.filter_state.v3.FilterStateConfig
 envoy.internal_redirect_predicates.previous_routes:
   categories:
   - envoy.internal_redirect_predicates

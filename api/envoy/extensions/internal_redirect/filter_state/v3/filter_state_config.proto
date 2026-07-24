@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package envoy.extensions.internal_redirect.filter_state.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.internal_redirect.filter_state.v3";
+option java_outer_classname = "FilterStateConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/internal_redirect/filter_state/v3;filter_statev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Filter-state internal redirect predicate]
+
+// An internal redirect predicate that decides whether to follow a redirect by
+// reading a boolean filter-state object set earlier in the request by another
+// filter (Lua, ext_proc, ``set_filter_state``, a dynamic module, ...).
+//
+// The predicate reads the filter-state boolean object named ``redirect_enabled_key``:
+//
+// * If the value is ``true``: follows the redirect
+// * If the value is ``false``: does not follow the redirect
+// * If the object is absent: ``redirect_if_absent`` decides (default: false)
+//
+// This lets a request-phase filter decide, per request, whether an
+// otherwise-enabled internal redirect is actually taken, without changing route
+// matching. Rich, request-time logic (tenant, JWT claim, header, time-of-day,
+// rollout %) belongs in the filter that *sets* the boolean value; this predicate
+// is a thin reader.
+// [#extension: envoy.internal_redirect_predicates.filter_state]
+message FilterStateConfig {
+  // Name of the filter-state boolean object to read. If true, the redirect is
+  // followed; if false, the redirect is skipped. Must be non-empty.
+  string redirect_enabled_key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Whether to follow the redirect when the filter-state object is absent.
+  // Defaults to false (do not redirect if the gate wasn't explicitly set),
+  // giving an opt-in posture.
+  bool redirect_if_absent = 2;
+}
