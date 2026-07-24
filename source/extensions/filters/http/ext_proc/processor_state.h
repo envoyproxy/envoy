@@ -661,7 +661,12 @@ public:
     return !local_response_started_ && ProcessorState::noExternalProcess();
   }
 
-  void handleModeOverride();
+  // Standalone mode override is only supported when Envoy is in the waiting for
+  // request header response state, and the old request body mode is STREAMED;
+  // and the new request body mode is FULL_DUPLEX_STREAMED, and the new request
+  // trailer mode is SEND.
+  bool handleStandaloneModeOverride(
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode old_body_mode);
 
 private:
   void setProcessingModeInternal(

@@ -818,17 +818,32 @@ bool DecodingProcessorState::isValidTrailersCallbackState() const {
   return false;
 }
 
-void DecodingProcessorState::handleModeOverride() {
-  if (hasBufferedData()) {
-    Buffer::OwnedImpl buffered_chunk;
-    modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
-    ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
-                     buffered_chunk.length());
+bool DecodingProcessorState::handleStandaloneModeOverride(
+    envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode old_body_mode) {
+  if (callbackState() == ProcessorState::CallbackState::HeadersCallback &&
+      old_body_mode == ProcessingMode::STREAMED &&
+      body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED &&
+      send_trailers_ == ProcessingMode::SEND) {
     bool end_stream = (complete_body_available_ && trailers_ == nullptr);
-    auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-    buffered_chunk.drain(buffered_chunk.length());
-    filter_.sendBodyChunk(*this, ProcessorState::CallbackState::HeadersCallback, req);
+    if (hasBufferedData() || (bufferedData() && end_stream)) {
+      // Body came in while we were waiting for this response.
+      Buffer::OwnedImpl buffered_chunk;
+      modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
+      ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
+                       buffered_chunk.length());
+      bool end_stream = (complete_body_available_ && trailers_ == nullptr);
+      auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
+      buffered_chunk.drain(buffered_chunk.length());
+      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::HeadersCallback, req);
+    }
+
+    if (trailers_ != nullptr) {
+      // Trailers came in while we were waiting for this response.
+      filter_.sendTrailers(*this, *trailers_);
+    }
+    return true;
   }
+  return false;
 }
 
 void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {

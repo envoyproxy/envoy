@@ -1832,23 +1832,20 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     if (config_->isAllowedOverrideMode(mode_override)) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server for this request",
                        *decoder_callbacks_);
+      const auto old_decoding_body_mode = decoding_state_.bodyMode();
       decoding_state_.setProcessingMode(mode_override);
       encoding_state_.setProcessingMode(mode_override);
+
+      // If the response case is not set, this response message is for overriding the
+      // processing mode only.
+      if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
+        if (decoding_state_.handleStandaloneModeOverride(old_decoding_body_mode)) {
+          return;
+        }
+      }
     } else {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server is disallowed",
                        *decoder_callbacks_);
-    }
-
-    // If the response case is not set, this response message is only for overriding the
-    // processing mode. In such case, just send the buffered data if necessary, then return.
-    if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
-      // Such mode override is only supported when Envoy is waiting for the request header
-      // response state, and the new request body mode is FULL_DUPLEX_STREAMED.
-      if (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback &&
-          decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
-        decoding_state_.handleModeOverride();
-        return;
-      }
     }
   }
 
