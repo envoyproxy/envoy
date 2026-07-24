@@ -43,6 +43,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using Envoy::StatusHelpers::HasStatus;
+
 namespace Envoy {
 namespace Server {
 
@@ -472,6 +474,56 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
   EXPECT_TRUE(active_chain_v2->addedViaApi());
 
   handle.reset();
+}
+
+TEST_P(FilterChainManagerImplTest, FcdsNoMatcherFails) {
+  NiceMock<MockListenerComponentFactory> listener_component_factory;
+  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
+      parent_context_.server_factory_context_, listener_component_factory);
+
+  auto status = filter_chain_manager_->addFilterChains(
+      nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_template_},
+      nullptr, filter_chain_factory_builder_, *filter_chain_manager_, fcds_shared_manager,
+      empty_config_source_, dummy_fcds_callbacks_);
+
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "FCDS requires a filter chain matcher."));
+}
+
+TEST_P(FilterChainManagerImplTest, FcdsQuicFails) {
+  NiceMock<MockListenerComponentFactory> listener_component_factory;
+  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
+      parent_context_.server_factory_context_, listener_component_factory);
+
+  EXPECT_CALL(parent_context_, isQuic()).WillRepeatedly(Return(true));
+
+  auto status = filter_chain_manager_->addFilterChains(
+      &matcher_,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_template_},
+      nullptr, filter_chain_factory_builder_, *filter_chain_manager_, fcds_shared_manager,
+      empty_config_source_, dummy_fcds_callbacks_);
+
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "FCDS does not support QUIC filter chains"));
+}
+
+TEST_P(FilterChainManagerImplTest, FcdsInvalidConfigSourceFails) {
+  NiceMock<MockListenerComponentFactory> listener_component_factory;
+  auto fcds_shared_manager = std::make_shared<FcdsSharedFilterChainManager>(
+      parent_context_.server_factory_context_, listener_component_factory);
+
+  EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce(Return(absl::InvalidArgumentError("invalid config source specifier")));
+
+  auto status = filter_chain_manager_->addFilterChains(
+      &matcher_, {}, nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
+      fcds_shared_manager, empty_config_source_, dummy_fcds_callbacks_);
+
+  EXPECT_THAT(status,
+              HasStatus(absl::StatusCode::kInvalidArgument, "cannot create a filter chain matcher: "
+                                                            "invalid config source specifier"));
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));
