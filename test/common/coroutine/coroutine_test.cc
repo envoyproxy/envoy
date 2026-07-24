@@ -1,5 +1,7 @@
+#include <coroutine>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 
 #include "source/common/coroutine/context.h"
 #include "source/common/coroutine/launch.h"
@@ -74,6 +76,16 @@ Task<absl::StatusOr<int>> returnsValue(int value) { co_return value; }
 
 Task<absl::Status> returnsOk(bool& ran) {
   ran = true;
+  co_return absl::OkStatus();
+}
+
+// Throws from the coroutine body to exercise PromiseBase::unhandled_exception().
+// `should_throw` is a runtime parameter so the `co_return` stays reachable (a bare
+// `throw` before it would make the coroutine's return path dead code).
+Task<absl::Status> throwsOnDataPlane(bool should_throw) {
+  if (should_throw) {
+    throw std::runtime_error("boom");
+  }
   co_return absl::OkStatus();
 }
 
@@ -171,6 +183,38 @@ TEST(TaskTest, DestroyingUnstartedTaskIsSafe) {
     // Never awaited or launched; destructor frees the frame at initial_suspend.
   }
   EXPECT_FALSE(controller.started);
+}
+
+// An exception escaping a coroutine body is routed to unhandled_exception(), which
+// panics: the data plane carries errors as absl::Status, never exceptions.
+TEST(TaskTest, ThrowingOnDataPlanePanics) {
+  auto exec = std::make_shared<ManualExecutor>();
+  // launch + drain live entirely inside EXPECT_DEATH so the parent process starts
+  // no coroutine (the throw aborts the forked child before the frame is freed).
+  EXPECT_DEATH(
+      {
+        DetachedHandle handle = launch(throwsOnDataPlane(true), exec, [](absl::Status) {});
+        exec->drain(); // resumes the body -> throws -> unhandled_exception() -> PANIC.
+      },
+      "coroutine threw on the data plane");
+}
+
+// promiseBase() recovers the shared PromiseBase (and thus the context) from a
+// type-erased coroutine handle -- the seam an executor uses to inspect a handle.
+TEST(PromiseBaseTest, RecoversContextFromTypeErasedHandle) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool ran = false;
+  // A lazy, unstarted root; `root` retains ownership (we read the handle via
+  // from_promise, not release()), so the frame is freed at scope exit.
+  Detail::RootTask root = Detail::awaitTaskAndCallOnDone(returnsOk(ran), [](absl::Status) {});
+  auto cancel = std::make_shared<CancellationState>();
+  root.promise().context_ = std::make_shared<CoroutineContext>(exec, cancel);
+
+  std::coroutine_handle<> handle =
+      std::coroutine_handle<Detail::RootTask::promise_type>::from_promise(root.promise());
+  EXPECT_EQ(&promiseBase(handle).context_->executor(), exec.get());
+  EXPECT_EQ(promiseBase(handle).context_->cancellation().get(), cancel.get());
+  EXPECT_FALSE(ran); // never started.
 }
 
 TEST(TaskTest, DeepChainPropagatesExecutorAndCancellation) {
