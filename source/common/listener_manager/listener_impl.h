@@ -82,6 +82,10 @@ public:
   Network::ListenSocketFactoryPtr clone() const override {
     return absl::WrapUnique(new ListenSocketFactoryImpl(*this));
   }
+  // Clone this factory but override tcp_backlog_size. Used by cloneSocketFactoryFrom() so
+  // that doFinalPreWorkerInit() calls listen() with the new listener's backlog value rather
+  // than the one carried by the existing socket factory.
+  Network::ListenSocketFactoryPtr cloneWithBacklogSize(uint32_t tcp_backlog_size) const;
   void closeAllSockets() override {
     for (auto& socket : sockets_) {
       socket->close();
@@ -100,6 +104,8 @@ private:
                           uint32_t num_sockets, absl::Status& creation_status);
 
   ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
+  ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone,
+                          uint32_t tcp_backlog_size);
 
   absl::StatusOr<Network::SocketSharedPtr>
   createListenSocketAndApplyOptions(ListenerComponentFactory& factory,

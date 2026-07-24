@@ -168,6 +168,23 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& 
   }
 }
 
+ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone,
+                                                 uint32_t tcp_backlog_size)
+    : factory_(factory_to_clone.factory_), local_address_(factory_to_clone.local_address_),
+      socket_type_(factory_to_clone.socket_type_), options_(factory_to_clone.options_),
+      listener_name_(factory_to_clone.listener_name_), tcp_backlog_size_(tcp_backlog_size),
+      bind_type_(factory_to_clone.bind_type_),
+      socket_creation_options_(factory_to_clone.socket_creation_options_) {
+  for (auto& socket : factory_to_clone.sockets_) {
+    sockets_.push_back(socket->duplicate());
+  }
+}
+
+Network::ListenSocketFactoryPtr
+ListenSocketFactoryImpl::cloneWithBacklogSize(uint32_t tcp_backlog_size) const {
+  return absl::WrapUnique(new ListenSocketFactoryImpl(*this, tcp_backlog_size));
+}
+
 absl::StatusOr<Network::SocketSharedPtr> ListenSocketFactoryImpl::createListenSocketAndApplyOptions(
     ListenerComponentFactory& factory, Network::Socket::Type socket_type, uint32_t worker_index) {
   // Socket might be nullptr when doing server validation.
@@ -1324,7 +1341,20 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
 
 absl::Status ListenerImpl::cloneSocketFactoryFrom(const ListenerImpl& other) {
   for (auto& socket_factory : other.getSocketFactories()) {
-    RETURN_IF_NOT_OK(addSocketFactory(socket_factory->clone()));
+    // Clone the existing socket factory but override tcp_backlog_size with the new listener's
+    // configured value. The copy constructor would carry over the old factory's backlog, causing
+    // doFinalPreWorkerInit() to call listen() with the stale value even when xDS updates the
+    // backlog. On Linux, listen() on an already-listening socket updates the accept queue depth,
+    // so passing the correct value here is sufficient to apply the change.
+    //
+    // tcp_backlog_size is the only listener option that requires this treatment: it is the only
+    // option that both (a) is absent from socketOptionsEqual() — so a change does not trigger new
+    // socket creation — and (b) can be re-applied to an already-listening socket via a second
+    // listen() call. All other mutable options (transparent, freebind, tcp_keepalive,
+    // socket_options, tcp_fast_open_queue_length) are already covered by socketOptionsEqual() and
+    // cause a full socket drain/recreate when changed.
+    RETURN_IF_NOT_OK(addSocketFactory(static_cast<ListenSocketFactoryImpl*>(socket_factory.get())
+                                          ->cloneWithBacklogSize(tcp_backlog_size_)));
   }
   return absl::OkStatus();
 }
