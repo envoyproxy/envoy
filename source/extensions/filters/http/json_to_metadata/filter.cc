@@ -127,8 +127,8 @@ absl::StatusOr<std::shared_ptr<FilterConfig>> FilterConfig::create(
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
     Stats::Scope& scope, Regex::Engine& regex_engine, bool per_route, absl::Status& creation_status)
-    : rqstats_{ALL_JSON_TO_METADATA_FILTER_STATS(
-          POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
+    : rqstats_{
+          ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.rq"))},
       respstats_{
           ALL_JSON_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "json_to_metadata.resp"))},
       request_rules_(SET_OR_RETURN_VALUE(generateRules(proto_config.request_rules().rules()),

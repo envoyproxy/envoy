@@ -29,8 +29,12 @@ TEST_F(PerfAnnotationTest, TestMacros) {
   PERF_RECORD(perf, "alpha", "2");
   PERF_RECORD(perf, "beta", "3");
 
-  { PERF_OWNED_OPERATION(owned_perf); }
-  { PERF_OWNED_RECORD(owned_perf, "gamma", "4"); }
+  {
+    PERF_OWNED_OPERATION(owned_perf);
+  }
+  {
+    PERF_OWNED_RECORD(owned_perf, "gamma", "4");
+  }
 
   std::string report = PERF_TO_STRING();
   EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
