@@ -404,10 +404,8 @@ local_cluster_rate_limit: {}
   const auto* local_cluster = context.cluster_manager_.active_clusters_.at("local_cluster").get();
   EXPECT_CALL(*local_cluster, prioritySet()).WillOnce(ReturnRef(priority_set));
 
-  EXPECT_TRUE(factory
-                  .createRouteSpecificFilterConfig(*proto_config, context,
-                                                   ProtobufMessage::getNullValidationVisitor())
-                  .ok());
+  EXPECT_OK(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                    ProtobufMessage::getNullValidationVisitor()));
 }
 
 TEST(Factory, GlobalEmptyConfigWithServerContext) {
