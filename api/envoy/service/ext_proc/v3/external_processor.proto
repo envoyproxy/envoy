@@ -238,6 +238,7 @@ message ProcessingResponse {
   // Subsequent messages will adhere to this new mode.
   //
   // Constraints:
+  //
   // 1. Request Path: A standalone ``mode_override`` only supports transitioning the body processing mode from
   //   ``STREAMED`` to ``FULL_DUPLEX_STREAMED``, and the trailer processing mode must be set to ``SEND``.
   // 2. Response Path: There are no restrictions on processing mode changes in this case.
