@@ -23,16 +23,13 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, i
     return absl::InvalidArgumentError("extract_field_spec: path must not end with '.'");
   }
   // '\' is reserved for a future escape syntax for document keys containing
-  // '.', '[', ']' (see the LIMITATION note on ExtractFieldSpec). Rejecting it
-  // now keeps that extension non-breaking.
+  // '.', '[', ']' Rejecting it now keeps that extension non-breaking.
   if (path.find('\\') != absl::string_view::npos) {
     return absl::InvalidArgumentError(
         "extract_field_spec: '\\' is reserved for future escape syntax");
   }
 
   ExtractFieldSpec out;
-  out.path = std::string(path);
-
   std::string current_key;
   bool in_array = false;
 
@@ -107,22 +104,6 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, i
                                                    " exceeds maximum supported depth ", max_depth));
   }
   return out;
-}
-
-std::string ExtractFieldSpec::canonicalPath() const {
-  std::string path;
-  for (const auto& seg : segments) {
-    if (seg.is_array_element) {
-      path += "[]";
-    } else {
-      // Dict key: prepend '.' when path is non-empty.
-      if (!path.empty()) {
-        path += '.';
-      }
-      path += seg.key;
-    }
-  }
-  return path;
 }
 
 absl::Status ParserConfig::validate() const {

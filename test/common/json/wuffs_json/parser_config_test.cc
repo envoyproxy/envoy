@@ -260,57 +260,7 @@ TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
 }
 
 // ============================================================================
-// ParserConfig::max_body_bytes contract
-// ============================================================================
-
-// max_body_bytes directs the outer filter to enforce a body-size cap by
-// tracking the sum of chunk.size() across feed() calls. nextSourcePosition()
-// is NOT suitable for this check: it tracks tokenized bytes and lags behind
-// received bytes when a NUMBER token straddles a chunk boundary (the tail
-// goes into pending_bytes_ and is not counted until the next feed()).
-TEST(MaxBodyBytesContractTest, NextSourcePositionAccumulatesAcrossChunks) {
-  MockHandler h;
-  WuffsJsonCursor cursor(h);
-  constexpr absl::string_view part1 = R"({"a":true,)";
-  constexpr absl::string_view part2 = R"("b":"xy",)";
-  constexpr absl::string_view part3 = R"("c":null})";
-  ASSERT_TRUE(cursor.feed(part1, /*closed=*/false).ok());
-  EXPECT_EQ(cursor.nextSourcePosition(), part1.size());
-  ASSERT_TRUE(cursor.feed(part2, /*closed=*/false).ok());
-  EXPECT_EQ(cursor.nextSourcePosition(), part1.size() + part2.size());
-  ASSERT_TRUE(cursor.feed(part3, /*closed=*/true).ok());
-  EXPECT_EQ(cursor.nextSourcePosition(), part1.size() + part2.size() + part3.size());
-}
-
-// The outer filter enforces max_body_bytes by accumulating chunk.size() before
-// each feed() call. An oversized body is rejected before its offending chunk
-// is parsed.
-TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
-  ParserConfig cfg;
-  cfg.max_body_bytes = 12;
-
-  MockHandler h;
-  WuffsJsonCursor cursor(h);
-  const std::vector<absl::string_view> chunks = {R"({"a":true,)", R"("b":null})"}; // 10 + 9 bytes
-
-  bool rejected = false;
-  size_t received_bytes = 0;
-  for (size_t i = 0; i < chunks.size(); ++i) {
-    received_bytes += chunks[i].size();
-    if (received_bytes > cfg.max_body_bytes) {
-      rejected = true; // filter would return ResourceExhausted here, chunk unparsed
-      break;
-    }
-    ASSERT_TRUE(cursor.feed(chunks[i], /*closed=*/i + 1 == chunks.size()).ok());
-  }
-
-  EXPECT_TRUE(rejected);
-  // Only the first chunk was fed: position shows the second never reached the cursor.
-  EXPECT_EQ(cursor.nextSourcePosition(), chunks[0].size());
-}
-
-// ============================================================================
-// Structural spec matching (matchesPatternPath) on real documents
+// Structural spec matching (matchesPatternPath)
 // ============================================================================
 
 // SpecMatchingHandler is the executable template for the production routing
@@ -443,7 +393,7 @@ TEST(StructuralMatchTest, RoutesNestedArrays) {
 TEST(StructuralMatchTest, RejectsHostileKeyCollision) {
   auto spec = parseExtractFieldSpec("a.b");
   ASSERT_TRUE(spec.ok());
-  ASSERT_EQ(spec->depth(), 2);
+  ASSERT_EQ(spec->segments.size(), 2u);
 
   {
     SpecMatchingHandler h(*spec);
@@ -682,7 +632,7 @@ TEST(StructuralMatchTest, SpecAtCursorDepthBoundMatchesEndToEnd) {
   path += "k";
   auto spec = parseExtractFieldSpec(path, bound);
   ASSERT_TRUE(spec.ok());
-  EXPECT_EQ(spec->depth(), bound);
+  EXPECT_EQ(static_cast<int>(spec->segments.size()), bound);
 
   // One segment deeper is refused at config load.
   EXPECT_FALSE(parseExtractFieldSpec("x." + path, bound).ok());
@@ -701,6 +651,56 @@ TEST(StructuralMatchTest, SpecAtCursorDepthBoundMatchesEndToEnd) {
 }
 
 // ============================================================================
+// ParserConfig::max_body_bytes contract
+// ============================================================================
+
+// max_body_bytes directs the outer filter to enforce a body-size cap by
+// tracking the sum of chunk.size() across feed() calls. nextSourcePosition()
+// is NOT suitable for this check: it tracks tokenized bytes and lags behind
+// received bytes when a NUMBER token straddles a chunk boundary (the tail
+// goes into pending_bytes_ and is not counted until the next feed()).
+TEST(MaxBodyBytesContractTest, NextSourcePositionAccumulatesAcrossChunks) {
+  MockHandler h;
+  WuffsJsonCursor cursor(h);
+  constexpr absl::string_view part1 = R"({"a":true,)";
+  constexpr absl::string_view part2 = R"("b":"xy",)";
+  constexpr absl::string_view part3 = R"("c":null})";
+  ASSERT_TRUE(cursor.feed(part1, /*closed=*/false).ok());
+  EXPECT_EQ(cursor.nextSourcePosition(), part1.size());
+  ASSERT_TRUE(cursor.feed(part2, /*closed=*/false).ok());
+  EXPECT_EQ(cursor.nextSourcePosition(), part1.size() + part2.size());
+  ASSERT_TRUE(cursor.feed(part3, /*closed=*/true).ok());
+  EXPECT_EQ(cursor.nextSourcePosition(), part1.size() + part2.size() + part3.size());
+}
+
+// The outer filter enforces max_body_bytes by accumulating chunk.size() before
+// each feed() call. An oversized body is rejected before its offending chunk
+// is parsed.
+TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
+  ParserConfig cfg;
+  cfg.max_body_bytes = 12;
+
+  MockHandler h;
+  WuffsJsonCursor cursor(h);
+  const std::vector<absl::string_view> chunks = {R"({"a":true,)", R"("b":null})"}; // 10 + 9 bytes
+
+  bool rejected = false;
+  size_t received_bytes = 0;
+  for (size_t i = 0; i < chunks.size(); ++i) {
+    received_bytes += chunks[i].size();
+    if (received_bytes > cfg.max_body_bytes) {
+      rejected = true; // filter would return ResourceExhausted here, chunk unparsed
+      break;
+    }
+    ASSERT_TRUE(cursor.feed(chunks[i], /*closed=*/i + 1 == chunks.size()).ok());
+  }
+
+  EXPECT_TRUE(rejected);
+  // Only the first chunk was fed: position shows the second never reached the cursor.
+  EXPECT_EQ(cursor.nextSourcePosition(), chunks[0].size());
+}
+
+// ============================================================================
 // parseExtractFieldSpec — valid paths
 // ============================================================================
 
@@ -710,8 +710,6 @@ TEST(ParseExtractFieldSpecTest, DepthOneScalar) {
   ASSERT_EQ(result->segments.size(), 1u);
   EXPECT_EQ(result->segments[0].key, "model");
   EXPECT_FALSE(result->segments[0].is_array_element);
-  EXPECT_EQ(result->depth(), 1);
-  EXPECT_EQ(result->path, "model");
 }
 
 TEST(ParseExtractFieldSpecTest, DepthOneArray) {
@@ -721,7 +719,6 @@ TEST(ParseExtractFieldSpecTest, DepthOneArray) {
   EXPECT_EQ(result->segments[0].key, "messages");
   EXPECT_FALSE(result->segments[0].is_array_element);
   EXPECT_TRUE(result->segments[1].is_array_element);
-  EXPECT_EQ(result->depth(), 2);
 }
 
 TEST(ParseExtractFieldSpecTest, DepthTwoScalarInArray) {
@@ -731,7 +728,6 @@ TEST(ParseExtractFieldSpecTest, DepthTwoScalarInArray) {
   EXPECT_EQ(result->segments[0].key, "messages");
   EXPECT_TRUE(result->segments[1].is_array_element);
   EXPECT_EQ(result->segments[2].key, "role");
-  EXPECT_EQ(result->depth(), 3);
 }
 
 TEST(ParseExtractFieldSpecTest, DepthThreeNestedDicts) {
@@ -741,7 +737,6 @@ TEST(ParseExtractFieldSpecTest, DepthThreeNestedDicts) {
   EXPECT_EQ(result->segments[0].key, "params");
   EXPECT_EQ(result->segments[1].key, "_meta");
   EXPECT_EQ(result->segments[2].key, "traceparent");
-  EXPECT_EQ(result->depth(), 3);
 }
 
 TEST(ParseExtractFieldSpecTest, NestedArrays) {
@@ -752,7 +747,6 @@ TEST(ParseExtractFieldSpecTest, NestedArrays) {
   EXPECT_TRUE(result->segments[1].is_array_element);
   EXPECT_EQ(result->segments[2].key, "content");
   EXPECT_TRUE(result->segments[3].is_array_element);
-  EXPECT_EQ(result->depth(), 4);
 }
 
 TEST(ParseExtractFieldSpecTest, RootArray) {
@@ -762,7 +756,6 @@ TEST(ParseExtractFieldSpecTest, RootArray) {
   ASSERT_EQ(result->segments.size(), 2u);
   EXPECT_TRUE(result->segments[0].is_array_element);
   EXPECT_EQ(result->segments[1].key, "role");
-  EXPECT_EQ(result->depth(), 2);
 }
 
 TEST(ParseExtractFieldSpecTest, UnderscorePrefixedKey) {
@@ -853,8 +846,7 @@ TEST(ParseExtractFieldSpecTest, BracketAfterBracketAccepted) {
   // an array of arrays (depth 3: key, outer wildcard, inner wildcard).
   auto result = parseExtractFieldSpec("a[][]");
   ASSERT_TRUE(result.ok());
-  EXPECT_EQ(result->depth(), 3);
-  EXPECT_EQ(result->canonicalPath(), "a[][]");
+  EXPECT_EQ(result->segments.size(), 3u);
 }
 
 TEST(ParseExtractFieldSpecTest, DepthBoundEnforced) {
@@ -876,34 +868,6 @@ TEST(ParseExtractFieldSpecTest, ErrorMessageIsInformative) {
   auto result = parseExtractFieldSpec("messages.[]");
   ASSERT_FALSE(result.ok());
   EXPECT_FALSE(result.status().message().empty());
-}
-
-// ============================================================================
-// ExtractFieldSpec::canonicalPath
-// ============================================================================
-
-// canonicalPath() must reproduce the accepted input syntax exactly (RoundTrip
-// below). It is diagnostics-only: routing compares segments structurally — see
-// the StructuralMatchTest section further below.
-
-// Canonical path is round-trippable: parse → canonicalPath == original path.
-TEST(CanonicalPathTest, RoundTrip) {
-  const std::vector<std::string> paths = {
-      "model",
-      "messages[]",
-      "messages[].role",
-      "params._meta.traceparent",
-      "messages[].content[]",
-      "_meta",
-      "[].role",
-      "a[][]",
-      "[][]",
-  };
-  for (const auto& p : paths) {
-    auto result = parseExtractFieldSpec(p);
-    ASSERT_TRUE(result.ok()) << "failed to parse: " << p;
-    EXPECT_EQ(result->canonicalPath(), p) << "round-trip failed for: " << p;
-  }
 }
 
 // ============================================================================
