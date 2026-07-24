@@ -133,8 +133,7 @@ public:
 
   // DrainDecision
   bool drainClose(Network::DrainDirection) const override;
-  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
-                                              DrainCloseCb) const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection, DrainCloseCb) const override;
 
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;

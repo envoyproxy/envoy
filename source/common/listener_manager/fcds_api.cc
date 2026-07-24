@@ -130,8 +130,8 @@ void FcdsFilterChainFactoryContextImpl::initialize(std::function<void()> complet
   init_manager_.initialize(*init_watcher_);
 }
 
-Common::CallbackHandlePtr FcdsFilterChainFactoryContextImpl::addOnDrainCloseCb(Network::DrainDirection,
-                                            DrainCloseCb) const {
+Common::CallbackHandlePtr
+FcdsFilterChainFactoryContextImpl::addOnDrainCloseCb(Network::DrainDirection, DrainCloseCb) const {
   IS_ENVOY_BUG("Unexpected function call");
   return nullptr;
 }

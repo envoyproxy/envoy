@@ -110,15 +110,13 @@ TEST_F(FcdsApiTest, OnConfigUpdateDecodesAndPropagates) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
 
   EXPECT_EQ(fcds_api_->filterChain(), nullptr);
-  EXPECT_OK(
-      fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
+  EXPECT_OK(fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
   EXPECT_EQ(fcds_api_->versionInfo(), "v1");
   // Still warming.
   EXPECT_EQ(fcds_api_->filterChain(), nullptr);
 
   // Ensure the idempotent update does not trigger a callback.
-  EXPECT_OK(
-      fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
+  EXPECT_OK(fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
 
   // Destruction unblocks the watcher.
   EXPECT_CALL(init_watcher_, ready());
@@ -243,7 +241,8 @@ TEST_F(FcdsApiTest, ErrorXdsFailureUnblocks) {
 
   EXPECT_CALL(init_watcher_, ready());
   EnvoyException dummy_ex("dummy exception");
-  fcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, &dummy_ex);
+  fcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                        &dummy_ex);
 }
 
 } // namespace
