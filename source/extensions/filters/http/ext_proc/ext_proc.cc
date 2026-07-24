@@ -1425,6 +1425,9 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
   encodeProtocolConfig(req);
+  if (end_stream) {
+    state.setEosSentToServerWithBody(true);
+  }
   return req;
 }
 
