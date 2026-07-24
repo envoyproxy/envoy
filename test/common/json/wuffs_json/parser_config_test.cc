@@ -173,7 +173,7 @@ TEST(CaptureAllScalarsTest, PerValueBudgetRejectsOversizedStrings) {
   constexpr absl::string_view json = R"({"model":"abcdefgh","n":1,"k":"wxyz"})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
   using F = CaptureAllScalarsHandler::Fields;
-  // "model":"abcdefgh" is rejected.
+  // "model":"abcdefgh" is rejected since it exceeds the max_per_scalar_bytes(4).
   EXPECT_EQ(h.fields(), (F{{"n", "1"}, {"k", "wxyz"}}));
 }
 
@@ -191,6 +191,7 @@ TEST(CaptureAllScalarsTest, PerValueBudgetSpansChunkBoundaries) {
   ASSERT_TRUE(cursor.feed(R"({"model":"abc)", /*closed=*/false).ok());
   ASSERT_TRUE(cursor.feed(R"(defgh","n":1})", /*closed=*/true).ok());
   using F = CaptureAllScalarsHandler::Fields;
+  // Cross-boundary value is also rejected by max_per_scalar_bytes.
   EXPECT_EQ(h.fields(), (F{{"n", "1"}}));
 }
 
