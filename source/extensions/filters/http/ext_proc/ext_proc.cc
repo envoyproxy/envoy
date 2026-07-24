@@ -1253,6 +1253,10 @@ std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& 
 FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_STREAM_LOG(trace, "decodeData({}): end_stream = {}", *decoder_callbacks_, data.length(),
                    end_stream);
+  if (skip_decode_data_once_) {
+    skip_decode_data_once_ = false;
+    return FilterDataStatus::Continue;
+  }
   const auto status = onData(decoding_state_, data, end_stream);
   ENVOY_STREAM_LOG(trace, "decodeData returning {}", *decoder_callbacks_, static_cast<int>(status));
   return status;
