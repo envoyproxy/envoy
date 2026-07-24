@@ -546,6 +546,8 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
+  void skipDecodeDataOnce() { skip_decode_data_once_ = true; }
+
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -713,6 +715,9 @@ private:
   // failed.
   bool processing_complete_ = false;
 
+  // When true, skip the next decodeData() call in FULL_DUPLEX_STREAMED mode.
+  // This suppresses duplicating body replay call.
+  bool skip_decode_data_once_ = false;
   // Set to true when an "immediate response" has been delivered. This helps us
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;

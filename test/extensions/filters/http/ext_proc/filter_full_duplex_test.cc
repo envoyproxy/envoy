@@ -40,7 +40,6 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
 
 using ::testing::Invoke;
-using ::testing::InSequence;
 using ::testing::Return;
 using ::testing::Unused;
 
@@ -539,19 +538,19 @@ TEST_F(HttpFilterTest, FullDuplexStreamedNoBodyDuplicationOnRetryBuffer) {
     streamed->set_end_of_stream(false);
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
-  
+
   EXPECT_EQ(1, inject_count);
 
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 
-  {
-    InSequence seq;
-    EXPECT_CALL(decoder_callbacks_, setSkipBodyOnNextContinue());
-    EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  }
-
   processRequestTrailers(std::nullopt, false);
 
+  // the filter must returning Continue without processing 
+  // to prevent body duplication.
+  Buffer::OwnedImpl replayed_data("hello world");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(replayed_data, false));
+
+  // body was injected exactly once, not replayed a second time through the filter chain.
   EXPECT_EQ(1, inject_count);
 
   filter_->onDestroy();
@@ -586,12 +585,6 @@ TEST_F(HttpFilterTest, FullDuplexStreamedNoBodyDuplicationOnRetryBufferNoTrailer
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
 
   {
-    InSequence seq;
-    EXPECT_CALL(decoder_callbacks_, setSkipBodyOnNextContinue());
-    EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  }
-
-  {
     auto response = std::make_unique<ProcessingResponse>();
     auto* body_resp = response->mutable_request_body();
     auto* streamed = body_resp->mutable_response()->mutable_body_mutation()->mutable_streamed_response();
@@ -599,6 +592,11 @@ TEST_F(HttpFilterTest, FullDuplexStreamedNoBodyDuplicationOnRetryBufferNoTrailer
     streamed->set_end_of_stream(true);
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
+
+  // the filter must returning Continue without processing 
+  // to prevent body duplication.
+  Buffer::OwnedImpl replayed_data("hello world");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(replayed_data, true));
 
   EXPECT_EQ(1, inject_count);
 
