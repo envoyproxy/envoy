@@ -1187,11 +1187,9 @@ TEST_F(EnvoyQuicServerStreamTest, InconsistentContentLengthHeadersOnlyDisabled) 
 TEST_F(EnvoyQuicServerStreamTest, OnCloseDoesNotUnderflowBytesToSendWithUnreportedBufferedBytes) {
   // make WritevData consume nothing so bytes stay buffered in the QUIC send buffer.
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
-      .WillRepeatedly(
-          Invoke([](quic::QuicStreamId, size_t, quic::QuicStreamOffset,
-                    quic::StreamSendingState, bool, std::optional<quic::EncryptionLevel>) {
-            return quic::QuicConsumedData{0, false};
-          }));
+      .WillRepeatedly(Invoke(
+          [](quic::QuicStreamId, size_t, quic::QuicStreamOffset, quic::StreamSendingState, bool,
+             std::optional<quic::EncryptionLevel>) { return quic::QuicConsumedData{0, false}; }));
 
   // simulate QUICHE writing bytes directly to the stream send buffer without going through
   // ScopedWatermarkBufferUpdater.
@@ -1206,7 +1204,8 @@ TEST_F(EnvoyQuicServerStreamTest, OnCloseDoesNotUnderflowBytesToSendWithUnreport
   EXPECT_LOG_NOT_CONTAINS("error", "Underflowed",
                           quic_stream_->encodeHeaders(response_headers_, true));
 
-  // confirm no underflow: headers buffered bytes_to_send_ is positive not wrapped to near UINT64_MAX.
+  // confirm no underflow: headers buffered bytes_to_send_ is positive not wrapped to near
+  // UINT64_MAX.
   EXPECT_GT(quic_session_.bytesToSend(), 0u);
   EXPECT_LT(quic_session_.bytesToSend(), 1000u);
 }
