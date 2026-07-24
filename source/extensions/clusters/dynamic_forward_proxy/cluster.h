@@ -165,7 +165,7 @@ private:
     // host selection to avoid calling back into the load balancer after it is destructed.
     ~DFPHostSelectionHandle() override { cancel(); }
 
-    virtual void cancel() {
+    void cancel() override {
       // Cancels the DNS callback.
       handle_.reset();
 
