@@ -85,8 +85,8 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
     warming_ = true;
   } else {
     if (filter_chain_) {
-      callbacks_.onFilterChainRemoved(std::move(filter_chain_));
-      filter_chain_ = nullptr;
+      Network::DrainableFilterChainSharedPtr draining = std::move(filter_chain_);
+      callbacks_.onFilterChainRemoved(std::move(draining));
       config_ = {};
       warming_ = false;
     }

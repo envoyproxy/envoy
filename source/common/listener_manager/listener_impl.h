@@ -461,7 +461,6 @@ private:
   const envoy::config::listener::v3::Listener& configInternal() const {
     return config_maybe_partial_filter_chains_;
   }
-  bool isQuic();
   std::shared_ptr<FcdsSharedFilterChainManager>
   maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config);
 

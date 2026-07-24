@@ -905,15 +905,12 @@ ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& 
   return absl::OkStatus();
 }
 
-bool ListenerImpl::isQuic() {
-  // The only connection oriented UDP transport protocol right now is QUIC.
-  return udpListenerConfig().has_value() &&
-         !udpListenerConfig()->listenerFactory().isTransportConnectionless();
-}
-
 absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::Listener& config) {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
-  ListenerFilterChainFactoryBuilder builder(isQuic(), validation_visitor_, *parent_.factory_,
+  // The only connection oriented UDP transport protocol right now is QUIC.
+  const bool is_quic = udpListenerConfig().has_value() &&
+         !udpListenerConfig()->listenerFactory().isTransportConnectionless();
+  ListenerFilterChainFactoryBuilder builder(is_quic, validation_visitor_, *parent_.factory_,
                                             *transport_factory_context_);
   return filter_chain_manager_->addFilterChains(
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,

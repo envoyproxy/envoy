@@ -410,6 +410,16 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
 
   // Wait for the draining filter chain count to drop to 0.
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+
+  // Try to connect after removal. We expect it to be rejected.
+  IntegrationCodecClientPtr codec_client2 = makeRawHttpConnection(
+      makeClientConnection(lookupPort(listener_name_)), std::nullopt, std::nullopt, false);
+
+  // Wait for the no_filter_chain_match counter to increment.
+  test_server_->waitForCounter(listenerStatPrefix("no_filter_chain_match"), Ge(1));
+
+  // The connection should be closed.
+  ASSERT_TRUE(codec_client2->waitForDisconnect(std::chrono::seconds(5)));
 }
 
 // Tests that a listener update via LDS (which triggers a full listener update)
