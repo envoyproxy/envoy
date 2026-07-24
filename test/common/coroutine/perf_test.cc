@@ -53,28 +53,28 @@
 namespace Envoy {
 namespace {
 
-constexpr uint32_t kRead = Event::FileReadyType::Read;
-constexpr uint32_t kWrite = Event::FileReadyType::Write;
+constexpr uint32_t Read = Event::FileReadyType::Read;
+constexpr uint32_t Write = Event::FileReadyType::Write;
 
 // Total bytes pushed through the echo loop per benchmark iteration. Large enough
 // that steady-state per-event work dominates the fixed per-iteration thread
 // spawn/join and coroutine launch cost.
-constexpr uint64_t kPayloadBytes = 1 << 20; // 10 MiB.
+constexpr uint64_t PayloadBytes = 1 << 20; // 1 MiB.
 
 // Bytes requested per read syscall. Reads happen in fixed-size slices (gated by
 // the watermark) rather than sizing each read to the exact room remaining, so the
 // buffer may overshoot the watermark by up to one slice -- as in real code.
-constexpr uint64_t kReadSize = 4096;
+constexpr uint64_t ReadSize = 4096;
 
 // Which side of the driver is throttled, to model a proxy whose two ends run at
 // different speeds. A slow reader lets the server's write buffer back up to the
 // high watermark (write backpressure); a slow writer starves it (read waits).
 enum class Pace { Balanced, SlowReader, SlowWriter };
 
-// The throttled side pauses this long for every `kThrottleUnit` bytes it transfers
+// The throttled side pauses this long for every `ThrottleUnit` bytes it transfers
 // (independent of the batch size), pacing that side to a few hundred MB/s.
-constexpr std::chrono::microseconds kThrottleDelay{300};
-constexpr uint64_t kThrottleUnit = 65536;
+constexpr std::chrono::microseconds ThrottleDelay{300};
+constexpr uint64_t ThrottleUnit = 65536;
 
 // ---------------------------------------------------------------------------
 // Connected socketpair: the server end is a non-blocking IoHandle driven by the
@@ -132,17 +132,17 @@ public:
   }
 
 private:
-  // Sleep once per `kThrottleUnit` bytes transferred when `slow` is set.
+  // Sleep once per `ThrottleUnit` bytes transferred when `slow` is set.
   static void throttle(bool slow, uint64_t& since_pause, uint64_t bytes) {
     if (!slow) {
       return;
     }
     since_pause += bytes;
-    if (since_pause >= kThrottleUnit) {
+    if (since_pause >= ThrottleUnit) {
       since_pause = 0;
       // Real wall-clock throttle on a load-generator thread (not Envoy code under
       // test), so a real sleep is intended here.
-      std::this_thread::sleep_for(kThrottleDelay); // NO_CHECK_FORMAT(real_time)
+      std::this_thread::sleep_for(ThrottleDelay); // NO_CHECK_FORMAT(real_time)
     }
   }
 
@@ -207,7 +207,7 @@ public:
       : io_(io), high_(high) {
     io_.initializeFileEvent(
         dispatcher, [this](uint32_t events) { return onReady(events); },
-        Event::FileTriggerType::Edge, kRead | kWrite);
+        Event::FileTriggerType::Edge, Read | Write);
   }
 
   // Re-arm for a fresh iteration (the socketpair is reused across iterations).
@@ -218,10 +218,10 @@ public:
 
 private:
   absl::Status onReady(uint32_t events) {
-    if (events & kRead) {
+    if (events & Read) {
       resumeRead();
     }
-    if (events & kWrite) {
+    if (events & Write) {
       resumeWrite();
     }
     return absl::OkStatus();
@@ -239,7 +239,7 @@ private:
     if (buffer_.length() >= high_) {
       return;
     }
-    Api::IoCallUint64Result r = io_.read(buffer_, kReadSize);
+    Api::IoCallUint64Result r = io_.read(buffer_, ReadSize);
     if (!r.ok()) {
       RELEASE_ASSERT(r.wouldBlock(), "read() failed");
       ++read_blocks_;
@@ -254,7 +254,7 @@ private:
     if (write_blocked_) {
       return;
     }
-    // directly resume write to aviod an addition epoll trip.
+    // directly resume write to avoid an additional epoll trip.
     resumeWrite();
   }
 
@@ -279,8 +279,8 @@ private:
   Network::IoHandle& io_;
   Buffer::OwnedImpl buffer_;
   const uint32_t high_;
-  bool read_blocked_ = 0;
-  bool write_blocked_ = 0;
+  bool read_blocked_ = false;
+  bool write_blocked_ = false;
   uint64_t read_blocks_ = 0;
   uint64_t write_blocks_ = 0;
 };
@@ -292,7 +292,7 @@ private:
 // as the callback server.
 // ===========================================================================
 
-// SocketReady, YieldToNextIeration and AsyncSocket should be provided by the
+// SocketReady, YieldToNextIteration and AsyncSocket should be provided by the
 // base library, but it doesn't yet exist.
 class SocketReady;
 class YieldToNextIteration;
@@ -306,8 +306,8 @@ public:
           onReady(events);
           return absl::OkStatus();
         },
-        Event::FileTriggerType::Edge, kRead | kWrite);
-    cb_for_yield = dispatcher.createSchedulableCallback([this] { resumeFromYield(); });
+        Event::FileTriggerType::Edge, Read | Write);
+    cb_for_yield_ = dispatcher.createSchedulableCallback([this] { resumeFromYield(); });
   }
 
   Coroutine::Task<absl::StatusOr<uint64_t>> read(Buffer::Instance& buf, uint64_t max,
@@ -335,7 +335,7 @@ private:
   uint64_t read_blocks_ = 0;
   uint64_t write_blocks_ = 0;
 
-  Event::SchedulableCallbackPtr cb_for_yield = nullptr;
+  Event::SchedulableCallbackPtr cb_for_yield_ = nullptr;
 };
 
 class SocketReady : public Coroutine::LeafAwaitable<absl::Status> {
@@ -358,13 +358,13 @@ private:
 
 class YieldToNextIteration : public Coroutine::LeafAwaitable<absl::Status> {
 public:
-  YieldToNextIteration(AsyncSocket& sock) : sock_(sock) {}
+  explicit YieldToNextIteration(AsyncSocket& sock) : sock_(sock) {}
   void resume() { complete(absl::OkStatus()); }
 
 private:
   void onStart() override {
     sock_.yielder_ = this;
-    sock_.cb_for_yield->scheduleCallbackNextIteration();
+    sock_.cb_for_yield_->scheduleCallbackNextIteration();
   }
   void onCancel() override { sock_.yielder_ = nullptr; }
   AsyncSocket& sock_;
@@ -402,7 +402,7 @@ Coroutine::Task<absl::StatusOr<uint64_t>> AsyncSocket::read(Buffer::Instance& bu
       co_return 0;
     }
     ++read_blocks_;
-    if (absl::Status s = co_await whenReady(kRead); !s.ok()) {
+    if (absl::Status s = co_await whenReady(Read); !s.ok()) {
       co_return s;
     }
   }
@@ -410,7 +410,7 @@ Coroutine::Task<absl::StatusOr<uint64_t>> AsyncSocket::read(Buffer::Instance& bu
 
 Coroutine::Task<absl::StatusOr<uint64_t>> AsyncSocket::write(Buffer::Instance& buf) {
   while (true) {
-    Api::IoCallUint64Result r = io_.write(buf); // Drains the written bytes.
+    Api::IoCallUint64Result r = io_.write(buf); // Drains from buf whatever the kernel accepts.
     if (r.ok()) {
       co_return r.return_value_;
     }
@@ -418,7 +418,7 @@ Coroutine::Task<absl::StatusOr<uint64_t>> AsyncSocket::write(Buffer::Instance& b
       co_return absl::InternalError("write() failed");
     }
     ++write_blocks_;
-    if (absl::Status s = co_await whenReady(kWrite); !s.ok()) {
+    if (absl::Status s = co_await whenReady(Write); !s.ok()) {
       co_return s;
     }
   }
@@ -430,7 +430,7 @@ Coroutine::Task<absl::Status> coroEcho(AsyncSocket& sock, uint32_t high) {
   while (true) {
     if (buf.length() < high) {
       bool await = buf.length() == 0;
-      absl::StatusOr<uint64_t> n = co_await sock.read(buf, kReadSize, await);
+      absl::StatusOr<uint64_t> n = co_await sock.read(buf, ReadSize, await);
       if (!n.ok()) {
         co_return n.status();
       }
@@ -448,14 +448,13 @@ Coroutine::Task<absl::Status> coroEcho(AsyncSocket& sock, uint32_t high) {
       co_return s;
     }
   }
-  co_return absl::OkStatus();
 }
 
 // ---------------------------------------------------------------------------
 // Benchmarks.
 // ---------------------------------------------------------------------------
 uint64_t payloadBytes() {
-  return Envoy::benchmark::skipExpensiveBenchmarks() ? (1 << 16) : kPayloadBytes;
+  return Envoy::benchmark::skipExpensiveBenchmarks() ? (1 << 16) : PayloadBytes;
 }
 
 // The benchmark main does not initialize libevent's thread support (the

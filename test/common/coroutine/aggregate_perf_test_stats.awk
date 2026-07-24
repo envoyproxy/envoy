@@ -10,7 +10,7 @@ function test_name(input) {
 }
 
 function print_stats(name, first, second) {
-  printf "%-20s\t%8d us\t%8d us\t%6.2f%%\n", name, first, second, second / first * 100
+  printf "%-24s" "%8d µs\t" "%8d µs\t" "%6.2f%%\n", name, first, second, second / first * 100
 }
 
 BEGIN {
@@ -27,6 +27,7 @@ BEGIN {
 
   cb_slow_writer_mean_total = 0;
   co_slow_writer_mean_total = 0;
+  printf "%-24s" "%11s\t" "%11s\t" "%7s\n", "test_param", "cb_cpu", "coro_cpu", "co/cb"
 }
 
 /bmCallbackEcho.*_mean/{
