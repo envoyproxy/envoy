@@ -595,10 +595,6 @@ void ProcessorState::continueIfNecessary() {
   if (paused_) {
     ENVOY_STREAM_LOG(debug, "Continuing processing", *filterCallbacks());
     paused_ = false;
-    if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
-      // body was already forwarded, skip doData().
-      skipBodyOnNextContinue();
-    }
     continueProcessing();
   }
 }
@@ -980,6 +976,9 @@ void DecodingProcessorState::continueProcessing() const {
   // If a local response was started the ext_proc becomes the terminal filter and
   // will never continue the decoder filter chain.
   if (!local_response_started_) {
+    if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
+      filter_.skipDecodeDataOnce();
+    }
     decoder_callbacks_->continueDecoding();
   }
 }
