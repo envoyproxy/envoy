@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3/sni_dynamic_forward_proxy.pb.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/stream_info/upstream_address.h"
@@ -41,9 +42,10 @@ public:
   virtual void setupFilter() {
     FilterConfig proto_config;
     proto_config.set_port_value(443);
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
     absl::Status status = absl::OkStatus();
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_, status);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, *this, cm_, ProtobufMessage::getStrictValidationVisitor(), status);
     EXPECT_OK(status);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
@@ -328,9 +330,10 @@ public:
     proto_config.set_port_value(443);
     proto_config.set_save_upstream_address(true);
 
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+    EXPECT_CALL(*dns_cache_manager_, getCache(_, _));
     absl::Status status = absl::OkStatus();
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_, status);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, *this, cm_, ProtobufMessage::getStrictValidationVisitor(), status);
     EXPECT_OK(status);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);

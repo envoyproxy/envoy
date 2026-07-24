@@ -35,7 +35,8 @@ ProxyFilterConfig::ProxyFilterConfig(
                                                                 max_buffered_bytes,
                                                                 DefaultMaxBufferedBytes)
                               : DefaultMaxBufferedBytes) {
-  auto cache_or_error = dns_cache_manager_->getCache(config.dns_cache_config());
+  auto cache_or_error =
+      dns_cache_manager_->getCache(context.messageValidationVisitor(), config.dns_cache_config());
   THROW_IF_NOT_OK_REF(cache_or_error.status());
   dns_cache_ = std::move(cache_or_error.value());
 }

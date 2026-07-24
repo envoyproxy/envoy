@@ -637,7 +637,7 @@ ConnectivityManagerImplSharedPtr ConnectivityManagerFactory::get() {
   return context_.serverFactoryContext().singletonManager().getTyped<ConnectivityManagerImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager), [this] {
         Envoy::Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl
-            cache_manager_factory{context_};
+            cache_manager_factory{context_.serverFactoryContext()};
 
         return std::make_shared<ConnectivityManagerImpl>(
             context_.serverFactoryContext().clusterManager(), cache_manager_factory.get());

@@ -603,7 +603,7 @@ ClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context) {
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.serverFactoryContext(), context.messageValidationVisitor());
+      context.serverFactoryContext());
 
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {
@@ -616,7 +616,8 @@ ClusterFactory::createClusterWithConfig(
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
       cache_manager_factory.get();
-  auto dns_cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
+  auto dns_cache_or_error =
+      cache_manager->getCache(context.messageValidationVisitor(), proto_config.dns_cache_config());
   RETURN_IF_NOT_OK_REF(dns_cache_or_error.status());
 
   absl::Status creation_status = absl::OkStatus();

@@ -55,7 +55,8 @@ public:
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
       Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
       Api::Api& api, TimeSource& time_source,
-      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
+      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;
@@ -77,7 +78,8 @@ public:
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr
-  getCache(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config);
+  getCache(ProtobufMessage::ValidationVisitor& validation_visitor,
+           const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config);
   TimeSource& time_source_;
   const Common::Redis::RespProtocolVersion protocol_version_;
 };

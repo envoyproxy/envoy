@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.sni_dynamic_forward_proxy"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/protobuf:message_validator_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/filters/network:well_known_names",

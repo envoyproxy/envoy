@@ -64,6 +64,7 @@ public:
   Network::MockDrainDecision drain_decision_;
   Runtime::MockLoader runtime_;
   NiceMock<Api::MockApi> api_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
 };
 
@@ -80,7 +81,7 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
   EXPECT_TRUE(config.downstream_auth_username_.empty());
   EXPECT_TRUE(config.downstream_auth_passwords_.empty());
@@ -110,7 +111,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
 }
@@ -133,7 +134,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamMultipleAuthPasswordsSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword1");
@@ -156,7 +157,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamOnlyExraAuthPasswordsSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword2");
@@ -179,7 +180,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSet) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -205,7 +206,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithMultiplePasswords) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -231,7 +232,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithOnlyExtraPasswords) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
@@ -255,7 +256,7 @@ TEST_F(RedisProxyFilterConfigTest, ExternalAuthBasic) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_TRUE(config.external_auth_enabled_);
   EXPECT_FALSE(config.external_auth_expiration_enabled_);
 }
@@ -278,7 +279,7 @@ TEST_F(RedisProxyFilterConfigTest, ExternalAuthWithExpiration) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_TRUE(config.external_auth_enabled_);
   EXPECT_TRUE(config.external_auth_expiration_enabled_);
 }
@@ -299,7 +300,7 @@ TEST_F(RedisProxyFilterConfigTest, ProtocolVersionDefaultsToResp2) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp2, config.protocolVersion());
 }
 
@@ -319,7 +320,7 @@ TEST_F(RedisProxyFilterConfigTest, ProtocolVersionResp3IsHonored) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
-                           time_source_, *this);
+                           time_source_, *this, context_.messageValidationVisitor());
   EXPECT_EQ(Common::Redis::RespProtocolVersion::Resp3, config.protocolVersion());
 }
 
@@ -347,8 +348,9 @@ public:
   RedisProxyFilterTest(const std::string& yaml_string) {
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
-    config_ = std::make_shared<ProxyFilterConfig>(
-        proto_config, *store_.rootScope(), drain_decision_, runtime_, api_, time_source_, *this);
+    config_ = std::make_shared<ProxyFilterConfig>(proto_config, *store_.rootScope(),
+                                                  drain_decision_, runtime_, api_, time_source_,
+                                                  *this, context_.messageValidationVisitor());
     time_source_.setSystemTime(std::chrono::seconds(0));
     buildFilter();
   }
@@ -406,6 +408,7 @@ public:
   std::unique_ptr<ProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Api::MockApi> api_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   ExternalAuth::MockExternalAuthClient* external_auth_client_;
   Event::SimulatedTimeSystem time_source_;
 };

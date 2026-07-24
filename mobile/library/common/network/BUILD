@@ -68,6 +68,7 @@ envoy_cc_library(
         "@envoy//source/common/network:socket_option_lib",
         "@envoy//source/common/runtime:runtime_features_lib",
         "@envoy//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
+        "@envoy//source/server:generic_factory_context_lib",
     ],
 )
 
