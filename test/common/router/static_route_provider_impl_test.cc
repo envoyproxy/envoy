@@ -16,6 +16,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -165,7 +166,7 @@ vhds:
 
   // VhdsSubscription::onConfigUpdate will call provider.onConfigUpdate() which will post to worker
   // thread (Second post).
-  EXPECT_TRUE(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   EXPECT_TRUE(cb_called);
   auto config_impl = std::static_pointer_cast<const ConfigImpl>(provider.configCast());
@@ -266,7 +267,7 @@ vhds:
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
       .Times(2)
       .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
-  EXPECT_TRUE(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   EXPECT_TRUE(cb1_called);
   EXPECT_TRUE(cb2_called);

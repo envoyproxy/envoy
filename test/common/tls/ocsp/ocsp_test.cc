@@ -6,6 +6,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +20,9 @@ namespace Tls {
 namespace Ocsp {
 
 namespace {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 namespace CertUtility = Envoy::Extensions::TransportSockets::Tls::Utility;
 
@@ -171,7 +175,7 @@ public:
   template <class T> void expectFailOnWrongTag(std::function<absl::StatusOr<T>(CBS&)> parse) {
     CBS cbs;
     CBS_init(&cbs, asn1_true.data(), asn1_true.size());
-    EXPECT_FALSE(parse(cbs).status().ok());
+    EXPECT_THAT(parse(cbs).status(), Not(IsOk()));
   }
 
   const std::vector<uint8_t> asn1_true = {0x1u, 1, 0xff};
