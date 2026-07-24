@@ -104,48 +104,187 @@ impl<'a> MetricSnapshot<'a> {
   /// Returns `true` on success with both buffers holding exactly their bytes. Returns `false` and
   /// leaves both buffers unchanged when the index is out of range.
   pub fn text_readout(&self, index: usize, name: &mut Vec<u8>, value: &mut Vec<u8>) -> bool {
-    // Both outputs come from a single call, and either may be truncated independently, so grow
-    // whichever did not fit and retry until both fit. The snapshot is stable for the duration of
-    // the flush, so this converges in at most two iterations. As with `fill_buffer`, a
-    // zero-capacity `Vec` passes a dangling-but-non-null pointer that Envoy leaves untouched.
-    loop {
-      let name_capacity = name.capacity();
-      let value_capacity = value.capacity();
-      let mut name_size: usize = 0;
-      let mut value_size: usize = 0;
-      let found = unsafe {
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
         abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
           self.envoy_ptr,
           index,
-          name.as_mut_ptr() as *mut c_char,
-          name_capacity,
-          &mut name_size,
-          value.as_mut_ptr() as *mut c_char,
-          value_capacity,
-          &mut value_size,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
         )
-      };
-      if !found {
-        return false;
-      }
-      if name_size <= name_capacity && value_size <= value_capacity {
-        // SAFETY: Envoy's snprintf-style contract guarantees that when each `size <= capacity` it
-        // wrote exactly that many bytes into the buffer, so no uninitialized bytes are exposed.
-        unsafe {
-          name.set_len(name_size);
-          value.set_len(value_size);
-        }
-        return true;
-      }
-      if name_size > name_capacity {
-        name.clear();
-        name.reserve(name_size);
-      }
-      if value_size > value_capacity {
-        value.clear();
-        value.reserve(value_size);
-      }
-    }
+      },
+    )
+  }
+
+  /// Reads the tag-extracted name of the counter at `index` into `name` (the stat name with tag
+  /// values removed). Returns `false` and leaves `name` unchanged when the index is out of range.
+  pub fn counter_tag_extracted_name(&self, index: usize, name: &mut Vec<u8>) -> bool {
+    fill_buffer(name, |ptr, capacity, size| unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+        self.envoy_ptr,
+        index,
+        ptr,
+        capacity,
+        size,
+      )
+    })
+  }
+
+  /// The number of tags on the counter at `index`, or `None` when the index is out of range.
+  pub fn counter_tag_count(&self, index: usize) -> Option<usize> {
+    let mut count: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+        self.envoy_ptr,
+        index,
+        &mut count,
+      )
+    };
+    found.then_some(count)
+  }
+
+  /// Reads tag `tag_index` of the counter at `index` into `name` and `value`. Returns `false` and
+  /// leaves both buffers unchanged when either index is out of range.
+  pub fn counter_tag(
+    &self,
+    index: usize,
+    tag_index: usize,
+    name: &mut Vec<u8>,
+    value: &mut Vec<u8>,
+  ) -> bool {
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
+  }
+
+  /// Reads the tag-extracted name of the gauge at `index` into `name`. See
+  /// [`counter_tag_extracted_name`](Self::counter_tag_extracted_name).
+  pub fn gauge_tag_extracted_name(&self, index: usize, name: &mut Vec<u8>) -> bool {
+    fill_buffer(name, |ptr, capacity, size| unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+        self.envoy_ptr,
+        index,
+        ptr,
+        capacity,
+        size,
+      )
+    })
+  }
+
+  /// The number of tags on the gauge at `index`, or `None` when the index is out of range.
+  pub fn gauge_tag_count(&self, index: usize) -> Option<usize> {
+    let mut count: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+        self.envoy_ptr,
+        index,
+        &mut count,
+      )
+    };
+    found.then_some(count)
+  }
+
+  /// Reads tag `tag_index` of the gauge at `index` into `name` and `value`. See
+  /// [`counter_tag`](Self::counter_tag).
+  pub fn gauge_tag(
+    &self,
+    index: usize,
+    tag_index: usize,
+    name: &mut Vec<u8>,
+    value: &mut Vec<u8>,
+  ) -> bool {
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
+  }
+
+  /// Reads the tag-extracted name of the text readout at `index` into `name`. See
+  /// [`counter_tag_extracted_name`](Self::counter_tag_extracted_name).
+  pub fn text_readout_tag_extracted_name(&self, index: usize, name: &mut Vec<u8>) -> bool {
+    fill_buffer(name, |ptr, capacity, size| unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+        self.envoy_ptr,
+        index,
+        ptr,
+        capacity,
+        size,
+      )
+    })
+  }
+
+  /// The number of tags on the text readout at `index`, or `None` when the index is out of range.
+  pub fn text_readout_tag_count(&self, index: usize) -> Option<usize> {
+    let mut count: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+        self.envoy_ptr,
+        index,
+        &mut count,
+      )
+    };
+    found.then_some(count)
+  }
+
+  /// Reads tag `tag_index` of the text readout at `index` into `name` and `value`. See
+  /// [`counter_tag`](Self::counter_tag).
+  pub fn text_readout_tag(
+    &self,
+    index: usize,
+    tag_index: usize,
+    name: &mut Vec<u8>,
+    value: &mut Vec<u8>,
+  ) -> bool {
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
   }
 
   /// Copies the whole snapshot into an [`OwnedMetricSnapshot`].
@@ -267,6 +406,50 @@ where
     // The name was truncated, so grow to the reported size and retry.
     buffer.clear();
     buffer.reserve(size);
+  }
+}
+
+/// Fills a name and value buffer from a single call that may truncate either independently. Grows
+/// whichever did not fit and retries until both fit, which converges in at most two iterations
+/// since the snapshot is stable for the flush. Returns `false` and leaves both buffers unchanged
+/// when the fill reports the entry does not exist.
+fn fill_two_buffers<F>(name: &mut Vec<u8>, value: &mut Vec<u8>, mut fill: F) -> bool
+where
+  F: FnMut(*mut c_char, usize, &mut usize, *mut c_char, usize, &mut usize) -> bool,
+{
+  loop {
+    let name_capacity = name.capacity();
+    let value_capacity = value.capacity();
+    let mut name_size: usize = 0;
+    let mut value_size: usize = 0;
+    let found = fill(
+      name.as_mut_ptr() as *mut c_char,
+      name_capacity,
+      &mut name_size,
+      value.as_mut_ptr() as *mut c_char,
+      value_capacity,
+      &mut value_size,
+    );
+    if !found {
+      return false;
+    }
+    if name_size <= name_capacity && value_size <= value_capacity {
+      // SAFETY: Envoy's snprintf-style contract guarantees that when each `size <= capacity` it
+      // wrote exactly that many bytes into the buffer, so no uninitialized bytes are exposed.
+      unsafe {
+        name.set_len(name_size);
+        value.set_len(value_size);
+      }
+      return true;
+    }
+    if name_size > name_capacity {
+      name.clear();
+      name.reserve(name_size);
+    }
+    if value_size > value_capacity {
+      value.clear();
+      value.reserve(value_size);
+    }
   }
 }
 

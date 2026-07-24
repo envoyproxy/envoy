@@ -84,6 +84,7 @@ constexpr absl::string_view RequestTrailerProcessingEffectField =
     "request_trailer_processing_effect";
 constexpr absl::string_view ResponseTrailerProcessingEffectField =
     "response_trailer_processing_effect";
+constexpr absl::string_view DestinationField = "destination";
 
 std::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -257,7 +258,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                            const std::string& stats_prefix, bool is_upstream,
                            Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-                           Server::Configuration::CommonFactoryContext& context)
+                           Server::Configuration::CommonFactoryContext& context,
+                           absl::Status& creation_status)
     : stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       untyped_forwarding_namespaces_(
           config.metadata_options().forwarding_namespaces().untyped().begin(),
@@ -281,7 +283,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
       filter_metadata_(config.filter_metadata()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
-                          config.response_attributes()),
+                          config.response_attributes(), creation_status),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config, builder, context)),
       on_processing_response_factory_cb_(
@@ -489,6 +491,7 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<int>(decoding_processor_effects_.trailer_effect_));
   (*struct_msg->mutable_fields())[RequestBodyProcessingEffectField].set_number_value(
       static_cast<int>(decoding_processor_effects_.body_effect_));
+  (*struct_msg->mutable_fields())[DestinationField].set_string_value(destination());
   return struct_msg;
 }
 
@@ -531,6 +534,7 @@ std::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   parts.push_back(absl::StrCat("bs:", bytes_sent_));
   parts.push_back(absl::StrCat("br:", bytes_received_));
   parts.push_back(absl::StrCat("os:", static_cast<int>(grpc_status_before_first_call_)));
+  parts.push_back(absl::StrCat("ds:", destination()));
 
   return absl::StrJoin(parts, ",");
 }
@@ -620,6 +624,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == GrpcStatusBeforeFirstCallField) {
     return static_cast<int64_t>(grpc_status_before_first_call_);
+  }
+  if (field_name == DestinationField) {
+    return absl::string_view(destination());
   }
   return {};
 }
@@ -715,7 +722,7 @@ void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, b
 
 void Filter::onComplete(ProcessingResponse& response) {
   ENVOY_STREAM_LOG(debug, "Received successful response from server", *decoder_callbacks_);
-  auto resp_ptr = std::make_unique<ProcessingResponse>(response);
+  auto resp_ptr = Grpc::ResponsePtr<ProcessingResponse>(response);
   onReceiveMessage(std::move(resp_ptr));
 }
 
@@ -1462,28 +1469,38 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 }
 
 void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info) {
-  if (stream_info == nullptr || logging_info_ == nullptr) {
+  if (logging_info_ == nullptr) {
     return;
   }
 
-  const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
-  if (upstream_meter != nullptr) {
-    logging_info_->setBytesSent(upstream_meter->wireBytesSent());
-    logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
-  }
-  // Only set upstream host in logging info once.
-  if (logging_info_->upstreamHost() == nullptr) {
-    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  if (stream_info != nullptr) {
+    const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
+    if (upstream_meter != nullptr) {
+      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+    }
+    // Only set upstream host in logging info once.
+    if (logging_info_->upstreamHost() == nullptr) {
+      logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+    }
+
+    // Only set cluster info in logging info once.
+    if (logging_info_->clusterInfo() == nullptr) {
+      logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
+    }
+
+    // Response code details should actually be set as many times as possible, since it's
+    // the *final* response code details that will give the most useful information.
+    logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
   }
 
-  // Only set cluster info in logging info once.
-  if (logging_info_->clusterInfo() == nullptr) {
-    logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
+  absl::string_view destination = "";
+  if (config_with_hash_key_.config().has_envoy_grpc()) {
+    destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
+  } else if (config_with_hash_key_.config().has_google_grpc()) {
+    destination = config_with_hash_key_.config().google_grpc().target_uri();
   }
-
-  // Response code details should actually be set as many times as possible, since it's
-  // the *final* response code details that will give the most useful information.
-  logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
+  logging_info_->setDestination(destination);
 }
 
 void Filter::logStreamInfo() {
@@ -1493,9 +1510,12 @@ void Filter::logStreamInfo() {
     return;
   }
 
-  if (stream_ != nullptr && grpc_service_.has_envoy_grpc()) {
+  if (grpc_service_.has_envoy_grpc()) {
     // Envoy gRPC service
-    logStreamInfoBase(&stream_->streamInfo());
+    logStreamInfoBase(stream_ != nullptr ? &stream_->streamInfo() : nullptr);
+  } else {
+    // Google gRPC service or others
+    logStreamInfoBase(nullptr);
   }
 }
 
@@ -1787,7 +1807,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
   }
 }
 
-void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
+void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
 
   if (config_->observabilityMode()) {
     ENVOY_STREAM_LOG(trace, "Ignoring received message when observability mode is enabled",

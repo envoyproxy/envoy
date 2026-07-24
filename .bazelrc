@@ -235,12 +235,6 @@ common:boringssl-fips --config=fips-common
 common:boringssl-fips --@envoy//bazel:ssl=@boringssl_fips//:ssl
 common:boringssl-fips --@envoy//bazel:crypto=@boringssl_fips//:crypto
 
-# AWS-LC FIPS
-common:aws-lc-fips --config=fips-common
-common:aws-lc-fips --@envoy//bazel:ssl=@aws_lc//:ssl
-common:aws-lc-fips --@envoy//bazel:crypto=@aws_lc//:crypto
-common:aws-lc-fips --@envoy//bazel:http3=False
-
 # OpenSSL
 common:openssl --@envoy//bazel:openssl=True
 common:openssl --@envoy//bazel:ssl=@envoy//compat/openssl:ssl

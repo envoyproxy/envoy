@@ -24,6 +24,7 @@ envoy_cc_library(
     deps = [
         ":deferred_deletable",
         ":dispatcher_thread_deletable",
+        ":evwatch_interface",
         ":file_event_interface",
         ":scaled_timer",
         ":schedulable_cb_interface",
@@ -37,6 +38,22 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/server:watchdog_interface",
         "@abseil-cpp//absl/functional:any_invocable",
+    ],
+)
+
+envoy_cc_library(
+    name = "evwatch_interface",
+    hdrs = ["evwatch.h"],
+    deps = [
+        "//envoy/common:time_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "evwatch_observer_manager_interface",
+    hdrs = ["evwatch_observer_manager.h"],
+    deps = [
+        ":evwatch_interface",
     ],
 )
 

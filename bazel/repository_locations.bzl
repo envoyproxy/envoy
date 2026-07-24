@@ -24,8 +24,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
     ),
     bazel_features = dict(
-        version = "1.45.0",
-        sha256 = "adfdb3cffab3a99a63363d844d559a81965d2b61a6062dd51a3d2478d416768f",
+        version = "1.51.0",
+        sha256 = "5450bfb2c8b4bc961c75368838f86156f563cc9adef1be7d504fc5619d54daab",
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
     ),
@@ -46,15 +46,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.35",
-        sha256 = "5179bc3f912d9c2dd5a6e5215e98222abe088847f021eba9f0f2e9a006deacaa",
+        version = "0.3.36",
+        sha256 = "7e1e9575d9477254e8855c4483b8fb08b088bd49868c3ef9330a4bb196492542",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
     rules_fuzzing = dict(
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
-        version = "0.7.0",
-        sha256 = "87adb1357bb5a932fa0de6fed0fc37412490a0c96f5259855008f208cf53a74f",
+        version = "0.8.0",
+        sha256 = "7d13a78e9edb1f63093adec75e16c47e2b975382b8911fc53b72f2355fcd0a16",
         strip_prefix = "rules_fuzzing-{version}",
         urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/v{version}.tar.gz"],
     ),
@@ -65,12 +65,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "3560f7dd3f08e16b9f84d877a5be21ec62071564783009571af5fcc6fad734d2",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
-    ),
-    aws_lc = dict(
-        version = "1.72.0",
-        sha256 = "f214c0e06e043c4f18b836059ccb5ecbed781173e8eed106839ee2dd4f4cc157",
-        strip_prefix = "aws-lc-{version}",
-        urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
     ),
     openssl = dict(
         version = "3.5.7",
@@ -97,14 +91,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/aignas/rules_shellcheck/archive/{version}.tar.gz"],
     ),
     aws_c_auth_testdata = dict(
-        version = "0.10.1",
-        sha256 = "85d737f0f735256f1931e85e4cadbe228d88698f7b59a9b390b49ef5d0778a43",
+        version = "0.10.4",
+        sha256 = "6fb567f496a450d4b6d3f5749d735977a0156957e8ccbca9af7a5ee15d1ffda7",
         strip_prefix = "aws-c-auth-{version}",
         urls = ["https://github.com/awslabs/aws-c-auth/archive/refs/tags/v{version}.tar.gz"],
     ),
     liburing = dict(
-        version = "2.14",
-        sha256 = "5f80964108981c6ad979c735f0b4877d5f49914c2a062f8e88282f26bf61de0c",
+        version = "2.15",
+        sha256 = "8d052f2622dcb3678cbaee5ff582a87572672a6c0a56533cdda5b65cb636120a",
         strip_prefix = "liburing-liburing-{version}",
         urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
     ),
@@ -127,13 +121,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
     perfetto = dict(
-        version = "54.0",
-        sha256 = "57cd976ca0b5474b1d617d1a97450ad55a208aaaff918265db3513275bf51d34",
+        version = "57.2",
+        sha256 = "c6fa3d89aee30f7da39402c9cd178c9f2e344544fda5c2109fd8457e319c3a2f",
         urls = ["https://github.com/google/perfetto/releases/download/v{version}/perfetto-cpp-sdk-src.zip"],
     ),
     c_ares = dict(
-        version = "1.34.6",
-        sha256 = "912dd7cc3b3e8a79c52fd7fb9c0f4ecf0aaa73e45efda880266a2d6e26b84ef5",
+        version = "1.34.8",
+        sha256 = "c222b6d681096f9444d2c4863d2c1174019e27cacca0a4a5c114d36dd7d7bf78",
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/v{version}/c-ares-{version}.tar.gz"],
     ),
@@ -150,8 +144,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Cyan4973/xxHash/archive/v{version}.tar.gz"],
     ),
     sql_parser = dict(
-        version = "3b40ba2d106587bdf053a292f7e3bb17e818a57f",
-        sha256 = "96c10c8e950a141a32034f19b19cdeb1da48fe859cf96ae5e19f894f36c62c71",
+        version = "52e5ad1f4fbb21301fcee7f9d18eef7e6ae6ab3e",
+        sha256 = "011e4786048436b90384cd2124a6ab4dd1961ae026df8d9dab9286e95a1e295f",
         strip_prefix = "sql-parser-{version}",
         urls = ["https://github.com/envoyproxy/sql-parser/archive/{version}.tar.gz"],
     ),
@@ -162,8 +156,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/mirror/tclap/archive/v{version}.tar.gz"],
     ),
     fmt = dict(
-        version = "12.1.0",
-        sha256 = "695fd197fa5aff8fc67b5f2bbc110490a875cdf7a41686ac8512fb480fa8ada7",
+        version = "12.2.0",
+        sha256 = "a2f4a8d51178f954e4c339007f77edd76ba0cb2e36f87a48e5a5403d9be5878f",
         strip_prefix = "fmt-{version}",
         urls = ["https://github.com/fmtlib/fmt/releases/download/{version}/fmt-{version}.zip"],
     ),
@@ -204,8 +198,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
     com_github_grpc_grpc = dict(
-        version = "1.81.1",
-        sha256 = "48ae0d05f87206112d9e9144a923191ee1e482141a70686ec58dc86d0b40fddc",
+        version = "1.83.0",
+        sha256 = "90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d",
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
     ),
@@ -227,8 +221,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/unicode-org/icu/releases/download/release-{version}/icu4c-{version}-sources.zip"],
     ),
     ipp_crypto = dict(
-        version = "1.3.0",
-        sha256 = "a1d87cb3b90fe4718609e4e9dd8343fd4531bb815e69bad901ac6b46f98b3b53",
+        version = "2.2.0",
+        sha256 = "d43503c479dd3292173b55aa6777161461e45621c0003169ea1a3b29aba897ed",
         strip_prefix = "cryptography-primitives-{version}",
         urls = ["https://github.com/intel/cryptography-primitives/archive/refs/tags/v{version}.tar.gz"],
     ),
@@ -288,8 +282,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://codeload.github.com/VectorCamp/vectorscan/tar.gz/refs/tags/vectorscan/{version}"],
     ),
     opentelemetry_cpp = dict(
-        version = "1.26.0",
-        sha256 = "8a878777a18a013e0ee6604629d1b5f29b162354c14489ad1dccd370f14ac372",
+        version = "1.28.0",
+        sha256 = "8c359919175d77c502515f5a783907d031cc6a172e44426dbe9bee3c1532201e",
         strip_prefix = "opentelemetry-cpp-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-cpp/archive/refs/tags/v{version}.tar.gz"],
     ),
@@ -306,8 +300,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
     ),
     dd_trace_cpp = dict(
-        version = "2.1.0",
-        sha256 = "8152fb69e61518a5b55ecb96edcbb19585f8950b6f070ac98ebd0b6dd6177492",
+        version = "2.1.1",
+        sha256 = "3e8d2a12c434b766ac92c1fcec07f49b92b8a12902f97e6c54839a65abe44649",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
     ),
@@ -318,18 +312,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
     ),
     libevent = dict(
-        # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
-        # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
-        # in the watchers (see https://github.com/libevent/libevent/pull/802).
-        # This also includes the fixes for https://github.com/libevent/libevent/issues/806
-        # and https://github.com/envoyproxy/envoy-mobile/issues/215.
-        # This also includes the fixes for Phantom events with EV_ET (see
-        # https://github.com/libevent/libevent/issues/984).
-        # This also includes the wepoll backend for Windows (see
-        # https://github.com/libevent/libevent/pull/1006)
-        # TODO(adip): Update to v2.2 when it is released.
-        version = "62c152d9a7cd264b993dad730c4163c6ede2e0a3",
-        sha256 = "4c80e5fe044ce5f8055b20a2f141ee32ec2614000f3e95d2aa81611a4c8f5213",
+        version = "release-2.2.2-alpha",
+        sha256 = "f0a1ead383fb4992cde92dfea88a19e43d8198b592938e454da1f5b7dbc39da9",
         strip_prefix = "libevent-{version}",
         urls = ["https://github.com/libevent/libevent/archive/{version}.tar.gz"],
     ),
@@ -466,13 +450,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/opencomputeproject/ocp-diag-core/archive/{version}.zip"],
     ),
     io_bazel_rules_go = dict(
-        version = "0.60.0",
-        sha256 = "86d3dc8f59d253524f933aaf2f3c05896cb0b605fc35b460c0b4b039996124c6",
+        version = "0.61.1",
+        sha256 = "763f4a3f6b03469fdb00a77a333dd0b5546d3ee1fa29db373128c08fee73e0e8",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
     ),
     rules_cc = dict(
-        version = "0.2.17",
-        sha256 = "283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a",
+        version = "0.2.22",
+        sha256 = "81c10a95a5c22d838276ee90d712635d6042419fdfca5ef88328226b6321e53b",
         strip_prefix = "rules_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_cc/releases/download/{version}/rules_cc-{version}.tar.gz"],
     ),
@@ -483,13 +467,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
     ),
     rules_java = dict(
-        version = "9.6.1",
-        sha256 = "9de4e178c2c4f98d32aafe5194c3f2b717ae10405caa11bdcb460ac2a6f61516",
+        version = "9.7.0",
+        sha256 = "68794ca344c1caf13dca65f90c06660823013fa080931266e2625103904a664e",
         urls = ["https://github.com/bazelbuild/rules_java/releases/download/{version}/rules_java-{version}.tar.gz"],
     ),
     rules_python = dict(
-        version = "1.9.0",
-        sha256 = "098ba13578e796c00c853a2161f382647f32eb9a77099e1c88bc5299333d0d6e",
+        version = "2.2.0",
+        sha256 = "e11d2e1efce1589e5bdfa93986712c74fc7467a0f093143d489d2ef5ebb1ed2a",
         strip_prefix = "rules_python-{version}",
         urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
     ),
@@ -507,8 +491,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_pkg/archive/{version}.tar.gz"],
     ),
     rules_shell = dict(
-        version = "0.7.1",
-        sha256 = "3709d1745ba4be4ef054449647b62e424267066eca887bb00dd29242cb8463a0",
+        version = "0.8.0",
+        sha256 = "20721f63908879c083f94869e618ea8d4ff5edb91ff9a72a2ebee357fdbc352d",
         strip_prefix = "rules_shell-{version}",
         urls = ["https://github.com/bazelbuild/rules_shell/releases/download/v{version}/rules_shell-v{version}.tar.gz"],
     ),
@@ -519,8 +503,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bytecodealliance/wasm-micro-runtime/archive/{version}.tar.gz"],
     ),
     wasmtime = dict(
-        version = "42.0.2",
-        sha256 = "96b94e150a3877d98cdc2e27bcd65ba89155ad67fa16c48fad6216664cb60d29",
+        version = "45.0.2",
+        sha256 = "a95cf57008b87dbe1cdaba220ea58b75bb0b53369e166fe21e729011bd25e9e8",
         strip_prefix = "wasmtime-{version}",
         urls = ["https://github.com/bytecodealliance/wasmtime/archive/v{version}.tar.gz"],
     ),
@@ -569,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "2e79733d0b831ab194dde343845aca66d5bedde3",
-        sha256 = "eeb92fb31981b3383b17dc1ec7ac8f67a5e52b615e899c88c7ee4edb671285cc",
+        version = "7a02e774630152a6f67f12458f9545ae3dabfc9b",
+        sha256 = "529c4b61254429e2953a8944ff6fd7583aacafe07a5e7e5b19f74fb17cf26394",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -581,8 +565,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "gurl-{version}",
     ),
     cel_spec = dict(
-        version = "0.25.1",
-        sha256 = "13583c5a312861648449845b709722676a3c9b43396b6b8e9cbe4538feb74ad2",
+        version = "0.25.2",
+        sha256 = "6bd7bbf973c6cd56136e7a5ec8efe61b7656fc52813350bc2807224551f515e7",
         strip_prefix = "cel-spec-{version}",
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
@@ -623,8 +607,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
     ),
     proxy_wasm_cpp_host = dict(
-        version = "09e5f8d6658fdb77f3d5859b27141e79514e371c",
-        sha256 = "366e7598d4931a96fd1c5b0482f87076d863810049aa3a8ce921616592ed3e8c",
+        version = "f2db56af443571e92a31c0b877106d9ea96e19ef",
+        sha256 = "34dac5bcebf0b156e435bf8dd9bdac5be60b95f967c420c680578d73af28c604",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
     ),
@@ -645,8 +629,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     # May be removable once Envoy upgrades to Bazel 8.0+ which includes this by default.
     # See: https://github.com/envoyproxy/envoy/pull/41172#issuecomment-2365923085
     platforms = dict(
-        version = "1.0.0",
-        sha256 = "852b71bfa15712cec124e4a57179b6bc95d59fdf5052945f5d550e072501a769",
+        version = "1.1.0",
+        sha256 = "324f5381753a610e472f79563d44e2026438195042aae4dc660b8c021f7de7f5",
         strip_prefix = "platforms-{version}",
         urls = [
             "https://github.com/bazelbuild/platforms/archive/{version}.tar.gz",
@@ -693,8 +677,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/maxmind/libmaxminddb/releases/download/{version}/libmaxminddb-{version}.tar.gz"],
     ),
     thrift = dict(
-        version = "0.23.0",
-        sha256 = "087ba9517063c8252e9e7fb4e3891a9fd85e20af80e0309e2276eff16791d75c",
+        version = "0.24.0",
+        sha256 = "d3a60676b1df3fb9850f6ce1e8a3df9a0efac036ceb4bce8ce46ee3eca735d2d",
         strip_prefix = "thrift-{version}/lib/py/",
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
@@ -724,14 +708,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/ninja-build/ninja/archive/refs/tags/v{version}.tar.gz"],
     ),
     fips_cmake_linux_x86_64 = dict(
-        version = "4.3.2",
-        sha256 = "791ae3604841ca03cb3889a3ad89165346e4b180ae3448efd4b0caa9ef46d245",
+        version = "4.4.0",
+        sha256 = "3864eb649b4466ae126a64bbde1657adad78efbbaa068bf38201de5cf1b5349f",
         strip_prefix = "cmake-{version}-linux-x86_64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-x86_64.tar.gz"],
     ),
     fips_cmake_linux_aarch64 = dict(
-        version = "4.3.2",
-        sha256 = "377079ab739f5765176f427609d9a2015b756ea20d5cba908d279c3731a2f481",
+        version = "4.4.0",
+        sha256 = "e98bb53e0b00a8f672424517d34c05bb9b94fd1c888c89e0b81bc8df51d1a94b",
         strip_prefix = "cmake-{version}-linux-aarch64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
     ),
@@ -746,24 +730,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "9d89a3ea57d141c2b22d70083f2c8459ba3890f2d9e818e7e933b75614936565",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
-    ),
-    fips_clang_ppc64le = dict(
-        version = "14.0.0",
-        sha256 = "2d504c4920885c86b306358846178bc2232dfac83b47c3b1d05861a8162980e6",
-        strip_prefix = "clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04.tar.xz"],
-    ),
-    fips_go_ppc64le = dict(
-        version = "1.26.3",
-        sha256 = "dbd82b50530ead2beb1fd72215117380df3cb16332b51467116dc35b3691dd75",
-        strip_prefix = "go",
-        urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
-    ),
-    fips_cmake_src = dict(
-        version = "4.3.2",
-        sha256 = "b0231eb39b3c3cabdc568c619df78208a7bd95ea10c9b2236d61218bac1b367d",
-        strip_prefix = "cmake-{version}",
-        urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}.tar.gz"],
     ),
     wuffs = dict(
         version = "0.4.0-alpha.9",

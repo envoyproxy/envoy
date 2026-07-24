@@ -155,7 +155,7 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+    ResponseProtoPtr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
@@ -321,6 +321,11 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
     }
   }
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, effective_resources);
+  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
+    for (absl::string_view resource : added_removed.removed_) {
+      xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
+    }
+  }
   if (options.use_namespace_matching_) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub->second->sub_state_.updateSubscriptionInterest({}, {});

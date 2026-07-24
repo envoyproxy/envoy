@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -25,6 +26,8 @@ namespace {
 
 using ::Envoy::Formatter::CommandParserFactory;
 using ::Envoy::Formatter::SubstitutionFormatStringUtils;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 // Builds a proto config that loads the named module with the given in-module formatter name.
 envoy::extensions::formatter::dynamic_modules::v3::DynamicModuleFormatter
@@ -188,7 +191,7 @@ formatters:
     envoy::config::core::v3::SubstitutionFormatString config;
     TestUtility::loadFromYaml(yaml, config);
     auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-    EXPECT_TRUE(formatter.status().ok()) << formatter.status().message();
+    EXPECT_OK(formatter.status());
     return (*formatter)->format(formatter_context_, stream_info_);
   }
 
@@ -240,7 +243,7 @@ formatters:
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-  ASSERT_TRUE(formatter.status().ok()) << formatter.status().message();
+  ASSERT_OK(formatter.status());
   EXPECT_EQ("second", (*formatter)->format(context, stream_info_));
 }
 
@@ -307,7 +310,7 @@ formatters:
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-  ASSERT_TRUE(formatter.status().ok()) << formatter.status().message();
+  ASSERT_OK(formatter.status());
   EXPECT_EQ("x-a,x-b", (*formatter)->format(context, stream_info_));
 }
 
@@ -341,7 +344,7 @@ formatters:
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-  ASSERT_TRUE(formatter.status().ok()) << formatter.status().message();
+  ASSERT_OK(formatter.status());
   EXPECT_EQ("0,", (*formatter)->format(context, stream_info_));
 }
 
@@ -413,7 +416,7 @@ formatters:
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config, context_);
-  ASSERT_TRUE(formatter.status().ok()) << formatter.status().message();
+  ASSERT_OK(formatter.status());
 
   const std::string expected = R"EOF({
   "value": "constant",
@@ -439,7 +442,8 @@ formatters:
 )EOF";
   envoy::config::core::v3::SubstitutionFormatString config;
   TestUtility::loadFromYaml(yaml, config);
-  EXPECT_FALSE(SubstitutionFormatStringUtils::fromProtoConfig(config, context_).status().ok());
+  EXPECT_THAT(SubstitutionFormatStringUtils::fromProtoConfig(config, context_).status(),
+              Not(IsOk()));
 }
 
 TEST_F(DynamicModuleFormatterTest, UnknownFormatterNameRejectedAtConfigLoad) {

@@ -12,8 +12,8 @@
 namespace Envoy {
 namespace ConnectionPool {
 namespace {
-int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
-  int64_t ret = 0;
+uint64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
+  uint64_t ret = 0;
   for (const auto& client : connecting_clients) {
     ret += client->currentUnusedCapacity();
   }
@@ -24,29 +24,28 @@ int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clien
 std::string ConnPoolImplBase::dumpState() const { return fmt::format("State: {}", *this); }
 
 void ConnPoolImplBase::assertCapacityCountsAreCorrect() {
-  SLOW_ASSERT(static_cast<int64_t>(connecting_stream_capacity_) ==
-                  currentUnusedCapacity(connecting_clients_) +
-                      currentUnusedCapacity(early_data_clients_),
+  SLOW_ASSERT(connecting_stream_capacity_ == currentUnusedCapacity(connecting_clients_) +
+                                                 currentUnusedCapacity(early_data_clients_),
               dumpState());
 
-  // Note: must include `busy_clients_` because they can have negative current unused capacity,
-  // which is included in `connecting_and_connected_stream_capacity_`.
+  // Busy clients always have currentUnusedCapacity() == 0 (clamped), so their contribution
+  // to the pool is zero. The invariant is that pool capacity equals connecting capacity plus
+  // the sum of ready clients' unused capacity.
   SLOW_ASSERT(
       connecting_and_connected_stream_capacity_ ==
-          (static_cast<int64_t>(connecting_stream_capacity_) +
-           currentUnusedCapacity(ready_clients_) + currentUnusedCapacity(busy_clients_)),
+          (connecting_stream_capacity_ + currentUnusedCapacity(ready_clients_) +
+           currentUnusedCapacity(busy_clients_)),
       fmt::format(
           "{} currentUnusedCapacity(ready_clients_) {}, currentUnusedCapacity(busy_clients_) {}",
           *this, currentUnusedCapacity(ready_clients_), currentUnusedCapacity(busy_clients_)));
 
-  SLOW_ASSERT(currentUnusedCapacity(busy_clients_) <= 0, dumpState());
+  SLOW_ASSERT(currentUnusedCapacity(busy_clients_) == 0, dumpState());
 
   if (ready_clients_.empty()) {
-    ENVOY_BUG((connecting_and_connected_stream_capacity_ - connecting_stream_capacity_) <= 0,
+    ENVOY_BUG(connecting_and_connected_stream_capacity_ == connecting_stream_capacity_,
               dumpState());
   } else {
-    ENVOY_BUG((connecting_and_connected_stream_capacity_ - connecting_stream_capacity_) > 0,
-              dumpState());
+    ENVOY_BUG(connecting_and_connected_stream_capacity_ > connecting_stream_capacity_, dumpState());
   }
 }
 
@@ -92,7 +91,7 @@ void ConnPoolImplBase::destructAllConnections() {
 }
 
 bool ConnPoolImplBase::shouldConnect(size_t pending_streams, size_t active_streams,
-                                     int64_t connecting_and_connected_capacity,
+                                     uint64_t connecting_and_connected_capacity,
                                      float preconnect_ratio, bool anticipate_incoming_stream) {
   // This is set to true any time global preconnect is being calculated.
   // ClusterManagerImpl::maybePreconnect is called directly before a stream is created, so the
@@ -215,7 +214,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     }
     ASSERT(client->state() == ActiveClient::State::Connecting, dumpState());
     ENVOY_BUG(std::numeric_limits<uint64_t>::max() - connecting_stream_capacity_ >=
-                  static_cast<uint64_t>(client->currentUnusedCapacity()),
+                  client->currentUnusedCapacity(),
               dumpState());
     ASSERT(client->real_host_description_);
     // Increase the connecting capacity to reflect the streams this connection can serve.
@@ -298,12 +297,17 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
     bool limited_by_concurrency =
         client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1;
     // The capacity calculated by concurrency could be negative if a SETTINGS frame lowered the
-    // number of allowed streams. In this case, connecting_and_connected_stream_capacity_ can be
-    // negative, and effective client capacity was still limited by concurrency. Compare
-    // client.concurrent_stream_limit_ and client.numActiveStreams() directly to avoid overflow.
+    // number of allowed streams. Compare client.concurrent_stream_limit_ and
+    // client.numActiveStreams() directly to avoid overflow.
     bool negative_capacity = client.concurrent_stream_limit_ < client.numActiveStreams() + 1;
     if (negative_capacity || limited_by_concurrency) {
-      incrConnectingAndConnectedStreamCapacity(1, client);
+      if (client.capacity_debt_ > 0) {
+        // The client has negative capacity not tracked in the pool. Absorb this stream closure
+        // into the debt rather than incrementing pool capacity.
+        client.capacity_debt_--;
+      } else {
+        incrConnectingAndConnectedStreamCapacity(1, client);
+      }
     }
   }
   if (client.state() == ActiveClient::State::Draining && client.numActiveStreams() == 0) {
@@ -570,7 +574,13 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       client.connect_timer_->disableTimer();
       client.connect_timer_.reset();
     }
-    decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity(), client);
+    // The pool tracks each client's contribution as currentUnusedCapacity() (already clamped
+    // to 0 for clients with negative raw capacity). Don't clear debt here — subsequent
+    // onStreamClosed calls will consume it as streams are destroyed on this connection.
+    uint32_t pool_contribution = client.currentUnusedCapacity();
+    if (pool_contribution > 0) {
+      decrConnectingAndConnectedStreamCapacity(pool_contribution, client);
+    }
 
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
@@ -932,7 +942,7 @@ void ActiveClient::onConnectionDurationTimeout() {
 }
 
 void ActiveClient::drain() {
-  const int64_t unused = currentUnusedCapacity();
+  const uint32_t unused = currentUnusedCapacity();
 
   // Remove draining client's capacity from the pool.
   //

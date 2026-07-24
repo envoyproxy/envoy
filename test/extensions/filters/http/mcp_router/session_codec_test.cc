@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/mcp_router/session_codec.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -9,6 +11,8 @@ namespace HttpFilters {
 namespace McpRouter {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
 
@@ -34,7 +38,7 @@ TEST(SessionCodecTest, ParseCompositeSessionId) {
 
   auto result = SessionCodec::parseCompositeSessionId(composite);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result->route, "route1");
   EXPECT_EQ(result->subject, "user1");
   EXPECT_THAT(result->backend_sessions,
@@ -49,7 +53,7 @@ TEST(SessionCodecTest, SubjectWithAtSymbol) {
 
   auto result = SessionCodec::parseCompositeSessionId(id);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result->route, "my_route");
   EXPECT_EQ(result->subject, subject_with_at);
   EXPECT_THAT(result->backend_sessions, UnorderedElementsAre(Pair("backend1", "session1")));
@@ -63,7 +67,7 @@ TEST(SessionCodecTest, ParseInvalidCustomFormat) {
   };
 
   for (const auto& input : invalid_inputs) {
-    EXPECT_FALSE(SessionCodec::parseCompositeSessionId(input).ok()) << "Input: " << input;
+    EXPECT_THAT(SessionCodec::parseCompositeSessionId(input), Not(IsOk())) << "Input: " << input;
   }
 }
 
@@ -73,7 +77,7 @@ TEST(SessionCodecTest, ParseEmptyBackendSessions) {
 
   auto result = SessionCodec::parseCompositeSessionId(composite);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result->route, "route1");
   EXPECT_EQ(result->subject, "user1");
   EXPECT_TRUE(result->backend_sessions.empty());
@@ -86,7 +90,7 @@ TEST(SessionCodecTest, BuildAndParsePartialBackendSessions) {
   std::string composite = SessionCodec::buildCompositeSessionId("route1", "user1", sessions);
 
   auto result = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result->route, "route1");
   EXPECT_EQ(result->subject, "user1");
   // Only backend1 should be present; backend2 is absent (session-less).

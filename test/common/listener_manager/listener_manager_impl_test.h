@@ -24,6 +24,7 @@
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -392,7 +393,7 @@ protected:
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _, _));
-    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
@@ -441,7 +442,7 @@ protected:
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _, _));
-    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 

@@ -65,8 +65,9 @@ public:
 
   // Overload the default capacity calculations to return the quic capacity
   // (modified by any stream limits in Envoy config)
-  int64_t currentUnusedCapacity() const override {
-    return std::min<int64_t>(quiche_capacity_, effectiveConcurrentStreamLimit());
+  uint32_t currentUnusedCapacity() const override {
+    return static_cast<uint32_t>(
+        std::min<uint64_t>(quiche_capacity_, effectiveConcurrentStreamLimit()));
   }
 
   // Overridden to return true as long as the client is doing handshake even when it is ready for

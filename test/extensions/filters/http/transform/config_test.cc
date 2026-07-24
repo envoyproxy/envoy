@@ -5,6 +5,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -14,6 +15,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Transform {
 namespace {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(FactoryTest, FactoryTest) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
@@ -95,10 +98,43 @@ clear_cluster_cache: true
 
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
-    EXPECT_FALSE(cb_or_error.status().ok());
-    EXPECT_EQ("Only one of clear_cluster_cache and clear_route_cache can be set to true",
-              cb_or_error.status().message());
+    EXPECT_THAT(cb_or_error,
+                HasStatusMessage(
+                    "Only one of clear_cluster_cache and clear_route_cache can be set to true"));
   }
+}
+
+TEST(FactoryTest, CreateFilterWithServerContext) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.transform");
+  ASSERT_NE(factory, nullptr);
+
+  const std::string config = R"EOF(
+request_transformation:
+  headers_mutations:
+  - append:
+      header:
+        key: "x-new-header-from-body"
+        value: "%REQUEST_BODY(body-key)%"
+  body_transformation:
+    body_format:
+      json_format:
+        raw-key: "raw-value"
+        header-key: "%REQ(header-key)%"
+        new-body-key: "%REQUEST_BODY(body-key)%"
+    action: REPLACE
+clear_route_cache: true
+  )EOF";
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  auto cb = factory->createHttpFilterFactoryFromProto(proto_config, "test", server_context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
 }
 
 } // namespace

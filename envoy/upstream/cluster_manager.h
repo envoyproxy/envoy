@@ -203,10 +203,8 @@ struct ClusterConnectivityState {
   // goes up by 100. If the connection is established and 2 streams are in use, it
   // would be reduced to 98 (as 2 of the 100 are not available).
   //
-  // Note that if more HTTP/2 streams have been established than are allowed by
-  // a late-received SETTINGS frame, this MAY BE NEGATIVE.
   // Note this tracks the sum of multiple 32 bit stream capacities so must remain 64 bit.
-  int64_t connecting_and_connected_stream_capacity_{};
+  uint64_t connecting_and_connected_stream_capacity_{};
 };
 
 /**

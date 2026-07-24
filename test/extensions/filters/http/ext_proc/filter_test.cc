@@ -36,6 +36,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -180,8 +181,11 @@ protected:
     auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
     builder_ = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
         std::move(builder_ptr));
+    absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, 200ms, 10000, *stats_store_.rootScope(),
-                                             "", is_upstream_filter, builder_, factory_context_);
+                                             "", is_upstream_filter, builder_, factory_context_,
+                                             creation_status);
+    ASSERT_OK(creation_status);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -216,6 +220,21 @@ protected:
     response_header_mode: "SEND"
     request_body_mode: "STREAMED"
     response_body_mode: "FULL_DUPLEX_STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  )EOF");
+  }
+
+  void initializeTestGoogleGrpc() {
+    initialize(R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: "ext_proc_server_uri"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
     request_trailer_mode: "SEND"
     response_trailer_mode: "SEND"
   )EOF");
@@ -6300,6 +6319,32 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatencyReturnContinue) {
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 }
 
+TEST_F(HttpFilterTest, ClusterMissingLoggingInfo) {
+  do_start_option_ = OnGrpcError;
+  initializeTestSendAll();
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->logStreamInfo();
+
+  ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server");
+}
+
+TEST_F(HttpFilterTest, GoogleGrpcMissingLoggingInfo) {
+  do_start_option_ = OnGrpcError;
+  initializeTestGoogleGrpc();
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->logStreamInfo();
+
+  ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server_uri");
+}
+
 TEST_F(HttpFilterTest, ResponseCaseToStringCoverage) {
   EXPECT_EQ("request headers",
             responseCaseToString(ProcessingResponse::ResponseCase::kRequestHeaders));
@@ -6513,6 +6558,7 @@ TEST_F(HttpFilterTest, LocalResponseStarted) {
 }
 
 } // namespace
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

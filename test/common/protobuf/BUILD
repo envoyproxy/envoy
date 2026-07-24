@@ -12,6 +12,21 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_proto_library(
+    name = "arena_wrapped_proto_test_proto",
+    srcs = ["arena_wrapped_proto_test.proto"],
+)
+
+envoy_cc_test(
+    name = "arena_wrapped_proto_test",
+    srcs = ["arena_wrapped_proto_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":arena_wrapped_proto_test_proto_cc_proto",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "message_validator_impl_test",
     srcs = ["message_validator_impl_test.cc"],
@@ -20,6 +35,7 @@ envoy_cc_test(
         "//source/common/protobuf:message_validator_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

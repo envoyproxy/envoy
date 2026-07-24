@@ -9,6 +9,7 @@
 #include "test/common/buffer/utility.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -70,14 +71,14 @@ TEST(GrpcCodecTest, decodeIncompleteFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
+  EXPECT_OK(decoder.decode(buffer, frames));
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(static_cast<size_t>(0), frames.size());
   EXPECT_EQ(static_cast<uint32_t>(request.ByteSize()), decoder.length());
   EXPECT_EQ(true, decoder.hasBufferedData());
 
   buffer.add(request_buffer.c_str() + 5);
-  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
+  EXPECT_OK(decoder.decode(buffer, frames));
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(static_cast<size_t>(1), frames.size());
   EXPECT_EQ(static_cast<uint32_t>(0), decoder.length());
@@ -162,7 +163,7 @@ TEST(GrpcCodecTest, decodeEmptyFrame) {
 
   Decoder decoder;
   std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
+  EXPECT_OK(decoder.decode(buffer, frames));
 
   EXPECT_EQ(1, frames.size());
   EXPECT_EQ(0, frames[0].length_);
@@ -181,7 +182,7 @@ TEST(GrpcCodecTest, decodeSingleFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
+  EXPECT_OK(decoder.decode(buffer, frames));
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(frames.size(), static_cast<uint64_t>(1));
   EXPECT_EQ(GRPC_FH_DEFAULT, frames[0].flags_);
@@ -208,7 +209,7 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  EXPECT_TRUE(decoder.decode(buffer, frames).ok());
+  EXPECT_OK(decoder.decode(buffer, frames));
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(frames.size(), static_cast<uint64_t>(1009));
   for (Frame& frame : frames) {

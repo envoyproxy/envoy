@@ -2,7 +2,7 @@ bazel_skylib:
   project_name: "bazel-skylib"
   project_desc: "Common useful functions and rules for Bazel"
   project_url: "https://github.com/bazelbuild/bazel-skylib"
-  release_date: "2025-12-16"
+  release_date: "2026-07-17"
   use_category:
   - api
   license: "Apache-2.0"
@@ -73,7 +73,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-06-10"
+  release_date: "2026-07-23"
   use_category:
   - build
   - controlplane
@@ -89,7 +89,7 @@ opentelemetry_proto:
   project_name: "OpenTelemetry Proto"
   project_desc: "Language Independent Interface Types For OpenTelemetry"
   project_url: "https://github.com/open-telemetry/opentelemetry-proto"
-  release_date: "2026-03-09"
+  release_date: "2026-07-21"
   use_category:
   - api
   license: "Apache-2.0"
@@ -107,7 +107,7 @@ rules_buf:
   project_name: "Bazel rules for Buf"
   project_desc: "Bazel rules for Buf"
   project_url: "https://github.com/bufbuild/rules_buf"
-  release_date: "2025-08-22"
+  release_date: "2026-04-30"
   use_category:
   - api
   license: "Apache-2.0"

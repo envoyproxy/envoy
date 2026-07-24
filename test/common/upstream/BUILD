@@ -27,6 +27,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:missing_cluster_notifier_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -44,6 +45,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:missing_cluster_notifier_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -63,6 +65,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -95,6 +98,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/config:config_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/base",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -185,6 +189,7 @@ envoy_cc_test(
         "//source/common/config:xds_resource_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//test/mocks/upstream:od_cds_api_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -202,6 +207,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )
@@ -295,6 +301,21 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "health_checker_test_base_lib",
+    hdrs = [
+        "health_checker_test_base.h",
+    ],
+    deps = [
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+    ],
+)
+
 envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = [
@@ -302,6 +323,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        ":health_checker_test_base_lib",
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -330,6 +352,53 @@ envoy_cc_test(
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_check/event_sinks/file/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "grpc_health_checker_impl_test",
+    srcs = [
+        "grpc_health_checker_impl_test.cc",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        ":health_checker_test_base_lib",
+        ":utility_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:health_checker_lib",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/health_check/event_sinks/file:file_sink_lib",
+        "//source/extensions/health_checkers/grpc:health_checker_lib",
+        "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/health_checkers/tcp:health_checker_lib",
+        "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -450,6 +519,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
@@ -478,6 +548,7 @@ envoy_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
@@ -552,6 +623,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -582,6 +654,7 @@ envoy_cc_test(
     data = ["//test/common/tls/test_data:certs"],
     rbe_pool = "6gig",
     deps = [
+        "//test/test_common:status_utility_lib",
         ":test_local_address_selector",
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -725,6 +798,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],

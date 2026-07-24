@@ -72,6 +72,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -96,6 +97,7 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -117,6 +119,7 @@ envoy_cc_test(
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -155,6 +158,7 @@ envoy_cc_test(
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -392,6 +396,10 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:notification_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:allocator_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -422,6 +430,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -484,5 +493,6 @@ envoy_cc_test(
     deps = [
         "//source/server:utils_lib",
         "//test/mocks/server:options_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )

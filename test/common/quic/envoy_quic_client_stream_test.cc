@@ -9,6 +9,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/webtransport.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -22,8 +23,11 @@ namespace Quic {
 
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::Invoke;
+using ::testing::Not;
 
 constexpr unsigned int kStreamId = 4u;
 
@@ -143,7 +147,7 @@ public:
         {":protocol", "connect-udp"}, {":path", "/.well-known/masque/udp/192.0.2.6/443/"},
         {":scheme", "https"},         {"capsule-protocol", "?1"}};
     const auto result = quic_stream_->encodeHeaders(request_headers, close_send_stream);
-    EXPECT_TRUE(result.ok());
+    EXPECT_OK(result);
 
     // Decodes the response.
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _))
@@ -193,7 +197,7 @@ public:
     Http::TestRequestHeaderMapImpl wt_headers = {
         {":authority", host_}, {":method", "GET"},        {":path", "/"},
         {":scheme", "https"},  {"connection", "Upgrade"}, {"upgrade", "webtransport"}};
-    EXPECT_TRUE(quic_stream_->encodeHeaders(wt_headers, /*end_stream=*/false).ok());
+    EXPECT_OK(quic_stream_->encodeHeaders(wt_headers, /*end_stream=*/false));
     return quic_stream_->web_transport();
   }
 
@@ -252,7 +256,7 @@ protected:
 
 TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   quic_stream_->setFlushTimeout(std::chrono::milliseconds(100)); // No-op
 
@@ -270,7 +274,7 @@ TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
 TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(std::nullopt, quic_stream_->http1StreamEncoderOptions());
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   quic_stream_->encodeData(request_body_, false);
   quic_stream_->encodeTrailers(request_trailers_);
 
@@ -297,7 +301,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
 TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithMemSliceReleasor) {
   EXPECT_EQ(std::nullopt, quic_stream_->http1StreamEncoderOptions());
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   quic_stream_->encodeData(request_body_, false);
   quic_stream_->encodeTrailers(request_trailers_);
 
@@ -327,7 +331,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_LE(quic_stream_->stream_bytes_written(),
@@ -382,7 +386,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
 
 TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   EXPECT_CALL(stream_decoder_, decode1xxHeaders_(_))
       .WillOnce(Invoke([this](const Http::ResponseHeaderMapPtr& headers) {
@@ -414,7 +418,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
 
 TEST_F(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
   // Receive several 10x headers, only the first 100 Continue header should be
@@ -436,7 +440,7 @@ TEST_F(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
 
   request_headers_.addCopy(":content-length", "32770"); // 32KB + 2 byte
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   // Encode 32kB request body. first 16KB should be written out right away. The
   // rest should be buffered. The high watermark is 16KB, so this call should
   // make the send buffer reach its high watermark.
@@ -499,7 +503,7 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
             return quic::QuicConsumedData{0u, state != quic::NO_FIN};
           }));
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   // Encode 16kB -10 bytes request body. Because the high watermark is 16KB, with previously
   // buffered headers, this call should make the send buffers reach their high watermark.
@@ -560,7 +564,7 @@ TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
 
 TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteClosed) {
   auto result = quic_stream_->encodeHeaders(request_headers_, true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
   quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
       quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
@@ -576,7 +580,7 @@ TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteOpen) {
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   quic_stream_->encodeData(request_body_, true);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
@@ -595,7 +599,7 @@ TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithEndStream) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   quic_stream_->encodeData(request_body_, true);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false));
@@ -614,7 +618,7 @@ TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithEndStream
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithTrailer) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   quic_stream_->encodeData(request_body_, true);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false));
@@ -636,7 +640,7 @@ TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithTrailer) 
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingTrailer) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   size_t offset = receiveResponse(response_body_, false);
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
@@ -664,7 +668,7 @@ TEST_F(EnvoyQuicClientStreamTest, MetadataNotSupported) {
 // Tests that posted stream block callback won't cause use-after-free crash.
 TEST_F(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::ResponseHeaderMapPtr& headers, bool) {
@@ -687,7 +691,7 @@ TEST_F(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
 TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
   quic_session_.setMaxIncomingHeadersCount(100);
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   quic_stream_->encodeData(request_body_, true);
 
   // Receive more response headers than allowed. Such response headers shouldn't be delivered to
@@ -710,8 +714,7 @@ TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
 TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidKey) {
   request_headers_.addCopy("x-foo\r\n", "hello world");
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.message(), testing::HasSubstr("invalid header name: x-foo\\r\\n"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("invalid header name: x-foo\\r\\n")));
 
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
@@ -720,8 +723,7 @@ TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidKey) {
 TEST_F(EnvoyQuicClientStreamTest, HeaderInvalidValue) {
   request_headers_.addCopy("x-foo", "hello\r\n\r\nGET /evil HTTP/1.1");
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.message(), testing::HasSubstr("invalid header value for: x-foo"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("invalid header value for: x-foo")));
 
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalConnectionFailure);
@@ -735,13 +737,13 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeHeadersOnClosedStream) {
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
 
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
 
 TEST_F(EnvoyQuicClientStreamTest, EncodeDataOnClosedStream) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   // Encode 18kB response body. first 16KB should be written out right away. The
   // rest should be buffered.
@@ -766,7 +768,7 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeDataOnClosedStream) {
 
 TEST_F(EnvoyQuicClientStreamTest, EncodeTrailersOnClosedStream) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   // Encode 18kB response body. first 16KB should be written out right away. The
   // rest should be buffered.
@@ -793,7 +795,7 @@ TEST_F(EnvoyQuicClientStreamTest, DecoderDestroyedBeforeDecoding1xxHeader) {
   quic_stream_->setResponseDecoder(*stream_decoder);
 
   auto result = quic_stream_->encodeHeaders(request_headers_, true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   // Destroy the mock decoder.
   stream_decoder.reset();
@@ -817,7 +819,7 @@ TEST_F(EnvoyQuicClientStreamTest, DecoderDestroyedBeforeDecodingHeader) {
   quic_stream_->setResponseDecoder(*stream_decoder);
 
   auto result = quic_stream_->encodeHeaders(request_headers_, true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   // Destroy the mock decoder.
   stream_decoder.reset();
@@ -839,7 +841,7 @@ TEST_F(EnvoyQuicClientStreamTest, DecoderDestroyedBeforeDecodingBody) {
   quic_stream_->setResponseDecoder(*stream_decoder);
 
   auto result = quic_stream_->encodeHeaders(request_headers_, true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   EXPECT_CALL(*stream_decoder, decodeHeaders_(_, /*end_stream=*/false));
   std::string headers = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
@@ -870,7 +872,7 @@ TEST_F(EnvoyQuicClientStreamTest, DecoderDestroyedBeforeDecodingTrailer) {
   quic_stream_->setResponseDecoder(*stream_decoder);
 
   auto result = quic_stream_->encodeHeaders(request_headers_, true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   EXPECT_CALL(*stream_decoder, decodeHeaders_(_, /*end_stream=*/false));
   std::string headers = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
@@ -937,7 +939,7 @@ TEST_F(EnvoyQuicClientStreamTest, WebTransportConnectDeferredUntilSettings) {
       {":authority", host_}, {":method", "GET"},        {":path", "/"},
       {":scheme", "https"},  {"connection", "Upgrade"}, {"upgrade", "webtransport"}};
   const auto result = quic_stream_->encodeHeaders(wt_headers, /*end_stream=*/false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   // The request is buffered, not written: no header bytes have been encoded onto the stream, and
   // QUICHE has not created the upstream WebTransport session yet.
   EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
@@ -958,7 +960,7 @@ TEST_F(EnvoyQuicClientStreamTest, WebTransportConnectDeferredUntilSettings) {
 TEST_F(EnvoyQuicClientStreamTest, NonWebTransportRequestNotDeferred) {
   EXPECT_FALSE(quic_session_.settings_received());
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_GT(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(), 0);
   // A non-WebTransport request never creates a WebTransport session.
   EXPECT_EQ(nullptr, quic_stream_->web_transport());
@@ -982,7 +984,7 @@ TEST_F(EnvoyQuicClientStreamTest, WebTransportConnectNotDeferredAfterSettings) {
       {":authority", host_}, {":method", "GET"},        {":path", "/"},
       {":scheme", "https"},  {"connection", "Upgrade"}, {"upgrade", "webtransport"}};
   const auto result = quic_stream_->encodeHeaders(wt_headers, /*end_stream=*/false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   // Written immediately (not buffered), and the upstream WebTransport session is created now.
   EXPECT_GT(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(), 0);
   EXPECT_NE(nullptr, quic_stream_->web_transport());
@@ -1003,7 +1005,7 @@ TEST_F(EnvoyQuicClientStreamTest, WebTransportConnectResetWhilePending) {
   Http::TestRequestHeaderMapImpl wt_headers = {
       {":authority", host_}, {":method", "GET"},        {":path", "/"},
       {":scheme", "https"},  {"connection", "Upgrade"}, {"upgrade", "webtransport"}};
-  EXPECT_TRUE(quic_stream_->encodeHeaders(wt_headers, /*end_stream=*/false).ok());
+  EXPECT_OK(quic_stream_->encodeHeaders(wt_headers, /*end_stream=*/false));
   // Buffered, not written, and no WebTransport session created yet.
   EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   EXPECT_EQ(nullptr, quic_stream_->web_transport());
@@ -1076,7 +1078,7 @@ TEST_F(EnvoyQuicClientStreamTest, WebTransportConnectResponseBridgesDownstream) 
 
 TEST_F(EnvoyQuicClientStreamTest, InconsistentContentLengthHeadersOnly) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {

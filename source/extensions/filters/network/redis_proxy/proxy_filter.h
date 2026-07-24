@@ -3,13 +3,13 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/real_time_system.h"
@@ -32,6 +32,7 @@ namespace RedisProxy {
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
+  COUNTER(downstream_rq_noproto)                                                                   \
   COUNTER(downstream_rq_total)                                                                     \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
@@ -64,6 +65,8 @@ public:
   const std::string downstream_auth_username_;
   std::vector<std::string> downstream_auth_passwords_;
   TimeSource& timeSource() const { return time_source_; };
+  // Listener-level RESP version (downstream + upstream). Fixed at config load.
+  Common::Redis::RespProtocolVersion protocolVersion() const { return protocol_version_; }
   const bool external_auth_enabled_;
   const bool external_auth_expiration_enabled_;
 
@@ -76,6 +79,7 @@ private:
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr
   getCache(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config);
   TimeSource& time_source_;
+  const Common::Redis::RespProtocolVersion protocol_version_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -138,11 +142,40 @@ private:
 
     Common::Redis::Client::Transaction& transaction() override { return parent_.transaction(); }
 
+    AuthAttempt attemptDownstreamAuthInline(const std::string& username,
+                                            const std::string& password,
+                                            uint32_t requested_version) override {
+      return parent_.attemptDownstreamAuthInline(*this, username, password, requested_version);
+    }
+    void setDownstreamRespVersion(uint32_t version) override;
+    Common::Redis::RespProtocolVersion protocolVersion() const override {
+      return parent_.config_->protocolVersion();
+    }
+
+    uint32_t currentDownstreamRespVersion() const override {
+      return parent_.downstream_resp_version_;
+    }
+
+    std::optional<uint32_t> takePendingHelloAuthVersion() override {
+      auto version = pending_hello_auth_version_;
+      pending_hello_auth_version_.reset();
+      return version;
+    }
+
+    // Downstream RESP version captured at request creation, set in the constructor from the
+    // parent filter's current downstream_resp_version_.
+    uint32_t resp_version_at_creation_;
     ProxyFilter& parent_;
     // This value is set when the request is on hold, waiting for an external auth response.
     Common::Redis::RespValuePtr pending_request_value_;
     Common::Redis::RespValuePtr pending_response_;
     CommandSplitter::SplitRequestPtr request_handle_;
+    // When this PendingRequest is a HELLO N AUTH ... whose inline-auth check was deferred to
+    // the external auth provider, holds N (the requested protocol version). On
+    // onAuthenticateExternal, ProxyFilter consults this to emit the deferred HELLO Map (and
+    // flip the downstream RESP version) on success or an error reply on failure, instead of
+    // the +OK that the AUTH-command path emits.
+    std::optional<uint32_t> pending_hello_auth_version_;
   };
 
   void onQuit(PendingRequest& request);
@@ -150,7 +183,23 @@ private:
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
   bool checkPassword(const std::string& password);
+  // Shared local-credential policy for ``AUTH <user> <pass>`` and ``HELLO N AUTH <user> <pass>``
+  // (one copy so the two auth entry points cannot silently diverge).
+  bool checkCredentials(const std::string& username, const std::string& password);
+  // Inline-auth path used by HELLO N AUTH ... handling. Local-credentials case returns
+  // Allowed (flipping connection_allowed_) or Denied. External-auth case stashes
+  // ``requested_version`` on ``request`` and kicks off ``authenticateExternal``, returning
+  // ``ImplOwnsResponse``; ``onAuthenticateExternal`` then emits the deferred HELLO Map / error.
+  CommandSplitter::SplitCallbacks::AuthAttempt
+  attemptDownstreamAuthInline(PendingRequest& request, const std::string& username,
+                              const std::string& password, uint32_t requested_version);
   void processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request);
+  // Drain any pending_request_value_ entries left in pending_requests_ after an external-auth
+  // round trip resolved (called from onAuthenticateExternal). Walks the entire list in FIFO
+  // order, not just the front; bails if a resumed entry starts a new round trip, and is
+  // guarded against reentrant calls because a resumed AUTH can resolve synchronously (gRPC send()
+  // may fail inline) and re-enter this method from within processRespValue.
+  void resumeAuthHeldRequests();
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
@@ -160,8 +209,20 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
+  // Per-connection negotiated downstream RESP version, held as the wire integer (2 or 3) so
+  // it compares directly against the ``HELLO N`` argument. This is distinct from the
+  // listener-policy type ``Common::Redis::RespProtocolVersion`` returned by
+  // ``ProxyFilterConfig::protocolVersion()``; the two are bridged by ``toWireRespVersion`` /
+  // ``toRespProtocolVersion`` at the boundaries. Starts at 2 (a legacy client never sends
+  // HELLO) and is flipped by ``setDownstreamRespVersion`` when a ``HELLO N`` whose ``N``
+  // matches the listener policy succeeds.
+  uint32_t downstream_resp_version_{2};
   Common::Redis::Client::Transaction transaction_;
   bool connection_quit_;
+  // True while resumeAuthHeldRequests is draining. A resumed AUTH that resolves synchronously
+  // re-enters resumeAuthHeldRequests via onAuthenticateExternal; the nested call must not start
+  // a second drain loop over the same list.
+  bool resuming_held_requests_{false};
   ExternalAuth::ExternalAuthClientPtr auth_client_;
   ExternalAuthCallStatus external_auth_call_status_;
   long external_auth_expiration_epoch_;

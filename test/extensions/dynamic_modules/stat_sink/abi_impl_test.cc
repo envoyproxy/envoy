@@ -164,6 +164,150 @@ TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterOutOfRange) {
 }
 
 // =============================================================================
+// Tag callbacks
+// =============================================================================
+
+TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagExtractedNameAndTags) {
+  c0_.name_ = "cluster.foo.rq_total";
+  c0_.setTagExtractedName("cluster.rq_total");
+  c0_.setTags({{"envoy.cluster_name", "foo"}, {"envoy.response_code", "200"}});
+  snapshot_.counters_.push_back({/*delta=*/1, c0_});
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ("cluster.rq_total", written(name_buffer, name_size, sizeof(name_buffer)));
+
+  size_t tag_count = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(2u, tag_count);
+
+  struct Expected {
+    const char* name;
+    const char* value;
+  } expected[] = {{"envoy.cluster_name", "foo"}, {"envoy.response_code", "200"}};
+  for (size_t i = 0; i < 2; i++) {
+    char tag_name[256];
+    char tag_value[256];
+    size_t tag_name_size = 0;
+    size_t tag_value_size = 0;
+    ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+        snapshotHandle(), 0, i, tag_name, sizeof(tag_name), &tag_name_size, tag_value,
+        sizeof(tag_value), &tag_value_size));
+    EXPECT_EQ(expected[i].name, written(tag_name, tag_name_size, sizeof(tag_name)));
+    EXPECT_EQ(expected[i].value, written(tag_value, tag_value_size, sizeof(tag_value)));
+  }
+}
+
+// A counter with no tags reports zero and no tag is readable.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagCountZero) {
+  c0_.name_ = "no_tags";
+  snapshot_.counters_.push_back({/*delta=*/1, c0_});
+
+  size_t tag_count = 12345;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(0u, tag_count);
+
+  char name_buffer[16];
+  char value_buffer[16];
+  size_t name_size = 0;
+  size_t value_size = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+      snapshotHandle(), 0, 0, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+      sizeof(value_buffer), &value_size));
+}
+
+// Out-of-range metric and tag indices return false without writing outputs.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetCounterTagOutOfRange) {
+  c0_.name_ = "cluster.foo.rq_total";
+  c0_.setTags({{"envoy.cluster_name", "foo"}});
+  snapshot_.counters_.push_back({/*delta=*/1, c0_});
+
+  char name_buffer[256] = {'Z'};
+  char value_buffer[256] = {'Z'};
+  size_t name_size = 12345;
+  size_t value_size = 6789;
+  // Tag index past the end.
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+      snapshotHandle(), 0, 1, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+      sizeof(value_buffer), &value_size));
+  // Metric index past the end.
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+      snapshotHandle(), 5, 0, name_buffer, sizeof(name_buffer), &name_size, value_buffer,
+      sizeof(value_buffer), &value_size));
+  size_t tag_count = 42;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+      snapshotHandle(), 5, &tag_count));
+  EXPECT_EQ(12345u, name_size);
+  EXPECT_EQ(6789u, value_size);
+  EXPECT_EQ(42u, tag_count);
+  EXPECT_EQ('Z', name_buffer[0]);
+}
+
+// Gauge and text-readout tag callbacks share the counter code path; a gauge spot check confirms
+// the wiring reaches the right snapshot collection.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetGaugeTagExtractedNameAndTags) {
+  g0_.name_ = "cluster.bar.cx_active";
+  g0_.setTagExtractedName("cluster.cx_active");
+  g0_.setTags({{"envoy.cluster_name", "bar"}});
+  snapshot_.gauges_.push_back(g0_);
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ("cluster.cx_active", written(name_buffer, name_size, sizeof(name_buffer)));
+
+  size_t tag_count = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(snapshotHandle(),
+                                                                                   0, &tag_count));
+  EXPECT_EQ(1u, tag_count);
+
+  char tag_name[256];
+  char tag_value[256];
+  size_t tag_name_size = 0;
+  size_t tag_value_size = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+      snapshotHandle(), 0, 0, tag_name, sizeof(tag_name), &tag_name_size, tag_value,
+      sizeof(tag_value), &tag_value_size));
+  EXPECT_EQ("envoy.cluster_name", written(tag_name, tag_name_size, sizeof(tag_name)));
+  EXPECT_EQ("bar", written(tag_value, tag_value_size, sizeof(tag_value)));
+}
+
+// The text-readout tag callbacks reach the third snapshot collection; a spot check confirms the
+// wiring, mirroring the gauge check above.
+TEST_F(DynamicModuleStatsSinkAbiTest, GetTextReadoutTagExtractedNameAndTags) {
+  t0_.name_ = "control_plane.foo.identifier";
+  t0_.setTagExtractedName("control_plane.identifier");
+  t0_.setTags({{"envoy.control_plane", "foo"}});
+  snapshot_.text_readouts_.push_back(t0_);
+
+  char name_buffer[256];
+  size_t name_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+      snapshotHandle(), 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ("control_plane.identifier", written(name_buffer, name_size, sizeof(name_buffer)));
+
+  size_t tag_count = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+      snapshotHandle(), 0, &tag_count));
+  EXPECT_EQ(1u, tag_count);
+
+  char tag_name[256];
+  char tag_value[256];
+  size_t tag_name_size = 0;
+  size_t tag_value_size = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+      snapshotHandle(), 0, 0, tag_name, sizeof(tag_name), &tag_name_size, tag_value,
+      sizeof(tag_value), &tag_value_size));
+  EXPECT_EQ("envoy.control_plane", written(tag_name, tag_name_size, sizeof(tag_name)));
+  EXPECT_EQ("foo", written(tag_value, tag_value_size, sizeof(tag_value)));
+}
+
+// =============================================================================
 // Gauge callbacks
 // =============================================================================
 
