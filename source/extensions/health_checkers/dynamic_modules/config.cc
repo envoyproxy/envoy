@@ -50,7 +50,7 @@ Upstream::HealthCheckerSharedPtr DynamicModuleHealthCheckerFactory::createCustom
   return std::make_shared<DynamicModuleHealthChecker>(
       context.cluster(), config, std::move(module_health_checker_config.value()),
       context.mainThreadDispatcher(), context.runtime(), context.api().randomGenerator(),
-      context.eventLogger());
+      context.eventLogger(), context.statsScope(), context.healthFlagCallbacks());
 }
 
 /**

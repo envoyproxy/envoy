@@ -209,7 +209,8 @@ void TcpHealthCheckFuzz::allocTcpHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
       *cluster_, config, context_.mainThreadDispatcher(), context_.runtime(),
-      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()),
+      cluster_->info()->statsScope());
   ENVOY_LOG_MISC(trace, "Created Tcp Health Checker");
 }
 
@@ -325,7 +326,8 @@ void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<NiceMock<TestGrpcHealthCheckerImpl>>(
       *cluster_, config, context_.mainThreadDispatcher(), context_.runtime(),
-      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()),
+      cluster_->info()->statsScope());
   ENVOY_LOG_MISC(trace, "Created Test Grpc Health Checker");
 }
 
