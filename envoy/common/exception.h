@@ -35,6 +35,10 @@ public:
     return;                                                                                        \
   }
 
+#define SET_AND_RETURN(status, set_status)                                                         \
+  set_status = status;                                                                             \
+  return;
+
 #define THROW_IF_NOT_OK_REF(status)                                                                \
   do {                                                                                             \
     if (!(status).ok()) {                                                                          \
