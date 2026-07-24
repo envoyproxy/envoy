@@ -174,8 +174,12 @@ ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() const {
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
-  auto alias = VhdsSubscription::domainNameToAlias(
-      config_update_info_->protobufConfigurationCast().name(), for_domain);
+  auto alias =
+      VhdsSubscription::domainNameToAlias(config_update_info_->protobufConfigurationCast().name(),
+                                          config_update_info_->protobufConfigurationCast()
+                                              .vhds()
+                                              .on_demand_virtual_host_resource_name(),
+                                          for_domain);
   // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
