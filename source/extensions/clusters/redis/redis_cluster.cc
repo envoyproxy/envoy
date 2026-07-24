@@ -99,30 +99,34 @@ RedisCluster::RedisCluster(
     }
   }
 
-  // Register the cluster callback using weak_ptr to avoid use-after-free
+  // Register the cluster callback using weak_ptr to avoid use-after-free. Locking the weak_ptr
+  // alone is not sufficient: the session briefly outlives its cluster (discovery clients keep
+  // it alive until their deferred deletion runs), so also gate on the session-owned shutdown
+  // flag before touching the resolve timer.
   std::weak_ptr<RedisDiscoverySession> weak_session = redis_discovery_session_;
   registration_handle_ = refresh_manager_->registerCluster(
       cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
       failure_refresh_threshold_, host_degraded_refresh_threshold_, [weak_session]() {
-        // Try to lock the weak pointer to ensure the session is still alive
         auto session = weak_session.lock();
-        if (session && session->resolve_timer_) {
+        if (session && !session->shutdown_ && session->resolve_timer_) {
           session->resolve_timer_->enableTimer(std::chrono::milliseconds(0));
         }
       });
 }
 
 RedisCluster::~RedisCluster() {
-  // Set flag to prevent any callbacks from executing during destruction
-  is_destroying_.store(true);
+  // Unregister from the refresh manager first so that it stops re-arming the resolve timer.
+  registration_handle_.reset();
 
-  // Reset redis_discovery_session_ before other members are destroyed
-  // to ensure any pending callbacks from refresh_manager_ don't access it.
-  // This matches the approach in PR #39625.
+  // Tear down all discovery work while the cluster is still intact. Dropping the reference
+  // below does not necessarily destroy the session: each discovery client holds a shared_ptr
+  // back to it (as its client Config), so the session lives until the deferred deletion of its
+  // closed clients runs. shutdown() cancels every source of a late callback so that the
+  // surviving session never dereferences the destroyed cluster.
+  redis_discovery_session_->shutdown();
   redis_discovery_session_.reset();
 
-  // Also clear DNS discovery targets to prevent their callbacks from
-  // accessing the destroyed cluster.
+  // Cancels any in-flight discovery DNS queries and stops the retry timers.
   dns_discovery_resolve_targets_.clear();
 }
 
@@ -268,13 +272,10 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
           }
 
           if (!resolve_timer_) {
-            resolve_timer_ = parent_.dispatcher_.createTimer([this]() -> void {
-              // Check if the parent cluster is being destroyed
-              if (parent_.is_destroying_.load()) {
-                return;
-              }
-              startResolveDns();
-            });
+            // The timer is owned by this target and the target is destroyed with the cluster,
+            // so this callback can never run after the cluster is gone.
+            resolve_timer_ =
+                parent_.dispatcher_.createTimer([this]() -> void { startResolveDns(); });
           }
           // if the initial dns resolved to empty, we'll skip the redis discovery phase and
           // treat it as an empty cluster.
@@ -298,8 +299,9 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void {
-        // Check if the parent cluster is being destroyed
-        if (parent_.is_destroying_.load()) {
+        // The session can outlive its cluster until the deferred deletion of its closed
+        // discovery clients runs (see shutdown()); parent_ must not be touched once shut down.
+        if (shutdown_) {
           return;
         }
         startResolveRedis();
@@ -318,16 +320,41 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession::ipAddressFromCluster
                                                        false);
 }
 
-RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
+RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() { shutdown(); }
+
+void RedisCluster::RedisDiscoverySession::shutdown() {
+  if (shutdown_) {
+    return;
+  }
+  shutdown_ = true;
+
   if (current_request_) {
     current_request_->cancel();
     current_request_ = nullptr;
   }
-  // Disable timer for mock tests.
+
+  // Cancel zone-discovery INFO requests before closing their clients so that the close does not
+  // fail them and re-enter finishZoneDiscovery() mid-teardown.
+  for (auto& [address, request] : zone_requests_) {
+    request->cancel();
+  }
+  zone_requests_.clear();
+  zone_callbacks_.clear();
+  pending_zone_discovery_slots_ = nullptr;
+  pending_zone_requests_.store(0);
+
+  for (auto& [id, query] : active_dns_queries_) {
+    query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+  }
+  active_dns_queries_.clear();
+
+  // The timer can be null in tests that construct the session against a bare mock dispatcher.
   if (resolve_timer_) {
     resolve_timer_->disableTimer();
   }
 
+  // close() synchronously raises LocalClose, whose handler erases the entry from client_map_
+  // and defers deletion of the client itself.
   while (!client_map_.empty()) {
     client_map_.begin()->second->client_->close();
   }
@@ -437,11 +464,17 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
       ENVOY_LOG(debug,
                 "starting async DNS resolution for primary slot address {} at index location {}",
                 slot.primary_hostname_, slot_idx);
-      parent_.dns_resolver_->resolve(
+      const uint64_t query_id = next_dns_query_id_++;
+      Network::ActiveDnsQuery* query = parent_.dns_resolver_->resolve(
           slot.primary_hostname_, parent_.dns_lookup_family_,
-          [this, slot_idx, slots, hostname_resolution_required_cnt](
+          [this, query_id, slot_idx, slots, hostname_resolution_required_cnt](
               Network::DnsResolver::ResolutionStatus status, absl::string_view,
               std::list<Network::DnsResponse>&& response) -> void {
+            active_dns_queries_.erase(query_id);
+            // Cancelled at shutdown(); defensively ignore a late callback (parent_ may be gone).
+            if (shutdown_) {
+              return;
+            }
             auto& slot = (*slots)[slot_idx];
             ENVOY_LOG(
                 debug,
@@ -470,6 +503,11 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
             // Continue on to resolve replicas
             resolveReplicas(slots, slot_idx, hostname_resolution_required_cnt);
           });
+      // resolve() returns nullptr when it completed inline; the callback has already
+      // unregistered itself in that case.
+      if (query != nullptr) {
+        active_dns_queries_[query_id] = query;
+      }
     } else {
       resolveReplicas(slots, slot_idx, hostname_resolution_required_cnt);
     }
@@ -500,11 +538,17 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
   for (uint64_t replica_idx = 0; replica_idx < slot.replicas_to_resolve_.size(); replica_idx++) {
     auto replica = slot.replicas_to_resolve_[replica_idx];
     ENVOY_LOG(debug, "starting async DNS resolution for replica address {}", replica.first);
-    parent_.dns_resolver_->resolve(
+    const uint64_t query_id = next_dns_query_id_++;
+    Network::ActiveDnsQuery* query = parent_.dns_resolver_->resolve(
         replica.first, parent_.dns_lookup_family_,
-        [this, index, slots, replica_idx, hostname_resolution_required_cnt](
+        [this, query_id, index, slots, replica_idx, hostname_resolution_required_cnt](
             Network::DnsResolver::ResolutionStatus status, absl::string_view,
             std::list<Network::DnsResponse>&& response) -> void {
+          active_dns_queries_.erase(query_id);
+          // Cancelled at shutdown(); defensively ignore a late callback (parent_ may be gone).
+          if (shutdown_) {
+            return;
+          }
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
           ENVOY_LOG(debug, "async DNS resolution complete for replica address {}", replica.first);
@@ -528,6 +572,11 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
             finishClusterHostnameResolution(slots);
           }
         });
+    // resolve() returns nullptr when it completed inline; the callback has already unregistered
+    // itself in that case.
+    if (query != nullptr) {
+      active_dns_queries_[query_id] = query;
+    }
   }
 }
 
@@ -780,6 +829,10 @@ void RedisCluster::RedisDiscoverySession::startZoneDiscovery(ClusterSlotsSharedP
 
 void RedisCluster::RedisDiscoverySession::onZoneResponse(
     std::string address, bool /*is_primary*/, NetworkFilters::Common::Redis::RespValuePtr&& value) {
+  // Cancelled at shutdown(); defensively ignore a late callback (parent_ may be gone).
+  if (shutdown_) {
+    return;
+  }
   ENVOY_LOG(debug, "received zone discovery response from {}", address);
 
   // Remove request tracking.
@@ -805,6 +858,10 @@ void RedisCluster::RedisDiscoverySession::onZoneResponse(
 
 void RedisCluster::RedisDiscoverySession::onZoneDiscoveryFailure(std::string address,
                                                                  bool /*is_primary*/) {
+  // Cancelled at shutdown(); defensively ignore a late callback (parent_ may be gone).
+  if (shutdown_) {
+    return;
+  }
   ENVOY_LOG(warn, "zone discovery failed for node {}", address);
 
   // Remove from tracking
