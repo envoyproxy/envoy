@@ -1,10 +1,8 @@
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 
-#include "envoy/common/exception.h"
 #include "envoy/common/hashable.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/common/fmt.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
@@ -54,7 +52,7 @@ public:
   createFromBytes(absl::string_view data) const override {
     bool value = false;
     if (!absl::SimpleAtob(data, &value)) {
-      throw EnvoyException(fmt::format("Invalid boolean value: '{}'", data));
+      return nullptr;
     }
     return std::make_unique<StreamInfo::BoolAccessorImpl>(value);
   }

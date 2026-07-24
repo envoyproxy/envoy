@@ -328,7 +328,23 @@ TEST_F(ConfigTest, SetBoolValueInvalid) {
       text_format_source:
         inline_string: "invalid"
   )YAML"});
-  EXPECT_THROW_WITH_MESSAGE(update(), EnvoyException, "Invalid boolean value: 'invalid'");
+  update();
+  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
+  EXPECT_EQ(nullptr, value);
+}
+
+TEST_F(ConfigTest, SetBoolValueFromHeaderInvalid) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(x-redirect-enabled)%"
+  )YAML"});
+  header_map_.addCopy("x-redirect-enabled", "garbage");
+  update();
+  const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
+  EXPECT_EQ(nullptr, value);
 }
 
 } // namespace
