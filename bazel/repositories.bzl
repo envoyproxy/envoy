@@ -214,6 +214,7 @@ def envoy_dependencies(skip_targets = []):
     _highway()
     _dragonbox()
     _fp16()
+    _immer()
     _simdutf()
     _quiche()
     _googleurl()
@@ -802,6 +803,12 @@ def _fp16():
     external_http_archive(
         name = "fp16",
         build_file = "@envoy//bazel/external:fp16.BUILD",
+    )
+
+def _immer():
+    external_http_archive(
+        name = "immer",
+        build_file = "@envoy//bazel/external:immer.BUILD",
     )
 
 def _simdutf():

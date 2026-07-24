@@ -530,6 +530,12 @@ __attribute__((weak)) void envoy_dynamic_module_callback_cluster_pre_init_comple
                "not implemented in this context");
 }
 
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
+    envoy_dynamic_module_type_cluster_envoy_ptr, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_use_persistent_host_map: "
+               "not implemented in this context");
+}
+
 __attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count: "

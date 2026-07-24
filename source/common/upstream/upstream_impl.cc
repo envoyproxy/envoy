@@ -7,6 +7,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "envoy/common/optref.h"
@@ -62,6 +63,7 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/locality_pool.h"
+#include "source/common/upstream/persistent_host_map.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -69,7 +71,33 @@
 
 namespace Envoy {
 namespace Upstream {
+
 namespace {
+
+// Wraps a flat HostMap behind the HostLookupTable interface. This is the default backing, used
+// unless the cluster opts into the persistent map via `setUsePersistentCrossPriorityHostMap()`.
+class FlatHostLookupTable : public HostLookupTable {
+public:
+  explicit FlatHostLookupTable(HostMapConstSharedPtr map) : map_(std::move(map)) {}
+  HostSharedPtr findHost(absl::string_view address) const override {
+    // `flat_hash_map<std::string, ...>` supports transparent lookup, so a `string_view` key
+    // avoids an allocation on the host-selection hot path.
+    const auto it = map_->find(address);
+    return it != map_->end() ? it->second : nullptr;
+  }
+  size_t size() const override { return map_->size(); }
+  bool empty() const override { return map_->empty(); }
+  void
+  forEach(absl::FunctionRef<void(const std::string&, const HostSharedPtr&)> cb) const override {
+    for (const auto& [address, host] : *map_) {
+      cb(address, host);
+    }
+  }
+
+private:
+  const HostMapConstSharedPtr map_;
+};
+
 const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
 defaultHappyEyeballsConfig() {
   CONSTRUCT_ON_FIRST_USE(
@@ -449,6 +477,10 @@ createUpstreamLocalAddressSelector(
 }
 
 } // namespace
+
+HostLookupTableConstSharedPtr makeFlatHostLookupTable(HostMapConstSharedPtr map) {
+  return std::make_shared<FlatHostLookupTable>(std::move(map));
+}
 
 // Allow disabling ALPN checks for transport sockets. See
 // https://github.com/envoyproxy/envoy/issues/22876
@@ -951,11 +983,11 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
                                   std::optional<bool> weighted_priority_health,
                                   std::optional<uint32_t> overprovisioning_factor,
-                                  HostMapConstSharedPtr cross_priority_host_map) {
+                                  HostLookupTableConstSharedPtr cross_priority_host_map) {
   // Update cross priority host map first. In this way, when the update callbacks of the priority
   // set are executed, the latest host map can always be obtained.
   if (cross_priority_host_map != nullptr) {
-    const_cross_priority_host_map_ = std::move(cross_priority_host_map);
+    cross_priority_lookup_ = std::move(cross_priority_host_map);
   }
 
   // Ensure that we have a HostSet for the given priority.
@@ -1003,13 +1035,17 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
                       hosts_removed, weighted_priority_health, overprovisioning_factor);
 }
 
+MainPrioritySetImpl::MainPrioritySetImpl() = default;
+
+MainPrioritySetImpl::~MainPrioritySetImpl() = default;
+
 void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                       LocalityWeightsConstSharedPtr locality_weights,
                                       const HostVector& hosts_added,
                                       const HostVector& hosts_removed,
                                       std::optional<bool> weighted_priority_health,
                                       std::optional<uint32_t> overprovisioning_factor,
-                                      HostMapConstSharedPtr cross_priority_host_map) {
+                                      HostLookupTableConstSharedPtr cross_priority_host_map) {
   ASSERT(cross_priority_host_map == nullptr,
          "External cross-priority host map is meaningless to MainPrioritySetImpl");
   updateCrossPriorityHostMap(priority, hosts_added, hosts_removed);
@@ -1019,13 +1055,20 @@ void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& upd
                                overprovisioning_factor);
 }
 
-HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
-  // Check if the host set in the main thread PrioritySet has been updated.
+HostLookupTableConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
+  if (last_update_used_persistent_) {
+    // The persistent path republishes the lookup table inside `updateCrossPriorityHostMap` whenever
+    // the map changes, so the cached table is already current here.
+    return cross_priority_lookup_;
+  }
+  // Legacy flat path. Check if the host set in the main thread PrioritySet has been updated.
   if (mutable_cross_priority_host_map_ != nullptr) {
     const_cross_priority_host_map_ = std::move(mutable_cross_priority_host_map_);
     ASSERT(mutable_cross_priority_host_map_ == nullptr);
+    // Publish the flat map through the lookup table so consumers always see the latest.
+    cross_priority_lookup_ = std::make_shared<FlatHostLookupTable>(const_cross_priority_host_map_);
   }
-  return const_cross_priority_host_map_;
+  return cross_priority_lookup_;
 }
 
 void MainPrioritySetImpl::updateCrossPriorityHostMap(uint32_t priority,
@@ -1036,8 +1079,61 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(uint32_t priority,
     return;
   }
 
-  // Since read_only_all_host_map_ may be shared by multiple threads, when the host set changes,
-  // we cannot directly modify read_only_all_host_map_.
+  const bool use_persistent = use_persistent_cross_priority_host_map_;
+
+  if (use_persistent) {
+    // Build the persistent backing lazily so default flat-path clusters never construct an `immer`
+    // map. This keeps the flat path allocation-free and avoids `immer`'s shared empty node, whose
+    // layout the vptr sanitizer rejects.
+    if (persistent_host_map_ == nullptr) {
+      persistent_host_map_ = std::make_unique<PersistentCrossPriorityHostMap>();
+    }
+    // If the persistent backing was just selected, seed it from the flat backing so the accumulated
+    // membership carries across the switch.
+    if (!last_update_used_persistent_) {
+      const HostMap& flat = mutable_cross_priority_host_map_ != nullptr
+                                ? *mutable_cross_priority_host_map_
+                                : *const_cross_priority_host_map_;
+      persistent_host_map_->seedFrom(flat);
+    }
+
+    for (const auto& host : hosts_removed) {
+      const auto host_address = addressToString(host->address());
+      const HostSharedPtr existing_host = persistent_host_map_->find(host_address);
+      // Only delete from the current priority to protect from situations where
+      // the add operation was already executed and has already moved the metadata of the host
+      // from a higher priority value to a lower priority value.
+      if (existing_host != nullptr && existing_host->priority() == priority) {
+        persistent_host_map_->erase(host_address);
+      }
+    }
+    for (const auto& host : hosts_added) {
+      // Like the flat path's `insert`, the first host wins on an address collision across
+      // priorities, so the persistent backing is a pure performance lever with no behavior change.
+      const auto host_address = addressToString(host->address());
+      if (persistent_host_map_->find(host_address) == nullptr) {
+        persistent_host_map_->set(host_address, host);
+      }
+    }
+
+    // Republish the lookup table so the cached wrapper is rebuilt only when the map changes.
+    cross_priority_lookup_ = persistent_host_map_->publish();
+    last_update_used_persistent_ = true;
+    return;
+  }
+
+  // Legacy flat path. If the persistent backing was just deselected, seed the flat backing from
+  // the persistent map so the accumulated membership carries across the switch.
+  if (last_update_used_persistent_) {
+    auto seeded = std::make_shared<HostMap>();
+    persistent_host_map_->exportTo(*seeded);
+    const_cross_priority_host_map_ = std::move(seeded);
+    mutable_cross_priority_host_map_ = nullptr;
+  }
+  last_update_used_persistent_ = false;
+
+  // Since the read only host map may be shared by multiple threads, when the host set changes,
+  // we cannot directly modify it.
   if (mutable_cross_priority_host_map_ == nullptr) {
     // Copy old read only host map to mutable host map.
     mutable_cross_priority_host_map_ = std::make_shared<HostMap>(*const_cross_priority_host_map_);
@@ -2399,7 +2495,8 @@ void PriorityStateManager::updateClusterPrioritySet(
 bool BaseDynamicClusterImpl::updateDynamicHostList(
     const HostVector& new_hosts, HostVector& current_priority_hosts,
     HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
-    const HostMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
+    absl::FunctionRef<HostSharedPtr(const std::string&)> host_lookup,
+    const absl::flat_hash_set<std::string>& all_new_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -2437,13 +2534,13 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   for (const HostSharedPtr& host : new_hosts) {
     // To match a new host with an existing host means comparing their addresses.
     const auto host_address_string = addressToString(host->address());
-    auto existing_host = all_hosts.find(host_address_string);
-    const bool existing_host_found = existing_host != all_hosts.end();
+    const HostSharedPtr existing_host = host_lookup(host_address_string);
+    const bool existing_host_found = existing_host != nullptr;
 
     // Clear any pending deletion flag on an existing host in case it came back while it was
     // being stabilized. We will set it again below if needed.
     if (existing_host_found) {
-      existing_host->second->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+      existing_host->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
     }
 
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
@@ -2452,19 +2549,19 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     //   but the health check address is different.
     const bool health_check_address_changed =
         (health_checker_ != nullptr && existing_host_found &&
-         *existing_host->second->healthCheckAddress() != *host->healthCheckAddress());
+         *existing_host->healthCheckAddress() != *host->healthCheckAddress());
     bool locality_changed = false;
-    locality_changed = (existing_host_found &&
-                        (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
+    locality_changed =
+        (existing_host_found && (!LocalityEqualTo()(host->locality(), existing_host->locality())));
     if (locality_changed) {
-      hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
+      hosts_with_updated_locality_for_current_priority.emplace(host_address_string);
     }
 
     const bool active_health_check_flag_changed =
         (health_checker_ != nullptr && existing_host_found &&
-         existing_host->second->disableActiveHealthCheck() != host->disableActiveHealthCheck());
+         existing_host->disableActiveHealthCheck() != host->disableActiveHealthCheck());
     if (active_health_check_flag_changed) {
-      hosts_with_active_health_check_flag_changed.emplace(existing_host->first);
+      hosts_with_active_health_check_flag_changed.emplace(host_address_string);
     }
     const bool endpoint_hostname_changed =
         (existing_host_found && host->hostname() != existing_host->second->hostname());
@@ -2479,14 +2576,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     // host's health check flag and metadata. Afterwards, the host is pushed back into the
     // final_hosts, i.e. hosts that should be preserved in the current priority.
     if (existing_host_found && !skip_inplace_host_update) {
-      existing_hosts_for_current_priority.emplace(existing_host->first);
+      existing_hosts_for_current_priority.emplace(host_address_string);
       // If we find a host matched based on address, we keep it. However we do change weight
       // inline so do that here.
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
-      if (existing_host->second->weight() != host->weight()) {
-        existing_host->second->weight(host->weight());
+      if (existing_host->weight() != host->weight()) {
+        existing_host->weight(host->weight());
         // We do full host set rebuilds so that load balancers can do pre-computation of data
         // structures based on host weight. This may become a performance problem in certain
         // deployments so it is runtime feature guarded and may also need to be configurable
@@ -2494,32 +2591,32 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         hosts_changed = true;
       }
 
-      hosts_changed |= updateEdsHealthFlag(*host, *existing_host->second);
+      hosts_changed |= updateEdsHealthFlag(*host, *existing_host);
 
       // Did metadata change? Compare cached hashes for O(1) comparison.
-      const bool metadata_changed = host->metadataHash() != existing_host->second->metadataHash();
+      const bool metadata_changed = host->metadataHash() != existing_host->metadataHash();
 
       if (metadata_changed) {
         // First, update the entire metadata for the endpoint.
-        existing_host->second->metadata(host->metadata());
+        existing_host->metadata(host->metadata());
 
         // Also, given that the canary attribute of an endpoint is derived from its metadata
         // (e.g.: from envoy.lb/canary), we do a blind update here since it's cheaper than testing
         // to see if it actually changed. We must update this besides just updating the metadata,
         // because it'll be used by the router filter to compute upstream stats.
-        existing_host->second->canary(host->canary());
+        existing_host->canary(host->canary());
 
         // If metadata changed, we need to rebuild. See github issue #3810.
         hosts_changed = true;
       }
 
       // Did the priority change?
-      if (host->priority() != existing_host->second->priority()) {
-        existing_host->second->priority(host->priority());
-        hosts_added_to_current_priority.emplace_back(existing_host->second);
+      if (host->priority() != existing_host->priority()) {
+        existing_host->priority(host->priority());
+        hosts_added_to_current_priority.emplace_back(existing_host);
       }
 
-      final_hosts.push_back(existing_host->second);
+      final_hosts.push_back(existing_host);
     } else {
       new_hosts_for_current_priority.emplace(host_address_string);
       if (host->weight() > max_host_weight) {
@@ -2535,10 +2632,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
           // If there's an existing host, use the same active health-status.
           // The existing host can be marked PENDING_ACTIVE_HC or
           // ACTIVE_HC_TIMEOUT if it is also marked with FAILED_ACTIVE_HC.
-          ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-                 existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-          ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
-                 existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+          ASSERT(!existing_host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+                 existing_host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+          ASSERT(!existing_host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
+                 existing_host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
           constexpr uint32_t active_hc_statuses_mask =
               enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
@@ -2546,7 +2643,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
               enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
               enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
 
-          const uint32_t existing_host_statuses = existing_host->second->healthFlagsGetAll();
+          const uint32_t existing_host_statuses = existing_host->healthFlagsGetAll();
           host->healthFlagsSetAll(existing_host_statuses & active_hc_statuses_mask);
         } else {
           // No previous known host, mark it as failed active HC.

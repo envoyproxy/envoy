@@ -4199,6 +4199,55 @@ TEST_F(DynamicModuleClusterTest, PreInitCompleteOffMainThreadFailsClosed) {
       "envoy_dynamic_module_callback_cluster_pre_init_complete must be called on the main thread");
 }
 
+// Verifies that `cluster_use_persistent_host_map` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, UsePersistentHostMapOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          envoy_dynamic_module_callback_cluster_use_persistent_host_map(cluster_ptr, true);
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_use_persistent_host_map must be called on the main "
+      "thread");
+}
+
+// Verifies that selecting the persistent host map backing on the main thread is accepted and keeps
+// identical cross-priority membership behavior.
+TEST_F(DynamicModuleClusterTest, UsePersistentHostMapOnMainThreadAccepted) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Select the persistent backing through the ABI callback before the first host update, as a
+  // module would during init.
+  void* cluster_ptr = cluster.get();
+  envoy_dynamic_module_callback_cluster_use_persistent_host_map(cluster_ptr, true);
+
+  std::vector<std::string> addresses = {"127.0.0.1:10001", "127.0.0.1:10002"};
+  std::vector<uint32_t> weights = {1, 2};
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, addresses, weights, hosts));
+
+  // The cross-priority host map is populated under the persistent backing.
+  EXPECT_EQ(2, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+  EXPECT_EQ(hosts[0], cluster->findHostByAddress("127.0.0.1:10001"));
+  EXPECT_EQ(hosts[1], cluster->findHostByAddress("127.0.0.1:10002"));
+
+  // Removal applies under the persistent backing too.
+  EXPECT_EQ(1, cluster->removeHosts({hosts[0]}));
+  EXPECT_EQ(nullptr, cluster->findHostByAddress("127.0.0.1:10001"));
+  EXPECT_EQ(hosts[1], cluster->findHostByAddress("127.0.0.1:10002"));
+}
+
 // Verifies that `cluster_find_host_by_address` is fail-closed when called off the main thread.
 TEST_F(DynamicModuleClusterTest, FindHostByAddressOffMainThreadFailsClosed) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));

@@ -454,20 +454,20 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostMapConstSharedPtr map, UnitFloat drop_overload,
+                                HostLookupTableConstSharedPtr map, UnitFloat drop_overload,
                                 absl::string_view drop_category);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-        LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupTableConstSharedPtr map,
         UnitFloat drop_overload, absl::string_view drop_category);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
-    const HostMapConstSharedPtr cross_priority_host_map_;
+    const HostLookupTableConstSharedPtr cross_priority_host_map_;
     UnitFloat drop_overload_{0};
     const std::string drop_category_;
   };
@@ -628,7 +628,7 @@ private:
                        const HostVector& hosts_added, const HostVector& hosts_removed,
                        std::optional<bool> weighted_priority_health,
                        std::optional<uint32_t> overprovisioning_factor,
-                       HostMapConstSharedPtr cross_priority_host_map);
+                       HostLookupTableConstSharedPtr cross_priority_host_map);
 
       // Drains any connection pools associated with the removed hosts. All connections will be
       // closed gracefully and no new connections will be created.
@@ -720,7 +720,7 @@ private:
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  bool weighted_priority_health, uint64_t overprovisioning_factor,
-                                 HostMapConstSharedPtr cross_priority_host_map);
+                                 HostLookupTableConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
@@ -931,7 +931,7 @@ private:
    */
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-      LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+      LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupTableConstSharedPtr map,
       UnitFloat drop_overload, absl::string_view drop_category);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;

@@ -200,11 +200,11 @@ bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
     return false;
   }
   std::string address_str(address.ptr, address.length);
-  const auto it = host_map->find(address_str);
-  if (it == host_map->end()) {
+  const auto host = host_map->findHost(address_str);
+  if (host == nullptr) {
     return false;
   }
-  switch (it->second->coarseHealth()) {
+  switch (host->coarseHealth()) {
   case Envoy::Upstream::Host::Health::Unhealthy:
     *result = envoy_dynamic_module_type_host_health_Unhealthy;
     break;

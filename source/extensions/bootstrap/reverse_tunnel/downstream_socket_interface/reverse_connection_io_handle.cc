@@ -545,20 +545,27 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
                           ReverseConnectionState::CannotConnect);
     return;
   }
+  // `HostLookupTable` provides `forEach()` but is not `range-iterable`, so collect the entries into
+  // a local vector once to iterate and size them below.
+  std::vector<std::pair<std::string, Upstream::HostSharedPtr>> resolved_host_entries;
+  host_map_ptr->forEach(
+      [&resolved_host_entries](const std::string& address, const Upstream::HostSharedPtr& host) {
+        resolved_host_entries.emplace_back(address, host);
+      });
   // Retrieve the resolved hosts for a cluster and update the corresponding maps.
   std::vector<std::string> resolved_hosts;
-  for (const auto& host_itr : *host_map_ptr) {
-    const std::string& resolved = host_itr.first;
+  resolved_hosts.reserve(resolved_host_entries.size());
+  for (const auto& [resolved, host] : resolved_host_entries) {
     resolved_hosts.emplace_back(resolved);
   }
   maybeUpdateHostsMappingsAndConnections(cluster_name, std::move(resolved_hosts));
   // Track successful connections for this cluster.
   uint32_t total_successful_connections = 0;
   uint32_t total_required_connections =
-      host_map_ptr->size() * cluster_config.reverse_connection_count;
+      resolved_host_entries.size() * cluster_config.reverse_connection_count;
 
   // Create connections to each host in the cluster.
-  for (const auto& [host_address, host] : *host_map_ptr) {
+  for (const auto& [host_address, host] : resolved_host_entries) {
     ENVOY_LOG(debug, "reverse_tunnel: Checking reverse connection count for host {} of cluster {}",
               host_address, cluster_name);
 
