@@ -263,14 +263,11 @@ TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
 // ParserConfig::max_body_bytes contract
 // ============================================================================
 
-// max_body_bytes directs the outer filter to check
-// cursor.nextSourcePosition() + chunk.size() against the limit before each
-// feed() call. These tests pin the two nextSourcePosition() properties that
-// contract depends on.
-
-// Discards all values; these tests only observe nextSourcePosition().
-// nextSourcePosition() is a global counter over the whole body stream, not
-// per-chunk: it accumulates across feed() calls and ends at total body size.
+// max_body_bytes directs the outer filter to enforce a body-size cap by
+// tracking the sum of chunk.size() across feed() calls. nextSourcePosition()
+// is NOT suitable for this check: it tracks tokenized bytes and lags behind
+// received bytes when a NUMBER token straddles a chunk boundary (the tail
+// goes into pending_bytes_ and is not counted until the next feed()).
 TEST(MaxBodyBytesContractTest, NextSourcePositionAccumulatesAcrossChunks) {
   MockHandler h;
   WuffsJsonCursor cursor(h);
@@ -285,25 +282,9 @@ TEST(MaxBodyBytesContractTest, NextSourcePositionAccumulatesAcrossChunks) {
   EXPECT_EQ(cursor.nextSourcePosition(), part1.size() + part2.size() + part3.size());
 }
 
-// nextSourcePosition() lags bytes actually fed by the in-flight token tail
-// held in pending_bytes_ (bounded by kMaxPendingBytes) — the slack the
-// max_body_bytes pre-feed check must tolerate.
-TEST(MaxBodyBytesContractTest, NextSourcePositionLagsByInFlightTokenTail) {
-  MockHandler h;
-  WuffsJsonCursor cursor(h);
-  // 7 bytes fed, but the trailing '1' is an incomplete NUMBER: Wuffs rewinds
-  // it into pending_bytes_, so only the 6 bytes before it are counted.
-  ASSERT_TRUE(cursor.feed("{\"n\": 1", /*closed=*/false).ok());
-  EXPECT_EQ(cursor.nextSourcePosition(), 6u);
-  // Completing the number counts the held byte plus the new chunk.
-  ASSERT_TRUE(cursor.feed("2}", /*closed=*/true).ok());
-  EXPECT_EQ(cursor.nextSourcePosition(), 9u);
-}
-
-// Executable form of the documented enforcement loop: the outer filter checks
-// nextSourcePosition() + chunk.size() against ParserConfig::max_body_bytes
-// before each feed() and rejects instead of feeding. An oversized body must be
-// rejected before its offending chunk is parsed.
+// The outer filter enforces max_body_bytes by accumulating chunk.size() before
+// each feed() call. An oversized body is rejected before its offending chunk
+// is parsed.
 TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
   ParserConfig cfg;
   cfg.max_body_bytes = 12;
@@ -313,8 +294,10 @@ TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
   const std::vector<absl::string_view> chunks = {R"({"a":true,)", R"("b":null})"}; // 10 + 9 bytes
 
   bool rejected = false;
+  size_t received_bytes = 0;
   for (size_t i = 0; i < chunks.size(); ++i) {
-    if (cursor.nextSourcePosition() + chunks[i].size() > cfg.max_body_bytes) {
+    received_bytes += chunks[i].size();
+    if (received_bytes > cfg.max_body_bytes) {
       rejected = true; // filter would return ResourceExhausted here, chunk unparsed
       break;
     }
@@ -334,7 +317,6 @@ TEST(MaxBodyBytesContractTest, PreFeedCheckRejectsBodyOverLimit) {
 // decision: convert spec.segments to PatternSegments once at config time,
 // then ask the cursor for a structural match at each openStringCapture —
 // zero allocations, and collision-free (see the hostile-key test below).
-// canonicalPath() is a diagnostics-only serialization.
 
 // Captures exactly the scalar values (strings, numbers, booleans, nulls)
 // whose root-to-here chain structurally matches the spec's segments; each

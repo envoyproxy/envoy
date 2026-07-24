@@ -197,8 +197,6 @@ public:
 
   // Monotonically increasing offset of the next source byte to be consumed.
   // Aligns with token_start / token_end values in callbacks.
-  // TODO(tyxia): outer filter should check nextSourcePosition() + chunk.size()
-  // against max_body_bytes before each feed() call.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
   // Exclusive upper bound for per-depth state tracking (depths 1–8).
@@ -227,10 +225,10 @@ private:
   // per-key allocation and guarding against DoS via unbounded key lengths.
   static constexpr size_t kMaxKeyBytes = 256;
   // kMaxPendingBytes is a hard limit against the byte-at-a-time DoS when a NUMBER token is split
-  // across chunk boundaries, NUMBER tokens that arrive complete with their terminator in one chunk
-  // bypass this path entirely — those are bounded by the max_body_bytes limit instead. A legitimate
-  // number is at most ~25 chars (64-bit int ≤ 20 digits; float with sign/decimal/exponent ≤ ~25).
-  // 64 bytes gives generous headroom.
+  // across chunk boundaries.
+  // Note: max_body_bytes (enforced by the outer filter via ParserConfig) also bounds pending_bytes_
+  // up to max_body_bytes bytes, kMaxPendingBytes provides a tight cap sized for the largest
+  // legitimate number (~25 chars).
   static constexpr size_t kMaxPendingBytes = 64;
   int depth_{0};
   bool is_dict_[kMaxTrackedDepth]{};

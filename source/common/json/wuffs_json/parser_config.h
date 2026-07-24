@@ -80,7 +80,7 @@ absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, i
 
 // Configuration that controls the JSON parser. Populated at filter init.
 struct ParserConfig {
-  // Maximum raw body bytes to feed. 0 = no limit (tests only).
+  // Maximum raw body bytes to feed to cursor (0 = no limit).
   size_t max_body_bytes{0};
 
   // Maximum decoded bytes for a single scalar string value. Over-budget values
