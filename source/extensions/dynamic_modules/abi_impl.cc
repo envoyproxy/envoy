@@ -3869,10 +3869,41 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_
   return false;
 }
 
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*,
+    uint64_t*, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, char*, size_t, size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr, size_t, size_t, double*, uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket: "
                "not implemented in this context");
   return false;
 }

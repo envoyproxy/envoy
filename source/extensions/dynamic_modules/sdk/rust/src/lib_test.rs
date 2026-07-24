@@ -6917,6 +6917,11 @@ fn test_matcher_get_all_headers() {
 const STUB_COUNTERS: [(&str, u64, u64); 2] = [("counter_0", 10, 5), ("counter_1", 20, 0)];
 const STUB_GAUGES: [(&str, u64); 1] = [("gauge_0", 42)];
 const STUB_TEXT_READOUTS: [(&str, &str); 1] = [("text_0", "value_0")];
+// name, sample_count, sample_sum, then the (upper_bound, cumulative_count) buckets.
+const STUB_HISTOGRAM_NAME: &str = "histogram_0";
+const STUB_HISTOGRAM_SAMPLE_COUNT: u64 = 7;
+const STUB_HISTOGRAM_SAMPLE_SUM: f64 = 123.5;
+const STUB_HISTOGRAM_BUCKETS: [(f64, u64); 3] = [(1.0, 2), (5.0, 5), (10.0, 7)];
 
 // Tag-extracted names and tags, indexed to match STUB_COUNTERS. counter_0 carries two tags,
 // counter_1 carries none, exercising both the empty and multi-tag paths.
@@ -7235,6 +7240,64 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_read
   true
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> usize {
+  1
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  sample_count_out: *mut u64,
+  sample_sum_out: *mut f64,
+) -> bool {
+  if index != 0 {
+    return false;
+  }
+  unsafe {
+    stub_write(STUB_HISTOGRAM_NAME, name_buffer, name_buffer_capacity, name_size);
+    *sample_count_out = STUB_HISTOGRAM_SAMPLE_COUNT;
+    *sample_sum_out = STUB_HISTOGRAM_SAMPLE_SUM;
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  histogram_index: usize,
+) -> usize {
+  if histogram_index != 0 {
+    return 0;
+  }
+  STUB_HISTOGRAM_BUCKETS.len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  histogram_index: usize,
+  bucket_index: usize,
+  upper_bound_out: *mut f64,
+  cumulative_count_out: *mut u64,
+) -> bool {
+  if histogram_index != 0 || bucket_index >= STUB_HISTOGRAM_BUCKETS.len() {
+    return false;
+  }
+  let (upper_bound, cumulative_count) = STUB_HISTOGRAM_BUCKETS[bucket_index];
+  unsafe {
+    *upper_bound_out = upper_bound;
+    *cumulative_count_out = cumulative_count;
+  }
+  true
+}
+
 #[test]
 fn test_envoy_dynamic_module_on_stat_sink_config_new_impl() {
   struct TestStatSink;
@@ -7335,6 +7398,29 @@ fn test_metric_snapshot_reads_all_entry_types() {
   assert!(!snapshot.text_readout(1, &mut name, &mut text_value));
   assert_eq!(name.as_slice(), b"text_0");
   assert_eq!(text_value.as_slice(), b"value_0");
+
+  assert_eq!(snapshot.histogram_count(), 1);
+  let histogram = snapshot.histogram(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"histogram_0");
+  assert_eq!(histogram.sample_count, 7);
+  assert_eq!(histogram.sample_sum, 123.5);
+  // An out-of-range read returns None and leaves the buffer untouched.
+  assert!(snapshot.histogram(1, &mut name).is_none());
+  assert_eq!(name.as_slice(), b"histogram_0");
+
+  // The buckets are cumulative and carry Envoy's resolved upper bounds.
+  assert_eq!(snapshot.histogram_bucket_count(0), 3);
+  assert_eq!(snapshot.histogram_bucket_count(1), 0);
+  assert_eq!(
+    snapshot.histogram_bucket(0, 1),
+    Some(stats_sink::HistogramBucket {
+      upper_bound: 5.0,
+      cumulative_count: 5,
+    })
+  );
+  // Out-of-range histogram or bucket index returns None.
+  assert!(snapshot.histogram_bucket(0, 3).is_none());
+  assert!(snapshot.histogram_bucket(1, 0).is_none());
 }
 
 #[test]
@@ -7693,6 +7779,28 @@ fn test_metric_snapshot_to_owned_copies_all_entries() {
     vec![stats_sink::OwnedTextReadout {
       name: "text_0".to_string(),
       value: "value_0".to_string(),
+    }]
+  );
+  assert_eq!(
+    owned.histograms,
+    vec![stats_sink::OwnedHistogram {
+      name: "histogram_0".to_string(),
+      sample_count: 7,
+      sample_sum: 123.5,
+      buckets: vec![
+        stats_sink::HistogramBucket {
+          upper_bound: 1.0,
+          cumulative_count: 2,
+        },
+        stats_sink::HistogramBucket {
+          upper_bound: 5.0,
+          cumulative_count: 5,
+        },
+        stats_sink::HistogramBucket {
+          upper_bound: 10.0,
+          cumulative_count: 7,
+        },
+      ],
     }]
   );
 
