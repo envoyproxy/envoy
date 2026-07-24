@@ -108,6 +108,8 @@ public:
   const std::string ExternalProcessing = "envoy.filters.http.ext_proc";
   // Set metadata filter
   const std::string SetMetadata = "envoy.filters.http.set_metadata";
+  // Body Size Limit filter
+  const std::string BodySizeLimit = "envoy.filters.http.body_size_limit";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;
