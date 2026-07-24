@@ -105,6 +105,7 @@ CONTRIB_EXTENSIONS = {
     # Load balancing policies
     #
     "envoy.load_balancing_policies.peak_ewma":      "//contrib/peak_ewma/load_balancing_policies/source:config",
+    "envoy.load_balancing_policies.per_worker_subset": "//contrib/per_worker_subset/load_balancing_policies/source:config",
 
     #
     # xDS delegates
