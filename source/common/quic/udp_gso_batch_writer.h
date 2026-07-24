@@ -7,9 +7,6 @@
 
 #include "envoy/network/udp_packet_writer_handler.h"
 
-#include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_protos.h"
-
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
 
 namespace Envoy {
@@ -96,9 +93,6 @@ public:
   createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
                         Envoy::Event::Dispatcher& dispatcher,
                         absl::AnyInvocable<void() &&> on_can_write_cb) override;
-
-private:
-  envoy::config::core::v3::RuntimeFeatureFlag enabled_;
 };
 
 } // namespace Quic

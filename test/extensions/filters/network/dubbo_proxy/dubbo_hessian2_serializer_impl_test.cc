@@ -63,9 +63,23 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        0x05, '2', '.', '0', '.', '2', // Dubbo version
-        0x04, 't', 'e', 's', 't',      // Service name
-        0x05, '0', '.', '0', '.', '0', // Service version
+        0x05,
+        '2',
+        '.',
+        '0',
+        '.',
+        '2', // Dubbo version
+        0x04,
+        't',
+        'e',
+        's',
+        't', // Service name
+        0x05,
+        '0',
+        '.',
+        '0',
+        '.',
+        '0', // Service version
     }));
     std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
     context->setBodySize(buffer.length());
@@ -377,8 +391,12 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x94',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x94', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
     context->setBodySize(buffer.length());
     auto result = serializer.deserializeRpcResult(buffer, context);
@@ -389,8 +407,12 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x93',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x93', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
     context->setBodySize(buffer.length());
     auto result = serializer.deserializeRpcResult(buffer, context);
@@ -401,8 +423,12 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x90',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x90', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
     context->setBodySize(4);
     auto result = serializer.deserializeRpcResult(buffer, context);
@@ -413,8 +439,12 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x91',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x91', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
     context->setBodySize(4);
     auto result = serializer.deserializeRpcResult(buffer, context);
@@ -450,8 +480,12 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x94',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x94', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
     context->setBodySize(0);
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
@@ -462,8 +496,12 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x96',                   // incorrect return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x96', // incorrect return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
     context->setBodySize(buffer.length());
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
@@ -474,8 +512,12 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x92',                   // without the value of the return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x92', // without the value of the return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
     std::string exception_string =
         fmt::format("RpcResult is no value, but the rest of the body size({}) not equal 0",

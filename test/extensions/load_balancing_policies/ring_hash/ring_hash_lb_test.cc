@@ -381,7 +381,9 @@ TEST_P(RingHashLoadBalancerTest, BasicWithDoundedLoad) {
     TestLoadBalancerContext context(6803900775736438537);
     EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context).host);
   }
-  { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host); }
+  {
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host);
+  }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
   hostSet().healthy_hosts_.clear();
@@ -450,7 +452,9 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
     TestLoadBalancerContext context(6803900775736438537);
     EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context).host);
   }
-  { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host); }
+  {
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host);
+  }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
   hostSet().healthy_hosts_.clear();
@@ -519,7 +523,9 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
     TestLoadBalancerContext context(6803900775736438537);
     EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context).host);
   }
-  { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host); }
+  {
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host);
+  }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
   hostSet().healthy_hosts_.clear();
