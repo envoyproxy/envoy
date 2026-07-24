@@ -23,11 +23,24 @@ using ConstMetadataSharedPoolSharedPtr =
                                                  MessageUtil, MessageUtil>>;
 
 /**
+ * PathSegment represents one segment in a metadata access path.
+ * Can be either a struct field key or a list element index.
+ */
+struct PathSegment {
+  enum class Type { Key, Index };
+  Type type_;
+  std::string key_; // used when type_ == Key
+  uint32_t index_;  // used when type_ == Index
+
+  PathSegment() : type_(Type::Key), index_(0) {}
+};
+
+/**
  * MetadataKey presents the key name and path to retrieve value from metadata.
  */
 struct MetadataKey {
   std::string key_;
-  std::vector<std::string> path_;
+  std::vector<PathSegment> path_;
 
   MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key);
 };
@@ -45,6 +58,16 @@ public:
    */
   static const Protobuf::Value& structValue(const Protobuf::Struct& struct_value,
                                             const std::vector<std::string>& path);
+
+  /**
+   * Lookup value by a path of keys and indices in a Struct. Supports traversing both
+   * struct fields (via key segments) and list elements (via index segments).
+   * @param struct_value reference.
+   * @param path path with key and/or index segments.
+   * @return const Protobuf::Value& value if found, empty if not found.
+   */
+  static const Protobuf::Value& structValue(const Protobuf::Struct& struct_value,
+                                            const std::vector<PathSegment>& path);
 
   /**
    * Lookup value of a key for a given filter in Metadata.

@@ -13,13 +13,28 @@ SINGLETON_MANAGER_REGISTRATION(const_metadata_shared_pool);
 MetadataKey::MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key)
     : key_(metadata_key.key()) {
   for (const auto& seg : metadata_key.path()) {
-    path_.push_back(seg.key());
+    PathSegment path_seg;
+    if (seg.has_key()) {
+      path_seg.type_ = PathSegment::Type::Key;
+      path_seg.key_ = seg.key();
+    } else if (seg.has_index()) {
+      path_seg.type_ = PathSegment::Type::Index;
+      path_seg.index_ = seg.index();
+    }
+    path_.push_back(path_seg);
   }
 }
 
 const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata* metadata,
                                                const MetadataKey& metadata_key) {
-  return metadataValue(metadata, metadata_key.key_, metadata_key.path_);
+  if (!metadata) {
+    return Protobuf::Value::default_instance();
+  }
+  const auto filter_it = metadata->filter_metadata().find(metadata_key.key_);
+  if (filter_it == metadata->filter_metadata().end()) {
+    return Protobuf::Value::default_instance();
+  }
+  return structValue(filter_it->second, metadata_key.path_);
 }
 
 const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata* metadata,
@@ -55,6 +70,50 @@ const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_valu
       data_struct = nullptr;
     }
   }
+  if (nullptr == val) {
+    return Protobuf::Value::default_instance();
+  }
+  return *val;
+}
+
+const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_value,
+                                             const std::vector<PathSegment>& path) {
+  const Protobuf::Struct* data_struct = &struct_value;
+  const Protobuf::Value* val = nullptr;
+
+  for (const auto& segment : path) {
+    if (segment.type_ == PathSegment::Type::Key) {
+      // Handle struct field access
+      if (nullptr == data_struct) {
+        ENVOY_LOG_MISC(debug, "MetadataKey path segment expects Struct but found null");
+        return Protobuf::Value::default_instance();
+      }
+      const auto entry_it = data_struct->fields().find(segment.key_);
+      if (entry_it == data_struct->fields().end()) {
+        ENVOY_LOG_MISC(debug, "MetadataKey key '{}' not found in Struct", segment.key_);
+        return Protobuf::Value::default_instance();
+      }
+      val = &(entry_it->second);
+      data_struct = val->has_struct_value() ? &(val->struct_value()) : nullptr;
+
+    } else { // PathSegment::Type::Index
+      // Handle list element access
+      if (val == nullptr || val->kind_case() != Protobuf::Value::kListValue) {
+        ENVOY_LOG_MISC(debug, "MetadataKey path segment expects ListValue but found {}",
+                       static_cast<int>(val ? val->kind_case() : Protobuf::Value::KIND_NOT_SET));
+        return Protobuf::Value::default_instance();
+      }
+      const auto& list = val->list_value();
+      if (segment.index_ >= static_cast<uint32_t>(list.values_size())) {
+        ENVOY_LOG_MISC(debug, "MetadataKey index {} out of bounds for list of size {}",
+                       segment.index_, list.values_size());
+        return Protobuf::Value::default_instance();
+      }
+      val = &(list.values(segment.index_));
+      data_struct = val->has_struct_value() ? &(val->struct_value()) : nullptr;
+    }
+  }
+
   if (nullptr == val) {
     return Protobuf::Value::default_instance();
   }
