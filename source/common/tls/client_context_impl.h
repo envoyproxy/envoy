@@ -17,6 +17,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
@@ -51,6 +52,13 @@ public:
 
   // Ssl::TlsCertificateSelectorContext
   const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
+
+  // Ssl::ClientContext
+  const Ssl::TlsContext& getTlsContext() const override {
+    // Client contexts always have exactly one TLS context; enforced in the constructor.
+    ASSERT(tls_contexts_.size() == 1);
+    return tls_contexts_[0];
+  }
 
   int selectTlsContext(SSL*);
 
