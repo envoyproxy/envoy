@@ -110,7 +110,14 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
-    std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+    // With the correct-stats-prefix flag enabled (default), pass the HCM stat_prefix as the
+    // stats_prefix string so upstream filters emit stats under "http.<stat_prefix>.rbac.*".
+    // With the flag disabled (legacy behavior), the scope's prefix string is used instead;
+    // since the router scope has an empty prefix this produced unnamespaced stats.
+    std::string prefix = Runtime::runtimeFeatureEnabled(
+                             "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+                             ? context.scope().symbolTable().toString(stat_prefix)
+                             : context.scope().symbolTable().toString(context.scope().prefix());
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,

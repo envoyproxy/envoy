@@ -1175,6 +1175,8 @@ private:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  // Factory context for upstream network and HTTP filters, scoped to stats_scope_
+  // ("cluster.<name>.").
   UpstreamFactoryContextImpl upstream_context_;
   const std::unique_ptr<
       const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
