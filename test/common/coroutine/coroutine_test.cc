@@ -9,6 +9,7 @@
 #include "source/common/coroutine/task.h"
 
 #include "test/common/coroutine/manual_executor.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/cleanup/cleanup.h"
@@ -76,6 +77,11 @@ Task<absl::StatusOr<int>> returnsValue(int value) { co_return value; }
 
 Task<absl::Status> returnsOk(bool& ran) {
   ran = true;
+  co_return absl::OkStatus();
+}
+
+Task<absl::Status> plusOne(int& val) {
+  ++val;
   co_return absl::OkStatus();
 }
 
@@ -174,6 +180,22 @@ TEST(TaskTest, ReturnsStatusThroughLaunch) {
   EXPECT_TRUE(body_ran);
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());
+}
+
+TEST(TaskTest, MultipleLaunces) {
+  auto exec = std::make_shared<ManualExecutor>();
+  int num_ran = 0;
+  int num_done = 0;
+  DetachedHandle handle(nullptr);
+  for (int i = 0; i < 10; ++i) {
+    handle = launch(plusOne(num_ran), exec, [&num_done](absl::Status status) {
+      ASSERT_OK(status);
+      ++num_done;
+    });
+  }
+  exec->drain();
+  EXPECT_EQ(10, num_ran);
+  EXPECT_EQ(10, num_done);
 }
 
 TEST(TaskTest, DestroyingUnstartedTaskIsSafe) {
