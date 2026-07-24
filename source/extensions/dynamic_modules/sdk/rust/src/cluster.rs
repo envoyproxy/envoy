@@ -2394,6 +2394,11 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_destroy(
   });
 }
 
+// SAFETY invariant shared by the `envoy_dynamic_module_on_cluster_*` entry points below:
+// `cluster_module_ptr` is the boxed cluster returned by `envoy_dynamic_module_on_cluster_new`
+// and `config_module_ptr` the config returned by `envoy_dynamic_module_on_cluster_config_new`.
+// Envoy owns each allocation until its matching destroy hook and does not invoke cluster
+// callbacks on it concurrently, so a recovered reference is the only live one for the call.
 /// # Safety
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
@@ -2405,7 +2410,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_new(
 ) -> abi::envoy_dynamic_module_type_cluster_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
     let config = config_module_ptr as *const *const dyn ClusterConfig;
-    let config = &**config;
+    // SAFETY: `config_module_ptr` is the module pointer returned by
+    // `envoy_dynamic_module_on_cluster_config_new`. Envoy keeps that config alive for the
+    // lifetime of every cluster created from it.
+    let config = unsafe { &**config };
     let envoy_cluster = EnvoyClusterImpl::new(cluster_envoy_ptr);
     let cluster = config.new_cluster(&envoy_cluster);
     wrap_into_c_void_ptr!(cluster)
@@ -2427,7 +2435,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_init(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
-    let cluster = &mut *cluster;
+    // SAFETY: see the shared invariant above; exclusively ours for this call.
+    let cluster = unsafe { &mut *cluster };
     let envoy_cluster = EnvoyClusterImpl::new(cluster_envoy_ptr);
     cluster.on_init(&envoy_cluster);
   }))
@@ -2471,7 +2480,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
 ) -> abi::envoy_dynamic_module_type_cluster_lb_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
     let cluster = cluster_module_ptr as *const *const dyn Cluster;
-    let cluster = &**cluster;
+    // SAFETY: see the shared invariant above; outlives every LB created from it.
+    let cluster = unsafe { &**cluster };
     let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
     let lb = cluster.new_load_balancer(&envoy_lb);
     let wrapper = Box::new(ClusterLbWrapper { lb, lb_envoy_ptr });
@@ -2493,7 +2503,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_destroy(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let wrapper = lb_module_ptr as *mut ClusterLbWrapper;
-    let _ = Box::from_raw(wrapper);
+    // SAFETY: `lb_module_ptr` is the wrapper leaked by
+    // `envoy_dynamic_module_on_cluster_lb_new`. Envoy calls this destroy hook exactly once, so
+    // reclaiming the box here cannot double-free.
+    let _ = unsafe { Box::from_raw(wrapper) };
   }))
   .map_err(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_cluster_lb_destroy", panic);
@@ -2512,7 +2525,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
   async_handle_out: *mut abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    let wrapper = &mut *(lb_module_ptr as *mut ClusterLbWrapper);
+    // SAFETY: `lb_module_ptr` is the wrapper leaked by
+    // `envoy_dynamic_module_on_cluster_lb_new`. Envoy drives a load balancer from a single worker
+    // thread, so this is the only live reference for the duration of the call.
+    let wrapper = unsafe { &mut *(lb_module_ptr as *mut ClusterLbWrapper) };
     let context = if context_envoy_ptr.is_null() {
       None
     } else {
@@ -2532,20 +2548,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
       async_completion,
     );
 
-    match result {
-      HostSelectionResult::Selected(host) => {
-        *host_out = host;
-        *async_handle_out = std::ptr::null_mut();
-      },
-      HostSelectionResult::NoHost => {
-        *host_out = std::ptr::null_mut();
-        *async_handle_out = std::ptr::null_mut();
-      },
-      HostSelectionResult::AsyncPending(handle) => {
-        *host_out = std::ptr::null_mut();
-        *async_handle_out = Box::into_raw(Box::new(handle))
-          as abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
-      },
+    // SAFETY: the ABI contract guarantees `host_out` and `async_handle_out` point to writable
+    // out-parameters owned by Envoy for the duration of the call. Every match arm writes both,
+    // so Envoy never observes an uninitialised out-parameter.
+    unsafe {
+      match result {
+        HostSelectionResult::Selected(host) => {
+          *host_out = host;
+          *async_handle_out = std::ptr::null_mut();
+        },
+        HostSelectionResult::NoHost => {
+          *host_out = std::ptr::null_mut();
+          *async_handle_out = std::ptr::null_mut();
+        },
+        HostSelectionResult::AsyncPending(handle) => {
+          *host_out = std::ptr::null_mut();
+          *async_handle_out = Box::into_raw(Box::new(handle))
+            as abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
+        },
+      }
     }
   }))
   .map_err(|panic| {
@@ -2553,10 +2574,18 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
     // Fail-closed: signal NoHost so Envoy returns 503 rather than dispatching to
     // a stale or uninitialised pointer.
     if !host_out.is_null() {
-      *host_out = std::ptr::null_mut();
+      // SAFETY: just checked non-null; per the ABI contract it points to a writable
+      // Envoy-owned out-parameter.
+      unsafe {
+        *host_out = std::ptr::null_mut();
+      }
     }
     if !async_handle_out.is_null() {
-      *async_handle_out = std::ptr::null_mut();
+      // SAFETY: just checked non-null; per the ABI contract it points to a writable
+      // Envoy-owned out-parameter.
+      unsafe {
+        *async_handle_out = std::ptr::null_mut();
+      }
     }
   });
 }
@@ -2572,7 +2601,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_cancel_host_selectio
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let handle = async_handle_module_ptr as *mut Box<dyn AsyncHostSelectionHandle>;
-    let mut handle = Box::from_raw(handle);
+    // SAFETY: `async_handle_module_ptr` is the handle leaked by
+    // `envoy_dynamic_module_on_cluster_lb_choose_host` on its `AsyncPending` path. Envoy cancels
+    // a pending selection at most once, so reclaiming the box here cannot double-free.
+    let mut handle = unsafe { Box::from_raw(handle) };
     handle.cancel();
   }))
   .map_err(|panic| {
@@ -2595,7 +2627,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_on_host_membership_u
   num_hosts_removed: usize,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    let wrapper = &mut *(lb_module_ptr as *mut ClusterLbWrapper);
+    // SAFETY: `lb_module_ptr` is the wrapper leaked by
+    // `envoy_dynamic_module_on_cluster_lb_new`. Envoy drives a load balancer from a single worker
+    // thread, so this is the only live reference for the duration of the call.
+    let wrapper = unsafe { &mut *(lb_module_ptr as *mut ClusterLbWrapper) };
     let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
     wrapper
       .lb
@@ -2620,7 +2655,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_timer_fired(
   timer_ptr: abi::envoy_dynamic_module_type_cluster_worker_timer_module_ptr,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    let wrapper = &mut *(lb_module_ptr as *mut ClusterLbWrapper);
+    // SAFETY: `lb_module_ptr` is the wrapper leaked by
+    // `envoy_dynamic_module_on_cluster_lb_new`. Envoy drives a load balancer from a single worker
+    // thread, so this is the only live reference for the duration of the call.
+    let wrapper = unsafe { &mut *(lb_module_ptr as *mut ClusterLbWrapper) };
     let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
     // Non-owning reference so the module can re-arm the timer it already owns.
     let timer_ref = EnvoyClusterWorkerTimerRef { raw_ptr: timer_ptr };
@@ -2643,7 +2681,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_scheduled(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let cluster = cluster_module_ptr as *const *const dyn Cluster;
-    let cluster = &**cluster;
+    // SAFETY: see the shared invariant above; outlives every LB created from it.
+    let cluster = unsafe { &**cluster };
     cluster.on_scheduled(&EnvoyClusterImpl::new(cluster_envoy_ptr), event_id);
   }))
   .map_err(|panic| {
@@ -2663,7 +2702,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_event(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let cluster = cluster_module_ptr as *const *const dyn Cluster;
-    let cluster = &**cluster;
+    // SAFETY: see the shared invariant above; outlives every LB created from it.
+    let cluster = unsafe { &**cluster };
     cluster.on_worker_event(&EnvoyClusterImpl::new(cluster_envoy_ptr), event_id);
   }))
   .map_err(|panic| {
@@ -2684,7 +2724,11 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_slot_data_destro
       return;
     }
     // Reclaim the outer Box; dropping it drops the inner Arc<T> via vtable dispatch.
-    let _: Box<WorkerSlotPayload> = Box::from_raw(data_module_ptr as *mut WorkerSlotPayload);
+    // SAFETY: `data_module_ptr` was just checked non-null and is the payload leaked when the
+    // worker slot was populated. Envoy destroys a slot exactly once, so reclaiming the box here
+    // cannot double-free.
+    let _: Box<WorkerSlotPayload> =
+      unsafe { Box::from_raw(data_module_ptr as *mut WorkerSlotPayload) };
   }))
   .map_err(|panic| {
     crate::log_ffi_panic(
@@ -2705,7 +2749,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_server_initialized(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
-    let cluster = &mut *cluster;
+    // SAFETY: see the shared invariant above; exclusively ours for this call.
+    let cluster = unsafe { &mut *cluster };
     cluster.on_server_initialized(&EnvoyClusterImpl::new(cluster_envoy_ptr));
   }))
   .map_err(|panic| {
@@ -2724,7 +2769,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_drain_started(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
-    let cluster = &mut *cluster;
+    // SAFETY: see the shared invariant above; exclusively ours for this call.
+    let cluster = unsafe { &mut *cluster };
     cluster.on_drain_started(&EnvoyClusterImpl::new(cluster_envoy_ptr));
   }))
   .map_err(|panic| {
@@ -2745,7 +2791,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_shutdown(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
-    let cluster = &mut *cluster;
+    // SAFETY: see the shared invariant above; exclusively ours for this call.
+    let cluster = unsafe { &mut *cluster };
     let completion = CompletionCallback::new(completion_callback, completion_context);
     cluster.on_shutdown(&EnvoyClusterImpl::new(cluster_envoy_ptr), completion);
   }))
@@ -2771,21 +2818,31 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
-    let cluster = &mut *cluster;
+    // SAFETY: see the shared invariant above; exclusively ours for this call.
+    let cluster = unsafe { &mut *cluster };
 
+    // SAFETY: when the corresponding size is non-zero, Envoy guarantees the pointer addresses
+    // that many live header pairs / body chunks for the duration of the call. The layout of
+    // `(EnvoyBuffer, EnvoyBuffer)` and `EnvoyBuffer` is asserted to match the ABI structs in
+    // `buffer.rs`.
     let headers = if headers_size > 0 {
-      Some(crate::ffi_helpers::slice_from_raw_or_empty(
-        headers as *const (EnvoyBuffer, EnvoyBuffer),
-        headers_size,
-      ))
+      Some(unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          headers as *const (EnvoyBuffer, EnvoyBuffer),
+          headers_size,
+        )
+      })
     } else {
       None
     };
+    // SAFETY: as above, for the body chunk array.
     let body = if body_chunks_size > 0 {
-      Some(crate::ffi_helpers::slice_from_raw_or_empty(
-        body_chunks as *const EnvoyBuffer,
-        body_chunks_size,
-      ))
+      Some(unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          body_chunks as *const EnvoyBuffer,
+          body_chunks_size,
+        )
+      })
     } else {
       None
     };

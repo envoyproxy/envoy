@@ -396,7 +396,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_parse(
   max_length: usize,
 ) -> *const c_void {
   catch_unwind(AssertUnwindSafe(|| {
-    let config = &*(config_ptr as *const Box<dyn FormatterConfig>);
+    // SAFETY: `config_ptr` is the boxed config returned by
+    // `envoy_dynamic_module_on_formatter_config_new`, which Envoy keeps alive until the matching
+    // destroy callback.
+    let config = unsafe { &*(config_ptr as *const Box<dyn FormatterConfig>) };
     // SAFETY: `command` and `command_arg` are format-string tokens (UTF-8 by contract). The
     // helpers tolerate empty inputs and substitute `U+FFFD` for malformed UTF-8.
     let command_str =
@@ -447,7 +450,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_format(
   result: *mut abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
   catch_unwind(AssertUnwindSafe(|| {
-    let provider = &*(provider_ptr as *const Box<dyn FormatterProvider>);
+    // SAFETY: `provider_ptr` is the boxed provider returned by
+    // `envoy_dynamic_module_on_formatter_provider_new`, which Envoy keeps alive until the
+    // matching destroy callback.
+    let provider = unsafe { &*(provider_ptr as *const Box<dyn FormatterProvider>) };
     let ctx = FormatterContext::new(formatter_context_envoy_ptr);
     match provider.format(&ctx) {
       Some(value) => {

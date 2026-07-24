@@ -1,4 +1,11 @@
 #![deny(warnings)]
+// Every unsafe operation inside an `unsafe fn` must be wrapped in its own `unsafe` block with a
+// `SAFETY:` comment naming the ABI invariant it relies on. Without this, an `unsafe fn` body is
+// one big implicit unsafe block, so the raw-pointer work at the FFI seam is indistinguishable
+// from the safe code around it and new unsafe operations can be added unreviewed. This is the
+// default in Rust edition 2024; denying it here gets the same guarantee on edition 2021 and
+// prevents backsliding.
+#![deny(unsafe_op_in_unsafe_fn)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]

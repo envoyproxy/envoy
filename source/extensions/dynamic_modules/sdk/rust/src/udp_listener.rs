@@ -588,7 +588,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_new(
     let filter_config = {
       let raw =
         filter_config_ptr as *const *const dyn UdpListenerFilterConfig<EnvoyUdpListenerFilterImpl>;
-      &**raw
+      // SAFETY: `filter_config_ptr` is the module pointer returned by
+      // `envoy_dynamic_module_on_udp_listener_filter_config_new`. Envoy keeps that config alive
+      // for the lifetime of every filter created from it.
+      unsafe { &**raw }
     };
     envoy_dynamic_module_on_udp_listener_filter_new_impl(&mut envoy_filter, filter_config)
   }))

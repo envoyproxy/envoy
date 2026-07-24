@@ -376,7 +376,10 @@ unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
 ) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
     let config = config_module_ptr as *const *const dyn UpstreamHttpTcpBridgeConfig;
-    let config = &**config;
+    // SAFETY: `config_module_ptr` is the module pointer returned by
+    // `envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new`. Envoy keeps that config
+    // alive for the lifetime of every bridge created from it.
+    let config = unsafe { &**config };
     let envoy_bridge = EnvoyUpstreamHttpTcpBridgeImpl::new(bridge_envoy_ptr);
     let bridge = config.new_bridge(&envoy_bridge);
     wrap_into_c_void_ptr!(bridge)

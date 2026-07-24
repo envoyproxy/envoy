@@ -282,7 +282,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_new(
   session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_health_checker_session_module_ptr {
   let result = catch_unwind(AssertUnwindSafe(|| {
-    let config = &*(config_ptr as *const Box<dyn HealthCheckerConfig>);
+    // SAFETY: `config_ptr` is the boxed config returned by
+    // `envoy_dynamic_module_on_health_checker_config_new`, which Envoy keeps alive for the
+    // lifetime of every session created from it.
+    let config = unsafe { &*(config_ptr as *const Box<dyn HealthCheckerConfig>) };
     let host = HealthCheckHost::new(session_envoy_ptr);
     let session: Box<dyn HealthCheckerSession> = config.new_session(&host);
     crate::wrap_into_c_void_ptr!(session)
@@ -306,7 +309,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_on_inter
   session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
 ) {
   if let Err(panic) = catch_unwind(AssertUnwindSafe(|| {
-    let session = &mut *(session_ptr as *mut Box<dyn HealthCheckerSession>);
+    // SAFETY: `session_ptr` is the boxed session returned by
+    // `envoy_dynamic_module_on_health_checker_session_new`. Envoy drives a session from a single
+    // thread, so this is the only live reference for the duration of the call.
+    let session = unsafe { &mut *(session_ptr as *mut Box<dyn HealthCheckerSession>) };
     let host = HealthCheckHost::new(session_envoy_ptr);
     let reporter = Reporter::new(session_envoy_ptr);
     session.on_interval(&host, reporter);
@@ -327,7 +333,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_on_timeo
   session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
 ) {
   if let Err(panic) = catch_unwind(AssertUnwindSafe(|| {
-    let session = &mut *(session_ptr as *mut Box<dyn HealthCheckerSession>);
+    // SAFETY: `session_ptr` is the boxed session returned by
+    // `envoy_dynamic_module_on_health_checker_session_new`. Envoy drives a session from a single
+    // thread, so this is the only live reference for the duration of the call.
+    let session = unsafe { &mut *(session_ptr as *mut Box<dyn HealthCheckerSession>) };
     session.on_timeout();
   })) {
     crate::log_ffi_panic(

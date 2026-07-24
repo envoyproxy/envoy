@@ -93,7 +93,9 @@ impl EnvoyMutBuffer<'_> {
   pub unsafe fn new(static_buf: *mut [u8]) -> Self {
     Self {
       raw_ptr: static_buf as *mut u8,
-      length: (*static_buf).len(),
+      // SAFETY: the caller guarantees `static_buf` points to a live `[u8]`; reading its length
+      // through the raw slice pointer only touches the pointer metadata, not the pointee.
+      length: unsafe { (*static_buf).len() },
       _marker: std::marker::PhantomData,
     }
   }

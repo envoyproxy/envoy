@@ -1388,7 +1388,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_new(
     let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(envoy_extension_ptr);
     let extension_config = {
       let raw = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
-      &**raw
+      // SAFETY: `extension_config_ptr` is the module pointer returned by
+      // `envoy_dynamic_module_on_bootstrap_extension_config_new`. Envoy keeps that config alive
+      // for the lifetime of every extension created from it.
+      unsafe { &**raw }
     };
     envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, extension_config)
   }))
@@ -1677,10 +1680,15 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_reque
         ptr: response_str.as_ptr() as *const _,
         length: response_str.len(),
       };
-      abi::envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
-        envoy_ptr,
-        response_buf,
-      );
+      // SAFETY: `envoy_ptr` is the admin-request handle Envoy passed to this callback, and
+      // `response_buf` borrows `response_str`, which outlives the call. Envoy copies the buffer
+      // before returning.
+      unsafe {
+        abi::envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+          envoy_ptr,
+          response_buf,
+        );
+      }
     }
 
     status_code
