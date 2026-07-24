@@ -502,6 +502,25 @@ TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
                           .getStringView());
 }
 
+// Regression test for the recreate_stream use-after-free. The recreate_stream_uaf filter requests
+// recreation via the safe request_stream_recreation() API and then writes through self; the SDK
+// defers the freeing recreate until after the hook returns, so self stays valid. Under
+// AddressSanitizer this passes cleanly — it would report a heap-use-after-free if the recreate were
+// performed inline (as a direct recreate_stream() call would).
+TEST_P(DynamicModulesIntegrationTest, RecreateStreamNoUseAfterFree) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the recreate_stream_uaf filter is only in the rust test module";
+  }
+  initializeFilter("recreate_stream_uaf");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestBody) {
   initializeFilter("send_response", "on_request_body");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

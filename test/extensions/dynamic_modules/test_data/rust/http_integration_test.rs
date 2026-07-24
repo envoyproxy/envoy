@@ -154,6 +154,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     },
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
     "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
+    "recreate_stream_uaf" => Some(Box::new(RecreateStreamUafFilterConfig {})),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
     "log_level" => Some(Box::new(LogLevelFilterConfig {})),
     _ => panic!("Unknown filter name: {name}"),
@@ -222,7 +223,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateObjectRecreateFilter {
             abi::envoy_dynamic_module_type_filter_state_life_span::Request,
           )
         });
-        assert!(envoy_filter.recreate_stream(None));
+        // SAFETY: this hook returns StopIteration immediately below and never touches
+        // `envoy_filter` again after recreate_stream succeeds.
+        assert!(unsafe { envoy_filter.recreate_stream(None) });
         abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
       },
       Some(object) => {
@@ -242,6 +245,51 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateObjectRecreateFilter {
         abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
       },
     }
+  }
+}
+
+/// Guards the recreate so the rebuilt instance does not recreate again. One Envoy runs per test, so
+/// a single static suffices.
+static RECREATE_UAF_DONE: AtomicBool = AtomicBool::new(false);
+
+/// Regression test for the `recreate_stream` use-after-free, exercising the safe deferred API.
+///
+/// `recreate_stream` synchronously frees the `Box<dyn HttpFilter>` backing `self`, so calling it
+/// directly and then touching `self` is a use-after-free. This filter uses the safe
+/// `request_stream_recreation`, which records the request and lets the SDK perform the recreation
+/// from the request-path trampoline after the hook returns — when nothing borrows the filter. After
+/// the deferred recreate the hook writes through `self` (the write that would be a UAF if the
+/// recreate had happened inline); it does not, so under AddressSanitizer this test passes cleanly.
+struct RecreateStreamUafFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for RecreateStreamUafFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(RecreateStreamUafFilter { marker: 0 })
+  }
+}
+
+struct RecreateStreamUafFilter {
+  /// Heap state owned by the filter `Box`, written after the recreate request to show `self` is
+  /// still valid (the deferred API did not free it inline).
+  marker: u64,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for RecreateStreamUafFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if RECREATE_UAF_DONE.swap(true, Ordering::SeqCst) {
+      // Rebuilt instance after the recreate: complete the request with a normal response.
+      envoy_filter.send_response(200, &[("x-recreate-uaf", b"done")], None, None);
+      return abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
+    }
+    // Safe request: the SDK performs the freeing recreate after this hook returns, so `self` stays
+    // valid for the remainder of the hook.
+    envoy_filter.request_stream_recreation();
+    self.marker = self.marker.wrapping_add(1);
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 }
 
