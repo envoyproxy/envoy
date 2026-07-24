@@ -76,7 +76,7 @@ absl::Status Coroutine::resume(int num_args, const YieldCallback& yield_callback
     if (!error) {
       error = "unspecified lua error";
     }
-    return absl::InvalidArgumentError(error);
+    return absl::InternalError(error);
   }
 }
 

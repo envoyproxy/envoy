@@ -17,7 +17,17 @@ namespace Common {
 namespace Lua {
 namespace {
 
+// Test helper that invokes MetadataMapHelper::loadValue() on the value at the top of the Lua stack.
+// It is registered as a Lua global so tests can drive loadValue() from within a coroutine (i.e. in
+// Lua's protected mode) and observe the error status raised via luaL_error.
+int luaLoadValue(lua_State* state) {
+  MetadataMapHelper::loadValue(state);
+  return 0;
+}
+
 class LuaBufferWrapperTest : public LuaWrappersTestBase<BufferWrapper> {};
+
+class LuaSslConnectionWrapperTest : public LuaWrappersTestBase<SslConnectionWrapper> {};
 
 class LuaMetadataMapWrapperTest : public LuaWrappersTestBase<MetadataMapWrapper> {
 public:
@@ -280,6 +290,50 @@ TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
 TEST_F(LuaConnectionWrapperTest, Secure) {
   expectSecureConnection(true);
   expectSecureConnection(false);
+}
+
+// When no parsed subject peer certificate is available, parsedSubjectPeerCertificate() returns nil.
+TEST_F(LuaSslConnectionWrapperTest, ParsedSubjectPeerCertificateEmpty) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      testPrint(tostring(object:parsedSubjectPeerCertificate()))
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  auto connection_info = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
+  // By default the mock returns an empty ParsedX509NameOptConstRef, exercising the nil branch.
+  SslConnectionWrapper::create(coroutine_->luaState(), *connection_info);
+  EXPECT_CALL(printer_, testPrint("nil"));
+  EXPECT_OK(start("callMe"));
+}
+
+// loadValue() rejects tables that are treated as structs but use non-string keys.
+TEST_F(LuaMetadataMapWrapperTest, LoadValueNonStringKey) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      loadValue({[true] = "value"})
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+  lua_pushcclosure(coroutine_->luaState(), luaLoadValue, 0);
+  lua_setglobal(coroutine_->luaState(), "loadValue");
+
+  const std::string yaml = R"EOF(
+    filter_metadata:
+      envoy.filters.http.lua:
+        make.delicious.bread:
+          name: pulla
+    )EOF";
+
+  envoy::config::core::v3::Metadata metadata = parseMetadataFromYaml(yaml);
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
+  MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
+  EXPECT_THAT(start("callMe"),
+              StatusHelpers::HasStatusMessage(testing::HasSubstr(
+                  "unexpected type boolean in table key (only string keys are supported)")));
 }
 
 } // namespace

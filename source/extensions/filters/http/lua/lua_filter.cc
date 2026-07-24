@@ -270,7 +270,7 @@ StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& corout
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
       callbacks_(callbacks), yield_callback_([this]() -> absl::Status {
         if (state_ == State::Running) {
-          return absl::InvalidArgumentError("script performed an unexpected yield");
+          return absl::InternalError("script performed an unexpected yield");
         }
         return absl::OkStatus();
       }),
