@@ -46,6 +46,10 @@ constexpr uint32_t kMaxBackoffExponent = 32;
 constexpr uint64_t kReconnectJitterPercent = 15;
 // Steady-state maintenance re-check interval.
 constexpr uint64_t kMaintainIntervalMs = 10000;
+// Short re-check interval used while a hot-restart child is waiting to be allowed to dial (i.e.
+// until it has asked the parent to stop accepting). The handoff window is brief, so poll frequently
+// to bound the added latency before the child stands up its own tunnel.
+constexpr uint64_t kParentStopAcceptingRecheckMs = 10;
 } // namespace
 
 // ReverseConnectionIOHandle implementation
@@ -941,6 +945,19 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
 }
 
 void ReverseConnectionIOHandle::maintainReverseConnections() {
+  // During a hot restart, don't dial until we've asked the parent to stop accepting new
+  // connections; otherwise the child's connection can be accepted by the still-listening parent
+  // through a shared loopback listener and be reset when the parent exits. Re-check shortly. With
+  // no extension (some unit tests), no parent, or hot restart disabled, this dials immediately.
+  auto* extension = getDownstreamExtension();
+  if (extension != nullptr && !extension->parentStoppedAccepting()) {
+    ENVOY_LOG(debug, "reverse_tunnel: parent still accepting; deferring reverse connection dial");
+    if (rev_conn_retry_timer_) {
+      rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(kParentStopAcceptingRecheckMs));
+    }
+    return;
+  }
+
   // Validate required configuration parameters at the top level.
   if (config_.src_node_id.empty()) {
     ENVOY_LOG(error, "Source node ID is required but empty - cannot maintain reverse connections");

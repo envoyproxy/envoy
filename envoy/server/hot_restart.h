@@ -49,6 +49,23 @@ public:
   virtual void drainParentListeners() PURE;
 
   /**
+   * @return whether this (child) instance has already asked the parent to stop accepting new
+   * connections, i.e. whether drainParentListeners() has sent the drain-listeners request. Returns
+   * true when there is no parent (fresh start) or hot restart is disabled. The drain request is
+   * fire-and-forget, so this reflects that the request was sent, not that the parent's listeners
+   * are confirmed closed.
+   *
+   * This is deliberately distinct from parentDrainedCallbackRegistrar(): that fires only once the
+   * parent is fully drained at the parent-shutdown deadline (potentially minutes later), whereas
+   * this flips as soon as the parent is asked to stop accepting. A child polls this to gate work
+   * that must not race the parent's still-open listeners -- e.g. a reverse-tunnel initiator dialing
+   * a loopback listener whose accept queue both epochs share during the handoff.
+   *
+   * Safe to call from any thread.
+   */
+  virtual bool parentStoppedAccepting() PURE;
+
+  /**
    * Retrieve a listening socket on the specified address from the parent process. The socket will
    * be duplicated across process boundaries.
    * @param address supplies the address of the socket to duplicate, e.g. tcp://127.0.0.1:5000.

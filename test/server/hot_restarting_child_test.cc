@@ -174,6 +174,15 @@ TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlr
                                                        callback2.AsStdFunction());
 }
 
+TEST_F(HotRestartingChildTest, ParentStopAcceptingLatchesOnDrainRequest) {
+  // With a parent (restart_epoch != 0), the child has not yet asked it to stop accepting.
+  EXPECT_FALSE(hot_restarting_child_->parentStopAcceptingRequested());
+  // drainParentListeners() sends the (fire-and-forget) drain-listeners request; expect one send.
+  fake_parent_->expectParentTerminateMessages();
+  hot_restarting_child_->drainParentListeners();
+  EXPECT_TRUE(hot_restarting_child_->parentStopAcceptingRequested());
+}
+
 TEST_F(HotRestartingChildTest, LogsErrorOnReplyMessageInUdpStream) {
   envoy::HotRestartMessage msg;
   msg.mutable_reply();

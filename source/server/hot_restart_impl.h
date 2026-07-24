@@ -102,6 +102,7 @@ public:
 
   // Server::HotRestart
   void drainParentListeners() override;
+  bool parentStoppedAccepting() override;
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
                                   absl::string_view network_namespace) override;
   void registerUdpForwardingListener(

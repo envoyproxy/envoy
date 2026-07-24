@@ -50,8 +50,20 @@ public:
       const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
           DownstreamReverseConnectionSocketInterface& config);
 
-  void onServerInitialized(Server::Instance&) override;
+  void onServerInitialized(Server::Instance& server) override;
   void onWorkerThreadInitialized() override;
+
+  /**
+   * @return whether the reverse-tunnel initiator may start dialing, i.e. whether the hot-restart
+   * parent (if any) has been asked to stop accepting new connections. Deferring the first dial
+   * until then avoids a freshly-forked child dialing into a loopback listener whose accept queue is
+   * still shared with the draining parent, which would otherwise let the child's tunnel be serviced
+   * by the old process during the handoff window.
+   *
+   * Returns true when there is no parent (fresh start), hot restart is disabled, or the server is
+   * not yet initialized. Safe to call from a worker thread.
+   */
+  bool parentStoppedAccepting();
 
   /**
    * @return reference to the stat prefix string.
@@ -182,6 +194,8 @@ public:
 
 private:
   Server::Configuration::ServerFactoryContext& context_;
+  // Captured in onServerInitialized() to reach hotRestart(); not owned. Null until then.
+  Server::Instance* server_{nullptr};
   const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
