@@ -912,6 +912,28 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
   quic_session_.OnDatagramReceived(datagram_fragment_);
 }
+
+TEST_F(EnvoyQuicServerStreamTest, DropDatagramAfterStreamRecreation) {
+  auto valid_indicator = std::make_shared<bool>(true);
+  std::weak_ptr<bool> weak_ind = valid_indicator;
+
+  EXPECT_CALL(stream_decoder_, getRequestDecoderHandle()).WillRepeatedly(Invoke([weak_ind, this]() {
+    auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+    ON_CALL(*handle, get()).WillByDefault(Invoke([weak_ind, this]() {
+      if (weak_ind.expired())
+        return OptRef<Http::RequestDecoder>();
+      return OptRef<Http::RequestDecoder>(stream_decoder_);
+    }));
+    return handle;
+  }));
+
+  setUpCapsuleProtocol(true, false);
+
+  valid_indicator.reset();
+
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
+}
 #endif
 
 TEST_F(EnvoyQuicServerStreamTest, RegularHeaderBeforePseudoHeader) {
