@@ -18,8 +18,7 @@ namespace Tls {
 
 namespace {
 
-// Applies per-certificate TLS parameters directly to a SSL* after SSL_set_SSL_CTX, which only
-// transfers certificate material and does not propagate cipher/version/curve settings.
+// Applies per-cert tls_params to ssl after SSL_set_SSL_CTX (which only transfers cert material).
 absl::Status applyTlsParamsToSsl(const Ssl::TlsParams& p, const Ssl::TlsContext& ctx, SSL* ssl) {
   using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
   if (p.min_protocol_version != TlsProto::TLS_AUTO) {
@@ -36,8 +35,7 @@ absl::Status applyTlsParamsToSsl(const Ssl::TlsParams& p, const Ssl::TlsContext&
                                               Utility::getLastCryptoError().value_or("")));
     }
   }
-  // Skip cipher/curve/sigalg fields when a custom handshaker manages them; applying them here
-  // would clobber handshaker-provided configuration.
+  // Don't clobber fields a custom handshaker owns.
   if (!ctx.provides_ciphers_and_curves_) {
     if (!p.cipher_suites.empty() && SSL_set_strict_cipher_list(ssl, p.cipher_suites.c_str()) != 1) {
       return absl::InternalError(absl::StrCat("Failed to set per-cert cipher suites: ",
@@ -151,9 +149,8 @@ void SslExtendedSocketInfoImpl::onCertificateSelectionCompleted(
     // This will only return NULL if memory allocation fails.
     RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_handshaker_.ssl(), selected_ctx->ssl_ctx_.get()) != nullptr,
                    "");
-    // tls_params_ is only reached here (the TLS cert_cb path). QUIC/HTTP3 downstream selects
-    // certificates via quic::ProofSource::GetProof() and never calls this function, so
-    // per-certificate tls_params have no effect on QUIC connections.
+    // QUIC selects certs via ProofSource::GetProof(), not cert_cb, so tls_params_ never applies
+    // there.
     bool params_ok = true;
     if (selected_ctx->tls_params_.has_value()) {
       if (absl::Status s =
