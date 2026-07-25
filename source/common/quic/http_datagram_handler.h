@@ -1,8 +1,9 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/http/codec.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 
@@ -12,6 +13,8 @@
 
 namespace Envoy {
 namespace Quic {
+
+using StreamDecoderProvider = std::function<Http::StreamDecoder*()>;
 
 // Enables HTTP Datagrams and the Capsule Protocol support based on RFC 9297. This class is used
 // both on the decode path (HTTP/3 codec -> Envoy) and the encode path (Envoy -> HTTP/3 codec) of
@@ -38,8 +41,10 @@ public:
   // created and sent successfully. Returns false if the CapsuleParser fails to parse the
   // |capsule_fragment| or the corresponding stream fails to send the Datagram.
   bool encodeCapsuleFragment(absl::string_view capsule_fragment, bool end_stream);
-  // Does not take ownership of the StreamDecoder. "decoder" must outlive HttpDatagramHandler.
-  void setStreamDecoder(Http::StreamDecoder* decoder) { stream_decoder_ = decoder; }
+
+  void setStreamDecoderProvider(StreamDecoderProvider decoder_provider) {
+    stream_decoder_provider_ = std::move(decoder_provider);
+  }
 
 private:
   // Serializes and decodes a given Capsule.
@@ -48,7 +53,7 @@ private:
   quic::QuicSpdyStream& stream_;
   quiche::CapsuleParser capsule_parser_{this};
   quiche::SimpleBufferAllocator capsule_buffer_allocator_;
-  Http::StreamDecoder* stream_decoder_ = nullptr; // not owned.
+  StreamDecoderProvider stream_decoder_provider_;
   bool fin_set_ = false;
 };
 
