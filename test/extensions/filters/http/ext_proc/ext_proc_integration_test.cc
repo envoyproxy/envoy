@@ -4978,7 +4978,8 @@ TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithTrailers) {
   EXPECT_TRUE(request.has_request_body());
   EXPECT_FALSE(request.request_body().end_of_stream());
 
-  // Next, ext_proc server receives the trailers message since request trailer mode transitioned to SEND.
+  // Next, ext_proc server receives the trailers message since request trailer mode transitioned to
+  // SEND.
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
   EXPECT_TRUE(request.has_request_trailers());
 
