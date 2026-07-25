@@ -18,7 +18,8 @@ namespace Tls {
 
 namespace {
 
-// Applies per-cert tls_params to ssl after SSL_set_SSL_CTX (which only transfers cert material).
+// Applies certificate-level tls_params to ssl after SSL_set_SSL_CTX (which only transfers cert
+// material).
 absl::Status applyTlsParamsToSsl(const Ssl::TlsParams& p, const Ssl::TlsContext& ctx, SSL* ssl) {
   using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
   if (p.min_protocol_version != TlsProto::TLS_AUTO) {
@@ -35,7 +36,7 @@ absl::Status applyTlsParamsToSsl(const Ssl::TlsParams& p, const Ssl::TlsContext&
                                               Utility::getLastCryptoError().value_or("")));
     }
   }
-  // Don't clobber fields a custom handshaker owns.
+  // Skip fields a custom handshaker owns to avoid overwriting its configuration.
   if (!ctx.provides_ciphers_and_curves_) {
     if (!p.cipher_suites.empty() && SSL_set_strict_cipher_list(ssl, p.cipher_suites.c_str()) != 1) {
       return absl::InternalError(absl::StrCat("Failed to set per-cert cipher suites: ",

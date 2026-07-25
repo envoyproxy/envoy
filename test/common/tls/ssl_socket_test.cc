@@ -2514,8 +2514,8 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsaWithFullScanEnabledOnSniMismatch) {
   testUtil(test_options.setExpectedSni("nomatch.example.com"));
 }
 
-// No per-cert tls_params: context-level tls_params still apply. Context restricts to AES128;
-// client offers both AES128 and AES256 — AES128 is negotiated via context-level params.
+// No certificate-level tls_params: context-level tls_params still apply. Context restricts to
+// AES128; client offers both AES128 and AES256 — AES128 is negotiated via context-level params.
 TEST_P(SslSocketTest, ContextLevelTlsParamsInheritedWhenNoCertLevelParams) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     sni: "server1.example.com"
@@ -2547,8 +2547,9 @@ TEST_P(SslSocketTest, ContextLevelTlsParamsInheritedWhenNoCertLevelParams) {
   testUtil(test_options);
 }
 
-// Per-cert tls_params applied: cert restricts to AES128 only. Client offering only AES256 fails
-// to connect, proving per-cert tls_params are enforced (not just the context-level defaults).
+// Certificate-level tls_params applied: cert restricts to AES128 only. Client offering only AES256
+// fails to connect, proving certificate-level tls_params are enforced (not just the context-level
+// defaults).
 TEST_P(SslSocketTest, PerCertTlsParamsApplied) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     sni: "server1.example.com"
@@ -2727,8 +2728,9 @@ TEST_P(SslSocketTest, PerCertTlsParamsEcdhCurvesApplied) {
       SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
-// Per-cert tls_params with a TLS 1.3 handshake: cert restricts to TLSv1_3 only, client max is 1.3.
-// Confirms that per-cert tls_params are applied correctly and a TLS 1.3 connection succeeds.
+// Certificate-level tls_params with a TLS 1.3 handshake: cert restricts to TLSv1_3 only, client max
+// is 1.3. Confirms that certificate-level tls_params are applied correctly and a TLS 1.3 connection
+// succeeds.
 TEST_P(SslSocketTest, PerCertTlsParamsTls13Succeeds) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
@@ -2765,8 +2767,8 @@ TEST_P(SslSocketTest, PerCertTlsParamsTls13Succeeds) {
                  .setExpectedRequestedServerName("server1.example.com"));
 }
 
-// Per-cert tls_params: cert sets min=TLSv1_3 while the context allows TLSv1_2 and up. A client
-// that only offers TLSv1_2 cannot negotiate, proving the cert-level min is enforced.
+// Certificate-level tls_params: cert sets min=TLSv1_3 while the context allows TLSv1_2 and up. A
+// client that only offers TLSv1_2 cannot negotiate, proving the certificate-level min is enforced.
 TEST_P(SslSocketTest, PerCertTlsParamsMinVersionApplied) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     sni: "server1.example.com"
@@ -2798,8 +2800,8 @@ TEST_P(SslSocketTest, PerCertTlsParamsMinVersionApplied) {
       SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
 }
 
-// Per-cert tls_params under a TLS 1.3 handshake: cert restricts signature_algorithms to
-// rsa_pss_rsae_sha384. Client advertises only rsa_pss_rsae_sha256 — no common sigalg → failure.
+// Certificate-level tls_params under a TLS 1.3 handshake: cert restricts signature_algorithms to
+// rsa_pss_rsae_sha384. Client offers only rsa_pss_rsae_sha256 — no common algorithm → failure.
 // Exercises the signature_algorithms branch in applyTlsParamsToSsl at TLS 1.3.
 TEST_P(SslSocketTest, PerCertTlsParamsSigAlgsTls13Fails) {
   envoy::config::listener::v3::Listener listener;
@@ -9581,7 +9583,7 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
 // ECONNRESET pushed by io_handle_bio's SO_ERROR probe, drainErrorQueue must surface the
 // TLS protocol error as the root cause and must NOT set detected_io_error_ to
 // ConnectionReset. Otherwise the user-visible failure cause (the cert verify error in
-// transport_failure_reason) gets clobbered by the symptomatic peer RST.
+// transport_failure_reason) gets overwritten by the symptomatic peer RST.
 TEST_P(SslSocketTest, DrainErrorQueuePrefersCertVerifyOverEconnreset) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
