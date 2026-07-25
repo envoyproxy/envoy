@@ -168,10 +168,6 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
-} // namespace
-
-namespace {
-
 std::shared_ptr<SharedPool::ObjectSharedPool<std::string>>
 getCipherSuitesPool(Singleton::Manager& singleton_manager, Event::Dispatcher& dispatcher) {
   return singleton_manager.getTyped<SharedPool::ObjectSharedPool<std::string>>(
@@ -362,21 +358,7 @@ Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
 unsigned ContextConfigImpl::tlsVersionFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
     unsigned default_version) {
-  switch (version) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO:
-    return default_version;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0:
-    return TLS1_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_1:
-    return TLS1_1_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2:
-    return TLS1_2_VERSION;
-  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
-    return TLS1_3_VERSION;
-  }
-  IS_ENVOY_BUG("unexpected tls version provided");
-  return default_version;
+  return Utility::tlsVersionFromProto(version, default_version);
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;

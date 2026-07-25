@@ -83,9 +83,10 @@ ClientContextImpl::ClientContextImpl(
     return;
   }
 
-  if (tls_contexts_[0].tls_params.has_value()) {
-    ENVOY_LOG(warn, "tls_params on a client TlsCertificate has no effect; "
+  if (tls_contexts_[0].tls_params_.has_value()) {
+    ENVOY_LOG(warn, "tls_params on a client TlsCertificate is not supported; "
                     "use context-level tls_params instead");
+    tls_contexts_[0].tls_params_.reset();
   }
 
   if (!parsed_alpn_protocols_.empty()) {

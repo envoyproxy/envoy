@@ -316,7 +316,11 @@ message TlsCertificate {
   // for that certificate during the TLS handshake; unset fields continue to use the context-level
   // values. This allows different cipher suites, ECDH curves, protocol versions, signature
   // algorithms, or compliance policies per certificate.
-  // Setting this on a client certificate has no effect.
+  // Note: because these are overrides rather than intersections, a per-certificate
+  // ``tls_minimum_protocol_version`` can lower the floor set by the context-level
+  // ``tls_params``, potentially weakening the listener's overall TLS posture.
+  // Setting this on a client certificate is not supported and is ignored.
+  // This field has no effect on QUIC/HTTP3 downstream connections.
   TlsParameters tls_params = 9;
 }
 

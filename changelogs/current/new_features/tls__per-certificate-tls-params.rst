@@ -3,5 +3,5 @@ Added support for per-certificate TLS parameter overrides via the ``tls_params``
 When set on a server certificate, any specified fields override the corresponding context-level
 TLS parameters for that certificate during the TLS handshake; unset fields continue to use the
 context-level values. This allows different cipher suites, ECDH curves, protocol versions,
-signature algorithms, and compliance policies per certificate. This field has no effect on client
-certificates.
+signature algorithms, and compliance policies per certificate. This field is not supported on
+client certificates and is ignored. It also has no effect on QUIC/HTTP3 downstream connections.

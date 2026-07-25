@@ -49,7 +49,11 @@ struct TlsContext {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   // Per-certificate TLS params applied to the SSL* after SSL_set_SSL_CTX, which only transfers
   // certificate material and does not propagate cipher/version/curve settings.
-  std::optional<Ssl::TlsParams> tls_params;
+  std::optional<Ssl::TlsParams> tls_params_;
+  // Mirrors ContextImpl::capabilities_ so applyTlsParamsToSsl can skip fields that a custom
+  // handshaker manages instead of BoringSSL.
+  bool provides_ciphers_and_curves_{false};
+  bool provides_sigalgs_{false};
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;

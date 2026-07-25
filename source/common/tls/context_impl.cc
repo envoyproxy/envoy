@@ -111,9 +111,16 @@ ContextImpl::ContextImpl(
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
+    ctx.provides_ciphers_and_curves_ = capabilities_.provides_ciphers_and_curves;
+    ctx.provides_sigalgs_ = capabilities_.provides_sigalgs;
     if (i < tls_certificates.size()) {
       if (const Ssl::TlsParams* p = tls_certificates[i].get().tlsParams(); p != nullptr) {
-        ctx.tls_params = *p;
+        ctx.tls_params_ = *p;
+        using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+        if (p->compliance_policy.has_value() &&
+            p->compliance_policy.value() == ProtoPolicy::FIPS_202205 && !FIPS_mode()) {
+          ENVOY_LOG(warn, "Per-certificate FIPS conformance policy applied on a non-FIPS build");
+        }
       }
     }
 
@@ -123,51 +130,12 @@ ContextImpl::ContextImpl(
     rc = SSL_CTX_set_max_proto_version(ctx.ssl_ctx_.get(), config.maxProtocolVersion());
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
-    if (!capabilities_.provides_ciphers_and_curves &&
-        !SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), config.cipherSuites().c_str())) {
-      // Break up a set of ciphers into each individual cipher and try them each individually in
-      // order to attempt to log which specific one failed. Example of config.cipherSuites():
-      // "-ALL:[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:ECDHE-ECDSA-AES128-SHA".
-      //
-      // "-" is both an operator when in the leading position of a token (-ALL: don't allow this
-      // cipher), and the common separator in names (ECDHE-ECDSA-AES128-GCM-SHA256). Don't split on
-      // it because it will separate pieces of the same cipher. When it is a leading character, it
-      // is removed below.
-      std::vector<absl::string_view> ciphers =
-          StringUtil::splitToken(config.cipherSuites(), ":+![|]", false);
-      std::vector<std::string> bad_ciphers;
-      for (const auto& cipher : ciphers) {
-        std::string cipher_str(cipher);
-
-        if (absl::StartsWith(cipher_str, "-")) {
-          cipher_str.erase(cipher_str.begin());
-        }
-
-        if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), cipher_str.c_str())) {
-          bad_ciphers.push_back(cipher_str);
-        }
-      }
-      creation_status = absl::InvalidArgumentError(
-          fmt::format("Failed to initialize cipher suites {}. The following "
-                      "ciphers were rejected when tried individually: {}",
-                      config.cipherSuites(), absl::StrJoin(bad_ciphers, ", ")));
-      return;
-    }
-
-    if (!capabilities_.provides_ciphers_and_curves &&
-        !SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
-      creation_status = absl::InvalidArgumentError(
-          absl::StrCat("Failed to initialize ECDH curves ", config.ecdhCurves()));
-      return;
-    }
-
-    // Set signature algorithms if given, otherwise fall back to BoringSSL defaults.
-    if (!capabilities_.provides_sigalgs && !config.signatureAlgorithms().empty()) {
-      if (!SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signatureAlgorithms().c_str())) {
-        creation_status = absl::InvalidArgumentError(absl::StrCat(
-            "Failed to initialize TLS signature algorithms ", config.signatureAlgorithms()));
-        return;
-      }
+    if (!capabilities_.provides_ciphers_and_curves || !capabilities_.provides_sigalgs) {
+      creation_status = Utility::validateCipherCurveAndSigalgsOnSslCtx(
+          capabilities_.provides_ciphers_and_curves ? "" : config.cipherSuites(),
+          capabilities_.provides_ciphers_and_curves ? "" : config.ecdhCurves(),
+          capabilities_.provides_sigalgs ? "" : config.signatureAlgorithms(), ctx.ssl_ctx_.get());
+      RETURN_ONLY_IF_NOT_OK_REF(creation_status);
     }
 
     // Register certificate compression algorithms to reduce TLS handshake size (RFC 8879).
@@ -378,31 +346,17 @@ ContextImpl::ContextImpl(
 
   // Compliance policy must be applied last to have a defined behavior.
   if (const auto policy = config.compliancePolicy(); policy.has_value()) {
-    switch (policy.value()) {
-      using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
-    case ProtoPolicy::FIPS_202205:
-      if (!fips_mode) {
-        ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
-      }
-      creation_status = setCompliancePolicy(ssl_compliance_policy_fips_202205);
-      if (!creation_status.ok()) {
-        return;
-      }
-      break;
-    case ProtoPolicy::CNSA2_202603:
-      creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa2_202603);
-      if (!creation_status.ok()) {
-        return;
-      }
-      break;
-    case ProtoPolicy::CNSA1_202603:
-      creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa1_202603);
-      if (!creation_status.ok()) {
-        return;
-      }
-      break;
-    default:
-      creation_status = absl::InvalidArgumentError("Unknown compliance policy");
+    using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+    if (policy.value() == ProtoPolicy::FIPS_202205 && !fips_mode) {
+      ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
+    }
+    auto ssl_policy_or_error = Utility::compliancePolicyToSslPolicy(policy.value());
+    if (!ssl_policy_or_error.ok()) {
+      creation_status = ssl_policy_or_error.status();
+      return;
+    }
+    creation_status = setCompliancePolicy(*ssl_policy_or_error);
+    if (!creation_status.ok()) {
       return;
     }
   }

@@ -1076,6 +1076,8 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP521EcdsaClientAllCurve
 // SSL_CTX always uses context-level ciphers so the RSA cert's tls_params do not affect
 // getClientEcdsaCapabilities(), which reads tls_contexts_[0]'s cipher list.
 TEST_P(SslCertficateIntegrationTest, MultiCertPerCertTlsParams) {
+  // cipher_suites override has no effect at TLS 1.3 — the protocol does not use the TLS 1.2
+  // cipher list — so this test cannot verify cipher selection via per-cert tls_params at 1.3.
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
     return;
   }
@@ -1128,6 +1130,8 @@ TEST_P(SslCertficateIntegrationTest, MultiCertPerCertTlsParams) {
 // only AES256 can be negotiated, confirming per-cert tls_params are applied for single-cert
 // servers.
 TEST_P(SslCertficateIntegrationTest, SingleCertPerCertTlsParams) {
+  // cipher_suites override has no effect at TLS 1.3 — the protocol does not use the TLS 1.2
+  // cipher list — so this test cannot verify cipher selection via per-cert tls_params at 1.3.
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
     return;
   }
@@ -1165,6 +1169,8 @@ TEST_P(SslCertficateIntegrationTest, SingleCertPerCertTlsParams) {
 // different SNIs verify that domain-based cert selection applies the correct per-cert tls_params:
 // SNI lyft.com selects servercert (AES128), SNI lyft2.com selects server2cert (AES256).
 TEST_P(SslCertficateIntegrationTest, MultiCertPerCertTlsParamsBySni) {
+  // cipher_suites override has no effect at TLS 1.3 — the protocol does not use the TLS 1.2
+  // cipher list — so this test cannot verify cipher selection via per-cert tls_params at 1.3.
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
     return;
   }

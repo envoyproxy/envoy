@@ -130,13 +130,9 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
           fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
     }
   }
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (config.has_tls_params()) {
     const auto& p = config.tls_params();
-    if (p.compliance_policies_size() > 1) {
-      creation_status = absl::InvalidArgumentError(
-          "Only one compliance policy may be specified per certificate tls_params");
-      return;
-    }
     tls_params_ = TlsParams{
         .min_protocol_version = p.tls_minimum_protocol_version(),
         .max_protocol_version = p.tls_maximum_protocol_version(),

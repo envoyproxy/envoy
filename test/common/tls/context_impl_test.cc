@@ -2165,8 +2165,8 @@ common_tls_context:
   EXPECT_EQ(gauge_opt->get().value(), 1787339648);
 }
 
-// tls_params on a client certificate has no effect — a warning is logged and context-level
-// params are used instead.
+// tls_params on a client certificate is not supported — a warning is logged and the params are
+// cleared so context-level params are used instead.
 TEST_F(SslContextImplTest, ClientCertTlsParamsWarns) {
   const std::string yaml = R"EOF(
   common_tls_context:
@@ -2184,7 +2184,7 @@ TEST_F(SslContextImplTest, ClientCertTlsParamsWarns) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr client_ctx;
-  EXPECT_LOG_CONTAINS("warning", "tls_params on a client TlsCertificate has no effect",
+  EXPECT_LOG_CONTAINS("warning", "tls_params on a client TlsCertificate is not supported",
                       client_ctx = *manager_.createSslClientContext(*store_.rootScope(), *cfg));
   auto cleanup = cleanUpHelper(client_ctx);
 }

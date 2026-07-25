@@ -9,68 +9,65 @@
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/utility.h"
 
-#include "openssl/tls1.h"
-
 using Envoy::Network::PostIoAction;
 
 namespace Envoy {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
 namespace {
 
 // Applies per-certificate TLS parameters directly to a SSL* after SSL_set_SSL_CTX, which only
 // transfers certificate material and does not propagate cipher/version/curve settings.
-void applyTlsParamsToSsl(const Ssl::TlsParams& p, SSL* ssl) {
+absl::Status applyTlsParamsToSsl(const Ssl::TlsParams& p, const Ssl::TlsContext& ctx, SSL* ssl) {
   using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
-  auto toVersion = [](TlsProto::TlsProtocol proto) -> uint16_t {
-    switch (proto) {
-    case TlsProto::TLS_AUTO:
-      return 0;
-    case TlsProto::TLSv1_0:
-      return TLS1_VERSION;
-    case TlsProto::TLSv1_1:
-      return TLS1_1_VERSION;
-    case TlsProto::TLSv1_2:
-      return TLS1_2_VERSION;
-    case TlsProto::TLSv1_3:
-      return TLS1_3_VERSION;
-    default:
-      return 0;
-    }
-  };
   if (p.min_protocol_version != TlsProto::TLS_AUTO) {
-    RELEASE_ASSERT(SSL_set_min_proto_version(ssl, toVersion(p.min_protocol_version)) == 1, "");
+    if (SSL_set_min_proto_version(ssl, Utility::tlsVersionFromProto(p.min_protocol_version, 0)) !=
+        1) {
+      return absl::InternalError(absl::StrCat("Failed to set per-cert min TLS version: ",
+                                              Utility::getLastCryptoError().value_or("")));
+    }
   }
   if (p.max_protocol_version != TlsProto::TLS_AUTO) {
-    RELEASE_ASSERT(SSL_set_max_proto_version(ssl, toVersion(p.max_protocol_version)) == 1, "");
+    if (SSL_set_max_proto_version(ssl, Utility::tlsVersionFromProto(p.max_protocol_version, 0)) !=
+        1) {
+      return absl::InternalError(absl::StrCat("Failed to set per-cert max TLS version: ",
+                                              Utility::getLastCryptoError().value_or("")));
+    }
   }
-  if (!p.cipher_suites.empty()) {
-    RELEASE_ASSERT(SSL_set_strict_cipher_list(ssl, p.cipher_suites.c_str()) == 1, "");
+  // Skip cipher/curve/sigalg fields when a custom handshaker manages them; applying them here
+  // would clobber handshaker-provided configuration.
+  if (!ctx.provides_ciphers_and_curves_) {
+    if (!p.cipher_suites.empty() && SSL_set_strict_cipher_list(ssl, p.cipher_suites.c_str()) != 1) {
+      return absl::InternalError(absl::StrCat("Failed to set per-cert cipher suites: ",
+                                              Utility::getLastCryptoError().value_or("")));
+    }
+    if (!p.ecdh_curves.empty() && SSL_set1_curves_list(ssl, p.ecdh_curves.c_str()) != 1) {
+      return absl::InternalError(absl::StrCat("Failed to set per-cert ECDH curves: ",
+                                              Utility::getLastCryptoError().value_or("")));
+    }
   }
-  if (!p.ecdh_curves.empty()) {
-    RELEASE_ASSERT(SSL_set1_curves_list(ssl, p.ecdh_curves.c_str()) == 1, "");
-  }
-  if (!p.signature_algorithms.empty()) {
-    RELEASE_ASSERT(SSL_set1_sigalgs_list(ssl, p.signature_algorithms.c_str()) == 1, "");
+  if (!ctx.provides_sigalgs_ && !p.signature_algorithms.empty() &&
+      SSL_set1_sigalgs_list(ssl, p.signature_algorithms.c_str()) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to set per-cert signature algorithms: ",
+                                            Utility::getLastCryptoError().value_or("")));
   }
   // Compliance policy must be applied last.
   if (p.compliance_policy.has_value()) {
-    switch (p.compliance_policy.value()) {
-    case TlsProto::FIPS_202205:
-      if (!FIPS_mode()) {
-        ENVOY_LOG_MISC(warn, "FIPS conformance policy applied on a non-FIPS build");
-      }
-      RELEASE_ASSERT(SSL_set_compliance_policy(ssl, ssl_compliance_policy_fips_202205) == 1, "");
-      break;
-    default:
-      RELEASE_ASSERT(false, "Unknown compliance policy");
+    auto ssl_policy_or_error = Utility::compliancePolicyToSslPolicy(p.compliance_policy.value());
+    if (!ssl_policy_or_error.ok()) {
+      return ssl_policy_or_error.status();
+    }
+    if (SSL_set_compliance_policy(ssl, *ssl_policy_or_error) != 1) {
+      return absl::InternalError(absl::StrCat("Failed to set per-cert compliance policy: ",
+                                              Utility::getLastCryptoError().value_or("")));
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace
-
-namespace Extensions {
-namespace TransportSockets {
-namespace Tls {
 
 void ValidateResultCallbackImpl::onSslHandshakeCancelled() { extended_socket_info_.reset(); }
 
@@ -154,11 +151,21 @@ void SslExtendedSocketInfoImpl::onCertificateSelectionCompleted(
     // This will only return NULL if memory allocation fails.
     RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_handshaker_.ssl(), selected_ctx->ssl_ctx_.get()) != nullptr,
                    "");
-    if (selected_ctx->tls_params.has_value()) {
-      applyTlsParamsToSsl(*selected_ctx->tls_params, ssl_handshaker_.ssl());
+    // tls_params_ is only reached here (the TLS cert_cb path). QUIC/HTTP3 downstream selects
+    // certificates via quic::ProofSource::GetProof() and never calls this function, so
+    // per-certificate tls_params have no effect on QUIC connections.
+    bool params_ok = true;
+    if (selected_ctx->tls_params_.has_value()) {
+      if (absl::Status s =
+              applyTlsParamsToSsl(*selected_ctx->tls_params_, *selected_ctx, ssl_handshaker_.ssl());
+          !s.ok()) {
+        ENVOY_LOG_MISC(warn, "Failed to apply per-certificate tls_params: {}", s.message());
+        cert_selection_result_ = Ssl::CertificateSelectionStatus::Failed;
+        params_ok = false;
+      }
     }
 
-    if (staple) {
+    if (params_ok && staple) {
       // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
       RELEASE_ASSERT(selected_ctx->ocsp_response_,
                      "OCSP response must be present under OcspStapleAction::Staple");

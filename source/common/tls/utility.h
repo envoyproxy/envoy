@@ -205,6 +205,32 @@ compliancePolicyFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params);
 
 /**
+ * Validates cipher_suites, ecdh_curves, and signature_algorithms strings against ssl_ctx,
+ * returning an error if BoringSSL rejects any of them. Skips empty strings. On cipher_suites
+ * failure, retries each token individually to produce a detailed bad-cipher list in the error.
+ */
+absl::Status validateCipherCurveAndSigalgsOnSslCtx(absl::string_view cipher_suites,
+                                                   absl::string_view ecdh_curves,
+                                                   absl::string_view signature_algorithms,
+                                                   SSL_CTX* ssl_ctx);
+
+/**
+ * Maps a CompliancePolicy proto enum to the corresponding BoringSSL constant. Returns an error
+ * for unknown values, which can occur when newer proto values arrive via xDS before code handles
+ * them.
+ */
+absl::StatusOr<ssl_compliance_policy_t> compliancePolicyToSslPolicy(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy);
+
+/**
+ * Maps a TlsProtocol proto enum to a BoringSSL version constant (e.g. TLS1_2_VERSION).
+ * TLS_AUTO maps to default_version. Unknown values return default_version and log an ENVOY_BUG.
+ */
+unsigned tlsVersionFromProto(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol version,
+    unsigned default_version);
+
+/**
  * Validates cipher_suites, ecdh_curves, signature_algorithms, and compliance_policy in params
  * against ssl_ctx. Returns an error status if any field is rejected by BoringSSL.
  */

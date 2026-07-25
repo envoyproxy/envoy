@@ -262,6 +262,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/ssl:ssl_lib",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
