@@ -60,8 +60,14 @@ message Config {
   // using cached secrets are unaffected. A cache slot is also released when the SDS server
   // removes the secret resource, canceling its subscription.
   //
-  // If unset, defaults to 1024. Deployments that serve more concurrently active certificates from
-  // a single listener or cluster should raise this limit accordingly.
+  // Secrets that resolved to a certificate are never reclaimed; they are released by an SDS
+  // removal or by the
+  // :ref:`cache_idle_timeout <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.cache_idle_timeout>`.
+  // Deployments where the SDS server issues certificates for arbitrary peer-controlled names
+  // should therefore configure both settings together, otherwise idle resolved secrets can fill
+  // the cache until new names are rejected.
+  //
+  // If unset, the number of cached secrets is unlimited.
   google.protobuf.UInt32Value max_secrets = 4 [(validate.rules).uint32 = {gt: 0}];
 
   // The duration a cached secret can remain unused by any TLS handshake before it is evicted from

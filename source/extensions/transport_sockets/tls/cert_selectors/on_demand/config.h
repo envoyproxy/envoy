@@ -45,9 +45,6 @@ using AsyncContextFactory = absl::AnyInvocable<AsyncContextConstSharedPtr(
 
 using ConfigProto =
     envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config;
-
-// Default limit on the number of cached secrets when ``max_secrets`` is unset.
-inline constexpr uint32_t DefaultMaxSecrets = 1024;
 using UpdateCb = std::function<absl::Status(absl::string_view, const Ssl::TlsCertificateConfig&)>;
 using RemoveCb = std::function<absl::Status(absl::string_view)>;
 
@@ -262,7 +259,7 @@ private:
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
-  // The maximum number of cache entries.
+  // The maximum number of cache entries, with 0 meaning unlimited.
   const uint32_t max_secrets_;
   // The idle duration after which an unused cache entry is evicted, if configured.
   const std::optional<std::chrono::milliseconds> idle_timeout_;
@@ -280,6 +277,10 @@ private:
     // Distinguishes entry incarnations for the same secret name, so that a deferred removal does
     // not erase an entry that was reclaimed and re-created while the removal was in flight.
     uint64_t generation_{0};
+    // Expired handles are compacted when the callback list reaches this size, which then doubles,
+    // keeping the insertion cost amortized constant and the list bounded by roughly twice the
+    // live pending handshakes.
+    size_t next_compact_size_{16};
     // Prefetched secrets are pinned in the cache: they are never idle-evicted or reclaimed.
     bool prefetched_{false};
     // Set on main-thread handshake activity (entry creation, fetch attach) and cleared by each

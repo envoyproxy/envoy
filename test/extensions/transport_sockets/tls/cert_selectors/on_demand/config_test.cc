@@ -14,6 +14,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -327,16 +328,17 @@ TEST_F(SecretManagerTest, PrefetchPinnedAcrossRefetch) {
   EXPECT_EQ(1, activeGauge());
 }
 
-// Expired pending handshake handles are compacted so the callback list is bounded by live
-// handshakes, not by the history of interrupted ones.
+// Expired pending handshake handles are compacted at geometric size thresholds so the callback
+// list stays bounded by roughly twice the live handshakes, not by the history of interrupted
+// ones, while insertion cost stays amortized constant.
 TEST_F(SecretManagerTest, ExpiredCallbacksCompacted) {
   auto manager = makeManager(std::string(kIdleConfig));
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 100; i++) {
     auto handle = std::make_shared<Handle>(AsyncContextConstSharedPtr(nullptr));
     manager->addCertificateConfig("a", handle, {});
     // The handle goes out of scope, simulating an interrupted handshake.
+    EXPECT_LE(manager->pendingCallbacksForTest("a"), 16);
   }
-  EXPECT_EQ(1, manager->pendingCallbacksForTest("a"));
   sweep();
   EXPECT_EQ(0, manager->pendingCallbacksForTest("a"));
 }
@@ -377,6 +379,49 @@ TEST_F(SecretManagerTest, ReclaimPendingEntryOverRejection) {
   EXPECT_EQ(2, activeGauge());
 }
 
+// The callback list stays bounded by roughly twice the live pending handshakes even when
+// interrupted handshakes are interleaved, and live handles are never dropped by compaction.
+TEST_F(SecretManagerTest, CompactionThresholdGrowsWithLiveHandshakes) {
+  auto manager = makeManager(std::string(kIdleConfig));
+  std::vector<HandleSharedPtr> live;
+  for (int i = 0; i < 20; i++) {
+    live.push_back(std::make_shared<Handle>(AsyncContextConstSharedPtr(nullptr)));
+    manager->addCertificateConfig("a", live.back(), {});
+  }
+  for (int i = 0; i < 100; i++) {
+    auto handle = std::make_shared<Handle>(AsyncContextConstSharedPtr(nullptr));
+    manager->addCertificateConfig("a", handle, {});
+    // With 20 live handles the compaction threshold doubles to 40, which bounds the list.
+    EXPECT_LE(manager->pendingCallbacksForTest("a"), 40);
+  }
+  EXPECT_GE(manager->pendingCallbacksForTest("a"), 20);
+  live.clear();
+  sweep();
+  EXPECT_EQ(0, manager->pendingCallbacksForTest("a"));
+}
+
+// A configured cache limit without an idle timeout cannot release resolved secrets, which is
+// worth a warning; configuring both is silent.
+TEST_F(SecretManagerTest, WarnsWhenLimitSetWithoutIdleTimeout) {
+  EXPECT_LOG_CONTAINS("warning", "max_secrets is configured without cache_idle_timeout", {
+    auto manager = makeManager(R"EOF(
+      config_source:
+        ads: {}
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+      max_secrets: 1
+    )EOF");
+  });
+  EXPECT_LOG_NOT_CONTAINS("warning", "max_secrets is configured without cache_idle_timeout", {
+    auto manager = makeManager(absl::StrCat(std::string(kIdleConfig), R"EOF(
+      max_secrets: 1
+    )EOF"));
+  });
+}
+
 // A deferred SDS removal does not erase an entry that was reclaimed and re-created for the same
 // name while the removal was in flight.
 TEST_F(SecretManagerTest, StaleRemovalIgnoredAfterReadmission) {
@@ -407,8 +452,8 @@ TEST_F(SecretManagerTest, StaleRemovalIgnoredAfterReadmission) {
   EXPECT_EQ(1, activeGauge());
 }
 
-// The default cache limit admits exactly 1024 secrets.
-TEST_F(SecretManagerTest, DefaultLimitIsApplied) {
+// When max_secrets is unset the cache is unlimited and admission never reclaims or rejects.
+TEST_F(SecretManagerTest, UnsetLimitIsUnlimited) {
   auto manager = makeManager(R"EOF(
       config_source:
         ads: {}
@@ -418,16 +463,12 @@ TEST_F(SecretManagerTest, DefaultLimitIsApplied) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
           name: server
     )EOF");
-  for (int i = 0; i < 1024; i++) {
+  for (int i = 0; i < 1500; i++) {
     manager->addCertificateConfig(absl::StrCat("secret_", i), nullptr, {});
   }
-  EXPECT_EQ(1024, activeGauge());
+  EXPECT_EQ(1500, activeGauge());
   EXPECT_EQ(0, counter("cert_reclaimed"));
-  // The next admission crosses the default limit: all entries are reclaimable pending fetches,
-  // so one is reclaimed rather than growing the cache.
-  manager->addCertificateConfig("secret_1024", nullptr, {});
-  EXPECT_EQ(1, counter("cert_reclaimed"));
-  EXPECT_EQ(1024, activeGauge());
+  EXPECT_EQ(0, counter("cert_overflow"));
 }
 
 TEST(FilterStateMapper, Derivation) {

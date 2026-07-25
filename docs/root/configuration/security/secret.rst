@@ -299,11 +299,12 @@ plane. A resource removal sent via the xDS response will cancel the data plane s
 specific secret name. When using the regular GRPC xDS protocol, the subscription for each mapped
 secret remains active until the removal of the parent resource (listener or cluster).
 
-The number of secrets fetched and cached by the selector is bounded by the :ref:`max_secrets
+The number of secrets fetched and cached by the selector can be bounded with the optional
+:ref:`max_secrets
 <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.max_secrets>`
-limit (1024 by default). Each cached secret holds an active SDS subscription, its own gRPC stream
-when the configuration source is not ADS, and the TLS contexts built from the certificate, so the
-limit bounds the memory and control plane load that peers can create when they control the mapped
+limit. Each cached secret holds an active SDS subscription, its own gRPC stream when the
+configuration source is not ADS, and the TLS contexts built from the certificate, so the limit
+bounds the memory and control plane load that peers can create when they control the mapped
 secret name, e.g. via the SNI field. When the cache is full and a handshake maps to a name that is
 not already cached, the selector first reclaims a slot from an entry that has no certificate and
 no pending handshakes, such as a subscription created by an interrupted handshake for a name
@@ -319,6 +320,12 @@ evicts secrets unused by any TLS handshake for the configured duration, or the p
 cluster is drained. Prefetched secrets are pinned in the cache and are not subject to idle
 eviction. Evicting a secret cancels its SDS subscription; connections that are already established
 with the certificate are not affected, and a later handshake for the same name fetches it again.
+
+Secrets that resolved to a certificate are never reclaimed by the cache limit, so deployments
+where the SDS server issues certificates for arbitrary peer-controlled names should configure
+``max_secrets`` together with ``cache_idle_timeout``; otherwise idle resolved secrets can fill the
+cache until new names are rejected. Envoy logs a warning at configuration load when only the limit
+is set.
 
 In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
 statistics are produced by the on-demand certificate extension. For downstream listeners, they are

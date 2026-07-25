@@ -586,6 +586,49 @@ TEST_P(OnDemandIntegrationTest, CachePoisonRecovery) {
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
+// Verifies that a resolved secret for a peer-controlled name cannot permanently occupy the cache
+// when the idle timeout is configured: the resolved entry idles out, freeing the slot for a
+// legitimate name.
+TEST_P(OnDemandIntegrationTest, CachePoisonRecoveryResolved) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  ssl_options_.setSni("junk");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_secrets: 1
+  cache_idle_timeout: 0.2s
+  )EOF");
+  // The SDS server resolves the attacker-controlled name, filling the only cache slot.
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  createXdsConnection();
+  waitSendSdsResponse("junk", "server");
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+
+  // The resolved entry is not reclaimable but idles out, freeing the slot.
+  test_server_->waitForCounter(onDemandStat("cert_evicted"), Eq(1), TestUtility::DefaultTimeout,
+                               dispatcher_.get());
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(0));
+
+  // A legitimate name is admitted afterwards.
+  ssl_options_.setSni("server");
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  auto conn2 = createClientConnection();
+  waitCertsRequested(2);
+  waitSendSdsResponse("server");
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  conn2.reset();
+  EXPECT_EQ(0, test_server_->counter(onDemandStat("cert_overflow"))->value());
+}
+
 // Verifies the overflow rejection for both the downstream and the upstream selector: a pinned,
 // resolved prefetched secret fills the cache, so a handshake mapping to another name is rejected.
 TEST_P(OnDemandIntegrationTest, MaxSecretsOverflowPrefetched) {

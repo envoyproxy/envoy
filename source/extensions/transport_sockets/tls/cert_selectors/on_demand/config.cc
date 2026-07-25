@@ -78,10 +78,15 @@ SecretManager::SecretManager(const ConfigProto& config,
       stats_(generateCertSelectionStats(*stats_scope_)),
       factory_context_(factory_context.serverFactoryContext()),
       config_source_(config.config_source()),
-      max_secrets_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_secrets, DefaultMaxSecrets)),
+      max_secrets_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_secrets, 0)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, cache_idle_timeout)),
       prefetch_names_(config.prefetch_secret_names().begin(), config.prefetch_secret_names().end()),
       context_factory_(std::move(context_factory)), cert_contexts_(factory_context_.threadLocal()) {
+  if (max_secrets_ > 0 && !idle_timeout_.has_value()) {
+    ENVOY_LOG(warn, "max_secrets is configured without cache_idle_timeout: secrets that resolved "
+                    "to a certificate are only released when the SDS server removes them, so idle "
+                    "resolved secrets can fill the cache until new names are rejected");
+  }
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   for (const auto& name : config.prefetch_secret_names()) {
     addCertificateConfig(name, nullptr, factory_context.initManager());
@@ -101,7 +106,8 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   // When the cache is full, prefer reclaiming a slot from an entry that never produced a
   // certificate and has no waiting handshakes over rejecting the new secret, so that abandoned
   // fetches for unknown names cannot permanently occupy the cache.
-  if (cache_.size() >= max_secrets_ && !cache_.contains(secret_name) && !reclaimUnusedEntry()) {
+  if (max_secrets_ > 0 && cache_.size() >= max_secrets_ && !cache_.contains(secret_name) &&
+      !reclaimUnusedEntry()) {
     ENVOY_LOG_EVERY_POW_2(
         warn, "On-demand secret cache is full at {} secrets, rejecting secret '{}'", cache_.size(),
         absl::CEscape(secret_name));
@@ -118,12 +124,16 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
     if (entry.cert_context_) {
       handle->notify(entry.cert_context_);
     } else {
-      // Compact expired handles so that the list size is bounded by the number of live pending
-      // handshakes rather than by the history of interrupted ones.
-      entry.callbacks_.erase(
-          std::remove_if(entry.callbacks_.begin(), entry.callbacks_.end(),
-                         [](const std::weak_ptr<Handle>& handle) { return handle.expired(); }),
-          entry.callbacks_.end());
+      // Compact expired handles at geometric size thresholds, keeping the insertion cost
+      // amortized constant while bounding the list by roughly twice the live pending handshakes
+      // rather than by the history of interrupted ones.
+      if (entry.callbacks_.size() >= entry.next_compact_size_) {
+        entry.callbacks_.erase(
+            std::remove_if(entry.callbacks_.begin(), entry.callbacks_.end(),
+                           [](const std::weak_ptr<Handle>& handle) { return handle.expired(); }),
+            entry.callbacks_.end());
+        entry.next_compact_size_ = std::max<size_t>(16, entry.callbacks_.size() * 2);
+      }
       entry.callbacks_.push_back(handle);
     }
   }
@@ -252,6 +262,7 @@ void SecretManager::evictIdle() {
         std::remove_if(entry.callbacks_.begin(), entry.callbacks_.end(),
                        [](const std::weak_ptr<Handle>& handle) { return handle.expired(); }),
         entry.callbacks_.end());
+    entry.next_compact_size_ = std::max<size_t>(16, entry.callbacks_.size() * 2);
     // Consume all activity flags in the same sweep so that an entry is evicted by the second
     // sweep after its last activity, i.e. within (1, 2] idle timeouts.
     bool active = entry.recently_active_;
@@ -412,15 +423,15 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
                                  AsyncContextFactory&& context_factory) {
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
-  const uint32_t max_secrets =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_secrets, DefaultMaxSecrets);
-  const absl::flat_hash_set<absl::string_view> prefetch_names(
-      config.prefetch_secret_names().begin(), config.prefetch_secret_names().end());
-  if (prefetch_names.size() > max_secrets) {
-    return absl::InvalidArgumentError(
-        fmt::format("The number of prefetched secrets ({}) exceeds the maximum number of "
-                    "cached secrets ({}).",
-                    prefetch_names.size(), max_secrets));
+  if (config.has_max_secrets()) {
+    const absl::flat_hash_set<absl::string_view> prefetch_names(
+        config.prefetch_secret_names().begin(), config.prefetch_secret_names().end());
+    if (prefetch_names.size() > config.max_secrets().value()) {
+      return absl::InvalidArgumentError(
+          fmt::format("The number of prefetched secrets ({}) exceeds the maximum number of "
+                      "cached secrets ({}).",
+                      prefetch_names.size(), config.max_secrets().value()));
+    }
   }
   MapperFactory& mapper_config =
       Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());
