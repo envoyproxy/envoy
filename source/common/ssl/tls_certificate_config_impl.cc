@@ -133,12 +133,10 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (config.has_tls_params()) {
     const auto& p = config.tls_params();
-    // Must check before constructing tls_params_: compliancePolicyFromProto IS_ENVOY_BUGs on >1.
-    if (p.compliance_policies_size() > 1) {
-      creation_status = absl::InvalidArgumentError(
-          "Only one compliance policy may be specified per certificate tls_params");
-      return;
-    }
+    bssl::UniquePtr<SSL_CTX> validation_ctx(SSL_CTX_new(TLS_method()));
+    creation_status =
+        Extensions::TransportSockets::Tls::Utility::validateTlsParamsProto(p, validation_ctx.get());
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
     tls_params_ = TlsParams{
         .min_protocol_version = p.tls_minimum_protocol_version(),
         .max_protocol_version = p.tls_maximum_protocol_version(),
@@ -148,9 +146,6 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
         .compliance_policy =
             Extensions::TransportSockets::Tls::Utility::compliancePolicyFromProto(p),
     };
-    bssl::UniquePtr<SSL_CTX> validation_ctx(SSL_CTX_new(TLS_method()));
-    creation_status =
-        Extensions::TransportSockets::Tls::Utility::validateTlsParamsProto(p, validation_ctx.get());
   }
 }
 
