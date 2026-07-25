@@ -88,6 +88,40 @@ TEST_F(OnDemandTest, BasicLoadTestStatefulResumption) {
   EXPECT_THAT(create(defaultConfig()), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST_F(OnDemandTest, MaxSecretsValid) {
+  EXPECT_OK(create(R"EOF(
+      config_source:
+        ads: {}
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+      max_secrets: 1
+      cache_idle_timeout: 300s
+    )EOF"));
+}
+
+TEST_F(OnDemandTest, MaxSecretsPrefetchOverflow) {
+  auto factory = create(R"EOF(
+      config_source:
+        ads: {}
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+      prefetch_secret_names:
+      - server
+      - server2
+      max_secrets: 1
+    )EOF");
+  EXPECT_THAT(factory, StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(factory.status().message(),
+              testing::HasSubstr("The number of prefetched secrets (2) exceeds the maximum number "
+                                 "of cached secrets (1)."));
+}
+
 TEST_F(OnDemandTest, QuicCall) {
   auto factory = create(defaultConfig());
   EXPECT_OK(factory);

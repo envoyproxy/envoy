@@ -299,6 +299,22 @@ plane. A resource removal sent via the xDS response will cancel the data plane s
 specific secret name. When using the regular GRPC xDS protocol, the subscription for each mapped
 secret remains active until the removal of the parent resource (listener or cluster).
 
+The number of secrets fetched and cached by the selector is bounded by the :ref:`max_secrets
+<envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.max_secrets>`
+limit (1024 by default). This protects the memory usage of Envoy when the peers control the mapped
+secret name, e.g. via the SNI field. Once the limit is reached, handshakes that map to a secret
+name that is not already cached are rejected until a secret is removed to free a cache slot, while
+handshakes using cached secrets are unaffected.
+
+Cached secrets can be removed in three ways: the management server removes the resource (including
+by the expiry of the :ref:`resource TTL <xds_protocol_TTL>`, which is processed as a removal), the
+optional :ref:`cache_idle_timeout
+<envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.cache_idle_timeout>`
+evicts secrets unused by any TLS handshake for the configured duration, or the parent listener or
+cluster is drained. Prefetched secrets are pinned in the cache and are not subject to idle
+eviction. Evicting a secret cancels its SDS subscription; connections that are already established
+with the certificate are not affected, and a later handshake for the same name fetches it again.
+
 In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
 statistics are produced by the on-demand certificate extension. For downstream listeners, they are
 in the *listener.<stat_prefix>.on_demand_secret.* namespace. For upstream clusters, the stat prefix
@@ -310,6 +326,8 @@ is *cluster.<stat_prefix>.on_demand_secret.*.
 
      cert_requested, Counter, Total number of new SDS subscriptions created
      cert_updated, Counter, Total number of certificate updates
+     cert_overflow, Counter, Total number of handshakes rejected due to the secret cache limit
+     cert_evicted, Counter, Total number of cached secrets evicted due to the cache idle timeout
      cert_active, Gauge, Number of active certificate subscriptions and certificates
 
 .. note::

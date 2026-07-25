@@ -1,5 +1,8 @@
 #pragma once
 
+#include <atomic>
+
+#include "envoy/event/timer.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -21,6 +24,8 @@ namespace OnDemand {
 #define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM)                                        \
   COUNTER(cert_requested)                                                                          \
   COUNTER(cert_updated)                                                                            \
+  COUNTER(cert_overflow)                                                                           \
+  COUNTER(cert_evicted)                                                                            \
   GAUGE(cert_active, Accumulate)
 
 struct CertSelectionStats {
@@ -37,6 +42,9 @@ using AsyncContextFactory = absl::AnyInvocable<AsyncContextConstSharedPtr(
 
 using ConfigProto =
     envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config;
+
+// Default limit on the number of cached secrets when ``max_secrets`` is unset.
+inline constexpr uint32_t DefaultMaxSecrets = 1024;
 using UpdateCb = std::function<absl::Status(absl::string_view, const Ssl::TlsCertificateConfig&)>;
 using RemoveCb = std::function<absl::Status(absl::string_view)>;
 
@@ -83,8 +91,21 @@ public:
    */
   Stats::Scope& certScope() const { return *scope_; }
 
+  /**
+   * Mark the context as used by a handshake. May be called from any thread.
+   */
+  void markUsed() const { used_.store(true, std::memory_order_relaxed); }
+
+  /**
+   * @return whether the context was used since the last call, clearing the flag.
+   */
+  bool consumeUsed() const { return used_.exchange(false, std::memory_order_relaxed); }
+
 private:
   Stats::ScopeSharedPtr scope_;
+  // Tracks handshake usage for idle eviction. Starts as used so that a fresh certificate survives
+  // at least one full idle period.
+  mutable std::atomic<bool> used_{true};
 };
 
 class ServerAsyncContext : public AsyncContext,
@@ -211,17 +232,28 @@ public:
 
 private:
   void doRemoveCertificateConfig(absl::string_view);
+  void evictIdle();
   const Stats::ScopeSharedPtr stats_scope_;
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
+  // The maximum number of cache entries.
+  const uint32_t max_secrets_;
+  // The idle duration after which an unused cache entry is evicted, if configured.
+  const std::optional<std::chrono::milliseconds> idle_timeout_;
   AsyncContextFactory context_factory_;
+  Event::TimerPtr idle_timer_;
 
   // Main-thread accessible context config subscriptions and callbacks.
   struct CacheEntry {
     AsyncContextConfigConstPtr cert_config_;
     AsyncContextConstSharedPtr cert_context_;
     std::vector<std::weak_ptr<Handle>> callbacks_;
+    // Prefetched secrets are pinned in the cache and never evicted as idle.
+    bool prefetched_{false};
+    // Set on main-thread activity (creation, fetch attach, update) and cleared by each idle
+    // sweep, guaranteeing an entry survives at least one full idle period after any activity.
+    bool recently_active_{true};
   };
   absl::flat_hash_map<std::string, CacheEntry> cache_;
 

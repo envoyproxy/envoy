@@ -5,6 +5,9 @@ package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -41,4 +44,21 @@ message Config {
   // requests). The parent resource initializes immediately without waiting for the fetch to
   // complete.
   repeated string prefetch_secret_names = 3;
+
+  // The maximum number of secrets that the certificate selector will fetch and cache. Both the
+  // prefetched secrets and the secrets requested on-demand count towards the limit, and the
+  // configuration is rejected if the number of distinct
+  // :ref:`prefetch_secret_names <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.prefetch_secret_names>`
+  // exceeds it. When the cache is full, TLS handshakes that map to a secret name that is not
+  // already cached are rejected, while handshakes using cached secrets are unaffected. A cache
+  // slot is released when the SDS server removes the secret resource, canceling its subscription.
+  // If unset, defaults to 1024.
+  google.protobuf.UInt32Value max_secrets = 4 [(validate.rules).uint32 = {gt: 0}];
+
+  // The duration a cached secret can remain unused by any TLS handshake before it is evicted from
+  // the cache, canceling its SDS subscription. Idleness is evaluated periodically, so a secret may
+  // be evicted up to two times this duration after its last use. Prefetched secrets are never
+  // evicted due to idleness. If unset, cached secrets are only removed when the SDS server removes
+  // the secret resource or the parent listener or cluster is drained.
+  google.protobuf.Duration cache_idle_timeout = 5 [(validate.rules).duration = {gt {}}];
 }

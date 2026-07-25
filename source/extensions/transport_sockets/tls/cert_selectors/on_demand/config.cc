@@ -5,6 +5,8 @@
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -72,18 +74,39 @@ SecretManager::SecretManager(const ConfigProto& config,
     : stats_scope_(factory_context.scope().createScope("on_demand_secret.")),
       stats_(generateCertSelectionStats(*stats_scope_)),
       factory_context_(factory_context.serverFactoryContext()),
-      config_source_(config.config_source()), context_factory_(std::move(context_factory)),
-      cert_contexts_(factory_context_.threadLocal()) {
+      config_source_(config.config_source()),
+      max_secrets_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_secrets, DefaultMaxSecrets)),
+      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, cache_idle_timeout)),
+      context_factory_(std::move(context_factory)), cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   for (const auto& name : config.prefetch_secret_names()) {
     addCertificateConfig(name, nullptr, factory_context.initManager());
+    cache_[name].prefetched_ = true;
+  }
+  if (idle_timeout_.has_value()) {
+    idle_timer_ = factory_context_.mainThreadDispatcher().createTimer([this] {
+      evictIdle();
+      idle_timer_->enableTimer(*idle_timeout_);
+    });
+    idle_timer_->enableTimer(*idle_timeout_);
   }
 }
 
 void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                                          OptRef<Init::Manager> init_manager) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (cache_.size() >= max_secrets_ && !cache_.contains(secret_name)) {
+    ENVOY_LOG_EVERY_POW_2(
+        warn, "On-demand secret cache is full at {} secrets, rejecting secret '{}'", cache_.size(),
+        secret_name);
+    stats_->cert_overflow_.inc();
+    if (handle) {
+      handle->notify(nullptr);
+    }
+    return;
+  }
   CacheEntry& entry = cache_[secret_name];
+  entry.recently_active_ = true;
   if (handle) {
     if (entry.cert_context_) {
       handle->notify(entry.cert_context_);
@@ -119,6 +142,7 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   setContext(secret_name, cert_context);
   CacheEntry& entry = cache_[secret_name];
   entry.cert_context_ = cert_context;
+  entry.recently_active_ = true;
   size_t notify_count = 0;
   for (const auto& fetch_handle : entry.callbacks_) {
     if (auto handle = fetch_handle.lock(); handle) {
@@ -181,6 +205,39 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
             secret_name, notify_count);
 }
 
+void SecretManager::evictIdle() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  std::vector<std::string> idle_names;
+  for (auto& [secret_name, entry] : cache_) {
+    if (entry.prefetched_) {
+      continue;
+    }
+    if (entry.recently_active_) {
+      entry.recently_active_ = false;
+      continue;
+    }
+    if (entry.cert_context_ && entry.cert_context_->consumeUsed()) {
+      continue;
+    }
+    // Entries with live pending handshakes are in use.
+    bool in_use = false;
+    for (const auto& fetch_handle : entry.callbacks_) {
+      if (!fetch_handle.expired()) {
+        in_use = true;
+        break;
+      }
+    }
+    if (!in_use) {
+      idle_names.push_back(secret_name);
+    }
+  }
+  for (const auto& secret_name : idle_names) {
+    ENVOY_LOG(debug, "Evicting certificate '{}' after an idle timeout", secret_name);
+    stats_->cert_evicted_.inc();
+    doRemoveCertificateConfig(secret_name);
+  }
+}
+
 HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
                                                 Ssl::CertificateSelectionCallbackPtr&& cb,
                                                 bool client_ocsp_capable) {
@@ -220,6 +277,7 @@ SecretManager::getContext(absl::string_view secret_name) const {
   if (current) {
     const auto it = current->ctx_by_name_.find(secret_name);
     if (it != current->ctx_by_name_.end()) {
+      it->second->markUsed();
       return it->second;
     };
   }
@@ -287,6 +345,16 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
                                  AsyncContextFactory&& context_factory) {
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
+  const uint32_t max_secrets =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_secrets, DefaultMaxSecrets);
+  const absl::flat_hash_set<absl::string_view> prefetch_names(
+      config.prefetch_secret_names().begin(), config.prefetch_secret_names().end());
+  if (prefetch_names.size() > max_secrets) {
+    return absl::InvalidArgumentError(
+        fmt::format("The number of prefetched secrets ({}) exceeds the maximum number of "
+                    "cached secrets ({}).",
+                    prefetch_names.size(), max_secrets));
+  }
   MapperFactory& mapper_config =
       Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
