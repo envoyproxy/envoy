@@ -2800,8 +2800,8 @@ TEST_P(SslSocketTest, PerCertTlsParamsMinVersionApplied) {
       SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
 }
 
-// Certificate-level tls_params under a TLS 1.3 handshake: cert restricts signature_algorithms to
-// rsa_pss_rsae_sha384. Client offers only rsa_pss_rsae_sha256 — no common algorithm → failure.
+// Certificate-level tls_params under a TLS 1.3 handshake: cert restricts to one signature
+// algorithm; client offers a different one — no common algorithm, handshake fails.
 // Exercises the signature_algorithms branch in applyTlsParamsToSsl at TLS 1.3.
 TEST_P(SslSocketTest, PerCertTlsParamsSigAlgsTls13Fails) {
   envoy::config::listener::v3::Listener listener;
@@ -2834,9 +2834,9 @@ TEST_P(SslSocketTest, PerCertTlsParamsSigAlgsTls13Fails) {
                      "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
-// Per-cert tls_params under a TLS 1.3 handshake: cert restricts ecdh_curves to P-521. Client
-// supports only X25519 and P-256 — no common group → failure. Exercises the ecdh_curves branch
-// in applyTlsParamsToSsl at TLS 1.3 (curves appear in key_share/supported_groups).
+// Certificate-level tls_params under a TLS 1.3 handshake: cert restricts ecdh_curves to P-521.
+// Client supports only X25519 and P-256 — no common group, handshake fails.
+// Exercises the ecdh_curves branch in applyTlsParamsToSsl at TLS 1.3 (key_share/supported_groups).
 TEST_P(SslSocketTest, PerCertTlsParamsEcdhCurvesTls13Fails) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
@@ -2868,10 +2868,10 @@ TEST_P(SslSocketTest, PerCertTlsParamsEcdhCurvesTls13Fails) {
                      "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
-// Per-cert tls_params under a TLS 1.3 handshake: cert sets compliance_policies: FIPS_202205.
-// FIPS_202205 at TLS 1.3 restricts permitted groups to P-256/P-384; a client restricted to
-// X25519 only finds no common group → handshake fails. Exercises compliance_policy application
-// in applyTlsParamsToSsl at TLS 1.3.
+// Certificate-level tls_params under a TLS 1.3 handshake: cert sets compliance_policies:
+// FIPS_202205. FIPS_202205 at TLS 1.3 restricts permitted groups to P-256/P-384; a client
+// restricted to X25519 only finds no common group, handshake fails. Exercises compliance_policy
+// application in applyTlsParamsToSsl at TLS 1.3.
 TEST_P(SslSocketTest, PerCertTlsParamsCompliancePolicyTls13Fails) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
@@ -2894,7 +2894,7 @@ TEST_P(SslSocketTest, PerCertTlsParamsCompliancePolicyTls13Fails) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-  // X25519 is not permitted under FIPS_202205; no common group → handshake fails.
+  // X25519 is not permitted under FIPS_202205; no common group, handshake fails.
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("X25519");
   client_ctx.set_sni("server1.example.com");
 
