@@ -350,20 +350,17 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
 void SecretManager::setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx) {
   ASSERT(cert_ctx != nullptr);
   cert_contexts_.runOnAllThreads(
-      [name = std::string(secret_name),
-       cert_ctx = std::move(cert_ctx)](OptRef<ThreadLocalCerts> certs) {
-        certs->ctx_by_name_[name] = cert_ctx;
-      },
+      [name = std::string(secret_name), cert_ctx = std::move(cert_ctx)](
+          OptRef<ThreadLocalCerts> certs) { certs->ctx_by_name_[name] = cert_ctx; },
       [stats_scope = stats_scope_, stats = stats_] { stats->cert_updated_.inc(); });
 }
 
 void SecretManager::removeContexts(std::vector<std::string> secret_names) {
-  cert_contexts_.runOnAllThreads(
-      [names = std::move(secret_names)](OptRef<ThreadLocalCerts> certs) {
-        for (const auto& name : names) {
-          certs->ctx_by_name_.erase(name);
-        }
-      });
+  cert_contexts_.runOnAllThreads([names = std::move(secret_names)](OptRef<ThreadLocalCerts> certs) {
+    for (const auto& name : names) {
+      certs->ctx_by_name_.erase(name);
+    }
+  });
 }
 
 std::optional<AsyncContextConstSharedPtr>
