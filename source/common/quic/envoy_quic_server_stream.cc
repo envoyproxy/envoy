@@ -574,8 +574,16 @@ bool EnvoyQuicServerStream::hasPendingData() {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  ASSERT(request_decoder_->get().has_value());
-  http_datagram_handler_->setStreamDecoder(request_decoder_->get().ptr());
+  if (request_decoder_ && request_decoder_->get().has_value()) {
+    std::shared_ptr<Http::RequestDecoderHandle> handle =
+        request_decoder_->get().ptr()->getRequestDecoderHandle();
+    http_datagram_handler_->setStreamDecoderProvider([handle]() -> Http::StreamDecoder* {
+      if (handle && handle->get().has_value()) {
+        return handle->get().ptr();
+      }
+      return nullptr;
+    });
+  }
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
