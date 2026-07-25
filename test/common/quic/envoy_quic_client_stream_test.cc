@@ -871,6 +871,35 @@ TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+TEST_F(EnvoyQuicClientStreamTest, DropDatagramAfterDecoderDestroyed) {
+  auto temp_decoder = std::make_unique<testing::NiceMock<Http::MockResponseDecoder>>();
+  EXPECT_CALL(*temp_decoder, decodeHeaders_(_, _)).Times(testing::AnyNumber());
+
+  quic_stream_->setResponseDecoder(*temp_decoder);
+
+  EXPECT_TRUE(quic_session_.OnSetting(quic::SETTINGS_H3_DATAGRAM, 1));
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":authority", host_},        {":method", "CONNECT"},
+      {":protocol", "connect-udp"}, {":path", "/.well-known/masque/udp/192.0.2.6/443/"},
+      {":scheme", "https"},         {"capsule-protocol", "?1"}};
+  const auto status = quic_stream_->encodeHeaders(request_headers, false);
+  EXPECT_TRUE(status.ok());
+
+  quiche::HttpHeaderBlock response_headers;
+  response_headers[":status"] = "200";
+  response_headers["capsule-protocol"] = "?1";
+  std::string payload = spdyHeaderToHttp3StreamPayload(response_headers);
+  quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
+  quic_stream_->OnStreamFrame(frame);
+  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+
+  temp_decoder.reset();
+
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
 TEST_F(EnvoyQuicClientStreamTest, ResetStreamWithHttpDatagramHandler) {
   setUpCapsuleProtocol(true, false);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
