@@ -228,10 +228,14 @@ public:
   absl::Status removeCertificateConfig(absl::string_view);
 
   /**
-   * Update the thread local caches with the certificates.
-   * @param cert_ctx the new context or nullptr to remove the secret.
+   * Install a new certificate context in the thread local caches.
    */
   void setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx);
+
+  /**
+   * Erase the certificate contexts from the thread local caches in one batched update.
+   */
+  void removeContexts(std::vector<std::string> secret_names);
 
   /**
    * Retrieve the thread local certificate.
@@ -251,7 +255,9 @@ public:
   size_t pendingCallbacksForTest(absl::string_view secret_name) const;
 
 private:
-  void doRemoveCertificateConfig(absl::string_view,
+  // Removes the cache entry, failing its pending handshakes. Returns whether a certificate
+  // context was installed for the entry and must also be erased from the thread local caches.
+  bool doRemoveCertificateConfig(absl::string_view,
                                  std::optional<uint64_t> expected_generation = {});
   void evictIdle();
   bool reclaimUnusedEntry();
@@ -274,8 +280,10 @@ private:
     AsyncContextConfigConstPtr cert_config_;
     AsyncContextConstSharedPtr cert_context_;
     std::vector<std::weak_ptr<Handle>> callbacks_;
-    // Distinguishes entry incarnations for the same secret name, so that a deferred removal does
-    // not erase an entry that was reclaimed and re-created while the removal was in flight.
+    // Bumped when the entry is created and on every successful certificate update, so that a
+    // deferred removal only applies while the entry state it observed is still current: it must
+    // not erase an entry that was reclaimed and re-created, nor a certificate that the SDS
+    // server published after signaling the removal.
     uint64_t generation_{0};
     // Expired handles are compacted when the callback list reaches this size, which then doubles,
     // keeping the insertion cost amortized constant and the list bounded by roughly twice the

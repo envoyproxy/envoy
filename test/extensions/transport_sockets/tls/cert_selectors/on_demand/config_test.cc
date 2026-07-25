@@ -141,8 +141,8 @@ TEST_F(OnDemandTest, CacheIdleTimeoutTooSmall) {
   for (const std::string timeout : {"0.000000001s", "0.000999s"}) {
     const std::string config =
         absl::StrCat(defaultConfig(), "\n      cache_idle_timeout: ", timeout);
-    EXPECT_THROW_WITH_REGEX({ auto result = create(config); }, EnvoyException,
-                            "cache_idle_timeout");
+    EXPECT_THROW_WITH_REGEX(
+        { auto result = create(config); }, EnvoyException, "cache_idle_timeout");
   }
 }
 
@@ -420,6 +420,50 @@ TEST_F(SecretManagerTest, WarnsWhenLimitSetWithoutIdleTimeout) {
       max_secrets: 1
     )EOF"));
   });
+}
+
+// A deferred SDS removal does not erase a certificate that the SDS server published after
+// signaling the removal: the later message wins.
+TEST_F(SecretManagerTest, StaleRemovalIgnoredAfterUpdate) {
+  Event::PostCb stale_removal;
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
+      .WillOnce([&](Event::PostCb callback) { stale_removal = std::move(callback); })
+      .WillRepeatedly([](Event::PostCb callback) { callback(); });
+  auto manager = makeManager(R"EOF(
+      config_source:
+        ads: {}
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF");
+  manager->addCertificateConfig("x", nullptr, {});
+  EXPECT_OK(manager->updateCertificate("x", cert_config_));
+  // The SDS server removes "x"; the removal is deferred to the main dispatcher.
+  EXPECT_OK(manager->removeCertificateConfig("x"));
+  // Before the deferred removal runs, the SDS server publishes a newer certificate.
+  EXPECT_OK(manager->updateCertificate("x", cert_config_));
+  // The stale removal must keep the newer certificate installed.
+  std::move(stale_removal)();
+  EXPECT_EQ(1, activeGauge());
+  EXPECT_TRUE(manager->getContext("x").has_value());
+}
+
+// A single sweep evicts multiple idle entries, erasing the thread local contexts of the resolved
+// ones so that later lookups miss.
+TEST_F(SecretManagerTest, BatchEvictionRemovesResolvedContexts) {
+  auto manager = makeManager(std::string(kIdleConfig));
+  manager->addCertificateConfig("a", nullptr, {});
+  manager->addCertificateConfig("b", nullptr, {});
+  manager->addCertificateConfig("c", nullptr, {});
+  EXPECT_OK(manager->updateCertificate("c", cert_config_));
+  EXPECT_TRUE(manager->getContext("c").has_value());
+  sweep();
+  sweep();
+  EXPECT_EQ(3, counter("cert_evicted"));
+  EXPECT_EQ(0, activeGauge());
+  EXPECT_FALSE(manager->getContext("c").has_value());
 }
 
 // A deferred SDS removal does not erase an entry that was reclaimed and re-created for the same

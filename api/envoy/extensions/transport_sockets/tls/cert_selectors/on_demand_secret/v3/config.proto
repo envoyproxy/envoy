@@ -28,6 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Similar to the regular SDS, the certificate is configured using the outer common TLS context,
 // e.g. by setting the FIPS compliance policy on the loaded certificate.
+// [#next-free-field: 6]
 message Config {
   // Defines the configuration source of the secrets.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];

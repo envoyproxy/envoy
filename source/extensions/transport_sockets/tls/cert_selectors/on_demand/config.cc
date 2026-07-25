@@ -108,9 +108,9 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   // fetches for unknown names cannot permanently occupy the cache.
   if (max_secrets_ > 0 && cache_.size() >= max_secrets_ && !cache_.contains(secret_name) &&
       !reclaimUnusedEntry()) {
-    ENVOY_LOG_EVERY_POW_2(
-        warn, "On-demand secret cache is full at {} secrets, rejecting secret '{}'", cache_.size(),
-        absl::CEscape(secret_name));
+    ENVOY_LOG_EVERY_POW_2(warn,
+                          "On-demand secret cache is full at {} secrets, rejecting secret '{}'",
+                          cache_.size(), absl::CEscape(secret_name));
     stats_->cert_overflow_.inc();
     if (handle) {
       handle->notify(nullptr);
@@ -172,6 +172,9 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   }
   setContext(secret_name, cert_context);
   entry.cert_context_ = cert_context;
+  // The update makes any deferred removal captured before it stale: the SDS server published the
+  // certificate after signaling the removal, and the later message wins.
+  entry.generation_ = next_generation_++;
   size_t notify_count = 0;
   for (const auto& fetch_handle : entry.callbacks_) {
     if (auto handle = fetch_handle.lock(); handle) {
@@ -217,26 +220,28 @@ absl::Status SecretManager::removeCertificateConfig(absl::string_view secret_nam
   if (it == cache_.end()) {
     return absl::OkStatus();
   }
-  // Capture the entry generation so that the deferred removal does not erase a different
-  // incarnation of the entry, e.g. one re-created by a fetch after the original entry was
-  // reclaimed while this removal was in flight.
+  // Capture the entry generation so that the deferred removal only applies while the entry state
+  // it observed is still current: it must not erase an entry re-created after a reclaim, nor a
+  // certificate that the SDS server published after signaling this removal.
   factory_context_.mainThreadDispatcher().post(
       [weak_this = std::weak_ptr<SecretManager>(shared_from_this()),
        name = std::string(secret_name), generation = it->second.generation_] {
         if (auto that = weak_this.lock(); that) {
-          that->doRemoveCertificateConfig(name, generation);
+          if (that->doRemoveCertificateConfig(name, generation)) {
+            that->removeContexts({name});
+          }
         }
       });
   return absl::OkStatus();
 }
 
-void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name,
+bool SecretManager::doRemoveCertificateConfig(absl::string_view secret_name,
                                               std::optional<uint64_t> expected_generation) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   auto it = cache_.find(secret_name);
   if (it == cache_.end() ||
       (expected_generation.has_value() && it->second.generation_ != *expected_generation)) {
-    return;
+    return false;
   }
   size_t notify_count = 0;
   for (const auto& fetch_handle : it->second.callbacks_) {
@@ -245,11 +250,12 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name,
       notify_count++;
     }
   }
+  const bool had_context = it->second.cert_context_ != nullptr;
   cache_.erase(it);
-  setContext(secret_name, nullptr);
   stats_->cert_active_.dec();
   ENVOY_LOG(trace, "Removed certificate subscription for '{}', notified {} pending connections",
             secret_name, notify_count);
+  return had_context;
 }
 
 void SecretManager::evictIdle() {
@@ -276,10 +282,17 @@ void SecretManager::evictIdle() {
     }
     idle_names.push_back(secret_name);
   }
+  std::vector<std::string> installed_names;
   for (const auto& secret_name : idle_names) {
     ENVOY_LOG(debug, "Evicting certificate '{}' after an idle timeout", absl::CEscape(secret_name));
     stats_->cert_evicted_.inc();
-    doRemoveCertificateConfig(secret_name);
+    if (doRemoveCertificateConfig(secret_name)) {
+      installed_names.push_back(secret_name);
+    }
+  }
+  // Erase all thread local contexts in one batched update rather than one per evicted secret.
+  if (!installed_names.empty()) {
+    removeContexts(std::move(installed_names));
   }
 }
 
@@ -301,7 +314,9 @@ bool SecretManager::reclaimUnusedEntry() {
     const std::string name(secret_name);
     ENVOY_LOG(debug, "Reclaiming pending secret '{}' to admit a new secret", absl::CEscape(name));
     stats_->cert_reclaimed_.inc();
-    doRemoveCertificateConfig(name);
+    // Reclaimable entries have no certificate, so no thread local contexts need to be erased.
+    const bool had_context = doRemoveCertificateConfig(name);
+    ASSERT(!had_context);
     return true;
   }
   return false;
@@ -333,16 +348,22 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
 }
 
 void SecretManager::setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx) {
+  ASSERT(cert_ctx != nullptr);
   cert_contexts_.runOnAllThreads(
       [name = std::string(secret_name),
        cert_ctx = std::move(cert_ctx)](OptRef<ThreadLocalCerts> certs) {
-        if (cert_ctx) {
-          certs->ctx_by_name_[name] = cert_ctx;
-        } else {
-          certs->ctx_by_name_.erase(name);
-        }
+        certs->ctx_by_name_[name] = cert_ctx;
       },
       [stats_scope = stats_scope_, stats = stats_] { stats->cert_updated_.inc(); });
+}
+
+void SecretManager::removeContexts(std::vector<std::string> secret_names) {
+  cert_contexts_.runOnAllThreads(
+      [names = std::move(secret_names)](OptRef<ThreadLocalCerts> certs) {
+        for (const auto& name : names) {
+          certs->ctx_by_name_.erase(name);
+        }
+      });
 }
 
 std::optional<AsyncContextConstSharedPtr>
