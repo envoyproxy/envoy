@@ -533,7 +533,7 @@ TEST_F(HttpFilterTest, FullDuplexStreamedNoBodyDuplicationOnRetryBuffer) {
   {
     auto response = std::make_unique<ProcessingResponse>();
     auto* body_resp = response->mutable_request_body();
-    auto* streamed = 
+    auto* streamed =
         body_resp->mutable_response()->mutable_body_mutation()->mutable_streamed_response();
     streamed->set_body("hello world");
     streamed->set_end_of_stream(false);
@@ -587,7 +587,7 @@ TEST_F(HttpFilterTest, FullDuplexStreamedNoBodyDuplicationOnRetryBufferNoTrailer
   {
     auto response = std::make_unique<ProcessingResponse>();
     auto* body_resp = response->mutable_request_body();
-    auto* streamed = 
+    auto* streamed =
         body_resp->mutable_response()->mutable_body_mutation()->mutable_streamed_response();
     streamed->set_body("hello world");
     streamed->set_end_of_stream(true);
