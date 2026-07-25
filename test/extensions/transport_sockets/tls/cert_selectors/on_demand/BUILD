@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tls.certificate_selectors.on_demand_secret"],
     deps = [
+        "//source/common/common:callback_impl_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/router:string_accessor_lib",
@@ -27,6 +28,8 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
         "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
         "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:status_utility_lib",

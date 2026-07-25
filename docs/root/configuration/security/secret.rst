@@ -301,10 +301,15 @@ secret remains active until the removal of the parent resource (listener or clus
 
 The number of secrets fetched and cached by the selector is bounded by the :ref:`max_secrets
 <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.max_secrets>`
-limit (1024 by default). This protects the memory usage of Envoy when the peers control the mapped
-secret name, e.g. via the SNI field. Once the limit is reached, handshakes that map to a secret
-name that is not already cached are rejected until a secret is removed to free a cache slot, while
-handshakes using cached secrets are unaffected.
+limit (1024 by default). Each cached secret holds an active SDS subscription, its own gRPC stream
+when the configuration source is not ADS, and the TLS contexts built from the certificate, so the
+limit bounds the memory and control plane load that peers can create when they control the mapped
+secret name, e.g. via the SNI field. When the cache is full and a handshake maps to a name that is
+not already cached, the selector first reclaims a slot from an entry that has no certificate and
+no pending handshakes, such as a subscription created by an interrupted handshake for a name
+unknown to the SDS server; this prevents abandoned fetches from permanently occupying the cache.
+If no entry is reclaimable, the handshake is rejected, while handshakes using cached secrets are
+unaffected.
 
 Cached secrets can be removed in three ways: the management server removes the resource (including
 by the expiry of the :ref:`resource TTL <xds_protocol_TTL>`, which is processed as a removal), the
@@ -328,6 +333,7 @@ is *cluster.<stat_prefix>.on_demand_secret.*.
      cert_updated, Counter, Total number of certificate updates
      cert_overflow, Counter, Total number of handshakes rejected due to the secret cache limit
      cert_evicted, Counter, Total number of cached secrets evicted due to the cache idle timeout
+     cert_reclaimed, Counter, Total number of pending secrets reclaimed to admit new secrets when the cache is full
      cert_active, Gauge, Number of active certificate subscriptions and certificates
 
 .. note::

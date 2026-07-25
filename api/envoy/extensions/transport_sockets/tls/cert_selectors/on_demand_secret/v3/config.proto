@@ -49,16 +49,27 @@ message Config {
   // prefetched secrets and the secrets requested on-demand count towards the limit, and the
   // configuration is rejected if the number of distinct
   // :ref:`prefetch_secret_names <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.prefetch_secret_names>`
-  // exceeds it. When the cache is full, TLS handshakes that map to a secret name that is not
-  // already cached are rejected, while handshakes using cached secrets are unaffected. A cache
-  // slot is released when the SDS server removes the secret resource, canceling its subscription.
-  // If unset, defaults to 1024.
+  // exceeds it. Each cached secret holds an active SDS subscription and the TLS contexts built
+  // from the certificate, so the limit bounds both the memory and the number of subscriptions a
+  // peer can create when it controls the mapped secret name, e.g. via SNI.
+  //
+  // When the cache is full and a TLS handshake maps to a secret name that is not already cached,
+  // the selector first tries to reclaim a slot from an entry that has no certificate and no
+  // pending handshakes, e.g. a subscription created by an interrupted handshake for a secret
+  // unknown to the SDS server. If no such entry exists, the handshake is rejected. Handshakes
+  // using cached secrets are unaffected. A cache slot is also released when the SDS server
+  // removes the secret resource, canceling its subscription.
+  //
+  // If unset, defaults to 1024. Deployments that serve more concurrently active certificates from
+  // a single listener or cluster should raise this limit accordingly.
   google.protobuf.UInt32Value max_secrets = 4 [(validate.rules).uint32 = {gt: 0}];
 
   // The duration a cached secret can remain unused by any TLS handshake before it is evicted from
   // the cache, canceling its SDS subscription. Idleness is evaluated periodically, so a secret may
   // be evicted up to two times this duration after its last use. Prefetched secrets are never
-  // evicted due to idleness. If unset, cached secrets are only removed when the SDS server removes
-  // the secret resource or the parent listener or cluster is drained.
-  google.protobuf.Duration cache_idle_timeout = 5 [(validate.rules).duration = {gt {}}];
+  // evicted due to idleness. The value must be at least 1ms. If unset, cached secrets are only
+  // removed when the SDS server removes the secret resource or the parent listener or cluster is
+  // drained.
+  google.protobuf.Duration cache_idle_timeout = 5
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }

@@ -430,8 +430,9 @@ TEST_P(OnDemandIntegrationTest, MaxSecretsOverflow) {
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
-// Verifies that a secret unused by handshakes for the idle timeout is evicted, canceling its
-// subscription, and that a subsequent handshake fetches it again.
+// Verifies that a secret unused by handshakes for the idle timeout is evicted, that connections
+// established with the certificate are unaffected by the eviction, and that a subsequent
+// handshake fetches the secret again.
 TEST_P(OnDemandIntegrationTest, IdleTimeoutEviction) {
   setup(R"EOF(
   certificate_mapper:
@@ -441,19 +442,16 @@ TEST_P(OnDemandIntegrationTest, IdleTimeoutEviction) {
       name: server
   cache_idle_timeout: 0.2s
   )EOF");
-  {
-    auto conn = createClientConnection();
-    if (upstream_selector_) {
-      conn->waitForUpstreamConnection();
-    }
-    waitCertsRequested(1);
-    createXdsConnection();
-    waitSendSdsResponse("server");
-    if (!upstream_selector_) {
-      conn->waitForUpstreamConnection();
-    }
-    conn->sendAndReceiveTlsData("hello", "world");
-    conn.reset();
+  // Establish a connection and keep it open across the eviction.
+  auto conn = createClientConnection();
+  if (upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
+  waitCertsRequested(1);
+  createXdsConnection();
+  waitSendSdsResponse("server");
+  if (!upstream_selector_) {
+    conn->waitForUpstreamConnection();
   }
 
   // With no further handshakes, the secret is evicted after the idle timeout.
@@ -461,25 +459,136 @@ TEST_P(OnDemandIntegrationTest, IdleTimeoutEviction) {
                                dispatcher_.get());
   test_server_->waitForGauge(onDemandStat("cert_active"), Eq(0));
 
+  // The established connection continues to work after the eviction.
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+
   // The next handshake fetches the secret again.
-  {
-    auto conn = createClientConnection();
-    if (upstream_selector_) {
-      conn->waitForUpstreamConnection();
-    }
-    waitCertsRequested(2);
-    waitSendSdsResponse("server");
-    if (!upstream_selector_) {
-      conn->waitForUpstreamConnection();
-    }
-    conn->sendAndReceiveTlsData("hello", "world");
-    conn.reset();
+  auto conn2 = createClientConnection();
+  if (upstream_selector_) {
+    conn2->waitForUpstreamConnection();
   }
+  waitCertsRequested(2);
+  waitSendSdsResponse("server");
+  if (!upstream_selector_) {
+    conn2->waitForUpstreamConnection();
+  }
+  conn2->sendAndReceiveTlsData("lorem", "ipsum");
+  conn2.reset();
+  // Do not assert cert_active here: on a slow run the secret may already be evicted again.
+  EXPECT_EQ(2, test_server_->counter(onDemandStat("cert_requested"))->value());
+}
+
+// Verifies that prefetched secrets are pinned in the cache while an on-demand canary secret in
+// the same cache is evicted, proving that idle sweeps ran and skipped the pinned entry.
+TEST_P(OnDemandIntegrationTest, IdleTimeoutPrefetchPinned) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    waitSendSdsResponse("server");
+  };
+  ssl_options_.setSni("server2");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  prefetch_secret_names:
+  - server
+  cache_idle_timeout: 0.2s
+  )EOF");
+  // Create a canary secret via a handshake for a non-prefetched name.
+  auto conn = createClientConnection();
+  waitCertsRequested(2);
+  waitSendSdsResponse("server2");
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+
+  // The canary is evicted once idle; the prefetched secret must survive the same sweeps.
+  test_server_->waitForCounter(onDemandStat("cert_evicted"), Eq(1), TestUtility::DefaultTimeout,
+                               dispatcher_.get());
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(1));
+
+  // The prefetched secret still serves handshakes from the cache, without a new SDS request.
+  ssl_options_.setSni("server");
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  auto conn2 = createClientConnection();
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  conn2.reset();
+  EXPECT_EQ(2, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_evicted"))->value());
+}
+
+// Verifies that an abandoned fetch for a secret unknown to the SDS server cannot permanently
+// occupy the cache: a later handshake for a different name reclaims the slot.
+TEST_P(OnDemandIntegrationTest, CachePoisonRecovery) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  // A connection paused in certificate selection is only reaped by the transport socket connect
+  // timeout, which releases its pending handshake handle.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    filter_chain->mutable_transport_socket_connect_timeout()->set_seconds(1);
+  });
+  ssl_options_.setSni("junk");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_secrets: 1
+  )EOF");
+  // A handshake for an unknown name occupies the only cache slot; the SDS server receives the
+  // subscription but never responds.
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  createXdsConnection();
+  xds_streams_.emplace_back();
+  AssertionResult stream_result =
+      xds_connection_->waitForNewStream(*dispatcher_, xds_streams_.back());
+  RELEASE_ASSERT(stream_result, stream_result.message());
+  xds_streams_.back()->startGrpcStream();
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+  AssertionResult message_result = xds_streams_.back()->waitForGrpcMessage(*dispatcher_, request);
+  RELEASE_ASSERT(message_result, message_result.message());
+  EXPECT_EQ("junk", request.resource_names_subscribe().at(0));
+
+  // The server reaps the paused connection, releasing the pending handshake handle while the
+  // abandoned subscription stays cached.
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"),
+                               Eq(1), TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_destroy"), Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  conn->waitForDisconnect();
+  conn.reset();
+  FakeRawConnectionPtr junk_upstream;
+  ASSERT_TRUE(dataStream()->waitForRawConnection(junk_upstream));
+
+  // A handshake for a known name reclaims the abandoned slot instead of being rejected.
+  ssl_options_.setSni("server");
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  auto conn2 = createClientConnection();
+  test_server_->waitForCounter(onDemandStat("cert_reclaimed"), Eq(1), TestUtility::DefaultTimeout,
+                               dispatcher_.get());
+  waitSendSdsResponse("server");
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  conn2.reset();
+  EXPECT_EQ(0, test_server_->counter(onDemandStat("cert_overflow"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
-// Verifies that prefetched secrets are pinned in the cache and not evicted as idle.
-TEST_P(OnDemandIntegrationTest, IdleTimeoutPrefetchPinned) {
+// Verifies the overflow rejection for both the downstream and the upstream selector: a pinned,
+// resolved prefetched secret fills the cache, so a handshake mapping to another name is rejected.
+TEST_P(OnDemandIntegrationTest, MaxSecretsOverflowPrefetched) {
   on_server_init_function_ = [&]() {
     createXdsConnection();
     waitSendSdsResponse("server");
@@ -489,22 +598,23 @@ TEST_P(OnDemandIntegrationTest, IdleTimeoutPrefetchPinned) {
     name: static-name
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
-      name: server
+      name: server2
   prefetch_secret_names:
   - server
-  cache_idle_timeout: 0.2s
+  max_secrets: 1
   )EOF");
-  // Allow several idle periods to elapse without any handshake.
-  timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(600));
-  EXPECT_EQ(0, test_server_->counter(onDemandStat("cert_evicted"))->value());
-  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
-
-  // The prefetched secret still serves handshakes.
   auto conn = createClientConnection();
-  conn->waitForUpstreamConnection();
-  conn->sendAndReceiveTlsData("hello", "world");
+  if (upstream_selector_) {
+    // Claim the upstream connection so that the fake upstream starts reading and the TLS
+    // handshake reaches certificate selection.
+    conn->waitForUpstreamConnection();
+  }
+  test_server_->waitForCounter(onDemandStat("cert_overflow"), Eq(1), TestUtility::DefaultTimeout,
+                               dispatcher_.get());
+  conn->waitForDisconnect();
   conn.reset();
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {

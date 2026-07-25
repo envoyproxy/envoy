@@ -1,11 +1,14 @@
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
+#include <algorithm>
+
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/escaping.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -77,11 +80,11 @@ SecretManager::SecretManager(const ConfigProto& config,
       config_source_(config.config_source()),
       max_secrets_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_secrets, DefaultMaxSecrets)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, cache_idle_timeout)),
+      prefetch_names_(config.prefetch_secret_names().begin(), config.prefetch_secret_names().end()),
       context_factory_(std::move(context_factory)), cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   for (const auto& name : config.prefetch_secret_names()) {
     addCertificateConfig(name, nullptr, factory_context.initManager());
-    cache_[name].prefetched_ = true;
   }
   if (idle_timeout_.has_value()) {
     idle_timer_ = factory_context_.mainThreadDispatcher().createTimer([this] {
@@ -95,10 +98,13 @@ SecretManager::SecretManager(const ConfigProto& config,
 void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                                          OptRef<Init::Manager> init_manager) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  if (cache_.size() >= max_secrets_ && !cache_.contains(secret_name)) {
+  // When the cache is full, prefer reclaiming a slot from an entry that never produced a
+  // certificate and has no waiting handshakes over rejecting the new secret, so that abandoned
+  // fetches for unknown names cannot permanently occupy the cache.
+  if (cache_.size() >= max_secrets_ && !cache_.contains(secret_name) && !reclaimUnusedEntry()) {
     ENVOY_LOG_EVERY_POW_2(
         warn, "On-demand secret cache is full at {} secrets, rejecting secret '{}'", cache_.size(),
-        secret_name);
+        absl::CEscape(secret_name));
     stats_->cert_overflow_.inc();
     if (handle) {
       handle->notify(nullptr);
@@ -106,11 +112,18 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
     return;
   }
   CacheEntry& entry = cache_[secret_name];
+  entry.prefetched_ = prefetch_names_.contains(secret_name);
   entry.recently_active_ = true;
   if (handle) {
     if (entry.cert_context_) {
       handle->notify(entry.cert_context_);
     } else {
+      // Compact expired handles so that the list size is bounded by the number of live pending
+      // handshakes rather than by the history of interrupted ones.
+      entry.callbacks_.erase(
+          std::remove_if(entry.callbacks_.begin(), entry.callbacks_.end(),
+                         [](const std::weak_ptr<Handle>& handle) { return handle.expired(); }),
+          entry.callbacks_.end());
       entry.callbacks_.push_back(handle);
     }
   }
@@ -118,6 +131,7 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   // Should be last to trigger the callback since constructor can fire the update event for an
   // existing SDS subscription.
   if (entry.cert_config_ == nullptr) {
+    entry.generation_ = next_generation_++;
     entry.cert_config_ = std::make_unique<AsyncContextConfig>(
         secret_name, factory_context_, config_source_, init_manager,
         [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
@@ -138,17 +152,26 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
       context_factory_(*stats_scope_, factory_context_, cert_config, creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
-  // Update the future lookups and notify pending callbacks.
-  setContext(secret_name, cert_context);
+  // Update the future lookups and notify pending callbacks. An SDS update is deliberately not
+  // treated as handshake activity, so the handshake-use flag object is shared with the replaced
+  // context instead of being reset; late use marks from workers still serving the prior context
+  // are then never lost.
   CacheEntry& entry = cache_[secret_name];
+  if (entry.cert_context_) {
+    cert_context->adoptUsedFlag(*entry.cert_context_);
+  }
+  setContext(secret_name, cert_context);
   entry.cert_context_ = cert_context;
-  entry.recently_active_ = true;
   size_t notify_count = 0;
   for (const auto& fetch_handle : entry.callbacks_) {
     if (auto handle = fetch_handle.lock(); handle) {
       handle->notify(cert_context);
       notify_count++;
     }
+  }
+  if (notify_count > 0) {
+    // Resumed handshakes count as certificate use.
+    cert_context->markUsed();
   }
   ENVOY_LOG(trace, "Notified {} pending connections about certificate '{}', out of queued {}",
             notify_count, secret_name, entry.callbacks_.size());
@@ -163,8 +186,12 @@ absl::Status SecretManager::updateAll() {
     // Refresh only if there is a certificate present and skip notifying.
     if (cert_config) {
       absl::Status creation_status = absl::OkStatus();
-      entry.cert_context_ =
+      auto cert_context =
           context_factory_(*stats_scope_, factory_context_, *cert_config, creation_status);
+      if (entry.cert_context_) {
+        cert_context->adoptUsedFlag(*entry.cert_context_);
+      }
+      entry.cert_context_ = cert_context;
       setContext(secret_name, entry.cert_context_);
       RETURN_IF_NOT_OK(creation_status);
     }
@@ -175,20 +202,30 @@ absl::Status SecretManager::updateAll() {
 absl::Status SecretManager::removeCertificateConfig(absl::string_view secret_name) {
   // We cannot remove the subscription caller directly because this is called during a callback
   // which continues later. Instead, we post to the main as a completion.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  const auto it = cache_.find(secret_name);
+  if (it == cache_.end()) {
+    return absl::OkStatus();
+  }
+  // Capture the entry generation so that the deferred removal does not erase a different
+  // incarnation of the entry, e.g. one re-created by a fetch after the original entry was
+  // reclaimed while this removal was in flight.
   factory_context_.mainThreadDispatcher().post(
       [weak_this = std::weak_ptr<SecretManager>(shared_from_this()),
-       name = std::string(secret_name)] {
+       name = std::string(secret_name), generation = it->second.generation_] {
         if (auto that = weak_this.lock(); that) {
-          that->doRemoveCertificateConfig(name);
+          that->doRemoveCertificateConfig(name, generation);
         }
       });
   return absl::OkStatus();
 }
 
-void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
+void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name,
+                                              std::optional<uint64_t> expected_generation) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   auto it = cache_.find(secret_name);
-  if (it == cache_.end()) {
+  if (it == cache_.end() ||
+      (expected_generation.has_value() && it->second.generation_ != *expected_generation)) {
     return;
   }
   size_t notify_count = 0;
@@ -209,33 +246,59 @@ void SecretManager::evictIdle() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   std::vector<std::string> idle_names;
   for (auto& [secret_name, entry] : cache_) {
-    if (entry.prefetched_) {
-      continue;
-    }
-    if (entry.recently_active_) {
-      entry.recently_active_ = false;
-      continue;
-    }
+    // Compact expired handles here as well so that the sweep cost stays proportional to the live
+    // pending handshakes.
+    entry.callbacks_.erase(
+        std::remove_if(entry.callbacks_.begin(), entry.callbacks_.end(),
+                       [](const std::weak_ptr<Handle>& handle) { return handle.expired(); }),
+        entry.callbacks_.end());
+    // Consume all activity flags in the same sweep so that an entry is evicted by the second
+    // sweep after its last activity, i.e. within (1, 2] idle timeouts.
+    bool active = entry.recently_active_;
+    entry.recently_active_ = false;
     if (entry.cert_context_ && entry.cert_context_->consumeUsed()) {
+      active = true;
+    }
+    if (entry.prefetched_ || active || !entry.callbacks_.empty()) {
+      // Prefetched entries are pinned and entries with live pending handshakes are in use.
       continue;
     }
-    // Entries with live pending handshakes are in use.
-    bool in_use = false;
-    for (const auto& fetch_handle : entry.callbacks_) {
-      if (!fetch_handle.expired()) {
-        in_use = true;
-        break;
-      }
-    }
-    if (!in_use) {
-      idle_names.push_back(secret_name);
-    }
+    idle_names.push_back(secret_name);
   }
   for (const auto& secret_name : idle_names) {
-    ENVOY_LOG(debug, "Evicting certificate '{}' after an idle timeout", secret_name);
+    ENVOY_LOG(debug, "Evicting certificate '{}' after an idle timeout", absl::CEscape(secret_name));
     stats_->cert_evicted_.inc();
     doRemoveCertificateConfig(secret_name);
   }
+}
+
+bool SecretManager::reclaimUnusedEntry() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Note: a fetch that is posted but not yet attached to an entry is not visible here, so its
+  // entry may be reclaimed concurrently. The posted fetch then simply re-admits the entry.
+  for (auto& [secret_name, entry] : cache_) {
+    if (entry.prefetched_ || entry.cert_context_ != nullptr) {
+      continue;
+    }
+    const bool has_live_callbacks =
+        std::any_of(entry.callbacks_.begin(), entry.callbacks_.end(),
+                    [](const std::weak_ptr<Handle>& handle) { return !handle.expired(); });
+    if (has_live_callbacks) {
+      continue;
+    }
+    // The erase in doRemoveCertificateConfig invalidates the map view, so copy the name first.
+    const std::string name(secret_name);
+    ENVOY_LOG(debug, "Reclaiming pending secret '{}' to admit a new secret", absl::CEscape(name));
+    stats_->cert_reclaimed_.inc();
+    doRemoveCertificateConfig(name);
+    return true;
+  }
+  return false;
+}
+
+size_t SecretManager::pendingCallbacksForTest(absl::string_view secret_name) const {
+  const auto it = cache_.find(secret_name);
+  return it == cache_.end() ? 0 : it->second.callbacks_.size();
 }
 
 HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
@@ -277,7 +340,11 @@ SecretManager::getContext(absl::string_view secret_name) const {
   if (current) {
     const auto it = current->ctx_by_name_.find(secret_name);
     if (it != current->ctx_by_name_.end()) {
-      it->second->markUsed();
+      // Only track usage when idle eviction can consume it, to keep the default handshake hot
+      // path free of shared writes.
+      if (idle_timeout_.has_value()) {
+        it->second->markUsed();
+      }
       return it->second;
     };
   }

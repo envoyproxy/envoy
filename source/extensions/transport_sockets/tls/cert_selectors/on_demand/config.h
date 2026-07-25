@@ -14,6 +14,8 @@
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/server_context_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -26,6 +28,7 @@ namespace OnDemand {
   COUNTER(cert_updated)                                                                            \
   COUNTER(cert_overflow)                                                                           \
   COUNTER(cert_evicted)                                                                            \
+  COUNTER(cert_reclaimed)                                                                          \
   GAUGE(cert_active, Accumulate)
 
 struct CertSelectionStats {
@@ -92,20 +95,35 @@ public:
   Stats::Scope& certScope() const { return *scope_; }
 
   /**
-   * Mark the context as used by a handshake. May be called from any thread.
+   * Mark the context as used by a handshake. May be called from any thread. Checks before
+   * writing so that the hot path does not repeatedly dirty a cache line shared by all workers.
    */
-  void markUsed() const { used_.store(true, std::memory_order_relaxed); }
+  void markUsed() const {
+    if (!used_->load(std::memory_order_relaxed)) {
+      used_->store(true, std::memory_order_relaxed);
+    }
+  }
 
   /**
-   * @return whether the context was used since the last call, clearing the flag.
+   * @return whether the context was used by a handshake since the last call, clearing the flag.
    */
-  bool consumeUsed() const { return used_.exchange(false, std::memory_order_relaxed); }
+  bool consumeUsed() const { return used_->exchange(false, std::memory_order_relaxed); }
+
+  /**
+   * Share the handshake-use flag with the context this one replaces. Workers may keep serving
+   * the prior context until the thread local update propagates; sharing the flag object ensures
+   * their late use marks are not lost across certificate updates. Must be called on the main
+   * thread before the context is published.
+   */
+  void adoptUsedFlag(const AsyncContext& prior) const { used_ = prior.used_; }
 
 private:
   Stats::ScopeSharedPtr scope_;
-  // Tracks handshake usage for idle eviction. Starts as used so that a fresh certificate survives
-  // at least one full idle period.
-  mutable std::atomic<bool> used_{true};
+  // Tracks handshake usage for idle eviction, shared between the contexts that replace each
+  // other for one secret name. Starts unused: the grace period for a new cache entry is granted
+  // by CacheEntry::recently_active_ instead, so that there is a single idle period of slack
+  // regardless of how often the certificate is updated.
+  mutable std::shared_ptr<std::atomic<bool>> used_{std::make_shared<std::atomic<bool>>(false)};
 };
 
 class ServerAsyncContext : public AsyncContext,
@@ -230,9 +248,16 @@ public:
                                    Ssl::CertificateSelectionCallbackPtr&& cb,
                                    bool client_ocsp_capable);
 
+  /**
+   * @return the number of pending handshake callbacks tracked for the secret. Test use only.
+   */
+  size_t pendingCallbacksForTest(absl::string_view secret_name) const;
+
 private:
-  void doRemoveCertificateConfig(absl::string_view);
+  void doRemoveCertificateConfig(absl::string_view,
+                                 std::optional<uint64_t> expected_generation = {});
   void evictIdle();
+  bool reclaimUnusedEntry();
   const Stats::ScopeSharedPtr stats_scope_;
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
@@ -241,6 +266,9 @@ private:
   const uint32_t max_secrets_;
   // The idle duration after which an unused cache entry is evicted, if configured.
   const std::optional<std::chrono::milliseconds> idle_timeout_;
+  // Configured prefetch names remain pinned in the cache even if the secret is removed by the
+  // SDS server and later fetched again on-demand.
+  const absl::flat_hash_set<std::string> prefetch_names_;
   AsyncContextFactory context_factory_;
   Event::TimerPtr idle_timer_;
 
@@ -249,13 +277,18 @@ private:
     AsyncContextConfigConstPtr cert_config_;
     AsyncContextConstSharedPtr cert_context_;
     std::vector<std::weak_ptr<Handle>> callbacks_;
-    // Prefetched secrets are pinned in the cache and never evicted as idle.
+    // Distinguishes entry incarnations for the same secret name, so that a deferred removal does
+    // not erase an entry that was reclaimed and re-created while the removal was in flight.
+    uint64_t generation_{0};
+    // Prefetched secrets are pinned in the cache: they are never idle-evicted or reclaimed.
     bool prefetched_{false};
-    // Set on main-thread activity (creation, fetch attach, update) and cleared by each idle
-    // sweep, guaranteeing an entry survives at least one full idle period after any activity.
+    // Set on main-thread handshake activity (entry creation, fetch attach) and cleared by each
+    // idle sweep, guaranteeing an entry survives at least one full idle period after activity.
+    // SDS updates deliberately do not set this: an updated but never used secret is still idle.
     bool recently_active_{true};
   };
   absl::flat_hash_map<std::string, CacheEntry> cache_;
+  uint64_t next_generation_{0};
 
   // Lock-free map to retrieve ready TLS contexts by name.
   struct ThreadLocalCerts : public ThreadLocal::ThreadLocalObject {
