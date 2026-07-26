@@ -121,10 +121,7 @@ public:
     }
   }
 
-  // Detaches this fixture's extension from the globally-registered upstream socket interface.
-  // setupUpstreamExtension() points the singleton acceptor's raw extension_ at the fixture-owned
-  // upstream_extension_; without this, a later test that reaches getThreadLocalSocketManager()
-  // without its own setup would dereference that freed extension.
+  // Undo setupUpstreamExtension()'s mutation of the process-wide acceptor singleton.
   void clearRegisteredUpstreamExtension() {
     auto* registered_upstream_interface =
         Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
@@ -301,8 +298,6 @@ public:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 
   void TearDown() override {
-    // Restore the registered singleton's extension_ before the fixture-owned extension is
-    // destroyed, so it does not dangle into the next test.
     clearRegisteredUpstreamExtension();
     // Clean up thread local components to avoid issues during destruction.
     upstream_tls_slot_.reset();
@@ -2569,6 +2564,18 @@ constexpr absl::string_view kNonExpiringToken =
 
 class ReverseTunnelJwtTest : public ReverseTunnelFilterUnitTest {
 protected:
+  void SetUp() override {
+    ReverseTunnelFilterUnitTest::SetUp();
+    // Mock setDynamicMetadata is a no-op by default; store it so %DYNAMIC_METADATA% can read back
+    // claims published during the handshake.
+    auto& stream_info = callbacks_.connection_.stream_info_;
+    ON_CALL(stream_info, setDynamicMetadata(testing::_, testing::_))
+        .WillByDefault(
+            testing::Invoke([&stream_info](const std::string& ns, const Protobuf::Struct& value) {
+              (*stream_info.metadata_.mutable_filter_metadata())[ns].MergeFrom(value);
+            }));
+  }
+
   // Configures inline JWT auth on `cfg` with the shared test JWKS.
   void setJwt(envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& cfg,
               absl::string_view issuer, const std::vector<std::string>& audiences = {},
