@@ -67,6 +67,26 @@ public:
   }
 };
 
+uint64_t handshakeCounter(Stats::IsolatedStoreImpl& store, absl::string_view name) {
+  auto c = TestUtility::findCounter(store, std::string(name));
+  return c == nullptr ? 0 : c->value();
+}
+
+// Drives one reverse-tunnel handshake through `filter` and returns the response bytes.
+std::string driveFilterHandshake(ReverseTunnelFilter& filter,
+                                 NiceMock<Network::MockReadFilterCallbacks>& callbacks,
+                                 const std::string& request_str) {
+  std::string written;
+  EXPECT_CALL(callbacks.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&written](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+  Buffer::OwnedImpl request(request_str);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+  return written;
+}
+
 class ReverseTunnelFilterUnitTest : public testing::Test {
 protected:
   void SetUp() override {
@@ -2560,6 +2580,269 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest, ConnectionLimitScopedPerTenan
 
   EXPECT_FALSE(cfg->validateConnectionLimit("node", "tenant-a"));
   EXPECT_TRUE(cfg->validateConnectionLimit("node", "tenant-b"));
+}
+
+// exceeding the per-node cap denies the handshake with 429 and increments `rejected`, not
+// `validation_failed`.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ConnectionLimitHandshakeRejectsOverCap) {
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  socket_manager->setMaxConnectionsPerNode(1);
+  socket_manager->addConnectionSocket("capped-node", "cluster", createUpstreamSocket(3001),
+                                      std::chrono::seconds(30));
+
+  ReverseTunnelFilter filter(config_or_error.value(), *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  const std::string written =
+      driveFilterHandshake(filter, callbacks_,
+                           makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                        "capped-node", "cluster", "tenant"));
+
+  EXPECT_THAT(written, testing::HasSubstr("429 Too Many Requests"));
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.rejected"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.validation_failed"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
+}
+
+// under the per-node cap the handshake is accepted and `rejected` stays at 0.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ConnectionLimitHandshakeAcceptsUnderCap) {
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  socket_manager->setMaxConnectionsPerNode(1);
+
+  // Closed socket skips registration in processAcceptedConnection; this test only asserts the
+  // handshake response/stats path gated by the connection-limit check.
+  auto closed_socket = std::make_unique<Network::MockConnectionSocket>();
+  EXPECT_CALL(*closed_socket, isOpen()).WillRepeatedly(testing::Return(false));
+  static Network::ConnectionSocketPtr stored_closed_socket_under_cap;
+  stored_closed_socket_under_cap = std::move(closed_socket);
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_closed_socket_under_cap));
+
+  ReverseTunnelFilter filter(config_or_error.value(), *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  const std::string written =
+      driveFilterHandshake(filter, callbacks_,
+                           makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                        "under-cap-node", "cluster", "tenant"));
+
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.rejected"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.validation_failed"));
+}
+
+// identity mismatch under the cap still returns 403 / `validation_failed` (not `rejected`).
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ConnectionLimitHandshakeIdentityFailsUnderCap) {
+  proto_config_.set_enable_connection_limit(true);
+  proto_config_.mutable_validation()->set_node_id_format("expected-node");
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  socket_manager->setMaxConnectionsPerNode(1);
+
+  ReverseTunnelFilter filter(config_or_error.value(), *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  const std::string written =
+      driveFilterHandshake(filter, callbacks_,
+                           makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                        "wrong-node", "cluster", "tenant"));
+
+  EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.validation_failed"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.rejected"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
+}
+
+// Cap is checked before identity validation: at the limit the handshake is Rejected even when the
+// node_id would also fail identity checks.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ConnectionLimitHandshakeRejectsBeforeIdentityCheck) {
+  proto_config_.set_enable_connection_limit(true);
+  proto_config_.mutable_validation()->set_node_id_format("expected-node");
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  socket_manager->setMaxConnectionsPerNode(1);
+  socket_manager->addConnectionSocket("wrong-node", "cluster", createUpstreamSocket(3002),
+                                      std::chrono::seconds(30));
+
+  ReverseTunnelFilter filter(config_or_error.value(), *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  const std::string written =
+      driveFilterHandshake(filter, callbacks_,
+                           makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                        "wrong-node", "cluster", "tenant"));
+
+  EXPECT_THAT(written, testing::HasSubstr("429 Too Many Requests"));
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.rejected"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.validation_failed"));
+}
+
+// validateIdentifiers returns Rejected / ValidationFailed / ValidationPassed distinctly.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ValidateIdentifiersDistinguishesLimitAndIdentity) {
+  proto_config_.set_enable_connection_limit(true);
+  proto_config_.mutable_validation()->set_node_id_format("expected-node");
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto cfg = config_or_error.value();
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  socket_manager->setMaxConnectionsPerNode(1);
+
+  Http::TestRequestHeaderMapImpl headers;
+  auto& stream_info = callbacks_.connection_.streamInfo();
+
+  EXPECT_EQ(ReverseTunnelValidationResult::ValidationPassed,
+            cfg->validateIdentifiers("expected-node", "cluster", "tenant", headers, stream_info));
+  EXPECT_EQ(ReverseTunnelValidationResult::ValidationFailed,
+            cfg->validateIdentifiers("wrong-node", "cluster", "tenant", headers, stream_info));
+
+  socket_manager->addConnectionSocket("expected-node", "cluster", createUpstreamSocket(3003),
+                                      std::chrono::seconds(30));
+  EXPECT_EQ(ReverseTunnelValidationResult::Rejected,
+            cfg->validateIdentifiers("expected-node", "cluster", "tenant", headers, stream_info));
+}
+
+// Dynamic metadata carries the three-state validation_result string used for logging and
+// visibility.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ValidationMetadataEmitsTriStateResult) {
+  auto& stream_info = callbacks_.connection_.stream_info_;
+  ON_CALL(stream_info, setDynamicMetadata(testing::_, testing::_))
+      .WillByDefault(
+          testing::Invoke([&stream_info](const std::string& ns, const Protobuf::Struct& value) {
+            (*stream_info.metadata_.mutable_filter_metadata())[ns].MergeFrom(value);
+          }));
+
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  socket_manager->setMaxConnectionsPerNode(1);
+
+  const auto metadata_result = [&stream_info]() -> std::string {
+    const auto& filter_metadata = stream_info.metadata_.filter_metadata();
+    const auto it = filter_metadata.find("envoy.filters.network.reverse_tunnel");
+    if (it == filter_metadata.end()) {
+      return "";
+    }
+    const auto& fields = it->second.fields();
+    const auto field = fields.find("validation_result");
+    return field == fields.end() ? "" : field->second.string_value();
+  };
+
+  // ValidationPassed.
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    cfg.set_enable_connection_limit(true);
+    cfg.mutable_validation()->set_emit_dynamic_metadata(true);
+    auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+    ASSERT_TRUE(config_or_error.ok());
+
+    auto closed_socket = std::make_unique<Network::MockConnectionSocket>();
+    EXPECT_CALL(*closed_socket, isOpen()).WillRepeatedly(testing::Return(false));
+    static Network::ConnectionSocketPtr stored_closed_socket_metadata_pass;
+    stored_closed_socket_metadata_pass = std::move(closed_socket);
+    EXPECT_CALL(callbacks_.connection_, getSocket())
+        .WillRepeatedly(testing::ReturnRef(stored_closed_socket_metadata_pass));
+
+    ReverseTunnelFilter filter(config_or_error.value(), *stats_store_.rootScope(),
+                               overload_manager_);
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+    filter.initializeReadFilterCallbacks(callbacks_);
+    driveFilterHandshake(
+        filter, callbacks_,
+        makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+    EXPECT_EQ("validation_passed", metadata_result());
+  }
+
+  stream_info.metadata_.mutable_filter_metadata()->clear();
+
+  // ValidationFailed (identity mismatch under the cap).
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    cfg.set_enable_connection_limit(true);
+    cfg.mutable_validation()->set_node_id_format("expected-node");
+    cfg.mutable_validation()->set_emit_dynamic_metadata(true);
+    auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+    ASSERT_TRUE(config_or_error.ok());
+    ReverseTunnelFilter filter(config_or_error.value(), *stats_store_.rootScope(),
+                               overload_manager_);
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+    filter.initializeReadFilterCallbacks(callbacks_);
+    EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+    driveFilterHandshake(filter, callbacks_,
+                         makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                      "wrong-node", "c", "t"));
+    EXPECT_EQ("validation_failed", metadata_result());
+  }
+
+  stream_info.metadata_.mutable_filter_metadata()->clear();
+
+  // Rejected (at the connection cap).
+  socket_manager->addConnectionSocket("n", "c", createUpstreamSocket(3004),
+                                      std::chrono::seconds(30));
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    cfg.set_enable_connection_limit(true);
+    cfg.mutable_validation()->set_emit_dynamic_metadata(true);
+    auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+    ASSERT_TRUE(config_or_error.ok());
+    ReverseTunnelFilter filter(config_or_error.value(), *stats_store_.rootScope(),
+                               overload_manager_);
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+    filter.initializeReadFilterCallbacks(callbacks_);
+    EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+    driveFilterHandshake(
+        filter, callbacks_,
+        makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+    EXPECT_EQ("rejected", metadata_result());
+  }
+}
+
+// connection limit enabled without a thread-local socket manager fails closed on the full
+// handshake path (429 / rejected).
+TEST_F(ReverseTunnelFilterUnitTest, ConnectionLimitHandshakeFailsClosedWithoutSocketManager) {
+  setupUpstreamExtension();
+
+  proto_config_.set_enable_connection_limit(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+
+  ReverseTunnelFilter filter(config_or_error.value(), *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  const std::string written = driveFilterHandshake(
+      filter, callbacks_,
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+
+  EXPECT_THAT(written, testing::HasSubstr("429 Too Many Requests"));
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.rejected"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.validation_failed"));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
 }
 
 // jwt_validator handshake authentication.

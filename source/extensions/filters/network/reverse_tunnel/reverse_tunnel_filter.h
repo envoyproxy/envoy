@@ -40,6 +40,20 @@ inline const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor* ge
       base_interface);
 }
 
+enum class ReverseTunnelValidationResult { ValidationPassed, ValidationFailed, Rejected };
+
+inline absl::string_view toStringView(ReverseTunnelValidationResult result) {
+  switch (result) {
+  case ReverseTunnelValidationResult::ValidationPassed:
+    return "validation_passed";
+  case ReverseTunnelValidationResult::ValidationFailed:
+    return "validation_failed";
+  case ReverseTunnelValidationResult::Rejected:
+    return "rejected";
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
 /**
  * Configuration for the reverse tunnel network filter.
  */
@@ -71,13 +85,15 @@ public:
   // configured per-worker connection cap (or no cap is configured).
   bool validateConnectionLimit(absl::string_view node_id, absl::string_view tenant_id) const;
 
-  // Validates the extracted node_id, cluster_id, and tenant_id against expected values.
-  // Returns true if validation passes or no validation is configured. The parsed handshake
-  // request headers are passed so validation format strings can reference them via %REQ(...)%.
-  bool validateIdentifiers(absl::string_view node_id, absl::string_view cluster_id,
-                           absl::string_view tenant_id,
-                           const Http::RequestHeaderMap& request_headers,
-                           const StreamInfo::StreamInfo& stream_info) const;
+  // Validates connection limit then, if configured, node_id/cluster_id/tenant_id against expected
+  // values. Returns ValidationPassed when under the cap and identifiers match (or no identity
+  // validation is configured); Rejected when the per-node connection cap would be exceeded;
+  // ValidationFailed when an identity check fails. The parsed handshake request headers are
+  // passed so validation format strings can reference them via %REQ(...)%.
+  ReverseTunnelValidationResult
+  validateIdentifiers(absl::string_view node_id, absl::string_view cluster_id,
+                      absl::string_view tenant_id, const Http::RequestHeaderMap& request_headers,
+                      const StreamInfo::StreamInfo& stream_info) const;
 
   // Returns true if JWT handshake authentication is configured.
   bool jwtEnabled() const { return jwt_validator_ != nullptr; }
@@ -95,7 +111,8 @@ public:
 
   // Emits validation results as dynamic metadata if configured.
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
-                              absl::string_view tenant_id, bool validation_passed,
+                              absl::string_view tenant_id,
+                              ReverseTunnelValidationResult validation_result,
                               StreamInfo::StreamInfo& stream_info) const;
 
   // Returns the required cluster name for validation.
