@@ -121,6 +121,22 @@ public:
     }
   }
 
+  // Detaches this fixture's extension from the globally-registered upstream socket interface.
+  // setupUpstreamExtension() points the singleton acceptor's raw extension_ at the fixture-owned
+  // upstream_extension_; without this, a later test that reaches getThreadLocalSocketManager()
+  // without its own setup would dereference that freed extension.
+  void clearRegisteredUpstreamExtension() {
+    auto* registered_upstream_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    if (registered_upstream_interface == nullptr) {
+      return;
+    }
+    if (auto* registered_acceptor = dynamic_cast<ReverseConnection::ReverseTunnelAcceptor*>(
+            const_cast<Network::SocketInterface*>(registered_upstream_interface))) {
+      registered_acceptor->extension_ = nullptr;
+    }
+  }
+
   // Helper method to set up upstream thread local slot for testing.
   void setupUpstreamThreadLocalSlot() {
     // Call onServerInitialized to set up the extension references properly.
@@ -285,6 +301,9 @@ public:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 
   void TearDown() override {
+    // Restore the registered singleton's extension_ before the fixture-owned extension is
+    // destroyed, so it does not dangle into the next test.
+    clearRegisteredUpstreamExtension();
     // Clean up thread local components to avoid issues during destruction.
     upstream_tls_slot_.reset();
     upstream_thread_local_registry_.reset();
