@@ -3,12 +3,16 @@
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/quic_server_transport_socket_factory.h"
+
+#include "test/common/quic/mock_quic_connection_id_generator_factory.h"
 #endif
 
 #include "test/common/listener_manager/listener_manager_impl_test.h"
 #include "test/integration/filters/test_listener_filter.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/server/utility.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 namespace Envoy {
@@ -807,7 +811,62 @@ udp_listener_config:
 #endif
 }
 
-INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplQuicOnlyTest, ::testing::Values(false, true));
+#if defined(ENVOY_ENABLE_QUIC)
+// LDS delivers a listener while the server init manager is initializing. Extensions initialized
+// during listener creation must be able to register init targets with either value of
+// "envoy.restart_features.defer_worker_routing_init".
+TEST_P(ListenerManagerImplQuicOnlyTest, CidGeneratorRegistersInitTarget) {
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(getBasicConfig());
+  auto* cid_generator_config = listener_proto.mutable_udp_listener_config()
+                                   ->mutable_quic_options()
+                                   ->mutable_connection_id_generator_config();
+  cid_generator_config->set_name("envoy.quic.mock_connection_id_generator");
+  std::ignore =
+      cid_generator_config->mutable_typed_config()->PackFrom(test::common::config::DummyConfig());
+
+  Quic::MockEnvoyQuicConnectionIdGeneratorConfigFactory cid_config_factory;
+  Registry::InjectFactory<Quic::EnvoyQuicConnectionIdGeneratorConfigFactory>
+      cid_config_factory_registration(cid_config_factory);
+
+  Init::ManagerImpl server_init_mgr("server-init-manager");
+  Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
+  Init::ExpectableTargetImpl child_target("child-target");
+
+  EXPECT_CALL(cid_config_factory, createQuicConnectionIdGeneratorFactory(_, _, _))
+      .WillOnce(Invoke([&](const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Configuration::FactoryContext& context)
+                           -> Quic::EnvoyQuicConnectionIdGeneratorFactoryPtr {
+        EXPECT_EQ(Init::Manager::State::Uninitialized, context.initManager().state());
+        context.initManager().add(child_target);
+        auto generator_factory =
+            std::make_unique<NiceMock<Quic::MockEnvoyQuicConnectionIdGeneratorFactory>>();
+        ON_CALL(*generator_factory, getCompatibleConnectionIdWorkerSelector(_))
+            .WillByDefault(Return([](const Buffer::Instance&, uint32_t) { return 0u; }));
+        return generator_factory;
+      }));
+
+  // Mimic LDS delivering the listener while the server init manager is initializing.
+  Init::TargetImpl lds_target("lds", [&]() {
+    EXPECT_TRUE(addOrUpdateListener(listener_proto));
+    lds_target.ready();
+  });
+  server_init_mgr.add(lds_target);
+  EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+
+  // The child target is initialized inline with the config delivery and blocks server init until it
+  // is ready.
+  child_target.expectInitialize();
+  server_init_watcher.expectReady().Times(0);
+  server_init_mgr.initialize(server_init_watcher);
+
+  server_init_watcher.expectReady();
+  child_target.ready();
+  EXPECT_EQ(Init::Manager::State::Initialized, server_init_mgr.state());
+}
+#endif
+
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplQuicOnlyTest,
+                         ::testing::Combine(::testing::Bool(), ::testing::Bool()));
 
 } // namespace
 } // namespace Server

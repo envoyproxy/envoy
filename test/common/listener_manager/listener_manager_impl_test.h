@@ -56,7 +56,8 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public testing::TestWithParam<bool> {
+// Parameterized on (use_matcher, defer_worker_routing_init).
+class ListenerManagerImplTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 public:
   // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
   // and the user is warned. For UDP it's always the default even if not effective.
@@ -71,7 +72,12 @@ protected:
   ListenerManagerImplTest()
       : listener_factory_ptr_(std::make_unique<NiceMock<MockListenerComponentFactory>>()),
         listener_factory_(*listener_factory_ptr_),
-        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
+        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(std::get<0>(GetParam())) {
+    // Once the envoy.restart_features.defer_worker_routing_init flag is deprecated, this suite
+    // should no longer be parameterized on it.
+    scoped_runtime_.mergeValues({{"envoy.restart_features.defer_worker_routing_init",
+                                  std::get<1>(GetParam()) ? "true" : "false"}});
+  }
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -496,6 +502,7 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
+  TestScopedRuntime scoped_runtime_;
   Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
   Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;

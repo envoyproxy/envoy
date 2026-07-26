@@ -1642,8 +1642,16 @@ filter_chains: {}
   Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
   { // Add and remove a listener before starting workers.
     ListenerHandle* listener_foo = expectListenerCreate(true, true);
-    EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    // With "envoy.restart_features.defer_worker_routing_init" the init target is registered with
+    // the server init manager after socket creation, otherwise at the end of the ListenerImpl
+    // constructor.
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+      EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+    } else {
+      EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    }
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1"));
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
@@ -9626,13 +9634,14 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest,
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersTest,
-                         ::testing::Values(false, true));
+                         ::testing::Combine(::testing::Bool(), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplForInPlaceFilterChainUpdateTest,
-                         ::testing::Values(false));
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithDispatcherStatsTest,
-                         ::testing::Values(false));
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 
 } // namespace
 } // namespace Server
