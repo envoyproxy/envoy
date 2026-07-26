@@ -394,10 +394,21 @@ bool DynamicModuleCluster::addHosts(
     const std::vector<std::string>& sub_zones,
     const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
     std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority) {
+  return addHosts(addresses, absl::Span<const absl::string_view>(), weights, regions, zones,
+                  sub_zones, metadata, result_hosts, priority);
+}
+
+bool DynamicModuleCluster::addHosts(
+    const std::vector<std::string>& addresses, absl::Span<const absl::string_view> hostnames,
+    const std::vector<uint32_t>& weights, const std::vector<std::string>& regions,
+    const std::vector<std::string>& zones, const std::vector<std::string>& sub_zones,
+    const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
+    std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority) {
   ASSERT(addresses.size() == weights.size());
   ASSERT(addresses.size() == regions.size());
   ASSERT(addresses.size() == zones.size());
   ASSERT(addresses.size() == sub_zones.size());
+  ASSERT(hostnames.empty() || hostnames.size() == addresses.size());
   ASSERT(metadata.empty() || metadata.size() == addresses.size());
   result_hosts.clear();
   result_hosts.reserve(addresses.size());
@@ -448,9 +459,12 @@ bool DynamicModuleCluster::addHosts(
       endpoint_metadata = std::move(md);
     }
 
+    const std::string hostname = hostnames.empty() || hostnames[i].empty()
+                                     ? cluster_info->name() + addresses[i]
+                                     : std::string(hostnames[i]);
     auto host_result = Upstream::HostImpl::create(
-        cluster_info, cluster_info->name() + addresses[i], std::move(resolved_address),
-        std::move(endpoint_metadata), nullptr, weights[i], std::move(locality),
+        cluster_info, hostname, std::move(resolved_address), std::move(endpoint_metadata), nullptr,
+        weights[i], std::move(locality),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
         envoy::config::core::v3::UNKNOWN);
     if (!host_result.ok()) {

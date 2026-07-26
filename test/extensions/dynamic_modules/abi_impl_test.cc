@@ -392,6 +392,11 @@ WEAK_STUB(CertValidatorGetFilterState,
 WEAK_STUB(ClusterAddHosts,
           envoy_dynamic_module_callback_cluster_add_hosts(nullptr, 0, nullptr, nullptr, nullptr,
                                                           nullptr, nullptr, nullptr, 0, 0, nullptr))
+WEAK_STUB(ClusterAddHostsWithHostnames,
+          envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(nullptr, 0, nullptr,
+                                                                         nullptr, nullptr, nullptr,
+                                                                         nullptr, nullptr, nullptr,
+                                                                         0, 0, nullptr))
 WEAK_STUB(ClusterRemoveHosts,
           envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, nullptr, 0))
 WEAK_STUB(ClusterPreInitComplete, envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr))

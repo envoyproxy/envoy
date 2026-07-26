@@ -563,6 +563,10 @@ TEST_F(DynamicModuleClusterTest, AbiCallbacksHostManagement) {
                                                               nullptr, 0, 2, host_ptrs));
   EXPECT_NE(nullptr, host_ptrs[0]);
   EXPECT_NE(nullptr, host_ptrs[1]);
+  EXPECT_EQ(cluster->info()->name() + addr1,
+            static_cast<Upstream::Host*>(host_ptrs[0])->hostname());
+  EXPECT_EQ(cluster->info()->name() + addr2,
+            static_cast<Upstream::Host*>(host_ptrs[1])->hostname());
 
   // Test add_hosts with invalid address causes entire batch to fail.
   std::string bad_addr = "invalid";
@@ -587,6 +591,84 @@ TEST_F(DynamicModuleClusterTest, AbiCallbacksHostManagement) {
   EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), host_ptrs, 2));
   // Removing again should return 0.
   EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), host_ptrs, 2));
+}
+
+TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesABI) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer addresses[] = {{"127.0.0.1:10001", 15},
+                                                         {"127.0.0.1:10002", 15}};
+  envoy_dynamic_module_type_module_buffer hostnames[] = {{"api.example.com", 15}, {nullptr, 0}};
+  uint32_t weights[] = {1, 1};
+  envoy_dynamic_module_type_module_buffer empty_localities[] = {{nullptr, 0}, {nullptr, 0}};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptrs[2] = {nullptr, nullptr};
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+      cluster.get(), 0, addresses, hostnames, weights, empty_localities, empty_localities,
+      empty_localities, nullptr, 0, 2, host_ptrs));
+  ASSERT_NE(nullptr, host_ptrs[0]);
+  ASSERT_NE(nullptr, host_ptrs[1]);
+
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(2, hosts.size());
+  EXPECT_EQ("api.example.com", hosts[0]->hostname());
+  EXPECT_EQ("test_cluster127.0.0.1:10002", hosts[1]->hostname());
+}
+
+TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesDeduplicatesIncrementalSharedAddress) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer address = {"127.0.0.1:10001", 15};
+  envoy_dynamic_module_type_module_buffer hostnames[] = {{"service-a.test", 14},
+                                                         {"service-b.test", 14}};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty_locality = {nullptr, 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptrs[] = {nullptr, nullptr};
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+      cluster.get(), 0, &address, &hostnames[0], &weight, &empty_locality, &empty_locality,
+      &empty_locality, nullptr, 0, 1, &host_ptrs[0]));
+  ASSERT_NE(nullptr, host_ptrs[0]);
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+      cluster.get(), 0, &address, &hostnames[1], &weight, &empty_locality, &empty_locality,
+      &empty_locality, nullptr, 0, 1, &host_ptrs[1]));
+  EXPECT_EQ(nullptr, host_ptrs[1]);
+
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(1, hosts.size());
+  EXPECT_EQ("service-a.test", hosts[0]->hostname());
+  EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), &host_ptrs[0], 1));
+}
+
+TEST_F(DynamicModuleClusterTest, AddHostsWithNullHostnamesABIUsesLegacyHostname) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer address = {"127.0.0.1:10001", 15};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty_locality = {nullptr, 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+      cluster.get(), 0, &address, nullptr, &weight, &empty_locality, &empty_locality,
+      &empty_locality, nullptr, 0, 1, &host_ptr));
+  ASSERT_NE(nullptr, host_ptr);
+
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(1, hosts.size());
+  EXPECT_EQ("test_cluster127.0.0.1:10001", hosts[0]->hostname());
 }
 
 // Test the LB ABI callback implementations directly.
@@ -4137,6 +4219,32 @@ TEST_F(DynamicModuleClusterTest, AddHostsOffMainThreadFailsClosed) {
         t.join();
       },
       "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
+}
+
+TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer address = {"127.0.0.1:10001", 15};
+  envoy_dynamic_module_type_module_buffer hostname = {"api.example.com", 15};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty = {nullptr, 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_FALSE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+              cluster_ptr, 0, &address, &hostname, &weight, &empty, &empty, &empty, nullptr, 0, 1,
+              &host_ptr));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames must be called on the main "
+      "thread");
 }
 
 // Verifies that `cluster_remove_hosts` is fail-closed when called off the main thread.
