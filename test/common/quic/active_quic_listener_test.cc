@@ -943,8 +943,7 @@ TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, PostsSocketOptionsFailure)
 
 TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, InitInCtorWhenFlagOff) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.restart_features.quic_listener_factory_deferred_socket_option_init", "false"}});
+  scoped_runtime.mergeValues({{"envoy.restart_features.defer_worker_routing_init", "false"}});
 
   const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
   makeCidGeneratorFactory(mock_option);

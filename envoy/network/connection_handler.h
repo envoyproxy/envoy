@@ -334,6 +334,7 @@ public:
    * Initializes routing of UDP packets to the correct worker. Called once when a listener is added
    * or updated, after the listen sockets are created. Implementations may register init targets
    * with the listener's init manager.
+   * Only called if envoy.restart_features.defer_worker_routing_init is enabled.
    * @param listen_socket_factories the listener's socket factories, one per address.
    * @return a status indicating if an error occurred.
    */

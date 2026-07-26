@@ -685,9 +685,15 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     added = true;
   }
 
-  if (auto udp_listener_config = new_listener_ref.udpListenerConfig()) {
-    RETURN_IF_NOT_OK(udp_listener_config->listenerFactory().initializeWorkerRouting(
-        new_listener_ref.listenSocketFactories()));
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    if (auto udp_listener_config = new_listener_ref.udpListenerConfig()) {
+      RETURN_IF_NOT_OK(udp_listener_config->listenerFactory().initializeWorkerRouting(
+          new_listener_ref.listenSocketFactories()));
+    }
+    // The listener init target must be registered with the server init manager after all of the
+    // listener's children have registered their targets with the listener's init manager. QUIC
+    // listeners also register targets in initializeWorkerRouting() above.
+    new_listener_ref.registerInitTargetIfWorkersNotStarted();
   }
 
   updateWarmingActiveGauges();

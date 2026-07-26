@@ -397,16 +397,14 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
             validation_visitor, context_.serverFactoryContext());
   }
 
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.restart_features.quic_listener_factory_deferred_socket_option_init")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
     creation_status = initializeCidGeneratorAndWorkerRouting();
   }
 }
 
 absl::Status ActiveQuicListenerFactory::initializeWorkerRouting(
     absl::Span<const Network::ListenSocketFactoryPtr> socket_factories) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.restart_features.quic_listener_factory_deferred_socket_option_init")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
     // Already initialized in the constructor, options were applied via socketOptions().
     return absl::OkStatus();
   }

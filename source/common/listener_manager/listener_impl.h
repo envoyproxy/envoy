@@ -290,6 +290,8 @@ public:
   // Check whether a new listener has duplicated listening address this listener.
   bool hasDuplicatedAddress(const ListenerImpl& other) const;
 
+  void registerInitTargetIfWorkersNotStarted();
+
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
