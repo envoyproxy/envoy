@@ -2599,7 +2599,7 @@ protected:
   }
 
   uint64_t counter(absl::string_view name) {
-    auto* c = TestUtility::findCounter(stats_store_, std::string(name));
+    auto c = TestUtility::findCounter(stats_store_, std::string(name));
     return c == nullptr ? 0 : c->value();
   }
 

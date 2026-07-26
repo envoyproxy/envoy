@@ -148,19 +148,18 @@ message JwtHandshakeValidation {
     // ``filename`` loaded from disk. The keys are read once when the configuration is loaded, which
     // keeps token verification during the handshake fully synchronous.
     config.core.v3.DataSource local_jwks = 3;
-
-    // [#comment:TODO: also allow fetching the JWKS from a remote source (remote_jwks).]
   }
 
-  // Name of the header carrying the token. Defaults to ``authorization``, and a leading ``Bearer ``
-  // prefix is stripped when present.
+  // Name of the header carrying the token. Defaults to ``authorization``, and a leading ``Bearer``
+  // prefix (with its trailing space) is stripped when present.
   string token_header = 4 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
 
   // Namespace under which verified claims are emitted as dynamic metadata. Defaults to
   // ``envoy.filters.network.reverse_tunnel.jwt``. Each top-level JWT claim is written as a field in
   // this namespace so it can be referenced via ``%DYNAMIC_METADATA(namespace:claim)%`` in the
   // ``validation`` block.
-  string claims_metadata_namespace = 5 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
+  string claims_metadata_namespace = 5
+      [(validate.rules).string = {max_len: 255 ignore_empty: true}];
 
   // If ``true``, a missing or invalid token does **not** reject the handshake (verified claims are
   // simply not published). Useful for a staged rollout / audit mode: rejections that *would* have
