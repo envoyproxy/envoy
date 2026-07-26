@@ -7130,6 +7130,44 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MptcpOnUdp) {
                             "listener mptcp-udp: enable_mptcp can only be used with TCP listeners");
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, NoBindToPortOnUdp) {
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+      name: udp-no-bind
+      bind_to_port: false
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1111
+          protocol: UDP
+      filter_chains:
+      - filters: []
+        name: foo
+    )EOF");
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(listener), EnvoyException,
+      "listener udp-no-bind: bind_to_port: false is not supported for UDP listeners");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, NoBindToPortOnQuic) {
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+      name: quic-no-bind
+      bind_to_port: false
+      udp_listener_config:
+        quic_options: {}
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1111
+          protocol: UDP
+      filter_chains:
+      - filters: []
+        name: foo
+    )EOF");
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(listener), EnvoyException,
+      "listener quic-no-bind: bind_to_port: false is not supported for UDP listeners");
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, MptcpOnUnixDomainSocket) {
   envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
       name: mptcp-udp
