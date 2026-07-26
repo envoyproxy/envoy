@@ -43,9 +43,18 @@ def envoy_dependency_imports(
         # which can be used to workaround a rules_rust bug. See:
         # - https://github.com/bazelbuild/rules_rust/issues/3521
         # - https://github.com/envoyproxy/envoy/issues/38951
-        cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock"):
+        cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock",
+        use_host_tools = False):
     compatibility_proxy_repo()
-    rules_foreign_cc_dependencies()
+
+    # When use_host_tools is True, skip downloading hermetic toolchains and use
+    # whatever is installed on the host. This is unsupported by the Envoy project
+    # and intended only for downstream builds in controlled environments.
+    if use_host_tools:
+        go_version = "host"
+        rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
+    else:
+        rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     if go_version != "host":

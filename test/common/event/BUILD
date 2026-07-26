@@ -28,6 +28,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "libevent_scheduler_test",
+    srcs = ["libevent_scheduler_test.cc"],
+    deps = [
+        "//source/common/event:libevent_scheduler_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "evwatch_observer_manager_impl_test",
+    srcs = ["evwatch_observer_manager_impl_test.cc"],
+    deps = [
+        "//source/common/event:evwatch_observer_manager_impl_lib",
+        "//source/common/event:libevent_scheduler_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "file_event_impl_test",
     srcs = ["file_event_impl_test.cc"],
     rbe_pool = "6gig",

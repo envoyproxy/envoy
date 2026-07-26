@@ -924,6 +924,7 @@ private:
         return listener_worker_router_;
       }
       const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+      Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override { return nullptr; }
 
       envoy::config::listener::v3::UdpListenerConfig config_;
       std::unique_ptr<Network::ActiveUdpListenerFactory> listener_factory_;

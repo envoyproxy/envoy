@@ -361,7 +361,7 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void GrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+    ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());

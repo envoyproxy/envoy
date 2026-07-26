@@ -113,10 +113,11 @@ std::vector<std::string> getFilterStateObjectsToLog(
 
 std::vector<Tracing::CustomTagConstSharedPtr> getCustomTags(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
-        config) {
+        config,
+    const Formatter::CommandParserPtrVector& command_parsers) {
   std::vector<Tracing::CustomTagConstSharedPtr> custom_tags;
   for (const auto& custom_tag : config.custom_tags()) {
-    custom_tags.push_back(Tracing::CustomTagUtility::createCustomTag(custom_tag));
+    custom_tags.push_back(Tracing::CustomTagUtility::createCustomTag(custom_tag, command_parsers));
   }
   return custom_tags;
 }

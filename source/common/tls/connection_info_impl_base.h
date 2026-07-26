@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/ssl/connection.h"
 
 #include "source/common/common/logger.h"
@@ -36,6 +37,7 @@ public:
   const std::string& pemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
   absl::Span<const std::string> pemEncodedPeerCertificateChain() const override;
+  absl::Span<const std::string> pemEncodedValidatedPeerCertificateChain() const override;
   bool peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const override;
   absl::Span<const std::string> uriSanPeerCertificate() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
@@ -65,6 +67,12 @@ public:
   // Returns the direct issuer cert from the validated chain, or nullptr if unavailable.
   // Subclasses that store the validated chain should override this.
   virtual X509* validatedPeerIssuer() const { return nullptr; }
+
+  // Returns the validated peer certificate chain (leaf first) if the subclass stores one.
+  // Subclasses that store the validated chain should override this.
+  virtual OptRef<const std::vector<bssl::UniquePtr<X509>>> validatedPeerCertChain() const {
+    return std::nullopt;
+  }
 
 private:
   // Enum values should be the name of the calling function, but capitalized.
@@ -96,6 +104,7 @@ private:
     UrlEncodedPemEncodedPeerCertificate,
     PemEncodedPeerCertificate,
     UrlEncodedPemEncodedPeerCertificateChain,
+    PemEncodedValidatedPeerCertificateChain,
     PemEncodedPeerCertificateChain,
     PeerCertificateSanMatches,
     DnsSansPeerCertificate,

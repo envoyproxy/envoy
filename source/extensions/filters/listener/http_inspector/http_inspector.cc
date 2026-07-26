@@ -10,13 +10,25 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace HttpInspector {
+
+namespace {
+
+// RFC 7230 token characters. HTTP request methods must consist solely of these.
+constexpr absl::string_view kValidHttpMethodChars =
+    "!#$%&'*+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz|~";
+
+constexpr size_t kMaxHttpMethodLength = 32;
+
+} // namespace
 
 Config::Config(Stats::Scope& scope)
     : stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {}
@@ -104,6 +116,17 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     // Ensure first line (also request line for HTTP request) in the buffer is not empty.
     if (data[0] == '\r' || data[0] == '\n') {
       return ParseState::Error;
+    }
+
+    // Fast-fail when the request-line prefix contains a byte that is not a
+    // valid HTTP method token character and not a method/path separator.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes")) {
+      const absl::string_view prefix = data.substr(0, kMaxHttpMethodLength);
+      const size_t bad = prefix.find_first_not_of(kValidHttpMethodChars);
+      if (bad != absl::string_view::npos && !absl::ascii_isspace(prefix[bad])) {
+        return ParseState::Error;
+      }
     }
 
     absl::string_view new_data = data.substr(nread_);

@@ -105,11 +105,13 @@ private:
 
   // Per-thread DNS cache info including pending callbacks.
   struct ThreadLocalHostInfo : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalHostInfo(DnsCacheImpl& parent) : parent_{parent} {}
+    ThreadLocalHostInfo(DnsCacheImpl& parent, Event::Dispatcher& dispatcher)
+        : parent_{parent}, dispatcher_{dispatcher} {}
     ~ThreadLocalHostInfo() override;
     void onHostMapUpdate(const HostMapUpdateInfoSharedPtr& resolved_info);
     absl::flat_hash_map<std::string, std::list<LoadDnsCacheEntryHandleImpl*>> pending_resolutions_;
     DnsCacheImpl& parent_;
+    Event::Dispatcher& dispatcher_;
   };
 
   class DnsHostInfoImpl : public DnsHostInfo {

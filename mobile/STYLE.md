@@ -27,7 +27,7 @@ Additionally it can be installed as a commit hook with `pre-commit install`.
   [detekt](https://github.com/arturbosch/detekt)
 - The rules enforced are available in the repo's [.kotlinlint.yml file](./.kotlinlint.yml).
   We build upon the default config provided by
-  [`detekt`](https://github.com/arturbosch/detekt/blob/master/detekt-cli/src/main/resources/default-detekt-config.yml)
+  [`detekt`](https://github.com/detekt/detekt/blob/main/detekt-core/src/main/resources/default-detekt-config.yml)
 
 ## Swift coding style
 

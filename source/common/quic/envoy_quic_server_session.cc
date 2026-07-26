@@ -13,10 +13,10 @@
 #include "source/common/common/scope_tracker.h"
 #include "source/common/http/session_idle_list_interface.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
-#include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "quiche/quic/core/quic_config.h"
@@ -179,7 +179,12 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 }
 
 void EnvoyQuicServerSession::Initialize() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_enable_reset_ssl_after_handshake")) {
+    enable_reset_ssl_after_handshake();
+  }
   quic::QuicServerSessionBase::Initialize();
+
   initialized_ = true;
   MaybeAddSessionToIdleList();
   quic_connection_->setEnvoyConnection(*this, *this);

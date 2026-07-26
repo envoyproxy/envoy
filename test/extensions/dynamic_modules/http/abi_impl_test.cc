@@ -25,6 +25,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1506,6 +1507,12 @@ TEST(ABIImpl, attribute_bool) {
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionMtls, &result));
   EXPECT_FALSE(result);
 
+  // HealthCheck is not handled locally and is served by delegating to the shared ContextAccessor.
+  EXPECT_CALL(stream_info, healthCheck()).WillRepeatedly(testing::Return(true));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
+      &filter, envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_TRUE(result);
+
   // Unsupported attribute.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
       &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result));
@@ -2530,6 +2537,17 @@ TEST(ABIImpl, GetAttributes) {
       &filter, envoy_dynamic_module_type_attribute_id_ResponseCode, &result_number));
   EXPECT_EQ(result_number, 200);
 
+  // envoy_dynamic_module_type_attribute_id_ResponseFlags
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ResponseFlags,
+      &result_number));
+  // NoHealthyUpstream (bit 1) and DnsResolutionFailed (bit 26).
+  const uint64_t response_flags = (1ULL << 1) | (1ULL << 26);
+  EXPECT_CALL(stream_info, legacyResponseFlags()).WillRepeatedly(testing::Return(response_flags));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_ResponseFlags, &result_number));
+  EXPECT_EQ(result_number, response_flags);
+
   // envoy_dynamic_module_type_attribute_id_UpstreamPort
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_UpstreamPort, &result_number));
@@ -2550,6 +2568,12 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionId, &result_number));
   EXPECT_EQ(result_number, 8386);
+
+  // envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(testing::Return(3));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount, &result_number));
+  EXPECT_EQ(result_number, 3);
 }
 
 // When the request header map is present but a typed header is absent, the attribute must be
@@ -3468,6 +3492,33 @@ TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostNonStrict) {
       filter_.get(), {host.data(), host.size()}, false));
 }
 
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionId) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  upstream_info->setUpstreamConnectionId(98765);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  EXPECT_EQ(98765, envoy_dynamic_module_callback_http_get_upstream_connection_id(filter_.get()));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionIdMissing) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_id(filter_.get()));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionIdNoUpstreamInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_http_get_upstream_connection_id(filter_.get()));
+}
+
 // Test GetClusterHostCount with a properly configured filter and mocked cluster manager.
 // This fixture creates a filter with a real config that has a mocked cluster manager.
 class DynamicModuleHttpFilterWithConfigTest : public testing::Test {
@@ -3480,12 +3531,12 @@ public:
 
     // Create a real dynamic module and filter config.
     auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
         *stats_scope_, context_);
-    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    ASSERT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
 
     filter_ = std::make_unique<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
@@ -3655,11 +3706,11 @@ class DynamicModuleHttpFilterLifecycleTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
     auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
         *stats_scope_, context_);
-    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    ASSERT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
   }
 
@@ -4160,12 +4211,12 @@ public:
 
     auto dynamic_module = Envoy::Extensions::DynamicModules::newDynamicModule(
         testSharedObjectPath("no_op", "c"), false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
         *stats_store_.rootScope(), context_);
-    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    ASSERT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
 
     filter_ = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);

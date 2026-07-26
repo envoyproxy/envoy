@@ -118,9 +118,17 @@ typed_config:
   void addReverseTunnelFilter(bool auto_close_connections = false,
                               const std::string& request_path = "/reverse_connections/request",
                               const std::string& request_method = "GET",
-                              const std::string& validation_config = "") {
-    const std::string filter_config =
-        fmt::format(R"EOF(
+                              const std::string& validation_config = "",
+                              uint32_t max_connections_per_node = 0) {
+    // The per-node cap now lives on the bootstrap upstream socket interface extension; the filter
+    // only opts into enforcement via enable_connection_limit. A non-zero cap therefore enables
+    // enable_connection_limit on the filter (at request_path indentation) and sets the limit on
+    // the extension below.
+    const std::string connection_limit_config =
+        max_connections_per_node == 0 ? "" : "\n          enable_connection_limit: true";
+
+    const std::string filter_config = fmt::format(
+        R"EOF(
         name: envoy.filters.network.reverse_tunnel
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
@@ -128,10 +136,10 @@ typed_config:
             seconds: 300
           auto_close_connections: {}
           request_path: "{}"
-          request_method: {}{}
+          request_method: {}{}{}
 )EOF",
-                    auto_close_connections ? "true" : "false", request_path, request_method,
-                    validation_config.empty() ? "" : "\n" + validation_config);
+        auto_close_connections ? "true" : "false", request_path, request_method,
+        connection_limit_config, validation_config.empty() ? "" : "\n" + validation_config);
 
     config_helper_.addConfigModifier(
         [filter_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -148,6 +156,23 @@ typed_config:
           // Add reverse tunnel filter (either as first filter or after existing filters).
           listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
         });
+
+    // Configure the per-node cap on the bootstrap extension when rate limiting is requested.
+    if (max_connections_per_node != 0) {
+      config_helper_.addConfigModifier(
+          [max_connections_per_node](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+            for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+              if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+                envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+                    UpstreamReverseConnectionSocketInterface config;
+                std::ignore = extension.typed_config().UnpackTo(&config);
+                config.set_max_connections_per_node(max_connections_per_node);
+                std::ignore = extension.mutable_typed_config()->PackFrom(config);
+                break;
+              }
+            }
+          });
+    }
   }
 
   std::string createTestPayload(const std::string& node_uuid = "integration-test-node",
@@ -1592,6 +1617,131 @@ cluster_type:
   addReverseTunnelFilter();
   // Should fail to start with validation error.
   EXPECT_DEATH(initialize(), "tenant_id_format must be configured");
+}
+
+// With max_connections_per_node set, accepting beyond the per-node cap is rejected while other
+// nodes remain unaffected. The integration test server runs a single worker (concurrency_ == 1),
+// so the per-worker count is deterministic.
+TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitRejectsBeyondCap) {
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", "",
+                         /*max_connections_per_node=*/1);
+  initialize();
+
+  // First connection for the capped node is accepted and registered (count -> 1).
+  std::string req1 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                    "capped-node", "test-cluster", "test-tenant");
+  IntegrationTcpClientPtr client1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(client1->write(req1));
+  client1->waitForData("HTTP/1.1 200 OK");
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
+
+  // Second connection for the same node exceeds the cap (1 is not < 1) -> rejected with 403.
+  std::string req2 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                    "capped-node", "test-cluster", "test-tenant");
+  IntegrationTcpClientPtr client2 = makeTcpConnection(lookupPort("listener_0"));
+  (void)client2->write(req2);
+  client2->waitForData("HTTP/1.1 403 Forbidden");
+  client2->waitForDisconnect();
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
+
+  // A different node has its own independent count and is still accepted.
+  std::string req3 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                    "other-node", "test-cluster", "test-tenant");
+  IntegrationTcpClientPtr client3 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(client3->write(req3));
+  client3->waitForData("HTTP/1.1 200 OK");
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
+
+  client1->close();
+  client3->close();
+}
+
+// Connections at or below the per-node cap are all accepted.
+TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitAllowsWithinCap) {
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", "",
+                         /*max_connections_per_node=*/2);
+  initialize();
+
+  IntegrationTcpClientPtr client1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(client1->write(createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "within-node", "test-cluster", "test-tenant")));
+  client1->waitForData("HTTP/1.1 200 OK");
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
+
+  IntegrationTcpClientPtr client2 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(client2->write(createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "within-node", "test-cluster", "test-tenant")));
+  client2->waitForData("HTTP/1.1 200 OK");
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
+
+  client1->close();
+  client2->close();
+}
+
+// With tenant isolation enabled, the per-node cap is scoped per tenant: hitting the cap for one
+// tenant on a node does not block a different tenant on the same node.
+TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitScopedPerTenant) {
+  // Enable tenant isolation on the upstream socket interface and provide a reverse connection
+  // cluster with a tenant_id_format (required when tenant isolation is on).
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+      if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+        envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+            UpstreamReverseConnectionSocketInterface config;
+        std::ignore = extension.typed_config().UnpackTo(&config);
+        config.mutable_enable_tenant_isolation()->set_value(true);
+        std::ignore = extension.mutable_typed_config()->PackFrom(config);
+        break;
+      }
+    }
+    envoy::config::cluster::v3::Cluster cluster;
+    TestUtility::loadFromYaml(R"EOF(
+name: reverse_connection_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cleanup_interval: 1s
+cluster_type:
+  name: envoy.clusters.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+    cleanup_interval: 10s
+    host_id_format: "%REQ(x-node-id)%"
+    tenant_id_format: "%REQ(x-tenant-id)%"
+)EOF",
+                              cluster);
+    bootstrap.mutable_static_resources()->add_clusters()->CopyFrom(cluster);
+  });
+
+  // Cap of 1 connection per node, scoped per tenant under tenant isolation.
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", "",
+                         /*max_connections_per_node=*/1);
+  initialize();
+  test_server_->waitUntilListenersReady();
+
+  // tenant-a brings the (tenant-a, shared-node) scope to the cap.
+  IntegrationTcpClientPtr client_a1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(client_a1->write(createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "shared-node", "shared-cluster", "tenant-a")));
+  client_a1->waitForData("HTTP/1.1 200 OK");
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
+
+  // A second tenant-a connection for the same node exceeds tenant-a's cap -> rejected.
+  IntegrationTcpClientPtr client_a2 = makeTcpConnection(lookupPort("listener_0"));
+  (void)client_a2->write(createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "shared-node", "shared-cluster", "tenant-a"));
+  client_a2->waitForData("HTTP/1.1 403 Forbidden");
+  client_a2->waitForDisconnect();
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
+
+  // tenant-b on the same node is an independent scope -> accepted.
+  IntegrationTcpClientPtr client_b1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(client_b1->write(createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "shared-node", "shared-cluster", "tenant-b")));
+  client_b1->waitForData("HTTP/1.1 200 OK");
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
+
+  client_a1->close();
+  client_b1->close();
 }
 
 } // namespace

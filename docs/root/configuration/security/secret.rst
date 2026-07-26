@@ -399,7 +399,7 @@ downstream listener:
             "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config
             default_value: "default_secret"
 
-For the *upstream* filter state override configuraton above to work, the value must be written in
+For the *upstream* filter state override configuration above to work, the value must be written in
 the downstream filter chain, e.g. using the following filter configuration:
 
 .. validated-code-block:: yaml

@@ -4,6 +4,7 @@
 
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/header_utility.h"
 #include "source/common/http/path_utility.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -252,21 +253,12 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
-  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6:
-  //
-  // Content-Length = 1*DIGIT
-  // TODO(#23315) - Validate multiple Content-Length values
-  const auto value_string_view = value.getStringView();
-
-  if (value_string_view.empty()) {
-    return {HeaderValueValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidContentLength};
-  }
-
-  std::uint64_t int_value{};
-  auto result = fromChars(value_string_view, int_value);
-  if (result.ec != std::errc() ||
-      result.ptr != (value_string_view.data() + value_string_view.size())) {
+  bool should_close_connection = false;
+  size_t unused_content_length = 0;
+  const auto result = ::Envoy::Http::HeaderUtility::validateContentLength(
+      value.getStringView(), true /*override_stream_error_on_invalid_http_message*/,
+      should_close_connection, unused_content_length);
+  if (result != ::Envoy::Http::HeaderUtility::HeaderValidationResult::ACCEPT) {
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidContentLength};
   }

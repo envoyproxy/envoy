@@ -230,8 +230,8 @@ public:
   // From HttpCacheFactory
   absl::StatusOr<std::shared_ptr<CacheSessions>>
   getCache(const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config&,
-           Server::Configuration::FactoryContext& context) override {
-    return context.serverFactoryContext().singletonManager().getTyped<CacheSessions>(
+           Server::Configuration::ServerFactoryContext& context) override {
+    return context.singletonManager().getTyped<CacheSessions>(
         SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_v2_singleton), [&context]() {
           return CacheSessions::create(context, std::make_unique<SimpleHttpCache>());
         });

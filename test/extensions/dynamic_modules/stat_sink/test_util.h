@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"

@@ -11,6 +11,7 @@ import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
 import "envoy/config/listener/v3/udp_listener_config.proto";
+import "envoy/config/metrics/v3/stats.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -61,7 +62,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 39]
+// [#next-free-field: 40]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -197,6 +198,12 @@ message Listener {
   // ``listener.<stat_prefix>.``.
   string stat_prefix = 28;
 
+  // Optional stats matcher that can be used to configure which stats are instantiated for this
+  // listener. If configured, this overrides the bootstrap :ref:`stats_config
+  // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_config>` stats matcher configuration
+  // for this listener.
+  metrics.v3.StatsMatcher stats_matcher = 39;
+
   // A list of filter chains to consider for this listener. The
   // :ref:`FilterChain <envoy_v3_api_msg_config.listener.v3.FilterChain>` with the most specific
   // :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` criteria is used on a
@@ -257,8 +264,11 @@ message Listener {
   // The following pre-defined metadata could be used by Envoy to manipulate the listener behavior:
   //
   // * ``envoy.stats_matcher``: this metadata could be used to customize the stats emitted by the
-  //   listener. See :ref:`well-known metadata <well_known_metadata_envoy_stats_matcher>` for more
-  //   details.
+  //   listener. See :ref:`well-known metadata
+  //   <well_known_metadata_envoy_stats_matcher>` for more details.
+  //   If :ref:`stats_matcher
+  //   <envoy_v3_api_field_config.listener.v3.Listener.stats_matcher>` is configured, this metadata
+  //   is ignored. The ``stats_matcher`` field should be preferred.
   //
   core.v3.Metadata metadata = 6;
 
