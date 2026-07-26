@@ -16,7 +16,7 @@ public:
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return true; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
-  absl::Status doFinalPreWorkerInit(absl::Span<const Network::ListenSocketFactoryPtr>) override {
+  absl::Status initializeWorkerRouting(absl::Span<const Network::ListenSocketFactoryPtr>) override {
     return absl::OkStatus();
   }
 

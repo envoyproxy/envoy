@@ -687,17 +687,6 @@ bool ListenerImpl::buildUdpListenerWorkerRouter(const Network::Address::Instance
   return true;
 }
 
-absl::Status ListenerImpl::doFinalPreWorkerInit() {
-  if (udp_listener_config_) {
-    RETURN_IF_NOT_OK(
-        udp_listener_config_->listener_factory_->doFinalPreWorkerInit(listenSocketFactories()));
-  }
-  for (auto& socket_factory : listenSocketFactories()) {
-    RETURN_IF_NOT_OK(socket_factory->doFinalPreWorkerInit());
-  }
-  return absl::OkStatus();
-}
-
 absl::Status
 ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
                                       uint32_t concurrency) {

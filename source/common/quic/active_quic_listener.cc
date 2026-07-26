@@ -403,7 +403,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   }
 }
 
-absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit(
+absl::Status ActiveQuicListenerFactory::initializeWorkerRouting(
     absl::Span<const Network::ListenSocketFactoryPtr> socket_factories) {
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.restart_features.quic_listener_factory_deferred_socket_option_init")) {

@@ -685,6 +685,11 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     added = true;
   }
 
+  if (auto udp_listener_config = new_listener_ref.udpListenerConfig()) {
+    RETURN_IF_NOT_OK(udp_listener_config->listenerFactory().initializeWorkerRouting(
+        new_listener_ref.listenSocketFactories()));
+  }
+
   updateWarmingActiveGauges();
   if (added) {
     stats_.listener_added_.inc();
@@ -822,11 +827,13 @@ ListenerManagerImpl::listeners(ListenerState state) {
 
 bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
   TRY_ASSERT_MAIN_THREAD {
-    absl::Status success = listener.doFinalPreWorkerInit();
-    if (!success.ok()) {
-      ENVOY_LOG(error, "final pre-worker listener init for listener '{}' failed: {}",
-                listener.name(), success.message());
-      return false;
+    for (auto& socket_factory : listener.listenSocketFactories()) {
+      absl::Status success = (socket_factory->doFinalPreWorkerInit());
+      if (!success.ok()) {
+        ENVOY_LOG(error, "final pre-worker listener init for listener '{}' failed: {}",
+                  listener.name(), success.message());
+        return false;
+      }
     }
     return true;
   }

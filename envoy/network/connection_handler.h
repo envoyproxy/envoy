@@ -331,16 +331,13 @@ public:
   virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
 
   /**
-   * Perform any initialization that must occur immediately prior to using the listen socket on
-   * workers, and which requires access to listen sockets. For creating and posting eBPF programs to
-   * each reuseport group.
-   *
-   * @param listen_socket_factories supplies a span of socket groups for which active udp listeners
-   * will be created. The sockets must have their address fully resolved either from config, or by
-   * the os in case of auto-bind sockets.
+   * Initializes routing of UDP packets to the correct worker. Called once when a listener is added
+   * or updated, after the listen sockets are created. Implementations may register init targets
+   * with the listener's init manager.
+   * @param listen_socket_factories the listener's socket factories, one per address.
    * @return a status indicating if an error occurred.
    */
-  virtual absl::Status doFinalPreWorkerInit(
+  virtual absl::Status initializeWorkerRouting(
       absl::Span<const Network::ListenSocketFactoryPtr> listen_socket_factories) PURE;
 };
 
