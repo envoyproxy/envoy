@@ -137,10 +137,5 @@ EnvoyDeterministicConnectionIdGeneratorFactory::getCompatibleConnectionIdWorkerS
   };
 }
 
-EnvoyQuicConnectionIdGeneratorFactoryPtr
-EnvoyDeterministicConnectionIdGeneratorContext::createQuicConnectionIdGeneratorFactory() {
-  return std::make_unique<EnvoyDeterministicConnectionIdGeneratorFactory>();
-}
-
 } // namespace Quic
 } // namespace Envoy

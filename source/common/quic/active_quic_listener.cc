@@ -372,24 +372,16 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     connection_debug_visitor_factory_ = factory.createFactory(*message, context_);
   }
 
-  // Initialize connection ID generator factory.
-  envoy::config::core::v3::TypedExtensionConfig cid_generator_config;
+  // Initialize connection ID generator factory config.
   if (!config.has_connection_id_generator_config()) {
-    cid_generator_config.set_name("envoy.quic.deterministic_connection_id_generator");
+    cid_generator_config_.set_name("envoy.quic.deterministic_connection_id_generator");
     envoy::extensions::quic::connection_id_generator::v3::DeterministicConnectionIdGeneratorConfig
         empty_connection_id_generator_config;
-    std::ignore =
-        cid_generator_config.mutable_typed_config()->PackFrom(empty_connection_id_generator_config);
+    std::ignore = cid_generator_config_.mutable_typed_config()->PackFrom(
+        empty_connection_id_generator_config);
   } else {
-    cid_generator_config = config.connection_id_generator_config();
+    cid_generator_config_ = config.connection_id_generator_config();
   }
-  auto& cid_generator_config_factory =
-      Config::Utility::getAndCheckFactory<EnvoyQuicConnectionIdGeneratorConfigFactory>(
-          cid_generator_config);
-  quic_cid_generator_context_ = cid_generator_config_factory.createQuicConnectionIdGeneratorContext(
-      *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
-                                                 cid_generator_config_factory),
-      validation_visitor, context_);
 
   if (config.has_server_preferred_address_config()) {
     const envoy::config::core::v3::TypedExtensionConfig& server_preferred_address_config =
@@ -407,8 +399,15 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.restart_features.quic_listener_factory_deferred_socket_option_init")) {
+    auto& cid_generator_config_factory =
+        Config::Utility::getAndCheckFactory<EnvoyQuicConnectionIdGeneratorConfigFactory>(
+            cid_generator_config_);
+
     quic_cid_generator_factory_ =
-        quic_cid_generator_context_->createQuicConnectionIdGeneratorFactory();
+        cid_generator_config_factory.createQuicConnectionIdGeneratorFactory(
+            *Config::Utility::translateToFactoryConfig(cid_generator_config_, validation_visitor,
+                                                       cid_generator_config_factory),
+            validation_visitor, context_);
     worker_selector_ =
         quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
     if (!disable_kernel_bpf_packet_routing_for_test_) {
@@ -444,9 +443,15 @@ absl::Status ActiveQuicListenerFactory::doFinalPreWorkerInit(
     return absl::OkStatus();
   }
 
-  ASSERT(quic_cid_generator_context_ != nullptr);
-  quic_cid_generator_factory_ =
-      quic_cid_generator_context_->createQuicConnectionIdGeneratorFactory();
+  auto& cid_generator_config_factory =
+      Config::Utility::getAndCheckFactory<EnvoyQuicConnectionIdGeneratorConfigFactory>(
+          cid_generator_config_);
+
+  quic_cid_generator_factory_ = cid_generator_config_factory.createQuicConnectionIdGeneratorFactory(
+      *Config::Utility::translateToFactoryConfig(
+          cid_generator_config_, context_.messageValidationVisitor(), cid_generator_config_factory),
+      context_.messageValidationVisitor(), context_);
+
   worker_selector_ =
       quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
   if (!disable_kernel_bpf_packet_routing_for_test_) {

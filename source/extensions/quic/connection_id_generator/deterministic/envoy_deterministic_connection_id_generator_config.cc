@@ -16,11 +16,11 @@ EnvoyDeterministicConnectionIdGeneratorConfigFactory::createEmptyConfigProto() {
                               DeterministicConnectionIdGeneratorConfig>();
 }
 
-EnvoyQuicConnectionIdGeneratorContextPtr
-EnvoyDeterministicConnectionIdGeneratorConfigFactory::createQuicConnectionIdGeneratorContext(
+EnvoyQuicConnectionIdGeneratorFactoryPtr
+EnvoyDeterministicConnectionIdGeneratorConfigFactory::createQuicConnectionIdGeneratorFactory(
     const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
     Server::Configuration::FactoryContext&) {
-  return std::make_unique<EnvoyDeterministicConnectionIdGeneratorContext>();
+  return std::make_unique<EnvoyDeterministicConnectionIdGeneratorFactory>();
 }
 
 REGISTER_FACTORY(EnvoyDeterministicConnectionIdGeneratorConfigFactory,

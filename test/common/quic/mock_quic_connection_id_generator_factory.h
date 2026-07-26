@@ -23,12 +23,6 @@ public:
               (uint32_t concurrency), (override));
 };
 
-class MockEnvoyQuicConnectionIdGeneratorContext : public EnvoyQuicConnectionIdGeneratorContext {
-public:
-  MOCK_METHOD(EnvoyQuicConnectionIdGeneratorFactoryPtr, createQuicConnectionIdGeneratorFactory, (),
-              (override));
-};
-
 class MockEnvoyQuicConnectionIdGeneratorConfigFactory
     : public EnvoyQuicConnectionIdGeneratorConfigFactory {
 public:
@@ -38,7 +32,7 @@ public:
     return std::make_unique<test::common::config::DummyConfig>();
   }
 
-  MOCK_METHOD(EnvoyQuicConnectionIdGeneratorContextPtr, createQuicConnectionIdGeneratorContext,
+  MOCK_METHOD(EnvoyQuicConnectionIdGeneratorFactoryPtr, createQuicConnectionIdGeneratorFactory,
               (const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
                Server::Configuration::FactoryContext&),
               (override));

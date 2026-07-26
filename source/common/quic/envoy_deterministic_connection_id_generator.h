@@ -44,12 +44,5 @@ private:
 #endif
 };
 
-class EnvoyDeterministicConnectionIdGeneratorContext
-    : public EnvoyQuicConnectionIdGeneratorContext {
-public:
-  // EnvoyQuicConnectionIdGeneratorContext.
-  EnvoyQuicConnectionIdGeneratorFactoryPtr createQuicConnectionIdGeneratorFactory() override;
-};
-
 } // namespace Quic
 } // namespace Envoy

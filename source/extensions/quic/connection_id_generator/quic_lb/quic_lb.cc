@@ -19,7 +19,7 @@ QuicLbConnectionIdGenerator::QuicLbConnectionIdGenerator(
     ThreadLocal::TypedSlot<ThreadLocalData>& tls, uint32_t worker_id)
     : tls_slot_(tls), worker_id_(worker_id) {
   ASSERT(worker_id <= UINT8_MAX,
-         "worker id constraint should have been validated in Context::create");
+         "worker id constraint should have been validated in Factory::create");
 }
 
 std::optional<quic::QuicConnectionId>
@@ -187,12 +187,12 @@ absl::StatusOr<KeyAndVersion> getAndValidateKeyAndVersion(
 
 } // namespace
 
-Context::Context(
+Factory::Factory(
     const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config)
     : config_(config) {}
 
-absl::StatusOr<std::unique_ptr<Context>>
-Context::create(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
+absl::StatusOr<std::unique_ptr<Factory>>
+Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
                 Server::Configuration::FactoryContext& context) {
   // The worker ID is stored in a single byte in the connection ID, so restrict use to concurrency
   // values compatible with this scheme.
@@ -202,7 +202,7 @@ Context::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
                                       "with a concurrency greater than 256");
   }
 
-  std::unique_ptr<Context> ret(new Context(config));
+  std::unique_ptr<Factory> ret(new Factory(config));
 
   auto server_id_or_result =
       Config::DataSource::read(config.server_id(), false, context.serverFactoryContext().api());
@@ -269,8 +269,8 @@ Context::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
           -> absl::Status { return getAndValidateKeyAndVersion(secret, api).status(); });
 
   ret->secrets_provider_update_callback_handle_ = ret->secrets_provider_->addUpdateCallback(
-      [&generator_context = *ret, &api = context.serverFactoryContext().api()]() -> absl::Status {
-        return generator_context.updateSecret(api);
+      [&factory = *ret, &api = context.serverFactoryContext().api()]() -> absl::Status {
+        return factory.updateSecret(api);
       });
 
   if (ret->secrets_provider_->secret()) {
@@ -281,7 +281,7 @@ Context::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
   return ret;
 }
 
-absl::Status Context::updateSecret(Api::Api& api) {
+absl::Status Factory::updateSecret(Api::Api& api) {
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret =
       secrets_provider_->secret();
   if (secret == nullptr) {
@@ -307,12 +307,8 @@ absl::Status Context::updateSecret(Api::Api& api) {
   return absl::OkStatus();
 }
 
-EnvoyQuicConnectionIdGeneratorFactoryPtr Context::createQuicConnectionIdGeneratorFactory() {
-  return std::make_unique<Factory>(*tls_slot_);
-}
-
 QuicConnectionIdGeneratorPtr Factory::createQuicConnectionIdGenerator(uint32_t worker_id) {
-  return std::make_unique<QuicLbConnectionIdGenerator>(tls_slot_, worker_id);
+  return std::make_unique<QuicLbConnectionIdGenerator>(*tls_slot_, worker_id);
 }
 
 absl::StatusOr<Network::Socket::OptionConstSharedPtr>
