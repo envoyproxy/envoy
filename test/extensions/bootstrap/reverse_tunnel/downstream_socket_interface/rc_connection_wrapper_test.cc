@@ -634,11 +634,11 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeLiteralHeaders) {
 }
 
 // Exercises the full ReverseTunnelInitiator::socket() -> io_handle -> wrapper path. socket()
-// snapshots the handshake formatters into the io_handle's config at creation time; when that happens
-// before onServerInitialized() builds them, the snapshot is null and gets reused for every re-dial.
-// This creates the socket while the extension is still uninitialized (and checks the snapshot really
-// is null), then initializes, dials, and checks the formatted value is sent -- not the raw literal.
-// Fails if the wrapper goes back to trusting the snapshot.
+// snapshots the handshake formatters into the io_handle's config at creation time; when that
+// happens before onServerInitialized() builds them, the snapshot is null and gets reused for every
+// re-dial. This creates the socket while the extension is still uninitialized (and checks the
+// snapshot really is null), then initializes, dials, and checks the formatted value is sent -- not
+// the raw literal. Fails if the wrapper goes back to trusting the snapshot.
 TEST_F(RCConnectionWrapperTest, HandshakeHeadersResolvedThroughSocketPathAfterInit) {
   Envoy::Formatter::TestCommandFactory factory;
   Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
@@ -678,7 +678,8 @@ TEST_F(RCConnectionWrapperTest, HandshakeHeadersResolvedThroughSocketPathAfterIn
   auto* io_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
   ASSERT_NE(io_handle, nullptr);
   // Root cause: the socket captured a null formatter snapshot because it was created before
-  // onServerInitialized(). A wrapper trusting this snapshot would emit the raw literal on every dial.
+  // onServerInitialized(). A wrapper trusting this snapshot would emit the raw literal on every
+  // dial.
   ASSERT_EQ(io_handle->handshakeHeaders(), nullptr);
 
   // The worker registers and the formatters are built only now, after the socket already exists.

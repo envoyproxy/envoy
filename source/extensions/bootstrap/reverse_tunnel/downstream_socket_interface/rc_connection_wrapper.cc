@@ -193,11 +193,12 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   };
 
   // Read the handshake formatters from the live extension, not from the io_handle's snapshot. The
-  // listen socket can be created before onServerInitialized() builds the formatters, so the snapshot
-  // taken at socket creation (parent_.handshakeHeaders()) may be null. That snapshot is reused for
-  // every re-dial, so trusting it would send the raw additional_headers() value instead of the
-  // formatted one. The extension always has the built formatters by the time we send a handshake;
-  // fall back to the snapshot only when the extension has none (it's just a copy of it anyway).
+  // listen socket can be created before onServerInitialized() builds the formatters, so the
+  // snapshot taken at socket creation (parent_.handshakeHeaders()) may be null. That snapshot is
+  // reused for every re-dial, so trusting it would send the raw additional_headers() value instead
+  // of the formatted one. The extension always has the built formatters by the time we send a
+  // handshake; fall back to the snapshot only when the extension has none (it's just a copy of it
+  // anyway).
   ReverseTunnelInitiatorExtension* extension = getDownstreamExtension();
   const HandshakeHeadersConstSharedPtr handshake_headers =
       (extension != nullptr && extension->handshakeHeaders() != nullptr)
