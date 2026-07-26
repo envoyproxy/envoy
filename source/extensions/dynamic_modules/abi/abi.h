@@ -9807,11 +9807,13 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
  * hostname.
  *
  * A non-empty logical hostname is available to upstream features such as automatic SNI and SAN
- * validation. An empty hostname entry preserves the legacy synthesized hostname behavior.
+ * validation. An empty hostname entry uses the same synthesized hostname behavior as
+ * envoy_dynamic_module_callback_cluster_add_hosts.
  *
  * @param hostnames is the optional array of logical hostnames corresponding to ``addresses``. Each
- * entry is owned by the module. An entry with length 0 uses the legacy synthesized hostname. The
- * entire array can be nullptr to use the legacy behavior for all hosts.
+ * entry is owned by the module. An entry with length 0 uses the same synthesized hostname behavior
+ * as envoy_dynamic_module_callback_cluster_add_hosts. The entire array can be nullptr to use that
+ * behavior for all hosts.
  *
  * See envoy_dynamic_module_callback_cluster_add_hosts for all other parameters and return
  * semantics.

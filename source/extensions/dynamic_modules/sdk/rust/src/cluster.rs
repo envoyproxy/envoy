@@ -374,8 +374,8 @@ pub trait EnvoyCluster: Send + Sync {
   ///
   /// Each non-empty hostname is stored separately from its corresponding `ip:port` address and is
   /// available to upstream features such as automatic SNI and SAN validation. An empty hostname
-  /// uses Envoy's legacy synthesized hostname. `hostnames` must have the same length as
-  /// `addresses`.
+  /// uses the same synthesized hostname as [`EnvoyCluster::add_hosts`]. `hostnames` must have the
+  /// same length as `addresses`.
   fn add_hosts_with_hostnames(
     &self,
     addresses: &[String],
@@ -460,8 +460,8 @@ pub trait EnvoyCluster: Send + Sync {
   ///
   /// Each non-empty hostname is stored separately from its corresponding `ip:port` address and is
   /// available to upstream features such as automatic SNI and SAN validation. An empty hostname
-  /// uses Envoy's legacy synthesized hostname. `hostnames` must have the same length as
-  /// `addresses`.
+  /// uses the same synthesized hostname as [`EnvoyCluster::add_hosts_with_locality_to_priority`].
+  /// `hostnames` must have the same length as `addresses`.
   fn add_hosts_with_hostnames_and_locality_to_priority(
     &self,
     priority: u32,
@@ -2916,7 +2916,7 @@ mod tests {
   fn add_hosts_with_hostnames_dispatches_and_validates_lengths() {
     use std::sync::atomic::Ordering;
 
-    crate::mod_test::MOCK_CLUSTER_LEGACY_ADD_HOSTS_CALLS.store(0, Ordering::SeqCst);
+    crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.store(0, Ordering::SeqCst);
     crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS
       .lock()
       .unwrap()
@@ -2977,9 +2977,9 @@ mod tests {
 
     cluster
       .add_hosts(&addresses, &weights)
-      .expect("the existing method must retain the legacy ABI");
+      .expect("the existing method must call the existing ABI callback");
     assert_eq!(
-      crate::mod_test::MOCK_CLUSTER_LEGACY_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
+      crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
       1
     );
   }

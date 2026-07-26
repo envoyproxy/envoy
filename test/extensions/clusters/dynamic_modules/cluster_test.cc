@@ -649,7 +649,7 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesDeduplicatesIncrementalSha
   EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), &host_ptrs[0], 1));
 }
 
-TEST_F(DynamicModuleClusterTest, AddHostsWithNullHostnamesABIUsesLegacyHostname) {
+TEST_F(DynamicModuleClusterTest, AddHostsWithNullHostnamesABIUsesExistingSynthesizedHostname) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_OK(result);
 

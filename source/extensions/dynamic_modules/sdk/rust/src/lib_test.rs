@@ -4388,7 +4388,7 @@ fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
 // Cluster Extension FFI stubs for testing.
 // =============================================================================
 
-pub(crate) static MOCK_CLUSTER_LEGACY_ADD_HOSTS_CALLS: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static MOCK_CLUSTER_ADD_HOSTS_CALLS: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS: std::sync::Mutex<
   Vec<(u32, Vec<Vec<u8>>)>,
 > = std::sync::Mutex::new(Vec::new());
@@ -4439,7 +4439,7 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
   _count: usize,
   _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
 ) -> bool {
-  MOCK_CLUSTER_LEGACY_ADD_HOSTS_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  MOCK_CLUSTER_ADD_HOSTS_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
   write_mock_cluster_host_ptrs(_result_host_ptrs, _count);
   true
 }
