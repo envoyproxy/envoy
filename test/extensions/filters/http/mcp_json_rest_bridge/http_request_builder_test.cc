@@ -254,6 +254,23 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversa
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+// '\' is percent-encoded to %5C rather than reaching the upstream literally, but an upstream that
+// decodes it and folds it to '/' would still see a traversal, so '\' is treated as a segment
+// separator by the check as well.
+TEST(HttpRequestBuilderTest, ConstructBaseUrlRejectsBackslashPathTraversal) {
+  json arguments = json::parse(R"json({"id": "..\\..\\admin\\secrets"})json");
+  EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+// A backslash that is not a traversal segment is still allowed through, percent-encoded.
+TEST(HttpRequestBuilderTest, ConstructBaseUrlEncodesNonTraversalBackslash) {
+  json arguments = json::parse(R"json({"id": "a\\b"})json");
+  absl::StatusOr<std::string> url = constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments);
+  ASSERT_TRUE(url.ok());
+  EXPECT_THAT(*url, StrEq("/v1/users/a%5Cb/profile"));
+}
+
 TEST(HttpRequestBuilderTest, PathTemplateNotInArgumentsReturnError) {
   HttpRule http_rule;
   TestUtility::loadFromYaml(R"yaml(

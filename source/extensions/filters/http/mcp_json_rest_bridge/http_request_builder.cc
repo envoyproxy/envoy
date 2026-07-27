@@ -3,6 +3,8 @@
 #include "source/common/http/utility.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "nlohmann/json.hpp"
@@ -155,7 +157,9 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
 
     // The constructed URL is installed verbatim as the upstream `:path` and is not re-normalized by
     // Envoy, so no attacker-controlled value may contain a '.'/'..' traversal segment (#45931).
-    for (const absl::string_view segment : absl::StrSplit(raw_value, '/')) {
+    // '\' is percent-encoded below, but an upstream that decodes it and folds it to '/' would see a
+    // traversal, so treat it as a separator here too.
+    for (const absl::string_view segment : absl::StrSplit(raw_value, absl::ByAnyChar("\\/"))) {
       if (segment == "." || segment == "..") {
         return absl::InvalidArgumentError(absl::StrCat(
             "path template variable '", element, "' must not contain path traversal segments"));
@@ -164,8 +168,8 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     // A simple variable (`{id}`) fills one segment, so its '/' is encoded; a variable with an
     // explicit pattern (`{name=projects/*}`) may span segments, so its '/' is preserved.
     const absl::string_view reserved_chars =
-        RE2::PartialMatch(pattern, "\\{" + RE2::QuoteMeta(element) + "=") ? ReservedChars
-                                                                          : ReservedCharsWithSlash;
+        absl::StrContains(pattern, absl::StrCat("{", element, "=")) ? ReservedChars
+                                                                    : ReservedCharsWithSlash;
 
     // Non-visible ASCII characters are always escaped by Http::Utility::PercentEncoding::encode,
     // in addition to the specified reserved characters.
