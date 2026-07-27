@@ -10,8 +10,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/json_escape_string.h"
-#include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -587,8 +587,16 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   // (final size is unknown), and let the headers flow through immediately so
   // the client can start receiving data without waiting for the full body.
   if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
-    buildStreamingPrefixAndSuffix(getResponseCode(response_headers) >=
-                                  static_cast<int>(Http::Code::BadRequest));
+    const int status_code = getResponseCode(response_headers);
+    // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
+    // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
+    // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
+    // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+    if (status_code != static_cast<int>(Http::Code::Unauthorized) &&
+        status_code != static_cast<int>(Http::Code::Forbidden)) {
+      response_headers.setStatus(enumToInt(Http::Code::OK));
+    }
+    buildStreamingPrefixAndSuffix(status_code >= static_cast<int>(Http::Code::BadRequest));
     response_headers.removeContentLength();
     response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
     return Http::FilterHeadersStatus::Continue;
@@ -1024,6 +1032,17 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
   }
 
   if (response_headers.has_value()) {
+    if (mcp_operation_ == McpOperation::ToolsCall || mcp_operation_ == McpOperation::ToolsList) {
+      const int status_code = getResponseCode(response_headers);
+      // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
+      // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
+      // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
+      // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+      if (status_code != static_cast<int>(Http::Code::Unauthorized) &&
+          status_code != static_cast<int>(Http::Code::Forbidden)) {
+        response_headers->setStatus(enumToInt(Http::Code::OK));
+      }
+    }
     const auto transfer_encoding = response_headers->TransferEncoding();
     const bool is_chunked =
         transfer_encoding != nullptr &&
