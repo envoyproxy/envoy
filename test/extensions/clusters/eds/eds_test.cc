@@ -22,14 +22,17 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::DoAll;
+using ::testing::Not;
 using testing::Return;
 using testing::SaveArg;
 
@@ -148,7 +151,7 @@ public:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -268,9 +271,9 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
 // Validate that onConfigUpdate() with empty cluster vector size ignores config.
 TEST_F(EdsTest, OnConfigUpdateEmpty) {
   initialize();
-  EXPECT_TRUE(eds_callbacks_->onConfigUpdate({}, "").ok());
+  EXPECT_OK(eds_callbacks_->onConfigUpdate({}, ""));
   Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(eds_callbacks_->onConfigUpdate({}, removed_resources, "").ok());
+  EXPECT_OK(eds_callbacks_->onConfigUpdate({}, removed_resources, ""));
   EXPECT_EQ(2UL, stats_.findCounterByString("cluster.name.update_empty").value().get().value());
   EXPECT_TRUE(initialized_);
 }
@@ -315,7 +318,7 @@ TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources, "cluster_name");
-  EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
+  EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
 
   EXPECT_TRUE(initialized_);
   EXPECT_EQ(1UL,
@@ -538,7 +541,7 @@ TEST_F(EdsTest, RejectBaseClassConstructorFailure) {
 
   // The most important passing criteria is that the above didn't crash.
 
-  EXPECT_FALSE(cluster_or_status.ok());
+  EXPECT_THAT(cluster_or_status, Not(IsOk()));
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
@@ -966,8 +969,8 @@ TEST_F(EdsTest, MalformedIPForHealthChecks) {
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException, "malformed IP address: foo.bar.com");
+      EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "")), EnvoyException,
+      "malformed IP address: foo.bar.com");
 }
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
@@ -2628,8 +2631,8 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException, "Unexpected non-zero priority for local cluster 'name'.");
+      EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "")), EnvoyException,
+      "Unexpected non-zero priority for local cluster 'name'.");
 
   // Try an update which only has endpoints with P=0. This should go through.
   cluster_load_assignment.clear_endpoints();
@@ -2921,8 +2924,7 @@ TEST_F(EdsTest, MalformedIP) {
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException,
+      EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "")), EnvoyException,
       "malformed IP address: foo.bar.com. Consider setting resolver_name or "
       "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
@@ -3209,14 +3211,14 @@ public:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(eds_callbacks_pre_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(eds_callbacks_pre_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
   void doOnConfigUpdateVerifyNoThrowPost(
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(eds_callbacks_post_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(eds_callbacks_post_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
   // Emulates a CDS update that creates a new cluster object with the same name,
   // that waits for EDS response.
@@ -3553,7 +3555,7 @@ public:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -3599,7 +3601,7 @@ TEST_F(XdstpConfigsEdsTest, DeltaOnConfigUpdateSuccess) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources, "cluster_name");
-  EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
+  EXPECT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
 
   EXPECT_TRUE(initialized_);
   EXPECT_EQ(1UL, stats_

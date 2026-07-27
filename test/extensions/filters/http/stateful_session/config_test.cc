@@ -3,6 +3,7 @@
 #include "test/mocks/http/stateful_session.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -71,14 +72,10 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
 
-  EXPECT_TRUE(factory
-                  .createRouteSpecificFilterConfig(proto_route_config, server_context,
-                                                   context.messageValidationVisitor())
-                  .ok());
-  EXPECT_TRUE(factory
-                  .createRouteSpecificFilterConfig(disabled_config, server_context,
-                                                   context.messageValidationVisitor())
-                  .ok());
+  EXPECT_OK(factory.createRouteSpecificFilterConfig(proto_route_config, server_context,
+                                                    context.messageValidationVisitor()));
+  EXPECT_OK(factory.createRouteSpecificFilterConfig(disabled_config, server_context,
+                                                    context.messageValidationVisitor()));
   EXPECT_THROW_WITH_MESSAGE(
       factory
           .createRouteSpecificFilterConfig(not_exist_config, server_context,
@@ -90,10 +87,8 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context)
                       .status()
                       .IgnoreError());
-  EXPECT_TRUE(factory
-                  .createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
-                                                   context.messageValidationVisitor())
-                  .ok());
+  EXPECT_OK(factory.createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
+                                                    context.messageValidationVisitor()));
 }
 
 TEST(StatefulSessionFactoryConfigTest, SimpleConfigTestWithServerContext) {

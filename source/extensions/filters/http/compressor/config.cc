@@ -15,9 +15,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Compressor {
 
-absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFactory(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::GenericFactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(
       proto_config.compressor_library().typed_config().type_url())};
   Compression::Compressor::NamedCompressorLibraryConfigFactory* const config_factory =
@@ -38,6 +38,20 @@ absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFacto
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CompressorFilter>(config));
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto_config, stats_prefix, context);
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+CompressorFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+  return createFilterFactory(proto_config, stats_prefix, generic_context);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

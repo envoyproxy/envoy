@@ -83,14 +83,11 @@ public:
   Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override;
   Upstream::LoadStatsReporter* loadStatsReporter() const override;
 
-  void handleDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
-
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure(bool) override;
   void
-  onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+  onDiscoveryResponse(ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
                       ControlPlaneStats& control_plane_stats) override;
   void onWriteable() override;
 

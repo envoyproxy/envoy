@@ -41,7 +41,7 @@ public:
       Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
       Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
       Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory& cluster_store_factory,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::ServerFactoryContext& context);
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreSharedPtr clusterStore() {
     return cluster_store_;

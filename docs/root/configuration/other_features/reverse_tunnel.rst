@@ -82,13 +82,26 @@ In the example above, this expands to:
 * ``src_cluster_id``: ``downstream-cluster`` - Logical grouping identifier for this Envoy and its peers.
 * ``src_tenant_id``: ``downstream-tenant`` - Tenant identifier for multi-tenant isolation.
 * ``remote_cluster``: ``upstream-cluster`` - Name of the upstream cluster to connect to.
-* ``connection_count``: ``1`` - Number of reverse connections to establish to the remote cluster.
+* ``connection_count``: ``1`` - Number of reverse connections to establish to **each resolved
+  endpoint (host)** of the remote cluster, not per cluster. See
+  :ref:`Connection count semantics <config_reverse_tunnel_connection_count>` below.
 
 The identifiers serve the following purposes:
 
 * **src_node_id**: Each node must have a unique ``src_node_id`` across the entire system to ensure proper routing and connection management. Data requests can target a specific node by its ID.
 * **src_cluster_id**: Multiple nodes can share the same ``src_cluster_id``, forming a logical group. Data requests sent using the cluster ID will be load balanced across all nodes in that cluster. The ``src_cluster_id`` must not collide with any ``src_node_id``.
 * **src_tenant_id**: Used in multi-tenant environments to isolate traffic and resources between different tenants or organizational units.
+
+.. _config_reverse_tunnel_connection_count:
+
+.. note::
+
+  ``connection_count`` is applied **per resolved endpoint (host)**, not per cluster. The initiator
+  resolves the remote cluster to its set of hosts and maintains ``connection_count`` connections to
+  each one, so the total for a cluster is ``number_of_resolved_endpoints * connection_count``. For
+  example, a cluster that resolves to 2 endpoints (such as a ``STRICT_DNS`` cluster or a headless
+  ``Service`` with 2 replicas) with ``connection_count: 4`` establishes 8 connections in total, 4 to
+  each endpoint, not 4 shared across the cluster. Size your socket budget accordingly.
 
 The ``downstream-service`` cluster in the example refers to the service behind the initiator Envoy that will be accessed via reverse tunnels from services behind the responder Envoy.
 
@@ -118,7 +131,7 @@ Multiple cluster support
 
 To establish reverse tunnels to multiple upstream clusters simultaneously, use the ``additional_addresses``
 field on the listener. Each address in this list specifies an additional upstream cluster and the number
-of connections to establish to it.
+of connections to establish to each of its resolved endpoints.
 
 .. code-block:: yaml
 
@@ -142,8 +155,10 @@ of connections to establish to it.
 
 This configuration establishes:
 
-* 2 connections to ``cluster-a``
-* 3 connections to ``cluster-b``
+* 2 connections to each resolved endpoint of ``cluster-a``
+* 3 connections to each resolved endpoint of ``cluster-b``
+
+(per :ref:`Connection count semantics <config_reverse_tunnel_connection_count>`).
 
 TLS configuration
 ~~~~~~~~~~~~~~~~~

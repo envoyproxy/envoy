@@ -30,17 +30,20 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::An;
 using testing::AnyNumber;
 using testing::ByMove;
 using testing::Eq;
 using testing::InvokeWithoutArgs;
+using ::testing::Not;
 using testing::NotNull;
 using testing::Pointee;
 using testing::Ref;
@@ -199,7 +202,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.server_factory_context_.local_info_.address_, config.localAddress());
@@ -245,7 +248,7 @@ http_filters:
                                        date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
-    ASSERT_TRUE(creation_status_.ok());
+    ASSERT_OK(creation_status_);
   }
 #else
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
@@ -309,7 +312,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // By default, tracer must be a null object (Tracing::NullTracer) rather than nullptr.
   EXPECT_THAT(config.tracer().get(), WhenDynamicCastTo<Tracing::NullTracer*>(NotNull()));
@@ -351,7 +354,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Even though tracer provider is configured in the bootstrap config, a given filter instance
   // should not have a tracer associated with it.
@@ -390,7 +393,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Actual Tracer must be obtained from the HttpTracerManager.
   EXPECT_THAT(config.tracer(), Eq(tracer_));
@@ -434,7 +437,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Actual Tracer must be obtained from the HttpTracerManager.
   EXPECT_THAT(config.tracer(), Eq(tracer_));
@@ -496,7 +499,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Actual Tracer must be obtained from the HttpTracerManager.
   EXPECT_THAT(config.tracer(), Eq(tracer_));
@@ -529,7 +532,7 @@ tracing:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
@@ -556,7 +559,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
   EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config.tracingConfig()->max_path_tag_length_);
@@ -594,7 +597,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   EXPECT_EQ(1, config.tracingConfig()->client_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
@@ -631,7 +634,7 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   EXPECT_EQ(0, config.tracingConfig()->client_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
@@ -668,7 +671,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest(store);
@@ -681,7 +684,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
       dispatcher, tls, runtime_config, local_info, store, generator, validation_visitor, *api);
-  ASSERT_TRUE(loader.ok());
+  ASSERT_OK(loader);
 
   int sampled_count = 0;
   NiceMock<Router::MockRoute> route;
@@ -716,7 +719,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // By default, trace context propagation is enabled (no_context_propagation is false)
   EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
@@ -739,7 +742,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationEnabled) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Trace context propagation is disabled when the flag is set to true
   EXPECT_TRUE(config.tracingConfig()->noContextPropagation());
@@ -762,7 +765,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationExplicitFa
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Trace context propagation is enabled when the flag is explicitly set to false
   EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
@@ -785,7 +788,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   auto unix_address = *Network::Address::PipeInstance::create("/foo");
   Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0, nullptr};
   Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0, nullptr};
@@ -809,7 +812,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   // Envoy no longer considers RFC1918 IP addresses to be internal if runtime guard is enabled.
   Network::Address::Ipv4Instance default_ip_address{"10.48.179.130", 0, nullptr};
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
@@ -837,7 +840,7 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   Network::Address::Ipv4Instance first_internal_ip_address{"100.64.0.10", 0, nullptr};
   Network::Address::Ipv4Instance second_internal_ip_address{"50.20.0.5", 0, nullptr};
   // This address is in the list of acceptable addresses (based on RFC1918) when the new config is
@@ -870,7 +873,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(60, config.maxRequestHeadersKb());
 }
 
@@ -890,7 +893,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(16, config.maxRequestHeadersKb());
 }
 
@@ -910,7 +913,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(8192, config.maxRequestHeadersKb());
 }
 
@@ -951,7 +954,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfiguredViaRunti
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(9000, config.maxRequestHeadersKb());
 }
 
@@ -974,7 +977,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersCountMaxConfiguredViaRu
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(42, config.maxRequestHeadersCount());
 }
 
@@ -995,7 +998,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
@@ -1014,7 +1017,7 @@ TEST_F(HttpConnectionManagerConfigTest, StreamIdleTimeoutDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   // 5 minutes -> ms.
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
@@ -1036,7 +1039,7 @@ TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   ASSERT_TRUE(config.streamFlushTimeout().has_value());
   // 5 minutes.
   EXPECT_EQ(5 * 60 * 1000, config.streamFlushTimeout().value().count());
@@ -1060,7 +1063,7 @@ TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutDefaultStreamIdleTimeo
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   ASSERT_TRUE(config.streamFlushTimeout().has_value());
   // 10 seconds.
   EXPECT_EQ(10 * 1000, config.streamFlushTimeout().value().count());
@@ -1083,7 +1086,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamFlushTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   ASSERT_TRUE(config.streamFlushTimeout().has_value());
   EXPECT_EQ(0, config.streamFlushTimeout().value().count());
 }
@@ -1106,7 +1109,7 @@ TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutAndStreamIdleTimeoutSe
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(10 * 1000, config.streamIdleTimeout().count());
   ASSERT_TRUE(config.streamFlushTimeout().has_value());
   EXPECT_EQ(20 * 1000, config.streamFlushTimeout().value().count());
@@ -1132,7 +1135,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxConnectionDurationJitter) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   // With jitter configured (50%), each call returns a value in [10000, 15000].
   // The jittering is internal to the config; we observe it by sampling.
   for (int i = 0; i < 5; ++i) {
@@ -1160,7 +1163,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxConnectionDurationJitterDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(10000, config.maxConnectionDuration().value().count());
 }
 
@@ -1183,7 +1186,7 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitter) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   // With jitter configured (25%), each call returns a value in [5000, 6250].
   for (int i = 0; i < 5; ++i) {
     const auto value = config.drainTimeout().count();
@@ -1208,7 +1211,7 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitterDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   // No jitter configured: drainTimeout() returns its base (default 5s).
   EXPECT_EQ(5000, config.drainTimeout().count());
 }
@@ -1231,7 +1234,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(1000, config.idleTimeout().value().count());
 }
 
@@ -1251,7 +1254,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(std::chrono::hours(1), config.idleTimeout().value());
 }
 
@@ -1273,7 +1276,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_FALSE(config.idleTimeout().has_value());
 }
 
@@ -1293,7 +1296,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestHeaderCount) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(100, config.maxRequestHeadersCount());
 }
 
@@ -1315,7 +1318,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(200, config.maxRequestHeadersCount());
 }
 
@@ -1337,7 +1340,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxResponseHeaderKbInvalid) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_, Not(IsOk()));
 }
 
 // Checking that default max_requests_per_connection is 0.
@@ -1356,7 +1359,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestPerConnection) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(0, config.maxRequestsPerConnection());
 }
 
@@ -1378,7 +1381,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestPerConnectionConfigurable) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(5, config.maxRequestsPerConnection());
 }
 
@@ -1402,7 +1405,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
 }
@@ -1427,7 +1430,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT,
             config.serverHeaderTransformation());
 }
@@ -1452,7 +1455,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::PASS_THROUGH,
             config.serverHeaderTransformation());
 }
@@ -1478,7 +1481,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(config.schemeToSet(), "http");
 }
 
@@ -1502,7 +1505,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   ASSERT_FALSE(config.shouldSchemeMatchUpstream());
 }
 
@@ -1528,7 +1531,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpsreamTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   ASSERT_TRUE(config.shouldSchemeMatchUpstream());
 }
 
@@ -1554,7 +1557,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   ASSERT_FALSE(config.shouldSchemeMatchUpstream());
 }
 
@@ -1581,7 +1584,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamAndSchemeToOverwriteI
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(config.schemeToSet(), "https");
   ASSERT_FALSE(config.shouldSchemeMatchUpstream());
   EXPECT_LOG_CONTAINS("warn",
@@ -1610,7 +1613,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 #ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
   EXPECT_TRUE(config.shouldNormalizePath());
 #else
@@ -1641,7 +1644,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_TRUE(config.shouldNormalizePath());
 }
 
@@ -1669,7 +1672,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_TRUE(config.shouldNormalizePath());
 }
 
@@ -1697,7 +1700,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_FALSE(config.shouldNormalizePath());
 }
 
@@ -1717,7 +1720,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_FALSE(config.shouldMergeSlashes());
 }
 
@@ -1738,7 +1741,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_TRUE(config.shouldMergeSlashes());
 }
 
@@ -1759,7 +1762,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_FALSE(config.shouldMergeSlashes());
 }
 
@@ -1779,7 +1782,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
@@ -1800,7 +1803,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(Http::StripPortType::MatchingHost, config.stripPortType());
 }
 
@@ -1840,7 +1843,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
@@ -1861,7 +1864,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(Http::StripPortType::Any, config.stripPortType());
 }
 
@@ -1882,7 +1885,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
@@ -1902,7 +1905,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(false, config.shouldStripTrailingHostDot());
 }
 
@@ -1923,7 +1926,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(true, config.shouldStripTrailingHostDot());
 }
 
@@ -1944,7 +1947,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(false, config.shouldStripTrailingHostDot());
 }
 
@@ -1964,7 +1967,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) 
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::ALLOW,
             config.headersWithUnderscoresAction());
 }
@@ -1987,7 +1990,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresDroppedByConfig) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER,
             config.headersWithUnderscoresAction());
 }
@@ -2010,7 +2013,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresRequestRejectedByC
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST,
             config.headersWithUnderscoresAction());
 }
@@ -2031,7 +2034,7 @@ TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(53 * 1000, config.requestTimeout().count());
 }
 
@@ -2051,7 +2054,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(0, config.requestTimeout().count());
 }
 
@@ -2070,7 +2073,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(0, config.requestTimeout().count());
 }
 
@@ -2155,7 +2158,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
                                        context_, date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
-    ASSERT_TRUE(creation_status_.ok());
+    ASSERT_OK(creation_status_);
 
     EXPECT_FALSE(config.flushAccessLogOnNewRequest());
   }
@@ -2170,7 +2173,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
                                        date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
-    ASSERT_TRUE(creation_status_.ok());
+    ASSERT_OK(creation_status_);
 
     EXPECT_FALSE(config.flushAccessLogOnNewRequest());
   }
@@ -2185,7 +2188,7 @@ TEST_F(HttpConnectionManagerConfigTest, FlushAccessLogOnNewRequest) {
                                        date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
-    ASSERT_TRUE(creation_status_.ok());
+    ASSERT_OK(creation_status_);
 
     EXPECT_TRUE(config.flushAccessLogOnNewRequest());
   }
@@ -2221,7 +2224,7 @@ TEST_F(HttpConnectionManagerConfigTest,
                                        date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
-    ASSERT_TRUE(creation_status_.ok());
+    ASSERT_OK(creation_status_);
 
     EXPECT_TRUE(config.flushAccessLogOnNewRequest());
   }
@@ -2276,7 +2279,7 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
                                        context_, date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
-    ASSERT_TRUE(creation_status_.ok());
+    ASSERT_OK(creation_status_);
 
     EXPECT_FALSE(config.accessLogFlushInterval().has_value());
   }
@@ -2291,7 +2294,7 @@ TEST_F(HttpConnectionManagerConfigTest, AccessLogFlushInterval) {
                                        date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
-    ASSERT_TRUE(creation_status_.ok());
+    ASSERT_OK(creation_status_);
 
     EXPECT_TRUE(config.accessLogFlushInterval().has_value());
     EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
@@ -2327,7 +2330,7 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedAccess
                                        date_provider_, route_config_provider_manager_,
                                        &scoped_routes_config_provider_manager_, tracer_manager_,
                                        filter_config_provider_manager_, creation_status_);
-    ASSERT_TRUE(creation_status_.ok());
+    ASSERT_OK(creation_status_);
 
     EXPECT_TRUE(config.accessLogFlushInterval().has_value());
     EXPECT_EQ(std::chrono::seconds(1), config.accessLogFlushInterval().value());
@@ -2667,7 +2670,7 @@ TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_FALSE(config.alwaysSetRequestIdInResponse());
 }
 
@@ -2687,7 +2690,7 @@ TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseConfigured) 
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_TRUE(config.alwaysSetRequestIdInResponse());
 }
 
@@ -2761,7 +2764,7 @@ TEST_F(HttpConnectionManagerConfigTest, CustomRequestIDExtension) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   auto request_id_extension =
       dynamic_cast<TestRequestIDExtension*>(config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
@@ -2828,7 +2831,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   auto request_id_extension = dynamic_cast<Extensions::RequestId::UUIDRequestIDExtension*>(
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
@@ -2856,7 +2859,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   auto request_id_extension = dynamic_cast<Extensions::RequestId::UUIDRequestIDExtension*>(
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
@@ -3008,7 +3011,7 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   const auto& original_ip_detection_extensions = config.originalIpDetectionExtensions();
   EXPECT_EQ(1, original_ip_detection_extensions.size());
@@ -3035,7 +3038,7 @@ TEST_F(HttpConnectionManagerConfigTest, EarlyHeaderMutationExtension) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   const auto& early_header_mutation_extensions = config.earlyHeaderMutationExtensions();
   EXPECT_EQ(1, early_header_mutation_extensions.size());
@@ -3356,7 +3359,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED,
             config.pathWithEscapedSlashesAction());
@@ -3386,7 +3389,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::UNESCAPE_AND_REDIRECT,
             config.pathWithEscapedSlashesAction());
@@ -3399,7 +3402,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
                                       date_provider_, route_config_provider_manager_,
                                       &scoped_routes_config_provider_manager_, tracer_manager_,
                                       filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::UNESCAPE_AND_FORWARD,
             config1.pathWithEscapedSlashesAction());
@@ -3433,7 +3436,7 @@ TEST_F(HttpConnectionManagerConfigTest,
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::REJECT_REQUEST,
             config.pathWithEscapedSlashesAction());
@@ -3469,7 +3472,7 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED,
             config.pathWithEscapedSlashesAction());
@@ -3494,7 +3497,7 @@ TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsCertAndChain)
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_EQ(Http::ForwardClientCertType::AppendForward, config.forwardClientCert());
   EXPECT_EQ(2, config.setCurrentClientCertDetails().size());
   EXPECT_EQ(Http::ClientCertDetailsType::Cert, config.setCurrentClientCertDetails()[0]);
@@ -3539,7 +3542,7 @@ TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcher) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Verify the default forward_client_cert is SANITIZE.
   EXPECT_EQ(Http::ForwardClientCertType::Sanitize, config.forwardClientCert());
@@ -3603,7 +3606,7 @@ TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcherWithMultipleActi
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Verify the matcher is created.
   EXPECT_NE(nullptr, config.forwardClientCertMatcher());
@@ -3633,7 +3636,7 @@ TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcherAllDetailsTypes)
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Verify the matcher is created.
   EXPECT_NE(nullptr, config.forwardClientCertMatcher());
@@ -3733,7 +3736,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #else
   // If UHV is disabled, providing config should result in rejection
@@ -3772,7 +3775,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfigWithRuntimeDisabled
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   // Without envoy.reloadable_features.enable_universal_header_validator runtime set, UHV is always
   // disabled
   EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
@@ -3782,7 +3785,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfigWithRuntimeDisabled
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_FALSE(creation_status_.ok());
+  ASSERT_THAT(creation_status_, Not(IsOk()));
 #endif
 }
 
@@ -3816,7 +3819,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfigWithRuntimeE
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
   EXPECT_FALSE(proto_config.restrict_http_methods());
   EXPECT_FALSE(proto_config.strip_fragment_from_path());
@@ -3833,7 +3836,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfigWithRuntimeE
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_FALSE(creation_status_.ok());
+  ASSERT_THAT(creation_status_, Not(IsOk()));
 #endif
 }
 
@@ -3862,7 +3865,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   // Without envoy.reloadable_features.enable_universal_header_validator runtime set, UHV is always
   // disabled
@@ -3906,7 +3909,7 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
   EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
   EXPECT_TRUE(proto_config.strip_fragment_from_path());
   EXPECT_FALSE(proto_config.restrict_http_methods());
@@ -3923,7 +3926,7 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_, Not(IsOk()));
 #endif
 }
 
@@ -4061,7 +4064,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   const auto& https_ports = config.httpsDestinationPorts();
   EXPECT_EQ(2, https_ports.size());
@@ -4100,7 +4103,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
   EXPECT_TRUE(config.httpsDestinationPorts().empty());
   EXPECT_TRUE(config.httpDestinationPorts().empty());
 }
@@ -4161,7 +4164,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 }
 
 } // namespace

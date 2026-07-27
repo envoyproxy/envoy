@@ -483,6 +483,12 @@ private:
     absl::flat_hash_map<std::string, ReverseConnectionState>
         connection_states;        // State tracking per connection
     uint32_t connecting_count{0}; // Number of pending connections.
+    // Wall-clock epoch millis of the first dial in the current establishment episode. Set on the
+    // first dial made while the host has no live connection, carried unchanged across handshake
+    // retries, and cleared on handshake success. This makes retries during initial establishment
+    // report the original intent time, while a redial after a previously-established connection
+    // drops starts a fresh episode.
+    std::optional<int64_t> episode_initiation_time_ms;
   };
 
   // Map from host address to connection info.

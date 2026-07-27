@@ -9,17 +9,30 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Transform {
 
-absl::StatusOr<Http::FilterFactoryCb> TransformFactoryConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> TransformFactoryConfig::createFilterFactory(
     const ProtoConfig& proto_config, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
   absl::Status creation_status = absl::OkStatus();
   auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, stat_prefix, context, creation_status);
+      std::make_shared<FilterConfig>(proto_config, stat_prefix, context, scope, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<TransformFilter>(filter_config));
   };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> TransformFactoryConfig::createFilterFactoryFromProtoTyped(
+    const ProtoConfig& proto_config, const std::string& stat_prefix,
+    Server::Configuration::FactoryContext& context) {
+  return createFilterFactory(proto_config, stat_prefix, context.serverFactoryContext(),
+                             context.scope());
+}
+
+absl::StatusOr<Http::FilterFactoryCb> TransformFactoryConfig::createHttpFilterFactoryFromProtoTyped(
+    const ProtoConfig& proto_config, const std::string& stat_prefix,
+    Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto_config, stat_prefix, context, context.scope());
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

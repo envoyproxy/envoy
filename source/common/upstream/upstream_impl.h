@@ -279,6 +279,17 @@ protected:
   makeAddressListOrNull(const Network::Address::InstanceConstSharedPtr& address,
                         const AddressVector& address_list);
 
+  /**
+   * @return nullptr if address_list has fewer than 2 addresses (happy eyeballs does not
+   * apply), otherwise a shared_ptr to a copy of address_list sorted with
+   * Network::HappyEyeballsConnectionProvider::sortAddresses() using the cluster's happy
+   * eyeballs config, or the default config if the cluster does not specify one. This is
+   * computed once when the address list is created or refreshed so that connection
+   * attempts do not re-sort it.
+   */
+  static SharedConstAddressVector makeSortedAddressListOrNull(const ClusterInfo& cluster,
+                                                              const AddressVector& address_list);
+
 private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
@@ -346,6 +357,11 @@ protected:
       std::shared_ptr<const envoy::config::core::v3::Locality> locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority, const AddressVector& address_list = {}, absl::string_view stat_name = {});
+
+  // Happy eyeballs sorted copy of the address list, or nullptr if the host does not have
+  // multiple addresses. Set at construction and never changed; read by
+  // HostImpl::sortedAddressListOrNull().
+  const SharedConstAddressVector sorted_address_list_or_null_;
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -478,10 +494,17 @@ public:
   }
 
 protected:
+  /**
+   * @return the address list sorted for happy eyeballs connection attempts, or nullptr if
+   * the host does not have multiple addresses. The list is computed once when the address
+   * list is created or refreshed rather than on every connection attempt.
+   */
+  virtual SharedConstAddressVector sortedAddressListOrNull() const PURE;
+
   static CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
-                   const SharedConstAddressVector& address_list,
+                   const SharedConstAddressVector& sorted_address_list,
                    Network::UpstreamTransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
@@ -497,7 +520,7 @@ protected:
                        Network::UpstreamTransportSocketFactory& factory,
                        Network::Address::InstanceConstSharedPtr orca_address,
                        const Network::Address::InstanceConstSharedPtr& host_address,
-                       const SharedConstAddressVector& address_list,
+                       const SharedConstAddressVector& sorted_address_list,
                        HostDescriptionConstSharedPtr host) const;
 
 private:
@@ -556,6 +579,11 @@ protected:
         HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
                             locality_metadata, locality, health_check_config, priority,
                             address_list, stat_name) {}
+
+  // Upstream::HostImplBase
+  SharedConstAddressVector sortedAddressListOrNull() const override {
+    return sorted_address_list_or_null_;
+  }
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {

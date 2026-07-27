@@ -32,6 +32,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -53,7 +54,7 @@ inline FilterConfigPerRoute
 makePerRoute(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config) {
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route(config, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
   return per_route;
 }
 
@@ -73,7 +74,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
                                              "ext_authz_prefix", factory_context_, creation_status);
-    ASSERT_TRUE(creation_status.ok());
+    ASSERT_OK(creation_status);
     client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
                                        factory_context_);

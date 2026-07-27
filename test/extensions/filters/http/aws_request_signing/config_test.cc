@@ -5,6 +5,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -14,6 +15,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
+
+using ::Envoy::StatusHelpers::HasStatusCode;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
@@ -224,8 +228,7 @@ credential_provider:
   // The config is invalid because the credential provider is empty.
   absl::StatusOr<Http::FilterFactoryCb> cb =
       factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_FALSE(cb.ok());
-  EXPECT_EQ(cb.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(cb, HasStatusCode(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, ConfigWithIncludedHeaders) {
@@ -405,10 +408,9 @@ match_excluded_headers:
   AwsRequestSigningFilterFactory factory;
 
   const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "SigV4 region string cannot contain wildcards or commas. Region "
-            "sets can be specified when using signing_algorithm: AWS_SIGV4A.");
+  EXPECT_THAT(result,
+              HasStatusMessage("SigV4 region string cannot contain wildcards or commas. Region "
+                               "sets can be specified when using signing_algorithm: AWS_SIGV4A."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4A) {
@@ -475,7 +477,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_TRUE(route_config.ok());
+  ASSERT_OK(route_config);
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4RegionInEnv) {
@@ -501,7 +503,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_TRUE(route_config.ok());
+  ASSERT_OK(route_config);
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4A) {
@@ -526,7 +528,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_TRUE(route_config.ok());
+  ASSERT_OK(route_config);
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionRouteSpecificFilterConfigSigV4) {
@@ -551,10 +553,9 @@ stat_prefix: foo_prefix
 
   const auto result = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "SigV4 region string cannot contain wildcards or commas. Region "
-            "sets can be specified when using signing_algorithm: AWS_SIGV4A.");
+  EXPECT_THAT(result,
+              HasStatusMessage("SigV4 region string cannot contain wildcards or commas. Region "
+                               "sets can be specified when using signing_algorithm: AWS_SIGV4A."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4RegionInEnv) {
@@ -602,10 +603,9 @@ match_excluded_headers:
 
   // Should fail as sigv4a requires region explicitly within config
   const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "AWS region is not set in xDS configuration and failed to retrieve "
-            "from environment variable or AWS profile/config files.");
+  EXPECT_THAT(result,
+              HasStatusMessage("AWS region is not set in xDS configuration and failed to retrieve "
+                               "from environment variable or AWS profile/config files."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, UpstreamFactoryTest) {
@@ -644,10 +644,9 @@ stat_prefix: foo_prefix
 
   const auto result = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "AWS region is not set in xDS configuration and failed to retrieve from "
-            "environment variable or AWS profile/config files.");
+  EXPECT_THAT(result, HasStatusMessage(
+                          "AWS region is not set in xDS configuration and failed to retrieve from "
+                          "environment variable or AWS profile/config files."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4ANoRegion) {
@@ -678,10 +677,9 @@ stat_prefix: foo_prefix
 
   const auto result = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "AWS region is not set in xDS configuration and failed to retrieve from "
-            "environment variable or AWS profile/config files.");
+  EXPECT_THAT(result, HasStatusMessage(
+                          "AWS region is not set in xDS configuration and failed to retrieve from "
+                          "environment variable or AWS profile/config files."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionNoRegionAvailable) {
@@ -710,10 +708,9 @@ match_excluded_headers:
 
   // Should fail as sigv4a requires region explicitly within config
   const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "AWS region is not set in xDS configuration and failed to retrieve "
-            "from environment variable or AWS profile/config files.");
+  EXPECT_THAT(result,
+              HasStatusMessage("AWS region is not set in xDS configuration and failed to retrieve "
+                               "from environment variable or AWS profile/config files."));
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidLowExpirationTime) {
