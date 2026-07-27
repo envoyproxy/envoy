@@ -807,7 +807,9 @@ public:
  */
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
   COUNTER(upstream_rq_dropped)                                                                     \
-  COUNTER(upstream_rq_drop_overload)
+  COUNTER(upstream_rq_drop_overload)                                                               \
+  COUNTER(upstream_rq_total)                                                                       \
+  GAUGE(upstream_rq_active, Accumulate)
 
 /**
  * Cluster circuit breakers gauges. Note that we do not generate a stats

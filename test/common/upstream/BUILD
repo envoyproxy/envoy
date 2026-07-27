@@ -494,6 +494,39 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "load_stats_reporter_benchmark",
+    srcs = ["load_stats_reporter_benchmark.cc"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/event:timer_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//envoy/upstream:outlier_detection_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/network:address_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/upstream:load_stats_reporter_lib",
+        "//source/common/upstream:upstream_includes",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
+        "@benchmark",
+        "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "load_stats_reporter_benchmark_test",
+    benchmark_binary = "load_stats_reporter_benchmark",
+)
+
 envoy_cc_test(
     name = "hds_test",
     srcs = ["hds_test.cc"],
