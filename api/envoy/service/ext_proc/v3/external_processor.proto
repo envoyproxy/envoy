@@ -239,8 +239,8 @@ message ProcessingResponse {
   //
   // Constraints:
   //
-  // 1. Request Path: A standalone ``mode_override`` only supports transitioning the body processing mode from
-  //   ``STREAMED`` to ``FULL_DUPLEX_STREAMED``, and the trailer processing mode must be set to ``SEND``.
+  // 1. Request Path: A standalone ``mode_override`` only supports transitioning the body processing mode
+  //    from other mode to ``FULL_DUPLEX_STREAMED``, and the trailer mode must be set to ``SEND``.
   // 2. Response Path: There are no restrictions on processing mode changes in this case.
   //
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
