@@ -191,23 +191,30 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
   const auto& tool_config = proto_config_.tool_config();
   std::string host = tool_config.default_server_info().host();
   std::string path = tool_config.default_server_info().path();
+  bool skip_endpoint_setup = false;
   if (host.empty() && path.empty()) {
-    path = "/mcp";
-  }
-  EndpointKey key{host, path};
-  auto& endpoint_config = endpoint_configs_[key];
-  for (const auto& tool : tool_config.tools()) {
-    if (endpoint_config.tool_entries
-            .try_emplace(tool.name(),
-                         ToolEntry{tool.http_rule(), tool.text_content_streaming_enabled(), &tool})
-            .second) {
-      endpoint_config.tools.push_back(&tool);
+    if (proto_config_.no_fallback_path()) {
+      skip_endpoint_setup = true;
+    } else {
+      path = "/mcp";
     }
   }
-  if (tool_config.has_tool_list_http_rule()) {
-    endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
+  if (!skip_endpoint_setup) {
+    EndpointKey key{host, path};
+    auto& endpoint_config = endpoint_configs_[key];
+    for (const auto& tool : tool_config.tools()) {
+      if (endpoint_config.tool_entries
+              .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
+                                                  tool.text_content_streaming_enabled(), &tool})
+              .second) {
+        endpoint_config.tools.push_back(&tool);
+      }
+    }
+    if (tool_config.has_tool_list_http_rule()) {
+      endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
+    }
+    endpoint_config.tool_list_local = tool_config.has_tool_list_local();
   }
-  endpoint_config.tool_list_local = tool_config.has_tool_list_local();
 
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
 }
