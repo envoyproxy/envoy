@@ -481,6 +481,22 @@ ok_response:
                      span_);
 }
 
+TEST_F(ExtAuthzGrpcClientTest, TestGrpcClientResetOnComplete) {
+  initialize();
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  EXPECT_CALL(span_, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce(Invoke([this](ResponsePtr&) {
+    // Synchronously destroy the client while inside onComplete()!
+    client_.reset();
+  }));
+
+  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(), span_);
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters
