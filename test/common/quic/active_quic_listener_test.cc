@@ -798,13 +798,18 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   EXPECT_TRUE(debug_visitor_factory.has_value());
 }
 
-class ActiveQuicListenerFactoryCidGeneratorInitTest : public ActiveQuicListenerFactoryTest {
+class ActiveQuicListenerFactoryInitializeWorkerRoutingTest : public ActiveQuicListenerFactoryTest {
 protected:
-  ActiveQuicListenerFactoryCidGeneratorInitTest() : registration_(config_factory_) {}
+  ActiveQuicListenerFactoryInitializeWorkerRoutingTest() : registration_(config_factory_) {}
 
-  void SetUp() override { factory_ = makeFactory(concurrency_); }
+  void SetUp() override {
+    auto creation_status = absl::OkStatus();
+    factory_ = makeFactory(concurrency_, creation_status);
+    ASSERT_OK(creation_status);
+  }
 
-  std::unique_ptr<ActiveQuicListenerFactory> makeFactory(uint32_t concurrency) {
+  std::unique_ptr<ActiveQuicListenerFactory> makeFactory(uint32_t concurrency,
+                                                         absl::Status& creation_status) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     options.mutable_connection_id_generator_config()->set_name(
         "envoy.quic.mock_connection_id_generator");
@@ -812,12 +817,9 @@ protected:
         options.mutable_connection_id_generator_config()->mutable_typed_config()->PackFrom(
             test::common::config::DummyConfig());
 
-    absl::Status creation_status = absl::OkStatus();
-    auto factory = std::make_unique<ActiveQuicListenerFactory>(
-        options, concurrency, quic_stat_names_, validation_visitor_, listener_context_,
-        creation_status);
-    EXPECT_OK(creation_status);
-    return factory;
+    return std::make_unique<ActiveQuicListenerFactory>(options, concurrency, quic_stat_names_,
+                                                       validation_visitor_, listener_context_,
+                                                       creation_status);
   }
 
   void makeCidGeneratorFactory(absl::StatusOr<Network::Socket::OptionConstSharedPtr> option) {
@@ -864,8 +866,7 @@ protected:
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
 };
 
-TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, FactoryCreatedPreWorker) {
-
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, CreateFactoryAndSetupWorkerRouting) {
   EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), nullptr);
 
   const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
@@ -885,7 +886,7 @@ TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, FactoryCreatedPreWorker) {
             default_cid_worker_selector_(buffer, 0));
 }
 
-TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, UnimplementedLogsWarn) {
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, KernelRoutingUnimplementedLogsWarn) {
   makeCidGeneratorFactory(absl::UnimplementedError("test platform"));
 
   EXPECT_LOG_CONTAINS("warn", "Efficient routing of QUIC packets",
@@ -895,7 +896,20 @@ TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, UnimplementedLogsWarn) {
   EXPECT_FALSE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
 }
 
-TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, PostsSocketOptions) {
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, KernelRoutingFailure) {
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), nullptr);
+
+  makeCidGeneratorFactory(absl::InternalError("test error"));
+
+  auto init_status = absl::OkStatus();
+  EXPECT_LOG_NOT_CONTAINS("warn", "Efficient routing of QUIC packets",
+                          { init_status = factory_->initializeWorkerRouting(socket_factories_); });
+
+  EXPECT_THAT(init_status, StatusHelpers::HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_THAT(init_status, StatusHelpers::HasStatusMessage(testing::HasSubstr("test error")));
+}
+
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, PostsSocketOptions) {
   const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
   makeCidGeneratorFactory(mock_option);
 
@@ -922,7 +936,7 @@ TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, PostsSocketOptions) {
   }
 }
 
-TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, PostsSocketOptionsFailure) {
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, PostsSocketOptionsFailure) {
   const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
   makeCidGeneratorFactory(mock_option);
 
@@ -941,14 +955,16 @@ TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, PostsSocketOptionsFailure)
                           sockets.back()->connectionInfoProvider().localAddress()->asString())));
 }
 
-TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, InitInCtorWhenFlagOff) {
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, InitInCtorWhenFlagOff) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.restart_features.defer_worker_routing_init", "false"}});
 
   const auto mock_option = std::make_shared<NiceMock<Network::MockSocketOption>>();
   makeCidGeneratorFactory(mock_option);
 
-  factory_ = makeFactory(concurrency_);
+  auto creation_status = absl::OkStatus();
+  factory_ = makeFactory(concurrency_, creation_status);
+  ASSERT_OK(creation_status);
 
   EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), cid_generator_factory_);
 
@@ -962,6 +978,33 @@ TEST_F(ActiveQuicListenerFactoryCidGeneratorInitTest, InitInCtorWhenFlagOff) {
   EXPECT_OK(factory_->initializeWorkerRouting({}));
   EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), cid_generator_factory_);
   EXPECT_EQ(factory_->socketOptions()->size(), 1u);
+}
+
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest,
+       InitInCtorWhenFlagOffUnimplementedLogsWarn) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.defer_worker_routing_init", "false"}});
+
+  makeCidGeneratorFactory(absl::UnimplementedError("test platform"));
+
+  auto creation_status = absl::OkStatus();
+  EXPECT_LOG_CONTAINS("warn", "Efficient routing of QUIC packets",
+                      { factory_ = makeFactory(concurrency_, creation_status); });
+  ASSERT_OK(creation_status);
+}
+
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest,
+       InitInCtorWhenFlagOffKernelRoutingFailure) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.defer_worker_routing_init", "false"}});
+
+  makeCidGeneratorFactory(absl::InternalError("test error"));
+
+  auto creation_status = absl::OkStatus();
+  EXPECT_LOG_NOT_CONTAINS("warn", "Efficient routing of QUIC packets",
+                          { factory_ = makeFactory(concurrency_, creation_status); });
+  EXPECT_THAT(creation_status, StatusHelpers::HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_THAT(creation_status, StatusHelpers::HasStatusMessage(testing::HasSubstr("test error")));
 }
 
 namespace {
