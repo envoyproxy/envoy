@@ -24,6 +24,10 @@ ggreenway:
   maintainer: true
   opsgenie: Greg
   slack: U78MBV869
+htuch:
+  maintainer: true
+  opsgenie: Harvey
+  slack: U78E7055Z
 jmarantz:
   slack: U80HPLBPG
 jwendell:
