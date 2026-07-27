@@ -262,7 +262,7 @@ message ProcessingResponse {
   // with the
   // :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
   // field set to true. The ext_proc server should then echo back all
-  // subsequent body contents as-is until it sees the client's drain-complete
+  // subsequent body contents until it sees the client's drain-complete
   // message. This provides a safe way for the ext_proc server to indicate
   // that it does not need to see the rest of the response body.
   //
@@ -533,6 +533,14 @@ message StreamedBodyResponse {
   // :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
   // field, it will populate this field to indicate that it has finished
   // sending data back to the data plane.
+  //
+  // Note that the ext_proc stream is no longer needed once neither
+  // requests nor responses are being sent. This can happen if both
+  // directions are completely drained. It can also happen if one
+  // direction is drained and the other direction was never being sent
+  // to begin with (e.g., by setting the corresponding body send mode to
+  // ``NONE``). In this situation, the data plane is free to cancel the
+  // stream, or the ext_proc server may close the stream with OK status.
   bool drain_complete = 5;
 }
 
