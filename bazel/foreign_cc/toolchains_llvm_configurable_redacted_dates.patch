@@ -1,0 +1,73 @@
+# Make date-macro redaction skippable via the --features=no-redact-dates flag.
+#
+# toolchains_llvm (>= 1.8.0) unconditionally injects
+#   -Wno-builtin-macro-redefined -imacros <execroot>/external/llvm_toolchain/redacted_dates.h
+# into every C/C++ compile action via unfiltered_compile_flags. The path is
+# execroot-relative and resolves correctly for normal Bazel cc actions but
+# fails inside Cargo build-script cc invocations (e.g. the `ring` crate) whose
+# working directory is not the Bazel execroot:
+#
+#   fatal error: 'external/llvm_toolchain/redacted_dates.h' file not found
+#
+# Design B: keep redaction ON everywhere (no cache invalidation for normal
+# target-config compiles) and gate it on a config_setting that matches
+# --features=no-redact-dates. Bazel resets --features to --host_features in the
+# exec configuration, so adding --host_features=no-redact-dates in .bazelrc
+# drops the flags only for exec-config compiles (Cargo build-script cc calls)
+# while leaving all target-config compiles unchanged.
+#
+# Remove this patch if upstream adds a supported flag for this purpose.
+diff --git a/toolchain/config/BUILD.bazel b/toolchain/config/BUILD.bazel
+--- a/toolchain/config/BUILD.bazel
++++ b/toolchain/config/BUILD.bazel
+@@ -73,5 +73,11 @@ config_setting(
+ config_setting(
+     name = "use_tsan",
+     values = {"features": "tsan"},
+     visibility = ["//visibility:public"],
+ )
++
++config_setting(
++    name = "no_redact_dates",
++    values = {"features": "no-redact-dates"},
++    visibility = ["//visibility:public"],
++)
+diff --git a/toolchain/cc_toolchain_config.bzl b/toolchain/cc_toolchain_config.bzl
+--- a/toolchain/cc_toolchain_config.bzl
++++ b/toolchain/cc_toolchain_config.bzl
+@@ -224,12 +224,20 @@ def cc_toolchain_config(
+     unfiltered_compile_flags = [
+         # Do not resolve our symlinked resource prefixes to real paths.
+         "-no-canonical-prefixes",
+-        # Reproducibility: redact date macros via an -imacros header rather than
+-        # -D__DATE__="redacted" on the command line, whose quotes are lost when
+-        # passed through sub-build flag strings.
+-        "-Wno-builtin-macro-redefined",
+-        "-imacros",
+-        redacted_dates_path,
+     ]
+ 
++    # Reproducibility: redact date macros via an -imacros header rather than
++    # -D__DATE__="redacted" on the command line, whose quotes are lost when
++    # passed through sub-build flag strings. Gated on --features=no-redact-dates
++    # (which Bazel resets to --host_features in the exec configuration) so that
++    # exec-config compiles (e.g. Cargo build-script cc invocations) can drop the
++    # execroot-relative -imacros path without affecting target-config compiles.
++    redact_dates_flags = select({
++        str(Label("@toolchains_llvm//toolchain/config:no_redact_dates")): [],
++        "//conditions:default": [
++            "-Wno-builtin-macro-redefined",
++            "-imacros",
++            redacted_dates_path,
++        ],
++    })
+     major_llvm_version = int(llvm_version.split(".")[0])
+@@ -963,7 +971,7 @@ def cc_toolchain_config(
+         # archives.
+         link_libs = baked_link_libs_stdlib + link_libs,
+         opt_link_flags = opt_link_flags,
+-        unfiltered_compile_flags = unfiltered_compile_flags,
++        unfiltered_compile_flags = unfiltered_compile_flags + redact_dates_flags,
+         coverage_compile_flags = coverage_compile_flags,
+         coverage_link_flags = coverage_link_flags,
+         supports_start_end_lib = supports_start_end_lib,

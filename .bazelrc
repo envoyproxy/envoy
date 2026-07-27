@@ -119,6 +119,11 @@ common:clang-common --linkopt=-fuse-ld=lld
 common:clang-common --cxxopt=-Wno-nullability-completeness
 common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
 common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
+# Drop the execroot-relative -imacros redacted_dates.h from exec-config compiles
+# (Cargo build-script cc invocations, host tools) where the path does not resolve.
+# Bazel resets --features to --host_features in the exec configuration, so this
+# only affects exec-config compiles; target-config compiles keep date redaction.
+common:clang-common --host_features=no-redact-dates
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
