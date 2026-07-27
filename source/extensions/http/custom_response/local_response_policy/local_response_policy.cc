@@ -21,11 +21,11 @@ LocalResponsePolicy::LocalResponsePolicy(
     const envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy&
         config,
     Server::Configuration::ServerFactoryContext& context)
-    : local_body_{config.has_body()
-                      ? std::optional<std::string>(THROW_OR_RETURN_VALUE(
-                            Config::DataSource::read(config.body(), true, context.api()),
-                            std::string))
-                      : std::optional<std::string>{}},
+    : local_body_{
+          config.has_body()
+              ? std::optional<std::string>(THROW_OR_RETURN_VALUE(
+                    Config::DataSource::read(config.body(), true, context.api()), std::string))
+              : std::optional<std::string>{}},
       status_code_{config.has_status_code()
                        ? std::optional<Envoy::Http::Code>(
                              static_cast<Envoy::Http::Code>(config.status_code().value()))
