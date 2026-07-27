@@ -504,6 +504,8 @@ ActiveQuicListenerFactory::createActiveQuicListener(
 }
 
 absl::Status ActiveQuicListenerFactory::initializeCidGeneratorAndWorkerRouting() {
+  ASSERT(quic_cid_generator_factory_ == nullptr);
+
   auto& cid_generator_config_factory =
       Config::Utility::getAndCheckFactory<EnvoyQuicConnectionIdGeneratorConfigFactory>(
           cid_generator_config_);

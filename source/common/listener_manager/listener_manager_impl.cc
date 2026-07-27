@@ -631,10 +631,12 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   ListenerImplPtr new_listener = nullptr;
+  bool in_place_update = false;
 
   // In place filter chain update depends on the active listener at worker.
   if (existing_active_listener != active_listeners_.end() &&
       (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_)) {
+    in_place_update = true;
     ENVOY_LOG(debug, "use in place update filter chain update path for listener name={} hash={}",
               name, hash);
     auto listener_or_error =
@@ -685,7 +687,8 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     added = true;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+  if (!in_place_update &&
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
     if (auto udp_listener_config = new_listener_ref.udpListenerConfig()) {
       RETURN_IF_NOT_OK(udp_listener_config->listenerFactory().initializeWorkerRouting(
           new_listener_ref.listenSocketFactories()));
