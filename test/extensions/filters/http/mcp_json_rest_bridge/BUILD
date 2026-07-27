@@ -58,7 +58,9 @@ envoy_cc_test(
     srcs = ["mcp_json_rest_bridge_integration_test.cc"],
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
+        "//test/integration:fake_access_log_lib",
         "//test/integration:http_integration_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
         "@nlohmann_json//:json",

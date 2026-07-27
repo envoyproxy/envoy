@@ -141,16 +141,31 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "evwatch_observer_manager_impl_lib",
+    srcs = ["evwatch_observer_manager_impl.cc"],
+    hdrs = ["evwatch_observer_manager_impl.h"],
+    deps = [
+        "//bazel/foreign_cc:event",
+        "//envoy/common:optref_lib",
+        "//envoy/common:time_interface",
+        "//envoy/event:evwatch_interface",
+        "//envoy/event:evwatch_observer_manager_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "libevent_scheduler_lib",
     srcs = ["libevent_scheduler.cc"],
     hdrs = ["libevent_scheduler.h"],
     deps = [
+        ":evwatch_observer_manager_impl_lib",
         ":libevent_lib",
         ":schedulable_cb_lib",
         ":timer_lib",
         "//bazel/foreign_cc:event",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:evwatch_interface",
+        "//envoy/event:evwatch_observer_manager_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
     ],

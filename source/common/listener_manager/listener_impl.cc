@@ -607,6 +607,12 @@ absl::Status ListenerImpl::validateConfig() {
           name_));
     }
   }
+  // UDP listeners always carry socket options (e.g. packet info), but with bind_to_port
+  // disabled no socket is created to apply them to, which previously crashed at startup.
+  if (!bind_to_port_ && socket_type_ == Network::Socket::Type::Datagram) {
+    return absl::InvalidArgumentError(
+        fmt::format("listener {}: bind_to_port: false is not supported for UDP listeners", name_));
+  }
   return absl::OkStatus();
 }
 

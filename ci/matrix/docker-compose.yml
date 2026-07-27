@@ -38,11 +38,11 @@ services:
         MATRIX_SETUP: *gcc-setup
     environment:
       <<: *common-env
-      EXPECTED_NO_ARGS: fail
+      EXPECTED_NO_ARGS: clang-libc++
       EXPECTED_GCC: gcc-libstdc++
-      EXPECTED_CLANG: fail
-      EXPECTED_GCC_ENV: fail
-      EXPECTED_CLANG_ENV: fail
+      EXPECTED_CLANG: clang-libc++
+      EXPECTED_GCC_ENV: clang-libc++
+      EXPECTED_CLANG_ENV: clang-libc++
     command:
     - bash
     - -c
@@ -93,8 +93,6 @@ services:
       gcc --version
       /usr/local/bin/test.sh
 
-  # this fails due to llvm's dep on shared libtinfo, it
-  # tries to pick the clang toolchain otherwise
   none:
     <<: *common-base
     build:
@@ -102,11 +100,11 @@ services:
       dockerfile: ci/matrix/Dockerfile
     environment:
       <<: *common-env
-      EXPECTED_NO_ARGS: fail
+      EXPECTED_NO_ARGS: clang-libc++
       EXPECTED_GCC: fail
-      EXPECTED_CLANG: fail
-      EXPECTED_GCC_ENV: fail
-      EXPECTED_CLANG_ENV: fail
+      EXPECTED_CLANG: clang-libc++
+      EXPECTED_GCC_ENV: clang-libc++
+      EXPECTED_CLANG_ENV: clang-libc++
     command:
     - bash
     - -c
