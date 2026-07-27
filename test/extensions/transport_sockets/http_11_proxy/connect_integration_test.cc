@@ -1,11 +1,14 @@
 #include "envoy/config/common/key_value/v3/config.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
@@ -98,7 +101,12 @@ typed_config:
         addFakeUpstream(upstreamProtocol());
       }
       fake_upstreams_[1]->setDisableAllAndDoNotEnable(true);
-      default_proxy_address_ = fake_upstreams_[1]->localAddress();
+      if (use_host_metadata_proxy_) {
+        // Populating default_proxy_address_
+        host_metadata_proxy_address_ = fake_upstreams_[1]->localAddress();
+      } else {
+        default_proxy_address_ = fake_upstreams_[1]->localAddress();
+      }
     }
 
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -122,6 +130,28 @@ typed_config:
       std::ignore = transport_socket->mutable_typed_config()->PackFrom(transport);
 
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      if (use_host_metadata_proxy_) {
+        auto* lb_endpoint =
+            cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+        auto* md = lb_endpoint->mutable_metadata();
+
+        envoy::config::core::v3::Address addr_proto;
+        Network::Utility::addressToProtobufAddress(*host_metadata_proxy_address_, addr_proto);
+        Protobuf::Any addr_any;
+        std::ignore = addr_any.PackFrom(addr_proto);
+        (*md->mutable_typed_filter_metadata())
+            [Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR] = addr_any;
+
+        if (!host_metadata_proxy_authorization_.empty()) {
+          Protobuf::StringValue auth_value;
+          auth_value.set_value(host_metadata_proxy_authorization_);
+          Protobuf::Any auth_any;
+          std::ignore = auth_any.PackFrom(auth_value);
+          (*md->mutable_typed_filter_metadata())
+              [Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH] = auth_any;
+        }
+      }
 
       ConfigHelper::HttpProtocolOptions protocol_options;
       protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
@@ -184,6 +214,9 @@ typed_config:
 
   bool pre_create_upstreams_ = false;
   Network::Address::InstanceConstSharedPtr default_proxy_address_;
+  bool use_host_metadata_proxy_ = false;
+  std::string host_metadata_proxy_authorization_;
+  Network::Address::InstanceConstSharedPtr host_metadata_proxy_address_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectHttpIntegrationTest,
@@ -636,6 +669,38 @@ TEST_P(Http11ConnectHttpIntegrationTest, ConfiguredProxy) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   ASSERT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("foo")).empty());
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("foo")).empty());
+}
+
+TEST_P(Http11ConnectHttpIntegrationTest, ProxyAuthorizationViaHostMetadata) {
+  pre_create_upstreams_ = true;
+  use_host_metadata_proxy_ = true;
+  host_metadata_proxy_authorization_ = "Basic abcdefghijk";
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Envoy dials the proxy (fake upstream 1) from the endpoint address metadata.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  // Verify the CONNECT request contains the Proxy-Authorization header.
+  std::string prefix_data;
+  ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", prefix_data));
+  const std::string target = fake_upstreams_[0]->localAddress()->asString();
+  const std::string expected_connect =
+      absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n",
+                   "Proxy-Authorization: ", host_metadata_proxy_authorization_, "\r\n\r\n");
+  EXPECT_EQ(expected_connect, prefix_data);
+
+  // Ship the CONNECT response and complete the encapsulated exchange.
+  fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
+  ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace
