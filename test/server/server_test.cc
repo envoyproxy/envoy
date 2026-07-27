@@ -4,6 +4,7 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/fatal_action_config.h"
@@ -65,6 +66,42 @@ using testing::StrictMock;
 namespace Envoy {
 namespace Server {
 namespace {
+
+class MockXdsConfigTracker : public Config::XdsConfigTracker {
+public:
+  MOCK_METHOD(void, onConfigAccepted,
+              (const absl::string_view, const std::vector<Config::DecodedResourcePtr>&),
+              (override));
+  MOCK_METHOD(void, onConfigAccepted,
+              (const absl::string_view,
+               absl::Span<const envoy::service::discovery::v3::Resource* const>,
+               const Protobuf::RepeatedPtrField<std::string>&),
+              (override));
+  MOCK_METHOD(void, onConfigRejected,
+              (const envoy::service::discovery::v3::DiscoveryResponse&, const absl::string_view),
+              (override));
+  MOCK_METHOD(void, onConfigRejected,
+              (const envoy::service::discovery::v3::DeltaDiscoveryResponse&,
+               const absl::string_view),
+              (override));
+  MOCK_METHOD(void, onResourceUnsubscribed,
+              (const absl::string_view type_url, absl::string_view resource), (override));
+};
+
+class MockXdsConfigTrackerFactory : public Config::XdsConfigTrackerFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Empty>();
+  }
+
+  std::string name() const override { return "envoy.xds_config_tracker.mock"; };
+
+  Config::XdsConfigTrackerPtr createXdsConfigTracker(const Protobuf::Any&,
+                                                     ProtobufMessage::ValidationVisitor&, Api::Api&,
+                                                     Event::Dispatcher&) override {
+    return std::make_unique<testing::NiceMock<MockXdsConfigTracker>>();
+  }
+};
 
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
@@ -1316,6 +1353,19 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
   options_.service_node_name_ = "some_node_name";
   EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
                           EnvoyException, "Unknown gRPC client cluster");
+}
+
+// Verify that RTDS over ADS initializes successfully and doesn't crash on shutdown.
+TEST_P(ServerInstanceImplTest, RtdsOverAdsShutdown) {
+  MockXdsConfigTrackerFactory factory;
+  Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
+
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  auto server_thread =
+      startTestServer("test/server/test_data/server/runtime_bootstrap_rtds_ads.yaml", false);
+  server_->shutdown();
+  server_thread->join();
 }
 
 // Validate invalid runtime in bootstrap is rejected.
