@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -8,14 +9,9 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
-    name = "reverse_connection_cluster_test",
-    srcs = ["reverse_connection_cluster_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [],
-    }),
-    tags = ["skip_on_windows"],
+envoy_cc_test_library(
+    name = "reverse_connection_cluster_test_base",
+    hdrs = ["reverse_connection_cluster_test_base.h"],
     deps = [
         "//envoy/registry",
         "//source/common/formatter:formatter_extension_lib",
@@ -35,4 +31,51 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/reverse_connection/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test(
+    name = "reverse_connection_cluster_config_test",
+    srcs = ["reverse_connection_cluster_config_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [],
+    }),
+    tags = ["skip_on_windows"],
+    deps = [":reverse_connection_cluster_test_base"],
+)
+
+envoy_cc_test(
+    name = "reverse_connection_cluster_lb_test",
+    srcs = ["reverse_connection_cluster_lb_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [],
+    }),
+    tags = ["skip_on_windows"],
+    deps = [":reverse_connection_cluster_test_base"],
+)
+
+envoy_cc_test(
+    name = "reverse_connection_cluster_formatter_test",
+    srcs = ["reverse_connection_cluster_formatter_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [],
+    }),
+    tags = ["skip_on_windows"],
+    deps = [
+        ":reverse_connection_cluster_test_base",
+        "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "reverse_connection_cluster_address_test",
+    srcs = ["reverse_connection_cluster_address_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [],
+    }),
+    tags = ["skip_on_windows"],
+    deps = [":reverse_connection_cluster_test_base"],
 )
