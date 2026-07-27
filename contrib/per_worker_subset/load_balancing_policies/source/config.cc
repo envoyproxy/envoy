@@ -48,20 +48,32 @@ TypedPerWorkerSubsetLbConfig::TypedPerWorkerSubsetLbConfig(const PerWorkerSubset
   worker_identity_->set([total_workers](Event::Dispatcher& dispatcher) {
     absl::string_view name = dispatcher.name();
     uint32_t index = total_workers;
-    if (absl::ConsumePrefix(&name, kWorkerNamePrefix) && absl::SimpleAtoi(name, &index)) {
-      RELEASE_ASSERT(index < total_workers, "parsed worker index exceeds configured worker count");
+    const bool parsed =
+        absl::ConsumePrefix(&name, kWorkerNamePrefix) && absl::SimpleAtoi(name, &index);
+    const bool valid = parsed && index < total_workers;
+    ENVOY_BUG(valid, fmt::format("per_worker_subset: invalid worker dispatcher name '{}'; "
+                                 "falling back to worker 0",
+                                 dispatcher.name()));
+    if (!valid) {
+      index = 0;
     }
-    // Non-worker threads can also receive TLS initialization callbacks. They
-    // keep the sentinel value and never create a worker-local LB.
     return std::make_shared<WorkerIdentity>(index);
   });
 }
 
 uint32_t TypedPerWorkerSubsetLbConfig::workerId() const {
   const auto identity = worker_identity_->get();
-  RELEASE_ASSERT(identity.has_value(), "per_worker_subset: worker identity TLS is unavailable");
-  RELEASE_ASSERT(identity->index_ < total_workers_,
-                 "per_worker_subset: LB creation attempted outside an Envoy worker thread");
+  ENVOY_BUG(identity.has_value(),
+            "per_worker_subset: worker identity TLS is unavailable; falling back to worker 0");
+  if (!identity.has_value()) {
+    return 0;
+  }
+  ENVOY_BUG(identity->index_ < total_workers_,
+            "per_worker_subset: worker identity exceeds configured worker count; "
+            "falling back to worker 0");
+  if (identity->index_ >= total_workers_) {
+    return 0;
+  }
   return identity->index_;
 }
 

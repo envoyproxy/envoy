@@ -141,6 +141,8 @@ public:
     return {};
   }
 
+  uint32_t workerIdForTest() const { return worker_id_; }
+
 private:
   void rebuildSubset(bool membership_changed);
   // Reconcile RANDOM_PARTITIONS' stable assignment after a membership update:

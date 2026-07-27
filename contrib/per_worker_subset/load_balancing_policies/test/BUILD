@@ -32,5 +32,7 @@ envoy_cc_test(
         "//contrib/per_worker_subset/load_balancing_policies/source:config",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
     ],
 )
