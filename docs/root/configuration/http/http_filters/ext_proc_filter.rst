@@ -27,6 +27,64 @@ stream requests from the proxy.
 The updated list of supported features can be found on the
 :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`.
 
+Session affinity
+----------------
+
+When the filter uses the Envoy gRPC client, requests to the external processor can use
+consistent hashing to keep sessions on the same processor endpoint. Configure the gRPC
+:ref:`initial metadata <envoy_v3_api_field_config.core.v3.GrpcService.initial_metadata>` to
+copy an affinity key from the downstream request, and configure the external processor cluster
+with a matching
+:ref:`cluster-level hash policy <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.hash_policy>`.
+
+For example, the filter can copy a session header into the gRPC request:
+
+.. code-block:: yaml
+
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_proc_cluster
+    initial_metadata:
+    - key: x-session-id
+      value: "%REQ(x-session-id)%"
+
+The external processor cluster can then hash the copied header:
+
+.. code-block:: yaml
+
+  name: ext_proc_cluster
+  lb_policy: RING_HASH
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http2_protocol_options: {}
+      hash_policy:
+      - header:
+          header_name: x-session-id
+
+Passive cookie affinity can be configured in the same way by copying the downstream ``cookie``
+header into the gRPC initial metadata and selecting the cookie by name in the cluster hash policy:
+
+.. code-block:: yaml
+
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_proc_cluster
+    initial_metadata:
+    - key: cookie
+      value: "%REQ(cookie)%"
+
+  # In the ext_proc_cluster HttpProtocolOptions:
+  hash_policy:
+  - cookie:
+      name: session_id
+
+The cluster must use a hash-based load balancer such as ``RING_HASH`` or ``MAGLEV``. Cookie
+affinity must be passive: generated cookies cannot be propagated from the external processor
+side stream to the original downstream client. This configuration does not apply to the native
+Google gRPC client. Cluster-level hash policies take precedence over request-level policies.
+
 Statistics
 ----------
 This filter outputs statistics in the
