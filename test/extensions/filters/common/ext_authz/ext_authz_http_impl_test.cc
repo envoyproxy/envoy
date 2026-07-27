@@ -730,6 +730,21 @@ TEST_F(ExtAuthzHttpClientTest, NoRetryPolicy) {
   client_->cancel();
 }
 
+TEST_F(ExtAuthzHttpClientTest, TestHttpClientResetOnComplete) {
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce(Invoke([this](ResponsePtr&) {
+    // Synchronously destroy the client while inside onComplete()!
+    client_.reset();
+  }));
+
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
+  auto check_response = TestCommon::makeMessageResponse(expected_headers);
+
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common
