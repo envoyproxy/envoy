@@ -837,11 +837,10 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::BadRequest),
-                     StrEq(R"json({"code":-32602,"message":"Failed to build HTTP request"})json"),
-                     _, _, StrEq("mcp_json_rest_bridge_request_tool_transcoding_failure")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::BadRequest),
+                             StrEq(R"json({"code":-32602,"message":"Invalid tool arguments"})json"),
+                             _, _, StrEq("mcp_json_rest_bridge_request_tool_transcoding_failure")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -869,8 +868,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(
-      R"json({"code":-32602,"message":"Failed to build HTTP request"})json");
+  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Invalid tool arguments"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -879,7 +877,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32602,"message":"Failed to build HTTP request"},"id":123,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32602,"message":"Invalid tool arguments"},"id":123,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
