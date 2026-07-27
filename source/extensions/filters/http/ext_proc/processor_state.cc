@@ -821,7 +821,7 @@ bool DecodingProcessorState::isValidTrailersCallbackState() const {
 bool DecodingProcessorState::handleStandaloneModeOverride(
     envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode old_body_mode) {
   if (callbackState() == ProcessorState::CallbackState::HeadersCallback &&
-      old_body_mode == ProcessingMode::STREAMED &&
+      old_body_mode != ProcessingMode::FULL_DUPLEX_STREAMED &&
       body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED && send_trailers_) {
     bool end_stream = (complete_body_available_ && trailers_ == nullptr);
     if (hasBufferedData() || (bufferedData() && end_stream)) {
