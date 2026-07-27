@@ -10,6 +10,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -34,6 +35,20 @@ inline const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor* ge
 
   return dynamic_cast<const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor*>(
       base_interface);
+}
+
+enum class ReverseTunnelValidationResult { ValidationPassed, ValidationFailed, Rejected };
+
+inline absl::string_view toStringView(ReverseTunnelValidationResult result) {
+  switch (result) {
+  case ReverseTunnelValidationResult::ValidationPassed:
+    return "validation_passed";
+  case ReverseTunnelValidationResult::ValidationFailed:
+    return "validation_failed";
+  case ReverseTunnelValidationResult::Rejected:
+    return "rejected";
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 /**
@@ -64,15 +79,16 @@ public:
   // configured per-worker connection cap (or no cap is configured).
   bool validateConnectionLimit(absl::string_view node_id, absl::string_view tenant_id) const;
 
-  // Validates the extracted node_id, cluster_id, and tenant_id against expected values.
-  // Returns true if validation passes or no validation is configured.
-  bool validateIdentifiers(absl::string_view node_id, absl::string_view cluster_id,
-                           absl::string_view tenant_id,
-                           const StreamInfo::StreamInfo& stream_info) const;
+  // Validates identifiers (and the connection limit when enabled).
+  // Returns ValidationPassed, ValidationFailed, or Rejected (limit exceeded).
+  ReverseTunnelValidationResult
+  validateIdentifiers(absl::string_view node_id, absl::string_view cluster_id,
+                      absl::string_view tenant_id, const StreamInfo::StreamInfo& stream_info) const;
 
   // Emits validation results as dynamic metadata if configured.
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
-                              absl::string_view tenant_id, bool validation_passed,
+                              absl::string_view tenant_id,
+                              ReverseTunnelValidationResult validation_result,
                               StreamInfo::StreamInfo& stream_info) const;
 
   // Returns the required cluster name for validation.

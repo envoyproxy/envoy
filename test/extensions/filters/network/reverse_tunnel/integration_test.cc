@@ -1635,14 +1635,15 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitRejectsBeyondCap) {
   client1->waitForData("HTTP/1.1 200 OK");
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
-  // Second connection for the same node exceeds the cap (1 is not < 1) -> rejected with 403.
+  // Second connection for the same node exceeds the cap (1 is not < 1) -> rejected with 429.
   std::string req2 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                     "capped-node", "test-cluster", "test-tenant");
   IntegrationTcpClientPtr client2 = makeTcpConnection(lookupPort("listener_0"));
   (void)client2->write(req2);
-  client2->waitForData("HTTP/1.1 403 Forbidden");
+  client2->waitForData("HTTP/1.1 429 Too Many Requests");
   client2->waitForDisconnect();
-  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   // A different node has its own independent count and is still accepted.
   std::string req3 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
@@ -1673,6 +1674,9 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitAllowsWithinCap) {
       "GET", "/reverse_connections/request", "within-node", "test-cluster", "test-tenant")));
   client2->waitForData("HTTP/1.1 200 OK");
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
+
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Eq(0));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   client1->close();
   client2->close();
@@ -1729,9 +1733,10 @@ cluster_type:
   IntegrationTcpClientPtr client_a2 = makeTcpConnection(lookupPort("listener_0"));
   (void)client_a2->write(createHttpRequestWithRtHeaders(
       "GET", "/reverse_connections/request", "shared-node", "shared-cluster", "tenant-a"));
-  client_a2->waitForData("HTTP/1.1 403 Forbidden");
+  client_a2->waitForData("HTTP/1.1 429 Too Many Requests");
   client_a2->waitForDisconnect();
-  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   // tenant-b on the same node is an independent scope -> accepted.
   IntegrationTcpClientPtr client_b1 = makeTcpConnection(lookupPort("listener_0"));
