@@ -59,7 +59,7 @@ public:
       headers.removeHost();
     }
     if (!headers.get(Http::LowerCaseString("send-reply")).empty()) {
-      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
+      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, std::nullopt,
                                          "invalid_header_filter_ready");
       return Http::FilterHeadersStatus::StopIteration;
     }

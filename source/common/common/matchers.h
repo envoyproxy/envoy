@@ -241,7 +241,7 @@ public:
   }
 
   // StringMatcher
-  bool match(absl::string_view value) const override { return doMatch(value, absl::nullopt); }
+  bool match(absl::string_view value) const override { return doMatch(value, std::nullopt); }
   bool match(absl::string_view value, const StringMatcher::Context& context) const override {
     return doMatch(value, makeOptRef(context));
   }

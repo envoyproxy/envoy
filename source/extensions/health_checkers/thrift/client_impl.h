@@ -45,7 +45,7 @@ private:
   ProtocolPtr protocol_;
   DecoderPtr decoder_;
   Buffer::OwnedImpl buffer_;
-  absl::optional<bool> success_;
+  std::optional<bool> success_;
   bool complete_{};
 };
 

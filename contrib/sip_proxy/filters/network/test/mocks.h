@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/router/router.h"
@@ -201,14 +202,14 @@ public:
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
   MOCK_METHOD(void, updateTrafficRoutingAssistant,
               (const std::string&, const std::string&, const std::string&,
-               const absl::optional<TraContextMap>),
+               const std::optional<TraContextMap>),
               ());
   MOCK_METHOD(QueryStatus, retrieveTrafficRoutingAssistant,
-              (const std::string&, const std::string&, const absl::optional<TraContextMap>,
+              (const std::string&, const std::string&, const std::optional<TraContextMap>,
                SipFilters::DecoderFilterCallbacks&, std::string&),
               ());
   MOCK_METHOD(void, deleteTrafficRoutingAssistant,
-              (const std::string&, const std::string&, const absl::optional<TraContextMap>), ());
+              (const std::string&, const std::string&, const std::optional<TraContextMap>), ());
   MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), ());
   MOCK_METHOD(void, doSubscribe,
               (const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity),

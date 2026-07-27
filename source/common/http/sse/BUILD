@@ -14,6 +14,5 @@ envoy_cc_library(
     hdrs = ["sse_parser.h"],
     deps = [
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
     ],
 )

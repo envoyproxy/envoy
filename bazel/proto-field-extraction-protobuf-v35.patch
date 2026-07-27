@@ -1,0 +1,161 @@
+# Protobuf v35 added [[nodiscard]] to many APIs. Suppress unused-result warnings
+# in proto-field-extraction. Remove when proto-field-extraction is updated.
+diff --git a/proto_field_extraction/field_extractor/BUILD.bazel b/proto_field_extraction/field_extractor/BUILD.bazel
+index 82b0cca..0168424 100644
+--- a/proto_field_extraction/field_extractor/BUILD.bazel
++++ b/proto_field_extraction/field_extractor/BUILD.bazel
+@@ -14,7 +14,7 @@
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "field_extractor",
+     srcs = [
+         "field_extractor.cc",
+@@ -68,7 +68,7 @@ cc_test(
+     ],
+ )
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "field_extractor_test_lib",
+     testonly = True,
+     srcs = ["field_extractor_test_lib.cc"],
+@@ -84,7 +84,7 @@ cc_library(
+     ],
+ )
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "field_extractor_util",
+     srcs = [
+         "field_extractor_util.cc",
+diff --git a/proto_field_extraction/field_extractor/field_extractor.h b/proto_field_extraction/field_extractor/field_extractor.h
+index ea8108c..f4863be 100644
+--- a/proto_field_extraction/field_extractor/field_extractor.h
++++ b/proto_field_extraction/field_extractor/field_extractor.h
+@@ -199,7 +199,7 @@ class FieldExtractor {
+       return T{};
+     }
+     // Update input_stream for the next iteration.
+-    input_stream->ReadLengthAndPushLimit();
++    static_cast<void>(input_stream->ReadLengthAndPushLimit());
+     return ExtractFieldInfoHelper(input_stream, *current_node.type, current + 1,
+                                   end, std::move(field_info_extractor));
+   }
+@@ -248,7 +248,7 @@ class FieldExtractor {
+                 field_info_extractor(*current_node.type, map_value_node.field,
+                                      input_stream));
+             results->push_back(std::move(result));
+-            input_stream->Skip(input_stream->BytesUntilLimit());
++            static_cast<void>(input_stream->Skip(input_stream->BytesUntilLimit()));
+             input_stream->PopLimit(limit);
+           }
+         }
+@@ -282,7 +282,7 @@ class FieldExtractor {
+           RETURN_IF_ERROR(ExtractRepeatedFieldInfoHelper(
+               input_stream, root_message, *map_value_type, current + 1, end,
+               field_info_extractor, field_info_map_extractor, results));
+-          input_stream->Skip(input_stream->BytesUntilLimit());
++          static_cast<void>(input_stream->Skip(input_stream->BytesUntilLimit()));
+           input_stream->PopLimit(map_value_limit);
+         }
+         // Skip empty map entry.
+@@ -300,7 +300,7 @@ class FieldExtractor {
+           RETURN_IF_ERROR(ExtractRepeatedFieldInfoHelper(
+               input_stream, root_message, *any_value_type, current + 1, end,
+               field_info_extractor, field_info_map_extractor, results));
+-          input_stream->Skip(input_stream->BytesUntilLimit());
++          static_cast<void>(input_stream->Skip(input_stream->BytesUntilLimit()));
+           input_stream->PopLimit(any_value_limit);
+         }
+         // Skip empty (e.g. no `value` data) or invalid (e.g. no `type_url`
+@@ -312,7 +312,7 @@ class FieldExtractor {
+             field_info_extractor, field_info_map_extractor, results));
+       }
+ 
+-      input_stream->Skip(input_stream->BytesUntilLimit());
++      static_cast<void>(input_stream->Skip(input_stream->BytesUntilLimit()));
+       input_stream->PopLimit(limit);
+     }
+ 
+diff --git a/proto_field_extraction/field_value_extractor/BUILD.bazel b/proto_field_extraction/field_value_extractor/BUILD.bazel
+index 2d1967c..e41ccd5 100644
+--- a/proto_field_extraction/field_value_extractor/BUILD.bazel
++++ b/proto_field_extraction/field_value_extractor/BUILD.bazel
+@@ -14,7 +14,7 @@
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "field_value_extractor_interface",
+     hdrs = ["field_value_extractor_interface.h"],
+     deps = [
+@@ -25,7 +25,7 @@ cc_library(
+     ],
+ )
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "field_value_extractor",
+     srcs = ["field_value_extractor.cc"],
+     hdrs = ["field_value_extractor.h"],
+@@ -70,7 +70,7 @@ cc_test(
+     ],
+ )
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "field_value_extractor_factory",
+     srcs = ["field_value_extractor_factory.cc"],
+     hdrs = ["field_value_extractor_factory.h"],
+diff --git a/proto_field_extraction/message_data/BUILD.bazel b/proto_field_extraction/message_data/BUILD.bazel
+index 2ac7d9b..17a3558 100644
+--- a/proto_field_extraction/message_data/BUILD.bazel
++++ b/proto_field_extraction/message_data/BUILD.bazel
+@@ -14,7 +14,7 @@
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "cord_message_data",
+     hdrs = ["cord_message_data.h"],
+     deps = [
+@@ -24,7 +24,7 @@ cc_library(
+     ],
+ )
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "message_data_interface",
+     hdrs = ["message_data.h"],
+     deps = [
+diff --git a/proto_field_extraction/test_utils/BUILD.bazel b/proto_field_extraction/test_utils/BUILD.bazel
+index 8260a12..5410fe6 100644
+--- a/proto_field_extraction/test_utils/BUILD.bazel
++++ b/proto_field_extraction/test_utils/BUILD.bazel
+@@ -14,7 +14,7 @@
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "utils",
+     testonly = True,
+     srcs = ["utils.cc"],
+diff --git a/proto_field_extraction/utils/BUILD.bazel b/proto_field_extraction/utils/BUILD.bazel
+index 6988f76..bfd3bd4 100644
+--- a/proto_field_extraction/utils/BUILD.bazel
++++ b/proto_field_extraction/utils/BUILD.bazel
+@@ -14,7 +14,7 @@
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
++cc_library(copts=["-Wno-unused-result"],
+     name = "constants",
+     srcs = [
+         "constants.cc",

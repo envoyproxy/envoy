@@ -23,7 +23,7 @@ void insertHttpInspectorConfigModifier(envoy::config::bootstrap::v3::Bootstrap& 
   auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
   auto* ppv_filter = listener->add_listener_filters();
   ppv_filter->set_name("http_inspector");
-  ppv_filter->mutable_typed_config()->PackFrom(http_inspector);
+  std::ignore = ppv_filter->mutable_typed_config()->PackFrom(http_inspector);
 }
 
 std::string testParamToString(

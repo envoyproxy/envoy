@@ -12,7 +12,6 @@ Contrib extensions
   cryptomb/cryptomb
   hyperscan/matcher
   hyperscan/regex_engine
-  dlb/dlb
   postgres/postgres
   qat/qat
   kae/kae

@@ -66,7 +66,7 @@ typed_config:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy pg_config;
       pg_config.set_stat_prefix("tcp_postgres");
       pg_config.set_cluster("cluster_postgres");
-      pg_filter->mutable_typed_config()->PackFrom(pg_config);
+      std::ignore = pg_filter->mutable_typed_config()->PackFrom(pg_config);
 
       // Default filter chain for non-PostgreSQL traffic.
       auto* default_chain = listener->add_filter_chains();
@@ -76,7 +76,7 @@ typed_config:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy default_config;
       default_config.set_stat_prefix("tcp_default");
       default_config.set_cluster("cluster_default");
-      default_filter->mutable_typed_config()->PackFrom(default_config);
+      std::ignore = default_filter->mutable_typed_config()->PackFrom(default_config);
     });
 
     setUpstreamCount(2);

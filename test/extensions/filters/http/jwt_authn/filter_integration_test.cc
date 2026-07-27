@@ -38,7 +38,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
-  filter.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
@@ -57,7 +57,7 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
 
   HttpFilter filter;
   filter.set_name("envoy.filters.http.jwt_authn");
-  filter.mutable_typed_config()->PackFrom(proto_config);
+  std::ignore = filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
@@ -750,7 +750,7 @@ public:
           auto& per_route_any =
               (*virtual_host->mutable_routes(0)
                     ->mutable_typed_per_filter_config())["envoy.filters.http.jwt_authn"];
-          per_route_any.PackFrom(per_route);
+          std::ignore = per_route_any.PackFrom(per_route);
         });
 
     initialize();

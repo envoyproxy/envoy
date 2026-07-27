@@ -75,7 +75,7 @@ private:
   bool needs_transformation_for_non_proto_encoded_response_{};
   Buffer::OwnedImpl decoding_buffer_;
   Grpc::Decoder decoder_;
-  absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
+  std::optional<Grpc::Context::RequestStatNames> request_stat_names_;
   bool is_grpc_web_request_{};
   Grpc::Context& context_;
   Http::ResponseHeaderMap* response_headers_{nullptr};

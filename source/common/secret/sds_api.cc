@@ -92,12 +92,15 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   if (!status.ok()) {
     return status;
   }
-  const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
-      resources[0].get().resource());
+  const auto& secret =
+      Envoy::Protobuf::DynamicCastMessage<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          resources[0].get().resource());
 
   if (secret.name() != sds_config_name_) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name()));
+    const auto msg =
+        fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name());
+    ENVOY_LOG_MISC(warn, "sds: secret '{}' config rejected: {}", sds_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
 
   const uint64_t new_hash = MessageUtil::hash(secret);
@@ -182,8 +185,10 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
 absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
                                         uint32_t removed_resources_num) const {
   if (added_resources_num == 0 && removed_resources_num == 0) {
-    return absl::InvalidArgumentError(
-        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
+    const auto msg =
+        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_);
+    ENVOY_LOG_MISC(warn, "sds: secret '{}' config rejected: {}", sds_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
 
   // This conditional technically allows a response with added=1 removed=1
@@ -191,10 +196,11 @@ absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
   // It is, however, preferred to ignore these nonsensical responses rather
   // than NACK them, so it is allowed here.
   if (added_resources_num > 1 || removed_resources_num > 1) {
-    return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secrets length for {}, number of added resources "
-                    "{}, number of removed resources {}. Expected sum is 1",
-                    sds_config_name_, added_resources_num, removed_resources_num));
+    const auto msg = fmt::format("Unexpected SDS secrets length for {}, number of added resources "
+                                 "{}, number of removed resources {}. Expected sum is 1",
+                                 sds_config_name_, added_resources_num, removed_resources_num);
+    ENVOY_LOG_MISC(warn, "sds: secret '{}' config rejected: {}", sds_config_name_, msg);
+    return absl::InvalidArgumentError(msg);
   }
   return absl::OkStatus();
 }

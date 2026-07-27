@@ -66,7 +66,8 @@ class FilterConfigImpl : public Logger::Loggable<Logger::Id::jwt>,
                          public AuthFactory {
 public:
   FilterConfigImpl(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context);
+                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context,
+                   absl::Status& creation_status);
 
   ~FilterConfigImpl() override = default;
 
@@ -109,7 +110,7 @@ public:
 
   // methods for AuthFactory interface. Factory method to help create authenticators.
   AuthenticatorPtr create(const JwtVerify::CheckAudience* check_audience,
-                          const absl::optional<std::string>& provider, bool allow_failed,
+                          const std::optional<std::string>& provider, bool allow_failed,
                           bool allow_missing) const override {
     return Authenticator::create(check_audience, provider, allow_failed, allow_missing,
                                  getJwksCache(), cm(), Common::JwksFetcher::create, timeSource());

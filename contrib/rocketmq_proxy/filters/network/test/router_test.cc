@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "test/mocks/server/factory_context.h"
 
 #include "contrib/rocketmq_proxy/filters/network/source/config.h"
@@ -253,7 +255,7 @@ TEST_F(RocketmqRouterTest, NoHealthyHosts) {
       }));
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _))
-      .WillOnce(Return(absl::nullopt));
+      .WillOnce(Return(std::nullopt));
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();

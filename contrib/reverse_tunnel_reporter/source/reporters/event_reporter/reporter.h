@@ -43,7 +43,7 @@ public:
 
   void onServerInitialized() override;
   void reportConnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
-                             absl::string_view tenant_id) override;
+                             absl::string_view tenant_id, int64_t initiation_time_ms) override;
   void reportDisconnectionEvent(absl::string_view node_id, absl::string_view cluster_id) override;
   ReverseTunnelEvent::ConnectionsList getAllConnections() override;
 

@@ -58,7 +58,7 @@ TEST_P(HttpProtocolIntegrationTest, CustomUpstreamLocalAddressSelector) {
     auto bind_config = bootstrap.mutable_cluster_manager()->mutable_upstream_bind_config();
     auto local_address_selector_config = bind_config->mutable_local_address_selector();
     Protobuf::Empty empty;
-    local_address_selector_config->mutable_typed_config()->PackFrom(empty);
+    std::ignore = local_address_selector_config->mutable_typed_config()->PackFrom(empty);
     local_address_selector_config->set_name("mock.upstream.local.address.selector");
     bind_config->mutable_source_address()->set_address("::1");
     bind_config->mutable_source_address()->set_port_value(port_value);
@@ -118,7 +118,7 @@ TEST_P(HttpProtocolIntegrationTest, BindConfigOverride) {
     auto bootstrap_address_selector_config =
         bootstrap_bind_config->mutable_local_address_selector();
     envoy::config::upstream::local_address_selector::v3::DefaultLocalAddressSelector config;
-    bootstrap_address_selector_config->mutable_typed_config()->PackFrom(config);
+    std::ignore = bootstrap_address_selector_config->mutable_typed_config()->PackFrom(config);
     bootstrap_address_selector_config->set_name(
         "envoy.upstream.local_address_selector.default_local_address_selector");
 
@@ -133,7 +133,7 @@ TEST_P(HttpProtocolIntegrationTest, BindConfigOverride) {
     bind_config->mutable_source_address()->set_port_value(port_value_1);
     Protobuf::Empty empty;
     auto address_selector_config = bind_config->mutable_local_address_selector();
-    address_selector_config->mutable_typed_config()->PackFrom(empty);
+    std::ignore = address_selector_config->mutable_typed_config()->PackFrom(empty);
     address_selector_config->set_name("test.upstream.local.address.selector");
   });
 

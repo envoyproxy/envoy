@@ -133,11 +133,19 @@ void BaseTcpProxySslIntegrationTest::ClientRawConnection::waitForDisconnect() {
   tcp_client_.close();
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 BaseTcpProxySslIntegrationTest::ClientSslConnection::tlsSessionId() const {
   const Ssl::ConnectionInfoConstSharedPtr ssl_info =
       ssl_client_->connectionInfoProvider().sslConnection();
-  return ssl_info ? absl::make_optional<std::string>(ssl_info->sessionId()) : absl::nullopt;
+  return ssl_info ? std::make_optional<std::string>(ssl_info->sessionId()) : std::nullopt;
+}
+
+std::optional<std::string>
+BaseTcpProxySslIntegrationTest::ClientSslConnection::peerCertificateSha256Digest() const {
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info =
+      ssl_client_->connectionInfoProvider().sslConnection();
+  return ssl_info ? std::make_optional<std::string>(ssl_info->sha256PeerCertificateDigest())
+                  : std::nullopt;
 }
 
 void BaseTcpProxySslIntegrationTest::setupConnections() {

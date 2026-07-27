@@ -15,13 +15,16 @@
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -219,7 +222,7 @@ TEST(Ipv4InstanceTest, NetnsComparison) {
 TEST(Ipv4InstanceTest, WithNetworkNamespace) {
   const auto ns1 = "/var/run/netns/11111";
   Ipv4Instance address1("1.2.3.4", nullptr);
-  EXPECT_EQ(absl::nullopt, address1.networkNamespace());
+  EXPECT_EQ(std::nullopt, address1.networkNamespace());
   Ipv4Instance address2("1.2.3.4", nullptr, ns1);
   EXPECT_EQ(ns1, address2.networkNamespace());
 
@@ -234,7 +237,7 @@ TEST(Ipv4InstanceTest, WithNetworkNamespace) {
   // Override with empty string.
   const auto address4 = address2.withNetworkNamespace("");
   EXPECT_NE(nullptr, address4);
-  EXPECT_EQ(absl::nullopt, address4->networkNamespace());
+  EXPECT_EQ(std::nullopt, address4->networkNamespace());
   EXPECT_EQ("1.2.3.4:0", address4->asString());
   EXPECT_EQ("1.2.3.4", address4->ip()->addressAsString());
   EXPECT_EQ(0U, address4->ip()->port());
@@ -381,7 +384,7 @@ TEST(Ipv6InstanceTest, NetnsCompare) {
 TEST(Ipv6InstanceTest, WithNetworkNamespace) {
   const auto ns1 = "/var/run/netns/11111";
   Ipv6Instance address1("::0001", 80, nullptr, true);
-  EXPECT_EQ(absl::nullopt, address1.networkNamespace());
+  EXPECT_EQ(std::nullopt, address1.networkNamespace());
   Ipv6Instance address2("::0001", 80, nullptr, true, ns1);
   EXPECT_EQ(ns1, address2.networkNamespace());
 
@@ -396,7 +399,7 @@ TEST(Ipv6InstanceTest, WithNetworkNamespace) {
   // Override with empty string.
   const auto address4 = address2.withNetworkNamespace("");
   EXPECT_NE(nullptr, address4);
-  EXPECT_EQ(absl::nullopt, address4->networkNamespace());
+  EXPECT_EQ(std::nullopt, address4->networkNamespace());
   EXPECT_EQ("[::1]:80", address4->asString());
   EXPECT_EQ("::1", address4->ip()->addressAsString());
   EXPECT_EQ(80U, address4->ip()->port());
@@ -533,7 +536,7 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(Type::Pipe, address->type());
   EXPECT_EQ(nullptr, address->ip());
   EXPECT_EQ(nullptr, address->envoyInternalAddress());
-  EXPECT_EQ(absl::nullopt, address->networkNamespace());
+  EXPECT_EQ(std::nullopt, address->networkNamespace());
   EXPECT_EQ(nullptr, address->withNetworkNamespace("/var/run/netns/1"));
 }
 
@@ -546,7 +549,7 @@ TEST(InternalInstanceTest, Basic) {
   EXPECT_NE(nullptr, address.envoyInternalAddress());
   EXPECT_EQ(nullptr, address.sockAddr());
   EXPECT_EQ(static_cast<decltype(address.sockAddrLen())>(0), address.sockAddrLen());
-  EXPECT_EQ(absl::nullopt, address.networkNamespace());
+  EXPECT_EQ(std::nullopt, address.networkNamespace());
   EXPECT_EQ(nullptr, address.withNetworkNamespace("/var/run/netns/1"));
 }
 
@@ -628,7 +631,7 @@ TEST(PipeInstanceTest, AbstractNamespace) {
   EXPECT_EQ(Type::Pipe, address->type());
   EXPECT_EQ(nullptr, address->ip());
 #else
-  EXPECT_FALSE(PipeInstance::create("@/foo").status().ok());
+  EXPECT_THAT(PipeInstance::create("@/foo").status(), Not(IsOk()));
 #endif
 }
 
@@ -650,7 +653,7 @@ TEST(PipeInstanceTest, EmbeddedNullAbstractNamespace) {
   EXPECT_EQ(Type::Pipe, address->type());
   EXPECT_EQ(nullptr, address->ip());
 #else
-  EXPECT_FALSE(PipeInstance::create(embedded_null).status().ok());
+  EXPECT_THAT(PipeInstance::create(embedded_null).status(), Not(IsOk()));
 #endif
 }
 
@@ -699,7 +702,7 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
 
   // Invalid family.
   sin.sin_family = AF_UNSPEC;
-  EXPECT_FALSE(addressFromSockAddr(ss, sizeof(sockaddr_in)).ok());
+  EXPECT_THAT(addressFromSockAddr(ss, sizeof(sockaddr_in)), Not(IsOk()));
 }
 
 TEST(AddressFromSockAddrDeathTest, IPv6) {
@@ -759,7 +762,7 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 #if defined(__linux__)
   EXPECT_EQ("@/some/abstract/path", (*addressFromSockAddr(ss, ss_len))->asString());
 #else
-  EXPECT_FALSE(addressFromSockAddr(ss, ss_len).ok());
+  EXPECT_THAT(addressFromSockAddr(ss, ss_len), Not(IsOk()));
 #endif
 }
 

@@ -26,7 +26,7 @@ void SharedRequestManager::onConnectionClose(Network::ConnectionEvent event) {
 }
 
 void SharedRequestManager::onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                                             absl::optional<StartTime> start_time) {
+                                             std::optional<StartTime> start_time) {
 
   const uint64_t stream_id = header_frame->frameFlags().streamId();
   const bool end_stream = header_frame->frameFlags().endStream();
@@ -100,7 +100,7 @@ void UniqueRequestManager::onConnectionClose(Network::ConnectionEvent event) {
 }
 
 void UniqueRequestManager::onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                                             absl::optional<StartTime> start_time) {
+                                             std::optional<StartTime> start_time) {
   if (pending_request_ != nullptr) {
     auto cb = pending_request_;
 

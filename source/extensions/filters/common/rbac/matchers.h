@@ -180,15 +180,15 @@ class AuthenticatedMatcher : public Matcher {
 public:
   AuthenticatedMatcher(const envoy::config::rbac::v3::Principal::Authenticated& auth,
                        Server::Configuration::CommonFactoryContext& context)
-      : matcher_(auth.has_principal_name() ? absl::make_optional<Matchers::StringMatcherImpl>(
+      : matcher_(auth.has_principal_name() ? std::make_optional<Matchers::StringMatcherImpl>(
                                                  auth.principal_name(), context)
-                                           : absl::nullopt) {}
+                                           : std::nullopt) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  const absl::optional<Matchers::StringMatcherImpl> matcher_;
+  const std::optional<Matchers::StringMatcherImpl> matcher_;
 };
 
 /**
@@ -204,7 +204,7 @@ public:
                 Expr::BuilderInstanceSharedConstPtr arena_builder)
       : permissions_(policy.permissions(), validation_visitor, context),
         principals_(policy.principals(), context),
-        expr_([&]() -> absl::optional<Expr::CompiledExpression> {
+        expr_([&]() -> std::optional<Expr::CompiledExpression> {
           if (policy.has_condition()) {
             // Use arena-based builder if provided, otherwise use cached builder.
             auto builder =
@@ -231,7 +231,7 @@ public:
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
-  const absl::optional<Expr::CompiledExpression> expr_;
+  const std::optional<Expr::CompiledExpression> expr_;
 };
 
 class MetadataMatcher : public Matcher {

@@ -50,27 +50,27 @@ void UUIDRequestIDExtension::setInResponse(Http::ResponseHeaderMap& response_hea
   }
 }
 
-absl::optional<absl::string_view>
+std::optional<absl::string_view>
 UUIDRequestIDExtension::get(const Http::RequestHeaderMap& request_headers) const {
   if (request_headers.RequestId() == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return request_headers.getRequestIdValue();
 }
 
-absl::optional<uint64_t>
+std::optional<uint64_t>
 UUIDRequestIDExtension::getInteger(const Http::RequestHeaderMap& request_headers) const {
   if (request_headers.RequestId() == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const std::string uuid(request_headers.getRequestIdValue());
   if (uuid.length() < 8) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   uint64_t value;
   if (!StringUtil::atoull(uuid.substr(0, 8).c_str(), value, 16)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return value;

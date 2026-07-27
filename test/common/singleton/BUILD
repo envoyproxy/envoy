@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/common:thread_lib",
         "//source/common/singleton:threadsafe_singleton",
         "//source/common/stats:isolated_store_lib",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ],

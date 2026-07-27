@@ -30,8 +30,6 @@ public:
   void initialize() override {
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
-    envoy::config::route::v3::RetryPolicy retry_policy;
-
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
     config_helper_.addVirtualHost(pass_through);
 
@@ -114,7 +112,7 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByPreviousRout
       previous_routes_config;
   auto* predicate = internal_redirect_policy->add_predicates();
   predicate->set_name("previous_routes");
-  predicate->mutable_typed_config()->PackFrom(previous_routes_config);
+  std::ignore = predicate->mutable_typed_config()->PackFrom(previous_routes_config);
   config_helper_.addVirtualHost(handle_prevent_repeated_target);
 
   // Validate that header sanitization is only called once.
@@ -178,7 +176,8 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByAllowListedR
   envoy::extensions::internal_redirect::allow_listed_routes::v3::AllowListedRoutesConfig
       allow_listed_routes_config;
   *allow_listed_routes_config.add_allowed_route_names() = "max_three_hop";
-  allow_listed_routes_predicate->mutable_typed_config()->PackFrom(allow_listed_routes_config);
+  std::ignore =
+      allow_listed_routes_predicate->mutable_typed_config()->PackFrom(allow_listed_routes_config);
 
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
 
@@ -247,7 +246,7 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedBySafeCrossSch
   predicate->set_name("safe_cross_scheme_predicate");
   envoy::extensions::internal_redirect::safe_cross_scheme::v3::SafeCrossSchemeConfig
       predicate_config;
-  predicate->mutable_typed_config()->PackFrom(predicate_config);
+  std::ignore = predicate->mutable_typed_config()->PackFrom(predicate_config);
 
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
 

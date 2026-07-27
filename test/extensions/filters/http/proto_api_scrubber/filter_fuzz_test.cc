@@ -135,7 +135,7 @@ std::string createFuzzDescriptorSet() {
   method->set_output_type(".fuzz.FuzzMessage");
 
   std::string bytes;
-  descriptor_set.SerializeToString(&bytes);
+  std::ignore = descriptor_set.SerializeToString(&bytes);
   return bytes;
 }
 
@@ -163,11 +163,11 @@ ProtoApiScrubberConfig createFuzzConfig() {
       ->mutable_expr()
       ->mutable_const_expr()
       ->set_bool_value(true);
-  cel_matcher->PackFrom(cel);
+  std::ignore = cel_matcher->PackFrom(cel);
 
   auto* action_config = entry->mutable_on_match()->mutable_action()->mutable_typed_config();
   envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove;
-  action_config->PackFrom(remove);
+  std::ignore = action_config->PackFrom(remove);
   entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
   auto* req_rules = method_rules.mutable_request_field_restrictions();
@@ -198,7 +198,8 @@ DEFINE_PROTO_FUZZER(const ProtoApiScrubberFuzzInput& input) {
   ON_CALL(encoder_callbacks, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
 
   auto config_proto = createFuzzConfig();
-  auto config_or_error = ProtoApiScrubberFilterConfig::create(config_proto, factory_context);
+  auto config_or_error = ProtoApiScrubberFilterConfig::create(
+      config_proto, factory_context.serverFactoryContext(), factory_context.scope());
 
   if (!config_or_error.ok()) {
     return;

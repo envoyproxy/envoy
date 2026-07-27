@@ -133,7 +133,7 @@ private:
     Buffer::OwnedImpl upstream_buffer_;
     MessageMetadataSharedPtr metadata_;
     ProtocolConverterSharedPtr protocol_converter_;
-    absl::optional<bool> success_;
+    std::optional<bool> success_;
     bool complete_ : 1 = false;
     bool passthrough_ : 1 = false;
     bool pending_transport_end_ : 1 = false;
@@ -362,7 +362,7 @@ private:
     std::list<ThriftFilters::FilterBaseSharedPtr> base_filters_;
     DecoderEventHandlerSharedPtr upgrade_handler_;
     ResponseDecoderPtr response_decoder_;
-    absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    std::optional<Router::RouteConstSharedPtr> cached_route_;
     Buffer::OwnedImpl response_buffer_;
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
@@ -377,7 +377,7 @@ private:
 
   void continueDecoding();
   void dispatch();
-  absl::optional<DirectResponse::ResponseType>
+  std::optional<DirectResponse::ResponseType>
   sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);

@@ -63,7 +63,7 @@ protected:
           mock_upstreams_headers_sent_.emplace_back();
           ON_CALL(*ret, sendHeaders)
               .WillByDefault([this, i](Http::RequestHeaderMap& headers, bool end_stream) {
-                EXPECT_EQ(mock_upstreams_headers_sent_[i], absl::nullopt)
+                EXPECT_EQ(mock_upstreams_headers_sent_[i], std::nullopt)
                     << "headers should only be sent once";
                 EXPECT_TRUE(end_stream) << "post requests should be bypassing the filter";
                 mock_upstreams_headers_sent_[i] = Http::TestRequestHeaderMapImpl();
@@ -187,14 +187,14 @@ protected:
 
   void populateCommonCacheEntry(size_t upstream_index, CacheFilterSharedPtr filter,
                                 absl::string_view body = "",
-                                OptRef<Http::ResponseTrailerMap> trailers = absl::nullopt) {
+                                OptRef<Http::ResponseTrailerMap> trailers = std::nullopt) {
     testDecodeRequestMiss(upstream_index, filter);
 
     receiveUpstreamHeaders(upstream_index, response_headers_,
-                           body.empty() && trailers == absl::nullopt);
+                           body.empty() && trailers == std::nullopt);
 
     if (!body.empty()) {
-      receiveUpstreamBody(upstream_index, body, trailers == absl::nullopt);
+      receiveUpstreamBody(upstream_index, body, trailers == std::nullopt);
     }
     if (trailers) {
       receiveUpstreamTrailers(upstream_index, *trailers);
@@ -294,7 +294,7 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   std::vector<std::unique_ptr<Http::MockAsyncClientStream>> mock_upstreams_;
   std::vector<std::reference_wrapper<Http::AsyncClient::StreamCallbacks>> mock_upstreams_callbacks_;
-  std::vector<absl::optional<Http::TestRequestHeaderMapImpl>> mock_upstreams_headers_sent_;
+  std::vector<std::optional<Http::TestRequestHeaderMapImpl>> mock_upstreams_headers_sent_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
   const Seconds delay_ = Seconds(10);
@@ -620,7 +620,7 @@ TEST_F(CacheFilterTest, CacheEntryStreamedWithTrailersAndNoContentLengthCanDeliv
       std::move(cb)(
           LookupResult{CacheEntryStatus::Ok,
                        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
-                       absl::nullopt, absl::nullopt},
+                       std::nullopt, std::nullopt},
           /* end_stream = */ false);
     });
   });
@@ -673,7 +673,7 @@ TEST_F(CacheFilterTest, OnDestroyBeforeOnHeadersAbortsAction) {
     dispatcher_->post([cb = std::move(cb),
                        response_headers = std::move(response_headers)]() mutable {
       std::move(cb)(
-          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt}, false);
+          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, std::nullopt}, false);
     });
   });
   auto filter = makeFilter(mock_http_cache, false);
@@ -695,7 +695,7 @@ TEST_F(CacheFilterTest, OnDestroyBeforeOnBodyAbortsAction) {
     dispatcher_->post([cb = std::move(cb),
                        response_headers = std::move(response_headers)]() mutable {
       std::move(cb)(
-          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt}, false);
+          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, std::nullopt}, false);
     });
   });
   LookupBodyCallback body_callback;
@@ -724,7 +724,7 @@ TEST_F(CacheFilterTest, OnDestroyBeforeOnTrailersAbortsAction) {
     dispatcher_->post([cb = std::move(cb),
                        response_headers = std::move(response_headers)]() mutable {
       std::move(cb)(
-          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt}, false);
+          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, std::nullopt}, false);
     });
   });
   EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
@@ -760,7 +760,7 @@ TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
     dispatcher_->post([cb = std::move(cb),
                        response_headers = std::move(response_headers)]() mutable {
       std::move(cb)(
-          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt}, false);
+          LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, std::nullopt}, false);
     });
   });
   EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
@@ -1342,7 +1342,7 @@ TEST_F(CacheFilterDeathTest, BadRangeRequestLookup) {
       std::move(cb)(
           LookupResult{CacheEntryStatus::Ok,
                        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
-                       absl::nullopt,
+                       std::nullopt,
                        RangeDetails{/*satisfiable_ = */ false, {AdjustedByteRange{0, 5}}}},
           false);
     });
@@ -1376,7 +1376,7 @@ TEST_F(CacheFilterTest, RangeRequestSatisfiedBeforeLengthKnown) {
       std::move(cb)(
           LookupResult{CacheEntryStatus::Ok,
                        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
-                       absl::nullopt,
+                       std::nullopt,
                        RangeDetails{/*satisfiable_ = */ true, {AdjustedByteRange{0, 5}}}},
           false);
     });
@@ -1451,17 +1451,17 @@ TEST(LookupStatusDeathTest, ResolveLookupStatusRequireValidationAndDestroyedIsBu
 }
 
 TEST(LookupStatusTest, ResolveLookupStatusReturnsCorrectStatuses) {
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Initial),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::Initial),
             LookupStatus::RequestIncomplete);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::NotServingFromCache),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::NotServingFromCache),
             LookupStatus::RequestNotCacheable);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::ValidatingCachedResponse),
             LookupStatus::Unknown);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::ValidatingCachedResponse),
             LookupStatus::Unknown);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ServingFromCache),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::ServingFromCache),
             LookupStatus::Unknown);
-  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Destroyed),
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(std::nullopt, FilterState::Destroyed),
             LookupStatus::Unknown);
   EXPECT_EQ(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
                                              FilterState::ValidatingCachedResponse),

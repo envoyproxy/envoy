@@ -19,6 +19,6 @@ class TestHostPredicate : public Upstream::RetryHostPredicate {
     }
   }
 
-  absl::optional<std::string> first_host_address_;
+  std::optional<std::string> first_host_address_;
 };
 } // namespace Envoy

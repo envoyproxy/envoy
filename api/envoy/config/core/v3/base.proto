@@ -502,6 +502,14 @@ message HeaderMap {
 message WatchedDirectory {
   // Directory path to watch.
   string path = 1 [(validate.rules).string = {min_len: 1}];
+
+  // If set to true, the watcher will also subscribe to file modification events
+  // (``IN_MODIFY`` on Linux) in addition to move events (``IN_MOVED_TO``). This allows
+  // in-place file writes to trigger reload callbacks. Use this when the writing process
+  // cannot use atomic rename (e.g. certain secret managers that write certificate files
+  // directly). By default, only move/rename events are watched, which is the safe choice
+  // for atomic updates (e.g. Kubernetes ConfigMap symlink swaps).
+  bool watch_modify = 2;
 }
 
 // Data source consisting of a file, an inline value, or an environment variable.

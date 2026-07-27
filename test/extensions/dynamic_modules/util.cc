@@ -2,9 +2,20 @@
 
 #include <cstdlib>
 
+#include "source/common/stats/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
+
+uint64_t failureCounter(Stats::Scope& scope, absl::string_view leaf,
+                        absl::string_view config_name) {
+  Stats::StatNameDynamicPool pool(scope.symbolTable());
+  Stats::StatNameTagVector tags{{pool.add("config_name"), pool.add(config_name)}};
+  return Stats::Utility::counterFromElements(
+             scope, {Stats::DynamicName("dynamic_modules"), Stats::DynamicName(leaf)}, tags)
+      .value();
+}
 
 std::string testSharedObjectPath(std::string name, std::string language) {
   return TestEnvironment::substitute(

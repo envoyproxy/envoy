@@ -68,7 +68,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/protobuf:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -87,7 +86,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/protobuf:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

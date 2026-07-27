@@ -13,7 +13,7 @@ constexpr char REGION[] = "REGION";
 constexpr char AWS_SIGV4A_SIGNING_REGION_SET[] = "AWS_SIGV4A_SIGNING_REGION_SET";
 constexpr char SIGV4A_SIGNING_REGION_SET[] = "SIGV4A_SIGNING_REGION_SET";
 
-absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
+std::optional<std::string> EnvironmentRegionProvider::getRegion() {
   std::string region;
 
   // Search for the region in environment variables AWS_REGION and AWS_DEFAULT_REGION
@@ -21,20 +21,20 @@ absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
   if (region.empty()) {
     region = Utility::getEnvironmentVariableOrDefault(AWS_DEFAULT_REGION, "");
     if (region.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
   }
   ENVOY_LOG(debug, "EnvironmentRegionProvider: Region string retrieved: {}", region);
   return region;
 }
 
-absl::optional<std::string> EnvironmentRegionProvider::getRegionSet() {
+std::optional<std::string> EnvironmentRegionProvider::getRegionSet() {
   std::string regionSet;
 
   // Search for the region in environment variables AWS_REGION and AWS_DEFAULT_REGION
   regionSet = Utility::getEnvironmentVariableOrDefault(AWS_SIGV4A_SIGNING_REGION_SET, "");
   if (regionSet.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   ENVOY_LOG(debug, "EnvironmentRegionProvider: RegionSet string retrieved: {}", regionSet);
   return regionSet;
@@ -52,7 +52,7 @@ AWSCredentialsFileRegionProvider::AWSCredentialsFileRegionProvider(
   }
 }
 
-absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
+std::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
   absl::flat_hash_map<std::string, std::string> elements = {{REGION, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
@@ -63,18 +63,18 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
 
   // Search for the region in the credentials file
   if (!Utility::resolveProfileElementsFromFile(file_path, profile, elements)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   it = elements.find(REGION);
   if (it == elements.end() || it->second.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ENVOY_LOG(debug, "AWSCredentialsFileRegionProvider: Region string retrieved: {}", it->second);
   return it->second;
 }
 
-absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
+std::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
   absl::flat_hash_map<std::string, std::string> elements = {{SIGV4A_SIGNING_REGION_SET, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
@@ -86,18 +86,18 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
 
   // Search for the region in the credentials file
   if (!Utility::resolveProfileElementsFromFile(file_path, profile, elements)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   it = elements.find(SIGV4A_SIGNING_REGION_SET);
   if (it == elements.end() || it->second.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ENVOY_LOG(debug, "AWSCredentialsFileRegionProvider: RegionSet string retrieved: {}", it->second);
   return it->second;
 }
 
-absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
+std::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
   absl::flat_hash_map<std::string, std::string> elements = {{REGION, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
@@ -105,19 +105,19 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
 
   if (!Utility::resolveProfileElementsFromFile(Utility::getConfigFilePath(),
                                                Utility::getConfigProfileName(), elements)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   it = elements.find(REGION);
   if (it == elements.end() || it->second.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ENVOY_LOG(debug, "AWSConfigFileRegionProvider: Region string retrieved: {}", it->second);
   return it->second;
 }
 
-absl::optional<std::string> AWSConfigFileRegionProvider::getRegionSet() {
+std::optional<std::string> AWSConfigFileRegionProvider::getRegionSet() {
   absl::flat_hash_map<std::string, std::string> elements = {{SIGV4A_SIGNING_REGION_SET, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
@@ -125,12 +125,12 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegionSet() {
 
   if (!Utility::resolveProfileElementsFromFile(Utility::getConfigFilePath(),
                                                Utility::getConfigProfileName(), elements)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   it = elements.find(SIGV4A_SIGNING_REGION_SET);
   if (it == elements.end() || it->second.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ENVOY_LOG(debug, "AWSConfigFileRegionProvider: RegionSet string retrieved: {}", it->second);
@@ -159,24 +159,24 @@ RegionProviderChain::RegionProviderChain(
   add(RegionProviderChain::createAWSConfigFileRegionProvider());
 }
 
-absl::optional<std::string> RegionProviderChain::getRegion() {
+std::optional<std::string> RegionProviderChain::getRegion() {
   for (auto& provider : providers_) {
     const auto region = provider->getRegion();
     if (region.has_value()) {
       return region;
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
-absl::optional<std::string> RegionProviderChain::getRegionSet() {
+std::optional<std::string> RegionProviderChain::getRegionSet() {
   for (auto& provider : providers_) {
     const auto regionSet = provider->getRegionSet();
     if (regionSet.has_value()) {
       return regionSet;
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Aws

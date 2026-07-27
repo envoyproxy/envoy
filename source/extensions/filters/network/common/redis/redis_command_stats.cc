@@ -20,6 +20,11 @@ RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std
       unknown_metric_(stat_name_set_->add("unknown")) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
   // Create StatName for each Redis command. Note that we don't include Auth or Ping.
+  // HELLO is included: the RESP3 negotiation sends it as a real upstream request, so its
+  // outcome should surface as upstream_commands.hello.* rather than folding into "unknown"
+  // (the legacy init commands AUTH/READONLY keep their historical "unknown" accounting).
+  stat_name_set_->rememberBuiltin(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::hello());
   stat_name_set_->rememberBuiltins(
       Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands());
   stat_name_set_->rememberBuiltins(

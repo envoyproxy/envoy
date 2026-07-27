@@ -7,12 +7,12 @@
 #include <bit>
 
 #include "source/common/common/hash.h"
-#include "source/common/common/thread.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
 #include "test/common/stats/make_elements_helper.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"

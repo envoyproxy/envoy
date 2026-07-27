@@ -44,8 +44,9 @@ public:
           *static_resources->mutable_clusters(0)->mutable_typed_extension_protocol_options();
       envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_options;
       h2_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-      cluster_protocol_options["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"].PackFrom(
-          h2_options);
+      std::ignore =
+          cluster_protocol_options["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(h2_options);
 
       // Add on demand config to tcp_proxy config.
       ASSERT(static_resources->listeners_size() == 1);
@@ -71,7 +72,7 @@ public:
       )EOF"));
       tcp_proxy_config.mutable_on_demand()->mutable_timeout()->set_seconds(
           std::chrono::duration_cast<std::chrono::seconds>(odcds_timeout_).count());
-      config_blob->PackFrom(tcp_proxy_config);
+      std::ignore = config_blob->PackFrom(tcp_proxy_config);
     });
 
     // The first upstream serves the ADS request including the future on demand CDS request.
@@ -351,8 +352,9 @@ public:
           *static_resources->mutable_clusters(0)->mutable_typed_extension_protocol_options();
       envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_options;
       h2_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-      cluster_protocol_options["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"].PackFrom(
-          h2_options);
+      std::ignore =
+          cluster_protocol_options["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(h2_options);
 
       // Configure ADS.
       auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
@@ -382,7 +384,7 @@ public:
         tcp_proxy_config1.mutable_on_demand()->mutable_odcds_config()->mutable_ads();
         tcp_proxy_config1.mutable_on_demand()->mutable_timeout()->set_seconds(
             std::chrono::duration_cast<std::chrono::seconds>(odcds_timeout_).count());
-        tcp_proxy1->mutable_typed_config()->PackFrom(tcp_proxy_config1);
+        std::ignore = tcp_proxy1->mutable_typed_config()->PackFrom(tcp_proxy_config1);
 
         // Configure l2 to point to new_cluster2.
         auto* tcp_proxy2 = l2->mutable_filter_chains(0)->mutable_filters(0);
@@ -393,7 +395,7 @@ public:
         tcp_proxy_config2.mutable_on_demand()->mutable_odcds_config()->mutable_ads();
         tcp_proxy_config2.mutable_on_demand()->mutable_timeout()->set_seconds(
             std::chrono::duration_cast<std::chrono::seconds>(odcds_timeout_).count());
-        tcp_proxy2->mutable_typed_config()->PackFrom(tcp_proxy_config2);
+        std::ignore = tcp_proxy2->mutable_typed_config()->PackFrom(tcp_proxy_config2);
       } else {
         auto* config_blob =
             listener->mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
@@ -406,7 +408,7 @@ public:
         tcp_proxy_config.mutable_on_demand()->mutable_odcds_config()->mutable_ads();
         tcp_proxy_config.mutable_on_demand()->mutable_timeout()->set_seconds(
             std::chrono::duration_cast<std::chrono::seconds>(odcds_timeout_).count());
-        config_blob->PackFrom(tcp_proxy_config);
+        std::ignore = config_blob->PackFrom(tcp_proxy_config);
       }
     });
 

@@ -32,12 +32,12 @@ public:
 
   void setField(const std::string& key, const std::string& value) { fields_[key] = value; }
 
-  absl::optional<std::string> getGeoField(absl::string_view key) const {
+  std::optional<std::string> getGeoField(absl::string_view key) const {
     auto it = fields_.find(key);
     if (it != fields_.end()) {
       return it->second;
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   bool empty() const { return fields_.empty(); }
@@ -45,7 +45,7 @@ public:
 
   // FilterState::Object
   ProtobufTypes::MessagePtr serializeAsProto() const override;
-  absl::optional<std::string> serializeAsString() const override;
+  std::optional<std::string> serializeAsString() const override;
   bool hasFieldSupport() const override { return true; }
   FieldType getField(absl::string_view field_name) const override;
 

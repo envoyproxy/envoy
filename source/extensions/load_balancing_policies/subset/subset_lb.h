@@ -6,6 +6,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/optref.h"
@@ -25,7 +26,6 @@
 #include "source/extensions/load_balancing_policies/subset/subset_lb_config.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -46,11 +46,11 @@ public:
   // TODO(alyssawilk) implement for non-metadata match.
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
   // Pool selection not implemented.
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                            const Upstream::Host& /*host*/,
                            std::vector<uint8_t>& /*hash_key*/) override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Lifetime tracking not implemented.
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
@@ -126,8 +126,8 @@ private:
     LoadBalancerPtr lb_;
 
   protected:
-    HostSetImplPtr createHostSet(uint32_t priority, absl::optional<bool> weighted_priority_health,
-                                 absl::optional<uint32_t> overprovisioning_factor) override;
+    HostSetImplPtr createHostSet(uint32_t priority, std::optional<bool> weighted_priority_health,
+                                 std::optional<uint32_t> overprovisioning_factor) override;
 
   private:
     const PrioritySet& original_priority_set_;
@@ -163,7 +163,7 @@ public:
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
                                const Protobuf::Struct& metadata_match_criteria_override);
     // LoadBalancerContext
-    absl::optional<uint64_t> computeHashKey() override { return wrapped_->computeHashKey(); }
+    std::optional<uint64_t> computeHashKey() override { return wrapped_->computeHashKey(); }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
       return metadata_match_.get();
     }
@@ -323,7 +323,7 @@ private:
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
-  absl::optional<SubsetSelectorFallbackParamsRef>
+  std::optional<SubsetSelectorFallbackParamsRef>
   tryFindSelectorFallbackParams(LoadBalancerContext* context);
 
   bool hostMatches(const SubsetMetadata& kvs, const Host& host);

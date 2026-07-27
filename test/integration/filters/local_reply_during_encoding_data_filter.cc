@@ -17,7 +17,7 @@ public:
   constexpr static char name[] = "local-reply-during-encode-data";
 
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
+    encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, std::nullopt,
                                        "");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }

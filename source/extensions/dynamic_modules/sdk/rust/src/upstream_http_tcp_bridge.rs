@@ -102,8 +102,6 @@ pub trait EnvoyUpstreamHttpTcpBridge: Send {
   fn send_response_trailers<'a>(&self, trailers: &'a [(&'a str, &'a [u8])]);
 }
 
-const MAX_BUFFER_SLICES: usize = 64;
-
 struct EnvoyUpstreamHttpTcpBridgeImpl {
   raw: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
 }
@@ -117,18 +115,25 @@ impl EnvoyUpstreamHttpTcpBridgeImpl {
 
   fn read_buffer_slices(
     &self,
+    size_getter: unsafe extern "C" fn(
+      abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    ) -> usize,
     getter: unsafe extern "C" fn(
       abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
       *mut abi::envoy_dynamic_module_type_envoy_buffer,
       *mut usize,
     ),
   ) -> Vec<u8> {
+    let size = unsafe { size_getter(self.raw) };
+    if size == 0 {
+      return Vec::new();
+    }
     let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
       abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: std::ptr::null_mut(),
         length: 0,
       };
-      MAX_BUFFER_SLICES
+      size
     ];
     let mut num_slices: usize = 0;
     unsafe {
@@ -234,12 +239,14 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
 
   fn get_request_buffer(&self) -> Vec<u8> {
     self.read_buffer_slices(
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size,
       abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer,
     )
   }
 
   fn get_response_buffer(&self) -> Vec<u8> {
     self.read_buffer_slices(
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size,
       abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer,
     )
   }
@@ -508,4 +515,65 @@ macro_rules! declare_upstream_http_tcp_bridge_init_functions {
       }
     }
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // A single byte that every stubbed slice points at. Its address is stable for the test.
+  static SLICE_BYTE: u8 = b'a';
+
+  // More slices than the old fixed 64-element window to guard against the historical overflow.
+  const OVERFLOW_SLICE_COUNT: usize = 100;
+
+  unsafe extern "C" fn overflow_size_getter(
+    _raw: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+  ) -> usize {
+    OVERFLOW_SLICE_COUNT
+  }
+
+  unsafe extern "C" fn overflow_fill_getter(
+    _raw: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+    result_buffer_length: *mut usize,
+  ) {
+    for i in 0..OVERFLOW_SLICE_COUNT {
+      *result_buffer.add(i) = abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: &SLICE_BYTE as *const u8 as _,
+        length: 1,
+      };
+    }
+    *result_buffer_length = OVERFLOW_SLICE_COUNT;
+  }
+
+  unsafe extern "C" fn empty_size_getter(
+    _raw: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+  ) -> usize {
+    0
+  }
+
+  unsafe extern "C" fn unreachable_fill_getter(
+    _raw: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+    _result_buffer_length: *mut usize,
+  ) {
+    unreachable!("the fill getter must not run when the chunk count is zero");
+  }
+
+  // A body split across more chunks than the old fixed window reassembles without overflowing.
+  #[test]
+  fn read_buffer_slices_handles_more_chunks_than_fixed_window() {
+    let bridge = EnvoyUpstreamHttpTcpBridgeImpl::new(std::ptr::null_mut());
+    let body = bridge.read_buffer_slices(overflow_size_getter, overflow_fill_getter);
+    assert_eq!(body, vec![b'a'; OVERFLOW_SLICE_COUNT]);
+  }
+
+  // An empty buffer returns early without invoking the fill getter.
+  #[test]
+  fn read_buffer_slices_skips_fill_when_empty() {
+    let bridge = EnvoyUpstreamHttpTcpBridgeImpl::new(std::ptr::null_mut());
+    let body = bridge.read_buffer_slices(empty_size_getter, unreachable_fill_getter);
+    assert!(body.is_empty());
+  }
 }

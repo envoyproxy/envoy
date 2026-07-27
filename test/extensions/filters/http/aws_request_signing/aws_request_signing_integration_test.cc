@@ -282,7 +282,7 @@ public:
       typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
       envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
           config;
-      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
+      std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
     });
   }
 
@@ -491,7 +491,8 @@ public:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+          std::ignore =
+              (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
         });
   }
 
@@ -753,7 +754,8 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
         TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "ap-southeast-1"),
                                   per_route_config);
         auto config = default_route->mutable_typed_per_filter_config();
-        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        std::ignore =
+            (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
         // (*config)["envoy.filters.http.aws_request_signing"].PackFrom(fmt::format(fmt::runtime(route_level_config),
         // "us-east-1")); Add route that should direct to cluster with custom bind config.
         auto next_route =
@@ -767,7 +769,8 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
                      ->mutable_virtual_hosts(0)
                      ->mutable_routes(1)
                      ->mutable_typed_per_filter_config();
-        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        std::ignore =
+            (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
         next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
         next_route->mutable_route()->set_cluster("cluster_0");
         next_route->mutable_match()->set_prefix("/path3");
@@ -778,7 +781,8 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
                      ->mutable_virtual_hosts(0)
                      ->mutable_routes(2)
                      ->mutable_typed_per_filter_config();
-        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        std::ignore =
+            (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
         next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
         next_route->mutable_route()->set_cluster("cluster_0");
         next_route->mutable_match()->set_prefix("/path4");
@@ -789,7 +793,8 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
                      ->mutable_virtual_hosts(0)
                      ->mutable_routes(3)
                      ->mutable_typed_per_filter_config();
-        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        std::ignore =
+            (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
         next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
         next_route->mutable_route()->set_cluster("cluster_0");
         next_route->mutable_match()->set_prefix("/path5");
@@ -800,7 +805,8 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
                      ->mutable_virtual_hosts(0)
                      ->mutable_routes(4)
                      ->mutable_typed_per_filter_config();
-        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        std::ignore =
+            (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
       });
 
   initialize();

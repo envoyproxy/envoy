@@ -54,7 +54,7 @@ public:
             TestUtility::parseYaml<envoy::extensions::http::header_formatters::preserve_case::v3::
                                        PreserveCaseFormatterConfig>(fmt::format(
                 "forward_reason_phrase: {}", GetParam().forward_reason_phrase ? "true" : "false"));
-        typed_extension_config->mutable_typed_config()->PackFrom(config);
+        std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(config);
 
         ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                          protocol_options);

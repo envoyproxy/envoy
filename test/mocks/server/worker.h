@@ -32,12 +32,14 @@ public:
 
   // Server::Worker
   MOCK_METHOD(void, addListener,
-              (absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+              (std::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
                AddListenerCompletion completion, Runtime::Loader&, Random::RandomGenerator&));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
-  MOCK_METHOD(void, start, (OptRef<GuardDog> guard_dog, const std::function<void()>& cb));
+  MOCK_METHOD(void, start,
+              (OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
+               std::optional<uint32_t> cpu_id));
   MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
@@ -47,6 +49,9 @@ public:
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
+  MOCK_METHOD(void, onFilterChainDrain,
+              (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains));
+  MOCK_METHOD(void, onListenerDrain, (Network::ListenerConfig & listener));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

@@ -1,0 +1,49 @@
+date: June 4, 2026
+
+bug_fixes:
+- area: dynamic_modules
+  change: |
+    Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
+    high watermark at filter-chain construction time. Downstream watermark callback registration is
+    now deferred until the in-module filter has been constructed.
+- area: http2
+  change: |
+    Apply nghttp2 CVE-2026-27135 patch.
+- area: http2
+  change: |
+    Fix: `CVE-2026-47774 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-22m2-hvr2-xqc8>`_
+
+    HTTP/2 streams will now be reset if the stream violates the maximum header list size configured via
+    ``mutable_max_request_headers_kb``. Note that this is different than the per header size specified
+    by ``max_header_field_size_kb``. Uncompressed cookies now count towards this limit to
+    protect Envoys against large uncompressed cookies causing excessive memory usage. Additionally, cookies
+    now also count towards ``max_headers_count`` limits.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.http2_include_cookies_in_limits`` to false.
+- area: oauth2
+  change: |
+    Fixed a bug where HMAC verification may exposure a timing side channel that leaks information of
+    HMAC secret validity.
+- area: oauth2
+  change: |
+    Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
+    succeed (~1/256) when the configured HMAC secret did not match the secret used to encrypt the
+    cookie (for example after secret rotation, or when receiving legacy unencrypted tokens). The
+    resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
+    ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
+    is preserved, matching the behavior already documented for the explicit decryption-failure case.
+
+minor_behavior_changes:
+- area: router
+  change: |
+    The upstream transport failure reason (e.g. TLS certificate validation errors) is no longer included
+    in the HTTP response body sent to downstream clients. It remains available in access logs via
+    ``%UPSTREAM_TRANSPORT_FAILURE_REASON%``. This behavioral change can be temporarily reverted by setting
+    runtime guard ``envoy.reloadable_features.hide_transport_failure_reason_in_response_body`` to ``false``.
+    This is being changed because in many cases the upstream failure details are inappropriate to send to
+    the downstream client as it discloses too many internal details.
+- area: upstream
+  change: |
+    Load balancer rebuild coalescing during EDS batch host updates is now opt-in. It was previously enabled
+    by default. It can be re-enabled by setting the runtime guard
+    ``envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update`` to ``true``.

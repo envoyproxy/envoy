@@ -65,17 +65,9 @@ impl MatchContext {
       return None;
     }
 
-    let mut headers = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: ptr::null_mut(),
-        key_length: 0,
-        value_ptr: ptr::null_mut(),
-        value_length: 0,
-      };
-      size
-    ];
-
-    let result = unsafe {
+    let mut headers: Vec<abi::envoy_dynamic_module_type_envoy_http_header> =
+      Vec::with_capacity(size);
+    let success = unsafe {
       abi::envoy_dynamic_module_callback_matcher_get_headers(
         self.envoy_ptr,
         header_type,
@@ -83,8 +75,11 @@ impl MatchContext {
       )
     };
 
-    if !result {
+    if !success {
       return None;
+    }
+    unsafe {
+      headers.set_len(size);
     }
 
     Some(

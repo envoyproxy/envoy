@@ -28,8 +28,8 @@ static constexpr absl::string_view ASN_DB_TYPE = "asn_db";
 static constexpr absl::string_view COUNTRY_DB_TYPE = "country_db";
 
 // Helper to get optional string from config field, returns nullopt if empty.
-absl::optional<std::string> getOptionalString(const std::string& value) {
-  return !value.empty() ? absl::make_optional(value) : absl::nullopt;
+std::optional<std::string> getOptionalString(const std::string& value) {
+  return !value.empty() ? std::make_optional(value) : std::nullopt;
 }
 } // namespace
 
@@ -69,7 +69,7 @@ GeoipProviderConfig::GeoipProviderConfig(
     asn_header_ = getOptionalString(headers.asn());
     asn_org_header_ = getOptionalString(headers.asn_org());
     // TODO(barroca): When the is_anon field is fully deprecated, remove this fallback.
-    anon_header_ = !headers.anon().empty() ? absl::make_optional(headers.anon())
+    anon_header_ = !headers.anon().empty() ? std::make_optional(headers.anon())
                                            : getOptionalString(headers.is_anon());
     anon_vpn_header_ = getOptionalString(headers.anon_vpn());
     anon_hosting_header_ = getOptionalString(headers.anon_hosting());
@@ -109,7 +109,7 @@ void GeoipProviderConfig::registerGeoDbStats(const absl::string_view& db_type) {
   stat_name_set_->rememberBuiltin(absl::StrCat(db_type, ".db_build_epoch"));
 }
 
-bool GeoipProviderConfig::isLookupEnabledForHeader(const absl::optional<std::string>& header) {
+bool GeoipProviderConfig::isLookupEnabledForHeader(const std::optional<std::string>& header) {
   return (header && !header.value().empty());
 }
 

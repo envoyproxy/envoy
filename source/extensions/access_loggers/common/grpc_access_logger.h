@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -18,7 +19,6 @@
 #include "source/extensions/access_loggers/common/grpc_access_logger_utils.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -83,7 +83,9 @@ public:
  */
 #define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
   COUNTER(logs_written)                                                                            \
-  COUNTER(logs_dropped)
+  COUNTER(logs_dropped)                                                                            \
+  COUNTER(grpc_entries_flushed)                                                                    \
+  COUNTER(grpc_entries_flush_failed)
 
 /**
  * Wrapper struct for the access log stats. @see stats_macros.h
@@ -105,7 +107,7 @@ public:
   GrpcAccessLogger(
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope,
-      absl::optional<std::string> access_log_prefix,
+      std::optional<std::string> access_log_prefix,
       std::unique_ptr<GrpcAccessLogClient<LogRequest, LogResponse>> client)
       : client_(std::move(client)), buffer_flush_interval_msec_(PROTOBUF_GET_MS_OR_DEFAULT(
                                         config, buffer_flush_interval, 1000)),
@@ -150,6 +152,7 @@ private:
   virtual void addEntry(HttpLogProto&& entry) PURE;
   virtual void addEntry(TcpLogProto&& entry) PURE;
   virtual void clearMessage() { message_.Clear(); }
+  virtual uint32_t countLogEntries() const PURE;
 
   void flush() {
     if (isEmpty()) {
@@ -161,10 +164,13 @@ private:
       initMessage();
     }
 
+    const uint32_t count = countLogEntries();
     if (client_->log(message_)) {
-      // Clear the message regardless of the success.
       approximate_message_size_bytes_ = 0;
       clearMessage();
+      incGrpcEntriesFlushedStats(count);
+    } else {
+      incGrpcEntriesFlushFailedStats(count);
     }
   }
 
@@ -199,6 +205,18 @@ private:
   void incLogsWrittenStats() {
     if (stats_) {
       stats_->logs_written_.inc();
+    }
+  }
+
+  void incGrpcEntriesFlushedStats(uint32_t count) {
+    if (stats_) {
+      stats_->grpc_entries_flushed_.add(count);
+    }
+  }
+
+  void incGrpcEntriesFlushFailedStats(uint32_t count) {
+    if (stats_) {
+      stats_->grpc_entries_flush_failed_.add(count);
     }
   }
 

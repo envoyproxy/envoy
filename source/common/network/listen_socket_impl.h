@@ -71,7 +71,7 @@ public:
   NetworkListenSocket(
       IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
       const Network::Socket::OptionsSharedPtr& options,
-      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar = absl::nullopt,
+      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar = std::nullopt,
       bool bind_to_port = false)
       : ListenSocketImpl(std::move(io_handle), address),
         parent_drained_callback_registrar_(parent_drained_callback_registrar) {

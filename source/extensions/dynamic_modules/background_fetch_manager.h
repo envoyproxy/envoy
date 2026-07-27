@@ -31,12 +31,12 @@ public:
   /**
    * Removes any fetch state for this SHA256 (e.g., after a successful cache hit).
    */
-  void erase(const std::string& sha256);
+  void erase(absl::string_view sha256);
 
   /**
    * Cleans up completed fetches and starts a new one if no fetch is in-flight for this SHA256.
    */
-  void fetchIfNeeded(const std::string& sha256, Upstream::ClusterManager& cm,
+  void fetchIfNeeded(absl::string_view sha256, Upstream::ClusterManager& cm,
                      const envoy::config::core::v3::RemoteDataSource& source);
 
 private:

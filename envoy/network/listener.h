@@ -22,6 +22,8 @@
 
 #include "source/common/common/interval_value.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -83,6 +85,14 @@ public:
   virtual absl::Status doFinalPreWorkerInit() PURE;
 };
 
+} // namespace Network
+
+namespace Quic {
+class QuicPacketWriterFactory;
+} // namespace Quic
+
+namespace Network {
+
 /**
  * Configuration for a UDP listener.
  */
@@ -99,6 +109,11 @@ public:
    * @return factory for writing to a UDP socket.
    */
   virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
+
+  /**
+   * @return factory for creating QUIC packet writers.
+   */
+  virtual Quic::QuicPacketWriterFactory* quicPacketWriterFactory() PURE;
 
   /**
    * @param address is used to query the address specific router.
@@ -140,6 +155,11 @@ using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
 class ListenerInfo {
 public:
   virtual ~ListenerInfo() = default;
+
+  /**
+   * @return absl::string_view the name of the listener as set in configuration.
+   */
+  virtual absl::string_view name() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
@@ -461,7 +481,7 @@ public:
   virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
 };
 
-using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;
+using UdpListenerCallbacksOptRef = std::optional<std::reference_wrapper<UdpListenerCallbacks>>;
 
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.

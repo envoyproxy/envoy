@@ -1,6 +1,7 @@
 #include "source/common/access_log/access_log_impl.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/common/time.h"
@@ -23,8 +24,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -92,7 +91,8 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     {
       auto& factory =
           Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(config.extension_filter());
-      return factory.createFilter(config.extension_filter(), context);
+      return THROW_OR_RETURN_VALUE(factory.createFilter(config.extension_filter(), context),
+                                   FilterPtr);
     }
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::FILTER_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
@@ -117,7 +117,7 @@ bool StatusCodeFilter::evaluate(const Formatter::Context&,
 }
 
 bool DurationFilter::evaluate(const Formatter::Context&, const StreamInfo::StreamInfo& info) const {
-  absl::optional<std::chrono::nanoseconds> duration = info.currentDuration();
+  std::optional<std::chrono::nanoseconds> duration = info.currentDuration();
   if (!duration.has_value()) {
     return false;
   }
@@ -214,8 +214,12 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
 
 bool HeaderFilter::evaluate(const Formatter::Context& context,
                             const StreamInfo::StreamInfo&) const {
-  return header_data_->matchesHeaders(
-      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers));
+  const auto& headers =
+      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
+    return header_data_->matchesHeaders(headers);
+  }
+  return header_data_->matchesHeadersIndividually(headers);
 }
 
 ResponseFlagFilter::ResponseFlagFilter(

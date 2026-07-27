@@ -2,11 +2,15 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
@@ -30,7 +34,7 @@ public:
    * version of the histogram).
    * @return An optional override for the number of bins.
    */
-  virtual absl::optional<uint32_t> bins(absl::string_view stat_name) const PURE;
+  virtual std::optional<uint32_t> bins(absl::string_view stat_name) const PURE;
 };
 
 using HistogramSettingsConstPtr = std::unique_ptr<const HistogramSettings>;

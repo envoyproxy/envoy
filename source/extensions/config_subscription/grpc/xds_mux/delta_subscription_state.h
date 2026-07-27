@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/grpc/status.h"
 
 #include "source/common/common/assert.h"
@@ -8,7 +10,6 @@
 #include "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -60,9 +61,9 @@ private:
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
-    bool isWaitingForServer() const { return version_ == absl::nullopt; }
+    bool isWaitingForServer() const { return version_ == std::nullopt; }
 
-    void setAsWaitingForServer() { version_ = absl::nullopt; }
+    void setAsWaitingForServer() { version_ = std::nullopt; }
     void setVersion(absl::string_view version) { version_ = std::string(version); }
 
     // Must not be called if waitingForServer() == true.
@@ -72,7 +73,7 @@ private:
     }
 
   private:
-    absl::optional<std::string> version_;
+    std::optional<std::string> version_;
   };
 
   OptRef<ResourceState> getRequestedResourceState(absl::string_view resource_name);

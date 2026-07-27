@@ -35,7 +35,7 @@ public:
   struct MockLoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandle* handle_;
-    absl::optional<DnsHostInfoSharedPtr> host_info_;
+    std::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   LoadDnsCacheEntryResult
@@ -61,11 +61,11 @@ public:
               (UpdateCallbacks & callbacks));
 
   MOCK_METHOD((void), iterateHostMap, (IterateHostMapCb));
-  MOCK_METHOD((absl::optional<const DnsHostInfoSharedPtr>), getHost, (absl::string_view));
+  MOCK_METHOD((std::optional<const DnsHostInfoSharedPtr>), getHost, (absl::string_view));
   MOCK_METHOD(Upstream::ResourceAutoIncDec*, canCreateDnsRequest_, ());
   MOCK_METHOD(void, forceRefreshHosts, ());
-  MOCK_METHOD(void, setIpVersionToRemove, (absl::optional<Network::Address::IpVersion>));
-  MOCK_METHOD(absl::optional<Network::Address::IpVersion>, getIpVersionToRemove, ());
+  MOCK_METHOD(void, setIpVersionToRemove, (std::optional<Network::Address::IpVersion>));
+  MOCK_METHOD(std::optional<Network::Address::IpVersion>, getIpVersionToRemove, ());
   MOCK_METHOD(void, stop, ());
 };
 
@@ -136,7 +136,7 @@ public:
 
   // Extensions::Common::DynamicForwardProxy::DfpCluster
   MOCK_METHOD(bool, enableSubCluster, (), (const));
-  MOCK_METHOD((std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>),
+  MOCK_METHOD((std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>>),
               createSubClusterConfig, (const std::string&, const std::string&, const int));
   MOCK_METHOD(bool, touch, (const std::string&));
 };

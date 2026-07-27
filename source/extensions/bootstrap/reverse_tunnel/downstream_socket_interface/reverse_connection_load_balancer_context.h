@@ -1,12 +1,11 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/upstream/load_balancer_context_base.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {

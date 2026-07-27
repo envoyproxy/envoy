@@ -22,20 +22,20 @@ public:
       envoy::config::core::v3::TransportSocket inner_socket;
       inner_socket.set_name("envoy.transport_sockets.raw_buffer");
       envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
-      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+      std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
       proto_config.mutable_transport_socket()->MergeFrom(inner_socket);
 
       auto* cluster_transport_socket =
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       cluster_transport_socket->set_name("envoy.transport_sockets.tcp_stats");
-      cluster_transport_socket->mutable_typed_config()->PackFrom(proto_config);
+      std::ignore = cluster_transport_socket->mutable_typed_config()->PackFrom(proto_config);
 
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* listener_transport_socket =
           listener->mutable_filter_chains(0)->mutable_transport_socket();
       listener_transport_socket->set_name("envoy.transport_sockets.tcp_stats");
-      listener_transport_socket->mutable_typed_config()->PackFrom(proto_config);
+      std::ignore = listener_transport_socket->mutable_typed_config()->PackFrom(proto_config);
 
       listener->set_stat_prefix("test");
     });

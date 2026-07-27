@@ -119,7 +119,14 @@ static void bmFlushToSinksWithPredicatesSet(::benchmark::State& state) {
   speed_test.test(state);
 }
 
-BENCHMARK(bmFlushToSinks)->Unit(::benchmark::kMillisecond)->RangeMultiplier(10)->Range(10, 1000000);
+// The 2500000 case exercises 10M metric objects per snapshot (2.5M each of
+// counters, gauges, histograms and text readouts), the regime where ref-count
+// overhead during flush was reported in #43836.
+BENCHMARK(bmFlushToSinks)
+    ->Unit(::benchmark::kMillisecond)
+    ->RangeMultiplier(10)
+    ->Range(10, 1000000)
+    ->Arg(2500000);
 BENCHMARK(bmFlushToSinksWithPredicatesSet)
     ->Unit(::benchmark::kMillisecond)
     ->RangeMultiplier(10)

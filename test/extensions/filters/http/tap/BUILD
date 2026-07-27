@@ -64,6 +64,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/tap:config",
         "//test/extensions/common/tap:common",
         "//test/integration:http_integration_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",

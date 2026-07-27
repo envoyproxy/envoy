@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -10,7 +12,6 @@
 #include "source/common/common/thread_annotations.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Thread {
@@ -64,10 +65,14 @@ struct Options {
   //
   // If no value is set, the thread will be created with the default thread priority for the
   // platform.
-  absl::optional<int> priority_{absl::nullopt};
+  std::optional<int> priority_{std::nullopt};
+
+  // An optional CPU index to pin the thread to. When set, the thread sets its affinity to this
+  // single CPU at start. Supported on Linux, ignored on other platforms.
+  std::optional<uint32_t> cpu_affinity_{std::nullopt};
 };
 
-using OptionsOptConstRef = const absl::optional<Options>&;
+using OptionsOptConstRef = const std::optional<Options>&;
 
 /**
  * Interface providing a mechanism for creating threads.
@@ -83,7 +88,7 @@ public:
    * @param options supplies options specified on thread creation.
    */
   virtual ThreadPtr createThread(std::function<void()> thread_routine,
-                                 OptionsOptConstRef options = absl::nullopt) PURE;
+                                 OptionsOptConstRef options = std::nullopt) PURE;
 
   /**
    * Return the current system thread ID

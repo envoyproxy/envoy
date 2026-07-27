@@ -28,7 +28,7 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
 
   {
     // If no filter is disabled explicitly by route, all filters should be added.
-    EXPECT_CALL(callbacks, filterDisabled(_)).Times(3).WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(callbacks, filterDisabled(_)).Times(3).WillRepeatedly(Return(std::nullopt));
     EXPECT_CALL(callbacks, setFilterConfigName(_)).Times(3);
     FilterChainUtility::createFilterChainForFactories(callbacks, filter_factories);
     EXPECT_EQ(added_filters.size(), 3);
@@ -38,11 +38,11 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
 
   {
 
-    EXPECT_CALL(callbacks, filterDisabled("filter_0")).WillOnce(Return(absl::make_optional(true)));
+    EXPECT_CALL(callbacks, filterDisabled("filter_0")).WillOnce(Return(std::make_optional(true)));
     EXPECT_CALL(callbacks, setFilterConfigName("filter_0")).Times(0);
-    EXPECT_CALL(callbacks, filterDisabled("filter_1")).WillOnce(Return(absl::make_optional(false)));
+    EXPECT_CALL(callbacks, filterDisabled("filter_1")).WillOnce(Return(std::make_optional(false)));
     EXPECT_CALL(callbacks, setFilterConfigName("filter_1"));
-    EXPECT_CALL(callbacks, filterDisabled("filter_2")).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(callbacks, filterDisabled("filter_2")).WillOnce(Return(std::nullopt));
     EXPECT_CALL(callbacks, setFilterConfigName("filter_2"));
 
     // 'filter_1' and 'filter_2' should be added.
@@ -68,18 +68,18 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabledAndDe
 
   {
     // If no filter is enabled explicitly by route, no filter should be added.
-    EXPECT_CALL(callbacks, filterDisabled(_)).Times(3).WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(callbacks, filterDisabled(_)).Times(3).WillRepeatedly(Return(std::nullopt));
     FilterChainUtility::createFilterChainForFactories(callbacks, filter_factories);
     EXPECT_EQ(added_filters.size(), 0);
   }
 
   {
 
-    EXPECT_CALL(callbacks, filterDisabled("filter_0")).WillOnce(Return(absl::make_optional(true)));
+    EXPECT_CALL(callbacks, filterDisabled("filter_0")).WillOnce(Return(std::make_optional(true)));
     EXPECT_CALL(callbacks, setFilterConfigName("filter_0")).Times(0);
-    EXPECT_CALL(callbacks, filterDisabled("filter_1")).WillOnce(Return(absl::make_optional(false)));
+    EXPECT_CALL(callbacks, filterDisabled("filter_1")).WillOnce(Return(std::make_optional(false)));
     EXPECT_CALL(callbacks, setFilterConfigName("filter_1"));
-    EXPECT_CALL(callbacks, filterDisabled("filter_2")).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(callbacks, filterDisabled("filter_2")).WillOnce(Return(std::nullopt));
     EXPECT_CALL(callbacks, setFilterConfigName("filter_2")).Times(0);
 
     // Only filter_1 should be added.

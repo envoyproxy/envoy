@@ -104,7 +104,7 @@ filter_disabled:
   }
 
   void initializeWithTlsInspector(bool ssl_client, const std::string& log_format,
-                                  absl::optional<bool> listener_filter_disabled = absl::nullopt,
+                                  std::optional<bool> listener_filter_disabled = std::nullopt,
                                   bool enable_ja3_fingerprinting = false,
                                   bool enable_ja4_fingerprinting = false) {
     std::string tls_inspector_config =
@@ -303,6 +303,10 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   // MD5 hash:
   //   `c68cd85633d6847f599328eb2df750b7` (BoringSSL)
   //   `bcab080434778b813a3903a51fdc90fc` (OpenSSL)
+  // The fingerprint includes the certificate compression extension, which is opt-in, so enable
+  // the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -332,6 +336,10 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
   // `JA4` fingerprint:
   //   `t12i0108en_f06271c2b022_91d8455748bc` (BoringSSL)
   //   `t12i0108en_f06271c2b022_322a62d02564` (OpenSSL)
+  // The fingerprint includes the certificate compression extension, which is opt-in, so enable
+  // the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -619,7 +627,7 @@ TEST_P(TlsInspectorIntegrationTest, SniCapturedOnFilterChainNotFound) {
   const std::string test_sni = "test.example.com";
   initializeWithTlsInspector(/*ssl_client=*/true,
                              /*log_format=*/"%REQUESTED_SERVER_NAME%|%RESPONSE_CODE_DETAILS%",
-                             /*listener_filter_disabled=*/absl::nullopt);
+                             /*listener_filter_disabled=*/std::nullopt);
 
   // Set up the SSL client with an SNI that won't match any filter chain.
   Network::Address::InstanceConstSharedPtr address =

@@ -45,6 +45,7 @@ NONSTANDARD_V3_PKGS = [
     'envoy.tcp.metadataexchange.config',  # Istio TCP metadata exchange.
     'istio.envoy.config.filter.http.alpn.v2alpha1',  # Istio ALPN.
     'istio.workload',  # Istio workload discovery.
+    'envoy.extensions.network_filters.peer_metadata',
 ]
 
 API_BUILD_FILE_TEMPLATE = string.Template(

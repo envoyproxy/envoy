@@ -54,7 +54,7 @@ bool checkDnsResolutionConfigExist(
     }
     cares.mutable_dns_resolver_options()->MergeFrom(
         config.dns_resolution_config().dns_resolver_options());
-    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
     typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
     return true;
   }
@@ -70,7 +70,7 @@ void handleLegacyDnsResolverData(
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(
       config.use_tcp_for_dns_lookups());
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 

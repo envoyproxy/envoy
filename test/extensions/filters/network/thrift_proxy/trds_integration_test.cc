@@ -88,7 +88,7 @@ static_resources:
     setUpstreamCount(3);
 
     PayloadOptions options(TransportType::Framed, ProtocolType::Binary, DriverMode::Success,
-                           absl::optional<std::string>(), "poke");
+                           std::optional<std::string>(), "poke");
     preparePayloads(options, request_bytes_, response_bytes_);
 
     BaseThriftIntegrationTest::initialize();

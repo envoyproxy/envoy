@@ -20,7 +20,7 @@ void ClusterUpdateTracker::onClusterAddOrUpdate(absl::string_view cluster_name,
   thread_local_cluster_ = get_cluster();
 }
 
-void ClusterUpdateTracker::onClusterRemoval(const std::string& cluster) {
+void ClusterUpdateTracker::onClusterRemoval(absl::string_view cluster) {
   if (cluster != cluster_name_) {
     return;
   }

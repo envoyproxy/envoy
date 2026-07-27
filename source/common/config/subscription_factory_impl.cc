@@ -45,7 +45,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
                                                    callbacks,
                                                    resource_decoder,
                                                    options,
-                                                   absl::nullopt,
+                                                   std::nullopt,
                                                    Utility::generateStats(scope),
                                                    cm_.adsMux()};
 
@@ -145,7 +145,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
                                                    callbacks,
                                                    resource_decoder,
                                                    options,
-                                                   absl::nullopt,
+                                                   std::nullopt,
                                                    Utility::generateStats(scope),
                                                    ads_grpc_mux};
   static constexpr absl::string_view subscription_type = "envoy.config_subscription.ads";

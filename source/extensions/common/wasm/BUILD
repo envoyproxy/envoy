@@ -34,6 +34,7 @@ envoy_cc_library(
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
+        "//envoy/network:dns_interface",
         "//envoy/server:lifecycle_notifier_interface",
         "//envoy/stats:custom_stat_namespaces_interface",
         "//envoy/thread_local:thread_local_object",
@@ -46,7 +47,6 @@ envoy_cc_library(
         "//source/common/version:version_includes",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
-        "@cel-cpp//eval/public:activation",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
         "@proxy_wasm_cpp_host//:headers",

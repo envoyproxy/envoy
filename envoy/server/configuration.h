@@ -4,14 +4,13 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -178,9 +177,9 @@ public:
   virtual Admin& admin() PURE;
 
   /**
-   * @return absl::optional<std::string> the path to look for flag files.
+   * @return std::optional<std::string> the path to look for flag files.
    */
-  virtual absl::optional<std::string> flagsPath() const PURE;
+  virtual std::optional<std::string> flagsPath() const PURE;
 
   /**
    * @return const envoy::config::bootstrap::v2::LayeredRuntime& runtime

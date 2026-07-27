@@ -33,7 +33,7 @@ class ActiveTcpSocket : public Network::ListenerFilterManager,
 public:
   ActiveTcpSocket(ActiveStreamListenerBase& listener, Network::ConnectionSocketPtr&& socket,
                   bool hand_off_restored_destination_connections,
-                  const absl::optional<std::string>& network_namespace);
+                  const std::optional<std::string>& network_namespace);
   ~ActiveTcpSocket() override;
 
   void onTimeout();

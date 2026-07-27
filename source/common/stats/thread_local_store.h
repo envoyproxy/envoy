@@ -37,7 +37,7 @@ class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
                            StatNameTagSpan stat_name_tags, SymbolTable& symbol_table,
-                           absl::optional<uint32_t> bins);
+                           std::optional<uint32_t> bins);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -87,7 +87,7 @@ class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
                       StatName tag_extracted_name, StatNameTagSpan stat_name_tags,
-                      ConstSupportedBuckets& supported_buckets, absl::optional<uint32_t> bins,
+                      ConstSupportedBuckets& supported_buckets, std::optional<uint32_t> bins,
                       uint64_t id);
   ~ParentHistogramImpl() override;
 
@@ -128,12 +128,12 @@ public:
   // RefcountInterface
   void incRefCount() override;
   bool decRefCount() override;
-  uint32_t use_count() const override { return ref_count_; }
+  uint32_t use_count() const override { return ref_count_.load(std::memory_order_relaxed); }
 
   // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
   void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
   bool shuttingDown() const { return shutting_down_; }
-  absl::optional<uint32_t> bins() const { return bins_; }
+  std::optional<uint32_t> bins() const { return bins_; }
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -141,7 +141,7 @@ private:
   detailedlBucketsHelper(const histogram_t& histogram) const;
 
   const Histogram::Unit unit_;
-  const absl::optional<uint32_t> bins_;
+  const std::optional<uint32_t> bins_;
   ThreadLocalStoreImpl& thread_local_store_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
@@ -167,7 +167,7 @@ public:
   static const char IterateScopeSync[];
   static const char MainDispatcherCleanupSync[];
 
-  ThreadLocalStoreImpl(Allocator& alloc);
+  explicit ThreadLocalStoreImpl(Allocator& alloc);
   ~ThreadLocalStoreImpl() override;
   // Stats::Store
   NullCounterImpl& nullCounter() override { return null_counter_; }
@@ -202,6 +202,15 @@ public:
   }
   void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
   void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) override;
+  // Enables/disables the explicit-tags logic store-wide. This should be called before
+  // any scope that with non-empty prefix is created.
+  void setUseExplicitTags(bool use_explicit_tags) override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    use_explicit_tags_ = use_explicit_tags;
+  }
+  // Whether the store is using the explicit-tags logic. Exposed primarily so tests can verify the
+  // value selected during server initialization.
+  bool useExplicitTags() const { return use_explicit_tags_; }
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
@@ -293,6 +302,12 @@ private:
     ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
               const ScopeStatsLimitSettings& limits = {},
               StatsMatcherSharedPtr scope_matcher = nullptr);
+    // Explicit-tags constructor. Used when the store is in explicit-tags mode
+    // (use_explicit_tags_ == true).
+    ScopeImpl(StatName base_name, StatNameTagSpan name_tags, StatName tagged_name,
+              ThreadLocalStoreImpl& parent, bool evictable,
+              const ScopeStatsLimitSettings& limits = {},
+              StatsMatcherSharedPtr scope_matcher = nullptr);
     ~ScopeImpl() override;
 
     void setCleanupCallback(std::function<void()> callback) override {
@@ -300,21 +315,26 @@ private:
     }
 
     // Stats::Scope
-    Counter& counterFromStatNameWithTags(const StatName& name,
-                                         StatNameTagVectorOptConstRef tags) override;
-    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                     Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatNameWithTags(const StatName& name,
-                                             StatNameTagVectorOptConstRef tags,
-                                             Histogram::Unit unit) override;
-    TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                               const ScopeStatsLimitSettings& limits = {},
-                               StatsMatcherSharedPtr matcher = nullptr) override;
-    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
-                                     StatsMatcherSharedPtr matcher = nullptr) override;
+    // The legacy scope ignores name_tags/tagged_name: it joins parent's prefix + base_name as
+    // before.
+    Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                   StatName tagged_name) override;
+    Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                               StatName tagged_name, Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                       StatName tagged_name, Histogram::Unit unit) override;
+    TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                           std::optional<StatNameTagSpan> name_tags,
+                                           StatName tagged_name) override;
+    ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
+                                             TagStringViewSpan name_tags,
+                                             absl::string_view tagged_name, bool evictable,
+                                             const ScopeStatsLimitSettings& limits,
+                                             StatsMatcherSharedPtr matcher) override;
+    ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                       StatName tagged_name, bool evictable,
+                                       const ScopeStatsLimitSettings& limits,
+                                       StatsMatcherSharedPtr matcher) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -416,7 +436,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
-                           absl::optional<StatNameTagSpan> stat_name_tags,
+                           std::optional<StatNameTagSpan> stat_name_tags,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatsMatcher::FastResult fast_reject_result,
                            StatNameStorageSet& central_rejected_stats,
@@ -424,7 +444,7 @@ private:
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     template <class StatType>
-    using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+    using StatTypeOptConstRef = std::optional<std::reference_wrapper<const StatType>>;
 
     /**
      * Looks up an existing stat, populating the local cache if necessary. Does
@@ -441,13 +461,13 @@ private:
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
       auto iter = central_cache_map.find(name);
       if (iter == central_cache_map.end()) {
-        return absl::nullopt;
+        return std::nullopt;
       }
 
       return std::cref(*iter->second);
     }
 
-    StatName prefix() const override { return prefix_.statName(); }
+    StatName prefix() const override { return prefix_; }
 
     // Returns the central cache, asserting that the parent lock is held.
     //
@@ -483,6 +503,13 @@ private:
       return effectiveMatcher().fastRejects(name);
     }
 
+    // Whether this scope uses the explicit-tags logic (propagating scope-level tags) or the legacy
+    // logic (which drops scope-level tag metadata). This mirrors the store-level flag, which is the
+    // single source of truth. Note that prefix_tags_ may still be null when this is true: a
+    // scope created in legacy mode before setUseExplicitTags() enabled the flag has no
+    // prefix_tags_.
+    bool useExplicitTags() const { return parent_.use_explicit_tags_; }
+
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
@@ -490,8 +517,11 @@ private:
     const ScopeStatsLimitSettings limits_;
     StatsMatcherSharedPtr scope_matcher_;
 
-  private:
-    StatNameStorage prefix_;
+    StatNameList prefix_list_;
+    StatName prefix_;
+    StatName base_prefix_;
+    std::vector<StatNameTag> prefix_tags_;
+
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
     std::function<void()> cleanup_callback_;
   };
@@ -601,6 +631,12 @@ private:
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
   StatNameSetPtr well_known_tags_;
+  // When true, scopes use the explicit-tags logic (ScopeImpl::useExplicitTags()), enabling the
+  // explicit-tags Scope APIs that propagate scope-level tags. When false, the legacy logic is used.
+  // Set once via setUseExplicitTags() during single-threaded startup (see the setter's contract);
+  // the root scope is always created explicit-tag-capable so this can be enabled without recreating
+  // it.
+  bool use_explicit_tags_ = false;
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);

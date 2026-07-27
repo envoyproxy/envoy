@@ -38,7 +38,7 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
   {
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
@@ -53,7 +53,7 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -66,7 +66,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
   {
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
@@ -110,7 +110,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
   {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
@@ -118,7 +118,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
   {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
@@ -126,7 +126,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -139,7 +139,7 @@ TEST(MatchingData, HttpResponseLocalReplyInputNoDetails) {
 
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-  EXPECT_EQ(result.stringData(), absl::nullopt);
+  EXPECT_EQ(result.stringData(), std::nullopt);
 }
 
 TEST(MatchingData, HttpResponseLocalReplyInputUpstreamResponse) {

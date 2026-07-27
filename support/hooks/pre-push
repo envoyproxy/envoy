@@ -19,6 +19,28 @@ if [[ -n "$NO_VERIFY" ]]; then
 fi
 
 DUMMY_SHA=0000000000000000000000000000000000000000
+HOOK_START_SECONDS=$SECONDS
+PRE_PUSH_REMOTE_IDLE_WARNING_SECONDS="${PRE_PUSH_REMOTE_IDLE_WARNING_SECONDS:-300}"
+
+warn_if_remote_may_have_timed_out() {
+  local threshold="$PRE_PUSH_REMOTE_IDLE_WARNING_SECONDS"
+  if [[ ! "$threshold" =~ ^[0-9]+$ ]]; then
+    threshold=300
+  fi
+
+  local elapsed=$((SECONDS - HOOK_START_SECONDS))
+  if ((elapsed < threshold)); then
+    return
+  fi
+
+  echo >&2
+  echo >&2 "WARNING: pre-push checks took ${elapsed}s."
+  echo >&2 "Git contacts the remote before running this hook, so a long hook can leave"
+  echo >&2 "the remote SSH connection idle long enough to time out. If the push stops"
+  echo >&2 "after this point without normal object-transfer output, retry the same"
+  echo >&2 "command. The local caches should be warm, so the checks should finish faster"
+  echo >&2 "and the push will usually succeed on the second attempt."
+}
 
 # shellcheck disable=SC2016
 echo 'Running pre-push check; to skip this step use `push --no-verify` or add `NO_VERIFY=1` to `.env`'
@@ -89,5 +111,7 @@ do
     "$SCRIPT_DIR"/check_repositories.sh || exit 1
   fi
 done
+
+warn_if_remote_may_have_timed_out
 
 exit 0

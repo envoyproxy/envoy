@@ -193,10 +193,27 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
 
+// Looks up (creating if necessary) the process-wide `lua.lua_vm_count` gauge directly on the
+// given server root scope. Both the filter-config-level and route-level VM setups call this same
+// helper against the server root scope so the stat name is always identical, regardless of
+// listener/route stat prefixes.
+Stats::Gauge& lookupLuaVmCountGauge(Stats::Scope& server_scope) {
+  Stats::StatNameManagedStorage stat_name("lua.lua_vm_count", server_scope.symbolTable());
+  return server_scope.gaugeFromStatName(stat_name.statName(), Stats::Gauge::ImportMode::Accumulate);
+}
+
 } // namespace
 
-PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
-    : lua_state_(lua_code, tls) {
+PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
+                                 Stats::Gauge& vm_count_gauge, uint32_t concurrency,
+                                 absl::Status& creation_status)
+    : lua_state_(lua_code, tls, creation_status), vm_count_gauge_(vm_count_gauge),
+      vm_count_delta_(concurrency + 1) {
+  // Account for this VM up-front so the count stays balanced with the destructor's sub() even if
+  // construction stops early below.
+  vm_count_gauge_.add(vm_count_delta_);
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
@@ -226,8 +243,12 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
       {
           [](lua_State* state) {
             lua_newtable(state);
-            { LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond); }
-            { LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond); }
+            {
+              LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
+            }
+            {
+              LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond);
+            }
             lua_setglobal(state, "EnvoyTimestampResolution");
           },
           // Add more initializers here.
@@ -244,21 +265,28 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   }
 }
 
+PerLuaCodeSetup::~PerLuaCodeSetup() { vm_count_gauge_.sub(vm_count_delta_); }
+
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::RequestOrResponseHeaderMap& headers, bool end_stream,
                                          Filter& filter, FilterCallbacks& callbacks,
                                          TimeSource& time_source)
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
-      callbacks_(callbacks), yield_callback_([this]() {
+      callbacks_(callbacks), yield_callback_([this]() -> absl::Status {
         if (state_ == State::Running) {
-          throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
+          return absl::InternalError("script performed an unexpected yield");
         }
+        return absl::OkStatus();
       }),
       time_source_(time_source) {}
 
 Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
-  coroutine_.start(function_ref, 1, yield_callback_);
+  coroutine_status_ = coroutine_.start(function_ref, 1, yield_callback_);
+  if (!coroutine_status_.ok()) {
+    // The Filter observes coroutine_status_ after this returns and reports the error.
+    return Http::FilterHeadersStatus::Continue;
+  }
   Http::FilterHeadersStatus status =
       (state_ == State::WaitForBody || state_ == State::HttpCall || state_ == State::Responded)
           ? Http::FilterHeadersStatus::StopIteration
@@ -281,16 +309,21 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
         Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
-    resumeCoroutine(1, yield_callback_);
+    coroutine_status_ = resumeCoroutine(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
     ENVOY_LOG(debug, "resuming body due to end stream");
     callbacks_.addData(data);
     state_ = State::Running;
-    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
+    coroutine_status_ = resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   } else if (state_ == State::WaitForTrailers && end_stream_) {
     ENVOY_LOG(debug, "resuming nil trailers due to end stream");
     state_ = State::Running;
-    resumeCoroutine(0, yield_callback_);
+    coroutine_status_ = resumeCoroutine(0, yield_callback_);
+  }
+
+  if (!coroutine_status_.ok()) {
+    // The Filter observes coroutine_status_ after this returns and reports the error.
+    return Http::FilterDataStatus::Continue;
   }
 
   if (state_ == State::HttpCall) {
@@ -314,17 +347,22 @@ Http::FilterTrailersStatus StreamHandleWrapper::onTrailers(Http::HeaderMap& trai
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(debug, "resuming nil body chunk due to trailers");
     state_ = State::Running;
-    resumeCoroutine(0, yield_callback_);
+    coroutine_status_ = resumeCoroutine(0, yield_callback_);
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(debug, "resuming body due to trailers");
     state_ = State::Running;
-    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
+    coroutine_status_ = resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   }
 
-  if (state_ == State::WaitForTrailers) {
+  if (coroutine_status_.ok() && state_ == State::WaitForTrailers) {
     // Mimic a call to trailers which will push the trailers onto the stack and then resume.
     state_ = State::Running;
-    resumeCoroutine(luaTrailers(coroutine_.luaState()), yield_callback_);
+    coroutine_status_ = resumeCoroutine(luaTrailers(coroutine_.luaState()), yield_callback_);
+  }
+
+  if (!coroutine_status_.ok()) {
+    // The Filter observes coroutine_status_ after this returns and reports the error.
+    return Http::FilterTrailersStatus::Continue;
   }
 
   Http::FilterTrailersStatus status = (state_ == State::HttpCall || state_ == State::Responded)
@@ -378,7 +416,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
       // By default, do not enforce a sampling decision on this `httpCall`'s span.
       // Instead, reuse the parent span's sampling decision. Callers can override
       // this default with the `trace_sampled` flag in the table argument below.
-      .setSampled(absl::nullopt);
+      .setSampled(std::nullopt);
 
   // Check if the last argument is table of options. For example:
   // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
@@ -487,11 +525,12 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     state_ = State::Running;
     markLive();
 
-    TRY_NEEDS_AUDIT {
-      resumeCoroutine(2, yield_callback_);
+    const absl::Status status = resumeCoroutine(2, yield_callback_);
+    if (status.ok()) {
       markDead();
+    } else {
+      filter_.scriptError(status);
     }
-    END_TRY catch (const Filters::Common::Lua::LuaException& e) { filter_.scriptError(e); }
 
     if (state_ == State::Running) {
       headers_continued_ = true;
@@ -833,7 +872,8 @@ StreamHandleWrapper::getTimestampResolution(absl::string_view unit_parameter) {
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
-                           Stats::Scope& scope, const std::string& stats_prefix)
+                           Stats::Scope& scope, const std::string& stats_prefix,
+                           uint32_t concurrency, absl::Status& creation_status)
     : cluster_manager_(cluster_manager),
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
@@ -842,42 +882,52 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
           scope.createScope(proto_config.stat_prefix().empty()
                                 ? absl::StrCat(stats_prefix, "lua")
                                 : absl::StrCat(stats_prefix, "lua.", proto_config.stat_prefix()))) {
+  Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(api.rootScope());
+
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
-      throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
-                           "for the Lua filter.");
+      SET_AND_RETURN(
+          absl::InvalidArgumentError("Error: Only one of `inline_code` or `default_source_code` "
+                                     "can be set for the Lua filter."),
+          creation_status);
     }
 
-    const std::string code = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(proto_config.default_source_code(), true, api), std::string);
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
+    auto code_or = Config::DataSource::read(proto_config.default_source_code(), true, api);
+    SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(
+        code_or.value(), tls, vm_count_gauge, concurrency, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   } else if (!proto_config.inline_code().empty()) {
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(
+        proto_config.inline_code(), tls, vm_count_gauge, concurrency, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   }
 
   for (const auto& source : proto_config.source_codes()) {
-    const std::string code =
-        THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
-    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
-    if (!per_lua_code_setup_ptr) {
-      continue;
-    }
+    auto code_or = Config::DataSource::read(source.second, true, api);
+    SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
+    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(
+        code_or.value(), tls, vm_count_gauge, concurrency, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
     per_lua_code_setups_map_[source.first] = std::move(per_lua_code_setup_ptr);
   }
 }
 
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
-    Server::Configuration::ServerFactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
     : disabled_(config.disabled()), name_(config.name()), filter_context_(config.filter_context()) {
   if (disabled_ || !name_.empty()) {
     return; // Filter is disabled or explicit script name is provided.
   }
   if (config.has_source_code()) {
     // Read and parse the inline Lua code defined in the route configuration.
-    const std::string code_str = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(config.source_code(), true, context.api()), std::string);
-    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+    auto code_or = Config::DataSource::read(config.source_code(), true, context.api());
+    SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
+    Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(context.api().rootScope());
+    per_lua_code_setup_ptr_ =
+        std::make_unique<PerLuaCodeSetup>(code_or.value(), context.threadLocal(), vm_count_gauge,
+                                          context.options().concurrency(), creation_status);
   }
 }
 
@@ -905,16 +955,18 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
                                            *this, callbacks, time_source_),
                true);
 
-  Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
-  TRY_NEEDS_AUDIT {
-    // The counter will increment twice if the supplied script has both request and response
-    // handles. This is intentionally kept so as to provide consistency with the way the 'errors'
-    // counter is incremented.
-    stats_.executions_.inc();
-    status = handle.get()->start(function_ref);
+  // The counter will increment twice if the supplied script has both request and response
+  // handles. This is intentionally kept so as to provide consistency with the way the 'errors'
+  // counter is incremented.
+  stats_.executions_.inc();
+  Http::FilterHeadersStatus status = handle.get()->start(function_ref);
+  // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
+  const absl::Status coroutine_status = handle.get()->coroutineStatus();
+  if (coroutine_status.ok()) {
     handle.markDead();
+  } else {
+    scriptError(coroutine_status);
   }
-  END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
 
   return status;
 }
@@ -923,12 +975,15 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
                                       bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
-    TRY_NEEDS_AUDIT {
-      handle.markLive();
-      status = handle.get()->onData(data, end_stream);
+    handle.markLive();
+    status = handle.get()->onData(data, end_stream);
+    // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
+    const absl::Status coroutine_status = handle.get()->coroutineStatus();
+    if (coroutine_status.ok()) {
       handle.markDead();
+    } else {
+      scriptError(coroutine_status);
     }
-    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
@@ -937,20 +992,23 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
 Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
-    TRY_NEEDS_AUDIT {
-      handle.markLive();
-      status = handle.get()->onTrailers(trailers);
+    handle.markLive();
+    status = handle.get()->onTrailers(trailers);
+    // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
+    const absl::Status coroutine_status = handle.get()->coroutineStatus();
+    if (coroutine_status.ok()) {
       handle.markDead();
+    } else {
+      scriptError(coroutine_status);
     }
-    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
 }
 
-void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
+void Filter::scriptError(const absl::Status& status) {
   stats_.errors_.inc();
-  scriptLog(spdlog::level::err, e.what());
+  scriptLog(spdlog::level::err, status.message());
   request_stream_wrapper_.reset();
   response_stream_wrapper_.reset();
 }
@@ -1019,7 +1077,7 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
         });
   };
   callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
-                             modify_headers, absl::nullopt,
+                             modify_headers, std::nullopt,
                              HttpResponseCodeDetails::get().LuaResponse);
 }
 

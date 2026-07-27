@@ -135,7 +135,7 @@ ServerContextImpl::ServerContextImpl(
   // since we should have a common ID for session resumption no matter what cert
   // is used. We do this early because it can fail.
   // TODO(kuat): TLS selectors do not support resumption, so session ID is not populated.
-  absl::optional<SessionContextID> session_id;
+  std::optional<SessionContextID> session_id;
   if (!tls_certificates.empty()) {
     absl::StatusOr<SessionContextID> id_or_error =
         generateHashForSessionContextId(config.serverNames());

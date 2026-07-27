@@ -90,7 +90,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -104,7 +103,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -118,7 +116,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -207,7 +204,9 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
         "//source/common/tls/private_key:private_key_manager_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/strings:string_view",
         "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -251,7 +250,6 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = [
-        "aws_lc_compat.h",
         "utility.h",
     ],
     external_deps = ["ssl"],
@@ -276,6 +274,9 @@ envoy_cc_library(
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/synchronization",
         "@brotli//:brotlidec",
         "@brotli//:brotlienc",
     ],

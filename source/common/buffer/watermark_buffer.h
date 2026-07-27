@@ -142,12 +142,12 @@ private:
   // This can differ with current_bucket_idx_ if buffer_memory_allocated_ was
   // just modified.
   // Returned class index, if present, is in the range [0, NUM_MEMORY_CLASSES_).
-  absl::optional<uint32_t> balanceToClassIndex();
+  std::optional<uint32_t> balanceToClassIndex();
   void updateAccountClass();
 
   uint64_t buffer_memory_allocated_ = 0;
   // Current bucket index where the account is being tracked in.
-  absl::optional<uint32_t> current_bucket_idx_;
+  std::optional<uint32_t> current_bucket_idx_;
 
   WatermarkBufferFactory* factory_ = nullptr;
 
@@ -211,14 +211,13 @@ public:
   // Called by BufferMemoryAccountImpls created by the factory on account class
   // updated.
   void updateAccountClass(const BufferMemoryAccountSharedPtr& account,
-                          absl::optional<uint32_t> current_class,
-                          absl::optional<uint32_t> new_class);
+                          std::optional<uint32_t> current_class, std::optional<uint32_t> new_class);
 
   uint32_t bitshift() const { return bitshift_; }
 
   // Unregister a buffer memory account.
   virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account,
-                                 absl::optional<uint32_t> current_class);
+                                 std::optional<uint32_t> current_class);
 
 protected:
   // Enable subclasses to inspect the mapping.

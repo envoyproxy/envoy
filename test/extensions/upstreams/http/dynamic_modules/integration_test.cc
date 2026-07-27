@@ -51,9 +51,10 @@ public:
           // Pass bridge mode as config.
           Protobuf::StringValue config_value;
           config_value.set_value(bridge_mode);
-          proto_config.mutable_bridge_config()->PackFrom(config_value);
+          std::ignore = proto_config.mutable_bridge_config()->PackFrom(config_value);
 
-          cluster->mutable_upstream_config()->mutable_typed_config()->PackFrom(proto_config);
+          std::ignore =
+              cluster->mutable_upstream_config()->mutable_typed_config()->PackFrom(proto_config);
         });
 
     initialize();

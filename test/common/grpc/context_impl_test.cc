@@ -71,7 +71,7 @@ TEST(GrpcContextTest, ResolveServiceAndMethod) {
   const Http::HeaderEntry* path = headers.Path();
   Stats::TestUtil::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
-  absl::optional<Context::RequestStatNames> request_names =
+  std::optional<Context::RequestStatNames> request_names =
       context.resolveDynamicServiceAndMethod(path);
   EXPECT_TRUE(request_names);
   EXPECT_EQ("service_name", absl::get<Stats::DynamicSavedName>(request_names->service_));
@@ -117,7 +117,7 @@ TEST(GrpcContextTest, resolveDynamicServiceAndMethodWithDotReplaced) {
   const Http::HeaderEntry* path = headers.Path();
   Stats::TestUtil::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
-  absl::optional<Context::RequestStatNames> request_names;
+  std::optional<Context::RequestStatNames> request_names;
   request_names = context.resolveDynamicServiceAndMethodWithDotReplaced(path);
   EXPECT_TRUE(request_names);
   EXPECT_EQ("foo_bar_zoo", absl::get<Stats::DynamicSavedName>(request_names->service_));

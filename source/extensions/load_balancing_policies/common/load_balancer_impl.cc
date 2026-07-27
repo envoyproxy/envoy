@@ -410,14 +410,14 @@ uint64_t LoadBalancerBase::random(bool peeking) {
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-    const absl::optional<LocalityLbConfig> locality_config)
+    const std::optional<LocalityLbConfig> locality_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
       local_priority_set_(local_priority_set),
       min_cluster_size_(locality_config.has_value()
                             ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                   locality_config->zone_aware_lb_config(), min_cluster_size, 6U)
                             : 6U),
-      force_local_zone_min_size_([&]() -> absl::optional<uint32_t> {
+      force_local_zone_min_size_([&]() -> std::optional<uint32_t> {
         // Check runtime value first
         if (auto rt = runtime_.snapshot().getInteger(RuntimeForceLocalZoneMinSize, 0); rt > 0) {
           return static_cast<uint32_t>(rt);
@@ -433,7 +433,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
             return 1U;
           }
         }
-        return absl::nullopt;
+        return std::nullopt;
       }()),
       routing_enabled_(locality_config.has_value()
                            ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
@@ -834,7 +834,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   return i;
 }
 
-absl::optional<ZoneAwareLoadBalancerBase::HostsSource>
+std::optional<ZoneAwareLoadBalancerBase::HostsSource>
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_t hash) const {
   auto host_set_and_source = chooseHostSet(context, hash);
 
@@ -849,7 +849,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   if (per_priority_panic_[hosts_source.priority_]) {
     stats_.lb_healthy_panic_.inc();
     if (fail_traffic_on_panic_) {
-      return absl::nullopt;
+      return std::nullopt;
     } else {
       hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
       return hosts_source;
@@ -864,7 +864,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   // locality_weighted_lb_config is set explicitly even the hostSourceToUse is called in the
   // load balancing policy extensions.
   if (locality_weighted_balancing_) {
-    absl::optional<uint32_t> locality;
+    std::optional<uint32_t> locality;
     if (host_availability == HostAvailability::Degraded) {
       locality = chooseDegradedLocality(host_set);
     } else {
@@ -874,7 +874,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
     if (locality.has_value()) {
       auto source_type = localitySourceType(host_availability);
       if (!source_type) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       hosts_source.source_type_ = source_type.value();
       hosts_source.locality_index_ = locality.value();
@@ -888,7 +888,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
       LocalityRoutingState::NoLocalityRouting) {
     auto source_type = sourceType(host_availability);
     if (!source_type) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     hosts_source.source_type_ = source_type.value();
     return hosts_source;
@@ -898,7 +898,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
     auto source_type = sourceType(host_availability);
     if (!source_type) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     hosts_source.source_type_ = source_type.value();
     return hosts_source;
@@ -909,11 +909,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
     // If the local Envoy instances are in global panic, and we should not fail traffic, do
     // not do locality based routing.
     if (fail_traffic_on_panic_) {
-      return absl::nullopt;
+      return std::nullopt;
     } else {
       auto source_type = sourceType(host_availability);
       if (!source_type) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       hosts_source.source_type_ = source_type.value();
       return hosts_source;
@@ -922,7 +922,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
 
   auto source_type = localitySourceType(host_availability);
   if (!source_type) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   hosts_source.source_type_ = source_type.value();
   hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
@@ -949,8 +949,8 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-    const absl::optional<LocalityLbConfig> locality_config,
-    const absl::optional<SlowStartConfig> slow_start_config, TimeSource& time_source)
+    const std::optional<LocalityLbConfig> locality_config,
+    const std::optional<SlowStartConfig> slow_start_config, TimeSource& time_source)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 healthy_panic_threshold, locality_config),
       seed_(random_.random()),
@@ -960,8 +960,8 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
                              : std::chrono::milliseconds(0)),
       aggression_runtime_(
           slow_start_config.has_value() && slow_start_config.value().has_aggression()
-              ? absl::optional<Runtime::Double>({slow_start_config.value().aggression(), runtime})
-              : absl::nullopt),
+              ? std::optional<Runtime::Double>({slow_start_config.value().aggression(), runtime})
+              : std::nullopt),
       time_source_(time_source), latest_host_added_time_(time_source_.monotonicTime()),
       slow_start_min_weight_percent_(slow_start_config.has_value()
                                          ? PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(
@@ -1116,7 +1116,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
     return nullptr;
   }
 
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
+  const std::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
   if (!hosts_source) {
     return nullptr;
   }
@@ -1143,7 +1143,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
+  const std::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
   if (!hosts_source) {
     return nullptr;
   }
@@ -1187,7 +1187,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
         time_source_.monotonicTime() - host.lastHcPassTime().value());
     if (in_healthy_state_duration < slow_start_window_) {
       double aggression =
-          aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
+          aggression_runtime_ != std::nullopt ? aggression_runtime_.value().value() : 1.0;
       if (aggression <= 0.0 || std::isnan(aggression)) {
         ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
                                      "aggression cannot be less than 0.0");

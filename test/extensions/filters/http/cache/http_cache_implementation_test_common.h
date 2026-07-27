@@ -69,7 +69,7 @@ protected:
   virtual absl::Status
   insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
          const absl::string_view body,
-         const absl::optional<Http::TestResponseTrailerMapImpl> trailers = absl::nullopt);
+         const std::optional<Http::TestResponseTrailerMapImpl> trailers = std::nullopt);
 
   absl::Status insert(absl::string_view request_path,
                       const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body);

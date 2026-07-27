@@ -56,7 +56,7 @@ public:
   }
 
   // AsyncStreamCallbacks
-  void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override;
+  void onReceiveMessage(Grpc::ResponsePtr<ResponseType>&& message) override;
 
   // RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -165,7 +165,7 @@ bool ProcessorStreamImpl<RequestType, ResponseType>::halfCloseAndDeleteOnRemoteC
 
 template <typename RequestType, typename ResponseType>
 void ProcessorStreamImpl<RequestType, ResponseType>::onReceiveMessage(
-    std::unique_ptr<ResponseType>&& response) {
+    Grpc::ResponsePtr<ResponseType>&& response) {
   if (!callbacks_.has_value()) {
     ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
     return;
@@ -227,6 +227,15 @@ public:
     if (!client_or_error.status().ok()) {
       ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10), "Creating raw asyc client failed {}",
                               client_or_error.status());
+      // Report the failure so the consuming filter honors failure_mode_allow. Without this
+      // call, openStream() observes a nullptr return with no prior onGrpcError/onGrpcClose,
+      // and Filter::openStream() short-circuits to IgnoreError — silently bypassing
+      // failure_mode_allow=false.
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.ext_proc_report_client_creation_error")) {
+        callbacks.onGrpcError(Grpc::Status::WellKnownGrpcStatus::Internal,
+                              std::string(client_or_error.status().message()));
+      }
       return nullptr;
     }
     Grpc::AsyncClient<RequestType, ResponseType> grpcClient(client_or_error.value());

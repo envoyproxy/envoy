@@ -194,7 +194,7 @@ Http::FilterHeadersStatus ApiKeyAuthFilter::onDenied(Http::Code code, absl::stri
     config_->stats().forbidden_.inc();
   }
 
-  decoder_callbacks_->sendLocalReply(code, body, nullptr, absl::nullopt, response_code_details);
+  decoder_callbacks_->sendLocalReply(code, body, nullptr, std::nullopt, response_code_details);
   return Http::FilterHeadersStatus::StopIteration;
 }
 

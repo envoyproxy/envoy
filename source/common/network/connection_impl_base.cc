@@ -28,6 +28,14 @@ void ConnectionImplBase::removeConnectionCallbacks(ConnectionCallbacks& callback
   }
 }
 
+void ConnectionImplBase::onDrain() {
+  for (ConnectionCallbacks* callback : callbacks_) {
+    if (callback != nullptr) {
+      callback->onDrain();
+    }
+  }
+}
+
 OptRef<const StreamInfo::StreamInfo> ConnectionImplBase::trackedStream() const {
   return streamInfo();
 }

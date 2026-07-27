@@ -10,6 +10,22 @@ bootstrap_extensions:
     "@type": >-
       type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
     stat_prefix: "downstream_reverse_connection"
+    access_log:
+    - name: envoy.access_loggers.stdout
+      typed_config:
+        "@type": >-
+          type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+        log_format:
+          text_format_source:
+            inline_string: >-
+              [%START_TIME%] reverse_tunnel_initiator
+              event=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:event)%
+              node=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:node_id)%
+              cluster=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:cluster_id)%
+              tenant=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:tenant_id)%
+              upstream_cluster=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:upstream_cluster)%
+              host=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:host_address)%
+              error=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:error)%
 
 static_resources:
   listeners:
@@ -61,7 +77,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: upstream-envoy  # Address of upstream-envoy
+                address: 127.0.0.1  # Address of upstream-envoy
                 port_value: 9000  # Port for rev_conn_api_listener
 
   # Backend HTTP service behind downstream which
@@ -76,5 +92,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: downstream-service
-                port_value: 80
+                address: 127.0.0.1
+                port_value: 8080

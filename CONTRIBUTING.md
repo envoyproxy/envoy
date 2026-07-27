@@ -152,11 +152,15 @@ versioning guidelines:
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
-  well as [release notes](changelogs/current.yaml). API changes should be documented
-  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
-  to multiple sections of the release notes, it should be noted in the first (most important) section
-  that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
-  `Incompatible Behavior Changes` but not in `Bug Fixes`.
+  well as a release note fragment in [changelogs/current](changelogs/current). Add the fragment to
+  the most appropriate section directory, using the canonical sections and areas listed in
+  [changelogs/changelogs.yaml](changelogs/changelogs.yaml). Fragment filenames should use the form
+  `<area>__<short-description>.rst`, for example
+  `http__added-new-request-stat.rst`. API changes should be documented inline with protos as per
+  the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies to multiple sections
+  of the release notes, it should be noted in the first (most important) section that applies. For
+  instance, a bug fix that introduces incompatible behavior should be noted in
+  `behavior_changes` but not in `bug_fixes`.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
@@ -193,8 +197,9 @@ versioning guidelines:
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
   Closing stale PRs helps us to keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
-  Additionally, the [version history](changelogs/current.yaml) must be updated with
-  relevant RST links for fields and messages as part of the commit.
+  Additionally, add a release note fragment under the `deprecated` section in
+  [changelogs/current](changelogs/current), with relevant RST links for fields and messages as part
+  of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
 * If your PR involves any changes to
@@ -266,12 +271,14 @@ Runtime code is held to the same standard as regular Envoy code, so both the old
 path and the new should have 100% coverage both with the feature defaulting true
 and false.
 
-Please note that if adding a runtime guarded feature, your [release notes](changelogs/current.yaml) should include both the functional change, and how to revert it, for example
+Please note that if adding a runtime guarded feature, your release note fragment in
+[changelogs/current](changelogs/current) should include both the functional change, and how to
+revert it, for example in `changelogs/current/behavior_changes/http__header-validation.rst`:
 
-```yaml
-- area: config
-  change: |
-      type URL is used to lookup extensions regardless of the name field. This may cause problems for empty filter configurations or mis-matched protobuf as the typed configurations. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.no_extension_lookup_by_name`` to false.
+```rst
+HTTP request header validation is now performed before route selection. This behavioral change can
+be temporarily reverted by setting runtime guard
+``envoy.reloadable_features.http_validate_headers_before_route_selection`` to ``false``.
 ```
 
 # PR review policy for maintainers

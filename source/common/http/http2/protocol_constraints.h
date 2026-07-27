@@ -45,7 +45,8 @@ public:
   using ReleasorProc = std::function<void()>;
 
   explicit ProtocolConstraints(CodecStats& stats,
-                               const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
+                               const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                               bool use_active_streams_for_limits);
 
   // Return ok status if no protocol constraints were violated.
   // Return error status of the first detected violation. Subsequent violations of constraints
@@ -68,7 +69,28 @@ public:
   Status trackInboundFrame(uint8_t type, bool end_stream, bool is_empty);
   // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
-  void incrementOpenedStreamCount() { ++opened_streams_; }
+  void incrementOpenedStreamCount() {
+    ++opened_streams_;
+    ++active_streams_;
+  }
+  void decrementActiveStreamCount() {
+    ASSERT(active_streams_ > 0);
+    if (active_streams_ > 0) {
+      --active_streams_;
+      if (use_active_streams_for_limits_) {
+        if (inbound_priority_frames_ > max_inbound_priority_frames_per_stream_) {
+          inbound_priority_frames_ -= max_inbound_priority_frames_per_stream_;
+        } else {
+          inbound_priority_frames_ = 0;
+        }
+        if (inbound_window_update_frames_ > 2) {
+          inbound_window_update_frames_ -= 2;
+        } else {
+          inbound_window_update_frames_ = 0;
+        }
+      }
+    }
+  }
 
   Status checkOutboundFrameLimits();
 
@@ -115,6 +137,8 @@ private:
   // For upstream connections this is incremented when the first HEADERS frame with the new
   // stream ID is sent to the upstream server.
   uint32_t opened_streams_ = 0;
+  // This counter keeps track of the number of currently active streams.
+  uint32_t active_streams_ = 0;
   // This counter keeps track of the number of inbound PRIORITY frames. If this counter exceeds
   // the value calculated using this formula:
   //
@@ -139,6 +163,8 @@ private:
   // Maximum number of inbound WINDOW_UPDATE frames per outbound DATA frame sent. Initialized
   // from corresponding http2_protocol_options. Default value is 10.
   const uint32_t max_inbound_window_update_frames_per_data_frame_sent_;
+
+  const bool use_active_streams_for_limits_;
 };
 
 } // namespace Http2

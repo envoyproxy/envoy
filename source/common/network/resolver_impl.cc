@@ -22,7 +22,7 @@ class IpResolver : public Resolver {
 public:
   absl::StatusOr<InstanceConstSharedPtr>
   resolve(const envoy::config::core::v3::SocketAddress& socket_address) override {
-    absl::optional<std::string> netns;
+    std::optional<std::string> netns;
     if (!socket_address.network_namespace_filepath().empty()) {
       netns = socket_address.network_namespace_filepath();
     }

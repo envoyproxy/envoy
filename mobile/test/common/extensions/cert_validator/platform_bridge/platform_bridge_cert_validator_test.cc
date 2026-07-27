@@ -161,7 +161,7 @@ protected:
   std::unique_ptr<MockValidator> mock_validator_;
   Thread::ThreadId main_thread_id_;
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> platform_bridge_config_;
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> platform_bridge_config_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TrustMode, PlatformBridgeCertValidatorTest,
@@ -459,7 +459,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ThreadPriority) {
   platform_bridge_config.mutable_thread_priority()->set_value(expected_thread_priority);
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   typed_config.set_name("PlatformBridgeCertValidator");
-  typed_config.mutable_typed_config()->PackFrom(platform_bridge_config);
+  std::ignore = typed_config.mutable_typed_config()->PackFrom(platform_bridge_config);
   platform_bridge_config_ = std::move(typed_config);
 
   EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());

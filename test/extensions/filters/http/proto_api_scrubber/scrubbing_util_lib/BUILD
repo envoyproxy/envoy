@@ -26,6 +26,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@proto-processing//proto_processing_lib/proto_scrubber",

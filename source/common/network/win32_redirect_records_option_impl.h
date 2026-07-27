@@ -22,7 +22,7 @@ public:
                  envoy::config::core::v3::SocketOption::SocketState state) const override;
   void hashKey(std::vector<uint8_t>&) const override;
 
-  absl::optional<Details>
+  std::optional<Details>
   getOptionDetails(const Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState) const override;
   bool isSupported() const override;

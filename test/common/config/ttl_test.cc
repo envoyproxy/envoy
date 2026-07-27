@@ -19,7 +19,7 @@ public:
 };
 
 TEST_F(TtlManagerTest, BasicUsage) {
-  absl::optional<std::vector<std::string>> maybe_expired;
+  std::optional<std::vector<std::string>> maybe_expired;
   auto cb = [&](const auto& expired) { maybe_expired = expired; };
   auto ttl_timer = new Event::MockTimer(&dispatcher_);
   TtlManager ttl(cb, dispatcher_, dispatcher_.timeSource());
@@ -55,7 +55,7 @@ TEST_F(TtlManagerTest, BasicUsage) {
 }
 
 TEST_F(TtlManagerTest, ScopedUpdate) {
-  absl::optional<std::vector<std::string>> maybe_expired;
+  std::optional<std::vector<std::string>> maybe_expired;
   auto cb = [&](const auto& expired) { maybe_expired = expired; };
   auto ttl_timer = new Event::MockTimer(&dispatcher_);
   TtlManager ttl(cb, dispatcher_, dispatcher_.timeSource());

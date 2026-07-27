@@ -81,7 +81,7 @@ TEST_F(HistogramSettingsImplTest, Matching) {
   EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({1, 2}));
   EXPECT_EQ(settings_->buckets("bcde"), ConstSupportedBuckets({3, 4}));
   EXPECT_EQ(settings_->bins("ab"), 5);
-  EXPECT_EQ(settings_->bins("ba"), absl::nullopt);
+  EXPECT_EQ(settings_->bins("ba"), std::nullopt);
 }
 
 // Test that earlier configs take precedence over later configs when both match.

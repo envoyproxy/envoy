@@ -54,7 +54,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http/cache_v2:http_cache_lib",
         "@abseil-cpp//absl/base",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/http/cache_v2/file_system_http_cache/v3:pkg_cc_proto",
     ],
 )

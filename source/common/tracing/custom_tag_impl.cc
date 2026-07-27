@@ -1,23 +1,23 @@
 #include "source/common/tracing/custom_tag_impl.h"
 
+#include <optional>
+
 #include "envoy/router/router.h"
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Tracing {
 namespace {
 
-absl::optional<std::string> jsonOrNullopt(const Protobuf::Message& message) {
+std::optional<std::string> jsonOrNullopt(const Protobuf::Message& message) {
 #ifdef ENVOY_ENABLE_YAML
   auto json_or_error = MessageUtil::getJsonStringFromMessage(message);
-  return json_or_error.ok() ? absl::optional<std::string>(json_or_error.value()) : absl::nullopt;
+  return json_or_error.ok() ? std::optional<std::string>(json_or_error.value()) : std::nullopt;
 #else
   UNREFERENCED_PARAMETER(message);
-  return absl::nullopt;
+  return std::nullopt;
 #endif
 }
 
@@ -53,10 +53,6 @@ RequestHeaderCustomTag::RequestHeaderCustomTag(
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.get_header_tag_from_header_map")) {
-    const auto entry = name_.get(ctx.trace_context);
-    return entry.value_or(default_value_);
-  }
   if (const auto headers = ctx.formatter_context.requestHeaders(); headers.has_value()) {
     if (const auto values = headers->get(header_name_); !values.empty()) {
       return values[0]->value().getStringView();
@@ -100,10 +96,10 @@ void MetadataCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& en
   custom_tags[std::string(tag())] = meta_str.value();
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 MetadataCustomTag::metadataToString(const envoy::config::core::v3::Metadata* metadata) const {
   if (!metadata) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   const Protobuf::Value& value = Envoy::Config::Metadata::metadataValue(metadata, metadata_key_);
@@ -122,7 +118,7 @@ MetadataCustomTag::metadataToString(const envoy::config::core::v3::Metadata* met
     break;
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 const envoy::config::core::v3::Metadata*

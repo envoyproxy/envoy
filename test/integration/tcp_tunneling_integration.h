@@ -102,9 +102,9 @@ public:
               (*cluster->mutable_typed_extension_protocol_options())
                   ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
       *protocol_options.add_http_filters() = config;
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(protocol_options);
     });
   }
 
@@ -112,7 +112,7 @@ public:
     HttpFilterProto filter_config;
     filter_config.set_name("envoy.filters.http.upstream_codec");
     auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
-    filter_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 

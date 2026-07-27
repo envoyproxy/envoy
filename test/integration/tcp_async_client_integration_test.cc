@@ -41,7 +41,7 @@ public:
           auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
           auto* filter_chain = listener->mutable_filter_chains(0);
           auto* filter = filter_chain->mutable_filters(0);
-          filter->mutable_typed_config()->PackFrom(proto_config);
+          std::ignore = filter->mutable_typed_config()->PackFrom(proto_config);
 
           auto* access_log = listener->add_access_log();
           access_log->set_name("envoy.access_loggers.file");
@@ -50,7 +50,7 @@ public:
           access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
               "DS_CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE% "
               "US_CLOSE_TYPE=%UPSTREAM_DETECTED_CLOSE_TYPE%\n");
-          access_log->mutable_typed_config()->PackFrom(access_log_config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
         });
 
     BaseIntegrationTest::initialize();
@@ -189,6 +189,27 @@ TEST_P(TcpAsyncClientIntegrationTest, ClientTearDown) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
+
+  tcp_client->close();
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/43233. With half close
+// enabled, the downstream payload and FIN can be delivered to the filter in two separate
+// read dispatches. The first dispatch destroys the async client (kill_after_on_data), and
+// the second dispatch used to dereference the destroyed client and segfault.
+TEST_P(TcpAsyncClientIntegrationTest, ClientTearDownSplitFin) {
+  init(true);
+
+  std::string request("request");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(request, false));
+  // Once the counter is visible the first onData() call has run and the async client is
+  // being destroyed within the same dispatch; any later read event sees a null client.
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_data", Ge(1));
+  // Deliver the FIN as a separate read event.
+  ASSERT_TRUE(tcp_client->write("", true));
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_data", Ge(2));
 
   tcp_client->close();
 }

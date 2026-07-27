@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls_common.h"
@@ -14,7 +15,6 @@
 #include "source/common/buffer/buffer_impl.h"
 
 #include "absl/container/fixed_array.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -87,13 +87,13 @@ public:
   /**
    * Read from a io handle directly into buffer.
    * @param buffer supplies the buffer to read into.
-   * @param max_length supplies the maximum length to read. A value of absl::nullopt means to read
+   * @param max_length supplies the maximum length to read. A value of std::nullopt means to read
    *   as much data as possible, within the constraints of available buffer size.
    * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
    * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
    */
   virtual Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                                       absl::optional<uint64_t> max_length) PURE;
+                                       std::optional<uint64_t> max_length) PURE;
 
   /**
    * Write the data in slices out.
@@ -173,8 +173,8 @@ public:
 
   // Struct representation of QuicProtocolOptions::SaveCmsgConfig config proto.
   struct UdpSaveCmsgConfig {
-    absl::optional<uint32_t> level;
-    absl::optional<uint32_t> type;
+    std::optional<uint32_t> level;
+    std::optional<uint32_t> type;
     uint32_t expected_size = 0;
 
     bool hasConfig() const { return (level.has_value() && type.has_value()); }
@@ -291,7 +291,7 @@ public:
   /**
    * @return the domain used by underlying socket (see man 2 socket)
    */
-  virtual absl::optional<int> domain() PURE;
+  virtual std::optional<int> domain() PURE;
 
   /**
    * Get local address (ip:port pair)
@@ -348,11 +348,11 @@ public:
   virtual Api::SysCallIntResult shutdown(int how) PURE;
 
   /**
-   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  @return std::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.
    */
-  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
+  virtual std::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
 
   /**
    * @return the current congestion window in bytes, or unset if not available or not
@@ -360,12 +360,12 @@ public:
    * @note some congestion controller's cwnd is measured in number of packets, in that case the
    * return value is cwnd(in packets) times the connection's MSS.
    */
-  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+  virtual std::optional<uint64_t> congestionWindowInBytes() const PURE;
 
   /**
-   * @return the interface name for the socket, if the OS supports it. Otherwise, absl::nullopt.
+   * @return the interface name for the socket, if the OS supports it. Otherwise, std::nullopt.
    */
-  virtual absl::optional<std::string> interfaceName() PURE;
+  virtual std::optional<std::string> interfaceName() PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

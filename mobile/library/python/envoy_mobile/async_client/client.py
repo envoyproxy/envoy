@@ -34,13 +34,15 @@ class AsyncClient:
     Use as an async context manager: ``async with AsyncClient(engine_builder) as client:``
     """
 
-    def __init__(self, engine_builder: EngineBuilderLike) -> None:
+    def __init__(self, engine_builder: EngineBuilderLike, listener_name: str = "") -> None:
         """Construct a new AsyncClient.
 
         Args:
             engine_builder: A pre-configured EngineBuilder (or compatible builder object) to finalize and build.
+            listener_name: The name of the API listener to route streams to.
         """
         self._engine_builder = engine_builder
+        self._listener_name = listener_name
         self._engine = None
         self._executor: Optional[Executor] = None
         self._engine_running = None
@@ -79,7 +81,7 @@ class AsyncClient:
         stream_complete = asyncio.Event()
         header_complete = asyncio.Event()
         response = Response(header_complete, stream_complete, self._executor)
-        stream = response.attach(self._engine)
+        stream = response.attach(self._engine, self._listener_name)
         self._send_request(stream, method, url, **kwargs)
         # Wait for either the response headers to arrive or an error to occur.
         await asyncio.wait(

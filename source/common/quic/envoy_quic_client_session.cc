@@ -12,6 +12,7 @@
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_network_connectivity_observer_impl.h"
 #include "source/common/quic/scone_state.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "quiche/quic/core/quic_bandwidth.h"
 
@@ -132,6 +133,23 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   }
 }
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+quic::WebTransportHttp3VersionSet
+EnvoyQuicClientSession::LocallySupportedWebTransportVersions() const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_support_web_transport")) {
+    return {};
+  }
+  return quic::kDefaultSupportedWebTransportVersions;
+}
+void EnvoyQuicClientSession::registerStreamWaitingForSettings(quic::QuicStreamId stream_id) {
+  streams_waiting_for_settings_.insert(stream_id);
+}
+
+void EnvoyQuicClientSession::unregisterStreamWaitingForSettings(quic::QuicStreamId stream_id) {
+  streams_waiting_for_settings_.erase(stream_id);
+}
+#endif
+
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
 
 void EnvoyQuicClientSession::connect() {
@@ -240,6 +258,30 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
       dispatcher_.timeSource());
 
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
+
+bool EnvoyQuicClientSession::OnSettingsFrame(const quic::SettingsFrame& frame) {
+  if (!quic::QuicSpdyClientSession::OnSettingsFrame(frame)) {
+    // The base implementation may close the connection on invalid settings.
+    return false;
+  }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // The peer's SETTINGS (carrying WebTransport/HTTP Datagram negotiation) are now known. Write any
+  // WebTransport CONNECT requests whose encodeHeaders() was deferred because QUICHE only creates
+  // the upstream WebTransport session at header-write time and only if WebTransport is already
+  // negotiated. Move the set aside first so a flush that somehow re-registers (it should not, since
+  // settings_received() is now true) cannot mutate what we iterate.
+  absl::flat_hash_set<quic::QuicStreamId> waiting = std::move(streams_waiting_for_settings_);
+  streams_waiting_for_settings_.clear();
+  for (quic::QuicStreamId stream_id : waiting) {
+    // The stream may have been reset/closed while waiting; GetActiveStream() returns nullptr then,
+    // so a stale ID is harmless.
+    if (auto* stream = GetActiveStream(stream_id); stream != nullptr) {
+      static_cast<EnvoyQuicClientStream*>(stream)->flushPendingHeaders();
+    }
+  }
+#endif
+  return true;
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {

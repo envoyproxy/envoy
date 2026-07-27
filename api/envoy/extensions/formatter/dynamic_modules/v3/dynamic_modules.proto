@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package envoy.extensions.formatter.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.formatter.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Formatter]
+// [#extension: envoy.formatter.dynamic_modules]
+
+// Configuration for the Dynamic Modules Formatter. This formatter allows loading shared object
+// files via ``dlopen`` to implement custom ``%COMMAND%`` operators for access logs and header
+// formatting.
+//
+// A module can be loaded by multiple formatters; the module is loaded only once and shared across
+// multiple command parser instances. Each parsed command produces a provider that is invoked on the
+// worker threads to compute the substitution value, with access to request and response headers,
+// stream info attributes, dynamic metadata, and the local reply body.
+message DynamicModuleFormatter {
+  // Specifies the shared-object level configuration. This field is required.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name for this formatter configuration. If not specified, defaults to an empty string.
+  //
+  // This can be used to distinguish between different formatter implementations inside a dynamic
+  // module. When Envoy receives this configuration, it passes the ``formatter_name`` to the dynamic
+  // module's formatter config init function together with the ``formatter_config``. That way a
+  // module can decide which in-module command parser implementation to use based on the name at
+  // load time.
+  string formatter_name = 2;
+
+  // The configuration for the formatter chosen by ``formatter_name``. If not specified, an empty
+  // configuration is passed to the module.
+  //
+  // This is passed to the module's formatter initialization function. Together with the
+  // ``formatter_name``, the module can decide which in-module command parser implementation to use
+  // and fine-tune which commands it recognizes.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  // without the wrapper.
+  //
+  // .. code-block:: yaml
+  //
+  //  # Passing a JSON struct configuration
+  //  formatter_config:
+  //    "@type": "type.googleapis.com/google.protobuf.Struct"
+  //    value:
+  //      redact_headers:
+  //      - authorization
+  //      - cookie
+  //
+  //  # Passing a simple string configuration
+  //  formatter_config:
+  //    "@type": "type.googleapis.com/google.protobuf.StringValue"
+  //    value: "x-request-id"
+  //
+  google.protobuf.Any formatter_config = 3;
+}

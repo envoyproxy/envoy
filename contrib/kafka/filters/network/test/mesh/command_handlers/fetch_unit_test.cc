@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "test/mocks/event/mocks.h"
 
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch.h"
@@ -46,7 +48,7 @@ protected:
   FetchUnitTest() { ON_CALL(filter_, dispatcher).WillByDefault(ReturnRef(dispatcher_)); }
 
   std::shared_ptr<FetchRequestHolder> makeTestee() {
-    const RequestHeader header = {FETCH_REQUEST_API_KEY, 0, TEST_CORRELATION_ID, absl::nullopt};
+    const RequestHeader header = {FETCH_REQUEST_API_KEY, 0, TEST_CORRELATION_ID, std::nullopt};
     // Our request refers to aaa-0, aaa-1, bbb-10, bbb-20.
     const FetchTopic t1 = {"aaa", {{0, 0, 0}, {1, 0, 0}}};
     const FetchTopic t2 = {"bbb", {{10, 0, 0}, {20, 0, 0}}};
@@ -98,7 +100,7 @@ TEST_F(FetchUnitTest, ShouldCleanupAfterTimer) {
 
 // Helper method to generate records.
 InboundRecordSharedPtr makeRecord() {
-  return std::make_shared<InboundRecord>("aaa", 0, 0, absl::nullopt, absl::nullopt);
+  return std::make_shared<InboundRecord>("aaa", 0, 0, std::nullopt, std::nullopt);
 }
 
 TEST_F(FetchUnitTest, ShouldReceiveRecords) {

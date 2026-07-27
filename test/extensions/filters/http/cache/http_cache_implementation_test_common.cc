@@ -100,7 +100,7 @@ LookupContextPtr HttpCacheImplementationTest::lookup(absl::string_view request_p
 
 absl::Status HttpCacheImplementationTest::insert(
     LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
-    const absl::string_view body, const absl::optional<Http::TestResponseTrailerMapImpl> trailers) {
+    const absl::string_view body, const std::optional<Http::TestResponseTrailerMapImpl> trailers) {
   // For responses with body, we must wait for insertBody's callback before
   // calling insertTrailers or completing. Note, in a multipart body test this
   // would need to check for the callback having been called for *every* body part,

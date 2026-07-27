@@ -796,7 +796,7 @@ TEST_P(WasmHttpFilterTest, AccessLogDisabledForIncompleteStream) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
 
   StreamInfo::MockStreamInfo log_stream_info;
-  EXPECT_CALL(log_stream_info, requestComplete()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_CALL(log_stream_info, requestComplete()).WillRepeatedly(testing::Return(std::nullopt));
   filter().log({&request_headers}, log_stream_info);
   filter().onDestroy();
 }
@@ -1830,7 +1830,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   rootContext().onTick(0);
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
-  absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
+  std::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
   EXPECT_CALL(request_stream_info_, requestComplete()).WillRepeatedly(Return(dur));
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("duration is 15000000"))));
   if (std::get<1>(GetParam()) != "rust") {

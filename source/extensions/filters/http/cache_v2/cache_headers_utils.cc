@@ -295,7 +295,7 @@ Key CacheHeadersUtils::makeKey(const Http::RequestHeaderMap& request_headers,
   return key;
 }
 
-absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::string_view& str) {
+std::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::string_view& str) {
   uint64_t val = 0;
   uint32_t bytes_consumed = 0;
 
@@ -306,7 +306,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
     uint64_t new_val = (val * 10) + (cur - '0');
     if (new_val / 8 < val) {
       // Overflow occurred
-      return absl::nullopt;
+      return std::nullopt;
     }
     val = new_val;
     ++bytes_consumed;
@@ -317,7 +317,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
     str.remove_prefix(bytes_consumed);
     return val;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 void CacheHeadersUtils::getAllMatchingHeaderNames(
@@ -422,7 +422,7 @@ constexpr absl::string_view headerSeparator = "\n";
 constexpr absl::string_view inValueSeparator = "\r";
 }; // namespace
 
-absl::optional<std::string>
+std::optional<std::string>
 VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
                                       const absl::btree_set<absl::string_view>& vary_header_values,
                                       const Http::RequestHeaderMap& request_headers) {
@@ -438,10 +438,10 @@ VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
     }
     if (!allow_list.allowsValue(value)) {
       // The backend tried to vary on a header that we don't allow, so return
-      // absl::nullopt to indicate we are unable to cache this request. This
+      // std::nullopt to indicate we are unable to cache this request. This
       // also may occur if the allow list has changed since an item was cached,
       // rendering the cached vary value invalid.
-      return absl::nullopt;
+      return std::nullopt;
     }
     // TODO(cbdm): Can add some bucketing logic here based on header. For
     // example, we could normalize the values for accept-language by making all

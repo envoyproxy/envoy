@@ -506,7 +506,7 @@ void TestContext::onLog() {
 
       // validate setting a filter state
       std::string in;
-      test_proto.SerializeToString(&in);
+      std::ignore = test_proto.SerializeToString(&in);
       if (setFilterState("protobuf_state", in) != WasmResult::Ok) {
         logWarn("setProperty(protobuf_state) failed");
       }
@@ -689,7 +689,7 @@ void TestRootContext::onTick() {
           0x00, 0x00, 0x00, 0x09, 0x01, 0x00, 0x00, 0x00, 0x69, 0x00, 0x00, 0x00};
       args.set_schema(bfbsData, 192);
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok != proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -705,7 +705,7 @@ void TestRootContext::onTick() {
       args.set_span(envoy::source::extensions::common::wasm::LifeSpan::FilterChain);
       args.set_readonly(true);
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok != proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -720,7 +720,7 @@ void TestRootContext::onTick() {
       args.set_type(envoy::source::extensions::common::wasm::WasmType::Bytes);
       args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest);
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok != proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -734,7 +734,7 @@ void TestRootContext::onTick() {
       envoy::source::extensions::common::wasm::DeclarePropertyArguments args;
       args.set_name("bytes_state");
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::BadArgument != proxy_call_foreign_function(function.data(), function.size(),
@@ -751,7 +751,7 @@ void TestRootContext::onTick() {
       args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest);
       args.set_schema("type.googleapis.com/wasmtest.TestProto");
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok != proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -826,7 +826,7 @@ void TestRootContext::onTick() {
       args.set_hash_function(hashFunc);
 
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
 
@@ -850,7 +850,7 @@ void TestRootContext::onTick() {
       args.set_hash_function("unknown");
 
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -873,7 +873,7 @@ void TestRootContext::onTick() {
       args.set_hash_function(hashFunc.data());
 
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -897,7 +897,7 @@ void TestRootContext::onTick() {
       args.set_hash_function(hashFunc.data());
 
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -997,7 +997,7 @@ void TestRootContext::onTick() {
       args.set_hash_function(hashFunc);
 
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
 
@@ -1021,7 +1021,7 @@ void TestRootContext::onTick() {
       args.set_hash_function("unknown");
 
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -1044,7 +1044,7 @@ void TestRootContext::onTick() {
       args.set_hash_function(hashFunc);
 
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
       if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
@@ -1164,7 +1164,7 @@ void TestRootContext::onTick() {
       sign_args.set_hash_function(hashFunc);
 
       std::string sign_in;
-      sign_args.SerializeToString(&sign_in);
+      std::ignore = sign_args.SerializeToString(&sign_in);
       char* sign_out = nullptr;
       size_t sign_out_size = 0;
 
@@ -1186,7 +1186,7 @@ void TestRootContext::onTick() {
             verify_args.set_hash_function(hashFunc);
 
             std::string verify_in;
-            verify_args.SerializeToString(&verify_in);
+            std::ignore = verify_args.SerializeToString(&verify_in);
             char* verify_out = nullptr;
             size_t verify_out_size = 0;
 
@@ -1226,7 +1226,7 @@ void TestRootContext::onTick() {
       args.set_hash_function(hashFunc);
 
       std::string in;
-      args.SerializeToString(&in);
+      std::ignore = args.SerializeToString(&in);
       char* out = nullptr;
       size_t out_size = 0;
 

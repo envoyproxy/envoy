@@ -1,0 +1,41 @@
+# Protobuf v35 removed FieldDescriptor::label(). Replace with is_repeated().
+# Remove this patch when cel-cpp is bumped to a version compatible with protobuf v35.
+diff --git a/internal/well_known_types.cc b/internal/well_known_types.cc
+index f66a936..8424001 100644
+--- a/internal/well_known_types.cc
++++ b/internal/well_known_types.cc
+@@ -249,26 +249,16 @@ absl::Status CheckFieldCppType(const FieldDescriptor* absl_nonnull field,
+   return absl::OkStatus();
+ }
+ 
+-absl::string_view LabelToString(FieldDescriptor::Label label) {
+-  switch (label) {
+-    case FieldDescriptor::LABEL_REPEATED:
+-      return "REPEATED";
+-    case FieldDescriptor::LABEL_REQUIRED:
+-      return "REQUIRED";
+-    case FieldDescriptor::LABEL_OPTIONAL:
+-      return "OPTIONAL";
+-    default:
+-      return "ERROR";
+-  }
+-}
+-
+ absl::Status CheckFieldCardinality(const FieldDescriptor* absl_nonnull field,
+                                    FieldDescriptor::Label label) {
+-  if (ABSL_PREDICT_FALSE(field->label() != label)) {
+-    return absl::InvalidArgumentError(
+-        absl::StrCat("unexpected field cardinality for protocol buffer message "
+-                     "well known type: ",
+-                     field->full_name(), " ", LabelToString(field->label())));
++  bool matches = (label == FieldDescriptor::LABEL_REPEATED)
++                     ? field->is_repeated()
++                     : !field->is_repeated();
++  if (ABSL_PREDICT_FALSE(!matches)) {
++    return absl::InvalidArgumentError(absl::StrCat(
++        "unexpected field cardinality for protocol buffer message "
++        "well known type: ",
++        field->full_name()));
+   }
+   return absl::OkStatus();
+ }

@@ -12,11 +12,18 @@ fn init() -> bool {
 fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListenerFilter>(
   _envoy_filter_config: &mut EC,
   name: &str,
-  _config: &[u8],
+  config: &[u8],
 ) -> Option<Box<dyn ListenerFilterConfig<ELF>>> {
   match name {
     "write_to_socket" => Some(Box::new(WriteToSocketFilterConfig)),
     "buffer_read" => Some(Box::new(BufferReadFilterConfig)),
+    "http_callout_on_accept" => Some(Box::new(HttpCalloutOnAcceptFilterConfig)),
+    "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
+    "read_attributes" => Some(Box::new(ReadAttributesFilterConfig)),
+    "filter_state_typed" => Some(Box::new(FilterStateTypedFilterConfig)),
+    "filter_chain_selector" => Some(Box::new(FilterChainSelectorFilterConfig {
+      selection: config.to_vec(),
+    })),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -91,5 +98,234 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for BufferReadFilter {
 
   fn max_read_bytes(&mut self, _envoy_filter: &mut ELF) -> usize {
     4
+  }
+}
+
+// =============================================================================
+// HTTP Callout On Accept Test Filter
+// =============================================================================
+
+// Issues an HTTP callout on accept and resumes the chain when it completes. The callout calls
+// shared_from_this on the filter, which throws std::bad_weak_ptr and aborts the worker unless the
+// production factory shares ownership. The callout targets cluster_0, served by the test autonomous
+// upstream.
+struct HttpCalloutOnAcceptFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for HttpCalloutOnAcceptFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(HttpCalloutOnAcceptFilter)
+  }
+}
+
+struct HttpCalloutOnAcceptFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutOnAcceptFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    let (result, _id) = envoy_filter.send_http_callout(
+      "cluster_0",
+      vec![
+        (":method", b"GET"),
+        (":path", b"/"),
+        ("host", b"example.com"),
+      ],
+      None,
+      5000,
+    );
+    // Always wait for the callout. The accept resumes only from on_http_callout_done, so the test
+    // echo proves the round trip ran. The autonomous upstream makes the callout succeed.
+    assert_eq!(
+      result,
+      abi::envoy_dynamic_module_type_http_callout_init_result::Success
+    );
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
+  }
+
+  fn on_http_callout_done(
+    &mut self,
+    envoy_filter: &mut ELF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+    _response_body: Vec<EnvoyBuffer>,
+  ) {
+    envoy_filter.continue_filter_chain(true);
+  }
+}
+
+// =============================================================================
+// Dynamic Metadata Test Filter
+// =============================================================================
+
+// Sets several string entries under one namespace via the batch setter on accept, then reads them
+// back to prove the batch and the getter round trip through the ABI. An empty batch must not create
+// a namespace.
+struct DynamicMetadataFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for DynamicMetadataFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(DynamicMetadataFilter)
+  }
+}
+
+struct DynamicMetadataFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for DynamicMetadataFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    envoy_filter.set_dynamic_metadata_string_batch(
+      "dynamic_modules.test",
+      &[
+        ("batch_key1", "batch_value1"),
+        ("batch_key2", "batch_value2"),
+      ],
+    );
+    envoy_filter.set_dynamic_metadata_string_batch("dynamic_modules.empty", &[]);
+
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key1")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value1".to_vec())
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key2")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value2".to_vec())
+    );
+    assert!(envoy_filter
+      .get_dynamic_metadata_string("dynamic_modules.empty", "batch_key1")
+      .is_none());
+
+    // Set a non-UTF-8 byte value and read it back to prove set_dynamic_metadata_bytes preserves it.
+    envoy_filter.set_dynamic_metadata_bytes(
+      "dynamic_modules.test",
+      "bytes_key",
+      &[0xff, 0x00, 0xfe],
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "bytes_key")
+        .map(|value| value.as_slice().to_vec()),
+      Some(vec![0xff, 0x00, 0xfe])
+    );
+
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+}
+
+// =============================================================================
+// Read Attributes Test Filter
+// =============================================================================
+
+// Reads connection stream info attributes through the generic attribute getters and asserts the
+// downstream addresses resolve at accept time.
+struct ReadAttributesFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for ReadAttributesFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(ReadAttributesFilter)
+  }
+}
+
+struct ReadAttributesFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for ReadAttributesFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    assert!(envoy_filter
+      .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress)
+      .is_some());
+    assert!(envoy_filter
+      .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::DestinationAddress)
+      .is_some());
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+}
+
+// =============================================================================
+// Typed Filter State Test Filter
+// =============================================================================
+
+// Writes a typed filter state on accept via set_filter_state_typed, using a key backed by an
+// ObjectFactory the C++ test harness registers, then reads it back with get_filter_state_typed to
+// prove the typed write/read round trips through the ABI. A failed assertion stops the chain and
+// the echo upstream never returns the payload.
+struct FilterStateTypedFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for FilterStateTypedFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(FilterStateTypedFilter)
+  }
+}
+
+struct FilterStateTypedFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for FilterStateTypedFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    const TYPED_KEY: &[u8] = b"envoy.test.listener_written_typed_object";
+    const TYPED_VALUE: &[u8] = b"typed_value";
+
+    // Writing without a registered ObjectFactory fails.
+    assert!(!envoy_filter.set_filter_state_typed(b"nonexistent.factory.key", TYPED_VALUE));
+
+    // Writing through the registered factory succeeds and round trips via the typed getter.
+    assert!(envoy_filter.set_filter_state_typed(TYPED_KEY, TYPED_VALUE));
+    assert_eq!(
+      envoy_filter
+        .get_filter_state_typed(TYPED_KEY)
+        .map(|value| value.as_slice().to_vec()),
+      Some(TYPED_VALUE.to_vec())
+    );
+
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+}
+
+// =============================================================================
+// Filter Chain Selector Test Filter
+// =============================================================================
+
+// Writes a per-connection selection value into typed filter state on accept, so a filter chain
+// matcher running after the listener filters can pick a filter chain from it via
+// envoy.matching.inputs.filter_state. The value is taken verbatim from the filter's config, letting
+// a caller steer a connection to a different chain without changing the module. This is the pattern
+// used to gate traffic between two otherwise-identical chains from a listener filter.
+struct FilterChainSelectorFilterConfig {
+  selection: Vec<u8>,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for FilterChainSelectorFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(FilterChainSelectorFilter {
+      selection: self.selection.clone(),
+    })
+  }
+}
+
+// Key backed by an ObjectFactory the C++ test harness registers. The matcher reads the same key.
+const SELECTOR_KEY: &[u8] = b"envoy.test.filter_chain_selector";
+
+struct FilterChainSelectorFilter {
+  selection: Vec<u8>,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for FilterChainSelectorFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    assert!(envoy_filter.set_filter_state_typed(SELECTOR_KEY, &self.selection));
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
 }

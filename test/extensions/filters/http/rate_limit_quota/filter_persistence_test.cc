@@ -192,9 +192,9 @@ protected:
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
       HttpConnectionManager hcm_config;
-      hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
+      std::ignore = hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
       hcm_config.clear_http_filters();
-      hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
+      std::ignore = hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
     });
     // Wait for all TLS stores to be deleted now that the filter factories are gone.
     ASSERT_TRUE(waitForAllTlsStoreDeletions());
@@ -354,11 +354,11 @@ bucket_action:
 
     auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
     HttpConnectionManager hcm_config;
-    hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
+    std::ignore = hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
 
     auto* rlqs_filter = hcm_config.mutable_http_filters(0);
     RateLimitQuotaFilterConfig rlqs_filter_config;
-    rlqs_filter->mutable_typed_config()->UnpackTo(&rlqs_filter_config);
+    std::ignore = rlqs_filter->mutable_typed_config()->UnpackTo(&rlqs_filter_config);
 
     // Change the deny_response_settings to send 403 status codes.
     auto* on_match_action = rlqs_filter_config.mutable_bucket_matchers()
@@ -367,14 +367,14 @@ bucket_action:
                                 ->mutable_on_match()
                                 ->mutable_action();
     RateLimitQuotaBucketSettings on_match_settings;
-    on_match_action->mutable_typed_config()->UnpackTo(&on_match_settings);
+    std::ignore = on_match_action->mutable_typed_config()->UnpackTo(&on_match_settings);
     on_match_settings.mutable_deny_response_settings()->mutable_http_status()->set_code(
         envoy::type::v3::StatusCode::Forbidden);
 
     // Re-pack in reverse order.
-    on_match_action->mutable_typed_config()->PackFrom(on_match_settings);
-    rlqs_filter->mutable_typed_config()->PackFrom(rlqs_filter_config);
-    hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
+    std::ignore = on_match_action->mutable_typed_config()->PackFrom(on_match_settings);
+    std::ignore = rlqs_filter->mutable_typed_config()->PackFrom(rlqs_filter_config);
+    std::ignore = hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
   });
   ASSERT_EQ(sendRequest(&headers), "403");
 }
@@ -429,18 +429,18 @@ bucket_action:
 
     auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
     HttpConnectionManager hcm_config;
-    hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
+    std::ignore = hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
 
     auto* rlqs_filter = hcm_config.mutable_http_filters(0);
     RateLimitQuotaFilterConfig rlqs_filter_config;
-    rlqs_filter->mutable_typed_config()->UnpackTo(&rlqs_filter_config);
+    std::ignore = rlqs_filter->mutable_typed_config()->UnpackTo(&rlqs_filter_config);
 
     // Change the filter's top-level domain.
     rlqs_filter_config.set_domain("new_domain");
 
     // Re-pack in reverse order.
-    rlqs_filter->mutable_typed_config()->PackFrom(rlqs_filter_config);
-    hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
+    std::ignore = rlqs_filter->mutable_typed_config()->PackFrom(rlqs_filter_config);
+    std::ignore = hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
   });
 
   // With an entirely fresh quota cache state & RLQS stream again, the next
@@ -510,19 +510,19 @@ bucket_action:
 
     auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
     HttpConnectionManager hcm_config;
-    hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
+    std::ignore = hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
 
     auto* rlqs_filter = hcm_config.mutable_http_filters(0);
     RateLimitQuotaFilterConfig rlqs_filter_config;
-    rlqs_filter->mutable_typed_config()->UnpackTo(&rlqs_filter_config);
+    std::ignore = rlqs_filter->mutable_typed_config()->UnpackTo(&rlqs_filter_config);
 
     // Change the filter's top-level RLQS server target.
     rlqs_filter_config.mutable_rlqs_server()->mutable_envoy_grpc()->set_cluster_name(
         "rlqs_upstream_1");
 
     // Re-pack in reverse order.
-    rlqs_filter->mutable_typed_config()->PackFrom(rlqs_filter_config);
-    hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
+    std::ignore = rlqs_filter->mutable_typed_config()->PackFrom(rlqs_filter_config);
+    std::ignore = hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
   });
 
   ASSERT_EQ(sendRequest(&headers), "200");

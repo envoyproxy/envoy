@@ -38,16 +38,16 @@ public:
         choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, choice_count, 2)),
         active_request_bias_runtime_(
             least_request_config.has_active_request_bias()
-                ? absl::optional<Runtime::Double>(
+                ? std::optional<Runtime::Double>(
                       {least_request_config.active_request_bias(), runtime})
-                : absl::nullopt),
+                : std::nullopt),
         selection_method_(least_request_config.selection_method()) {
     initialize();
   }
 
 protected:
   void refresh(uint32_t priority) override {
-    active_request_bias_ = active_request_bias_runtime_ != absl::nullopt
+    active_request_bias_ = active_request_bias_runtime_ != std::nullopt
                                ? active_request_bias_runtime_.value().value()
                                : 1.0;
 
@@ -87,7 +87,7 @@ private:
   // whenever a `HostSet` is updated.
   bool count_pending_requests_{};
 
-  const absl::optional<Runtime::Double> active_request_bias_runtime_;
+  const std::optional<Runtime::Double> active_request_bias_runtime_;
   const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
       selection_method_{};
 };

@@ -4,6 +4,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"

@@ -19,7 +19,7 @@ public:
   TimedCertValidator(std::chrono::milliseconds validation_time_out_ms,
                      const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                      Server::Configuration::CommonFactoryContext& context,
-                     absl::optional<std::string> expected_host_name)
+                     std::optional<std::string> expected_host_name)
       : DefaultCertValidator(config, stats, context),
         validation_time_out_ms_(validation_time_out_ms), expected_host_name_(expected_host_name) {}
 
@@ -43,9 +43,9 @@ private:
   std::chrono::milliseconds validation_time_out_ms_;
   Ssl::ValidateResultCallbackPtr callback_;
   std::vector<std::string> cert_chain_in_str_;
-  absl::optional<std::string> expected_host_name_;
-  absl::optional<std::string> expected_local_address_;
-  absl::optional<std::string> expected_peer_address_;
+  std::optional<std::string> expected_host_name_;
+  std::optional<std::string> expected_local_address_;
+  std::optional<std::string> expected_peer_address_;
 };
 
 class TimedCertValidatorFactory : public CertValidatorFactory {
@@ -81,8 +81,8 @@ public:
 
 private:
   std::chrono::milliseconds validation_time_out_ms_{5};
-  absl::optional<std::string> expected_host_name_;
-  absl::optional<std::string> expected_peer_address_;
+  std::optional<std::string> expected_host_name_;
+  std::optional<std::string> expected_peer_address_;
 };
 
 DECLARE_FACTORY(TimedCertValidatorFactory);

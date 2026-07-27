@@ -99,17 +99,17 @@ struct OrcaHostLbPolicyData : public Envoy::Upstream::HostLbPolicyData {
 
   // Get the weight if it was updated between max_non_empty_since and min_last_update_time,
   // otherwise return nullopt.
-  absl::optional<uint32_t> getWeightIfValid(MonotonicTime max_non_empty_since,
-                                            MonotonicTime min_last_update_time) {
+  std::optional<uint32_t> getWeightIfValid(MonotonicTime max_non_empty_since,
+                                           MonotonicTime min_last_update_time) {
     // If non_empty_since_ is too recent, we should use the default weight.
     if (max_non_empty_since < non_empty_since_.load()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     // If last update time is too old, we should use the default weight.
     if (last_update_time_.load() < min_last_update_time) {
       // Reset the non_empty_since_ time so the timer will start again.
       non_empty_since_.store(OrcaHostLbPolicyData::kDefaultNonEmptySince);
-      return absl::nullopt;
+      return std::nullopt;
     }
     return weight_;
   }
@@ -154,9 +154,9 @@ public:
   OrcaLoadReportHandlerSharedPtr reportHandler() { return report_handler_; }
 
   // Get weight based on host LB policy data if valid, otherwise return nullopt.
-  static absl::optional<uint32_t> getWeightIfValidFromHost(const Upstream::Host& host,
-                                                           MonotonicTime max_non_empty_since,
-                                                           MonotonicTime min_last_update_time);
+  static std::optional<uint32_t> getWeightIfValidFromHost(const Upstream::Host& host,
+                                                          MonotonicTime max_non_empty_since,
+                                                          MonotonicTime min_last_update_time);
 
 private:
   // Add LB policy data to all hosts that don't already have it.

@@ -55,6 +55,7 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/internal_upstream:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",

@@ -26,6 +26,9 @@ public:
   DynamicModuleUdpListenerFilterConfigFactory factory_;
 };
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ValidConfig) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
   const std::string yaml = R"EOF(
@@ -40,6 +43,27 @@ filter_config:
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
+
+  auto callback = factory_.createFilterFactoryFromProto(proto_config, context);
+
+  NiceMock<Network::MockUdpListenerFilterManager> filter_manager;
+  NiceMock<Network::MockUdpReadFilterCallbacks> read_callbacks;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher{"worker_0"};
+  ON_CALL(read_callbacks.udp_listener_, dispatcher())
+      .WillByDefault(testing::ReturnRef(worker_thread_dispatcher));
+
+  EXPECT_CALL(filter_manager, addReadFilter_(testing::_));
+  callback(filter_manager, read_callbacks);
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ValidConfigWithLocalFile) {
+  NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+  envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"));
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_filter_name("test_filter");
 
   auto callback = factory_.createFilterFactoryFromProto(proto_config, context);
 
@@ -76,6 +100,9 @@ filter_name: test_filter
 
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(proto_config, context),
                           EnvoyException, "Failed to load.*");
+
+  EXPECT_EQ(1U, failureCounter(context.server_factory_context_.serverScope(), "module_load_error",
+                               "test_filter"));
 }
 
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ModuleWithoutUdpSupport) {

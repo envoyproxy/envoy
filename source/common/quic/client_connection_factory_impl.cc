@@ -72,7 +72,7 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   } else {
     client_writer_config.set_name("envoy.quic.packet_writer.default");
     envoy::extensions::quic::client_writer_factory::v3::DefaultClientWriter empty_default_config;
-    client_writer_config.mutable_typed_config()->PackFrom(empty_default_config);
+    std::ignore = client_writer_config.mutable_typed_config()->PackFrom(empty_default_config);
   }
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<QuicClientPacketWriterConfigFactory>(
       client_writer_config);

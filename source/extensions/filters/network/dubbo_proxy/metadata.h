@@ -1,14 +1,13 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/message.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +35,7 @@ public:
   int64_t requestId() const { return request_id_; }
 
   void setTimeout(uint32_t timeout) { timeout_ = timeout; }
-  absl::optional<uint32_t> timeout() const { return timeout_; }
+  std::optional<uint32_t> timeout() const { return timeout_; }
 
   void setTwoWayFlag(bool two_way) { is_two_way_ = two_way; }
   bool isTwoWay() const { return is_two_way_; }
@@ -66,8 +65,8 @@ private:
   MessageType message_type_{MessageType::Request};
   ProtocolType proto_type_{ProtocolType::Dubbo};
 
-  absl::optional<uint8_t> response_status_;
-  absl::optional<uint32_t> timeout_;
+  std::optional<uint8_t> response_status_;
+  std::optional<uint32_t> timeout_;
 
   RpcInvocationSharedPtr invocation_info_;
 

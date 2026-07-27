@@ -57,7 +57,12 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   lifetime in this scenario prevents holding onto healthy connections even after they would otherwise be
   undiscoverable. To modify the max connection duration for downstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
-  field in the HTTP connection manager configuration. To modify the max connection duration for upstream connections use the
+  field in the HTTP connection manager configuration. Optionally, :ref:`max_connection_duration_jitter
+  <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration_jitter>` (downstream
+  only) can extend the effective duration by a random amount up to
+  ``max_connection_duration * jitter / 100``, preventing a thundering-herd of reconnects when many
+  connections are established at roughly the same time. To modify the max connection duration for
+  upstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` field in the cluster configuration.
 
 * The HTTP connection manager :ref:`drain_timeout
@@ -72,7 +77,11 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   connection hits the :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`,
   when :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
   is reached, or during general server draining. The default grace period is *5000 milliseconds (5 seconds)*
-  if this option is not specified.
+  if this option is not specified. Optionally, :ref:`drain_timeout_jitter
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout_jitter>`
+  can extend the grace period by a random amount up to ``drain_timeout * jitter / 100``, staggering
+  the final ``GOAWAY`` across simultaneously-draining connections to mitigate thundering-herd
+  reconnects.
 
 See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
 
@@ -164,9 +173,9 @@ stream timeouts already introduced above.
 Scaled timeouts
 ^^^^^^^^^^^^^^^
 
-In situations where envoy is under high load, Envoy can dynamically configure timeouts using scaled timeouts.
+In situations where Envoy is under high load, Envoy can dynamically configure timeouts using scaled timeouts.
 Envoy supports scaled timeouts through the :ref:`Overload Manager <envoy_v3_api_msg_config.overload.v3.OverloadManager>`, configured
-in envoy :ref:`bootstrap configuration <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager>`.
+in Envoy :ref:`bootstrap configuration <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager>`.
 Using a :ref:`reduce timeouts <config_overload_manager_reducing_timeouts>` overload action,
 the Overload Manager can be configured to monitor :ref:`resources <envoy_v3_api_msg_config.overload.v3.ResourceMonitor>`
 and scale timeouts accordingly. For example, a common use case may be to monitor the Envoy :ref:`heap size <envoy_v3_api_msg_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig>`

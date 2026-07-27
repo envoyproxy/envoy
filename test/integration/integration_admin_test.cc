@@ -18,6 +18,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -275,7 +276,7 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   EXPECT_EQ("200", request("admin", "GET", "/clusters?format=json", response));
   EXPECT_EQ("application/json", contentType(response));
-  EXPECT_TRUE(Json::Factory::loadFromString(response->body()).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(response->body()).status());
 
   EXPECT_EQ("400", request("admin", "POST", "/cpuprofiler", response));
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
@@ -397,13 +398,13 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // .. and that we can unpack one of the entries.
   envoy::admin::v3::RoutesConfigDump route_config_dump;
-  config_dump.configs(4).UnpackTo(&route_config_dump);
+  std::ignore = config_dump.configs(4).UnpackTo(&route_config_dump);
   envoy::config::route::v3::RouteConfiguration route_config;
   EXPECT_TRUE(route_config_dump.static_route_configs(0).route_config().UnpackTo(&route_config));
   EXPECT_EQ("route_config_0", route_config.name());
 
   envoy::admin::v3::SecretsConfigDump secret_config_dump;
-  config_dump.configs(5).UnpackTo(&secret_config_dump);
+  std::ignore = config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump?include_eds", response));
@@ -438,7 +439,7 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // SecretsConfigDump should have been totally filtered away.
   secret_config_dump.Clear();
-  name_filtered_config_dump.configs(5).UnpackTo(&secret_config_dump);
+  std::ignore = name_filtered_config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ(secret_config_dump.static_secrets().size(), 0);
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",

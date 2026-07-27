@@ -22,16 +22,16 @@ public:
          Regex::Engine& regex_engine);
 
   // Http::HashPolicy
-  absl::optional<uint64_t> generateHash(OptRef<const RequestHeaderMap> headers,
-                                        OptRef<const StreamInfo::StreamInfo> info,
-                                        AddCookieCallback add_cookie = nullptr) const override;
+  std::optional<uint64_t> generateHash(OptRef<const RequestHeaderMap> headers,
+                                       OptRef<const StreamInfo::StreamInfo> info,
+                                       AddCookieCallback add_cookie = nullptr) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() = default;
-    virtual absl::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap> headers,
-                                              OptRef<const StreamInfo::StreamInfo> info,
-                                              AddCookieCallback add_cookie = nullptr) const PURE;
+    virtual std::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap> headers,
+                                             OptRef<const StreamInfo::StreamInfo> info,
+                                             AddCookieCallback add_cookie = nullptr) const PURE;
 
     // If the method is a terminal method, ignore rest of the hash policy chain.
     virtual bool terminal() const PURE;

@@ -35,8 +35,8 @@ public:
   absl::StatusOr<Ssl::ServerContextSharedPtr>
   createSslServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                          Ssl::ContextAdditionalInitFunc additional_init) override;
-  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
-  absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override;
+  std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) override;
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
     return private_key_method_manager_;

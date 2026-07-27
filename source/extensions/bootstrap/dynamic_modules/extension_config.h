@@ -142,14 +142,16 @@ public:
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             Upstream::ThreadLocalClusterCommand& get_cluster) override;
-  void onClusterRemoval(const std::string& cluster_name) override;
+  void onClusterRemoval(absl::string_view cluster_name) override;
 
   /**
    * Sets the listener manager reference. Must be called during onServerInitialized before
-   * the module can enable listener lifecycle events.
+   * the module can enable listener lifecycle events. Marks the server as initialized so the
+   * cluster manager can be accessed safely.
    */
   void setListenerManager(Server::ListenerManager& listener_manager) {
     listener_manager_ = &listener_manager;
+    server_initialized_ = true;
   }
 
   /**
@@ -456,6 +458,10 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up cluster_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
   bool cluster_lifecycle_enabled_ = false;
+
+  // True once the server is initialized, set when the listener manager is provided during
+  // onServerInitialized. The cluster manager is only safe to access after this point.
+  bool server_initialized_ = false;
 
   // Listener manager pointer. Set during onServerInitialized via setListenerManager().
   // Not available during bootstrap extension creation.

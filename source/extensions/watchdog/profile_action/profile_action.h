@@ -1,12 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <optional>
 
 #include "envoy/extensions/watchdog/profile_action/v3/profile_action.pb.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {

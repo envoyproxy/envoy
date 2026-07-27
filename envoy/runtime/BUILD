@@ -12,12 +12,11 @@ envoy_cc_library(
     name = "runtime_interface",
     hdrs = ["runtime.h"],
     deps = [
-        "//envoy/stats:stats_interface",
+        "//envoy/stats:scope_interface",
         "//envoy/thread_local:thread_local_object",
         "//source/common/common:assert_lib",
         "//source/common/singleton:threadsafe_singleton",
         "@abseil-cpp//absl/container:node_hash_map",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

@@ -293,7 +293,7 @@ public:
    * @return timestamp of when host has transitioned from unhealthy to
    *         healthy state via an active healthchecking.
    */
-  virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
+  virtual std::optional<MonotonicTime> lastHcPassTime() const PURE;
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an

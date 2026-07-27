@@ -1,6 +1,7 @@
 #include "source/common/stats/symbol_table.h"
 
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -29,21 +30,17 @@ void StatName::debugPrint() {
   // TODO(jmarantz): capture this functionality (always prints regardless of
   // loglevel) in an ENVOY_LOG macro variant or similar, perhaps
   // ENVOY_LOG_MISC(stderr, ...);
-  if (size_and_data_ == nullptr) {
-    std::cerr << "Null StatName" << std::endl;
-  } else {
-    const size_t nbytes = dataSize();
-    std::cerr << "dataSize=" << nbytes << ":";
-    for (size_t i = 0; i < nbytes; ++i) {
-      std::cerr << " " << static_cast<uint64_t>(data()[i]);
-    }
-    const SymbolVec encoding = SymbolTable::Encoding::decodeSymbols(*this);
-    std::cerr << ", numSymbols=" << encoding.size() << ":";
-    for (Symbol symbol : encoding) {
-      std::cerr << " " << symbol;
-    }
-    std::cerr << std::endl;
+  const size_t nbytes = dataSize();
+  std::cerr << "dataSize=" << nbytes << ":";
+  for (size_t i = 0; i < nbytes; ++i) {
+    std::cerr << " " << static_cast<uint64_t>(data()[i]);
   }
+  const SymbolVec encoding = SymbolTable::Encoding::decodeSymbols(*this);
+  std::cerr << ", numSymbols=" << encoding.size() << ":";
+  for (Symbol symbol : encoding) {
+    std::cerr << " " << symbol;
+  }
+  std::cerr << std::endl;
 }
 #endif
 
@@ -118,14 +115,9 @@ public:
 
   TokenIter(StatName stat_name) {
     const uint8_t* raw_data = stat_name.dataIncludingSize();
-    if (raw_data == nullptr) {
-      size_ = 0;
-      array_ = nullptr;
-    } else {
-      std::pair<uint64_t, size_t> size_consumed = decodeNumber(raw_data);
-      size_ = size_consumed.first;
-      array_ = raw_data + size_consumed.second;
-    }
+    std::pair<uint64_t, size_t> size_consumed = decodeNumber(raw_data);
+    size_ = size_consumed.first;
+    array_ = raw_data + size_consumed.second;
   }
 
   /**
@@ -253,12 +245,7 @@ void SymbolTable::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) 
 
 void SymbolTable::Encoding::appendToMemBlock(StatName stat_name,
                                              MemBlockBuilder<uint8_t>& mem_block) {
-  const uint8_t* data = stat_name.dataIncludingSize();
-  if (data == nullptr) {
-    mem_block.appendOne(0);
-  } else {
-    mem_block.appendData(absl::MakeSpan(data, stat_name.size()));
-  }
+  mem_block.appendData(absl::MakeSpan(stat_name.dataIncludingSize(), stat_name.size()));
 }
 
 SymbolTable::SymbolTable()
@@ -313,6 +300,37 @@ uint64_t SymbolTable::numSymbols() const {
 
 std::string SymbolTable::toString(const StatName& stat_name) const {
   return absl::StrJoin(decodeStrings(stat_name), ".");
+}
+
+size_t SymbolTable::serializeToBuffer(const StatName& stat_name, char* buffer,
+                                      size_t buffer_size) const {
+  // A null buffer is only valid as a length query when buffer_size is 0.
+  ASSERT(buffer != nullptr || buffer_size == 0);
+  // Tracks the full required length even when it exceeds buffer_size, so the caller can detect
+  // truncation and retry. Tokens are copied only while they still fit.
+  size_t bytes_required = 0;
+  const auto append = [&](absl::string_view token) {
+    if (bytes_required < buffer_size && !token.empty()) {
+      const size_t copy_size = std::min(token.size(), buffer_size - bytes_required);
+      memcpy(buffer + bytes_required, token.data(), copy_size); // NOLINT(safe-memcpy)
+    }
+    bytes_required += token.size();
+  };
+
+  Thread::LockGuard lock(lock_);
+  Encoding::TokenIter iter(stat_name);
+  bool first = true;
+  for (Encoding::TokenIter::TokenType type = iter.next();
+       type != Encoding::TokenIter::TokenType::End; type = iter.next()) {
+    if (!first) {
+      append(".");
+    }
+    first = false;
+    // fromSymbol() requires lock_, which is held for the duration of this call.
+    append(type == Encoding::TokenIter::TokenType::Symbol ? fromSymbol(iter.symbol())
+                                                          : iter.stringView());
+  }
+  return bytes_required;
 }
 
 void SymbolTable::incRefCount(const StatName& stat_name) {
@@ -696,6 +714,40 @@ void SymbolTable::populateList(const StatName* names, uint32_t num_names, StatNa
   // total_size_bytes. After appending all the encoded data into the
   // allocated byte array, we should have exhausted all the memory
   // we though we needed.
+  ASSERT(mem_block.capacityRemaining() == 0);
+  list.moveStorageIntoList(mem_block.release());
+}
+
+void SymbolTable::populateList(StatName tagged_name, StatName base_name, StatNameTagSpan name_tags,
+                               StatNameList& list) {
+  const size_t stat_name_count = name_tags.size() * 2 + 2;
+
+  RELEASE_ASSERT(stat_name_count < 256, "Maximum number elements in a StatNameList exceeded");
+
+  // One byte for the number of names, plus the size of each name.
+  size_t total_size_bytes = 1;
+  total_size_bytes += tagged_name.size() + base_name.size();
+  for (const auto& tag : name_tags) {
+    total_size_bytes += tag.first.size() + tag.second.size();
+  }
+
+  // Now allocate the exact number of bytes required and move the encodings into storage.
+  MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
+  mem_block.appendOne(stat_name_count);
+  Encoding::appendToMemBlock(tagged_name, mem_block);
+  Encoding::appendToMemBlock(base_name, mem_block);
+  incRefCount(tagged_name);
+  incRefCount(base_name);
+  for (const auto& tag : name_tags) {
+    Encoding::appendToMemBlock(tag.first, mem_block);
+    Encoding::appendToMemBlock(tag.second, mem_block);
+    incRefCount(tag.first);
+    incRefCount(tag.second);
+  }
+
+  // This assertion double-checks the arithmetic where we computed total_size_bytes. After appending
+  // all the encoded data into the allocated byte array, we should have exhausted all the memory we
+  // thought we needed.
   ASSERT(mem_block.capacityRemaining() == 0);
   list.moveStorageIntoList(mem_block.release());
 }

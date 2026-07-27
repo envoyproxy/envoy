@@ -119,7 +119,7 @@ public:
    *     can be generated from the inputs; nullopt if a vary_identifier cannot be
    *     generated.
    */
-  static absl::optional<Key>
+  static std::optional<Key>
   makeVaryKey(const Key& base, const VaryAllowList& vary_allow_list,
               const absl::btree_set<absl::string_view>& vary_header_values,
               const Http::RequestHeaderMap& request_headers);

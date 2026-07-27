@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/http/filter.h"
@@ -12,7 +13,6 @@
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,7 +54,7 @@ private:
  * Lambda ARN Example:
  * arn:aws:lambda:us-west-2:987654321:function:hello_envoy
  */
-absl::optional<Arn> parseArn(absl::string_view arn);
+std::optional<Arn> parseArn(absl::string_view arn);
 
 /**
  * All stats for the AWS Lambda filter. @see stats_macros.h

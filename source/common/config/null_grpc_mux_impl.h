@@ -34,7 +34,7 @@ public:
     return absl::UnimplementedError("");
   }
 
-  EdsResourcesCacheOptRef edsResourcesCache() override { return absl::nullopt; }
+  EdsResourcesCacheOptRef edsResourcesCache() override { return std::nullopt; }
 
   Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
   Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
@@ -42,7 +42,7 @@ public:
   void onWriteable() override {}
   void onStreamEstablished() override {}
   void onEstablishmentFailure(bool) override {}
-  void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
+  void onDiscoveryResponse(ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse>&&,
                            ControlPlaneStats&) override {}
 };
 

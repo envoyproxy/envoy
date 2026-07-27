@@ -122,11 +122,102 @@ class TestEnvoyClientTransport(unittest.TestCase):
         self.mock_stream.send_headers.assert_called_once_with(unittest.mock.ANY, False)
         self.mock_stream.send_data.assert_has_calls(
             [
-                call(b"chunk1", False),
-                call(b"chunk2", False),
+                call(b"chunk1"),
+                call(b"chunk2"),
             ]
         )
         self.mock_stream.close.assert_called_once_with(b"")
+
+    def test_handle_request_duplicate_headers(self):
+        """Verify that duplicate headers are correctly preserved in sync transport."""
+        request = httpx.Request("GET", "https://example.com")
+
+        def side_effect(*args, **kwargs):
+            on_headers = kwargs.get("on_headers")
+            on_headers(
+                {
+                    ":status": "200",
+                    "content-type": "application/json",
+                    "set-cookie": ["cookie1", "cookie2"],
+                },
+                False,
+                None,
+            )
+            on_data = kwargs.get("on_data")
+            on_data(b"ok", 2, True, None)
+            return self.mock_stream
+
+        self.mock_prototype.start.side_effect = side_effect
+
+        response = self.transport.handle_request(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "application/json")
+        self.assertEqual(response.headers.get_list("set-cookie"), ["cookie1", "cookie2"])
+
+    def test_handle_request_socket_tag(self):
+        """Verify that the transport tag is injected into the Envoy headers in sync transport."""
+        request = httpx.Request("GET", "https://example.com")
+
+        def side_effect(*args, **kwargs):
+            on_headers = kwargs.get("on_headers")
+            on_headers({":status": "200"}, True, None)
+            return self.mock_stream
+
+        self.mock_prototype.start.side_effect = side_effect
+
+        # We can inspect the transport's tag before running the request
+        expected_tag = self.transport._transport_tag
+        expected_header_value = f"0,{expected_tag}"
+
+        self.transport.handle_request(request)
+
+        # Verify send_headers was called
+        self.mock_stream.send_headers.assert_called_once()
+
+        # Extract the headers passed to Envoy
+        sent_headers = self.mock_stream.send_headers.call_args[0][0]
+
+        # Verify the socket tag header is present and has the correct value
+        self.assertIn("x-envoy-mobile-socket-tag", sent_headers)
+        self.assertEqual(sent_headers["x-envoy-mobile-socket-tag"], expected_header_value)
+
+    def test_handle_request_filtered_headers(self):
+        """Verify that HTTP/1.1 connection-specific headers (forbidden in H2) and duplicate host headers are filtered out."""
+        request = httpx.Request(
+            "GET",
+            "https://example.com/path",
+            headers={
+                "connection": "upgrade",
+                "keep-alive": "timeout=5",
+                "host": "another-host.com",
+                "custom-header": "custom-value",
+            },
+        )
+
+        def side_effect(*args, **kwargs):
+            on_headers = kwargs.get("on_headers")
+            on_headers({":status": "200"}, True, None)
+            return self.mock_stream
+
+        self.mock_prototype.start.side_effect = side_effect
+
+        self.transport.handle_request(request)
+
+        # Verify send_headers was called
+        self.mock_stream.send_headers.assert_called_once()
+        sent_headers = self.mock_stream.send_headers.call_args[0][0]
+
+        # Verify pseudo-headers are present
+        self.assertEqual(sent_headers[":authority"], "example.com")
+
+        # Verify custom headers are preserved
+        self.assertEqual(sent_headers["custom-header"], "custom-value")
+
+        # Verify forbidden headers are filtered out
+        self.assertNotIn("connection", sent_headers)
+        self.assertNotIn("keep-alive", sent_headers)
+        self.assertNotIn("host", sent_headers)
 
 
 class TestAsyncEnvoyClientTransport(unittest.IsolatedAsyncioTestCase):
@@ -163,7 +254,7 @@ class TestAsyncEnvoyClientTransport(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await response.aread(), b"created")
 
         self.mock_stream.send_headers.assert_called_once_with(unittest.mock.ANY, False)
-        self.mock_stream.send_data.assert_called_once_with(b"body", False)
+        self.mock_stream.send_data.assert_called_once_with(b"body")
         self.mock_stream.close.assert_called_with(b"")
 
     async def test_handle_async_request_error(self):
@@ -210,11 +301,68 @@ class TestAsyncEnvoyClientTransport(unittest.IsolatedAsyncioTestCase):
         self.mock_stream.send_headers.assert_called_once_with(unittest.mock.ANY, False)
         self.mock_stream.send_data.assert_has_calls(
             [
-                call(b"chunk1", False),
-                call(b"chunk2", False),
+                call(b"chunk1"),
+                call(b"chunk2"),
             ]
         )
         self.mock_stream.close.assert_called_once_with(b"")
+
+    async def test_handle_async_request_duplicate_headers(self):
+        """Verify that duplicate headers are correctly preserved and exposed via HTTPX."""
+        request = httpx.Request("GET", "https://example.com")
+
+        def side_effect(*args, **kwargs):
+            on_headers = kwargs.get("on_headers")
+            loop = asyncio.get_running_loop()
+            loop.call_soon(
+                on_headers,
+                {
+                    ":status": "200",
+                    "content-type": "application/json",
+                    "set-cookie": ["cookie1", "cookie2"],
+                },
+                False,
+                None,
+            )
+            on_data = kwargs.get("on_data")
+            loop.call_soon(on_data, b"ok", 2, True, None)
+            return self.mock_stream
+
+        self.mock_prototype.start.side_effect = side_effect
+
+        response = await self.transport.handle_async_request(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "application/json")
+        self.assertEqual(response.headers.get_list("set-cookie"), ["cookie1", "cookie2"])
+
+    async def test_handle_async_request_socket_tag(self):
+        """Verify that the transport tag is injected into the Envoy headers."""
+        request = httpx.Request("GET", "https://example.com")
+
+        def side_effect(*args, **kwargs):
+            on_headers = kwargs.get("on_headers")
+            loop = asyncio.get_running_loop()
+            loop.call_soon(on_headers, {":status": "200"}, True, None)
+            return self.mock_stream
+
+        self.mock_prototype.start.side_effect = side_effect
+
+        # We can inspect the transport's tag before running the request
+        expected_tag = self.transport._transport_tag
+        expected_header_value = f"0,{expected_tag}"
+
+        await self.transport.handle_async_request(request)
+
+        # Verify send_headers was called
+        self.mock_stream.send_headers.assert_called_once()
+
+        # Extract the headers passed to Envoy
+        sent_headers = self.mock_stream.send_headers.call_args[0][0]
+
+        # Verify the socket tag header is present and has the correct value
+        self.assertIn("x-envoy-mobile-socket-tag", sent_headers)
+        self.assertEqual(sent_headers["x-envoy-mobile-socket-tag"], expected_header_value)
 
 
 from envoy_mobile.async_client.executor import AsyncioExecutor

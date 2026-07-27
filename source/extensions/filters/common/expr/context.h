@@ -72,6 +72,7 @@ constexpr absl::string_view DNSSanLocalCertificate = "dns_san_local_certificate"
 constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
 constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certificate_digest";
 constexpr absl::string_view PeerCertificate = "peer_certificate";
+constexpr absl::string_view PeerCertificateValid = "peer_certificate_valid";
 constexpr absl::string_view DownstreamTransportFailureReason = "transport_failure_reason";
 
 // Source properties
@@ -125,12 +126,12 @@ class FilterStateWrapper;
 class XDSWrapper;
 
 // Type aliases for value extractors
-using CelValueExtractor = std::function<absl::optional<CelValue>(const RequestWrapper&)>;
-using ResponseValueExtractor = std::function<absl::optional<CelValue>(const ResponseWrapper&)>;
-using ConnectionValueExtractor = std::function<absl::optional<CelValue>(const ConnectionWrapper&)>;
-using UpstreamValueExtractor = std::function<absl::optional<CelValue>(const UpstreamWrapper&)>;
-using XDSValueExtractor = std::function<absl::optional<CelValue>(const XDSWrapper&)>;
-using SslExtractor = std::function<absl::optional<CelValue>(const Ssl::ConnectionInfo&)>;
+using CelValueExtractor = std::function<std::optional<CelValue>(const RequestWrapper&)>;
+using ResponseValueExtractor = std::function<std::optional<CelValue>(const ResponseWrapper&)>;
+using ConnectionValueExtractor = std::function<std::optional<CelValue>(const ConnectionWrapper&)>;
+using UpstreamValueExtractor = std::function<std::optional<CelValue>(const UpstreamWrapper&)>;
+using XDSValueExtractor = std::function<std::optional<CelValue>(const XDSWrapper&)>;
+using SslExtractor = std::function<std::optional<CelValue>(const Ssl::ConnectionInfo&)>;
 
 // Forward declare the singleton value classes
 class RequestLookupValues {
@@ -170,15 +171,15 @@ public:
 };
 
 // Helper functions declarations
-absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
-absl::optional<CelValue>
+std::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
+std::optional<CelValue>
 convertHeaderEntry(Protobuf::Arena& arena,
                    Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
 
 template <class T> class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
   HeadersWrapper(Protobuf::Arena& arena, const T* value) : arena_(arena), value_(value) {}
-  absl::optional<CelValue> operator[](CelValue key) const override {
+  std::optional<CelValue> operator[](CelValue key) const override {
     if (value_ == nullptr || !key.IsString()) {
       return {};
     }
@@ -240,7 +241,7 @@ public:
   RequestWrapper(Protobuf::Arena& arena, const ::Envoy::Http::RequestHeaderMap* headers,
                  const StreamInfo::StreamInfo& info)
       : BaseWrapper(arena), headers_(arena, headers), info_(info) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  std::optional<CelValue> operator[](CelValue key) const override;
 
 protected:
   friend class RequestLookupValues;
@@ -254,7 +255,7 @@ public:
                   const ::Envoy::Http::ResponseTrailerMap* trailers,
                   const StreamInfo::StreamInfo& info)
       : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  std::optional<CelValue> operator[](CelValue key) const override;
 
 protected:
   friend class ResponseLookupValues;
@@ -267,7 +268,7 @@ class ConnectionWrapper : public BaseWrapper {
 public:
   ConnectionWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
       : BaseWrapper(arena), info_(info) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  std::optional<CelValue> operator[](CelValue key) const override;
 
 protected:
   friend class ConnectionLookupValues;
@@ -278,7 +279,7 @@ class UpstreamWrapper : public BaseWrapper {
 public:
   UpstreamWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
       : BaseWrapper(arena), info_(info) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  std::optional<CelValue> operator[](CelValue key) const override;
 
 protected:
   friend class UpstreamLookupValues;
@@ -289,7 +290,7 @@ class PeerWrapper : public BaseWrapper {
 public:
   PeerWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info, bool local)
       : BaseWrapper(arena), info_(info), local_(local) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  std::optional<CelValue> operator[](CelValue key) const override;
 
 private:
   const StreamInfo::StreamInfo& info_;
@@ -300,7 +301,7 @@ class FilterStateWrapper : public BaseWrapper {
 public:
   FilterStateWrapper(Protobuf::Arena& arena, const StreamInfo::FilterState& filter_state)
       : BaseWrapper(arena), filter_state_(filter_state) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  std::optional<CelValue> operator[](CelValue key) const override;
 
 private:
   const StreamInfo::FilterState& filter_state_;
@@ -311,7 +312,7 @@ public:
   XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo* info,
              const LocalInfo::LocalInfo* local_info)
       : BaseWrapper(arena), info_(info), local_info_(local_info) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  std::optional<CelValue> operator[](CelValue key) const override;
 
 protected:
   friend class XDSLookupValues;

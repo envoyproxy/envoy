@@ -367,7 +367,7 @@ bool networkHealthCheckFailureType(envoy::data::core::v3::HealthCheckFailureType
 } // namespace
 
 HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
-    envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
+    envoy::data::core::v3::HealthCheckFailureType type, bool retriable, uint64_t http_status_code) {
   // If we are unhealthy, reset the # of healthy to zero.
   num_healthy_ = 0;
 
@@ -379,7 +379,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {
-        parent_.event_logger_->logEjectUnhealthy(parent_.healthCheckerType(), host_, type);
+        parent_.event_logger_->logEjectUnhealthy(parent_.healthCheckerType(), host_, type,
+                                                 http_status_code);
       }
     } else {
       changed_state = HealthTransition::ChangePending;
@@ -399,7 +400,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   changed_state = clearPendingFlag(changed_state);
 
   if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {
-    parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_);
+    parent_.event_logger_->logUnhealthy(parent_.healthCheckerType(), host_, type, first_check_,
+                                        http_status_code);
   }
 
   parent_.stats_.failure_.inc();
@@ -415,8 +417,13 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
-    envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
-  HealthTransition changed_state = setUnhealthy(type, retriable);
+    envoy::data::core::v3::HealthCheckFailureType type, bool retriable, uint64_t http_status_code) {
+  HealthTransition changed_state = setUnhealthy(type, retriable, http_status_code);
+  // Clear the cached HTTP status code on non-HTTP failures so the HDS report does
+  // not ship a stale code from the last successful response.
+  if (type == envoy::data::core::v3::NETWORK || type == envoy::data::core::v3::NETWORK_TIMEOUT) {
+    host_->setLastHealthCheckHttpStatus(0);
+  }
   // It's possible that the previous call caused this session to be deferred deleted.
   if (timeout_timer_ != nullptr) {
     timeout_timer_->disableTimer();

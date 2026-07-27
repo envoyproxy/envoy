@@ -24,7 +24,7 @@ using ::testing::ReturnRef;
 using ::testing::StrictMock;
 
 MATCHER_P(OptRefWith, m, "") {
-  if (arg == absl::nullopt) {
+  if (arg == std::nullopt) {
     *result_listener << "is nullopt";
     return false;
   }

@@ -1,5 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/router/router_impl.h"
 
+#include <optional>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
@@ -200,7 +202,7 @@ FilterStatus Router::handleAffinity() {
   if (metadata->pCookieIpMap().has_value()) {
     auto [key, val] = metadata->pCookieIpMap().value();
     ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, absl::nullopt);
+    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, std::nullopt);
   }
 
   const std::shared_ptr<const ProtocolOptionsConfig> options =
@@ -724,8 +726,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       if (metadata->pCookieIpMap().has_value()) {
         auto [key, val] = metadata->pCookieIpMap().value();
         ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val,
-                                                                  absl::nullopt);
+        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, std::nullopt);
       }
 
       active_trans->startUpstreamResponse();

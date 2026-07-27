@@ -1,3 +1,3 @@
 # We dont build from this dockerfile - we just parse the version, but storing
 # here means we get the dependabot updates
-FROM moby/buildkit:v0.29.0@sha256:0039c1d47e8748b5afea56f4e85f14febaf34452bd99d9552d2daa82262b5cc5
+FROM moby/buildkit:v0.31.1@sha256:6b59b7df63a8cb9902736f9ddf7fcff8261613d3e7449b8ea8b7537fc399c03a

@@ -26,7 +26,7 @@ public:
 private:
   Server::Configuration::ServerFactoryContext& context_;
   std::string profile_;
-  absl::optional<Config::DataSource::DataSourceProviderPtr<std::string>>
+  std::optional<Config::DataSource::DataSourceProviderPtr<std::string>>
       credential_file_data_source_provider_;
   bool has_watched_directory_ = false;
 

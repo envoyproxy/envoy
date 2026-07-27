@@ -1,10 +1,14 @@
 #include "engine.h"
 
+#include <memory>
+
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "library/common/internal_engine.h"
+#include "library/common/network/socket_tag_socket_option_impl.h"
 #include "library/common/system/system_helper.h"
 #include "library/common/types/c_types.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Platform {
@@ -31,8 +35,8 @@ Engine::~Engine() {
 // because they either require or will require a weak ptr
 // which can't be provided from inside of the constructor
 // because of how std::enable_shared_from_this works
-StreamClientSharedPtr Engine::streamClient() {
-  return std::make_shared<StreamClient>(shared_from_this());
+StreamClientSharedPtr Engine::streamClient(absl::string_view listener_name) {
+  return std::make_shared<StreamClient>(shared_from_this(), listener_name);
 }
 
 std::string Engine::dumpStats() { return engine_->dumpStats(); }
@@ -60,6 +64,10 @@ void Engine::onDefaultNetworkAvailable() { engine_->onDefaultNetworkAvailable();
 
 envoy_status_t Engine::setProxySettings(absl::string_view host, const uint16_t port) {
   return engine_->setProxySettings(host, port);
+}
+
+void Engine::drainConnectionsBySocketTag(uint32_t tag) {
+  engine_->drainConnectionsBySocketTag(tag);
 }
 
 } // namespace Platform

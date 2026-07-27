@@ -204,7 +204,7 @@ Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
   return return_trailers;
 }
 
-absl::optional<std::string> AutonomousUpstream::responseBody() {
+std::optional<std::string> AutonomousUpstream::responseBody() {
   Thread::LockGuard lock(headers_lock_);
   return response_body_;
 }

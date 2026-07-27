@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,7 +13,6 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "tools/cpp/runfiles/runfiles.h"
 
 namespace Envoy {
@@ -84,9 +84,9 @@ public:
 
   /**
    * Obtain the value of an environment variable, null if not available.
-   * @return absl::optional<std::string> with the value of the environment variable.
+   * @return std::optional<std::string> with the value of the environment variable.
    */
-  static absl::optional<std::string> getOptionalEnvVar(const std::string& var);
+  static std::optional<std::string> getOptionalEnvVar(const std::string& var);
 
   /**
    * Obtain the value of an environment variable, die if not available.

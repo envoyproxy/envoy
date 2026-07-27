@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -7,8 +9,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -56,11 +56,11 @@ private:
 
   // The version_info carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.
-  absl::optional<std::string> last_good_version_info_;
+  std::optional<std::string> last_good_version_info_;
   // The nonce carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.
   // Used when it's time to make a spontaneous (i.e. not primarily meant as an ACK) request.
-  absl::optional<std::string> last_good_nonce_;
+  std::optional<std::string> last_good_nonce_;
 
   // Starts true because we should send a request upon subscription start.
   bool update_pending_{true};

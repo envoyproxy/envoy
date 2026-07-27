@@ -6,6 +6,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/stats_utility.h"
 #include "test/test_common/test_runtime.h"
 

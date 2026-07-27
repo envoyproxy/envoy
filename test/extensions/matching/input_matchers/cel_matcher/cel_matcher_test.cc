@@ -75,11 +75,11 @@ public:
     case ExpressionType::CheckedExpression: {
       if (use_cel) {
         ::cel::expr::CheckedExpr checked_expr;
-        Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+        std::ignore = Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
         cel_matcher.mutable_expr_match()->mutable_cel_expr_checked()->MergeFrom(checked_expr);
       } else {
         google::api::expr::v1alpha1::CheckedExpr checked_expr;
-        Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+        std::ignore = Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
         cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
       }
       break;
@@ -87,11 +87,11 @@ public:
     case ExpressionType::ParsedExpression: {
       if (use_cel) {
         ::cel::expr::ParsedExpr parsed_expr;
-        Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
+        std::ignore = Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
         cel_matcher.mutable_expr_match()->mutable_cel_expr_parsed()->MergeFrom(parsed_expr);
       } else {
         google::api::expr::v1alpha1::ParsedExpr parsed_expr;
-        Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
+        std::ignore = Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
         cel_matcher.mutable_expr_match()->mutable_parsed_expr()->MergeFrom(parsed_expr);
       }
       break;
@@ -106,10 +106,11 @@ public:
 
     xds::type::matcher::v3::HttpAttributesCelMatchInput cel_match_input;
     single_predicate->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
-    single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
+    std::ignore =
+        single_predicate->mutable_input()->mutable_typed_config()->PackFrom(cel_match_input);
 
     auto* custom_matcher = single_predicate->mutable_custom_match();
-    custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
+    std::ignore = custom_matcher->mutable_typed_config()->PackFrom(cel_matcher);
 
     xds::type::matcher::v3::Matcher::OnMatch on_match;
     std::string on_match_config = R"EOF(
@@ -259,7 +260,7 @@ TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
   ::envoy::config::core::v3::Pipe pipe;
   pipe.set_path("/foo/bar/baz.fads");
   Protobuf::Any typed_metadata;
-  typed_metadata.PackFrom(pipe);
+  std::ignore = typed_metadata.PackFrom(pipe);
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {std::string(kFilterNamespace), typed_metadata});
   auto matcher_tree = buildMatcherTree(absl::StrFormat(

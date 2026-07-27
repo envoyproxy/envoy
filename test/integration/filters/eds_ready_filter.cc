@@ -36,16 +36,16 @@ public:
 
     if (!gauge.has_value()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
-                                         "Couldn't find stat", nullptr, absl::nullopt, "");
+                                         "Couldn't find stat", nullptr, std::nullopt, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
     if (gauge->get().value() == 0) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError, "EDS not ready",
-                                         nullptr, absl::nullopt, "");
+                                         nullptr, std::nullopt, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
-    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "EDS is ready", nullptr,
-                                       absl::nullopt, "");
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "EDS is ready", nullptr, std::nullopt,
+                                       "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

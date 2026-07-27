@@ -432,6 +432,16 @@ type HttpFilterHandle interface {
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
 
+	// GetLogLevel returns the current effective log level of the host environment's logging
+	// mechanism. The returned level reflects runtime changes, for example those applied via the
+	// admin API.
+	GetLogLevel() LogLevel
+
+	// IsLogLevelEnabled reports whether the given log level is enabled by the host environment's
+	// logging mechanism. It can be used to skip expensive work that is only needed when a message
+	// at the given level would actually be logged.
+	IsLogLevelEnabled(level LogLevel) bool
+
 	// HttpCallout performs an HTTP call to an external service. The call is asynchronous; the
 	// response, or an error, is delivered to the provided callback.
 	//
@@ -558,4 +568,34 @@ type HttpFilterConfigHandle interface {
 	// This should be called only during the plugin configuration phase, and the returned
 	// Scheduler can be used later even outside of the callbacks and at other threads.
 	GetScheduler() Scheduler
+
+	// RecordHistogramValue records the given value to the histogram metric. The order and
+	// size of tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.RecordHistogramValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	RecordHistogramValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// SetGaugeValue sets the given value on the gauge metric. The order and size of
+	// tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.SetGaugeValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	SetGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// IncrementGaugeValue adds the given value to the gauge metric. The order and size of
+	// tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.IncrementGaugeValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	IncrementGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// DecrementGaugeValue subtracts the given value from the gauge metric. The order and
+	// size of tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.DecrementGaugeValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	DecrementGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// IncrementCounterValue adds the given value to the counter metric. The order and
+	// size of tagsValues must match the tag keys defined when the metric was created.
+	// Unlike HttpFilterHandle.IncrementCounterValue, this does not require a per-stream filter and
+	// can be called outside of the request lifecycle, for example from a scheduled background task.
+	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
 }

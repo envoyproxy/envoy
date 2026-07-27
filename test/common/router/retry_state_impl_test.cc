@@ -1119,7 +1119,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
     EXPECT_TRUE(state_->enabled());
 
     Http::TestResponseHeaderMapImpl response_headers{{":status", "429"}, {"Retry-After", "301"}};
-    EXPECT_EQ(absl::nullopt, state_->parseResetInterval(response_headers));
+    EXPECT_EQ(std::nullopt, state_->parseResetInterval(response_headers));
   }
 
   // Failure case: Matches reset header (timestamp) but exceeds max_interval (>5min)
@@ -1130,7 +1130,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
 
     Http::TestResponseHeaderMapImpl response_headers{{":status", "429"},
                                                      {"X-RateLimit-Reset", "1000000301"}};
-    EXPECT_EQ(absl::nullopt, state_->parseResetInterval(response_headers));
+    EXPECT_EQ(std::nullopt, state_->parseResetInterval(response_headers));
   }
 
   // The only reset header matches (seconds) and the header value is in within range
@@ -1140,7 +1140,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
     EXPECT_TRUE(state_->enabled());
 
     Http::TestResponseHeaderMapImpl response_headers{{":status", "429"}, {"Retry-After", "300"}};
-    EXPECT_EQ(absl::optional<std::chrono::milliseconds>(300000),
+    EXPECT_EQ(std::optional<std::chrono::milliseconds>(300000),
               state_->parseResetInterval(response_headers));
   }
 
@@ -1152,7 +1152,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
 
     Http::TestResponseHeaderMapImpl response_headers{{":status", "429"},
                                                      {"x-ratelimit-reset", "1000000300"}};
-    EXPECT_EQ(absl::optional<std::chrono::milliseconds>(300000),
+    EXPECT_EQ(std::optional<std::chrono::milliseconds>(300000),
               state_->parseResetInterval(response_headers));
   }
 
@@ -1165,7 +1165,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
 
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "429"}, {"x-ratelimit-reset", "1000000002"}, {"retry-after", "3"}};
-    EXPECT_EQ(absl::optional<std::chrono::milliseconds>(3000),
+    EXPECT_EQ(std::optional<std::chrono::milliseconds>(3000),
               state_->parseResetInterval(response_headers));
   }
 }
@@ -1443,6 +1443,35 @@ TEST_F(RouterRetryStateImplTest, ParseRetryGrpcOn) {
   result = RetryStateImpl::parseRetryGrpcOn(config);
   EXPECT_EQ(result.first, 96);
   EXPECT_FALSE(result.second);
+}
+
+TEST_F(RouterRetryStateImplTest, GetUnknownRetryOnTokens) {
+  // All valid HTTP tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("5xx,gateway-error,connect-failure").empty());
+
+  // All valid gRPC tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("cancelled,deadline-exceeded").empty());
+
+  // Mixed valid HTTP and gRPC tokens: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("5xx,cancelled").empty());
+
+  // One unknown token among valid ones.
+  auto unknown = RetryStateImpl::getUnknownRetryOnTokens("5xx,typo,connect-failure");
+  EXPECT_EQ(unknown.size(), 1);
+  EXPECT_EQ(unknown[0], "typo");
+
+  // Multiple unknown tokens.
+  unknown = RetryStateImpl::getUnknownRetryOnTokens("bad1,5xx,bad2");
+  EXPECT_EQ(unknown.size(), 2);
+  EXPECT_EQ(unknown[0], "bad1");
+  EXPECT_EQ(unknown[1], "bad2");
+
+  // All unknown tokens.
+  unknown = RetryStateImpl::getUnknownRetryOnTokens("foo,bar");
+  EXPECT_EQ(unknown.size(), 2);
+
+  // Empty config: no unknowns.
+  EXPECT_TRUE(RetryStateImpl::getUnknownRetryOnTokens("").empty());
 }
 
 TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {

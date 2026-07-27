@@ -219,7 +219,7 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
       *tool_config.request_headers_, *tool_config.response_headers_, stream_info, body);
 
   Envoy::Http::Utility::LocalReplyData local_reply_data{
-      is_grpc, entry.responseCode(), direct_response_body, absl::nullopt, is_head_request};
+      is_grpc, entry.responseCode(), direct_response_body, std::nullopt, is_head_request};
 
   Envoy::Http::Utility::sendLocalReply(false, encode_functions, local_reply_data);
 }
@@ -325,8 +325,11 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); },
         [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
-        [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
+        [this, &stream_info](auto&... params) -> bool {
+          return this->compareRedirectPath(params..., stream_info);
+        },
         [this](auto&... params) -> bool { return this->compareRedirectCode(params...); },
+        [this](auto&... params) -> bool { return this->compareTimeout(params...); },
         [this](auto&... params) -> bool { return this->compareRequestHeaderFields(params...); },
         [this](auto&... params) -> bool { return this->compareResponseHeaderFields(params...); },
     };
@@ -480,7 +483,8 @@ bool RouterCheckTool::compareRewriteHost(
 
 bool RouterCheckTool::compareRedirectPath(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-    envoy::RouterCheckToolSchema::ValidationFailure& failure) {
+    envoy::RouterCheckToolSchema::ValidationFailure& failure,
+    const StreamInfo::StreamInfo& stream_info) {
   if (!expected.has_path_redirect()) {
     return true;
   }
@@ -488,7 +492,8 @@ bool RouterCheckTool::compareRedirectPath(
       tool_config.route_ != nullptr && tool_config.route_->directResponseEntry() != nullptr;
   std::string actual = "";
   if (has_direct_response_entry) {
-    actual = tool_config.route_->directResponseEntry()->newUri(*tool_config.request_headers_);
+    actual = tool_config.route_->directResponseEntry()->newUri(*tool_config.request_headers_,
+                                                               stream_info);
   }
   const bool matches = compareResults(actual, expected.path_redirect().value(), "path_redirect");
   if (!matches) {
@@ -520,6 +525,25 @@ bool RouterCheckTool::compareRedirectCode(
   }
   if (matches && has_direct_response_entry) {
     coverage_.markRedirectCodeCovered(tool_config.route_);
+  }
+  return matches;
+}
+
+bool RouterCheckTool::compareTimeout(ToolConfig& tool_config,
+                                     const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                                     envoy::RouterCheckToolSchema::ValidationFailure& failure) {
+  if (!expected.has_timeout()) {
+    return true;
+  }
+  const bool has_route_entry =
+      tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
+  const uint64_t actual = has_route_entry ? tool_config.route_->routeEntry()->timeout().count() : 0;
+  const uint64_t expected_ms = DurationUtil::durationToMilliseconds(expected.timeout());
+  const bool matches = compareResults(actual, expected_ms, "timeout");
+  if (!matches) {
+    *failure.mutable_expected_timeout() = expected.timeout();
+    failure.mutable_actual_timeout()->set_seconds(actual / 1000);
+    failure.mutable_actual_timeout()->set_nanos((actual % 1000) * 1000000);
   }
   return matches;
 }

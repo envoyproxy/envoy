@@ -17,7 +17,7 @@ public:
   constexpr static char name[] = "continue-after-local-reply-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, std::nullopt,
                                        "ContinueAfterLocalReplyFilter is ready");
     return Http::FilterHeadersStatus::Continue;
   }

@@ -24,14 +24,14 @@ public:
    * Function that maps a HostDescription to it's effective priority level in a cluster.
    * For most cluster types, the mapping is simply `return host.priority()`, but some
    * cluster types require more complex mapping.
-   * @return either the effective priority, or absl::nullopt if the mapping cannot be determined,
+   * @return either the effective priority, or std::nullopt if the mapping cannot be determined,
    *         which can happen if the host has been removed from the configurations since it was
    *         used.
    */
   using PriorityMappingFunc =
-      std::function<absl::optional<uint32_t>(const Upstream::HostDescription&)>;
+      std::function<std::optional<uint32_t>(const Upstream::HostDescription&)>;
 
-  static absl::optional<uint32_t> defaultPriorityMapping(const Upstream::HostDescription& host) {
+  static std::optional<uint32_t> defaultPriorityMapping(const Upstream::HostDescription& host) {
     return host.priority();
   }
 
@@ -113,7 +113,7 @@ public:
   struct UpdateOptionsReturn {
     // New upstream socket options to apply to the next request attempt. If changed, will affect
     // connection pool selection similar to that which was done for the initial request.
-    absl::optional<Network::Socket::OptionsSharedPtr> new_upstream_socket_options_;
+    std::optional<Network::Socket::OptionsSharedPtr> new_upstream_socket_options_;
   };
 
   virtual ~RetryOptionsPredicate() = default;

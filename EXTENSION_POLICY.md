@@ -89,22 +89,30 @@ part of the Wasm implementation validation. The rationale for this policy:
 
 ## Extension stability and security posture
 
-Every extension is expected to be tagged with a `status` and `security_posture` in its
-`envoy_cc_extension` rule.
+Every extension is expected to be tagged with a `status` and `security_posture` in its entry in the
+extension metadata file
+([source/extensions/extensions_metadata.yaml](source/extensions/extensions_metadata.yaml) for core
+extensions, [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml) for contrib
+extensions). The schema for these files is defined in
+[tools/extensions/extensions_schema.yaml](tools/extensions/extensions_schema.yaml).
 
 The `status` is one of:
-* `stable`: The extension is stable and is expected to be production usable. This is the default if
-  no `status` is specified.
+* `stable`: The extension is stable and is expected to be production usable.
 * `alpha`: The extension is functional but has not had substantial production burn time, use only
   with this caveat.
 * `wip`: The extension is work-in-progress. Functionality is incomplete and it is not intended for
   production use.
 
+Extensions that can be used in both downstream and upstream contexts (e.g., HTTP filters listed
+under both `envoy.filters.http` and `envoy.filters.http.upstream` categories) may also specify a
+`status_upstream` field. This allows the upstream usage to have a different maturity level than
+the downstream usage (e.g., `status: stable` with `status_upstream: alpha`).
+
 The extension status may be adjusted by the extension [CODEOWNERS](./CODEOWNERS) and/or Envoy
 maintainers based on an assessment of the above criteria. Note that the status of the extension
 reflects the implementation status. It is orthogonal to the API stability, for example, an extension
 API marked with `(xds.annotations.v3.file_status).work_in_progress` might have a `stable` implementation and
-and an extension with a stable config proto can have a `wip` implementation.
+an extension with a stable config proto can have a `wip` implementation.
 
 The `security_posture` is one of:
 * `robust_to_untrusted_downstream`: The extension is hardened against untrusted downstream traffic. It

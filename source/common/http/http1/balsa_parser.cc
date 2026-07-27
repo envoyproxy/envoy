@@ -262,9 +262,9 @@ bool BalsaParser::isHttp11() const {
   }
 }
 
-absl::optional<uint64_t> BalsaParser::contentLength() const {
+std::optional<uint64_t> BalsaParser::contentLength() const {
   if (!headers_.content_length_valid()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return headers_.content_length();
 }

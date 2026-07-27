@@ -78,8 +78,15 @@ public:
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
+
+  // Drive the response encoder directly for the streaming-response ABI. These set
+  // sent_local_reply_ so the module's own encode hooks are not re-entered for the response it is
+  // producing, matching sendLocalReply.
+  void sendResponseHeaders(ResponseHeaderMapPtr&& headers, bool end_stream);
+  void sendResponseData(Buffer::Instance& data, bool end_stream);
+  void sendResponseTrailers(ResponseTrailerMapPtr&& trailers);
 
   // The callbacks for the filter. Worker-thread only; foreign threads must use `dispatcher()`.
   // They are only valid until onDestroy() is called.
@@ -95,7 +102,11 @@ public:
 
   // Temporary storage for the serialized typed filter state value returned by
   // get_filter_state_typed. Valid until the end of the current event hook.
-  absl::optional<std::string> last_serialized_filter_state_;
+  std::optional<std::string> last_serialized_filter_state_;
+
+  // Temporary holder for host metadata snapshots returned by host metadata getters.
+  // Valid until the next metadata getter call on this filter.
+  Upstream::MetadataConstSharedPtr last_metadata_snapshot_;
 
   /**
    * Helper to get the correct callbacks.
@@ -114,28 +125,28 @@ public:
     if (decoder_callbacks_) {
       return decoder_callbacks_->requestHeaders();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   RequestTrailerMapOptRef requestTrailers() {
     if (decoder_callbacks_) {
       return decoder_callbacks_->requestTrailers();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ResponseHeaderMapOptRef responseHeaders() {
     if (encoder_callbacks_) {
       return encoder_callbacks_->responseHeaders();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ResponseTrailerMapOptRef responseTrailers() {
     if (encoder_callbacks_) {
       return encoder_callbacks_->responseTrailers();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   /**
@@ -233,6 +244,7 @@ public:
 
   bool hasConfig() const { return config_ != nullptr; }
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
+  const DynamicModuleHttpFilterConfigSharedPtr& getFilterConfigSharedPtr() const { return config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
 
   /**
@@ -261,15 +273,18 @@ private:
    */
   void maybeRegisterDownstreamWatermarkCallbacks();
 
-  // True if the filter is in the continue state. This is to avoid prohibited calls to
-  // continueDecoding() or continueEncoding() multiple times.
-  bool in_continue_ = false;
+  // True when the decode or encode direction is in the continue state. Tracked per direction to
+  // avoid prohibited repeat continueDecoding() or continueEncoding() calls, and so a continue in
+  // one direction never suppresses a resume in the other.
+  bool decode_in_continue_ = false;
+  bool encode_in_continue_ = false;
 
   // This helps to avoid reentering the module when sending a local reply. For example, if
   // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of
   // the stack calling it, which can be problematic. For example, with Rust, that might cause
-  // multiple mutable borrows of the same object. In practice, a module shouldn't need encodeHeaders
-  // and encodeData to be called for local reply contents, so we just skip them with this flag.
+  // multiple mutable borrows of the same object. In practice, a module shouldn't need its encode
+  // hooks called for local reply contents, so we just skip them with this flag. The
+  // streaming-response ABI (sendResponseHeaders and friends) sets it for the same reason.
   bool sent_local_reply_ = false;
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;

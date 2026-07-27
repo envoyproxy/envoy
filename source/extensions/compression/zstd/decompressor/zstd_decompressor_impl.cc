@@ -49,24 +49,14 @@ void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
       }
 
       setInput(input_slice);
-      if (!process(output_buffer)) {
-        return;
-      }
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.enable_compression_bomb_protection") &&
-          (output_buffer.length() > limit)) {
-        stats_.zstd_generic_error_.inc();
-        ENVOY_LOG(trace,
-                  "excessive decompression ratio detected: output "
-                  "size {} for input size {}",
-                  output_buffer.length(), input_buffer.length());
+      if (!process(output_buffer, limit)) {
         return;
       }
     }
   }
 }
 
-bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer) {
+bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer, uint64_t limit) {
   while (input_.pos < input_.size) {
     const size_t result = ZSTD_decompressStream(dctx_.get(), &output_, &input_);
     if (isError(result)) {
@@ -74,6 +64,19 @@ bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer) {
     }
 
     getOutput(output_buffer);
+
+    // Check bomb protection after every decompression step, not after the
+    // entire slice is drained. This matches gzip and brotli behavior.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_compression_bomb_protection") &&
+        (output_buffer.length() > limit)) {
+      stats_.zstd_generic_error_.inc();
+      ENVOY_LOG(trace,
+                "excessive decompression ratio detected: output "
+                "size {} for limit {}",
+                output_buffer.length(), limit);
+      return false;
+    }
   }
 
   return true;

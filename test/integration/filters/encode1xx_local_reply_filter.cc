@@ -17,7 +17,7 @@ public:
   Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
                                        "Local Reply During encode1xxHeaders.", nullptr,
-                                       absl::nullopt, "");
+                                       std::nullopt, "");
     return Http::Filter1xxHeadersStatus::Continue;
   }
 };

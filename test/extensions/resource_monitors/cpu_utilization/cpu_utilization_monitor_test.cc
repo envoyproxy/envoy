@@ -1,11 +1,11 @@
 #include <cstdlib>
+#include <optional>
 
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_stats_reader.h"
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_utilization_monitor.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -38,8 +38,8 @@ public:
   double pressure() const { return *pressure_; }
 
 private:
-  absl::optional<double> pressure_;
-  absl::optional<EnvoyException> error_;
+  std::optional<double> pressure_;
+  std::optional<EnvoyException> error_;
 };
 
 // =============================================================================

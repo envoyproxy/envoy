@@ -83,7 +83,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:upstream_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -97,7 +96,6 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/config:utility_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

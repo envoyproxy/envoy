@@ -53,7 +53,7 @@ public:
              Api::Api& api, WorkerStatNames& stat_names);
 
   // Server::Worker
-  void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+  void addListener(std::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
                    AddListenerCompletion completion, Runtime::Loader& loader,
                    Random::RandomGenerator& random) override;
   uint64_t numConnections() const override;
@@ -62,12 +62,16 @@ public:
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
-  void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) override;
+  void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
+             std::optional<uint32_t> cpu_id) override;
   void initializeStats(Stats::Scope& scope) override;
   void stop() override;
   void stopListener(Network::ListenerConfig& listener,
                     const Network::ExtraShutdownListenerOptions& options,
                     std::function<void()> completion) override;
+  void onFilterChainDrain(uint64_t listener_tag,
+                          const std::list<const Network::FilterChain*>& filter_chains) override;
+  void onListenerDrain(Network::ListenerConfig& listener) override;
 
 private:
   void threadRoutine(OptRef<GuardDog> guard_dog, const std::function<void()>& cb);

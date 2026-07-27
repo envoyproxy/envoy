@@ -140,7 +140,7 @@ TEST_F(QuicFilterManagerConnectionImplTest, IsHalfCloseEnabled) {
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
-  const absl::optional<uint64_t> id = impl_.connectionInfoProvider().connectionID();
+  const std::optional<uint64_t> id = impl_.connectionInfoProvider().connectionID();
   EXPECT_TRUE(id.has_value());
   EXPECT_NE(id.value_or(0), 0);
 }

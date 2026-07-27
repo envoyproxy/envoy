@@ -1,3 +1,4 @@
+#include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/router/string_accessor.h"
 
 #include "source/common/tls/cert_validator/cert_validator.h"
@@ -10,6 +11,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -22,7 +24,11 @@ namespace Tls {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::NiceMock;
+using ::testing::Not;
 
 class DynamicModuleCertValidatorTest : public testing::Test {
 protected:
@@ -55,29 +61,31 @@ protected:
 // Config creation tests.
 // =============================================================================
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleCertValidatorTest, ConfigNewSuccess) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
   EXPECT_NE(config_or_error.value()->in_module_config_, nullptr);
 }
 
 TEST_F(DynamicModuleCertValidatorTest, ConfigNewReturnsNull) {
   auto config_or_error = createConfig("cert_validator_config_new_fail");
-  ASSERT_FALSE(config_or_error.ok());
-  EXPECT_THAT(config_or_error.status().message(),
-              testing::HasSubstr("Failed to initialize dynamic module cert validator config"));
+  ASSERT_THAT(config_or_error, HasStatusMessage(testing::HasSubstr(
+                                   "Failed to initialize dynamic module cert validator config")));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, ConfigNewModuleNotFound) {
   auto module =
       Envoy::Extensions::DynamicModules::newDynamicModuleByName("nonexistent_module", false, false);
-  EXPECT_FALSE(module.ok());
+  EXPECT_THAT(module, Not(IsOk()));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, ConfigNewMissingSymbol) {
   // The "no_op" module does not implement cert validator functions.
   auto config_or_error = createConfig("no_op");
-  ASSERT_FALSE(config_or_error.ok());
+  ASSERT_THAT(config_or_error, Not(IsOk()));
 }
 
 // =============================================================================
@@ -86,7 +94,7 @@ TEST_F(DynamicModuleCertValidatorTest, ConfigNewMissingSymbol) {
 
 TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainSuccess) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -109,7 +117,7 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainSuccess) {
 
 TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainFailure) {
   auto config_or_error = createConfig("cert_validator_fail");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -134,7 +142,7 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainFailure) {
 
 TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainEmptyChain) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -150,7 +158,7 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainEmptyChain) {
 
 TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainDerEncodingError) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -171,7 +179,7 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainDerEncodingError) {
 
 TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainNoClientCertificateStatus) {
   auto config_or_error = createConfig("cert_validator_no_client_cert");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -191,7 +199,7 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainNoClientCertificateStatus)
 
 TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainNotValidatedDefaultStatus) {
   auto config_or_error = createConfig("cert_validator_not_validated");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -211,7 +219,7 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainNotValidatedDefaultStatus)
 
 TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainMultipleCerts) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -233,7 +241,7 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainMultipleCerts) {
 
 TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainWithIsServerTrue) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -255,27 +263,25 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainWithIsServerTrue) {
 
 TEST_F(DynamicModuleCertValidatorTest, InitializeSslContextsReturnsVerifyMode) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
   Stats::Scope& scope = *store_.rootScope();
   auto result = validator.initializeSslContexts({}, false, scope);
-  ASSERT_TRUE(result.ok());
   // cert_validator_no_op returns SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT = 0x03.
-  EXPECT_EQ(0x03, result.value());
+  ASSERT_THAT(result, IsOkAndHolds(0x03));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, InitializeSslContextsHandshakerProvidesCerts) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
   Stats::Scope& scope = *store_.rootScope();
   auto result = validator.initializeSslContexts({}, true, scope);
-  ASSERT_TRUE(result.ok());
-  EXPECT_EQ(0x03, result.value());
+  ASSERT_THAT(result, IsOkAndHolds(0x03));
 }
 
 // =============================================================================
@@ -284,7 +290,7 @@ TEST_F(DynamicModuleCertValidatorTest, InitializeSslContextsHandshakerProvidesCe
 
 TEST_F(DynamicModuleCertValidatorTest, UpdateDigestForSessionId) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -304,7 +310,7 @@ TEST_F(DynamicModuleCertValidatorTest, UpdateDigestForSessionId) {
 
 TEST_F(DynamicModuleCertValidatorTest, UpdateDigestForSessionIdEmptyDigest) {
   auto config_or_error = createConfig("cert_validator_empty_digest");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -328,7 +334,7 @@ TEST_F(DynamicModuleCertValidatorTest, UpdateDigestForSessionIdEmptyDigest) {
 
 TEST_F(DynamicModuleCertValidatorTest, DaysUntilFirstCertExpiresReturnsNullopt) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
   EXPECT_FALSE(validator.daysUntilFirstCertExpires().has_value());
@@ -336,7 +342,7 @@ TEST_F(DynamicModuleCertValidatorTest, DaysUntilFirstCertExpiresReturnsNullopt) 
 
 TEST_F(DynamicModuleCertValidatorTest, GetCaFileNameReturnsEmpty) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
   EXPECT_EQ("", validator.getCaFileName());
@@ -344,7 +350,7 @@ TEST_F(DynamicModuleCertValidatorTest, GetCaFileNameReturnsEmpty) {
 
 TEST_F(DynamicModuleCertValidatorTest, GetCaCertInformationReturnsNull) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
   EXPECT_EQ(nullptr, validator.getCaCertInformation());
@@ -352,19 +358,19 @@ TEST_F(DynamicModuleCertValidatorTest, GetCaCertInformationReturnsNull) {
 
 TEST_F(DynamicModuleCertValidatorTest, AddClientValidationContext) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
   CSmartPtr<SSL_CTX, SSL_CTX_free> ssl_ctx(SSL_CTX_new(TLS_method()));
   // With require_client_cert = true.
-  EXPECT_TRUE(validator.addClientValidationContext(ssl_ctx.get(), true).ok());
+  EXPECT_OK(validator.addClientValidationContext(ssl_ctx.get(), true));
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
             SSL_CTX_get_verify_mode(ssl_ctx.get()));
 
   // With require_client_cert = false.
   CSmartPtr<SSL_CTX, SSL_CTX_free> ssl_ctx2(SSL_CTX_new(TLS_method()));
-  EXPECT_TRUE(validator.addClientValidationContext(ssl_ctx2.get(), false).ok());
+  EXPECT_OK(validator.addClientValidationContext(ssl_ctx2.get(), false));
   EXPECT_EQ(SSL_VERIFY_PEER, SSL_CTX_get_verify_mode(ssl_ctx2.get()));
 }
 
@@ -391,8 +397,59 @@ typed_config:
 
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_TRUE(result.ok());
-  EXPECT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "config_init_error", "test"));
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorWithLocalFile) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig
+  dynamic_module_config:
+    module:
+      local:
+        filename: {{ test_rundir }}/test/extensions/dynamic_modules/test_data/c/libcert_validator_no_op.so
+  validator_name: test
+)EOF");
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  TestUtility::loadFromYaml(yaml, typed_conf);
+  TestCertificateValidationContextConfig validation_config(typed_conf);
+
+  DynamicModuleCertValidatorFactory factory;
+  auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
+                                            *store_.rootScope());
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
+}
+
+// Remote module sources are not supported for cert validators (no init manager is wired up).
+TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorRemoteSourceRejected) {
+  const std::string yaml = R"EOF(
+name: envoy.tls.cert_validator.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: abc123
+  validator_name: test
+)EOF";
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  TestUtility::loadFromYaml(yaml, typed_conf);
+  TestCertificateValidationContextConfig validation_config(typed_conf);
+
+  DynamicModuleCertValidatorFactory factory;
+  auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
+                                            *store_.rootScope());
+  EXPECT_THAT(result, Not(IsOk()));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorWithValidatorConfig) {
@@ -414,8 +471,34 @@ typed_config:
   DynamicModuleCertValidatorFactory factory;
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_TRUE(result.ok());
-  EXPECT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorInvalidValidatorConfig) {
+  // The module loads successfully, but the validator_config Any cannot be unpacked, so the failure
+  // is counted as config_init_error (not module_load_error). This is built programmatically because
+  // a malformed Any cannot be expressed in YAML.
+  envoy::extensions::transport_sockets::tls::cert_validator::dynamic_modules::v3::
+      DynamicModuleCertValidatorConfig dm_config;
+  dm_config.mutable_dynamic_module_config()->set_name("cert_validator_no_op");
+  dm_config.set_validator_name("test");
+  // Claims to be a StringValue but the value is not a valid encoding, so knownAnyToBytes fails.
+  auto* any = dm_config.mutable_validator_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  typed_conf.set_name("envoy.tls.cert_validator.dynamic_modules");
+  std::ignore = typed_conf.mutable_typed_config()->PackFrom(dm_config);
+  TestCertificateValidationContextConfig validation_config(typed_conf);
+
+  DynamicModuleCertValidatorFactory factory;
+  auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
+                                            *store_.rootScope());
+  ASSERT_THAT(result, Not(IsOk()));
+
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorConfigNewFails) {
@@ -434,9 +517,12 @@ typed_config:
   DynamicModuleCertValidatorFactory factory;
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to initialize dynamic module cert validator config"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Failed to initialize dynamic module cert validator config")));
+
+  // The module loads fine but its config creation fails, counted as config_init_error.
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FactoryCreateCertValidatorModuleNotFound) {
@@ -455,7 +541,9 @@ typed_config:
   DynamicModuleCertValidatorFactory factory;
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
-  ASSERT_FALSE(result.ok());
+  ASSERT_THAT(result, Not(IsOk()));
+
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "module_load_error", "test"));
 }
 
 // =============================================================================
@@ -464,77 +552,72 @@ typed_config:
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateSetAndGet) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-  auto& config = config_or_error.value();
+  ASSERT_OK(config_or_error);
 
   // Set up mock transport socket callbacks to provide filter state access.
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
-
-  config->current_callbacks_ = &transport_callbacks;
+  CertValidatorCallContext call_context;
+  call_context.callbacks = &transport_callbacks;
 
   const std::string key = "test.key";
   const std::string value = "test.value";
 
   bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
-      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()},
+      static_cast<void*>(&call_context), {const_cast<char*>(key.data()), key.size()},
       {const_cast<char*>(value.data()), value.size()});
   EXPECT_TRUE(ok);
 
   // Verify by reading it back.
   envoy_dynamic_module_type_envoy_buffer result_buf;
   ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
-      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, &result_buf);
+      static_cast<void*>(&call_context), {const_cast<char*>(key.data()), key.size()}, &result_buf);
   EXPECT_TRUE(ok);
   EXPECT_EQ(value.size(), result_buf.length);
   EXPECT_EQ(value, std::string(result_buf.ptr, result_buf.length));
-
-  config->current_callbacks_ = nullptr;
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateGetNonExisting) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-  auto& config = config_or_error.value();
+  ASSERT_OK(config_or_error);
 
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
-  config->current_callbacks_ = &transport_callbacks;
+  CertValidatorCallContext call_context;
+  call_context.callbacks = &transport_callbacks;
 
   const std::string key = "nonexistent.key";
   envoy_dynamic_module_type_envoy_buffer result_buf;
   bool ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
-      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, &result_buf);
+      static_cast<void*>(&call_context), {const_cast<char*>(key.data()), key.size()}, &result_buf);
   EXPECT_FALSE(ok);
   EXPECT_EQ(nullptr, result_buf.ptr);
   EXPECT_EQ(0, result_buf.length);
-
-  config->current_callbacks_ = nullptr;
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateSetNullCallbacks) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-  auto& config = config_or_error.value();
+  ASSERT_OK(config_or_error);
 
-  // current_callbacks_ is nullptr by default.
+  // The call context has no callbacks, so filter state is unavailable.
+  CertValidatorCallContext call_context;
   const std::string key = "test.key";
   const std::string value = "test.value";
 
   bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
-      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()},
+      static_cast<void*>(&call_context), {const_cast<char*>(key.data()), key.size()},
       {const_cast<char*>(value.data()), value.size()});
   EXPECT_FALSE(ok);
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateGetNullCallbacks) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-  auto& config = config_or_error.value();
+  ASSERT_OK(config_or_error);
 
-  // current_callbacks_ is nullptr by default.
+  // The call context has no callbacks, so filter state is unavailable.
+  CertValidatorCallContext call_context;
   const std::string key = "test.key";
   envoy_dynamic_module_type_envoy_buffer result_buf;
   bool ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
-      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, &result_buf);
+      static_cast<void*>(&call_context), {const_cast<char*>(key.data()), key.size()}, &result_buf);
   EXPECT_FALSE(ok);
   EXPECT_EQ(nullptr, result_buf.ptr);
   EXPECT_EQ(0, result_buf.length);
@@ -542,68 +625,62 @@ TEST_F(DynamicModuleCertValidatorTest, FilterStateGetNullCallbacks) {
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateSetNullKey) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-  auto& config = config_or_error.value();
+  ASSERT_OK(config_or_error);
 
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
-  config->current_callbacks_ = &transport_callbacks;
+  CertValidatorCallContext call_context;
+  call_context.callbacks = &transport_callbacks;
 
   const std::string value = "test.value";
   bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
-      static_cast<void*>(config.get()), {nullptr, 0},
+      static_cast<void*>(&call_context), {nullptr, 0},
       {const_cast<char*>(value.data()), value.size()});
   EXPECT_FALSE(ok);
-
-  config->current_callbacks_ = nullptr;
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateSetNullValue) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-  auto& config = config_or_error.value();
+  ASSERT_OK(config_or_error);
 
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
-  config->current_callbacks_ = &transport_callbacks;
+  CertValidatorCallContext call_context;
+  call_context.callbacks = &transport_callbacks;
 
   const std::string key = "test.key";
   bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
-      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, {nullptr, 0});
+      static_cast<void*>(&call_context), {const_cast<char*>(key.data()), key.size()}, {nullptr, 0});
   EXPECT_FALSE(ok);
-
-  config->current_callbacks_ = nullptr;
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateGetNullKey) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-  auto& config = config_or_error.value();
+  ASSERT_OK(config_or_error);
 
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
-  config->current_callbacks_ = &transport_callbacks;
+  CertValidatorCallContext call_context;
+  call_context.callbacks = &transport_callbacks;
 
   envoy_dynamic_module_type_envoy_buffer result_buf;
   bool ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
-      static_cast<void*>(config.get()), {nullptr, 0}, &result_buf);
+      static_cast<void*>(&call_context), {nullptr, 0}, &result_buf);
   EXPECT_FALSE(ok);
   EXPECT_EQ(nullptr, result_buf.ptr);
   EXPECT_EQ(0, result_buf.length);
-
-  config->current_callbacks_ = nullptr;
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateSetEmptyValue) {
   auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-  auto& config = config_or_error.value();
+  ASSERT_OK(config_or_error);
 
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
-  config->current_callbacks_ = &transport_callbacks;
+  CertValidatorCallContext call_context;
+  call_context.callbacks = &transport_callbacks;
 
   const std::string key = "test.key";
   const std::string empty_value = "";
 
   bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
-      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()},
+      static_cast<void*>(&call_context), {const_cast<char*>(key.data()), key.size()},
       {const_cast<char*>(empty_value.data()), empty_value.size()});
   // Empty value has a non-null pointer but zero length, so ptr check passes.
   EXPECT_TRUE(ok);
@@ -611,18 +688,16 @@ TEST_F(DynamicModuleCertValidatorTest, FilterStateSetEmptyValue) {
   // Verify by reading it back.
   envoy_dynamic_module_type_envoy_buffer result_buf;
   ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
-      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, &result_buf);
+      static_cast<void*>(&call_context), {const_cast<char*>(key.data()), key.size()}, &result_buf);
   EXPECT_TRUE(ok);
   EXPECT_EQ(0, result_buf.length);
-
-  config->current_callbacks_ = nullptr;
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateViaDoVerifyCertChain) {
   // This test uses the cert_validator_filter_state C module which sets and reads
   // filter state during do_verify_cert_chain.
   auto config_or_error = createConfig("cert_validator_filter_state");
-  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_OK(config_or_error);
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);
 
@@ -648,31 +723,6 @@ TEST_F(DynamicModuleCertValidatorTest, FilterStateViaDoVerifyCertChain) {
                              ->getDataReadOnly<Router::StringAccessor>("cert_validator.test_key");
   ASSERT_NE(nullptr, accessor);
   EXPECT_EQ("cert_validator.test_value", accessor->asString());
-}
-
-TEST_F(DynamicModuleCertValidatorTest, FilterStateCallbacksResetAfterVerify) {
-  // Verify that current_callbacks_ is reset to nullptr after doVerifyCertChain returns.
-  auto config_or_error = createConfig("cert_validator_no_op");
-  ASSERT_TRUE(config_or_error.ok());
-
-  DynamicModuleCertValidator validator(config_or_error.value(), stats_);
-
-  bssl::UniquePtr<X509> cert = readCertFromFile(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
-
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
-  sk_X509_push(cert_chain.get(), cert.release());
-
-  CSmartPtr<SSL_CTX, SSL_CTX_free> ssl_ctx(SSL_CTX_new(TLS_method()));
-
-  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
-  CertValidator::ExtraValidationContext validation_context{&transport_callbacks};
-
-  validator.doVerifyCertChain(*cert_chain, nullptr, nullptr, *ssl_ctx, validation_context, false,
-                              "example.com");
-
-  // After the call, current_callbacks_ should be reset.
-  EXPECT_EQ(nullptr, config_or_error.value()->current_callbacks_);
 }
 
 } // namespace

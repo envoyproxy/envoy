@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -56,8 +57,8 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -176,26 +177,37 @@ getClusterSpecifierPluginByTheProto(const envoy::config::route::v3::ClusterSpeci
   return factory->createClusterSpecifierPlugin(*config, factory_context);
 }
 
-::Envoy::Http::Utility::RedirectConfig
+absl::StatusOr<std::unique_ptr<::Envoy::Http::Utility::RedirectConfig>>
 createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine& regex_engine) {
-  ::Envoy::Http::Utility::RedirectConfig redirect_config{
-      route.redirect().scheme_redirect(),
-      route.redirect().host_redirect(),
-      route.redirect().port_redirect() ? ":" + std::to_string(route.redirect().port_redirect())
-                                       : "",
-      route.redirect().path_redirect(),
-      route.redirect().prefix_rewrite(),
-      route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution() : "",
-      route.redirect().has_regex_rewrite()
-          ? THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(
-                                      route.redirect().regex_rewrite().pattern(), regex_engine),
-                                  Regex::CompiledMatcherPtr)
-          : nullptr,
-      route.redirect().path_redirect().find('?') != absl::string_view::npos,
-      route.redirect().https_redirect(),
-      route.redirect().strip_query()};
+  std::unique_ptr<::Envoy::Http::Utility::RedirectConfig> redirect_config =
+      std::make_unique<::Envoy::Http::Utility::RedirectConfig>(
+          ::Envoy::Http::Utility::RedirectConfig{
+              route.redirect().scheme_redirect(), route.redirect().host_redirect(),
+              route.redirect().port_redirect()
+                  ? ":" + std::to_string(route.redirect().port_redirect())
+                  : "",
+              route.redirect().path_redirect(), route.redirect().prefix_rewrite(),
+              route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution()
+                                                   : "",
+              route.redirect().has_regex_rewrite()
+                  ? THROW_OR_RETURN_VALUE(
+                        Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern(),
+                                                   regex_engine),
+                        Regex::CompiledMatcherPtr)
+                  : nullptr,
+              nullptr, route.redirect().path_redirect().find('?') != absl::string_view::npos,
+              route.redirect().https_redirect(), route.redirect().strip_query()});
   if (route.redirect().has_regex_rewrite()) {
-    ASSERT(redirect_config.prefix_rewrite_redirect_.empty());
+    ASSERT(redirect_config->prefix_rewrite_redirect_.empty());
+  }
+  if (!route.redirect().path_rewrite().empty()) {
+    absl::StatusOr<Formatter::FormatterPtr> formatter_or =
+        Envoy::Formatter::FormatterImpl::create(route.redirect().path_rewrite(), true);
+    if (!formatter_or.ok()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to create path_rewrite formatter: ", formatter_or.status()));
+    }
+    redirect_config->path_rewrite_formatter_ = std::move(formatter_or.value());
   }
   return redirect_config;
 }
@@ -240,7 +252,8 @@ const std::string& OriginalConnectPort::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_port");
 }
 
-std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers) const {
+std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers,
+                                  const StreamInfo::StreamInfo&) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
@@ -366,8 +379,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
   // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
   // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
   // disabled.
-  trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
-                                              : absl::nullopt;
+  trace_sampled_ = config.has_trace_sampled() ? std::optional<bool>(config.trace_sampled().value())
+                                              : std::nullopt;
 
   // Create HeaderMutations directly from HeaderMutation rules
   if (!config.request_headers_mutations().empty()) {
@@ -499,10 +512,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),
-      redirect_config_(route.has_redirect()
-                           ? std::make_unique<::Envoy::Http::Utility::RedirectConfig>(
-                                 createRedirectConfig(route, factory_context.regexEngine()))
-                           : nullptr),
+      redirect_config_(
+          route.has_redirect()
+              ? THROW_OR_RETURN_VALUE(createRedirectConfig(route, factory_context.regexEngine()),
+                                      std::unique_ptr<::Envoy::Http::Utility::RedirectConfig>)
+              : nullptr),
       hedge_policy_(buildHedgePolicy(vhost->hedgePolicy(), route.route())),
       internal_redirect_policy_(
           THROW_OR_RETURN_VALUE(buildInternalRedirectPolicy(route.route(), validator, route.name()),
@@ -771,6 +785,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
               "not be stripped: {}",
               redirect_config_->path_redirect_);
   }
+
   if (!route.stat_prefix().empty()) {
     route_stats_context_ = std::make_unique<RouteStatsContextImpl>(
         factory_context.scope(), factory_context.routerContext().routeStatNames(),
@@ -843,7 +858,8 @@ bool RouteEntryImplBase::isRedirect() const {
   }
   return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
          !redirect_config_->prefix_rewrite_redirect_.empty() ||
-         redirect_config_->regex_rewrite_redirect_ != nullptr;
+         redirect_config_->regex_rewrite_redirect_ != nullptr ||
+         redirect_config_->path_rewrite_formatter_ != nullptr;
 }
 
 bool RouteEntryImplBase::matchRoute(const RouteMatchContext& route_match_context,
@@ -1098,12 +1114,16 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
                                     regex_rewrite_.get(), regex_rewrite_substitution_);
 }
 
-std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) const {
+std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers,
+                                       const StreamInfo::StreamInfo& stream_info) const {
   ASSERT(isDirectResponse());
-  return ::Envoy::Http::Utility::newUri(
-      ::Envoy::makeOptRefFromPtr(
-          const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get())),
-      headers);
+  const auto redirect_config_ref = ::Envoy::makeOptRefFromPtr(
+      const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get()));
+  if (redirect_config_ != nullptr && redirect_config_->path_rewrite_formatter_ != nullptr) {
+    return ::Envoy::Http::Utility::newUriWithFormatter(
+        redirect_config_ref, headers, *redirect_config_->path_rewrite_formatter_, stream_info);
+  }
+  return ::Envoy::Http::Utility::newUri(redirect_config_ref, headers);
 }
 
 absl::string_view RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,
@@ -1338,8 +1358,8 @@ absl::Status RouteEntryImplBase::validateClusters(const Upstream::ClusterManager
   return absl::OkStatus();
 }
 
-absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
-  absl::optional<bool> result = per_filter_configs_->disabled(config_name);
+std::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
+  std::optional<bool> result = per_filter_configs_->disabled(config_name);
   if (result.has_value()) {
     return result.value();
   }
@@ -1690,8 +1710,8 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
 
-absl::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
-  absl::optional<bool> result = per_filter_configs_->disabled(config_name);
+std::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view config_name) const {
+  std::optional<bool> result = per_filter_configs_->disabled(config_name);
   if (result.has_value()) {
     return result.value();
   }
@@ -2006,8 +2026,17 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   }
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
-  // Lower-case the value of the host header, as hostnames are case insensitive.
-  const std::string host = absl::AsciiStrToLower(host_header_value);
+  // Lower-case the value of the host header, as hostnames are case insensitive. Hosts on the wire
+  // are overwhelmingly lower-case already (DNS names normalize to lower-case per RFC 3986 3.2.2),
+  // so scan first and only build a lower-cased copy when an upper-case byte is present. This keeps
+  // the common path allocation-free instead of always constructing a std::string.
+  absl::string_view host = host_header_value;
+  std::string lowercase_host;
+  if (std::any_of(host_header_value.begin(), host_header_value.end(),
+                  [](char c) { return absl::ascii_isupper(static_cast<unsigned char>(c)); })) {
+    lowercase_host = absl::AsciiStrToLower(host_header_value);
+    host = lowercase_host;
+  }
   const auto iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();

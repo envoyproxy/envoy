@@ -162,7 +162,7 @@ void XfccIntegrationTest::initialize() {
     san_matcher->set_san_type(
         envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
     transport_socket->set_name("envoy.transport_sockets.tls");
-    transport_socket->mutable_typed_config()->PackFrom(context);
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(context);
   });
 
   if (tls_) {

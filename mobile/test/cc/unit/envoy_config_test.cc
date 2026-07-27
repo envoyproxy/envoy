@@ -1,18 +1,20 @@
 #include <sys/socket.h>
 
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 
+#include "source/common/protobuf/utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_replace.h"
-#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "test/cc/engine_builder_test_shim.h"
 #include "library/common/api/external.h"
@@ -32,10 +34,8 @@ using envoy::config::cluster::v3::Cluster;
 using envoy::config::core::v3::SocketOption;
 using DfpClusterConfig = ::envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig;
 using testing::HasSubstr;
-using testing::IsEmpty;
 using testing::Not;
 using testing::NotNull;
-using testing::SizeIs;
 
 DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   DfpClusterConfig cluster_config;
@@ -81,6 +81,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addDnsQueryTimeoutSeconds(321)
       .addH2ConnectionKeepaliveIdleIntervalMilliseconds(222)
       .addH2ConnectionKeepaliveTimeoutSeconds(333)
+      .setKeepAliveInitialIntervalMilliseconds(3500)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
       .addRuntimeGuard("quic_no_tcp_delay", true)
@@ -100,6 +101,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
+      "initial_interval { seconds: 3 nanos: 500000000 }",
       "connection_options: \"AKDU,BWRS,5RTO,EVMB,10AF,MPQC\"",
       "client_connection_options: \"1RTT\"",
       "hostname: \"www.abc.com\"",
@@ -120,6 +122,15 @@ TEST(TestConfig, ConfigIsApplied) {
   for (const auto& string : must_contain) {
     EXPECT_THAT(config_str, HasSubstr(string)) << "'" << string << "' not found in " << config_str;
   }
+}
+
+TEST(TestConfig, SetKeepAliveInitialIntervalMilliseconds) {
+  EngineBuilder engine_builder;
+  engine_builder.setKeepAliveInitialIntervalMilliseconds(3000);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string config_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(config_str, HasSubstr("initial_interval { seconds: 3 }"));
 }
 
 TEST(TestConfig, SameFlagMultiTimes) {
@@ -213,6 +224,17 @@ TEST(TestConfig, StreamIdleTimeout) {
   engine_builder.setStreamIdleTimeoutSeconds(42);
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("stream_idle_timeout { seconds: 42 }"));
+}
+
+TEST(TestConfig, RequestTimeout) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("timeout { }"));
+
+  engine_builder.setRequestTimeoutMilliseconds(42500);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("timeout { seconds: 42 nanos: 500000000 }"));
 }
 
 TEST(TestConfig, PerTryIdleTimeout) {
@@ -490,7 +512,7 @@ TEST(TestConfig, AddNativeFilters) {
   Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
   std::string serialized_buffer;
-  buffer.SerializeToString(&serialized_buffer);
+  std::ignore = buffer.SerializeToString(&serialized_buffer);
   typed_config.set_value(serialized_buffer);
 
   engine_builder.addNativeFilter(filter_name1, typed_config);
@@ -696,6 +718,91 @@ TEST(TestConfig, MoveConstructor) {
   EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
 }
 #endif // ENVOY_MOBILE_XDS
+
+#if defined(USE_MOBILE_ENGINE_BUILDER)
+TEST(TestConfig, CustomListenerSuccess) {
+  MobileEngineBuilder builder;
+  envoy::config::listener::v3::Listener listener;
+  listener.set_name("custom_listener_1");
+  listener.mutable_api_listener(); // set api_listener
+  builder.addApiListener(listener);
+
+  auto bootstrap_or_status = builder.generateBootstrap();
+  ASSERT_TRUE(bootstrap_or_status.ok());
+  auto bootstrap = std::move(bootstrap_or_status.value());
+
+  ASSERT_EQ(bootstrap->static_resources().listeners_size(), 1);
+  EXPECT_EQ(bootstrap->static_resources().listeners(0).name(), "custom_listener_1");
+  EXPECT_TRUE(bootstrap->static_resources().listeners(0).has_api_listener());
+}
+
+TEST(TestConfig, CustomListenerValidationEmptyName) {
+  MobileEngineBuilder builder;
+  envoy::config::listener::v3::Listener listener;
+  // name is empty
+  listener.mutable_api_listener();
+  builder.addApiListener(listener);
+
+  auto bootstrap_or_status = builder.generateBootstrap();
+  EXPECT_FALSE(bootstrap_or_status.ok());
+  EXPECT_EQ(bootstrap_or_status.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(bootstrap_or_status.status().message(),
+              HasSubstr("Custom listener must have a name."));
+}
+
+TEST(TestConfig, CustomListenerValidationMissingApiListener) {
+  MobileEngineBuilder builder;
+  envoy::config::listener::v3::Listener listener;
+  listener.set_name("custom_listener_1");
+  // api_listener is not set
+  builder.addApiListener(listener);
+
+  auto bootstrap_or_status = builder.generateBootstrap();
+  EXPECT_FALSE(bootstrap_or_status.ok());
+  EXPECT_EQ(bootstrap_or_status.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(bootstrap_or_status.status().message(), HasSubstr("must have an api_listener"));
+}
+
+TEST(TestConfig, CustomListenerValidationDuplicateName) {
+  MobileEngineBuilder builder;
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("custom_listener_1");
+  listener1.mutable_api_listener();
+  builder.addApiListener(listener1);
+
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("custom_listener_1"); // duplicate name
+  listener2.mutable_api_listener();
+  builder.addApiListener(listener2);
+
+  auto bootstrap_or_status = builder.generateBootstrap();
+  EXPECT_FALSE(bootstrap_or_status.ok());
+  EXPECT_EQ(bootstrap_or_status.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(bootstrap_or_status.status().message(),
+              HasSubstr("Duplicate listener name: custom_listener_1"));
+}
+
+TEST(TestConfig, MultipleCustomListeners) {
+  MobileEngineBuilder builder;
+  envoy::config::listener::v3::Listener listener1;
+  listener1.set_name("custom_listener_1");
+  listener1.mutable_api_listener();
+  builder.addApiListener(listener1);
+
+  envoy::config::listener::v3::Listener listener2;
+  listener2.set_name("custom_listener_2");
+  listener2.mutable_api_listener();
+  builder.addApiListener(listener2);
+
+  auto bootstrap_or_status = builder.generateBootstrap();
+  ASSERT_TRUE(bootstrap_or_status.ok());
+  auto bootstrap = std::move(bootstrap_or_status.value());
+
+  ASSERT_EQ(bootstrap->static_resources().listeners_size(), 2);
+  EXPECT_EQ(bootstrap->static_resources().listeners(0).name(), "custom_listener_1");
+  EXPECT_EQ(bootstrap->static_resources().listeners(1).name(), "custom_listener_2");
+}
+#endif
 
 } // namespace
 } // namespace Envoy

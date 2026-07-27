@@ -42,12 +42,12 @@ struct LookupResult {
   // If the cache entry is still populating, and the cache supports streaming,
   // and the response had no content-length header, the content length may be
   // unknown at lookup-time.
-  absl::optional<uint64_t> content_length_;
+  std::optional<uint64_t> content_length_;
 
   // If the request is a range request, this struct indicates if the ranges can
   // be satisfied and which ranges are requested. nullopt indicates that this is
   // not a range request or the range header has been ignored.
-  absl::optional<RangeDetails> range_details_;
+  std::optional<RangeDetails> range_details_;
 
   // Update the content length of the object and its response headers.
   void setContentLength(uint64_t new_length) {
@@ -97,7 +97,7 @@ public:
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 ResponseMetadata&& metadata,
-                                absl::optional<uint64_t> content_length) const;
+                                std::optional<uint64_t> content_length) const;
 
   const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
@@ -316,11 +316,11 @@ public:
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
   //
-  // Pass factory context to allow HttpCache to use async client, stats scope
+  // Pass the server factory context to allow HttpCache to use async client, stats scope
   // etc.
   virtual std::shared_ptr<HttpCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-           Server::Configuration::FactoryContext& context) PURE;
+           Server::Configuration::ServerFactoryContext& context) PURE;
 
 private:
   const std::string name_;

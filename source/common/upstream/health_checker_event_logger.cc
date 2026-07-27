@@ -13,20 +13,31 @@ namespace Upstream {
 void HealthCheckEventLoggerImpl::logEjectUnhealthy(
     envoy::data::core::v3::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
-    envoy::data::core::v3::HealthCheckFailureType failure_type) {
-  createHealthCheckEvent(health_checker_type, *host, [&failure_type](auto& event) {
-    event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
-  });
+    envoy::data::core::v3::HealthCheckFailureType failure_type, uint64_t http_status_code) {
+  createHealthCheckEvent(health_checker_type, *host,
+                         [&failure_type, http_status_code](auto& event) {
+                           event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
+                           if (http_status_code != 0) {
+                             event.mutable_eject_unhealthy_event()->set_http_status_code(
+                                 static_cast<uint32_t>(http_status_code));
+                           }
+                         });
 }
 
 void HealthCheckEventLoggerImpl::logUnhealthy(
     envoy::data::core::v3::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
-    envoy::data::core::v3::HealthCheckFailureType failure_type, bool first_check) {
-  createHealthCheckEvent(health_checker_type, *host, [&first_check, &failure_type](auto& event) {
-    event.mutable_health_check_failure_event()->set_failure_type(failure_type);
-    event.mutable_health_check_failure_event()->set_first_check(first_check);
-  });
+    envoy::data::core::v3::HealthCheckFailureType failure_type, bool first_check,
+    uint64_t http_status_code) {
+  createHealthCheckEvent(
+      health_checker_type, *host, [&first_check, &failure_type, http_status_code](auto& event) {
+        event.mutable_health_check_failure_event()->set_failure_type(failure_type);
+        event.mutable_health_check_failure_event()->set_first_check(first_check);
+        if (http_status_code != 0) {
+          event.mutable_health_check_failure_event()->set_http_status_code(
+              static_cast<uint32_t>(http_status_code));
+        }
+      });
 }
 
 void HealthCheckEventLoggerImpl::logAddHealthy(

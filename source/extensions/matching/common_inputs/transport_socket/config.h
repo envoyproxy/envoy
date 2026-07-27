@@ -28,9 +28,9 @@ protected:
   /**
    * Extract the specific value from the matching data.
    * @param data the transport socket matching data.
-   * @return the extracted string value or absl::nullopt if not available.
+   * @return the extracted string value or std::nullopt if not available.
    */
-  virtual absl::optional<std::string>
+  virtual std::optional<std::string>
   getValue(const Upstream::TransportSocketMatchingData& data) const PURE;
 };
 
@@ -43,7 +43,7 @@ public:
       : filter_(filter), path_(path) {}
 
 protected:
-  absl::optional<std::string>
+  std::optional<std::string>
   getValue(const Upstream::TransportSocketMatchingData& data) const override;
 
 private:
@@ -60,7 +60,7 @@ public:
       : filter_(filter), path_(path) {}
 
 protected:
-  absl::optional<std::string>
+  std::optional<std::string>
   getValue(const Upstream::TransportSocketMatchingData& data) const override;
 
 private:
@@ -108,7 +108,7 @@ public:
   explicit FilterStateInput(const std::string& key) : key_(key) {}
 
 protected:
-  absl::optional<std::string>
+  std::optional<std::string>
   getValue(const Upstream::TransportSocketMatchingData& data) const override;
 
 private:

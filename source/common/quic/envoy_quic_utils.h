@@ -195,7 +195,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
 
 // Convert a cert in string form to X509 object.
 // Return nullptr if the bytes passed cannot be passed.
-bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::string* error_details);
+bssl::UniquePtr<X509> parseDERCertificate(absl::string_view der_bytes, std::string* error_details);
 
 // Deduce the suitable signature algorithm according to the public key.
 // Return the sign algorithm id works with the public key; If the public key is

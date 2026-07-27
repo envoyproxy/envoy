@@ -7,6 +7,7 @@
 
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/mocks/http/stream_reset_handler.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

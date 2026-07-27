@@ -16,6 +16,7 @@ envoy_cc_extension(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/buffer:buffer_interface",
+        "//envoy/common:random_generator_interface",
         "//envoy/network:connection_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
@@ -32,5 +33,6 @@ envoy_cc_library(
     deps = [
         ":reverse_connection_utility_lib",
         "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:io_socket_error_lib",
     ],
 )

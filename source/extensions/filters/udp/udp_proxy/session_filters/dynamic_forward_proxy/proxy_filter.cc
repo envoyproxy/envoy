@@ -55,7 +55,7 @@ ReadFilterStatus ProxyFilter::onNewSession() {
     return ReadFilterStatus::Continue;
   }
 
-  absl::optional<uint32_t> port;
+  std::optional<uint32_t> port;
   const auto* port_filter_state =
       read_callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
           "envoy.upstream.dynamic_port");

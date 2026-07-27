@@ -253,7 +253,7 @@ void Filter::extractMetadata(const StartupMessage& message) {
     }
 
     Protobuf::Any any;
-    any.PackFrom(typed);
+    std::ignore = any.PackFrom(typed);
     cb_->setDynamicTypedMetadata("envoy.postgres_inspector", any);
     ENVOY_LOG(debug, "postgres inspector: extracted metadata - user: {}, database: {}, app: {}",
               user_, database_, application_name_);

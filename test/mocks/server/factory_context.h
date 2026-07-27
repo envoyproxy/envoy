@@ -30,6 +30,12 @@ public:
 
   // Server::Configuration::FactoryContext
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
+  MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
+  MOCK_METHOD(bool, isQuic, (), (const));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
+  MOCK_METHOD(Stats::Scope&, prefixedScope, ());
+
+  // Server::Configuration::ListenerFactoryContext
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
 

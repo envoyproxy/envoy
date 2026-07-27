@@ -55,24 +55,24 @@ using McpMethodMap = absl::flat_hash_map<absl::string_view, McpMethod>;
 
 const McpMethodMap& mcpMethodMap() {
   CONSTRUCT_ON_FIRST_USE(
-      McpMethodMap,
-      {{"initialize", McpMethod::Initialize},
-       {"tools/list", McpMethod::ToolsList},
-       {"tools/call", McpMethod::ToolsCall},
-       {"resources/list", McpMethod::ResourcesList},
-       {"resources/read", McpMethod::ResourcesRead},
-       {"resources/subscribe", McpMethod::ResourcesSubscribe},
-       {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
-       {"resources/templates/list", McpMethod::ResourcesTemplatesList},
-       {"prompts/list", McpMethod::PromptsList},
-       {"prompts/get", McpMethod::PromptsGet},
-       {"completion/complete", McpMethod::CompletionComplete},
-       {"logging/setLevel", McpMethod::LoggingSetLevel},
-       {"ping", McpMethod::Ping},
-       // Notifications (client -> server).
-       {"notifications/initialized", McpMethod::NotificationInitialized},
-       {"notifications/cancelled", McpMethod::NotificationCancelled},
-       {"notifications/roots/list_changed", McpMethod::NotificationRootsListChanged}});
+      McpMethodMap, {{"initialize", McpMethod::Initialize},
+                     {"tools/list", McpMethod::ToolsList},
+                     {"tools/call", McpMethod::ToolsCall},
+                     {"resources/list", McpMethod::ResourcesList},
+                     {"resources/read", McpMethod::ResourcesRead},
+                     {"resources/subscribe", McpMethod::ResourcesSubscribe},
+                     {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
+                     {"resources/templates/list", McpMethod::ResourcesTemplatesList},
+                     {"prompts/list", McpMethod::PromptsList},
+                     {"prompts/get", McpMethod::PromptsGet},
+                     {"completion/complete", McpMethod::CompletionComplete},
+                     {"logging/setLevel", McpMethod::LoggingSetLevel},
+                     {"ping", McpMethod::Ping},
+                     // Notifications (client -> server).
+                     {"notifications/initialized", McpMethod::NotificationInitialized},
+                     {"notifications/cancelled", McpMethod::NotificationCancelled},
+                     {"notifications/roots/list_changed", McpMethod::NotificationRootsListChanged},
+                     {"__jsonrpc_response", McpMethod::ServerResponse}});
 }
 
 McpMethod parseMethodString(absl::string_view method_str) {
@@ -235,6 +235,10 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       handleNotification("notifications/roots/list_changed");
       break;
 
+    case McpMethod::ServerResponse:
+      handleServerResponse();
+      break;
+
     default:
       config_->stats().rq_invalid_.inc();
       sendHttpError(400, "Unsupported method");
@@ -262,6 +266,8 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
         rewritePromptsGetBody(data);
       } else if (method_ == McpMethod::CompletionComplete) {
         rewriteCompletionCompleteBody(data);
+      } else if (method_ == McpMethod::ServerResponse) {
+        rewriteServerResponseId(data);
       }
       needs_body_rewrite_ = false;
     }
@@ -306,10 +312,14 @@ bool McpRouterFilter::readMetadataFromMcpFilter() {
     return false;
   }
 
-  // Extract request ID.
+  // Extract request ID (numeric for requests, string for server responses).
   auto id_it = fields.find("id");
-  if (id_it != fields.end() && id_it->second.has_number_value()) {
-    request_id_ = static_cast<int64_t>(id_it->second.number_value());
+  if (id_it != fields.end()) {
+    if (id_it->second.has_number_value()) {
+      request_id_ = static_cast<int64_t>(id_it->second.number_value());
+    } else if (id_it->second.has_string_value()) {
+      server_response_id_ = id_it->second.string_value();
+    }
   }
 
   // Extract method-specific parameters from metadata.
@@ -594,6 +604,53 @@ ssize_t McpRouterFilter::rewriteCompletionCompleteBody(Buffer::Instance& buffer)
   return 0;
 }
 
+std::pair<std::string, std::string>
+McpRouterFilter::parseServerResponseId(const std::string& prefixed_id) {
+  if (!config_->isMultiplexing()) {
+    return {config_->defaultBackendName(), prefixed_id};
+  }
+
+  size_t pos = prefixed_id.find(kNameDelimiter);
+  if (pos == std::string::npos) {
+    if (!config_->defaultBackendName().empty()) {
+      return {config_->defaultBackendName(), prefixed_id};
+    }
+    return {"", prefixed_id};
+  }
+
+  std::string backend = prefixed_id.substr(0, pos);
+  std::string original_id = prefixed_id.substr(pos + kNameDelimiter.size());
+
+  if (config_->findBackend(backend) != nullptr) {
+    return {backend, original_id};
+  }
+
+  return {"", prefixed_id};
+}
+
+ssize_t McpRouterFilter::rewriteServerResponseId(Buffer::Instance& buffer) {
+  if (server_response_id_.empty() || server_response_id_ == original_response_id_) {
+    return 0;
+  }
+
+  // The prefixed ID is a quoted string in the JSON body: "id":"time__42".
+  // We need to replace it with the original ID, restoring numeric type if possible.
+  std::string search_str = absl::StrCat("\"", server_response_id_, "\"");
+  ssize_t pos = buffer.search(search_str.data(), search_str.size(), 0);
+  if (pos < 0) {
+    return 0;
+  }
+
+  // If the original ID is all digits, output as unquoted number to restore type.
+  bool is_numeric = !original_response_id_.empty() &&
+                    std::all_of(original_response_id_.begin(), original_response_id_.end(),
+                                [](char c) { return c >= '0' && c <= '9'; });
+  std::string replacement =
+      is_numeric ? original_response_id_ : absl::StrCat("\"", original_response_id_, "\"");
+
+  return rewriteAtPosition(buffer, pos, search_str, replacement);
+}
+
 ssize_t McpRouterFilter::rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos,
                                            const std::string& search_str,
                                            const std::string& replacement) {
@@ -812,14 +869,49 @@ void McpRouterFilter::pushSseEvent(const std::string& backend_name, const std::s
     sse_headers_sent_ = true;
   }
 
-  // TODO(botengyao): Transform server-to-client request IDs for proper routing.
-  // For ServerRequest events (roots/list, sampling/createMessage), the ID needs to be
-  // prefixed with backend_name so client responses can be routed back correctly.
+  std::string modified_data = event_data;
+
+  // For ServerRequest events in multiplexing mode, prefix the ID with backend name
+  // so client responses can be routed back to the correct backend.
+  if (event_type == SseMessageType::ServerRequest && config_->isMultiplexing()) {
+    auto parsed_or = Json::Factory::loadFromString(event_data);
+    if (parsed_or.ok()) {
+      // Build the old and new ID value strings, then search for "id":<old>
+      // (with optional space after colon).
+      std::string old_val;
+      std::string new_val;
+      auto id_int_or = (*parsed_or)->getInteger("id");
+      if (id_int_or.ok()) {
+        old_val = std::to_string(*id_int_or);
+        new_val = absl::StrCat("\"", backend_name, kNameDelimiter, old_val, "\"");
+      } else {
+        auto id_str_or = (*parsed_or)->getString("id");
+        if (id_str_or.ok()) {
+          old_val = absl::StrCat("\"", *id_str_or, "\"");
+          new_val = absl::StrCat("\"", backend_name, kNameDelimiter, *id_str_or, "\"");
+        }
+      }
+      if (!old_val.empty()) {
+        // Try "id":VALUE then "id": VALUE (with space).
+        std::string search = absl::StrCat("\"id\":", old_val);
+        std::string replace = absl::StrCat("\"id\":", new_val);
+        size_t pos = modified_data.find(search);
+        if (pos == std::string::npos) {
+          search = absl::StrCat("\"id\": ", old_val);
+          replace = absl::StrCat("\"id\": ", new_val);
+          pos = modified_data.find(search);
+        }
+        if (pos != std::string::npos) {
+          modified_data.replace(pos, search.size(), replace);
+        }
+      }
+    }
+  }
 
   // Format and send the SSE event to client.
   Buffer::OwnedImpl buffer;
   buffer.add("event: message\ndata: ");
-  buffer.add(event_data);
+  buffer.add(modified_data);
   buffer.add("\n\n");
   decoder_callbacks_->encodeData(buffer, false);
 }
@@ -1484,6 +1576,43 @@ void McpRouterFilter::handleLoggingSetLevel() {
   start_logging();
 }
 
+void McpRouterFilter::handleServerResponse() {
+  auto [backend_name, original_id] = parseServerResponseId(server_response_id_);
+
+  if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
+    sendHttpError(400, fmt::format("Invalid server response ID '{}': cannot determine backend",
+                                   server_response_id_));
+    return;
+  }
+
+  const McpBackendConfig* backend = config_->findBackend(backend_name);
+  if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
+    sendHttpError(400, fmt::format("Unknown backend '{}' in response ID", backend_name));
+    return;
+  }
+
+  original_response_id_ = original_id;
+  needs_body_rewrite_ = (server_response_id_ != original_response_id_);
+
+  ENVOY_LOG(debug, "server_response: backend='{}', id='{}' -> '{}', needs_rewrite={}", backend_name,
+            server_response_id_, original_id, needs_body_rewrite_);
+
+  initializeSingleBackend(*backend, [weak_self = weak_from_this()](BackendResponse resp) {
+    auto self = weak_self.lock();
+    if (!self) {
+      return;
+    }
+    if (resp.success) {
+      self->sendJsonResponse(resp.body, self->encoded_session_id_);
+    } else {
+      self->config_->stats().rq_backend_failure_.inc();
+      self->sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+    }
+  });
+}
+
 // Response aggregation helpers.
 
 std::string McpRouterFilter::extractJsonRpcFromResponse(const BackendResponse& response) {
@@ -1513,7 +1642,7 @@ std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendRespon
   return absl::StrCat(
       R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{)", R"("protocolVersion":")",
       kProtocolVersion, R"(",)",
-      R"("capabilities":{"tools":{"listChanged":true},"prompts":{"listChanged":true},"resources":{"listChanged":true,"subscribe":true}},)",
+      R"("capabilities":{"tools":{"listChanged":true},"prompts":{"listChanged":true},"resources":{"listChanged":true,"subscribe":true},"elicitation":{}},)",
       R"("serverInfo":{"name":")", kGatewayName, R"(","version":")", kGatewayVersion, R"("},)",
       R"("instructions":"MCP gateway aggregating multiple backend servers.")", R"(}})");
 }
@@ -1883,6 +2012,16 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
             size_delta = static_cast<int64_t>(rewritten_uri_.size()) -
                          static_cast<int64_t>(resource_uri_.size());
           }
+        } else if (method_ == McpMethod::ServerResponse) {
+          // Server response ID rewriting: "time__42" -> 42 (or "42").
+          std::string quoted_id = absl::StrCat("\"", server_response_id_, "\"");
+          bool is_numeric = !original_response_id_.empty() &&
+                            std::all_of(original_response_id_.begin(), original_response_id_.end(),
+                                        [](char c) { return c >= '0' && c <= '9'; });
+          std::string replacement =
+              is_numeric ? original_response_id_ : absl::StrCat("\"", original_response_id_, "\"");
+          size_delta =
+              static_cast<int64_t>(replacement.size()) - static_cast<int64_t>(quoted_id.size());
         }
         int64_t new_length = static_cast<int64_t>(original_length) + size_delta;
         headers->setContentLength(new_length);

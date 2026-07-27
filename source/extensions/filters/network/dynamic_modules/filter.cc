@@ -118,13 +118,14 @@ Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
-  // Set the current write buffer for ABI callbacks. The buffer pointer is kept after the callback
-  // returns so that modules can access buffered data outside of on_write (e.g., in on_scheduled).
-  // The buffer is the connection's persistent write buffer and remains valid for the lifetime of
-  // the connection.
+  // The write buffer is only valid for the duration of this call. The connection reuses or moves it
+  // after on_write returns, so the pointer is restored when the call returns rather than cached for
+  // asynchronous access.
+  Buffer::Instance* previous_write_buffer = current_write_buffer_;
   current_write_buffer_ = &data;
   auto status = config_->on_network_filter_write_(thisAsVoidPtr(), in_module_filter_, data.length(),
                                                   end_stream);
+  current_write_buffer_ = previous_write_buffer;
   return toEnvoyFilterStatus(status);
 }
 

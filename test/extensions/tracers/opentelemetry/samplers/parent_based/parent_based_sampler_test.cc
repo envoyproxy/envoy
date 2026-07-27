@@ -49,10 +49,10 @@ TEST(ParentBasedSamplerTest, TestShouldSample) {
     auto trace_id = absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
 
     auto root_sampling_result = wrapped_sampler->shouldSample(
-        info, absl::nullopt, trace_id, "a_random_name",
+        info, std::nullopt, trace_id, "a_random_name",
         ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
     auto sampling_result =
-        sampler->shouldSample(info, absl::nullopt, trace_id, "a_random_name",
+        sampler->shouldSample(info, std::nullopt, trace_id, "a_random_name",
                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
 
     EXPECT_EQ(sampling_result.decision, root_sampling_result.decision);

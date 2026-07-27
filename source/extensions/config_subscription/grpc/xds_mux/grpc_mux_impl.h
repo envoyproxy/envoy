@@ -99,7 +99,7 @@ public:
     handleStreamEstablishmentFailure(next_attempt_may_send_initial_resource_version);
   }
   void onWriteable() override { trySendDiscoveryRequests(); }
-  void onDiscoveryResponse(std::unique_ptr<RS>&& message,
+  void onDiscoveryResponse(ResponseProtoPtr<RS>&& message,
                            ControlPlaneStats& control_plane_stats) override {
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }
@@ -200,7 +200,7 @@ private:
   // any). First, prioritizes ACKs over non-ACK subscription interest updates. Then, prioritizes
   // non-ACK updates in the order the various types of subscriptions were activated (as tracked by
   // subscription_ordering_).
-  absl::optional<std::string> whoWantsToSendDiscoveryRequest();
+  std::optional<std::string> whoWantsToSendDiscoveryRequest();
 
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);

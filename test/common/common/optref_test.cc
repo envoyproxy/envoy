@@ -10,9 +10,9 @@ TEST(OptRefTest, Empty) {
   OptRef<std::string> optref;
   EXPECT_FALSE(optref.has_value());
   EXPECT_FALSE(optref);
-  EXPECT_EQ(optref, absl::nullopt);
-  EXPECT_EQ(absl::nullopt, optref);
-  absl::optional<std::string> copy = optref.copy();
+  EXPECT_EQ(optref, std::nullopt);
+  EXPECT_EQ(std::nullopt, optref);
+  std::optional<std::string> copy = optref.copy();
   EXPECT_FALSE(copy);
   EXPECT_TRUE(!copy);
 }
@@ -21,8 +21,8 @@ TEST(OptRefTest, NonConst) {
   std::string str("Hello");
   OptRef<std::string> optref(str);
   EXPECT_TRUE(optref.has_value());
-  EXPECT_NE(optref, absl::nullopt);
-  EXPECT_NE(absl::nullopt, optref);
+  EXPECT_NE(optref, std::nullopt);
+  EXPECT_NE(std::nullopt, optref);
   EXPECT_EQ("Hello", *optref);
   EXPECT_EQ(5, optref->size());
   optref->append(", World!");
@@ -43,15 +43,15 @@ TEST(OptRefTest, ConstOptRef) {
   std::string str("Hello");
   const OptRef<std::string> optref(str);
   EXPECT_TRUE(optref.has_value());
-  EXPECT_NE(optref, absl::nullopt);
-  EXPECT_NE(absl::nullopt, optref);
+  EXPECT_NE(optref, std::nullopt);
+  EXPECT_NE(std::nullopt, optref);
   EXPECT_EQ("Hello", *optref);
   EXPECT_EQ(5, optref->size());
   EXPECT_EQ("Hello", optref.ref());
   EXPECT_EQ("Hello", *optref);
   std::reference_wrapper<const std::string> value = optref.value();
   EXPECT_EQ("Hello", value.get());
-  absl::optional<std::string> copy = optref.copy();
+  std::optional<std::string> copy = optref.copy();
   EXPECT_TRUE(copy);
   EXPECT_FALSE(!copy);
 
@@ -64,8 +64,8 @@ TEST(OptRefTest, ConstObject) {
   std::string str("Hello");
   const OptRef<const std::string> optref(str);
   EXPECT_TRUE(optref.has_value());
-  EXPECT_NE(optref, absl::nullopt);
-  EXPECT_NE(absl::nullopt, optref);
+  EXPECT_NE(optref, std::nullopt);
+  EXPECT_NE(std::nullopt, optref);
   EXPECT_EQ("Hello", *optref);
   EXPECT_EQ(5, optref->size());
   EXPECT_EQ("Hello", optref.ref());
@@ -100,15 +100,15 @@ TEST(OptRefTest, Conversion) {
   EXPECT_EQ(&(*const_ref_to_bar), &bar);
 
   // Ref conversion on construction from derived class of null value.
-  OptRef<Bar> bar_null_ref(absl::nullopt);
+  OptRef<Bar> bar_null_ref(std::nullopt);
   OptRef<Foo> foo_ref_to_bar_null = bar_null_ref;
-  EXPECT_EQ(foo_ref_to_bar_null, absl::nullopt);
+  EXPECT_EQ(foo_ref_to_bar_null, std::nullopt);
 }
 
 TEST(OptRefTest, Size) {
-  // Using absl::optional for references costs at least a pointer plus a bool.
+  // Using std::optional for references costs at least a pointer plus a bool.
   // On most platforms this is 16 bytes, on Windows it's 24.
-  absl::optional<std::reference_wrapper<uint64_t>> obj1;
+  std::optional<std::reference_wrapper<uint64_t>> obj1;
   EXPECT_LT(sizeof(uint64_t*), sizeof(obj1));
 
   // Using OptRef just costs a pointer.

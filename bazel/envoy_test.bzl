@@ -313,7 +313,7 @@ def envoy_benchmark_test(
         data = [":" + benchmark_binary] + data,
         exec_properties = exec_properties,
         args = ["$(rlocationpath %s)" % native.package_relative_label(benchmark_binary)],
-        tags = tags + ["nocoverage"],
+        tags = tags + ["no_san", "nocoverage"],
         **kargs
     )
 

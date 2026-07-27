@@ -2,6 +2,7 @@
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {

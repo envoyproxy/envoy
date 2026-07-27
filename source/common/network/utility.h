@@ -155,7 +155,7 @@ public:
    */
   static Address::InstanceConstSharedPtr
   parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port = 0, bool v6only = true,
-                              absl::optional<std::string> network_namespace = absl::nullopt);
+                              std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws
@@ -177,7 +177,7 @@ public:
    */
   static Address::InstanceConstSharedPtr
   parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only = true,
-                                     absl::optional<std::string> network_namespace = absl::nullopt);
+                                     std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Get the local address of the first interface address that is of type

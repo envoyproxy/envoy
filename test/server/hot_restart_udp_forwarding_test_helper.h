@@ -14,7 +14,7 @@ public:
                                      std::shared_ptr<Network::UdpListenerConfig> listener_config) {
     child_.registerUdpForwardingListener(address, listener_config);
   }
-  absl::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
+  std::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
   getListenerForDestination(const Network::Address::Instance& address) {
     return child_.udp_forwarding_context_.getListenerForDestination(address);
   }

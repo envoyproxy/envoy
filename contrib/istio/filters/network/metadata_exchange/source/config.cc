@@ -6,8 +6,7 @@
 #include "contrib/istio/filters/network/metadata_exchange/source/metadata_exchange.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
+namespace Tcp {
 namespace MetadataExchange {
 
 namespace {
@@ -88,6 +87,5 @@ static Registry::RegisterFactory<MetadataExchangeUpstreamConfigFactory,
     registered_upstream_;
 
 } // namespace MetadataExchange
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace Tcp
 } // namespace Envoy

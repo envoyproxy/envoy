@@ -32,16 +32,16 @@ bool EnvelopeSessionStateFactory::SessionStateImpl::onUpdate(
 EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)
     : name_(config.header().name()) {}
 
-absl::optional<std::string>
+std::optional<std::string>
 EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers) const {
   const auto hdr = headers.get(name_);
   if (hdr.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const absl::InlinedVector<absl::string_view, 2> parts =
       absl::StrSplit(hdr[0]->value().getStringView(), ';', absl::SkipEmpty());
   if (parts.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   std::string upstream_host = Base64::decode(parts[0]);
 
@@ -60,11 +60,11 @@ EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers
   if (decoded.empty()) {
     // Do nothing if the 'UV' part is not valid or if there is no UV part.
     ENVOY_LOG(info, "Header {} contains invalid 'UV' part or there is no 'UV' part", name_);
-    return absl::nullopt;
+    return std::nullopt;
   }
   headers.setReferenceKey(name_, decoded);
 
-  return !upstream_host.empty() ? absl::make_optional(std::move(upstream_host)) : absl::nullopt;
+  return !upstream_host.empty() ? std::make_optional(std::move(upstream_host)) : std::nullopt;
 }
 
 } // namespace Envelope

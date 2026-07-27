@@ -1,10 +1,16 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/init/manager.h"
 #include "envoy/secret/secret_provider.h"
+
+#include "absl/status/status.h"
 
 namespace Envoy {
 

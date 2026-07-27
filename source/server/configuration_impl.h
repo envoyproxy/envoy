@@ -196,7 +196,7 @@ public:
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
-  absl::optional<std::string> flagsPath() const override { return flags_path_; }
+  std::optional<std::string> flagsPath() const override { return flags_path_; }
   const envoy::config::bootstrap::v3::LayeredRuntime& runtime() override {
     return layered_runtime_;
   }
@@ -224,7 +224,7 @@ private:
   };
 
   AdminImpl admin_;
-  absl::optional<std::string> flags_path_;
+  std::optional<std::string> flags_path_;
   envoy::config::bootstrap::v3::LayeredRuntime layered_runtime_;
 };
 

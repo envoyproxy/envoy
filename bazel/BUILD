@@ -90,6 +90,14 @@ cc_library(
 )
 
 config_setting(
+    name = "sockmap_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    define_values = {"sockmap": "enabled"},
+)
+
+config_setting(
     name = "windows_opt_build",
     values = {
         "cpu": "x64_windows",
@@ -555,11 +563,6 @@ config_setting(
 )
 
 config_setting(
-    name = "using_aws_lc",
-    flag_values = {":ssl": "@aws_lc//:ssl"},
-)
-
-config_setting(
     name = "using_openssl",
     flag_values = {":openssl": "True"},
 )
@@ -569,7 +572,6 @@ selects.config_setting_group(
     name = "using_fips_ssl",
     match_any = [
         ":using_boringssl_fips",
-        ":using_aws_lc",
     ],
 )
 

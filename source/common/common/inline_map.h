@@ -107,17 +107,17 @@ public:
 
   /**
    * Fetch the handle for the given key. Return handle if the given key is inline key and return
-   * absl::nullopt if the given key is normal key. May only be called after finalize(). This should
+   * std::nullopt if the given key is normal key. May only be called after finalize(). This should
    * be used to get the handle of the inline keys that added by addHandle(). This function could
    * used to determine if a key is added as inline key or not at runtime or xDS config loading time
    * and decide if the key should be used as inline key or normal key.
    * Heterogeneous lookup is supported here.
    */
-  template <class GetKey> absl::optional<Handle> getHandleByKey(const GetKey& key) const {
+  template <class GetKey> std::optional<Handle> getHandleByKey(const GetKey& key) const {
     ASSERT(finalized_, "Cannot get inline handle before finalize()");
 
     if (auto it = inline_keys_map_.find(key); it == inline_keys_map_.end()) {
-      return absl::nullopt;
+      return std::nullopt;
     } else {
       return it->second;
     }
@@ -212,7 +212,7 @@ public:
       return it->second;
     }
 
-    if (absl::optional<uint64_t> entry_id = inlineLookup(key, hash); entry_id.has_value()) {
+    if (std::optional<uint64_t> entry_id = inlineLookup(key, hash); entry_id.has_value()) {
       if (inlineEntryValid(*entry_id)) {
         return inline_entries_[*entry_id];
       }
@@ -236,7 +236,7 @@ public:
       return it->second;
     }
 
-    if (absl::optional<uint64_t> entry_id = inlineLookup(key, hash); entry_id.has_value()) {
+    if (std::optional<uint64_t> entry_id = inlineLookup(key, hash); entry_id.has_value()) {
       if (inlineEntryValid(*entry_id)) {
         return inline_entries_[*entry_id];
       }
@@ -281,7 +281,7 @@ public:
    */
   template <class SetKey, class SetValue>
   std::pair<ValueRef, bool> set(SetKey&& key, SetValue&& value) {
-    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (std::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       // This key is registered as inline key and try to insert the value to the inline array.
 
       // If the entry is already valid, insert will fail and return the ref of exist value.
@@ -324,7 +324,7 @@ public:
    * @return the number of elements erased.
    */
   template <class GetKey> uint64_t erase(const GetKey& key) {
-    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (std::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       return clearInlineMapEntry(*entry_id);
     } else {
       return dynamic_entries_.erase(key);
@@ -392,7 +392,7 @@ public:
    * Override operator [] to support the dynamic key assignment.
    */
   template <class GetKey> Value& operator[](const GetKey& key) {
-    if (absl::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
+    if (std::optional<uint64_t> entry_id = inlineLookup(key); entry_id.has_value()) {
       // This key is registered as inline key and try to add the value to the inline array.
       if (!inlineEntryValid(*entry_id)) {
         resetInlineMapEntry(*entry_id, Value());
@@ -465,21 +465,21 @@ private:
     return 0;
   }
 
-  template <class GetKey> absl::optional<uint64_t> inlineLookup(const GetKey& key) const {
+  template <class GetKey> std::optional<uint64_t> inlineLookup(const GetKey& key) const {
     const auto& map_ref = descriptor_.inlineKeysMap();
     if (auto iter = map_ref.find(key); iter != map_ref.end()) {
       return iter->second.inlineId();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   template <class GetKey>
-  absl::optional<uint64_t> inlineLookup(const GetKey& key, size_t hash) const {
+  std::optional<uint64_t> inlineLookup(const GetKey& key, size_t hash) const {
     const auto& map_ref = descriptor_.inlineKeysMap();
     if (auto iter = map_ref.find(key, hash); iter != map_ref.end()) {
       return iter->second.inlineId();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   bool inlineEntryValid(uint64_t inline_entry_id) const {

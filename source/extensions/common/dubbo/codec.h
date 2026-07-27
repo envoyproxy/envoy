@@ -47,7 +47,7 @@ class DirectResponseUtil {
 public:
   static MessageMetadataSharedPtr heartbeatResponse(MessageMetadata& heartbeat_request);
   static MessageMetadataSharedPtr localResponse(MessageMetadata& request, ResponseStatus status,
-                                                absl::optional<RpcResponseType> type,
+                                                std::optional<RpcResponseType> type,
                                                 absl::string_view content);
 };
 

@@ -32,7 +32,7 @@ private:
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       return {};
     }
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext*, const Upstream::Host&,
                              std::vector<uint8_t>&) override {
       return {};
@@ -48,6 +48,8 @@ private:
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
       return std::make_unique<LbImpl>(host_);
     }
+
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     const Upstream::HostSharedPtr host_;
   };

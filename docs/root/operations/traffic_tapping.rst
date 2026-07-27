@@ -80,6 +80,16 @@ emitted. When streaming, a series of :ref:`SocketStreamedTraceSegment
 See the :ref:`HTTP tap filter streaming <config_http_filters_tap_streaming>` documentation for more
 information. Most of the concepts overlap between the HTTP filter and the transport socket.
 
+Sampling
+--------
+
+Configure :ref:`tap_enabled <envoy_v3_api_field_config.tap.v3.TapConfig.tap_enabled>` to sample a
+fraction of connections. Only the configured fraction of connections proceeds to match-predicate
+evaluation; the remainder is not tapped and increments the ``cx_sampled_out`` statistic. The
+configured sampling rate is recorded on :ref:`configured_sample_rate
+<envoy_v3_api_field_data.tap.v3.TraceWrapper.configured_sample_rate>` of the first emitted
+``TraceWrapper`` segment of each trace, as with the HTTP filter.
+
 Statistics
 ----------
 
@@ -91,8 +101,9 @@ To customize the prefix used in these statistics, configure the :ref:`stats_pref
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  streamed_submit, Counter, The total count of submissions triggered by streamed trace events
   buffered_submit, Counter, The total count of submissions triggered by buffered trace events
+  cx_sampled_out, Counter, Total connections short-circuited by ``tap_enabled`` sampling before match evaluation
+  streamed_submit, Counter, The total count of submissions triggered by streamed trace events
 
 PCAP generation
 ---------------

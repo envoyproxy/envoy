@@ -4,9 +4,12 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -22,7 +25,8 @@ public:
     ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   }
 
-  void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {
+  void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data,
+                                              bool expect_resumption = true) {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
@@ -31,6 +35,9 @@ public:
     EXPECT_EQ(expect_early_data,
               static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
                   .earlyDataEnabled());
+    EXPECT_EQ(expect_resumption,
+              static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
+                  .resumptionEnabled());
   }
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -93,6 +100,69 @@ enable_early_data:
 )EOF");
 
   verifyQuicServerTransportSocketFactory(yaml, true);
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ResumptionExplicitlyDisabled) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+enable_resumption:
+  value: false
+enable_early_data:
+  value: false
+)EOF");
+
+  verifyQuicServerTransportSocketFactory(yaml, false, false);
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ResumptionExplicitlyEnabled) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+enable_resumption:
+  value: true
+)EOF");
+
+  verifyQuicServerTransportSocketFactory(yaml, true, true);
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ResumptionDisabledEarlyDataEnabledInvalid) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+enable_resumption:
+  value: false
+enable_early_data:
+  value: true
+)EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      verifyQuicServerTransportSocketFactory(yaml, true, false), EnvoyException,
+      "QUIC early data is enabled but resumption is disabled. Early data requires resumption.");
 }
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthUnsupported) {
@@ -212,7 +282,7 @@ TEST_F(QuicClientTransportSocketFactoryTest, TlsCertificateSelector) {
   }));
   auto factory_or_error = Quic::QuicClientTransportSocketFactory::create(
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
-  EXPECT_FALSE(factory_or_error.ok());
+  EXPECT_THAT(factory_or_error, Not(IsOk()));
 }
 
 TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {

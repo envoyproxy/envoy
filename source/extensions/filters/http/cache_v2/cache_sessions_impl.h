@@ -141,12 +141,12 @@ private:
 
   void headersWritten(const Http::ResponseHeaderMap&& response_headers,
                       ResponseMetadata&& response_metadata,
-                      absl::optional<uint64_t> content_length_override, bool end_stream)
+                      std::optional<uint64_t> content_length_override, bool end_stream)
       ABSL_LOCKS_EXCLUDED(mu_);
 
   // Populates the headers in memory.
   void saveHeaders(const Http::ResponseHeaderMap&& response_headers,
-                   ResponseMetadata&& response_metadata, absl::optional<uint64_t> content_length,
+                   ResponseMetadata&& response_metadata, std::optional<uint64_t> content_length,
                    bool end_stream) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
   bool requiresValidationFor(const ActiveLookupRequest& lookup) const
@@ -272,10 +272,10 @@ private:
 class CacheSessionsImpl : public CacheSessions,
                           public std::enable_shared_from_this<CacheSessionsImpl> {
 public:
-  CacheSessionsImpl(Server::Configuration::FactoryContext& context,
+  CacheSessionsImpl(Server::Configuration::ServerFactoryContext& context,
                     std::unique_ptr<HttpCache> cache)
-      : time_source_(context.serverFactoryContext().timeSource()), cache_(std::move(cache)),
-        stats_(generateStats(context.serverFactoryContext().scope(), cache_->cacheInfo().name_)) {}
+      : time_source_(context.timeSource()), cache_(std::move(cache)),
+        stats_(generateStats(context.scope(), cache_->cacheInfo().name_)) {}
 
   void lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) override;
   CacheFilterStats& stats() const override { return *stats_; }

@@ -32,7 +32,7 @@ public:
     decoder_callbacks_->streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::NoFilterConfigFound);
     decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
-                                       absl::nullopt, EMPTY_STRING);
+                                       std::nullopt, EMPTY_STRING);
     return Http::FilterHeadersStatus::StopIteration;
   }
 };

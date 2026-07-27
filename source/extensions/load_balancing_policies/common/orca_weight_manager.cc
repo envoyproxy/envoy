@@ -185,7 +185,7 @@ bool OrcaWeightManager::updateWeightsOnHosts(const Upstream::HostVector& hosts) 
   // Scan through all hosts and update their weights if they are valid.
   for (const auto& host_ptr : hosts) {
     // Get client side weight or `nullopt` if it is invalid (see above).
-    absl::optional<uint32_t> client_side_weight =
+    std::optional<uint32_t> client_side_weight =
         getWeightIfValidFromHost(*host_ptr, max_non_empty_since, min_last_update_time);
     // If `client_side_weight` is valid, then set it as the host weight and store it in
     // `weights` to calculate median valid weight across all hosts.
@@ -243,14 +243,14 @@ void OrcaWeightManager::addLbPolicyDataToHosts(const Upstream::HostVector& hosts
   }
 }
 
-absl::optional<uint32_t>
+std::optional<uint32_t>
 OrcaWeightManager::getWeightIfValidFromHost(const Upstream::Host& host,
                                             MonotonicTime max_non_empty_since,
                                             MonotonicTime min_last_update_time) {
   auto client_side_data = host.typedLbPolicyData<OrcaHostLbPolicyData>();
   if (!client_side_data.has_value()) {
     ENVOY_LOG_MISC(trace, "Host does not have OrcaHostLbPolicyData {}", getHostAddress(&host));
-    return absl::nullopt;
+    return std::nullopt;
   }
   return client_side_data->getWeightIfValid(max_non_empty_since, min_last_update_time);
 }

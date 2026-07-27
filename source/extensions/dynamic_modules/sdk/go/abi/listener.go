@@ -735,6 +735,66 @@ func (h *dymListenerConfigHandle) DefineCounter(
 	return shared.MetricID(metricID), shared.MetricsResult(result)
 }
 
+func (h *dymListenerConfigHandle) IncrementCounterValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_listener_filter_config_increment_counter(
+		h.hostConfigPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymListenerConfigHandle) SetGaugeValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_listener_filter_config_set_gauge(
+		h.hostConfigPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymListenerConfigHandle) IncrementGaugeValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_listener_filter_config_increment_gauge(
+		h.hostConfigPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymListenerConfigHandle) DecrementGaugeValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(
+		h.hostConfigPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymListenerConfigHandle) RecordHistogramValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+		h.hostConfigPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
 func (h *dymListenerConfigHandle) GetScheduler() shared.Scheduler {
 	if h.scheduler == nil {
 		schedulerPtr := C.envoy_dynamic_module_callback_listener_filter_config_scheduler_new(

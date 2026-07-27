@@ -169,7 +169,7 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr addr_;
-  absl::optional<Http::Protocol> protocol_;
+  std::optional<Http::Protocol> protocol_;
   CheckRequestUtils check_request_generator_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;
@@ -641,7 +641,6 @@ TEST_F(CheckRequestUtilsTest, HeadersAsBytesExistingPartialBodyHeader) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                                  {":path", "/bar"}};
-  envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(callbacks_, connection())
       .Times(2)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));

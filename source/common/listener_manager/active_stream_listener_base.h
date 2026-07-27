@@ -203,6 +203,11 @@ public:
    */
   void removeConnection(ActiveTcpConnection& connection);
 
+  // Network::ConnectionHandler::ActiveListener
+  void onFilterChainDrainStart(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onListenerDrainStart() override;
+
 protected:
   /**
    * Return the active connections container attached to the given filter chain.

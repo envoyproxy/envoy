@@ -21,7 +21,7 @@ ProtobufTypes::MessagePtr GeoipInfo::serializeAsProto() const {
   return proto_struct;
 }
 
-absl::optional<std::string> GeoipInfo::serializeAsString() const {
+std::optional<std::string> GeoipInfo::serializeAsString() const {
   auto proto_struct = serializeAsProto();
   return Json::Factory::loadFromProtobufStruct(dynamic_cast<const Protobuf::Struct&>(*proto_struct))
       ->asJsonString();

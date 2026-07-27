@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/request_codec.h"
 #include "contrib/kafka/filters/network/test/buffer_based_test.h"
 #include "gmock/gmock.h"
@@ -136,7 +138,7 @@ TEST_F(RequestCodecUnitTest, ShouldPassParsedMessageToCallbackAndInitializeNextP
   putGarbageIntoBuffer();
 
   const AbstractRequestSharedPtr parsed_message =
-      std::make_shared<Request<int32_t>>(RequestHeader{0, 0, 0, absl::nullopt}, 0);
+      std::make_shared<Request<int32_t>>(RequestHeader{0, 0, 0, std::nullopt}, 0);
 
   MockParserSharedPtr parser1 = std::make_shared<MockParser>();
   EXPECT_CALL(*parser1, parse(_))
@@ -167,7 +169,7 @@ TEST_F(RequestCodecUnitTest, ShouldPassParseFailureDataToCallback) {
   putGarbageIntoBuffer();
 
   const RequestParseFailureSharedPtr failure_data =
-      std::make_shared<RequestParseFailure>(RequestHeader{0, 0, 0, absl::nullopt});
+      std::make_shared<RequestParseFailure>(RequestHeader{0, 0, 0, std::nullopt});
 
   MockParserSharedPtr parser = std::make_shared<MockParser>();
   auto consume_and_return = [&failure_data](absl::string_view& data) -> RequestParseResponse {

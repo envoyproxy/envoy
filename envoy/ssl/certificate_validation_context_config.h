@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -9,8 +10,6 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -82,7 +81,7 @@ public:
   /**
    * @return the configuration for the custom certificate validator if configured.
    */
-  virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  virtual const std::optional<envoy::config::core::v3::TypedExtensionConfig>&
   customValidatorConfig() const PURE;
 
   /**
@@ -98,13 +97,18 @@ public:
   /**
    * @return the max depth used when verifying the certificate-chain
    */
-  virtual absl::optional<uint32_t> maxVerifyDepth() const PURE;
+  virtual std::optional<uint32_t> maxVerifyDepth() const PURE;
 
   /**
    * @return true if the SAN validation rules should be replaced with a rule to validate that the
    * certificate matches the transmitted SNI.
    */
   virtual bool autoSniSanMatch() const PURE;
+
+  /**
+   * @return whether to suppress sending CA certificate names to clients during handshake.
+   */
+  virtual bool suppressClientCaList() const PURE;
 
   // SECURITY NOTE
   //

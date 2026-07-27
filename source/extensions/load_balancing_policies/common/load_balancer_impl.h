@@ -54,7 +54,7 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
 class LoadBalancerConfigHelper {
 public:
   template <class Proto>
-  static absl::optional<envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig>
+  static std::optional<envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig>
   slowStartConfigFromProto(const Proto& proto_config) {
     if (!proto_config.has_slow_start_config()) {
       return {};
@@ -63,7 +63,7 @@ public:
   }
 
   template <class Proto>
-  static absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
+  static std::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
   localityLbConfigFromProto(const Proto& proto_config) {
     if (!proto_config.has_locality_lb_config()) {
       return {};
@@ -146,11 +146,11 @@ public:
                  const DegradedLoad& degraded_per_priority_load);
 
   // Pool selection not implemented.
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                            const Upstream::Host& /*host*/,
                            std::vector<uint8_t>& /*hash_key*/) override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Lifetime tracking not implemented.
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
@@ -270,7 +270,7 @@ protected:
   ZoneAwareLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                             ClusterLbStats& stats, Runtime::Loader& runtime,
                             Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-                            const absl::optional<LocalityLbConfig> locality_config);
+                            const std::optional<LocalityLbConfig> locality_config);
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
@@ -353,9 +353,9 @@ protected:
 
   /**
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
-   * If no host is chosen (due to fail_traffic_on_panic being set), return absl::nullopt.
+   * If no host is chosen (due to fail_traffic_on_panic being set), return std::nullopt.
    */
-  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context, uint64_t hash) const;
+  std::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context, uint64_t hash) const;
 
   /**
    * Index into priority_set via hosts source descriptor.
@@ -417,38 +417,38 @@ private:
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 
-  static absl::optional<HostsSource::SourceType>
+  static std::optional<HostsSource::SourceType>
   localitySourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return absl::make_optional<HostsSource::SourceType>(
+      return std::make_optional<HostsSource::SourceType>(
           HostsSource::SourceType::LocalityHealthyHosts);
     case HostAvailability::Degraded:
-      return absl::make_optional<HostsSource::SourceType>(
+      return std::make_optional<HostsSource::SourceType>(
           HostsSource::SourceType::LocalityDegradedHosts);
     }
     IS_ENVOY_BUG("unexpected locality source type enum");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  static absl::optional<HostsSource::SourceType> sourceType(HostAvailability host_availability) {
+  static std::optional<HostsSource::SourceType> sourceType(HostAvailability host_availability) {
     switch (host_availability) {
     case HostAvailability::Healthy:
-      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::HealthyHosts);
+      return std::make_optional<HostsSource::SourceType>(HostsSource::SourceType::HealthyHosts);
     case HostAvailability::Degraded:
-      return absl::make_optional<HostsSource::SourceType>(HostsSource::SourceType::DegradedHosts);
+      return std::make_optional<HostsSource::SourceType>(HostsSource::SourceType::DegradedHosts);
     }
 
     IS_ENVOY_BUG("unexpected source type enum");
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  absl::optional<uint32_t> chooseHealthyLocality(HostSet& host_set) const {
+  std::optional<uint32_t> chooseHealthyLocality(HostSet& host_set) const {
     ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
     return per_priority_state_[host_set.priority()]->locality_wrr_->chooseHealthyLocality();
   };
 
-  absl::optional<uint32_t> chooseDegradedLocality(HostSet& host_set) const {
+  std::optional<uint32_t> chooseDegradedLocality(HostSet& host_set) const {
     ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
     return per_priority_state_[host_set.priority()]->locality_wrr_->chooseDegradedLocality();
   };
@@ -482,7 +482,7 @@ private:
 
   // Config for zone aware routing.
   const uint64_t min_cluster_size_;
-  const absl::optional<uint32_t> force_local_zone_min_size_;
+  const std::optional<uint32_t> force_local_zone_min_size_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
   const LocalityLbConfig::ZoneAwareLbConfig::LocalityBasis locality_basis_;
@@ -518,8 +518,8 @@ public:
   EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                       ClusterLbStats& stats, Runtime::Loader& runtime,
                       Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-                      const absl::optional<LocalityLbConfig> locality_config,
-                      const absl::optional<SlowStartConfig> slow_start_config,
+                      const std::optional<LocalityLbConfig> locality_config,
+                      const std::optional<SlowStartConfig> slow_start_config,
                       TimeSource& time_source);
 
   // Upstream::ZoneAwareLoadBalancerBase
@@ -570,7 +570,7 @@ private:
 protected:
   // Slow start related config
   const std::chrono::milliseconds slow_start_window_;
-  const absl::optional<Runtime::Double> aggression_runtime_;
+  const std::optional<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
   MonotonicTime latest_host_added_time_;
   const double slow_start_min_weight_percent_;

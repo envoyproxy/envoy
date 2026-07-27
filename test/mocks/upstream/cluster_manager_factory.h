@@ -24,7 +24,7 @@ public:
   MOCK_METHOD(Http::ConnectionPool::InstancePtr, allocateConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                std::vector<Http::Protocol>& protocol,
-               const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+               const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                    alternate_protocol_options,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
@@ -36,7 +36,7 @@ public:
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState& state,
-               absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout));
+               std::optional<std::chrono::milliseconds> tcp_pool_idle_timeout));
 
   MOCK_METHOD((absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>),
               clusterFromProto,

@@ -155,6 +155,21 @@ type ListenerFilterConfigHandle interface {
 	DefineGauge(name string) (MetricID, MetricsResult)
 	// DefineCounter defines a counter metric during config creation.
 	DefineCounter(name string) (MetricID, MetricsResult)
+
+	// IncrementCounterValue increases a counter metric by value from the config context.
+	//
+	// Unlike ListenerFilterHandle.IncrementCounterValue, this does not require a per-connection
+	// filter and can be called outside of the connection lifecycle, e.g. from a scheduled task.
+	IncrementCounterValue(id MetricID, value uint64) MetricsResult
+	// SetGaugeValue sets a gauge metric to value from the config context.
+	SetGaugeValue(id MetricID, value uint64) MetricsResult
+	// IncrementGaugeValue increases a gauge metric by value from the config context.
+	IncrementGaugeValue(id MetricID, value uint64) MetricsResult
+	// DecrementGaugeValue decreases a gauge metric by value from the config context.
+	DecrementGaugeValue(id MetricID, value uint64) MetricsResult
+	// RecordHistogramValue records value into a histogram metric from the config context.
+	RecordHistogramValue(id MetricID, value uint64) MetricsResult
+
 	// GetScheduler returns a scheduler bound to the config context.
 	GetScheduler() Scheduler
 	// Log writes a formatted message through Envoy's logging subsystem.

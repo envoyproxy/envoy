@@ -40,7 +40,7 @@ public:
 
   ::Envoy::Formatter::FormatterPtr
   getTestMetadataFormatterLegacy(std::string type, std::string tag = "METADATA",
-                                 absl::optional<size_t> max_length = absl::nullopt) {
+                                 std::optional<size_t> max_length = std::nullopt) {
     std::string max_length_fmt{};
     if (max_length.has_value()) {
       max_length_fmt = fmt::format(":{}", *max_length);

@@ -225,7 +225,7 @@ public:
   }
 
   void newUpstream(Router::GenericConnectionPoolCallbacks* request,
-                   absl::optional<Envoy::Http::Protocol> protocol) {
+                   std::optional<Envoy::Http::Protocol> protocol) {
     auto upstream = std::make_unique<FuzzUpstream>(request->upstreamToDownstream());
     auto stream = std::make_unique<Extensions::Upstreams::Http::Http::HttpUpstream>(
         request->upstreamToDownstream(), &upstream->mock_request_encoder_);
@@ -282,7 +282,7 @@ public:
     ON_CALL(*direct_response_entry_, responseCode()).WillByDefault(Return(code));
     ON_CALL(*direct_response_entry_, formatBody(_, _, _, _))
         .WillByDefault(Return(direct_response_body_));
-    ON_CALL(*direct_response_entry_, newUri(_)).WillByDefault(Return(new_uri));
+    ON_CALL(*direct_response_entry_, newUri(_, _)).WillByDefault(Return(new_uri));
     ON_CALL(*mock_route_, directResponseEntry())
         .WillByDefault(Return(direct_response_entry_.get()));
   }
@@ -413,7 +413,7 @@ public:
   createGenericConnPool(Upstream::HostConstSharedPtr,
                         Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        Upstream::ResourcePriority, absl::optional<Envoy::Http::Protocol> protocol,
+                        Upstream::ResourcePriority, std::optional<Envoy::Http::Protocol> protocol,
                         Upstream::LoadBalancerContext*, const Protobuf::Message&) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       return nullptr;

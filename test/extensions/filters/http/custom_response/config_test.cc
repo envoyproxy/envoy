@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/custom_response/factory.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -67,7 +68,7 @@ TEST(CustomResponseFilterConfigTest, NoHostAndPathRedirect) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, "stats", context).ok());
+  EXPECT_OK(factory.createFilterFactoryFromProto(filter_config, "stats", context));
 }
 
 TEST(CustomResponseFilterConfigTest, PrefixRewrite) {
@@ -90,7 +91,7 @@ TEST(CustomResponseFilterConfigTest, PrefixRewrite) {
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, "stats", context).ok()),
+      EXPECT_OK(factory.createFilterFactoryFromProto(filter_config, "stats", context)),
       EnvoyException, "prefix_rewrite is not supported for Custom Response");
 }
 

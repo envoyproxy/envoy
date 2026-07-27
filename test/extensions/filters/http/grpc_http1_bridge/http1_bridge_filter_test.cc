@@ -52,7 +52,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
+  std::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
 };
 
 TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {

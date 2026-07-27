@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -9,7 +11,6 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 
-#include "absl/types/optional.h"
 #include "contrib/rocketmq_proxy/filters/network/source/codec.h"
 #include "contrib/rocketmq_proxy/filters/network/source/protocol.h"
 #include "contrib/rocketmq_proxy/filters/network/source/router/router.h"
@@ -91,7 +92,7 @@ private:
   RemotingCommandPtr response_;
   MessageMetadataSharedPtr metadata_;
   Router::RouterPtr router_;
-  absl::optional<Router::RouteConstSharedPtr> cached_route_;
+  std::optional<Router::RouteConstSharedPtr> cached_route_;
 
   void updateActiveRequestStats(bool is_inc = true);
 };

@@ -84,7 +84,7 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   bool charged_response_timing_ : 1 = false;
   bool close_downstream_on_error_ : 1;
 
-  absl::optional<MonotonicTime> downstream_request_complete_time_;
+  std::optional<MonotonicTime> downstream_request_complete_time_;
   uint64_t response_size_{};
 };
 

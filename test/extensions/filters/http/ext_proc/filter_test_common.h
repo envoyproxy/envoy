@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -89,28 +89,28 @@ protected:
   // Expect a request_headers request, and send back a valid response.
   void processRequestHeaders(
       bool buffering_data,
-      absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
+      std::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb);
 
   // Expect a response_headers request, and send back a valid response
   void processResponseHeaders(
       bool buffering_data,
-      absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
+      std::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb);
 
   void processResponseHeadersAfterTrailer(
-      absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
+      std::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb);
 
   // Expect a request_body request, and send back a valid response
   void processRequestBody(
-      absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
+      std::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
       bool should_continue = true,
       const std::chrono::microseconds latency = std::chrono::microseconds(10));
 
   // Expect a request_body request, and send back a valid response
   void processResponseBody(
-      absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
+      std::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
       bool should_continue = true);
 
   void processResponseBodyHelper(absl::string_view data, Buffer::OwnedImpl& want_response_body,
@@ -120,13 +120,13 @@ protected:
                                                Buffer::OwnedImpl& want_response_body);
 
   void processRequestTrailers(
-      absl::optional<
+      std::optional<
           std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
           cb,
       bool should_continue = true);
 
   void processResponseTrailers(
-      absl::optional<
+      std::optional<
           std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
           cb,
       bool should_continue = true);
@@ -171,7 +171,7 @@ protected:
   // In addition, bytes sent/received should also be stored.
   void expectFilterState(const Envoy::Protobuf::Struct& expected_metadata);
 
-  absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
+  std::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;

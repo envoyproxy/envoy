@@ -4,12 +4,11 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -68,13 +67,13 @@ public:
    * Some non-HTTP codes like TIMEOUT may require special mapping to HTTP code
    * and such code may be passed as optional parameter.
    */
-  virtual void putResult(Result result, absl::optional<uint64_t> code) PURE;
+  virtual void putResult(Result result, std::optional<uint64_t> code) PURE;
 
   /**
    * Wrapper around putResult with 2 params when mapping to HTTP code is not
    * required.
    */
-  void putResult(Result result) { putResult(result, absl::nullopt); }
+  void putResult(Result result) { putResult(result, std::nullopt); }
 
   /**
    * Add a response time for a host (in this case response time is generic and might be used for
@@ -86,13 +85,13 @@ public:
    * Get the time of last ejection.
    * @return the last time this host was ejected, if the host has been ejected previously.
    */
-  virtual const absl::optional<MonotonicTime>& lastEjectionTime() PURE;
+  virtual const std::optional<MonotonicTime>& lastEjectionTime() PURE;
 
   /**
    * Get the time of last unejection.
    * @return the last time this host was unejected, if the host has been unejected previously.
    */
-  virtual const absl::optional<MonotonicTime>& lastUnejectionTime() PURE;
+  virtual const std::optional<MonotonicTime>& lastUnejectionTime() PURE;
 
   /**
    * @return the success rate of the host in the last calculated interval, in the range 0-100.

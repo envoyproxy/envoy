@@ -103,7 +103,7 @@ TrackedWatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_han
 }
 
 void TrackedWatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
-                                                      absl::optional<uint32_t> current_class) {
+                                                      std::optional<uint32_t> current_class) {
   WatermarkBufferFactory::unregisterAccount(account, current_class);
   absl::MutexLock lock(mutex_);
   ++total_accounts_unregistered_;

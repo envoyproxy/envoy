@@ -61,6 +61,17 @@ public:
    * watermark to under its low watermark.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * Called when the connection has been notified that it is being drained (for example
+   * because the filter chain or listener that owns it is being drained). Callbacks may
+   * use this signal to begin a graceful shutdown of any state layered on top of the
+   * connection (e.g. send an HTTP/2 GOAWAY or close-after-current-request).
+   *
+   * The connection remains usable after this call; it is not closed by onDrain() itself.
+   * The default implementation is a no-op.
+   */
+  virtual void onDrain() {}
 };
 
 /**
@@ -167,6 +178,14 @@ public:
   virtual bool isHalfCloseEnabled() const PURE;
 
   /**
+   * Notify the connection that it is being drained. This will fire onDrain() on every
+   * registered ConnectionCallbacks. Drain is a notification only: the connection is
+   * not closed and remains usable. Callbacks may react by initiating a graceful
+   * shutdown of any higher-level state (e.g. HTTP/2 GOAWAY).
+   */
+  virtual void onDrain() PURE;
+
+  /**
    * Close the connection.
    * @param type the connection close type.
    */
@@ -270,7 +289,7 @@ public:
    * @return The unix socket peer credentials of the remote client. Note that this is only
    * supported for unix socket connections.
    */
-  virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
+  virtual std::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
 
   /**
    * Set the stats to update for various connection state changes. Note that for performance reasons
@@ -397,11 +416,11 @@ public:
   virtual bool startSecureTransport() PURE;
 
   /**
-   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  @return std::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.
    */
-  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
+  virtual std::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
 
   /**
    * Try to configure the connection's initial congestion window.
@@ -424,7 +443,7 @@ public:
    * @note some congestion controller's cwnd is measured in number of packets, in that case the
    * return value is cwnd(in packets) times the connection's MSS.
    */
-  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+  virtual std::optional<uint64_t> congestionWindowInBytes() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

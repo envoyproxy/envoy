@@ -21,6 +21,13 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     }
   }
 
+  const bool has_invert_filter = query_.getFirstValue("invert_filter").has_value();
+  if (has_invert_filter && !re2_filter_) {
+    response.add("invert_filter can only be used if filter is also provided");
+    return Http::Code::BadRequest;
+  }
+  filter_inverted_ = has_invert_filter;
+
   absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode_);
   if (!status.ok()) {
     response.add(status.message());
@@ -60,7 +67,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     return Http::Code::BadRequest;
   }
 
-  const absl::optional<std::string> hidden_value = query_.getFirstValue("hidden");
+  const std::optional<std::string> hidden_value = query_.getFirstValue("hidden");
   if (hidden_value.has_value() && !hidden_value.value().empty()) {
     if (hidden_value.value() == "include") {
       hidden_ = HiddenFlag::Include;
@@ -74,7 +81,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     }
   }
 
-  const absl::optional<std::string> format_value = Utility::formatParam(query_);
+  const std::optional<std::string> format_value = Utility::formatParam(query_);
   if (format_value.has_value() && !format_value.value().empty()) {
     if (format_value.value() == "prometheus") {
       format_ = StatsFormat::Prometheus;

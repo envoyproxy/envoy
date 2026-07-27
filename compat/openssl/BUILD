@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//bazel:toolchains.bzl", "LIBCLANG_CPP")
+load("//bazel:toolchains.bzl", "LIBCLANG_CPP", "LIBLLVM")
 load("//compat/openssl:bazel/rules.bzl", "mapping_func_filegroup", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
@@ -187,11 +187,22 @@ genrule(
             --include "$$CLANG_INCLUDE_DIR" \
             --output $(RULEDIR) \
             --prefix ossl 2>&1
+
+        # Some distros (e.g. Fedora) use multiarch OpenSSL headers where
+        # configuration.h dispatches to platform-specific files like
+        # configuration-x86_64.h. Flatten by replacing configuration.h
+        # with the platform-specific content, stripping the include guard.
+        OSSL_DIR=$(RULEDIR)/include/ossl/openssl
+        PLATFORM_CFG="$$OSSL_DIR/configuration-$$(uname -m).h"
+        if [ -f "$$PLATFORM_CFG" ]; then
+            sed '/openssl_conf_multilib_redirection_h/,/#endif/d;/#error/d' \
+                "$$PLATFORM_CFG" > "$$OSSL_DIR/configuration.h"
+        fi
     """,
     tools = [
         "//compat/openssl/prefixer",
         LIBCLANG_CPP,
-    ],
+    ] + ([LIBLLVM] if LIBLLVM else []),
     visibility = ["//visibility:private"],
 )
 
@@ -404,6 +415,7 @@ mapping_func_filegroup(
         "BIO_write",
         "BN_add_word",
         "BN_bin2bn",
+        "BN_bn2bin_padded",
         "BN_bn2dec",
         "BN_bn2hex",
         "BN_cmp_word",
@@ -439,6 +451,7 @@ mapping_func_filegroup(
         "EC_POINT_free",
         "EC_POINT_mul",
         "EC_POINT_new",
+        "d2i_ECDSA_SIG",
         "ECDSA_do_verify",
         "ECDSA_SIG_free",
         "ECDSA_SIG_get0",
@@ -554,6 +567,7 @@ mapping_func_filegroup(
         "NAME_CONSTRAINTS_free",
         "NAME_CONSTRAINTS_new",
         "OBJ_cmp",
+        "OBJ_nid2sn",
         "OBJ_obj2nid",
         "OBJ_obj2txt",
         "OBJ_txt2obj",
@@ -687,6 +701,8 @@ mapping_func_filegroup(
         "SSL_CTX_set_verify_depth",
         "SSL_CTX_set_verify",
         "SSL_CTX_set1_curves_list",
+        "SSL_CTX_set1_group_ids",
+        "SSL_CTX_set1_groups_list",
         "SSL_CTX_set1_sigalgs_list",
         "SSL_CTX_use_certificate_chain_file",
         "SSL_CTX_use_certificate_file",
@@ -710,6 +726,7 @@ mapping_func_filegroup(
         "SSL_get_curve_id",
         "SSL_get_group_id",
         "SSL_get_group_name",
+        "SSL_get_negotiated_group",
         "SSL_get_error",
         "SSL_get_ex_data_X509_STORE_CTX_idx",
         "SSL_get_ex_data",

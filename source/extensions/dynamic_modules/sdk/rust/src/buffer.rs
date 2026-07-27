@@ -51,6 +51,7 @@ impl EnvoyBuffer<'_> {
     }
   }
 
+  #[inline]
   pub fn as_slice(&self) -> &[u8] {
     // The null guard is inlined here rather than going through `ffi_helpers` so that this
     // method does not transitively reference `envoy_log_*`. `as_slice` is reached by SDK
@@ -112,6 +113,7 @@ impl EnvoyMutBuffer<'_> {
   }
 
   /// This returns an immutable slice to the underlying memory region managed by Envoy.
+  #[inline]
   pub fn as_slice(&self) -> &[u8] {
     // See `EnvoyBuffer::as_slice` for why the null guard is inlined here.
     if self.raw_ptr.is_null() {
@@ -122,6 +124,7 @@ impl EnvoyMutBuffer<'_> {
   }
 
   /// This returns a mutable slice to the underlying memory region managed by Envoy.
+  #[inline]
   pub fn as_mut_slice(&mut self) -> &mut [u8] {
     // See `EnvoyBuffer::as_slice` for why the null guard is inlined here.
     if self.raw_ptr.is_null() {
@@ -140,5 +143,102 @@ impl Default for EnvoyMutBuffer<'_> {
       length: 0,
       _marker: std::marker::PhantomData,
     }
+  }
+}
+
+// Envoy fills caller-allocated `Vec`s of these types in place by reinterpreting them as the ABI
+// buffer and HTTP header structs, so assert the layouts match to keep those reinterpretations sound.
+const _: () = {
+  type EnvoyBufferPair = (EnvoyBuffer<'static>, EnvoyBuffer<'static>);
+
+  assert!(
+    std::mem::size_of::<EnvoyBuffer<'static>>()
+      == std::mem::size_of::<crate::abi::envoy_dynamic_module_type_envoy_buffer>()
+  );
+  assert!(
+    std::mem::align_of::<EnvoyBuffer<'static>>()
+      == std::mem::align_of::<crate::abi::envoy_dynamic_module_type_envoy_buffer>()
+  );
+  assert!(
+    std::mem::offset_of!(EnvoyBuffer<'static>, raw_ptr)
+      == std::mem::offset_of!(crate::abi::envoy_dynamic_module_type_envoy_buffer, ptr)
+  );
+  assert!(
+    std::mem::offset_of!(EnvoyBuffer<'static>, length)
+      == std::mem::offset_of!(crate::abi::envoy_dynamic_module_type_envoy_buffer, length)
+  );
+
+  assert!(
+    std::mem::size_of::<EnvoyMutBuffer<'static>>()
+      == std::mem::size_of::<crate::abi::envoy_dynamic_module_type_envoy_buffer>()
+  );
+  assert!(
+    std::mem::align_of::<EnvoyMutBuffer<'static>>()
+      == std::mem::align_of::<crate::abi::envoy_dynamic_module_type_envoy_buffer>()
+  );
+  assert!(
+    std::mem::offset_of!(EnvoyMutBuffer<'static>, raw_ptr)
+      == std::mem::offset_of!(crate::abi::envoy_dynamic_module_type_envoy_buffer, ptr)
+  );
+  assert!(
+    std::mem::offset_of!(EnvoyMutBuffer<'static>, length)
+      == std::mem::offset_of!(crate::abi::envoy_dynamic_module_type_envoy_buffer, length)
+  );
+
+  assert!(
+    std::mem::size_of::<EnvoyBufferPair>()
+      == std::mem::size_of::<crate::abi::envoy_dynamic_module_type_envoy_http_header>()
+  );
+  assert!(
+    std::mem::align_of::<EnvoyBufferPair>()
+      == std::mem::align_of::<crate::abi::envoy_dynamic_module_type_envoy_http_header>()
+  );
+  assert!(
+    std::mem::offset_of!(EnvoyBufferPair, 0)
+      == std::mem::offset_of!(
+        crate::abi::envoy_dynamic_module_type_envoy_http_header,
+        key_ptr
+      )
+  );
+  assert!(
+    std::mem::offset_of!(EnvoyBufferPair, 1)
+      == std::mem::offset_of!(
+        crate::abi::envoy_dynamic_module_type_envoy_http_header,
+        value_ptr
+      )
+  );
+};
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_envoy_buffer_as_slice_returns_underlying_bytes() {
+    assert_eq!(EnvoyBuffer::new(b"hello").as_slice(), b"hello");
+  }
+
+  #[test]
+  fn test_envoy_buffer_as_slice_treats_null_and_empty_alike() {
+    // A null buffer and a non-null zero-length buffer both yield an empty slice, so the list getters
+    // can return Envoy-filled entries directly without normalizing empty ones.
+    assert_eq!(EnvoyBuffer::default().as_slice(), b"");
+    assert_eq!(EnvoyBuffer::new(b"").as_slice(), b"");
+  }
+
+  #[test]
+  fn test_envoy_mut_buffer_round_trips_through_slices() {
+    let mut data = *b"hello";
+    let mut buffer = unsafe { EnvoyMutBuffer::new_from_raw(data.as_mut_ptr(), data.len()) };
+    assert_eq!(buffer.as_slice(), b"hello");
+    buffer.as_mut_slice()[0] = b'j';
+    assert_eq!(buffer.as_slice(), b"jello");
+  }
+
+  #[test]
+  fn test_envoy_mut_buffer_slices_are_empty_when_null() {
+    let mut buffer = EnvoyMutBuffer::default();
+    assert_eq!(buffer.as_slice(), b"");
+    assert_eq!(buffer.as_mut_slice(), b"");
   }
 }

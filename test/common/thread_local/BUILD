@@ -19,5 +19,6 @@ envoy_cc_test(
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )

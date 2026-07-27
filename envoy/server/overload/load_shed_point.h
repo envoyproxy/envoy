@@ -33,7 +33,7 @@ public:
       "envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch";
 
   // Envoy will close the connections before creating codec if Envoy is under pressure,
-  // typically memory. This happens once geting data from the connection.
+  // typically memory. This happens once getting data from the connection.
   const std::string HcmCodecCreation = "envoy.load_shed_points.hcm_ondata_creating_codec";
 
   const std::string HttpDownstreamFilterCheck =
@@ -52,7 +52,7 @@ public:
       "envoy.load_shed_points.http3_server_go_away_and_close_on_dispatch";
 
   // Envoy will send a GOAWAY while processing HTTP3 requests at the codec level
-  // which will eventually drain the HPPT/3 connection.
+  // which will eventually drain the HTTP/3 connection.
   const std::string H3ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http3_server_go_away_on_dispatch";
 };

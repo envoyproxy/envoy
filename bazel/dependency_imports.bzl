@@ -18,7 +18,7 @@ load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_depende
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
-load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
@@ -43,9 +43,18 @@ def envoy_dependency_imports(
         # which can be used to workaround a rules_rust bug. See:
         # - https://github.com/bazelbuild/rules_rust/issues/3521
         # - https://github.com/envoyproxy/envoy/issues/38951
-        cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock"):
+        cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock",
+        use_host_tools = False):
     compatibility_proxy_repo()
-    rules_foreign_cc_dependencies()
+
+    # When use_host_tools is True, skip downloading hermetic toolchains and use
+    # whatever is installed on the host. This is unsupported by the Envoy project
+    # and intended only for downstream builds in controlled environments.
+    if use_host_tools:
+        go_version = "host"
+        rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
+    else:
+        rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     if go_version != "host":
@@ -64,7 +73,7 @@ def envoy_dependency_imports(
         exec_triple = "s390x-unknown-linux-gnu",
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
         ],
         versions = [rust_common.default_version],
     )
@@ -73,7 +82,7 @@ def envoy_dependency_imports(
         versions = ["1.88.0"],
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
             # Unconditionally specify the target triples for x-compilations.
             # Note that the toolchain won't be fetched/used unless the target triple is actually used in the build.
             "x86_64-unknown-linux-gnu",
@@ -251,6 +260,17 @@ def envoy_download_go_sdks(go_version):
 def crates_repositories(cargo_bazel_lockfile):
     crates_repository(
         name = "envoy_rust_crate_index",
+        annotations = {
+            # rules_rust re-roots CC/CXX/LD into the execroot for build scripts, but its
+            # inherited CFLAGS/CXXFLAGS leave the toolchain's execroot-relative
+            # `-imacros external/llvm_toolchain/redacted_dates.h` path untouched. Run
+            # ring's build.rs from the execroot so the existing toolchain path resolves
+            # without changing redaction semantics or compile command lines.
+            "ring": [crate.annotation(
+                build_script_data = ["@llvm_toolchain//:redacted_dates.h"],
+                build_script_rundir = ".",
+            )],
+        },
         cargo_lockfile = "@envoy//:Cargo.lock",
         lockfile = Label(cargo_bazel_lockfile),
         manifests = ["@envoy//:Cargo.toml"],

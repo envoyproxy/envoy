@@ -151,6 +151,22 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "local_reply_during_host_selection_filter_lib",
+    srcs = [
+        "local_reply_during_host_selection_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        ":test_filters_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "send_goaway_filter_lib",
     srcs = [
         "send_goaway_filter.cc",
@@ -709,7 +725,7 @@ envoy_cc_test_library(
         "//source/common/network:connection_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-        "//test/test_common:utility_lib",
+        "//test/test_common:test_random_generator_lib",
     ],
 )
 
@@ -897,7 +913,6 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
         "//test/test_common:network_utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )

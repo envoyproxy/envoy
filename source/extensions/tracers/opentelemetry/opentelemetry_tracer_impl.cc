@@ -127,10 +127,12 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     // Get the max cache size from config
     uint64_t max_cache_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, max_cache_size,
                                                               DEFAULT_MAX_CACHE_SIZE);
-    TracerPtr tracer =
-        std::make_unique<Tracer>(std::move(exporter), factory_context.timeSource(),
-                                 factory_context.api().randomGenerator(), factory_context.runtime(),
-                                 dispatcher, tracing_stats_, resource_ptr, sampler, max_cache_size);
+    bool set_instrumentation_scope =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, set_instrumentation_scope, true);
+    TracerPtr tracer = std::make_unique<Tracer>(
+        std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
+        factory_context.runtime(), dispatcher, tracing_stats_, resource_ptr, sampler,
+        max_cache_size, set_instrumentation_scope);
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }
@@ -144,18 +146,24 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   SpanContextExtractor extractor(trace_context);
   const auto span_kind = getSpanKind(config);
+  auto applyTracingDecision = [&tracing_decision](Tracing::SpanPtr span) -> Tracing::SpanPtr {
+    if (!tracing_decision.traced) {
+      span->setSampled(false);
+    }
+    return span;
+  };
   if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
-    Tracing::SpanPtr new_open_telemetry_span =
-        tracer.startSpan(operation_name, stream_info, stream_info.startTime(), tracing_decision,
-                         trace_context, span_kind);
-    return new_open_telemetry_span;
+    return applyTracingDecision(tracer.startSpan(operation_name, stream_info,
+                                                 stream_info.startTime(), tracing_decision,
+                                                 trace_context, span_kind));
   } else {
     // Try to extract the span context. If we can't, just return a null span.
     absl::StatusOr<SpanContext> span_context = extractor.extractSpanContext();
     if (span_context.ok()) {
-      return tracer.startSpan(operation_name, stream_info, stream_info.startTime(),
-                              span_context.value(), trace_context, span_kind);
+      return applyTracingDecision(tracer.startSpan(operation_name, stream_info,
+                                                   stream_info.startTime(), span_context.value(),
+                                                   trace_context, span_kind));
     } else {
       ENVOY_LOG(trace, "Unable to extract span context: ", span_context.status());
       return std::make_unique<Tracing::NullSpan>();

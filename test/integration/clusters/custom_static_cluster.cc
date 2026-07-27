@@ -16,7 +16,7 @@ void CustomStaticCluster::startPreInit() {
   priority_set_.updateHosts(
       priority_,
       Upstream::HostSetImpl::partitionHosts(hosts_ptr, Upstream::HostsPerLocalityImpl::empty()), {},
-      hosts, {}, 123, absl::nullopt);
+      hosts, {}, 123, std::nullopt);
 
   onPreInitComplete();
 }

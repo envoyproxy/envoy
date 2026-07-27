@@ -14,7 +14,7 @@ namespace Matcher {
 template <class DataType> class PrefixMapMatcher : public MapMatcher<DataType> {
 public:
   static absl::StatusOr<std::unique_ptr<PrefixMapMatcher>>
-  create(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match) {
+  create(DataInputPtr<DataType>&& data_input, std::optional<OnMatch<DataType>> on_no_match) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<PrefixMapMatcher<DataType>>(
         new PrefixMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status));
@@ -28,7 +28,7 @@ public:
 
 protected:
   PrefixMapMatcher(DataInputPtr<DataType>&& data_input,
-                   absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
+                   std::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
       : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
 
   ActionMatchResult doMatch(const DataType& data, absl::string_view key,

@@ -2,6 +2,7 @@
 
 #include <numeric>
 #include <string>
+#include <type_traits>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
@@ -26,10 +27,9 @@
   ((message).has_##field_name() ? (message).field_name().value() : (default_value))
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
-// absl::nullopt.
+// std::nullopt.
 #define PROTOBUF_GET_OPTIONAL_WRAPPED(message, field_name)                                         \
-  ((message).has_##field_name() ? absl::make_optional((message).field_name().value())              \
-                                : absl::nullopt)
+  ((message).has_##field_name() ? std::make_optional((message).field_name().value()) : std::nullopt)
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a EnvoyException.
@@ -52,12 +52,12 @@
   (!(message).field_name().empty() ? (message).field_name() : (default_value))
 
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return
-// absl::nullopt.
+// std::nullopt.
 #define PROTOBUF_GET_OPTIONAL_MS(message, field_name)                                              \
   ((message).has_##field_name()                                                                    \
-       ? absl::optional<std::chrono::milliseconds>(                                                \
+       ? std::optional<std::chrono::milliseconds>(                                                 \
              DurationUtil::durationToMilliseconds((message).field_name()))                         \
-       : absl::nullopt)
+       : std::nullopt)
 
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw an
 // EnvoyException.
@@ -180,7 +180,7 @@ public:
       printer.SetHideUnknownFields(true);
       for (const auto& message : source) {
         std::string text_message;
-        printer.PrintToString(message, &text_message);
+        std::ignore = printer.PrintToString(message, &text_message);
         absl::StrAppend(&text, text_message);
       }
     }
@@ -379,7 +379,8 @@ public:
   static const MessageType&
   downcastAndValidate(const Protobuf::Message& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor) {
-    const auto& typed_config = dynamic_cast<MessageType>(config);
+    const auto& typed_config =
+        Envoy::Protobuf::DynamicCastMessage<std::remove_reference_t<MessageType>>(config);
     validate(typed_config, validation_visitor);
     return typed_config;
   }
@@ -679,7 +680,7 @@ public:
    * @param str string to be wrapped.
    * @return wrapped string.
    */
-  static Protobuf::Value optionalStringValue(const absl::optional<std::string>& str);
+  static Protobuf::Value optionalStringValue(const std::optional<std::string>& str);
 
   /**
    * Wrap boolean into Protobuf::Value boolean value.

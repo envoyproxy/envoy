@@ -54,7 +54,7 @@ public:
   }
 
 private:
-  absl::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
+  std::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
 };
 
 REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory<NetworkFilterActionContext>);
@@ -202,7 +202,7 @@ Envoy::Network::FilterFactoryCb MatchDelegateConfig::createFilterFactory(
 
   Matcher::MatchTreeFactory<Envoy::Network::MatchingData, NetworkFilterActionContext>
       matcher_factory(action_context, context.serverFactoryContext(), validation_visitor);
-  absl::optional<Matcher::MatchTreeFactoryCb<Envoy::Network::MatchingData>> factory_cb =
+  std::optional<Matcher::MatchTreeFactoryCb<Envoy::Network::MatchingData>> factory_cb =
       std::nullopt;
 
   if (proto_config.has_xds_matcher()) {

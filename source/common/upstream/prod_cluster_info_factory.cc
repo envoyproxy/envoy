@@ -2,6 +2,8 @@
 
 #include "envoy/stats/scope.h"
 
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/watcher_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -14,10 +16,11 @@ ClusterInfoConstSharedPtr
 ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
   Envoy::Stats::ScopeSharedPtr scope = generateStatsScope(params.cluster_, params.server_context_);
 
+  Init::ManagerImpl init_manager(absl::StrCat("HdsCluster ", params.cluster_.name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       params.server_context_, *scope, params.server_context_.messageValidationVisitor());
+  factory_context.setInitManager(init_manager);
 
-  // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::UpstreamTransportSocketFactoryPtr socket_factory = THROW_OR_RETURN_VALUE(
       Upstream::createTransportSocketFactory(params.cluster_, factory_context),
       Network::UpstreamTransportSocketFactoryPtr);
@@ -30,12 +33,17 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
                                          factory_context, socket_factory, *scope),
       std::unique_ptr<TransportSocketMatcherImpl>);
 
-  return THROW_OR_RETURN_VALUE(
+  auto cluster_info = THROW_OR_RETURN_VALUE(
       ClusterInfoImpl::create(params.server_context_.initManager(), params.server_context_,
                               params.cluster_, params.bind_config_,
                               params.server_context_.runtime(), std::move(socket_matcher),
                               std::move(scope), params.added_via_api_, factory_context),
       std::unique_ptr<ClusterInfoImpl>);
+
+  Init::WatcherImpl noop_watcher("HdsCluster cluster info", []() {});
+  init_manager.initialize(noop_watcher);
+
+  return cluster_info;
 }
 
 } // namespace Upstream

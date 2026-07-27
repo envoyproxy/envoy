@@ -1,5 +1,7 @@
 #include "config.h"
 
+#include <optional>
+
 #include "upstream_request.h"
 
 namespace Envoy {
@@ -12,7 +14,7 @@ namespace Golang {
 Router::GenericConnPoolPtr GolangGenericConnPoolFactory::createGenericConnPool(
     Upstream::HostConstSharedPtr, Upstream::ThreadLocalCluster& thread_local_cluster,
     Router::GenericConnPoolFactory::UpstreamProtocol, Upstream::ResourcePriority priority,
-    absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx,
+    std::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx,
     const Protobuf::Message& config) const {
   auto ret = std::make_unique<TcpConnPool>(thread_local_cluster, priority, ctx, config);
   return (ret->valid() ? std::move(ret) : nullptr);

@@ -1,12 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -48,15 +48,15 @@ public:
    */
   struct ParsedEvent {
     // The concatenated data field values. Per SSE spec, multiple data fields are joined with
-    // newlines. absl::nullopt if no data fields present, empty string if data field exists but
+    // newlines. std::nullopt if no data fields present, empty string if data field exists but
     // empty.
-    absl::optional<std::string> data;
-    // The event ID. absl::nullopt if no id field is present.
-    absl::optional<std::string> id;
-    // The event type. absl::nullopt if no event field is present.
-    absl::optional<std::string> event_type;
-    // The reconnection time in milliseconds. absl::nullopt if no retry field is present.
-    absl::optional<uint64_t> retry;
+    std::optional<std::string> data;
+    // The event ID. std::nullopt if no id field is present.
+    std::optional<std::string> id;
+    // The event type. std::nullopt if no event field is present.
+    std::optional<std::string> event_type;
+    // The reconnection time in milliseconds. std::nullopt if no retry field is present.
+    std::optional<uint64_t> retry;
   };
 
   /**

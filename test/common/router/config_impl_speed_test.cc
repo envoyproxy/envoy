@@ -118,7 +118,7 @@ static RouteConfiguration genMatcherTreeRouteConfig(benchmark::State& state) {
     // Create the matcher action
     auto& matcher_action = (*map)[path];
     matcher_action.mutable_action()->set_name("route");
-    matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route);
+    std::ignore = matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route);
   }
 
   return route_config;
@@ -189,7 +189,7 @@ static RouteConfiguration genPrefixMatcherTreeRouteConfig(benchmark::State& stat
     // Create the matcher action for this shelf
     auto& matcher_action = (*map)[shelf_prefix];
     matcher_action.mutable_action()->set_name("route");
-    matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route_list);
+    std::ignore = matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route_list);
   }
 
   return route_config;
@@ -395,8 +395,49 @@ static void bmMixedRoutes(benchmark::State& state) {
   }
 }
 
+/**
+ * Route config with `n` virtual hosts, each keyed by a distinct exact lower-case FQDN domain. The
+ * benchmarked request authority matches the last virtual host, so route() exercises the
+ * findVirtualHost() host lower-casing path (unlike the wildcard-domain configs above, which take
+ * the default virtual host fast path and never lower-case the host).
+ */
+static RouteConfiguration genVirtualHostConfig(int n) {
+  RouteConfiguration route_config;
+  for (int i = 0; i < n; ++i) {
+    VirtualHost* v_host = route_config.add_virtual_hosts();
+    v_host->set_name(absl::StrCat("vhost_", i));
+    v_host->add_domains(absl::StrCat("service-", i, ".team.svc.cluster.local"));
+    Route* route = v_host->add_routes();
+    route->mutable_direct_response()->set_status(200);
+    route->mutable_match()->set_prefix("/");
+  }
+  return route_config;
+}
+
+// Benchmark virtual host lookup with an already-lower-case authority. The 30-plus byte authority
+// exceeds the std::string small-string-optimization capacity, so lower-casing it into a temporary
+// std::string was a heap allocation on every request before this optimization.
+static void bmVirtualHostLookup(benchmark::State& state) {
+  const int n = state.range(0);
+  Api::ApiPtr api = Api::createApiForTest();
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genVirtualHostConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(), true);
+  Http::TestRequestHeaderMapImpl headers{
+      {":authority", absl::StrCat("service-", n - 1, ".team.svc.cluster.local")},
+      {":method", "GET"},
+      {":path", "/"},
+      {"x-forwarded-proto", "http"}};
+  for (auto _ : state) { // NOLINT
+    config->route(headers, stream_info, 0);
+  }
+}
+
 BENCHMARK(bmPlainRoutes)->RangeMultiplier(2)->Ranges({{64, 2 << 10}});
 BENCHMARK(bmMixedRoutes)->RangeMultiplier(2)->Ranges({{64, 2 << 10}});
+BENCHMARK(bmVirtualHostLookup)->RangeMultiplier(2)->Ranges({{1, 2 << 9}});
 
 } // namespace
 } // namespace Router

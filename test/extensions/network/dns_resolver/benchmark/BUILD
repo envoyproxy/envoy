@@ -52,8 +52,5 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "dns_resolver_benchmark_test",
     benchmark_binary = "dns_resolver_benchmark",
-    tags = [
-        "fails_on_clang_cl",
-        "no_tsan",
-    ],
+    tags = ["fails_on_clang_cl"],
 )

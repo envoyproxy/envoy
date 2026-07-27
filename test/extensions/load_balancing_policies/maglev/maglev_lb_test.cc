@@ -1,4 +1,5 @@
 #include <memory>
+#include <optional>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
@@ -13,9 +14,8 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -35,13 +35,13 @@ public:
         should_select_another_host_(should_select_another_host) {}
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
   uint32_t hostSelectionRetryCount() const override { return retry_count_; };
   bool shouldSelectAnotherHost(const Host& host) override {
     return should_select_another_host_(host);
   }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
   uint32_t retry_count_;
   HostPredicate should_select_another_host_;
 };
@@ -96,7 +96,7 @@ public:
     }
 
     createLb();
-    EXPECT_TRUE(lb_->initialize().ok());
+    EXPECT_OK(lb_->initialize());
   }
 
   NiceMock<MockPrioritySet> priority_set_;
@@ -139,7 +139,7 @@ TEST_F(MaglevLoadBalancerTest, LbDestructedBeforeFactory) {
 // worker priority set, so the cluster manager should not recreate the worker LB on host changes.
 TEST_F(MaglevLoadBalancerTest, FactoryDoesNotRecreateOnHostChange) {
   init(7);
-  EXPECT_FALSE(lb_->factory()->recreateOnHostChange());
+  EXPECT_FALSE(lb_->factory()->recreateOnHostChangeDeprecated());
 }
 
 // Worker LB instances pick up new factory state when the worker priority set fires a member

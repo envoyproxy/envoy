@@ -39,7 +39,7 @@ TEST(FactoryTest, FactoryTest) {
   TestUtility::loadFromYaml(config, proto_mutation);
 
   Protobuf::Any any_config;
-  any_config.PackFrom(proto_mutation);
+  std::ignore = any_config.PackFrom(proto_mutation);
 
   EXPECT_NE(nullptr, factory->createExtension(any_config, context));
 }

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -11,19 +12,20 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/message.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/http/exception.h"
 #include "source/common/http/http_option_limits.h"
 #include "source/common/http/status.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -294,9 +296,9 @@ uint64_t getResponseStatus(const ResponseHeaderMap& headers);
 /**
  * Get the response status from the response headers.
  * @param headers supplies the headers to get the status from.
- * @return absl::optional<uint64_t> the response code or absl::nullopt if the headers are invalid.
+ * @return std::optional<uint64_t> the response code or std::nullopt if the headers are invalid.
  */
-absl::optional<uint64_t> getResponseStatusOrNullopt(const ResponseHeaderMap& headers);
+std::optional<uint64_t> getResponseStatusOrNullopt(const ResponseHeaderMap& headers);
 
 /**
  * Determine whether these headers are a valid Upgrade request or response.
@@ -359,7 +361,7 @@ struct LocalReplyData {
   // Supplies the optional body text which is returned.
   absl::string_view body_text_;
   // gRPC status code to override the httpToGrpcStatus mapping with.
-  const absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+  const std::optional<Grpc::Status::GrpcStatus> grpc_status_;
   // Tells if this is a response to a HEAD request.
   bool is_head_request_ = false;
 };
@@ -468,7 +470,7 @@ const std::string& getProtocolString(const Protocol p);
  * @param length to truncate the constructed URI's path
  */
 std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
-                             absl::optional<uint32_t> max_path_length);
+                             std::optional<uint32_t> max_path_length);
 
 /**
  * Extract scheme, host and path from a URI. The host may contain a port.
@@ -640,7 +642,7 @@ struct AuthorityAttributes {
   absl::string_view host_;
 
   // If parsed authority has port, that is stored here.
-  absl::optional<uint16_t> port_;
+  std::optional<uint16_t> port_;
 };
 
 /**
@@ -697,6 +699,7 @@ struct RedirectConfig {
   const std::string prefix_rewrite_redirect_;
   const std::string regex_rewrite_redirect_substitution_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  Formatter::FormatterPtr path_rewrite_formatter_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const bool path_redirect_has_query_;
   const bool https_redirect_;
@@ -727,6 +730,15 @@ bool schemeIsHttps(const absl::string_view scheme);
  */
 std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
                    const Http::RequestHeaderMap& headers);
+
+/*
+ * Compute new URI, evaluating formatter to derive the path. Falls back to newUri if the formatter
+ * produces an empty path.
+ */
+std::string newUriWithFormatter(OptRef<const RedirectConfig> redirect_config,
+                                const Http::RequestHeaderMap& headers,
+                                const Formatter::Formatter& formatter,
+                                const StreamInfo::StreamInfo& stream_info);
 
 } // namespace Utility
 } // namespace Http

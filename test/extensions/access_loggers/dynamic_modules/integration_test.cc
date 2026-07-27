@@ -50,6 +50,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesAccessLogIntegrationTest,
 TEST_P(DynamicModulesAccessLogIntegrationTest, BasicLogging) {
   initializeWithAccessLogger();
 
+  // The logger config emits a counter directly from the config context (no log event), exercising
+  // config-scoped metric emission.
+  test_server_->waitForCounter("dynamicmodulescustom.config_total", testing::Ge(1));
+
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
   Http::TestRequestHeaderMapImpl request_headers{

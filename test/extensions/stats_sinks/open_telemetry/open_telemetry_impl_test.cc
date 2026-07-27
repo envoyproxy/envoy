@@ -9,6 +9,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
 
@@ -56,8 +57,8 @@ public:
       resource.attributes_[key] = value;
     }
     if (!metric_conversion_pbtext.empty()) {
-      Protobuf::TextFormat::ParseFromString(metric_conversion_pbtext,
-                                            sink_config.mutable_custom_metric_conversions());
+      std::ignore = Protobuf::TextFormat::ParseFromString(
+          metric_conversion_pbtext, sink_config.mutable_custom_metric_conversions());
     }
     return std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
   }
@@ -195,7 +196,7 @@ TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, SendExportRequest) {
 }
 
 TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, PartialSuccess) {
-  auto response = std::make_unique<MetricsExportResponse>();
+  auto response = Grpc::ResponsePtr<MetricsExportResponse>();
   response->mutable_partial_success()->set_rejected_data_points(1);
   exporter_->onSuccess(std::move(response), Tracing::NullSpan::instance());
 }

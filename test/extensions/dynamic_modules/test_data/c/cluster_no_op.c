@@ -79,24 +79,34 @@ void envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
     size_t num_hosts_removed) {
   (void)lb_module_ptr;
 
-  // Test accessing added host addresses.
+  // Test accessing added hosts by address and by pointer.
   for (size_t i = 0; i < num_hosts_added; i++) {
     envoy_dynamic_module_type_envoy_buffer addr = {NULL, 0};
     envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(lb_envoy_ptr, i, true,
                                                                            &addr);
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host =
+        envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_envoy_ptr, i, true);
+    (void)host;
   }
 
-  // Test accessing removed host addresses.
+  // Test accessing removed hosts by address and by pointer.
   for (size_t i = 0; i < num_hosts_removed; i++) {
     envoy_dynamic_module_type_envoy_buffer addr = {NULL, 0};
     envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(lb_envoy_ptr, i, false,
                                                                            &addr);
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host =
+        envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_envoy_ptr, i, false);
+    (void)host;
   }
 
   // Test out-of-bounds index.
   envoy_dynamic_module_type_envoy_buffer oob_result = {NULL, 0};
   envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
       lb_envoy_ptr, num_hosts_added, true, &oob_result);
+  envoy_dynamic_module_type_cluster_host_envoy_ptr oob_host =
+      envoy_dynamic_module_callback_cluster_lb_get_member_update_host(lb_envoy_ptr, num_hosts_added,
+                                                                      true);
+  (void)oob_host;
 }
 
 void envoy_dynamic_module_on_cluster_server_initialized(

@@ -83,6 +83,12 @@ bool DynamicMetadataRateLimitOverride::populateOverride(
   return false;
 }
 
+bool StaticRateLimitOverride::populateOverride(RateLimit::Descriptor& descriptor,
+                                               const envoy::config::core::v3::Metadata*) const {
+  descriptor.limit_.emplace(RateLimit::RateLimitOverride{requests_per_unit_, unit_});
+  return true;
+}
+
 bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                              const std::string& local_service_cluster,
                                              const Http::RequestHeaderMap&,
@@ -262,7 +268,7 @@ bool QueryParametersAction::populateDescriptor(RateLimit::DescriptorEntry& descr
   Http::Utility::QueryParamsMulti query_parameters =
       Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
 
-  const absl::optional<std::string> query_param_value =
+  const std::optional<std::string> query_param_value =
       query_parameters.getFirstValue(query_param_name_);
 
   // If query parameter is not present and ``skip_if_absent`` is ``true``, skip this descriptor.
@@ -527,6 +533,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::kDynamicMetadata:
       limit_override_.emplace(
           new DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
+      break;
+    case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::kRateLimit:
+      limit_override_.emplace(new StaticRateLimitOverride(config.limit().rate_limit()));
       break;
     case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::
         OVERRIDE_SPECIFIER_NOT_SET:

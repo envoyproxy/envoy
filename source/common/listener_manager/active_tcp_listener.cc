@@ -109,9 +109,9 @@ void ActiveTcpListener::recordConnectionsAcceptedOnSocketEvent(uint32_t connecti
 void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                                        bool hand_off_restored_destination_connections,
                                        bool rebalanced,
-                                       const absl::optional<std::string>& network_namespace) {
+                                       const std::optional<std::string>& network_namespace) {
   // Get Round Trip Time
-  absl::optional<std::chrono::milliseconds> t = socket->lastRoundTripTime();
+  std::optional<std::chrono::milliseconds> t = socket->lastRoundTripTime();
   if (t.has_value()) {
     socket->connectionInfoProvider().setRoundTripTime(t.value());
   }

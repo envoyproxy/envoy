@@ -19,13 +19,13 @@ namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
 // Extract the value of the header.
-absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) const {
+std::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) const {
   const auto header_value = Http::HeaderUtility::getAllOfHeaderAsString(map, header_);
   if (!header_value.result().has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Catch the value in the header before removing.
-  absl::optional<std::string> value = std::string(header_value.result().value());
+  std::optional<std::string> value = std::string(header_value.result().value());
   if (remove_) {
     map.remove(header_);
   }
@@ -33,12 +33,12 @@ absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) c
 }
 
 // Extract the value of the key from the cookie header.
-absl::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) const {
+std::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) const {
   std::string value = Envoy::Http::Utility::parseCookieValue(map, cookie_);
   if (!value.empty()) {
     return {std::move(value)};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::StatusOr<Rule> Rule::create(const ProtoRule& rule, Regex::Engine& regex_engine) {
@@ -341,7 +341,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 
   for (const auto& rule : rules) {
     const auto& proto_rule = rule.rule();
-    absl::optional<std::string> value = rule.selector_->extract(headers);
+    std::optional<std::string> value = rule.selector_->extract(headers);
 
     // Increment rules_processed stat if stats are enabled.
     config->chargeStat(StatsEvent::RulesProcessed, direction);

@@ -1,5 +1,7 @@
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
+#include <optional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 
@@ -8,8 +10,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -122,7 +122,7 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
 }
 
 Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
-                                           absl::optional<uint64_t> max_length_opt) {
+                                           std::optional<uint64_t> max_length_opt) {
   // Below value comes from Buffer::OwnedImpl::default_read_reservation_size_.
   uint64_t max_length = max_length_opt.value_or(MAX_FRAGMENT * FRAGMENT_SIZE);
   if (max_length == 0) {
@@ -313,7 +313,7 @@ Api::SysCallIntResult IoHandleImpl::ioctl(unsigned long, void*, unsigned long, v
 
 Api::SysCallIntResult IoHandleImpl::setBlocking(bool) { return makeInvalidSyscallResult(); }
 
-absl::optional<int> IoHandleImpl::domain() { return absl::nullopt; }
+std::optional<int> IoHandleImpl::domain() { return std::nullopt; }
 
 absl::StatusOr<Network::Address::InstanceConstSharedPtr> IoHandleImpl::localAddress() {
   return IoHandleImpl::getCommonInternalAddress();

@@ -66,7 +66,7 @@ TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
                                 new Network::Address::Ipv4Instance("174.2.2.222", 80))}),
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
   EXPECT_EQ("202.168.0.13:52000",
             transport_socket_options->proxyProtocolOptions()->src_addr_->asStringView());
@@ -80,7 +80,7 @@ TEST_F(TransportSocketOptionsImplTest, ApplicationProtocols) {
                         std::make_unique<ApplicationProtocols>(http_alpns),
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  EXPECT_EQ(absl::nullopt, transport_socket_options->serverNameOverride());
+  EXPECT_EQ(std::nullopt, transport_socket_options->serverNameOverride());
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
 }
 
@@ -94,7 +94,7 @@ TEST_F(TransportSocketOptionsImplTest, Both) {
                         std::make_unique<ApplicationProtocols>(http_alpns),
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
 }
@@ -112,7 +112,7 @@ public:
 
 class NonHashableObj : public StreamInfo::FilterState::Object {};
 class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
-  absl::optional<uint64_t> hash() const override { return 12345; };
+  std::optional<uint64_t> hash() const override { return 12345; };
 };
 
 TEST_F(TransportSocketOptionsImplTest, FilterStateHashable) {
@@ -142,7 +142,7 @@ TEST_F(TransportSocketOptionsImplTest, DynamicObjects) {
   setFilterStateObject(ApplicationProtocols::key(), "h2,http/1.1");
   setFilterStateObject(UpstreamSubjectAltNames::key(), "www.example.com,example.com");
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
   std::vector<std::string> http_alpns{"h2", "http/1.1"};
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
@@ -157,7 +157,7 @@ TEST_F(TransportSocketOptionsImplTest, DownstreamNetworkNamespace) {
   auto network_namespace_obj =
       std::make_unique<DownstreamNetworkNamespace>(network_namespace_filepath);
   EXPECT_EQ(network_namespace_filepath, network_namespace_obj->value());
-  EXPECT_EQ(absl::make_optional<std::string>(network_namespace_filepath),
+  EXPECT_EQ(std::make_optional<std::string>(network_namespace_filepath),
             network_namespace_obj->serializeAsString());
 
   // Test key.

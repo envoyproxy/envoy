@@ -232,7 +232,7 @@ public:
     FilterContext context_;
   };
 
-  ActiveStream(Filter& parent, RequestHeaderFramePtr request, absl::optional<StartTime> start_time);
+  ActiveStream(Filter& parent, RequestHeaderFramePtr request, std::optional<StartTime> start_time);
 
   void addDecoderFilter(ActiveDecoderFilterPtr filter) {
     decoder_filters_.emplace_back(std::move(filter));
@@ -277,7 +277,7 @@ public:
   }
 
   void deferredDelete();
-  void completeStream(absl::optional<DownstreamStreamResetReason> reason = {});
+  void completeStream(std::optional<DownstreamStreamResetReason> reason = {});
 
   uint64_t requestStreamId() const { return request_header_frame_->frameFlags().streamId(); }
 
@@ -378,7 +378,7 @@ public:
 
   // ServerCodecCallbacks
   void onDecodingSuccess(RequestHeaderFramePtr header_frame,
-                         absl::optional<StartTime> start_time = {}) override;
+                         std::optional<StartTime> start_time = {}) override;
   void onDecodingSuccess(RequestCommonFramePtr common_frame) override;
   void onDecodingFailure(absl::string_view reason = {}) override;
   void writeToConnection(Buffer::Instance& buffer) override;
@@ -409,7 +409,7 @@ public:
    * @param request the request to be processed.
    * @param start_time the start time of the request.
    */
-  void newDownstreamRequest(StreamRequestPtr request, absl::optional<StartTime> start_time = {});
+  void newDownstreamRequest(StreamRequestPtr request, std::optional<StartTime> start_time = {});
 
   static const std::string& name() {
     CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.generic_proxy");

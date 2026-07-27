@@ -12,6 +12,26 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "client_assertion_test",
+    srcs = ["client_assertion_test.cc"],
+    extension_names = ["envoy.filters.http.oauth2"],
+    rbe_pool = "6gig",
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/extensions/filters/http/oauth2:client_assertion_lib",
+        "//test/mocks:common_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
@@ -20,7 +40,11 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/oauth2:config",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )
 
@@ -38,6 +62,9 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:factory_context_mocks",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )
 
@@ -55,8 +82,13 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )
 
@@ -70,5 +102,8 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
     ],
 )

@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/api/v2/cluster.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -23,16 +25,17 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
 using Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::ContainsRegex;
 using testing::Eq;
 using testing::HasSubstr;
+using ::testing::Not;
 using testing::Optional;
 using testing::Ref;
 using testing::Return;
@@ -64,14 +67,14 @@ TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
   EXPECT_EQ(Utility::checkFilesystemSubscriptionBackingPath("foo", *api).message(),
             "paths must refer to an existing path in the system: 'foo' does not exist");
   std::string test_path = TestEnvironment::temporaryDirectory();
-  EXPECT_TRUE(Utility::checkFilesystemSubscriptionBackingPath(test_path, *api).ok());
+  EXPECT_OK(Utility::checkFilesystemSubscriptionBackingPath(test_path, *api));
 }
 
 TEST(UtilityTest, ParseDefaultRateLimitSettings) {
   envoy::config::core::v3::ApiConfigSource api_config_source;
   const absl::StatusOr<RateLimitSettings> rate_limit_settings =
       Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_OK(rate_limit_settings);
   EXPECT_EQ(false, rate_limit_settings->enabled_);
   EXPECT_EQ(100, rate_limit_settings->max_tokens_);
   EXPECT_EQ(10, rate_limit_settings->fill_rate_);
@@ -82,7 +85,7 @@ TEST(UtilityTest, ParseEmptyRateLimitSettings) {
   api_config_source.mutable_rate_limit_settings();
   const absl::StatusOr<RateLimitSettings> rate_limit_settings =
       Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_OK(rate_limit_settings);
   EXPECT_EQ(true, rate_limit_settings->enabled_);
   EXPECT_EQ(100, rate_limit_settings->max_tokens_);
   EXPECT_EQ(10, rate_limit_settings->fill_rate_);
@@ -96,7 +99,7 @@ TEST(UtilityTest, ParseRateLimitSettings) {
   rate_limits->mutable_fill_rate()->set_value(4);
   const absl::StatusOr<RateLimitSettings> rate_limit_settings =
       Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_OK(rate_limit_settings);
   EXPECT_EQ(true, rate_limit_settings->enabled_);
   EXPECT_EQ(500, rate_limit_settings->max_tokens_);
   EXPECT_EQ(4, rate_limit_settings->fill_rate_);
@@ -110,9 +113,9 @@ TEST(UtilityTest, ParseNanFillRateLimitSettings) {
   rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::quiet_NaN());
   const absl::StatusOr<RateLimitSettings> rate_limit_settings =
       Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_FALSE(rate_limit_settings.ok());
-  EXPECT_EQ(rate_limit_settings.status().message(),
-            "The value of fill_rate in RateLimitSettings (nan) must not be NaN nor Inf");
+  EXPECT_THAT(rate_limit_settings,
+              HasStatusMessage(
+                  "The value of fill_rate in RateLimitSettings (nan) must not be NaN nor Inf"));
 }
 
 TEST(UtilityTest, ParseInfiniteFillRateLimitSettings) {
@@ -123,9 +126,9 @@ TEST(UtilityTest, ParseInfiniteFillRateLimitSettings) {
   rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::infinity());
   const absl::StatusOr<RateLimitSettings> rate_limit_settings =
       Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_FALSE(rate_limit_settings.ok());
-  EXPECT_EQ(rate_limit_settings.status().message(),
-            "The value of fill_rate in RateLimitSettings (inf) must not be NaN nor Inf");
+  EXPECT_THAT(rate_limit_settings,
+              HasStatusMessage(
+                  "The value of fill_rate in RateLimitSettings (inf) must not be NaN nor Inf"));
 }
 
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
@@ -224,9 +227,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
-    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false, 0, false)
-                    .ok());
+    EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                                     false, 0, false));
   }
 
   {
@@ -236,9 +238,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_CALL(
         async_client_manager,
         factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
-    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, true, 0, false)
-                    .ok());
+    EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                                     true, 0, false));
   }
 }
 
@@ -338,9 +339,8 @@ TEST(UtilityTest, AggregatedFactoryForGrpcApiConfigSource) {
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
-    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false, 0, true)
-                    .ok());
+    EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                                     false, 0, true));
   }
 
   {
@@ -350,9 +350,8 @@ TEST(UtilityTest, AggregatedFactoryForGrpcApiConfigSource) {
     EXPECT_CALL(
         async_client_manager,
         factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
-    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, true, 0, true)
-                    .ok());
+    EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                                     true, 0, true));
   }
 
   // Validates that if GRPC/DELTA_GRPC is expected then AGGREGATED_ types are rejected.
@@ -420,9 +419,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSourceWithFailover) {
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
-    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false, 0, false)
-                    .ok());
+    EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                                     false, 0, false));
   }
 
   // 2 gRPC services is valid.
@@ -436,17 +434,15 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSourceWithFailover) {
     expected_grpc_service_foo.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service_foo), Ref(scope), false));
-    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false, 0, false)
-                    .ok());
+    EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                                     false, 0, false));
 
     envoy::config::core::v3::GrpcService expected_grpc_service_bar;
     expected_grpc_service_bar.mutable_envoy_grpc()->set_cluster_name("bar");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service_bar), Ref(scope), false));
-    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false, 1, false)
-                    .ok());
+    EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                                     false, 1, false));
   }
 }
 
@@ -503,9 +499,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(1000 + 1));
 
     // only valid base interval value
-    strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
-            .value();
+    strategy = Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
+                   .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     // time limit will be 10 * provided default base interval
@@ -513,7 +508,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(500 * 10 + 1));
 
     // invalid base interval value
-    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt)
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, std::nullopt)
                   .status()
                   .message(),
               "default_base_interval_ms must be greater than zero");
@@ -537,7 +532,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
     EXPECT_FALSE(config.has_retry_policy());
 
     JitteredExponentialBackOffStrategyPtr strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
             .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
@@ -546,7 +541,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(500 * 10 + 1));
 
     // test an invalid default base interval
-    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt)
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, std::nullopt)
                   .status()
                   .message(),
               "default_base_interval_ms must be greater than zero");
@@ -563,7 +558,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
 
     JitteredExponentialBackOffStrategyPtr strategy =
         Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 500,
-                                                           absl::nullopt)
+                                                           std::nullopt)
             .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
@@ -573,7 +568,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
 
     // test an invalid default base interval
     EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 0,
-                                                                 absl::nullopt)
+                                                                 std::nullopt)
                   .status()
                   .message(),
               "default_base_interval_ms must be greater than zero");
@@ -597,7 +592,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {
     TestUtility::loadFromYaml(config_yaml, config);
     EXPECT_TRUE(config.has_retry_policy());
     JitteredExponentialBackOffStrategyPtr strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
             .value();
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     EXPECT_EQ(
@@ -626,7 +621,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {
 
     JitteredExponentialBackOffStrategyPtr strategy =
         Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 500,
-                                                           absl::nullopt)
+                                                           std::nullopt)
             .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
@@ -664,7 +659,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
           test_max_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
               .value();
 
       // provided time limit is equal to max time limit
@@ -691,7 +686,7 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
           test_base_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
               .value();
 
       // max_interval should be less than or equal test_base_interval * 10
@@ -718,10 +713,10 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
       config.mutable_retry_policy()->mutable_retry_back_off()->mutable_max_interval()->set_seconds(
           test_max_interval_ms);
 
-      EXPECT_FALSE(
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
-              .status()
-              .ok());
+      EXPECT_THAT(
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, std::nullopt)
+              .status(),
+          Not(IsOk()));
     }
   }
 }
@@ -731,7 +726,7 @@ TEST(UtilityTest, AnyWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
   Protobuf::Timestamp out;
   EXPECT_THAT(
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
@@ -745,7 +740,7 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
@@ -763,7 +758,7 @@ TEST(UtilityTest, TranslateAnyToFactoryConfig) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any typed_config;
-  typed_config.PackFrom(source_duration);
+  std::ignore = typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
@@ -783,7 +778,7 @@ public:
     (*typed_struct.mutable_type_url()) =
         absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());
     MessageUtil::jsonConvert(inner, *typed_struct.mutable_value());
-    typed_config.PackFrom(typed_struct);
+    std::ignore = typed_config.PackFrom(typed_struct);
   }
 };
 
@@ -798,9 +793,8 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToStruct) {
   this->packTypedStructIntoAny(typed_config, untyped_struct);
 
   Protobuf::Struct out;
-  EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
-                                             ProtobufMessage::getStrictValidationVisitor(), out)
-                  .ok());
+  EXPECT_OK(Utility::translateOpaqueConfig(typed_config,
+                                           ProtobufMessage::getStrictValidationVisitor(), out));
 
   EXPECT_THAT(out, ProtoEq(untyped_struct));
 }
@@ -818,16 +812,14 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV2) {
 
   {
     API_NO_BOOST(envoy::api::v2::Cluster) out;
-    EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
-                                               ProtobufMessage::getNullValidationVisitor(), out)
-                    .ok());
+    EXPECT_OK(Utility::translateOpaqueConfig(typed_config,
+                                             ProtobufMessage::getNullValidationVisitor(), out));
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
     API_NO_BOOST(envoy::api::v2::Cluster) out;
-    EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
-                                               ProtobufMessage::getStrictValidationVisitor(), out)
-                    .ok());
+    EXPECT_OK(Utility::translateOpaqueConfig(typed_config,
+                                             ProtobufMessage::getStrictValidationVisitor(), out));
     EXPECT_THAT(out, ProtoEq(cluster));
   }
 }
@@ -845,16 +837,14 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV3) {
 
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-    EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
-                                               ProtobufMessage::getNullValidationVisitor(), out)
-                    .ok());
+    EXPECT_OK(Utility::translateOpaqueConfig(typed_config,
+                                             ProtobufMessage::getNullValidationVisitor(), out));
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-    EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
-                                               ProtobufMessage::getStrictValidationVisitor(), out)
-                    .ok());
+    EXPECT_OK(Utility::translateOpaqueConfig(typed_config,
+                                             ProtobufMessage::getStrictValidationVisitor(), out));
     EXPECT_THAT(out, ProtoEq(cluster));
   }
 }
@@ -893,12 +883,11 @@ TEST(UtilityTest, AnyToClusterV2) {
     drain_connections_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  typed_config.PackFrom(cluster);
+  std::ignore = typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::api::v2::Cluster) out;
-  EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
-                                             ProtobufMessage::getStrictValidationVisitor(), out)
-                  .ok());
+  EXPECT_OK(Utility::translateOpaqueConfig(typed_config,
+                                           ProtobufMessage::getStrictValidationVisitor(), out));
   EXPECT_THAT(out, ProtoEq(cluster));
 }
 
@@ -911,12 +900,11 @@ TEST(UtilityTest, AnyToClusterV3) {
     ignore_health_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  typed_config.PackFrom(cluster);
+  std::ignore = typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-  EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
-                                             ProtobufMessage::getStrictValidationVisitor(), out)
-                  .ok());
+  EXPECT_OK(Utility::translateOpaqueConfig(typed_config,
+                                           ProtobufMessage::getStrictValidationVisitor(), out));
   EXPECT_THAT(out, ProtoEq(cluster));
 }
 
@@ -924,12 +912,11 @@ TEST(UtilityTest, AnyToClusterV3) {
 TEST(UtilityTest, EmptyToEmptyConfig) {
   Protobuf::Any typed_config;
   Protobuf::Empty empty_config;
-  typed_config.PackFrom(empty_config);
+  std::ignore = typed_config.PackFrom(empty_config);
 
   envoy::extensions::filters::http::cors::v3::Cors out;
-  EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
-                                             ProtobufMessage::getStrictValidationVisitor(), out)
-                  .ok());
+  EXPECT_OK(Utility::translateOpaqueConfig(typed_config,
+                                           ProtobufMessage::getStrictValidationVisitor(), out));
   EXPECT_THAT(out, ProtoEq(envoy::extensions::filters::http::cors::v3::Cors()));
 }
 
@@ -958,9 +945,8 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
 
   // All ok.
   primary_clusters.insert("foo_cluster");
-  EXPECT_TRUE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
-          .ok());
+  EXPECT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters,
+                                                                    *api_config_source));
 
   // API with cluster_names set should be rejected.
   api_config_source->add_cluster_names("foo_cluster");
@@ -989,9 +975,8 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
 
   // All ok.
   primary_clusters.insert("foo_cluster");
-  EXPECT_TRUE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
-          .ok());
+  EXPECT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters,
+                                                                    *api_config_source));
 }
 
 // Validates CheckCluster functionality.
@@ -1008,12 +993,12 @@ TEST(UtilityTest, CheckCluster) {
   EXPECT_EQ(Utility::checkCluster("prefix", "foo", cm, false).status().message(),
             "prefix: invalid cluster 'foo': currently only "
             "static (non-CDS) clusters are supported");
-  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, true).ok());
+  EXPECT_OK(Utility::checkCluster("prefix", "foo", cm, true));
 
   // Validate that bootstrap cluster does not throw any exceptions.
   ON_CALL(*cm.active_clusters_["foo"]->info_, addedViaApi()).WillByDefault(Return(false));
-  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, true).ok());
-  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, false).ok());
+  EXPECT_OK(Utility::checkCluster("prefix", "foo", cm, true));
+  EXPECT_OK(Utility::checkCluster("prefix", "foo", cm, false));
 }
 
 // Validates getGrpcControlPlane() functionality.
@@ -1050,7 +1035,7 @@ TEST(UtilityTest, GetGrpcControlPlane) {
       api_type: GRPC
     )EOF";
     TestUtility::loadFromYaml(config_yaml, api_config_source);
-    EXPECT_EQ(absl::nullopt, Utility::getGrpcControlPlane(api_config_source));
+    EXPECT_EQ(std::nullopt, Utility::getGrpcControlPlane(api_config_source));
   }
 }
 

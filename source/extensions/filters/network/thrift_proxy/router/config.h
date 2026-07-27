@@ -29,7 +29,7 @@ public:
   ConfigImpl(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
       Server::Configuration::ServerFactoryContext& context, bool validate_clusters_default) {
-    absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
+    std::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
     if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)) {
       validation_clusters = context.clusterManager().clusters();
     }

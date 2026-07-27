@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -15,8 +17,6 @@
 #include "test/integration/http_integration.h"
 #include "test/server/config_validation/xds_fuzz.pb.h"
 #include "test/server/config_validation/xds_verifier.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 

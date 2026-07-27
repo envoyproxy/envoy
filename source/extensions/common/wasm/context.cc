@@ -471,12 +471,12 @@ enum class PropertyToken { PROPERTY_TOKENS(_DECLARE) };
 static absl::flat_hash_map<std::string, PropertyToken> property_tokens = {PROPERTY_TOKENS(_PAIR)};
 #undef _PAIR
 
-absl::optional<google::api::expr::runtime::CelValue>
+std::optional<google::api::expr::runtime::CelValue>
 Context::FindValue(absl::string_view name, Protobuf::Arena* arena) const {
   return findValue(name, arena, false);
 }
 
-absl::optional<google::api::expr::runtime::CelValue>
+std::optional<google::api::expr::runtime::CelValue>
 Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const {
   using google::api::expr::runtime::CelProtoWrapper;
   using google::api::expr::runtime::CelValue;
@@ -906,7 +906,7 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
     message->trailers(buildRequestTrailerMapFromPairs(request_trailers));
   }
 
-  absl::optional<std::chrono::milliseconds> timeout;
+  std::optional<std::chrono::milliseconds> timeout;
   if (timeout_milliseconds > 0) {
     timeout = std::chrono::milliseconds(timeout_milliseconds);
   }
@@ -1646,7 +1646,7 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
       // C++, Rust and other SDKs use -1 (InvalidCode) as the default value if gRPC code is not set,
       // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
       // at all.
-      absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = absl::nullopt;
+      std::optional<Grpc::Status::GrpcStatus> grpc_status_code = std::nullopt;
       if (grpc_status >= Grpc::Status::WellKnownGrpcStatus::Ok &&
           grpc_status <= Grpc::Status::WellKnownGrpcStatus::MaximumKnown) {
         grpc_status_code = Grpc::Status::WellKnownGrpcStatus(grpc_status);

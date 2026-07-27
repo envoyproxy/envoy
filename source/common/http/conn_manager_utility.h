@@ -5,6 +5,7 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/tracing/trace_reason.h"
 
 #include "source/common/http/conn_manager_impl.h"
@@ -46,7 +47,7 @@ public:
                   uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                       headers_with_underscores_action,
-                  Server::OverloadManager& overload_manager);
+                  Server::OverloadManager& overload_manager, Runtime::Loader& runtime);
 
   /* The result after calling mutateRequestHeaders(), containing the final remote address. Note that
    * an extension used for detecting the original IP of the request might decide it should be
@@ -54,7 +55,7 @@ public:
    */
   struct MutateRequestHeadersResult {
     Network::Address::InstanceConstSharedPtr final_remote_address;
-    absl::optional<OriginalIPRejectRequestOptions> reject_request;
+    std::optional<OriginalIPRejectRequestOptions> reject_request;
   };
 
   /**
@@ -125,9 +126,9 @@ public:
   static NormalizePathAction maybeNormalizePath(RequestHeaderMap& request_headers,
                                                 const ConnectionManagerConfig& config);
 
-  static absl::optional<uint32_t> maybeNormalizeHost(RequestHeaderMap& request_headers,
-                                                     const ConnectionManagerConfig& config,
-                                                     uint32_t port);
+  static std::optional<uint32_t> maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                                    const ConnectionManagerConfig& config,
+                                                    uint32_t port);
 
   /**
    * Mutate request headers if request needs to be traced.

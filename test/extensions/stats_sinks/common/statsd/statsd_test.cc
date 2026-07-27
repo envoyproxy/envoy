@@ -268,6 +268,26 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
   tls_.shutdownThread();
 }
 
+TEST_F(TcpStatsdSinkTest, LargeStatNameNoOverflow) {
+  InSequence s;
+
+  NiceMock<Stats::MockCounter> counter;
+  std::string large_name(20000, 'a');
+  counter.name_ = large_name;
+  counter.latch_ = 1;
+  counter.used_ = true;
+  snapshot_.counters_.push_back({1, counter});
+
+  expectCreateConnection();
+  EXPECT_CALL(*connection_, write(_, _))
+      .WillOnce(Invoke([&large_name](Buffer::Instance& buffer, bool) -> void {
+        std::string compare = fmt::format("envoy.{}:1|c\n", large_name);
+        EXPECT_EQ(compare, buffer.toString());
+        buffer.drain(buffer.length());
+      }));
+  sink_->flush(snapshot_);
+}
+
 } // namespace
 } // namespace Statsd
 } // namespace Common

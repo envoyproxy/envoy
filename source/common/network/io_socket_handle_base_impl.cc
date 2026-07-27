@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Network {
 
 IoSocketHandleBaseImpl::IoSocketHandleBaseImpl(os_fd_t fd, bool socket_v6only,
-                                               absl::optional<int> domain)
+                                               std::optional<int> domain)
     : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
 
 IoSocketHandleBaseImpl::~IoSocketHandleBaseImpl() {
@@ -61,7 +61,7 @@ Api::SysCallIntResult IoSocketHandleBaseImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
 }
 
-absl::optional<int> IoSocketHandleBaseImpl::domain() { return domain_; }
+std::optional<int> IoSocketHandleBaseImpl::domain() { return domain_; }
 
 absl::StatusOr<Address::InstanceConstSharedPtr> IoSocketHandleBaseImpl::localAddress() {
   sockaddr_storage ss;
@@ -105,7 +105,7 @@ absl::StatusOr<Address::InstanceConstSharedPtr> IoSocketHandleBaseImpl::peerAddr
   return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
 }
 
-absl::optional<std::chrono::milliseconds> IoSocketHandleBaseImpl::lastRoundTripTime() {
+std::optional<std::chrono::milliseconds> IoSocketHandleBaseImpl::lastRoundTripTime() {
   Api::EnvoyTcpInfo info;
   auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
   if (!result.return_value_) {
@@ -114,7 +114,7 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleBaseImpl::lastRoundTripT
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
-absl::optional<uint64_t> IoSocketHandleBaseImpl::congestionWindowInBytes() const {
+std::optional<uint64_t> IoSocketHandleBaseImpl::congestionWindowInBytes() const {
   Api::EnvoyTcpInfo info;
   auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
   if (!result.return_value_) {
@@ -123,29 +123,29 @@ absl::optional<uint64_t> IoSocketHandleBaseImpl::congestionWindowInBytes() const
   return info.tcpi_snd_cwnd;
 }
 
-absl::optional<std::string> IoSocketHandleBaseImpl::interfaceName() {
+std::optional<std::string> IoSocketHandleBaseImpl::interfaceName() {
   auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
   if (!os_syscalls_singleton.supportsGetifaddrs()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   auto address_or_error = localAddress();
   if (!address_or_error.status().ok()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   Address::InstanceConstSharedPtr& socket_address = *address_or_error;
   if (!socket_address || socket_address->type() != Address::Type::Ip) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
   if (rc.return_value_ != 0) {
     ENVOY_LOG_EVERY_POW_2(warn, "getifaddrs error: {}", rc.errno_);
-    return absl::nullopt;
+    return std::nullopt;
   }
 
-  absl::optional<std::string> selected_interface_name{};
+  std::optional<std::string> selected_interface_name{};
   for (const auto& interface_address : interface_addresses) {
     if (!interface_address.interface_addr_) {
       continue;

@@ -115,8 +115,9 @@ FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResour
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
-  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
-      resources[0].get().resource());
+  const auto& filter_config =
+      Envoy::Protobuf::DynamicCastMessage<envoy::config::core::v3::TypedExtensionConfig>(
+          resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected resource name in ExtensionConfigDS response: {}", filter_config.name()));
@@ -303,7 +304,7 @@ ProtobufTypes::MessagePtr FilterConfigProviderManagerImplBase::dumpEcdsFilterCon
     filter_config.set_name(ecds_filter->name());
     MessageUtil::packFrom(*filter_config.mutable_typed_config(), *ecds_filter->lastConfig());
     auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
-    filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
+    std::ignore = filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
     filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());
     TimestampUtil::systemClockToTimestamp(ecds_filter->lastUpdated(),
                                           *(filter_config_dump.mutable_last_updated()));

@@ -37,7 +37,7 @@ public:
         0,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, empty_host_vector_, empty_host_vector_, random_.random(), absl::nullopt);
+        {}, empty_host_vector_, empty_host_vector_, random_.random(), std::nullopt);
   }
 
   void peekThenPick(std::vector<int> picks) {

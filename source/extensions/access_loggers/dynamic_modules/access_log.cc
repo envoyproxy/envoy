@@ -2,6 +2,8 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/extensions/dynamic_modules/abi_context_accessors.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -59,9 +61,8 @@ void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
   tl_logger.log_context_ = &context;
   tl_logger.stream_info_ = &stream_info;
 
-  // Convert AccessLogType to ABI enum. The cast is safe because enum values are aligned.
   const auto abi_log_type =
-      static_cast<envoy_dynamic_module_type_access_log_type>(context.accessLogType());
+      Extensions::DynamicModules::ContextAccessor::accessLogTypeToAbi(context.accessLogType());
 
   // Invoke the module's log callback with the context pointer.
   config_->on_logger_log_(tl_logger.thisAsVoidPtr(), tl_logger.logger_, abi_log_type);

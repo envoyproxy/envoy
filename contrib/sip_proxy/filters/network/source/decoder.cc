@@ -118,9 +118,14 @@ int Decoder::reassemble(Buffer::Instance& data) {
       // }
 
       char len[10]{}; // temporary storage
-      remaining_data.copyOut(content_length_start + strlen("Content-Length:"),
-                             content_length_end - content_length_start - strlen("Content-Length:"),
-                             len);
+      size_t value_len = content_length_end - content_length_start - strlen("Content-Length:");
+      // The Content-Length value comes from the untrusted SIP message and may be
+      // longer than the temporary buffer; cap the copy so it cannot overflow len[]
+      // and keep room for the trailing NUL that atoi() relies on.
+      if (value_len > sizeof(len) - 1) {
+        value_len = sizeof(len) - 1;
+      }
+      remaining_data.copyOut(content_length_start + strlen("Content-Length:"), value_len, len);
 
       clen = std::atoi(len);
 

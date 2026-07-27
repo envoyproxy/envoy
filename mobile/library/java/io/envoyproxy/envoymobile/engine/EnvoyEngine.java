@@ -58,6 +58,13 @@ public interface EnvoyEngine {
   String dumpStats();
 
   /**
+   * Drains connections matching the given socket tag.
+   *
+   * @param tag Socket tag.
+   */
+  void drainConnectionsBySocketTag(int tag);
+
+  /**
    * Returns a handle to the underlying InternalEngine pointer.
    *
    * <p>This value is an opaque pointer handle encoded as a {@code long} and originates from a

@@ -1,0 +1,131 @@
+date: June 23, 2026
+
+behavior_changes:
+- area: build
+  change: |
+    The contrib extension ``envoy.network.connection_balance.dlb`` (Intel DLB
+    connection balancer) has been disabled at the Bazel layer for all builds and
+    platforms due to a breakage at the source archive.
+
+    See https://github.com/envoyproxy/envoy/issues/45491 for local workarounds.
+
+bug_fixes:
+- area: dns_filter
+  change: |
+    Fix `CVE-2026-48497 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-j6g2-wf95-q66q>`_
+
+    Fix sanity checking of the query name length to avoid abnormal process termination. Use ``ENVOY_BUG``
+    in case sanity check fails.
+- area: ext_authz
+  change: |
+    Fix: `CVE-2026-47205 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-mvh9-767w-x47j>`_
+
+    Fixed a use-after-free crash in the ext_authz filter when per-route service overrides are active
+    and the downstream connection resets during an in-flight authorization check.
+- area: ext_proc
+  change: |
+    Fix: `CVE-2026-47207 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-68cv-hq5f-g6xv>`_
+
+    Fixed a bug when the ext_proc server sends packed unexpected ProcessingResponses to Envoy.
+- area: formatter
+  change: |
+    Fix: `CVE-2026-47220 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-j9wh-4qfm-wf2v>`_
+
+    Fixed a crash bug in the ``%REQUESTED_SERVER_NAME%`` formatter where the host or original host is not set
+    correctly but the formatter is configured to access the host value.
+- area: grpc_stats
+  change: |
+    Fix: `CVE-2026-47204 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-3jxh-8p6x-7pf6>`_
+
+    Fixed a crash or use-after-free when gRPC stats filter performs stat tracking on a direct response route.
+- area: json
+  change: |
+    Fix: `CVE-2026-48042 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-f24p-rxw2-g6pv>`_
+
+    Limit JSON nesting depth at 1000. The limit could be relaxed to 10K by setting the
+    ``envoy.reloadable_features.limit_json_parser_nesting_depth`` to ``false``.
+- area: oauth2
+  change: |
+    Fixed a bug where the asyncronous token change callback could be triggered after the filter had been
+    torn down (``onDestroy()`` had been called), which could lead to access dangling pointers and result
+    in UAF/crash.
+- area: oauth2
+  change: "Fix: `CVE-2026-47775 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-396h-jpq4-vc7p>`_\n\
+    \nAddressed a padding oracle in the OAuth2 filter's AES-256-CBC cookie decryption.\
+    \ The filter\nnow supports AES-256-GCM encryption with a ``gcm.`` algorithm marker,\
+    \ which authenticates the\nciphertext and removes the oracle.\n\n**The fix is\
+    \ opt-in to keep rolling upgrades safe.** On upgrade, the default behaviour is\n\
+    unchanged: cookies are still encrypted with AES-256-CBC and the CBC decrypt path\
+    \ is still\nreachable, so existing sessions and mixed-version clusters keep working.\
+    \ Two runtime flags\ncontrol the migration:\n\n* ``envoy.reloadable_features.oauth2_use_gcm_encryption``\
+    \ (default ``false``) \u2014 when set to\n  ``true``, ``encrypt()`` produces AES-256-GCM\
+    \ ciphertexts prefixed with ``gcm.``. While\n  ``false`` (the default), ``encrypt()``\
+    \ continues to emit AES-256-CBC ciphertexts with no\n  prefix, wire-compatible\
+    \ with older instances.\n* ``envoy.reloadable_features.oauth2_legacy_cbc_decrypt_compat``\
+    \ (default ``true``) \u2014 when\n  ``true``, ``decrypt()`` accepts both ``gcm.``-prefixed\
+    \ cookies (via GCM) and legacy\n  cookies (via the legacy CBC fallback). When\
+    \ set to ``false``, only ``gcm.``-prefixed\n  cookies decrypt, legacy CBC cookies\
+    \ are rejected and the affected users are redirected\n  to the OAuth server to\
+    \ re-authenticate. While the CBC fallback is reachable, it partially\n  reopens\
+    \ CVE-2026-47775.\n\nYou should set ``envoy.reloadable_features.oauth2_use_gcm_encryption``\
+    \ to ``true`` once\nyou have ensured that all instances in your cluster are capable\
+    \ of decrypting GCM-encrypted cookies.\nAnd then, you could set ``envoy.reloadable_features.oauth2_legacy_cbc_decrypt_compat``\
+    \ to ``false``\nto disable the legacy CBC decryption path at appropriate time.\n\
+    \n**Never set ``envoy.reloadable_features.oauth2_legacy_cbc_decrypt_compat`` to\
+    \ ``false``\nbefore you have enabled ``envoy.reloadable_features.oauth2_use_gcm_encryption``.**\n\
+    \nBoth flags and the AES-256-CBC code paths are scheduled for removal once the\
+    \ migration\nwindow has elapsed.\n\nThe OAuth2 filter exposes a new counter ``oauth_legacy_cbc_decrypt``\
+    \ that increments each\ntime a cookie is successfully decrypted via the legacy\
+    \ CBC fallback. Operators should watch\nthis stat decay to zero across the migration\
+    \ window before flipping\n``oauth2_legacy_cbc_decrypt_compat`` to ``false``.\n"
+- area: proxy_protocol
+  change: |
+    Fix: `CVE-2026-47692 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-wh36-hm39-mm3r>`_
+
+    Fixed a bug where passthrough TLVs combined with added TLVs could exceed the maximum length,
+    resulting in a mismatch between the size reported in the header and the number of bytes written.
+    This could allow a smuggled request from the host writing the PROXY protocol header to the upstream
+    host. This behavioral change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.proxy_protocol_remove_too_long_tlvs`` to ``false``.
+- area: quic
+  change: |
+    Fix: `GHSA-p7c7-7c47-pwch <https://github.com/envoyproxy/envoy/security/advisories/GHSA-p7c7-7c47-pwch>`_
+
+    Denial-of-Service Attack Against the HTTP/3 Stack via QPACK Blocked Decoding.
+- area: quic
+  change: |
+    Fix: `CVE-2026-48743 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-8phg-2h2q-jgxf>`_.
+
+    Validate HTTP/3 headers-only request and response content-length, and reset stream if inconsistent.
+
+    The change is guarded by runtime guard ``envoy.reloadable_features.quic_validate_headers_only_content_length``.
+- area: router
+  change: |
+    Fix: `CVE-2026-47221 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-rcff-gw58-pjpr>`_
+
+    Fixed an issue when handling HTTP 303 internal redirects for body-less requests. The redirect handling
+    code attempted to drain a request body buffer that was never allocated, causing a segmentation fault.
+- area: tcp_statsd_sync
+  change: |
+    Fix: `CVE-2026-48706 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-7q3f-gwg7-j8g4>`_
+
+    Fixed a TcpStatsdSync buffer overflow issue with large stats name.
+- area: tls
+  change: |
+    Fix: [CVE-2026-47778](https://github.com/envoyproxy/envoy/security/advisories/GHSA-f8x4-rw5x-f3r7)
+
+    Fixes an issue where Envoy could fail to validate the Subject Alternative Name (SAN) of a peer
+    certificate if the SAN contained an embedded NUL byte. Previously, the SAN parsing was vulnerable
+    to NUL byte truncation in some configurations, potentially leading to incorrect trust decisions.
+- area: wasm
+  change: |
+    Bump ``com_github_wasmtime`` to resolve CVE-2026-47261.
+- area: zstd
+  change: |
+    Fix: `CVE-2026-48044 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-m3p9-47wh-88wg>`_
+
+    Fixed a memory exhaustion vulnerability in the Zstd decompressor where the ``MaxInflateRatio``
+    limit was only checked after each input slice was fully processed, allowing a maliciously crafted
+    compressed payload to expand to hundreds of MB within a single ``process()`` call. The inflate
+    ratio limit is now enforced inside the inner decompression loop, matching the gzip and brotli
+    decompressors and aborting decompression as soon as the threshold is breached.

@@ -18,6 +18,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -116,8 +117,8 @@ public:
       const std::string& address, const DnsLookupFamily lookup_family,
       const DnsResolver::ResolutionStatus expected_status, const bool expected_results,
       const bool exit_dispatcher = true,
-      const absl::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>>&& expected_traces =
-          absl::nullopt) {
+      const std::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>>&& expected_traces =
+          std::nullopt) {
     active_dns_query_ =
         resolver_->resolve(address, lookup_family,
                            [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
@@ -125,7 +126,7 @@ public:
                              EXPECT_EQ(expected_status, status);
                              if (expected_results) {
                                EXPECT_FALSE(results.empty());
-                               absl::optional<bool> is_v4{};
+                               std::optional<bool> is_v4{};
                                for (const auto& result : results) {
                                  const auto& addrinfo = result.addrInfo();
                                  switch (lookup_family) {
@@ -891,7 +892,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
   // Error in processing will cause the connection to the DNS server to be reset.
   EXPECT_CALL(dns_service_, dnsServiceProcessResult(_)).WillOnce(Return(kDNSServiceErr_Unknown));
 
-  ASSERT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_ready_cb_(Event::FileReadyType::Read));
 
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.processing_failure")->value());
 }

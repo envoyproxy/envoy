@@ -6,7 +6,7 @@
 
 #include <functional>
 
-#include "absl/types/optional.h"
+#include <optional>
 #include "library/common/network/proxy_settings.h"
 
 namespace Envoy {
@@ -41,7 +41,7 @@ protected:
   virtual CFDictionaryRef getSystemProxySettings() const;
 
 private:
-  absl::optional<SystemProxySettings> readSystemProxySettings() const;
+  std::optional<SystemProxySettings> readSystemProxySettings() const;
 
   dispatch_source_t source_;
   dispatch_queue_t queue_;

@@ -141,7 +141,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
 void SignerBaseImpl::addRequiredHeaders(Http::RequestHeaderMap& headers,
                                         const std::string long_date,
-                                        const absl::optional<std::string> session_token,
+                                        const std::optional<std::string> session_token,
                                         const absl::string_view override_region) {
   // Explicitly remove Authorization and security token header if present
   headers.remove(Http::CustomHeaders::get().Authorization);
@@ -176,7 +176,7 @@ SignerBaseImpl::createAuthorizationCredential(absl::string_view access_key_id,
 void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
                                        const absl::string_view credential,
                                        const absl::string_view long_date,
-                                       const absl::optional<std::string> session_token,
+                                       const std::optional<std::string> session_token,
                                        const std::map<std::string, std::string>& signed_headers,
                                        const uint16_t expiration_time) const {
   // X-Amz-Algorithm

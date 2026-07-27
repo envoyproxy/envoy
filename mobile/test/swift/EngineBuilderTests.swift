@@ -27,13 +27,13 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingLogLevelAddsLogLevelWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { _, logLevel in
-      XCTAssertEqual("trace", logLevel)
+      XCTAssertEqual("info", logLevel)
       expectation.fulfill()
     }
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .setLogLevel(.trace)
+      .setLogLevel(.info)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }

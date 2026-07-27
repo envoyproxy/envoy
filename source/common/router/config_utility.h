@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cinttypes>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -44,8 +44,8 @@ public:
 
   private:
     const std::string name_;
-    const absl::optional<bool> present_match_;
-    const absl::optional<Matchers::StringMatcherImpl> matcher_;
+    const std::optional<bool> present_match_;
+    const std::optional<Matchers::StringMatcherImpl> matcher_;
   };
 
   using QueryParameterMatcherPtr = std::unique_ptr<const QueryParameterMatcher>;
@@ -59,7 +59,7 @@ public:
 
     const std::string& name() const { return name_; }
 
-    bool matches(const absl::optional<absl::string_view>& cookie_value) const;
+    bool matches(const std::optional<absl::string_view>& cookie_value) const;
 
   private:
     const std::string name_;
@@ -105,11 +105,11 @@ public:
   /**
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
    * @param route supplies the Route configuration.
-   * @return absl::optional<Http::Code> the HTTP status from the route's direct_response if
+   * @return std::optional<Http::Code> the HTTP status from the route's direct_response if
    * specified, or the HTTP status code from the route's redirect if specified, or an empty
-   * absl::optional otherwise.
+   * std::optional otherwise.
    */
-  static absl::optional<Http::Code>
+  static std::optional<Http::Code>
   parseDirectResponseCode(const envoy::config::route::v3::Route& route);
 
   /**

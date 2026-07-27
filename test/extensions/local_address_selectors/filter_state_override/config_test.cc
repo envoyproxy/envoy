@@ -3,6 +3,8 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/local_address_selectors/filter_state_override/config.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -15,10 +17,9 @@ namespace {
 TEST(ConfigTest, EmptyUpstreamAddresses) {
   NamespaceLocalAddressSelectorFactory factory;
   std::vector<Upstream::UpstreamLocalAddress> upstream_local_addresses;
-  EXPECT_EQ(factory.createLocalAddressSelector(upstream_local_addresses, absl::nullopt)
-                .status()
-                .message(),
-            "Bootstrap's upstream binding config has no valid source address.");
+  EXPECT_EQ(
+      factory.createLocalAddressSelector(upstream_local_addresses, std::nullopt).status().message(),
+      "Bootstrap's upstream binding config has no valid source address.");
 }
 
 TEST(ConfigTest, NullUpstreamAddress) {
@@ -26,8 +27,8 @@ TEST(ConfigTest, NullUpstreamAddress) {
   std::vector<Upstream::UpstreamLocalAddress> upstream_local_addresses;
   upstream_local_addresses.emplace_back(Upstream::UpstreamLocalAddress{nullptr, nullptr});
   const auto endpoint = std::make_shared<const Network::Address::Ipv4Instance>("10.10.10.10");
-  const auto selector = factory.createLocalAddressSelector(upstream_local_addresses, absl::nullopt);
-  ASSERT_TRUE(selector.ok());
+  const auto selector = factory.createLocalAddressSelector(upstream_local_addresses, std::nullopt);
+  ASSERT_OK(selector);
   const auto result = selector.value()->getUpstreamLocalAddress(endpoint, nullptr, {});
   EXPECT_EQ(nullptr, result.address_);
 }
@@ -37,7 +38,7 @@ constexpr absl::string_view BadValue = "I'm bad";
 class TestObject : public StreamInfo::FilterState::Object {
 public:
   TestObject(absl::string_view value) : value_(value) {}
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     if (value_ == BadValue) {
       return {};
     }
@@ -60,7 +61,7 @@ Network::TransportSocketOptionsConstSharedPtr optionsWithOverride(absl::string_v
 }
 
 template <class... Args>
-void validateNamespaceOverride(absl::optional<std::string> netns, bool ipv6, Args&&... args) {
+void validateNamespaceOverride(std::optional<std::string> netns, bool ipv6, Args&&... args) {
   Network::Address::InstanceConstSharedPtr upstream_address;
   if (ipv6) {
     upstream_address =
@@ -75,8 +76,8 @@ void validateNamespaceOverride(absl::optional<std::string> netns, bool ipv6, Arg
   const auto endpoint = std::make_shared<const Network::Address::Ipv4Instance>("10.10.10.10");
   Network::TransportSocketOptionsConstSharedPtr options =
       netns ? optionsWithOverride(*netns) : nullptr;
-  const auto selector = factory.createLocalAddressSelector(upstream_local_addresses, absl::nullopt);
-  ASSERT_TRUE(selector.ok());
+  const auto selector = factory.createLocalAddressSelector(upstream_local_addresses, std::nullopt);
+  ASSERT_OK(selector);
   const auto result = selector.value()->getUpstreamLocalAddress(endpoint, nullptr,
                                                                 makeOptRefFromPtr(options.get()));
   EXPECT_NE(nullptr, result.address_);
@@ -84,7 +85,7 @@ void validateNamespaceOverride(absl::optional<std::string> netns, bool ipv6, Arg
   if (netns) {
     if (netns->empty()) {
       // Override with empty string clear the namespace.
-      EXPECT_EQ(absl::nullopt, result.address_->networkNamespace());
+      EXPECT_EQ(std::nullopt, result.address_->networkNamespace());
     } else if (*netns == BadValue) {
       // Override with a bad filter state object is a no-op.
       EXPECT_EQ(upstream_address->networkNamespace(), result.address_->networkNamespace());

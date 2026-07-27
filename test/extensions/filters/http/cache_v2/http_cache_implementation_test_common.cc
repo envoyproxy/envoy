@@ -85,7 +85,7 @@ LookupResult HttpCacheImplementationTest::lookup(absl::string_view request_path)
 
 CacheReaderPtr HttpCacheImplementationTest::insert(
     Key key, const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body,
-    const absl::optional<Http::TestResponseTrailerMapImpl> trailers) {
+    const std::optional<Http::TestResponseTrailerMapImpl> trailers) {
   // For responses with body, we must wait for insertBody's callback before
   // calling insertTrailers or completing. Note, in a multipart body test this
   // would need to check for the callback having been called for *every* body part,
@@ -132,7 +132,7 @@ CacheReaderPtr HttpCacheImplementationTest::insert(
 
 CacheReaderPtr HttpCacheImplementationTest::insert(
     absl::string_view request_path, const Http::TestResponseHeaderMapImpl& headers,
-    const absl::string_view body, const absl::optional<Http::TestResponseTrailerMapImpl> trailers) {
+    const absl::string_view body, const std::optional<Http::TestResponseTrailerMapImpl> trailers) {
   return insert(simpleKey(request_path), headers, body, trailers);
 }
 
@@ -165,7 +165,7 @@ LookupRequest HttpCacheImplementationTest::makeLookupRequest(absl::string_view r
 TEST_P(HttpCacheImplementationTest, PutGet) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
-  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(lookup_result.body_length_, Eq(std::nullopt));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
@@ -181,7 +181,7 @@ TEST_P(HttpCacheImplementationTest, PutGet) {
 
   const std::string& request_path_2("/another-name");
   LookupResult another_name_lookup_result = lookup(request_path_2);
-  EXPECT_THAT(another_name_lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(another_name_lookup_result.body_length_, Eq(std::nullopt));
 
   const std::string new_body1("NewValue");
   insert(request_path_2, response_headers, new_body1);
@@ -245,7 +245,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersForMissingKeyFails) {
 TEST_P(HttpCacheImplementationTest, PutGetWithTrailers) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
-  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(lookup_result.body_length_, Eq(std::nullopt));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
@@ -265,7 +265,7 @@ TEST_P(HttpCacheImplementationTest, PutGetWithTrailers) {
 
   const std::string& request_path_2("/another-name");
   LookupResult another_name_lookup_result = lookup(request_path_2);
-  EXPECT_THAT(another_name_lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(another_name_lookup_result.body_length_, Eq(std::nullopt));
 
   const std::string new_body1("NewValue");
   insert(request_path_2, response_headers, new_body1, response_trailers);
@@ -282,7 +282,7 @@ TEST_P(HttpCacheImplementationTest, PutGetWithTrailers) {
 TEST_P(HttpCacheImplementationTest, InsertReadingNullBufferBodyWithEndStream) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
-  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(lookup_result.body_length_, Eq(std::nullopt));
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
       {"date", formatter_.fromTime(time_system_.systemTime())},
@@ -322,7 +322,7 @@ TEST_P(HttpCacheImplementationTest, InsertReadingNullBufferBodyWithEndStream) {
 TEST_P(HttpCacheImplementationTest, HeadersOnlyInsert) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
-  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(lookup_result.body_length_, Eq(std::nullopt));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
@@ -343,7 +343,7 @@ TEST_P(HttpCacheImplementationTest, HeadersOnlyInsert) {
 TEST_P(HttpCacheImplementationTest, ReadingFromBodyDuringInsert) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
-  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(lookup_result.body_length_, Eq(std::nullopt));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
@@ -395,7 +395,7 @@ TEST_P(HttpCacheImplementationTest, ReadingFromBodyDuringInsert) {
 TEST_P(HttpCacheImplementationTest, UpstreamResetWhileExpectingBodyShouldBeInsertFailed) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
-  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(lookup_result.body_length_, Eq(std::nullopt));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
@@ -446,7 +446,7 @@ TEST_P(HttpCacheImplementationTest, TouchOnAbsentEntryHasNoExternallyVisibleEffe
 TEST_P(HttpCacheImplementationTest, UpstreamResetWhileExpectingTrailersShouldBeInsertFailed) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
-  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+  EXPECT_THAT(lookup_result.body_length_, Eq(std::nullopt));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},

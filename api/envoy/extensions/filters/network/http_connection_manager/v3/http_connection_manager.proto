@@ -39,7 +39,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 62]
+// [#next-free-field: 63]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -663,6 +663,18 @@ message HttpConnectionManager {
   // is reached, or during general server draining. The default grace period is
   // 5000 milliseconds (5 seconds) if this option is not specified.
   google.protobuf.Duration drain_timeout = 12;
+
+  // Percentage-based jitter for ``drain_timeout``. If set, the actual drain grace period
+  // is extended by a random duration up to ``drain_timeout * jitter / 100`` per connection.
+  // This staggers the final GOAWAY (and connection close) across time so that connections
+  // entering the drain state simultaneously do not all complete draining at the same instant,
+  // mitigating thundering-herd reconnects. If not set, no jitter is added.
+  //
+  // This is analogous to
+  // :ref:`max_connection_duration_jitter
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration_jitter>`,
+  // but applied to the drain grace timer rather than the connection duration timer.
+  type.v3.Percent drain_timeout_jitter = 62;
 
   // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
   // It is defined as a grace period after connection close processing has been locally initiated

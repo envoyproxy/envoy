@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "source/common/grpc/common.h"
+#include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 
@@ -8,6 +9,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -57,8 +59,25 @@ protected:
     return &stream_;
   }
 
+  // Drives the `getOrCreateRawAsyncClientWithHashKey` failure path: first opens a normal
+  // stream (so we can verify the happy path still works), then arranges for the next
+  // start() call to observe an InvalidArgumentError. Caller asserts the runtime-guard-
+  // dependent fallout (onGrpcError invocation vs. silent nullptr).
+  void startAndExpectClientCreationFailure() {
+    Http::AsyncClient::ParentContext parent_context;
+    parent_context.stream_info = &stream_info_;
+    auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
+    auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+    EXPECT_NE(stream, nullptr);
+
+    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(absl::InvalidArgumentError("creation-error")));
+    stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+    EXPECT_EQ(stream, nullptr);
+  }
+
   // ExternalProcessorCallbacks
-  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) override {
+  void onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& response) override {
     last_response_ = std::move(response);
   }
 
@@ -72,7 +91,7 @@ protected:
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse&) override {}
   void onError() override {}
 
-  std::unique_ptr<ProcessingResponse> last_response_;
+  Grpc::ResponsePtr<ProcessingResponse> last_response_{nullptr};
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   std::string grpc_error_message_;
   bool grpc_closed_ = false;
@@ -334,16 +353,23 @@ TEST_F(ExtProcStreamTest, OnReceiveMessageAfterFilterDestroy) {
 }
 
 TEST_F(ExtProcStreamTest, ClientStartError) {
-  Http::AsyncClient::ParentContext parent_context;
-  parent_context.stream_info = &stream_info_;
-  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
-  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
-  EXPECT_NE(stream, nullptr);
+  // Legacy behavior: with the runtime guard off, start() returns nullptr without invoking
+  // onGrpcError (matching the pre-fix semantic this test was originally written against).
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_report_client_creation_error", "false"}});
 
-  EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
-      .WillOnce(Return(absl::InvalidArgumentError("error")));
-  stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
-  EXPECT_EQ(stream, nullptr);
+  startAndExpectClientCreationFailure();
+  EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Ok);
+  EXPECT_EQ(grpc_error_message_, "");
+}
+
+TEST_F(ExtProcStreamTest, ClientStartErrorGuardEnabled) {
+  // New behavior under the default runtime guard: start() surfaces the failure via
+  // onGrpcError so the consuming filter can honor failure_mode_allow.
+  startAndExpectClientCreationFailure();
+  EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Internal);
+  EXPECT_THAT(grpc_error_message_, testing::HasSubstr("creation-error"));
 }
 
 } // namespace

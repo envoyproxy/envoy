@@ -30,12 +30,12 @@ class BaseEngineBuilderTest : public testing::TestWithParam<TestServerType> {
 protected:
   BaseEngineBuilderTest() : server_type_(GetParam()) {}
 
-  void
-  SetUpEngineAndServer(absl::optional<envoymobile::extensions::filters::http::assertion::Assertion>
-                           assertion_config = std::nullopt,
-                       const absl::flat_hash_map<std::string, std::string>& headers = {},
-                       absl::string_view body = "",
-                       const absl::flat_hash_map<std::string, std::string>& trailers = {}) {
+  void SetUpEngineAndServer(
+      std::optional<envoymobile::extensions::filters::http::assertion::Assertion> assertion_config =
+          std::nullopt,
+      const absl::flat_hash_map<std::string, std::string>& headers = {},
+      absl::string_view body = "",
+      const absl::flat_hash_map<std::string, std::string>& trailers = {}) {
     absl::Notification engine_running;
     Platform::TestEngineBuilder engine_builder;
 
@@ -43,7 +43,7 @@ protected:
       ::envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
           assertion_filter;
       assertion_filter.set_name("envoy.filters.http.assertion");
-      assertion_filter.mutable_typed_config()->PackFrom(assertion_config.value());
+      std::ignore = assertion_filter.mutable_typed_config()->PackFrom(assertion_config.value());
       engine_builder.addHcmHttpFilter(std::move(assertion_filter));
     }
 

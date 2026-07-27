@@ -24,13 +24,14 @@ inline const char* kDefaultFineGrainLogFormat = "[%Y-%m-%d %T.%e][%t][%l] [%g:%#
  */
 struct VerbosityLogUpdateInfo final {
   const std::string update_pattern;
-  const bool update_is_path; // i.e. it contains a path separator.
+  const bool update_is_path;   // i.e. it contains a path separator.
+  const bool match_group_only; // i.e. it only matches against logger group names.
   const spdlog::level::level_enum log_level;
 
   VerbosityLogUpdateInfo(absl::string_view update_pattern, bool update_is_path,
-                         spdlog::level::level_enum log_level)
+                         bool match_group_only, spdlog::level::level_enum log_level)
       : update_pattern(std::string(update_pattern)), update_is_path(update_is_path),
-        log_level(log_level) {}
+        match_group_only(match_group_only), log_level(log_level) {}
 };
 
 /**
@@ -46,6 +47,13 @@ public:
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
+   * Gets a logger from map given a file and name.
+   */
+  SpdLoggerSharedPtr getFineGrainLogEntryForFlush(absl::string_view file,
+                                                  absl::string_view name = "")
+      ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
+
+  /**
    * Gets the default verbosity log level.
    */
   spdlog::level::level_enum getVerbosityDefaultLevel() const
@@ -55,7 +63,8 @@ public:
    * Initializes Fine-Grain Logger, gets log level from setting vector, and registers it in global
    * map if not done.
    */
-  void initFineGrainLogger(const std::string& key, std::atomic<spdlog::logger*>& logger)
+  spdlog::logger* initFineGrainLogger(absl::string_view file, absl::string_view logger_name,
+                                      std::atomic<spdlog::logger*>& logger)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
@@ -90,10 +99,21 @@ public:
   FineGrainLogLevelMap getAllFineGrainLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
+   * Data struct for verbosity updates.
+   */
+  struct VerbosityUpdate {
+    absl::string_view pattern;
+    int level;
+    bool match_group_only = false;
+  };
+
+  /**
    * Updates all loggers based on the verbosity updates <(file, level) ...>.
    * It supports file basename and glob "*" and "?" pattern, eg. ("foo", 2), ("foo/b*", 3)
    * Patterns including a slash character are matched against full path names, while those
    * without are matched against base names (by removing one suffix) only.
+   *
+   * If match_group_only is true, the pattern is only matched against the logger group name.
    *
    * It will store the current verbosity updates and clear all previous modifications for
    * future check when initializing a new logger.
@@ -103,7 +123,7 @@ public:
    *
    * Files which do not match any pattern use the default verbosity log level.
    */
-  void updateVerbositySetting(const std::vector<std::pair<absl::string_view, int>>& updates)
+  void updateVerbositySetting(const std::vector<VerbosityUpdate>& updates)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
@@ -123,6 +143,12 @@ public:
    * and wildcards may match /. No support for bracket expressions [...].
    */
   static bool safeFileNameMatch(absl::string_view pattern, absl::string_view str);
+
+  /**
+   * Check if a logger's name matches the given file and logger name.
+   */
+  bool checkFineGrainLogger(spdlog::logger* logger, absl::string_view file, absl::string_view name)
+      ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
    * Remove a fine grain log entry for testing only.
@@ -150,14 +176,14 @@ private:
    * Append verbosity level updates to the VerbosityLogUpdateInfo vector.
    */
   void appendVerbosityLogUpdate(absl::string_view update_pattern,
-                                spdlog::level::level_enum log_level)
+                                spdlog::level::level_enum log_level, bool match_group_only)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fine_grain_log_lock_);
 
   /**
-   * Returns the current log level of `file`. Default log level is used if there is no
+   * Returns the current log level of `key`. Default log level is used if there is no
    * match in verbosity_update_info_.
    */
-  spdlog::level::level_enum getLogLevel(absl::string_view file) const
+  spdlog::level::level_enum getLogLevel(absl::string_view key) const
       ABSL_SHARED_LOCKS_REQUIRED(fine_grain_log_lock_);
 
   /**
@@ -165,6 +191,11 @@ private:
    * (not for the corresponding loggers).
    */
   mutable absl::Mutex fine_grain_log_lock_;
+
+  /**
+   * Parses a logger key into its file and name components.
+   */
+  static std::pair<absl::string_view, absl::string_view> parseKey(absl::string_view key);
 
   /**
    * Map that stores <key, logger> pairs, key can be the file name.
@@ -194,23 +225,52 @@ FineGrainLogContext& getFineGrainLogContext();
  * The local pointer is used to avoid another load() when logging. Here we use
  * spdlog::logger* as atomic<shared_ptr> is a C++20 feature.
  */
-#define FINE_GRAIN_LOGGER()                                                                        \
-  ([]() -> spdlog::logger* {                                                                       \
+#define FINE_GRAIN_LOGGER(NAME)                                                                    \
+  ([&](absl::string_view name) -> spdlog::logger* {                                                \
     static std::atomic<spdlog::logger*> flogger{nullptr};                                          \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_acquire);                       \
-    if (!local_flogger) {                                                                          \
-      ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);                    \
-      local_flogger = flogger.load(std::memory_order_acquire);                                     \
+                                                                                                   \
+    if (__builtin_constant_p(NAME)) {                                                              \
+      if (ABSL_PREDICT_FALSE(!local_flogger)) {                                                    \
+        local_flogger =                                                                            \
+            ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, name, flogger);        \
+      }                                                                                            \
+    } else {                                                                                       \
+      static std::atomic<const char*> cached_name_ptr{nullptr};                                    \
+      const char* current_ptr = name.data();                                                       \
+      if (ABSL_PREDICT_FALSE(!local_flogger ||                                                     \
+                             cached_name_ptr.load(std::memory_order_relaxed) != current_ptr)) {    \
+        if (!local_flogger || !::Envoy::getFineGrainLogContext().checkFineGrainLogger(             \
+                                  local_flogger, __FILE__, name)) {                                \
+          local_flogger =                                                                          \
+              ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, name, flogger);      \
+        }                                                                                          \
+        if (local_flogger) {                                                                       \
+          cached_name_ptr.store(current_ptr, std::memory_order_relaxed);                           \
+        }                                                                                          \
+      }                                                                                            \
     }                                                                                              \
     return local_flogger;                                                                          \
-  }())
+  }(NAME))
 
 /**
- * Macro for fine-grain logger to log.
+ * Macro for fine-grain logger to log without a group.
  */
 #define FINE_GRAIN_LOG(LEVEL, ...)                                                                 \
   do {                                                                                             \
-    spdlog::logger* local_flogger = FINE_GRAIN_LOGGER();                                           \
+    spdlog::logger* local_flogger = FINE_GRAIN_LOGGER("");                                         \
+    if (ENVOY_LOG_COMP_LEVEL(*local_flogger, LEVEL)) {                                             \
+      local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                         \
+                         ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                  \
+    }                                                                                              \
+  } while (0)
+
+/**
+ * Macro for fine-grain logger to log with a group.
+ */
+#define FINE_GRAIN_GROUP_LOG(LEVEL, NAME, ...)                                                     \
+  do {                                                                                             \
+    spdlog::logger* local_flogger = FINE_GRAIN_LOGGER(NAME);                                       \
     if (ENVOY_LOG_COMP_LEVEL(*local_flogger, LEVEL)) {                                             \
       local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                         \
                          ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                  \
@@ -221,22 +281,23 @@ FineGrainLogContext& getFineGrainLogContext();
  * Convenient macro for connection log.
  */
 #define FINE_GRAIN_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                        \
-  FINE_GRAIN_LOG(LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
+  FINE_GRAIN_GROUP_LOG(LEVEL, "", "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
 /**
  * Convenient macro for stream log.
  */
 #define FINE_GRAIN_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                          \
-  FINE_GRAIN_LOG(LEVEL, "[C{}][S{}] " FORMAT,                                                      \
-                 (STREAM).connection() ? (STREAM).connection()->id() : 0, (STREAM).streamId(),     \
-                 ##__VA_ARGS__)
+  FINE_GRAIN_GROUP_LOG(LEVEL, "", "[C{}][S{}] " FORMAT,                                            \
+                       (STREAM).connection() ? (STREAM).connection()->id() : 0,                    \
+                       (STREAM).streamId(), ##__VA_ARGS__)
 
 /**
  * Convenient macro for log flush.
  */
-#define FINE_GRAIN_FLUSH_LOG()                                                                     \
+#define FINE_GRAIN_FLUSH_LOG(NAME)                                                                 \
   do {                                                                                             \
-    SpdLoggerSharedPtr p = ::Envoy::getFineGrainLogContext().getFineGrainLogEntry(__FILE__);       \
+    SpdLoggerSharedPtr p =                                                                         \
+        ::Envoy::getFineGrainLogContext().getFineGrainLogEntryForFlush(__FILE__, NAME);            \
     if (p) {                                                                                       \
       p->flush();                                                                                  \
     }                                                                                              \

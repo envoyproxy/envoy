@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -15,8 +17,6 @@
 #include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 #include "source/extensions/filters/network/dubbo_proxy/stats.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -195,7 +195,7 @@ private:
   Stats::TimespanPtr request_timer_;
   ActiveResponseDecoderPtr response_decoder_;
 
-  absl::optional<Router::RouteConstSharedPtr> cached_route_;
+  std::optional<Router::RouteConstSharedPtr> cached_route_;
 
   std::list<ActiveMessageDecoderFilterPtr> decoder_filters_;
   std::function<FilterStatus(DubboFilters::DecoderFilter*)> filter_action_;

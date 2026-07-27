@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
@@ -18,8 +19,6 @@
 #include "source/common/config/remote_data_fetcher.h"
 #include "source/common/config/watched_directory.h"
 #include "source/common/init/target_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -62,9 +61,9 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
 
 /**
  * @param source data source.
- * @return absl::optional<std::string> path to DataSource if a filename, otherwise absl::nullopt.
+ * @return std::optional<std::string> path to DataSource if a filename, otherwise std::nullopt.
  */
-absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source);
+std::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source);
 
 template <class DataType>
 using DataTransform = std::function<absl::StatusOr<std::shared_ptr<DataType>>(absl::string_view)>;

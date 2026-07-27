@@ -28,7 +28,7 @@ public:
     // This is called from the thread to which the hot restart Event::Dispatcher
     // dispatches, which is expected to be the same main thread as registerListener
     // is called from.
-    absl::optional<ForwardEntry>
+    std::optional<ForwardEntry>
     getListenerForDestination(const Network::Address::Instance& address);
 
     // Registers a UdpListenerConfig and address into the map, to be matched using
@@ -59,7 +59,7 @@ public:
                                      absl::AnyInvocable<void()> action) override;
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
-  absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
+  std::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
   void sendParentTerminateRequest();
   void mergeParentStats(Stats::Store& stats_store,
                         const envoy::HotRestartMessage::Reply::Stats& stats_proto);

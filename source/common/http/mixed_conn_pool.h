@@ -17,7 +17,7 @@ public:
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Upstream::ClusterConnectivityState& state,
-      absl::optional<HttpServerPropertiesCache::Origin> origin,
+      std::optional<HttpServerPropertiesCache::Origin> origin,
       Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
       Server::OverloadManager& overload_manager)
       : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
@@ -37,7 +37,7 @@ private:
   // Default to HTTP/1, as servers which don't support ALPN are probably HTTP/1 only.
   Http::Protocol protocol_ = Protocol::Http11;
   Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache_;
-  absl::optional<HttpServerPropertiesCache::Origin> origin_;
+  std::optional<HttpServerPropertiesCache::Origin> origin_;
 };
 
 } // namespace Http

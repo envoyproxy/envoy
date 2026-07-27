@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -10,7 +11,6 @@
 #include "source/extensions/common/dubbo/hessian2_utils.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -247,12 +247,12 @@ public:
   RpcResponse() = default;
 
   void setResponseType(RpcResponseType response_type) { response_type_ = response_type; }
-  absl::optional<RpcResponseType> responseType() const { return response_type_; }
+  std::optional<RpcResponseType> responseType() const { return response_type_; }
 
   ResponseContent& content() const { return content_; }
 
 private:
-  absl::optional<RpcResponseType> response_type_;
+  std::optional<RpcResponseType> response_type_;
   mutable ResponseContent content_;
 };
 

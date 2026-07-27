@@ -22,6 +22,7 @@
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -172,9 +173,11 @@ TEST_P(AdminInstanceTest, Help) {
       format: File format to use; One of (text, json)
   /logging (POST): query/change logging levels
       paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>. If fine grain logging is enabled, use __FILE__ or a glob experision as the logger name. For example, source/common*:warning
+      group: Change given logger group to desired level, set to <logger_group_name>:<desired_level>. logger_group_name must be a logger name.
       level: desired logging level, this will change all loggers's level; One of (, trace, debug, info, warning, error, critical, off)
   /memory: print current allocation/heap usage
   /memory/tcmalloc: print TCMalloc stats
+  /peak_heap_dump: dump peak Envoy heap (if supported)
   /quitquitquit (POST): exit the server
   /ready: print server state, return 200 if LIVE, otherwise return 503
   /reopen_logs (POST): reopen access logs
@@ -185,6 +188,7 @@ TEST_P(AdminInstanceTest, Help) {
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
       filter: Regular expression (Google re2) for filtering stats
+      invert_filter: Invert the filter regex
       format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
       histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, summary)
@@ -192,6 +196,7 @@ TEST_P(AdminInstanceTest, Help) {
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
       filter: Regular expression (Google re2) for filtering stats
+      invert_filter: Invert the filter regex
       histogram_buckets: Histogram bucket display mode; One of (cumulative, summary)
   /stats/recentlookups: Show recent stat-name lookups
   /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
@@ -339,7 +344,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.routeConfigProvider().config();
   peer.routeConfigProvider().configInfo();
   peer.routeConfigProvider().lastUpdated();
-  ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
+  ASSERT_OK(peer.routeConfigProvider().onConfigUpdate());
 
   peer.scopedRouteConfigProvider().lastUpdated();
   peer.scopedRouteConfigProvider().getConfig();
@@ -356,7 +361,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.socketFactory().clone();
   peer.socketFactory().closeAllSockets();
-  ASSERT_TRUE(peer.socketFactory().doFinalPreWorkerInit().ok());
+  ASSERT_OK(peer.socketFactory().doFinalPreWorkerInit());
 
   peer.listener().name();
   peer.listener().udpListenerConfig();

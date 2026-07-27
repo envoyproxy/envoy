@@ -196,7 +196,7 @@ void HealthCheckFilter::onComplete() {
           headers.setEnvoyDegraded("");
         }
       },
-      absl::nullopt, *details);
+      std::nullopt, *details);
 }
 
 } // namespace HealthCheck

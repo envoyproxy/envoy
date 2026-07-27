@@ -29,6 +29,9 @@ public:
   DynamicModuleAccessLogFactory factory_;
 };
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModuleAccessLogFactoryTest, FactoryName) {
   EXPECT_EQ("envoy.access_loggers.dynamic_modules", factory_.name());
 }
@@ -65,6 +68,49 @@ logger_config:
   AccessLog::FilterPtr filter;
   auto access_log = factory_.createAccessLogInstance(proto_config, std::move(filter), context, {});
   EXPECT_NE(nullptr, access_log);
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(context.server_context_.serverScope(), "module_load_error",
+                               "test_logger"));
+  EXPECT_EQ(0U, failureCounter(context.server_context_.serverScope(), "config_init_error",
+                               "test_logger"));
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModuleAccessLogFactoryTest, ValidConfigWithLocalFile) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context.server_context_, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context.server_context_);
+
+  envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Extensions::DynamicModules::testSharedObjectPath("access_log_no_op", "c"));
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_logger_name("test_logger");
+
+  AccessLog::FilterPtr filter;
+  auto access_log = factory_.createAccessLogInstance(proto_config, std::move(filter), context, {});
+  EXPECT_NE(nullptr, access_log);
+}
+
+// Remote module sources are not supported for access loggers (no init manager is wired up).
+TEST_F(DynamicModuleAccessLogFactoryTest, RemoteSourceRejected) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  ScopedThreadLocalServerContextSetter setter(context.server_context_);
+
+  envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog proto_config;
+  auto* remote = proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  proto_config.set_logger_name("test_logger");
+
+  AccessLog::FilterPtr filter;
+  EXPECT_THROW(factory_.createAccessLogInstance(proto_config, std::move(filter), context, {}),
+               EnvoyException);
 }
 
 TEST_F(DynamicModuleAccessLogFactoryTest, ValidConfigWithFilter) {
@@ -104,6 +150,9 @@ logger_name: test_logger
   EXPECT_THROW_WITH_REGEX(
       factory_.createAccessLogInstance(proto_config, std::move(filter), context, {}),
       EnvoyException, "Failed to load.*");
+
+  EXPECT_EQ(1U, failureCounter(context.server_context_.serverScope(), "module_load_error",
+                               "test_logger"));
 }
 
 TEST_F(DynamicModuleAccessLogFactoryTest, FactoryRegistration) {
@@ -128,6 +177,36 @@ logger_name: test_logger
   EXPECT_THROW_WITH_REGEX(
       factory_.createAccessLogInstance(proto_config, std::move(filter), context, {}),
       EnvoyException, "Failed to resolve symbol.*config_new");
+
+  // The module loads fine but its config creation fails resolving a symbol, so this is counted as
+  // config_init_error.
+  EXPECT_EQ(1U, failureCounter(context.server_context_.serverScope(), "config_init_error",
+                               "test_logger"));
+  EXPECT_EQ(0U, failureCounter(context.server_context_.serverScope(), "module_load_error",
+                               "test_logger"));
+}
+
+TEST_F(DynamicModuleAccessLogFactoryTest, MalformedLoggerConfig) {
+  // The module loads fine but the logger_config Any cannot be unpacked, counted as
+  // config_init_error. A malformed Any must be built programmatically.
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog proto_config;
+  proto_config.mutable_dynamic_module_config()->set_name("access_log_no_op");
+  proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+  proto_config.set_logger_name("test_logger");
+  auto* any = proto_config.mutable_logger_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+
+  AccessLog::FilterPtr filter;
+  EXPECT_THROW_WITH_REGEX(
+      factory_.createAccessLogInstance(proto_config, std::move(filter), context, {}),
+      EnvoyException, "Failed to parse logger config");
+
+  EXPECT_EQ(1U, failureCounter(context.server_context_.serverScope(), "config_init_error",
+                               "test_logger"));
+  EXPECT_EQ(0U, failureCounter(context.server_context_.serverScope(), "module_load_error",
+                               "test_logger"));
 }
 
 TEST_F(DynamicModuleAccessLogFactoryTest, MissingConfigDestroy) {

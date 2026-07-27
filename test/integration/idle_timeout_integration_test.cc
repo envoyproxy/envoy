@@ -683,7 +683,7 @@ public:
       // Add custom upstream filter
       auto* filter = cluster->add_filters();
       filter->set_name("envoy.test.upstream_idle_timeout_verifier");
-      filter->mutable_typed_config()->PackFrom(Protobuf::Struct());
+      std::ignore = filter->mutable_typed_config()->PackFrom(Protobuf::Struct());
 
       // Set idle timeout
       ConfigHelper::HttpProtocolOptions protocol_options;

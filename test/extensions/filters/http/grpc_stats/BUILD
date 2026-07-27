@@ -26,3 +26,16 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/grpc_stats/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "grpc_stats_filter_integration_test",
+    size = "large",
+    srcs = ["grpc_stats_filter_integration_test.cc"],
+    extension_names = ["envoy.filters.http.grpc_stats"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/grpc_stats:config",
+        "//test/integration:http_integration_lib",
+    ],
+)

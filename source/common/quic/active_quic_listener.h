@@ -16,6 +16,7 @@
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
 
+#include "quiche/quic/core/quic_packet_writer.h"
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
 namespace Envoy {
@@ -58,6 +59,7 @@ public:
     // No-op. Quic can't do anything upon listener error.
   }
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
+  quic::QuicPacketWriter* quicPacketWriter() { return quic_packet_writer_; }
   void onDataWorker(Network::UdpRecvData&& data) override;
   uint32_t destination(const Network::UdpRecvData& data) const override;
   size_t numPacketsExpectedPerEventLoop() const override;
@@ -72,6 +74,9 @@ public:
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onFilterChainDrainStart(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+  void onListenerDrainStart() override;
 
   void onCloseIdleHttpConnections(bool is_saturated) override;
 
@@ -89,8 +94,9 @@ private:
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   const bool kernel_worker_routing_;
-  absl::optional<Runtime::FeatureFlag> enabled_;
+  std::optional<Runtime::FeatureFlag> enabled_;
   Network::UdpPacketWriter* udp_packet_writer_;
+  quic::QuicPacketWriter* quic_packet_writer_{nullptr};
 
   // The number of runs of the event loop in which at least one CHLO was buffered.
   // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
@@ -149,10 +155,9 @@ protected:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
-  absl::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
+  std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
       crypto_server_stream_factory_;
-  absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
-      proof_source_factory_;
+  std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>> proof_source_factory_;
   EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr connection_debug_visitor_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;

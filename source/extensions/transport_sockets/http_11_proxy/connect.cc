@@ -33,7 +33,7 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
     Network::TransportSocketOptionsConstSharedPtr options,
     std::shared_ptr<const Upstream::HostDescription> host,
-    absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info)
+    std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info)
     : PassthroughSocket(std::move(transport_socket)), options_(options) {
   // If the filter state metadata has populated the relevant entries in the transport socket
   // options, we want to maintain the original behavior of this transport socket.
@@ -205,7 +205,7 @@ Network::IoResult UpstreamHttp11ConnectSocket::writeHeader() {
 
 UpstreamHttp11ConnectSocketFactory::UpstreamHttp11ConnectSocketFactory(
     Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-    absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info)
+    std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info)
     : PassthroughFactory(std::move(transport_socket_factory)), proxy_info_(proxy_info) {}
 
 Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportSocket(

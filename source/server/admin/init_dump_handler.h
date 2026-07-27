@@ -26,7 +26,7 @@ private:
    * Helper methods for the /init_dump url handler to add unready targets information.
    */
   std::unique_ptr<envoy::admin::v3::UnreadyTargetsDumps>
-  dumpUnreadyTargets(const absl::optional<std::string>& target) const;
+  dumpUnreadyTargets(const std::optional<std::string>& target) const;
 
   /**
    * Helper methods for the /init_dump url handler to add unready targets config of listeners.

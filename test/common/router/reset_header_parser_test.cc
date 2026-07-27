@@ -80,7 +80,7 @@ format: SECONDS
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
@@ -96,7 +96,7 @@ format: SECONDS
   Http::TestResponseHeaderMapImpl response_headers{
       {"retry-after", "Fri, 17 Jul 2020 11:59:51 GMT"}};
 
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
@@ -111,7 +111,7 @@ format: SECONDS
 
   Http::TestResponseHeaderMapImpl response_headers{{"retry-after", "2.5"}};
 
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
@@ -126,7 +126,7 @@ format: SECONDS
 
   Http::TestResponseHeaderMapImpl response_headers{{"retry-after", "5"}};
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(5000),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(5000),
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
@@ -141,7 +141,7 @@ format: SECONDS
 
   Http::TestResponseHeaderMapImpl response_headers{{"Retry-After", "5"}};
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(5000),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(5000),
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
@@ -156,7 +156,7 @@ format: UNIX_TIMESTAMP
 
   Http::TestResponseHeaderMapImpl response_headers{{"retry-after", "1595320702.1234"}};
 
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
@@ -171,7 +171,7 @@ format: UNIX_TIMESTAMP
 
   Http::TestResponseHeaderMapImpl response_headers{{"retry-after", "999999999"}};
 
-  EXPECT_EQ(absl::nullopt,
+  EXPECT_EQ(std::nullopt,
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
@@ -186,7 +186,7 @@ format: UNIX_TIMESTAMP
 
   Http::TestResponseHeaderMapImpl response_headers{{"retry-after", "1000000000"}};
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(0),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(0),
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
@@ -201,7 +201,7 @@ format: UNIX_TIMESTAMP
 
   Http::TestResponseHeaderMapImpl response_headers{{"retry-after", "1000000007"}};
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(7000),
+  EXPECT_EQ(std::optional<std::chrono::milliseconds>(7000),
             reset_header_parser.parseInterval(test_time_.timeSystem(), response_headers));
 }
 

@@ -127,7 +127,7 @@ protected:
       auto* resource = response.add_resources();
       resource->set_name(resource_name);
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(lb_endpoint);
+      std::ignore = resource->mutable_resource()->PackFrom(lb_endpoint);
     }
     locality_stream->sendGrpcMessage(response);
   }

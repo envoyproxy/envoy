@@ -25,7 +25,7 @@ public:
     is_active_ = true;
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                        "AssertNonReentrantFilter local reply during decodeHeaders.",
-                                       nullptr, absl::nullopt, "");
+                                       nullptr, std::nullopt, "");
     is_active_ = false;
     return Http::FilterHeadersStatus::Continue;
   }

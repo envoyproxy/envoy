@@ -52,20 +52,21 @@ using StructMap = absl::flat_hash_map<std::string, Protobuf::Struct>;
 using namespace Envoy::Extensions::NetworkFilters::ThriftProxy;
 
 class ThriftDecoderHandler;
-using ThriftMetadataToProtobufValue = std::function<absl::optional<Protobuf::Value>(
+using ThriftMetadataToProtobufValue = std::function<std::optional<Protobuf::Value>(
     MessageMetadataSharedPtr, const ThriftDecoderHandler&)>;
 
 class Rule {
 public:
-  Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root);
+  Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root,
+       absl::Status& creation_status);
 
   const ProtoRule& rule() const { return rule_; }
   uint16_t ruleId() const { return rule_id_; }
   bool matches(const MessageMetadata& metadata) const;
 
   bool shouldExtractMetadata() const { return static_cast<bool>(protobuf_value_extracter_); }
-  absl::optional<Protobuf::Value> extractValue(MessageMetadataSharedPtr metadata,
-                                               const ThriftDecoderHandler& handler) const {
+  std::optional<Protobuf::Value> extractValue(MessageMetadataSharedPtr metadata,
+                                              const ThriftDecoderHandler& handler) const {
     return protobuf_value_extracter_(metadata, handler);
   }
   ThriftMetadataToProtobufValue getValueExtractorFromField(
@@ -124,7 +125,7 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata&
                    proto_config,
-               Stats::Scope& scope);
+               Stats::Scope& scope, absl::Status& creation_status);
 
   ThriftDecoderHandlerPtr createThriftDecoderHandler(DecoderEventHandler& handler,
                                                      bool is_request) {
@@ -145,10 +146,18 @@ public:
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
   Rules generateRules(const ProtobufRepeatedRule& proto_rules,
-                      PayloadExtractor::TrieSharedPtr trie_root) const {
+                      PayloadExtractor::TrieSharedPtr trie_root,
+                      absl::Status& creation_status) const {
     Rules rules;
     for (const auto& proto_rule : proto_rules) {
-      rules.emplace_back(proto_rule, rules.size(), trie_root);
+      if (!creation_status.ok()) {
+        return rules;
+      }
+      auto rule = Rule(proto_rule, rules.size(), trie_root, creation_status);
+      if (!creation_status.ok()) {
+        return rules;
+      }
+      rules.emplace_back(std::move(rule));
     }
     return rules;
   }

@@ -35,8 +35,8 @@ public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   BaseSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
                         Event::Dispatcher& dispatcher,
-                        XdsConfigTrackerOptRef xds_config_tracker = absl::nullopt,
-                        XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+                        XdsConfigTrackerOptRef xds_config_tracker = std::nullopt,
+                        XdsResourcesDelegateOptRef xds_resources_delegate = std::nullopt,
                         const std::string& target_xds_authority = "")
       : ttl_([this](const std::vector<std::string>& expired) { ttlExpiryCallback(expired); },
              dispatcher, dispatcher.timeSource()),
@@ -144,8 +144,8 @@ public:
   virtual std::unique_ptr<T>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
                         OpaqueResourceDecoderSharedPtr resource_decoder,
-                        XdsConfigTrackerOptRef xds_config_tracker = absl::nullopt,
-                        XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+                        XdsConfigTrackerOptRef xds_config_tracker = std::nullopt,
+                        XdsResourcesDelegateOptRef xds_resources_delegate = std::nullopt,
                         const std::string& target_xds_authority = "") PURE;
 };
 

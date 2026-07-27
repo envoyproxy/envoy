@@ -59,7 +59,7 @@ void Win32RedirectRecordsOptionImpl::hashKey(std::vector<uint8_t>& hash) const {
   pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(in_buffer_bstr), hash);
 }
 
-absl::optional<Socket::Option::Details> Win32RedirectRecordsOptionImpl::getOptionDetails(
+std::optional<Socket::Option::Details> Win32RedirectRecordsOptionImpl::getOptionDetails(
     const Socket&, envoy::config::core::v3::SocketOption::SocketState) const {
 
   absl::string_view in_buffer_bstr(reinterpret_cast<const char*>(redirect_records_.buf_),

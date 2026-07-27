@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -8,7 +9,6 @@
 
 #include "source/common/common/utility.h"
 
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -143,7 +143,7 @@ std::chrono::seconds getExpirationUnixTime(const X509* cert);
  * @param time_source the time source to use for current time calculation.
  * @return the number of days till this certificate is valid, the value is set when not expired.
  */
-absl::optional<uint32_t> getDaysUntilExpiration(const X509* cert, TimeSource& time_source);
+std::optional<uint32_t> getDaysUntilExpiration(const X509* cert, TimeSource& time_source);
 
 /**
  * Returns the time from when this certificate is valid.
@@ -160,11 +160,11 @@ SystemTime getValidFrom(const X509& cert);
 SystemTime getExpirationTime(const X509& cert);
 
 /**
- * Returns the last crypto error from ERR_get_error(), or `absl::nullopt`
+ * Returns the last crypto error from ERR_get_error(), or `std::nullopt`
  * if the error stack is empty.
  * @return std::string error message
  */
-absl::optional<std::string> getLastCryptoError();
+std::optional<std::string> getLastCryptoError();
 
 /**
  * Returns error string corresponding error code derived from OpenSSL.

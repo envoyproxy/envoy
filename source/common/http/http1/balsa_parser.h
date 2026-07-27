@@ -30,7 +30,7 @@ public:
   ParserStatus getStatus() const override;
   Http::Code statusCode() const override;
   bool isHttp11() const override;
-  absl::optional<uint64_t> contentLength() const override;
+  std::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;
   absl::string_view methodName() const override;
   absl::string_view errorMessage() const override;

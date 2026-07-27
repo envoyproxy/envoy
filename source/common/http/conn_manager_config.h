@@ -220,9 +220,9 @@ public:
   virtual const AccessLog::InstanceSharedPtrVector& accessLogs() PURE;
 
   /**
-   * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
+   * @return const std::optional<std::chrono::milliseconds>& the interval to flush the access logs.
    */
-  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
+  virtual const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
 
   // If set to true, access log will be flushed when a new HTTP request is received, after request
   // headers have been evaluated, and before attempting to establish a connection with the upstream.
@@ -253,7 +253,10 @@ public:
 
   /**
    * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
-   *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
+   *         notice" to the time it will issue a full GOAWAY and not accept any new streams. If
+   *         ``drain_timeout_jitter`` is configured, each call returns the base timeout extended
+   *         by a random amount up to ``drainTimeout * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method.
    */
   virtual std::chrono::milliseconds drainTimeout() const PURE;
 
@@ -282,7 +285,7 @@ public:
   /**
    * @return optional idle timeout for incoming connection manager connections.
    */
-  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+  virtual std::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return if the connection manager does routing base on router config, e.g. a Server::Admin impl
@@ -291,9 +294,14 @@ public:
   virtual bool isRoutable() const PURE;
 
   /**
-   * @return optional maximum connection duration timeout for manager connections.
+   * @return optional maximum connection duration timeout for manager connections. If
+   *         ``max_connection_duration_jitter`` is configured, each call returns the
+   *         base duration extended by a random amount up to
+   *         ``max_connection_duration * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method;
+   *         callers should arm their timer with whatever value this returns.
    */
-  virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
   /**
    * @return whether maxConnectionDuration allows HTTP1 clients to choose when to close connection
@@ -321,7 +329,7 @@ public:
    * @return per-stream flush timeout for incoming connection manager connections. Zero indicates a
    *         disabled idle timeout.
    */
-  virtual absl::optional<std::chrono::milliseconds> streamFlushTimeout() const PURE;
+  virtual std::optional<std::chrono::milliseconds> streamFlushTimeout() const PURE;
 
   /**
    * @return request timeout for incoming connection manager connections. Zero indicates
@@ -344,7 +352,7 @@ public:
   /**
    * @return maximum duration time to keep alive stream
    */
-  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
 
   /**
    * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
@@ -378,9 +386,9 @@ public:
   serverHeaderTransformation() const PURE;
 
   /**
-   * @return const absl::optional<std::string> the scheme name to write into requests.
+   * @return const std::optional<std::string> the scheme name to write into requests.
    */
-  virtual const absl::optional<std::string>& schemeToSet() const PURE;
+  virtual const std::optional<std::string>& schemeToSet() const PURE;
 
   /**
    * @return bool whether the scheme should be overwritten to match the upstream transport protocol.
@@ -422,7 +430,7 @@ public:
   virtual bool skipXffAppend() const PURE;
 
   /**
-   * @return const absl::optional<std::string>& value of via header to add to requests and response
+   * @return const std::optional<std::string>& value of via header to add to requests and response
    *                                            headers if set.
    */
   virtual const std::string& via() const PURE;
@@ -461,7 +469,7 @@ public:
    *         be enabled. User agent will only overwritten if it doesn't already exist. If enabled,
    *         the same user agent will be written to the x-envoy-downstream-service-cluster header.
    */
-  virtual const absl::optional<std::string>& userAgent() PURE;
+  virtual const std::optional<std::string>& userAgent() PURE;
 
   /**
    *  @return TracerSharedPtr Tracer to use.

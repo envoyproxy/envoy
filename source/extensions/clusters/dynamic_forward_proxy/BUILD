@@ -25,6 +25,7 @@ envoy_cc_extension(
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

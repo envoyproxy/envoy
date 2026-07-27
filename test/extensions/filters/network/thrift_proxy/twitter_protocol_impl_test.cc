@@ -105,7 +105,7 @@ public:
 
     TestTwitterProtocolImpl proto;
 
-    metadata_->mutableSpans().emplace_back(trace_id, "", span_id, absl::optional<int64_t>(),
+    metadata_->mutableSpans().emplace_back(trace_id, "", span_id, std::optional<int64_t>(),
                                            AnnotationList(), BinaryAnnotationList(), false);
     metadata_->responseHeaders().addCopy(Http::LowerCaseString("test-header"), "test-header-value");
 
@@ -178,7 +178,10 @@ public:
       Buffer::OwnedImpl buffer;
       buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length() + 13);
       addSeq(buffer, {
-                         0x80, 0x01, 0x00, 0x02, // binary, reply
+                         0x80,
+                         0x01,
+                         0x00,
+                         0x02, // binary, reply
                      });
       buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
       buffer.add(TwitterProtocolImpl::upgradeMethodName());
@@ -322,8 +325,11 @@ TEST_F(TwitterProtocolTest, RequestUpgradeSequence) {
          });
   expected_buffer.add(TwitterProtocolImpl::upgradeMethodName());
   addSeq(expected_buffer, {
-                              0x00, 0x00, 0x00, 0x64, // sequence number
-                              0x00,                   // upgrade response stop field
+                              0x00,
+                              0x00,
+                              0x00,
+                              0x64, // sequence number
+                              0x00, // upgrade response stop field
                           });
   EXPECT_EQ(expected_buffer.toString(), response_buffer.toString());
 
@@ -349,7 +355,10 @@ TEST_F(TwitterProtocolTest, ResponseUpgradeSequence) {
   Buffer::OwnedImpl expected_buffer;
   expected_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length() + 13);
   addSeq(expected_buffer, {
-                              0x80, 0x01, 0x00, 0x01, // binary, call
+                              0x80,
+                              0x01,
+                              0x00,
+                              0x01, // binary, call
                           });
   expected_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
   expected_buffer.add(TwitterProtocolImpl::upgradeMethodName());
@@ -360,7 +369,10 @@ TEST_F(TwitterProtocolTest, ResponseUpgradeSequence) {
   Buffer::OwnedImpl response_buffer;
   response_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length() + 13);
   addSeq(response_buffer, {
-                              0x80, 0x01, 0x00, 0x02, // binary, reply
+                              0x80,
+                              0x01,
+                              0x00,
+                              0x02, // binary, reply
                           });
   response_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
   response_buffer.add(TwitterProtocolImpl::upgradeMethodName());
@@ -413,22 +425,31 @@ TEST_F(TwitterProtocolTest, ResponseUpgradeRejectedSequence) {
   response_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length() +
                                       response_err.length() + 27);
   addSeq(response_buffer, {
-                              0x80, 0x01, 0x00, 0x03, // binary, exception
+                              0x80,
+                              0x01,
+                              0x00,
+                              0x03, // binary, exception
                           });
   response_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
   response_buffer.add(TwitterProtocolImpl::upgradeMethodName());
   response_buffer.writeBEInt<int32_t>(0);
   addSeq(response_buffer, {
-                              0x0B, 0x00, 0x01, // string field 1
+                              0x0B,
+                              0x00,
+                              0x01, // string field 1
                           });
   response_buffer.writeBEInt<int32_t>(response_err.length());
   response_buffer.add(response_err);
-  addSeq(response_buffer,
-         {
-             0x08, 0x00, 0x02, // int field 2
-             0x00, 0x00, 0x00, static_cast<uint8_t>(AppExceptionType::UnknownMethod),
-             0x00, // stop field
-         });
+  addSeq(response_buffer, {
+                              0x08,
+                              0x00,
+                              0x02, // int field 2
+                              0x00,
+                              0x00,
+                              0x00,
+                              static_cast<uint8_t>(AppExceptionType::UnknownMethod),
+                              0x00, // stop field
+                          });
 
   EXPECT_TRUE(response_decoder->onData(response_buffer));
 
@@ -734,7 +755,7 @@ TEST_F(TwitterProtocolTest, WriteResponseHeader) {
   headers.addCopy(Http::LowerCaseString("key2"), "value2");
 
   SpanList& spans = metadata_->mutableSpans();
-  spans.emplace_back(1, "s1", 100, absl::optional<int64_t>(10),
+  spans.emplace_back(1, "s1", 100, std::optional<int64_t>(10),
                      AnnotationList({
                          Annotation(100000, "a1", {Endpoint(0xC0A80001, 0, "")}),
                          Annotation(100001, "a2", {}),
@@ -747,7 +768,7 @@ TEST_F(TwitterProtocolTest, WriteResponseHeader) {
                          BinaryAnnotation("bak2", "bav2", AnnotationType::String, {}),
                      }),
                      true);
-  spans.emplace_back(2, "s2", 200, absl::optional<int64_t>(), AnnotationList(),
+  spans.emplace_back(2, "s2", 200, std::optional<int64_t>(), AnnotationList(),
                      BinaryAnnotationList(), false);
   TestTwitterProtocolImpl proto;
   Buffer::OwnedImpl buffer;
@@ -934,7 +955,7 @@ TEST_F(TwitterProtocolTest, TestUpgradedWriteMessageBegin) {
   metadata_->setMethodName("message");
   metadata_->setSequenceId(1);
   metadata_->setTraceId(1);
-  metadata_->mutableSpans().emplace_back(100, "", 100, absl::optional<int64_t>(), AnnotationList(),
+  metadata_->mutableSpans().emplace_back(100, "", 100, std::optional<int64_t>(), AnnotationList(),
                                          BinaryAnnotationList(), false);
 
   {
@@ -970,7 +991,7 @@ TEST_F(TwitterProtocolTest, TestUpgradedWriteMessageBegin) {
   metadata_->setMethodName("message");
   metadata_->setSequenceId(1);
   metadata_->setTraceId(1);
-  metadata_->mutableSpans().emplace_back(100, "", 100, absl::optional<int64_t>(), AnnotationList(),
+  metadata_->mutableSpans().emplace_back(100, "", 100, std::optional<int64_t>(), AnnotationList(),
                                          BinaryAnnotationList(), false);
 
   {

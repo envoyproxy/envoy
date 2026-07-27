@@ -1,4 +1,5 @@
 #include <chrono>
+#include <optional>
 
 #include "envoy/common/exception.h"
 #include "envoy/thread/thread.h"
@@ -22,7 +23,7 @@ using testing::Return;
 
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
-  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
+  MOCK_METHOD(std::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
   MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
 };
@@ -80,7 +81,7 @@ TEST_F(SharedConsumerManagerTest, ShouldHandleMissingConfig) {
   // given
   const std::string topic = "topic";
 
-  EXPECT_CALL(configuration_, computeClusterConfigForTopic(topic)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(configuration_, computeClusterConfigForTopic(topic)).WillOnce(Return(std::nullopt));
 
   EXPECT_CALL(consumer_factory_, createConsumer(_, _, _, _, _)).Times(0);
 
@@ -144,7 +145,7 @@ protected:
   }
 
   InboundRecordSharedPtr makeRecord(const std::string& topic, const int32_t partition) {
-    return std::make_shared<InboundRecord>(topic, partition, 0, absl::nullopt, absl::nullopt);
+    return std::make_shared<InboundRecord>(topic, partition, 0, std::nullopt, std::nullopt);
   }
 };
 

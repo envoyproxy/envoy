@@ -20,15 +20,15 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
 
   // Header with bad data.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request", "abc"}};
-  EXPECT_EQ(absl::nullopt, config.httpStatusCode(&bad_headers));
+  EXPECT_EQ(std::nullopt, config.httpStatusCode(&bad_headers));
 
   // Out of range header - value too low.
   Http::TestRequestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request", "199"}};
-  EXPECT_EQ(absl::nullopt, config.httpStatusCode(&too_low_headers));
+  EXPECT_EQ(std::nullopt, config.httpStatusCode(&too_low_headers));
 
   // Out of range header - value too high.
   Http::TestRequestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-request", "600"}};
-  EXPECT_EQ(absl::nullopt, config.httpStatusCode(&too_high_headers));
+  EXPECT_EQ(std::nullopt, config.httpStatusCode(&too_high_headers));
 
   // Valid header.
   Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request", "401"}};
@@ -42,11 +42,11 @@ TEST(FaultConfigTest, FaultAbortGrpcHeaderConfig) {
 
   // Header with bad data.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-grpc-request", "abc"}};
-  EXPECT_EQ(absl::nullopt, config.grpcStatusCode(&bad_headers));
+  EXPECT_EQ(std::nullopt, config.grpcStatusCode(&bad_headers));
 
   // Out of range header - value too low.
   Http::TestRequestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-grpc-request", "-1"}};
-  EXPECT_EQ(absl::nullopt, config.grpcStatusCode(&too_low_headers));
+  EXPECT_EQ(std::nullopt, config.grpcStatusCode(&too_low_headers));
 
   // Valid header - with well-defined gRPC status code in [0,16] range.
   Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-abort-grpc-request", "5"}};
@@ -99,7 +99,7 @@ TEST(FaultConfigTest, FaultDelayHeaderConfig) {
 
   // Header with bad data.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-delay-request", "abc"}};
-  EXPECT_EQ(absl::nullopt, config.duration(&bad_headers));
+  EXPECT_EQ(std::nullopt, config.duration(&bad_headers));
 
   // Valid header.
   Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-delay-request", "123"}};
@@ -149,11 +149,11 @@ TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
 
   // Header with bad data.
   Http::TestRequestHeaderMapImpl bad_headers{{"x-envoy-fault-throughput-response", "abc"}};
-  EXPECT_EQ(absl::nullopt, config.rateKbps(&bad_headers));
+  EXPECT_EQ(std::nullopt, config.rateKbps(&bad_headers));
 
   // Header with zero.
   Http::TestRequestHeaderMapImpl zero_headers{{"x-envoy-fault-throughput-response", "0"}};
-  EXPECT_EQ(absl::nullopt, config.rateKbps(&zero_headers));
+  EXPECT_EQ(std::nullopt, config.rateKbps(&zero_headers));
 
   // Valid header.
   Http::TestRequestHeaderMapImpl good_headers{{"x-envoy-fault-throughput-response", "123"}};

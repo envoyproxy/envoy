@@ -69,7 +69,7 @@ struct HostSelectionResponse {
   std::unique_ptr<AsyncHostSelectionHandle> cancelable;
   // Optional HTTP status code to use when host selection fails because the strict override
   // destination is missing from available endpoints. If not set, defaults to 503.
-  absl::optional<Http::Code> failure_status;
+  std::optional<Http::Code> failure_status;
 };
 
 /**
@@ -84,9 +84,9 @@ public:
    * Compute and return an optional hash key to use during load balancing. This
    * method may modify internal state so it should only be called once per
    * routing attempt.
-   * @return absl::optional<uint64_t> the optional hash key to use.
+   * @return std::optional<uint64_t> the optional hash key to use.
    */
-  virtual absl::optional<uint64_t> computeHashKey() PURE;
+  virtual std::optional<uint64_t> computeHashKey() PURE;
 
   /**
    * @return Router::MetadataMatchCriteria* metadata for use in selecting a subset of hosts
@@ -254,7 +254,7 @@ public:
    * @return selected pool and connection to be used, or nullopt if no selection is made,
    *         for example if no matching connection is found.
    */
-  virtual absl::optional<SelectedPoolAndConnection>
+  virtual std::optional<SelectedPoolAndConnection>
   selectExistingConnection(LoadBalancerContext* context, const Host& host,
                            std::vector<uint8_t>& hash_key) PURE;
 };
@@ -284,9 +284,17 @@ public:
   virtual LoadBalancerPtr create(LoadBalancerParams params) PURE;
 
   /**
-   * @return bool whether the load balancer should be recreated when the host set changes.
+   * @return bool whether the cluster manager should recreate this worker-local load balancer
+   *         every time the host set changes.
+   *
+   * DEPRECATED: this hook exists only to keep not-yet-migrated load balancers working while the
+   * cluster manager's recreate-on-host-change loop is phased out. New load balancers MUST return
+   * false and refresh any host-derived state by subscribing to the priority set via
+   * PrioritySet::addMemberUpdateCb. The hook has no default so out-of-tree implementations are
+   * forced to make an explicit choice during the migration; it will be removed once all known
+   * implementations have moved off the legacy contract.
    */
-  virtual bool recreateOnHostChange() const { return true; }
+  virtual bool recreateOnHostChangeDeprecated() const PURE;
 };
 
 using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;

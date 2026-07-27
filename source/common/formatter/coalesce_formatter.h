@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -9,8 +10,6 @@
 
 #include "source/common/common/statusor.h"
 #include "source/common/formatter/substitution_format_utility.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -45,15 +44,15 @@ public:
    * @return StatusOr containing the formatter or an error.
    */
   static absl::StatusOr<FormatterProviderPtr> create(absl::string_view json_config,
-                                                     absl::optional<size_t> max_length);
+                                                     std::optional<size_t> max_length);
 
   CoalesceFormatter(std::vector<FormatterProviderPtr>&& formatters,
-                    absl::optional<size_t> max_length)
+                    std::optional<size_t> max_length)
       : formatters_(std::move(formatters)), max_length_(max_length) {}
 
   // FormatterProvider interface.
-  absl::optional<std::string> format(const Context& context,
-                                     const StreamInfo::StreamInfo& stream_info) const override;
+  std::optional<std::string> format(const Context& context,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
 
@@ -74,10 +73,10 @@ private:
    */
   static absl::StatusOr<FormatterProviderPtr>
   createFormatterForCommand(absl::string_view command, absl::string_view param,
-                            absl::optional<size_t> max_length);
+                            std::optional<size_t> max_length);
 
   std::vector<FormatterProviderPtr> formatters_;
-  absl::optional<size_t> max_length_;
+  std::optional<size_t> max_length_;
 };
 
 } // namespace Formatter

@@ -21,7 +21,7 @@ using JwtVerify::Status;
 class MockAuthFactory : public AuthFactory {
 public:
   MOCK_METHOD(AuthenticatorPtr, create,
-              (const JwtVerify::CheckAudience*, const absl::optional<std::string>&, bool, bool),
+              (const JwtVerify::CheckAudience*, const std::optional<std::string>&, bool, bool),
               (const));
 };
 

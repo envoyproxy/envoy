@@ -264,6 +264,9 @@ TEST_P(OutlierDetectionIntegrationTest, NoClusterOverwrite) {
     EXPECT_EQ("500", response->headers().getStatusValue());
   }
 
+  // Wait for the main thread to eject the host
+  test_server_->waitForCounter("cluster.cluster_0.outlier_detection.ejections_enforced_total",
+                               Eq(1));
   // Send another request. It should not reach upstream and should be handled by envoy.
   // The only existing endpoint in the cluster has been marked as unhealthy.
   IntegrationStreamDecoderPtr response =
@@ -272,7 +275,7 @@ TEST_P(OutlierDetectionIntegrationTest, NoClusterOverwrite) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 
 // Test verifies that non-5xx codes defined in cluster's protocol options
@@ -355,6 +358,9 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
+  // Wait for the main thread to eject the host
+  test_server_->waitForCounter("cluster.cluster_0.outlier_detection.ejections_enforced_total",
+                               Eq(1));
   // Now send a request. It will be captured by Envoy and 503 will be returned as the only upstream
   // is unhealthy now..
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -362,7 +368,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 // Test verifies that 5xx gateway errors configured in cluster protocol options are
 // forwarded to outlier detection in the original form and are not converted to code 500.
@@ -428,6 +434,9 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
     EXPECT_EQ("502", response->headers().getStatusValue());
   }
 
+  // Wait for the main thread to eject the host
+  test_server_->waitForCounter("cluster.cluster_0.outlier_detection.ejections_enforced_total",
+                               Eq(1));
   // Now send a request. It will be captured by Envoy and 503 will be returned as the only upstream
   // is unhealthy now..
   IntegrationStreamDecoderPtr response =
@@ -436,7 +445,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

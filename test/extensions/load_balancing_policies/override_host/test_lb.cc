@@ -66,7 +66,7 @@ private:
       return {};
     }
 
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(LoadBalancerContext*, const Host&, std::vector<uint8_t>&) override {
       return std::nullopt;
     }
@@ -86,6 +86,8 @@ private:
     LoadBalancerPtr create(LoadBalancerParams params) override {
       return std::make_unique<LoadBalancerImpl>(params.priority_set);
     }
+
+    bool recreateOnHostChangeDeprecated() const override { return false; }
   };
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;

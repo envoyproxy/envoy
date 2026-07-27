@@ -19,7 +19,6 @@ envoy_cc_library(
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:hash_lib",
         "//source/common/router:string_accessor_lib",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -36,7 +35,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -58,5 +56,22 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",
         "@envoy_api//contrib/envoy/extensions/filters/common/workload_discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "peer_metadata_registry_lib",
+    srcs = ["peer_metadata_registry.cc"],
+    hdrs = ["peer_metadata_registry.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/registry",
+        "//envoy/server:bootstrap_extension_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/singleton:instance_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//source/common/protobuf",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )

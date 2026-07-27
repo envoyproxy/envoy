@@ -13,13 +13,28 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
+# The envoy.network.connection_balance.dlb extension is disabled at the
+# Bazel layer because the upstream Intel mirror (downloadmirror.intel.com)
+# serving @dlb returns HTTP 202 Accepted instead of 200 OK, which aborts
+# Bazel external_http_archive fetches and breaks any build of
+# //contrib/exe:envoy-static (and any test under //contrib/dlb/...). See
+# https://github.com/envoyproxy/envoy/issues/45491. The targets below
+# carry tags = ["manual"] so they are excluded from wildcard builds and
+# tests (//contrib/...). The matching registration in
+# //contrib:contrib_build_config.bzl is commented out so envoy-static no
+# longer pulls them in. Drop the "manual" tags (and restore the build
+# config + metadata entries) when the upstream @dlb mirror is healthy
+# again or if that does not occur, we will consider dropping this extension.
 make(
     name = "dlb",
     env = {"DLB_DISABLE_DOMAIN_SERVER": "TRUE"},
     lib_source = "@dlb//:libdlb",
     out_static_libs = ["libdlb.a"],
     postfix_script = "mv libdlb.a $$INSTALLDIR/lib && rm -rf $$INSTALLDIR/include && mkdir -p $$INSTALLDIR/include && cp -L *.h $$INSTALLDIR/include",
-    tags = ["skip_on_windows"],
+    tags = [
+        "manual",
+        "skip_on_windows",
+    ],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     targets = ["libdlb.a"],
 )
@@ -37,6 +52,7 @@ envoy_cc_contrib_extension(
             "DLB_DISABLED=1",
         ],
     }),
+    tags = ["manual"],
     deps = [
         "//envoy/api:api_interface",
         "//envoy/registry",

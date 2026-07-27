@@ -38,17 +38,17 @@ public:
     return *downstream_connection_info_provider_;
   }
 
-  const absl::optional<std::string>& virtualClusterName() const override {
+  const std::optional<std::string>& virtualClusterName() const override {
     return virtual_cluster_name_;
   }
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
-  absl::optional<std::chrono::nanoseconds> currentDuration() const override {
+  std::optional<std::chrono::nanoseconds> currentDuration() const override {
     return duration(end_time_);
   }
 
-  absl::optional<std::chrono::nanoseconds> requestComplete() const override {
+  std::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(end_time_);
   }
 
@@ -68,8 +68,8 @@ public:
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
-  absl::optional<MonotonicTime> end_time_;
-  absl::optional<std::string> virtual_cluster_name_;
+  std::optional<MonotonicTime> end_time_;
+  std::optional<std::string> virtual_cluster_name_;
   Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
       std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Envoy::Event::SimulatedTimeSystem test_time_;
