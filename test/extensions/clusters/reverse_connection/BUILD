@@ -15,6 +15,7 @@ envoy_cc_test(
         "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
         "//conditions:default": [],
     }),
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
