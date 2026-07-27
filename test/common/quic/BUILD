@@ -67,6 +67,7 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3(["envoy_quic_proof_source_test.cc"]),
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
+        "//test/test_common:status_utility_lib",
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
@@ -155,6 +156,7 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3(["envoy_quic_client_stream_test.cc"]),
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
+        "//test/test_common:status_utility_lib",
         ":test_utils_lib",
         "//source/common/http:headers_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
@@ -404,6 +406,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
+        "//test/test_common:status_utility_lib",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/tls:context_config_lib",

@@ -5,6 +5,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -69,7 +70,7 @@ TEST_F(DrainAwareServerConnectionTest, DelegatesDispatch) {
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*inner_ptr_, dispatch(testing::Ref(data)));
   auto status = conn->dispatch(data);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   destroyConnection(conn);
 }
 

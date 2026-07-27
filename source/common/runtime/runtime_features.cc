@@ -77,6 +77,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http_preserve_rst_no_error);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
+RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_limit_json_parser_nesting_depth);
 RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
@@ -94,7 +95,6 @@ RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_legacy_cbc_decrypt_compat);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
-RUNTIME_GUARD(envoy_reloadable_features_on_demand_track_end_stream);
 RUNTIME_GUARD(envoy_reloadable_features_orca_weight_manager_use_named_metrics_first);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
@@ -120,6 +120,7 @@ RUNTIME_GUARD(envoy_reloadable_features_report_load_when_rq_active_is_non_zero);
 RUNTIME_GUARD(envoy_reloadable_features_reset_ignore_upstream_reason);
 RUNTIME_GUARD(envoy_reloadable_features_reset_with_error);
 RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_dynamic_metadata);
+RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_partition_original_dst_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
@@ -139,7 +140,6 @@ RUNTIME_GUARD(envoy_reloadable_features_uri_template_mixed_variable_literals);
 RUNTIME_GUARD(envoy_reloadable_features_use_migration_in_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
-RUNTIME_GUARD(envoy_reloadable_features_wasm_use_effective_ctx_for_foreign_functions);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
@@ -152,6 +152,10 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
+// scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
+// TODO: flip to true after sufficient testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_stats_explicit_tags);
 // TODO: Flip to true after sufficient testing to enable formatter support for rate limit action
 // descriptor_value fields by default.
 FALSE_RUNTIME_GUARD(
