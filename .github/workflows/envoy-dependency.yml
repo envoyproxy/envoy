@@ -53,16 +53,16 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/actions/appauth@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+      uses: envoyproxy/toolshed/actions/appauth@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+      uses: envoyproxy/toolshed/actions/github/checkout@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/actions/bson@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+    - uses: envoyproxy/toolshed/actions/bson@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: update
       name: Update dependency (${{ inputs.dependency }})
       with:
@@ -97,13 +97,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - uses: envoyproxy/toolshed/actions/upload/diff@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+    - uses: envoyproxy/toolshed/actions/upload/diff@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       name: Upload diff
       with:
         name: ${{ inputs.dependency }}-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr }}
-      uses: envoyproxy/toolshed/actions/github/pr@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+      uses: envoyproxy/toolshed/actions/github/pr@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         base: main
         body: |
@@ -134,11 +134,11 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/actions/appauth@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+      uses: envoyproxy/toolshed/actions/appauth@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/bind-mounts@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+    - uses: envoyproxy/toolshed/actions/bind-mounts@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       if: ! github.event.repository.private
       with:
         mounts: |
@@ -150,12 +150,12 @@ jobs:
             chown: "runner:runner"
     - name: Free disk space
       if: github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+      uses: envoyproxy/toolshed/actions/diskspace@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         to_remove: |
           /usr/local/.ghcup
           /usr/local/lib/android
-    - uses: envoyproxy/toolshed/actions/github/checkout@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+    - uses: envoyproxy/toolshed/actions/github/checkout@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -211,7 +211,7 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/actions/docker/shas@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+      uses: envoyproxy/toolshed/actions/docker/shas@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         images: |
            sha-ci: docker.io/envoyproxy/envoy-build:ci-${{ steps.build-tools.outputs.tag }}
@@ -249,7 +249,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/actions/github/pr@7b48c21c6809feb1be3741337cc5deffb67c4b66  # actions-v0.4.20
+      uses: envoyproxy/toolshed/actions/github/pr@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         base: main
         body: Created by Envoy dependency bot
