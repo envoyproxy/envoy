@@ -936,9 +936,12 @@ TEST_F(SslServerContextImplOcspTest, TestStaplingRequiredWithoutStapleConfigFail
 TEST_F(SslServerContextImplOcspTest, TestUnsuccessfulOcspResponseConfigFails) {
   std::vector<uint8_t> data = {
       // SEQUENCE
-      0x30, 3,
+      0x30,
+      3,
       // OcspResponseStatus - InternalError
-      0xau, 1, 2,
+      0xau,
+      1,
+      2,
       // no response bytes
   };
   std::string der_response(data.begin(), data.end());

@@ -80,7 +80,9 @@ TEST_F(CredsUtilityTest, CallCredentials) {
 }
 
 TEST_F(CredsUtilityTest, DefaultChannelCredentials) {
-  { EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials({}, *api_)); }
+  {
+    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials({}, *api_));
+  }
   {
     envoy::config::core::v3::GrpcService config;
     TestUtility::setTestSslGoogleGrpcConfig(config, true);

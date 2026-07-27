@@ -92,7 +92,7 @@ public:
     }
   }
 
-  OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
+  OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const override {
     auto it = active_clusters_map_.find(cluster_name);
     if (it != active_clusters_map_.end()) {
       return *it->second;

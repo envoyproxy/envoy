@@ -360,15 +360,17 @@ TEST_P(LoadStatsReporterImplTest, EndpointLevelLoadStatsReporting) {
   HostSharedPtr host1 = makeTestHost("host1", locality);
   HostSharedPtr host2 = makeTestHost("host2", locality);
   host_set.hosts_per_locality_ = makeHostsPerLocality({{host1, host2}});
-  addStats(host1, 10.0); // metric_a = 10.0
-  addStats(host2, 20.0); // metric_a = 20.0
 
   cluster.info_->eds_service_name_ = "eds_service_for_foo";
 
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
-  cluster.info_->load_report_stats_.upstream_rq_total_.add(2);
   deliverLoadStatsResponse({"foo"}, true);
+
+  // Add stats AFTER tracking starts so they are not discarded by latching.
+  addStats(host1, 10.0); // metric_a = 10.0
+  addStats(host2, 20.0); // metric_a = 20.0
+  cluster.info_->load_report_stats_.upstream_rq_total_.add(2);
   time_system_.setMonotonicTime(std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
@@ -429,15 +431,17 @@ TEST_P(LoadStatsReporterImplTest, EndpointLevelLoadStatsReportingNoUpdate) {
   HostSharedPtr host1 = makeTestHost("host1", locality);
   HostSharedPtr host2 = makeTestHost("host2", locality);
   host_set.hosts_per_locality_ = makeHostsPerLocality({{host1, host2}});
-  addStats(host1, 10.0);
-  // Host2 has no updates. Its stats are all 0 and will be latched as such.
 
   cluster.info_->eds_service_name_ = "eds_service_for_foo";
 
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
-  cluster.info_->load_report_stats_.upstream_rq_total_.inc();
   deliverLoadStatsResponse({"foo"}, true);
+
+  // Add stats AFTER tracking starts.
+  addStats(host1, 10.0);
+  // Host2 has no updates. Its stats are all 0.
+  cluster.info_->load_report_stats_.upstream_rq_total_.inc();
   time_system_.setMonotonicTime(std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
@@ -490,16 +494,17 @@ TEST_P(LoadStatsReporterImplTest, UpstreamLocalityStats) {
                 host2 = makeTestHost("host2", locality1);
   host_set_.hosts_per_locality_ = makeHostsPerLocality({{host0, host1}, {host2}});
 
+  cluster.info_->eds_service_name_ = "bar";
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
+  deliverLoadStatsResponse({"foo"});
+
+  // Add stats AFTER tracking starts.
   addStats(host0, 0.11111, 1.0);
   addStats(host0, 0.33333, 0, 3.14159);
   addStats(host1, 0.44444, 0.12345);
   addStats(host2, 10.01, 0, 20.02, 30.03);
-
-  cluster.info_->eds_service_name_ = "bar";
-  ON_CALL(cm_, getActiveCluster("foo"))
-      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   cluster.info_->load_report_stats_.upstream_rq_total_.add(4);
-  deliverLoadStatsResponse({"foo"});
   // First stats report on timer tick.
   time_system_.setMonotonicTime(std::chrono::microseconds(4));
   {
@@ -530,16 +535,17 @@ TEST_P(LoadStatsReporterImplTest, UpstreamLocalityStats) {
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 
-  // Traffic between previous request and next response. Previous latched metrics are cleared.
-  host1->stats().rq_success_.inc();
+  time_system_.setMonotonicTime(std::chrono::microseconds(6));
+  deliverLoadStatsResponse({"foo"});
 
+  // Traffic between previous request and next response. Previous latched metrics are cleared.
+  // Add stats AFTER tracking response to avoid any potential issues, though it shouldn't latch
+  // here.
+  host1->stats().rq_success_.inc();
   host1->stats().rq_total_.inc();
   host1->loadMetricStats().add("metric_a", 1.41421);
   host1->loadMetricStats().add("metric_e", 2.71828);
-
-  time_system_.setMonotonicTime(std::chrono::microseconds(6));
   cluster.info_->load_report_stats_.upstream_rq_total_.inc();
-  deliverLoadStatsResponse({"foo"});
   // Second stats report on timer tick.
   time_system_.setMonotonicTime(std::chrono::microseconds(28));
   {
@@ -671,14 +677,16 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
   HostSharedPtr host1 = makeTestHost("host1", locality);
   host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
 
-  // Set rq_success to non-zero, all others to zero.
-  host1->stats().rq_success_.inc();
-
   cluster.info_->eds_service_name_ = "eds_service_for_foo";
 
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
+
+  // Set rq_success to non-zero, all others to zero.
+  // Add stats AFTER tracking starts so they are not discarded.
+  host1->stats().rq_success_.inc();
+  cluster.info_->load_report_stats_.upstream_rq_total_.inc();
   time_system_.setMonotonicTime(std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
@@ -726,14 +734,16 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
   HostSharedPtr host1 = makeTestHost("host1", locality);
   host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
 
-  // Set rq_error to non-zero, all others to zero.
-  host1->stats().rq_error_.inc();
-
   cluster.info_->eds_service_name_ = "eds_service_for_foo";
 
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
+
+  // Set rq_error to non-zero, all others to zero.
+  // Add stats AFTER tracking starts so they are not discarded.
+  host1->stats().rq_error_.inc();
+  cluster.info_->load_report_stats_.upstream_rq_total_.inc();
   time_system_.setMonotonicTime(std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
@@ -781,14 +791,16 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
   HostSharedPtr host1 = makeTestHost("host1", locality);
   host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
 
-  // Add a custom metric, all other counters zero.
-  host1->loadMetricStats().add("metric_a", 1.0);
-
   cluster.info_->eds_service_name_ = "eds_service_for_foo";
 
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
+
+  // Add a custom metric, all other counters zero.
+  // Add stats AFTER tracking starts.
+  host1->loadMetricStats().add("metric_a", 1.0);
+  cluster.info_->load_report_stats_.upstream_rq_total_.inc();
   time_system_.setMonotonicTime(std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
@@ -836,14 +848,16 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
   HostSharedPtr host1 = makeTestHost("host1", locality);
   host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
 
-  // Set rq_success to non-zero, all others to zero.
-  host1->stats().rq_success_.inc();
-
   cluster.info_->eds_service_name_ = "eds_service_for_foo";
 
   ON_CALL(cm_, getActiveCluster("foo"))
       .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
+
+  // Set rq_success to non-zero, all others to zero.
+  // Add stats AFTER tracking starts.
+  host1->stats().rq_success_.inc();
+  cluster.info_->load_report_stats_.upstream_rq_total_.inc();
   time_system_.setMonotonicTime(std::chrono::microseconds(101));
   {
     // Expect no UpstreamLocalityStats
