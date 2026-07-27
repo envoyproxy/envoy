@@ -1,5 +1,6 @@
 #include <string>
 
+#include "source/common/memory/stats.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
 #include "test/test_common/status_utility.h"
@@ -1881,6 +1882,79 @@ TEST_F(McpJsonParserTest, NoMethodNoResultInvalid) {
 
   EXPECT_FALSE(parser_->isValidMcpRequest());
   EXPECT_FALSE(parser_->isResponse());
+}
+
+TEST(McpJsonParserMemoryTest, HeavyObjectFieldsMemory) {
+  // Test object payload memory usage via Envoy Memory Stats.
+  std::string body =
+      R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"q","arguments":{)";
+  for (int i = 0; i < 5000; ++i) {
+    if (i > 0) {
+      body += ',';
+    }
+    body += '"';
+    body += 'k';
+    body += std::to_string(i);
+    body += R"(":"v")";
+  }
+  body += "}}}";
+
+  const uint64_t before_allocated = Envoy::Memory::Stats::totalCurrentlyAllocated();
+  {
+    McpParserConfig config = McpParserConfig::createDefault();
+    McpJsonParser parser(config);
+    auto s1 = parser.parse(body);
+    auto s2 = parser.finishParse();
+
+    EXPECT_TRUE(s1.ok()) << s1.message();
+    EXPECT_TRUE(s2.ok()) << s2.message();
+
+    const uint64_t after_allocated = Envoy::Memory::Stats::totalCurrentlyAllocated();
+    const int64_t heap_bytes =
+        static_cast<int64_t>(after_allocated) - static_cast<int64_t>(before_allocated);
+
+    // Verify heap usage remains well bounded relative to input size.
+    EXPECT_LT(heap_bytes, static_cast<int64_t>(body.size() * 2));
+  }
+}
+
+TEST(McpJsonParserMemoryTest, HeavyObjectFieldsUnorderedMethod) {
+  // Method field appears after params; verifies mid-parse method discovery optimization
+  // doesn't leak memory or fail field extraction when method comes late.
+  std::string body = R"({"jsonrpc":"2.0","id":1,"params":{"name":"q","arguments":{)";
+  for (int i = 0; i < 5000; ++i) {
+    if (i > 0) {
+      body += ',';
+    }
+    body += '"';
+    body += 'k';
+    body += std::to_string(i);
+    body += R"(":"v")";
+  }
+  body += R"(}},"method":"tools/call"})";
+
+  const uint64_t before_allocated = Envoy::Memory::Stats::totalCurrentlyAllocated();
+  {
+    McpParserConfig config = McpParserConfig::createDefault();
+    McpJsonParser parser(config);
+    auto s1 = parser.parse(body);
+    auto s2 = parser.finishParse();
+
+    EXPECT_TRUE(s1.ok()) << s1.message();
+    EXPECT_TRUE(s2.ok()) << s2.message();
+    EXPECT_TRUE(parser.isValidMcpRequest());
+    EXPECT_EQ(parser.getMethod(), "tools/call");
+
+    const auto* name = parser.getNestedValue("params.name");
+    ASSERT_NE(name, nullptr);
+    EXPECT_EQ(name->string_value(), "q");
+
+    const uint64_t after_allocated = Envoy::Memory::Stats::totalCurrentlyAllocated();
+    const int64_t heap_bytes =
+        static_cast<int64_t>(after_allocated) - static_cast<int64_t>(before_allocated);
+
+    EXPECT_LT(heap_bytes, static_cast<int64_t>(body.size() * 2));
+  }
 }
 
 } // namespace
