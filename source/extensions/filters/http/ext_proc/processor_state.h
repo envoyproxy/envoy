@@ -661,8 +661,8 @@ public:
     return !local_response_started_ && ProcessorState::noExternalProcess();
   }
 
-  // Standalone mode override is only supported when Envoy is in the waiting for
-  // request header response state, and the old request body mode is STREAMED;
+  // Standalone mode override is only supported when Envoy is in the waiting for request
+  // header response state, and the old request body mode is not FULL_DUPLEX_STREAMED;
   // and the new request body mode is FULL_DUPLEX_STREAMED, and the new request
   // trailer mode is SEND.
   bool handleStandaloneModeOverride(
