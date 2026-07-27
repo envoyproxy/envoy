@@ -178,6 +178,20 @@ TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAccepte
             Http::FilterHeadersStatus::Continue);
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathNoOpMode) {
+  proto_config_.set_no_fallback_path(true);
+  makeFilter();
+
+  // With no_fallback_path enabled and no default server host/path specified,
+  // even a request to "/mcp" should just pass through since no fallback path is configured.
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
   makeFilter();
 

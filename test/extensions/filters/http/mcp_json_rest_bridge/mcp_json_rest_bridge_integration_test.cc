@@ -1451,5 +1451,58 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
 }
 
+TEST_P(McpJsonRestBridgeIntegrationTest, NoFallbackPathNoOpModeIntegrationTest) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      no_fallback_path: true
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {}
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Since the filter is in no-op mode (no fallback path registered at "/mcp"),
+  // the request should be forwarded completely untouched to the upstream backend.
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
+  EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/mcp"));
+  EXPECT_THAT(upstream_request_->body().toString(), StrEq(request_body));
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  Buffer::OwnedImpl response_data;
+  response_data.add("raw backend response");
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+  EXPECT_THAT(response->body(), StrEq("raw backend response"));
+}
+
 } // namespace
 } // namespace Envoy
