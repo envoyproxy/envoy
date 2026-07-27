@@ -64,8 +64,8 @@ public:
     // a reliable per-Envoy identity. Stability across restarts is unnecessary:
     // the seed only decorrelates worker-to-host assignments across processes.
     const uint64_t envoy_seed = context.api().randomGenerator().random();
-    return Upstream::LoadBalancerConfigPtr{
-        new TypedPerWorkerSubsetLbConfig(*typed, resolveTotalWorkers(context), envoy_seed)};
+    return Upstream::LoadBalancerConfigPtr{new TypedPerWorkerSubsetLbConfig(
+        *typed, resolveTotalWorkers(context), envoy_seed, context.threadLocal())};
   }
 
   // Legacy ``lb_policy`` enum path -- not supported for this extension.

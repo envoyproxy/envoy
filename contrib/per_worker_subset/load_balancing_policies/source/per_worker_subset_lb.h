@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -11,6 +10,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -79,11 +79,18 @@ enum class HostSelectionStrategy : uint8_t {
   EnvoyP2C = 3,
 };
 
+struct WorkerIdentity : public ThreadLocal::ThreadLocalObject {
+  explicit WorkerIdentity(uint32_t index) : index_(index) {}
+
+  const uint32_t index_;
+};
+
 class TypedPerWorkerSubsetLbConfig : public Upstream::LoadBalancerConfig {
 public:
   TypedPerWorkerSubsetLbConfig(const PerWorkerSubsetLbProto& proto, uint32_t total_workers,
-                               uint64_t envoy_seed)
-      : proto_(proto), total_workers_(total_workers), envoy_seed_(envoy_seed) {}
+                               uint64_t envoy_seed, ThreadLocal::SlotAllocator& tls);
+
+  uint32_t workerId() const;
 
   const PerWorkerSubsetLbProto proto_;
 
@@ -102,10 +109,10 @@ public:
   // Within a single Envoy, disjointness is preserved.
   const uint64_t envoy_seed_;
 
-  // Sequential per-cluster worker-ID counter. Each per-worker LB instance
-  // grabs its ID via ``fetch_add`` (returns pre-increment value). Solely for
-  // unique IDs; W comes from ``total_workers_`` above.
-  mutable std::atomic<uint32_t> next_worker_id_{0};
+  // Stable worker identity, initialized once per worker from that worker's
+  // dispatcher name. Every LB recreated on the same worker reads the same
+  // index; no LB-construction ordering is involved.
+  std::unique_ptr<ThreadLocal::TypedSlot<WorkerIdentity>> worker_identity_;
 };
 
 class PerWorkerSubsetLoadBalancer : public Upstream::LoadBalancer,

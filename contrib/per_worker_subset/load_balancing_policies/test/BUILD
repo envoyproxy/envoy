@@ -30,6 +30,7 @@ envoy_cc_test(
     srcs = ["config_test.cc"],
     deps = [
         "//contrib/per_worker_subset/load_balancing_policies/source:config",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_factory_context_mocks",
     ],
 )

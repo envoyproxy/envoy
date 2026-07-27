@@ -24,6 +24,7 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/upstream:upstream_lib",
         # Inner stock LBs used when host_selection_strategy is
@@ -45,6 +46,7 @@ envoy_cc_contrib_extension(
     hdrs = ["config.h"],
     deps = [
         ":per_worker_subset_lb_lib",
+        "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/load_balancing_policies/common:factory_base",
         "@envoy_api//contrib/envoy/extensions/load_balancing_policies/per_worker_subset/v3alpha:pkg_cc_proto",
