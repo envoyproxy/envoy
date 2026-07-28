@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/aws_eventstream_parser/filter.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 
 #include "source/common/common/base64.h"
@@ -141,20 +142,20 @@ void Filter::processBuffer() {
   buffer_.drain(length - buffer_view.size());
 }
 
-absl::optional<std::string> Filter::unwrapBedrockEnvelope(absl::string_view payload) {
+std::optional<std::string> Filter::unwrapBedrockEnvelope(absl::string_view payload) {
   auto json_or = Json::Factory::loadFromString(std::string(payload));
   if (!json_or.ok()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   auto bytes_or = json_or.value()->getString("bytes");
   if (!bytes_or.ok()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   std::string decoded = Base64::decode(bytes_or.value());
   if (decoded.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return decoded;
@@ -169,7 +170,7 @@ bool Filter::processMessage(absl::string_view payload) {
 
   // Auto-detect and unwrap Bedrock InvokeModelWithResponseStream envelope.
   absl::string_view effective_payload = payload;
-  absl::optional<std::string> unwrapped = unwrapBedrockEnvelope(payload);
+  std::optional<std::string> unwrapped = unwrapBedrockEnvelope(payload);
   if (unwrapped.has_value()) {
     effective_payload = unwrapped.value();
   }

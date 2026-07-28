@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -101,9 +102,9 @@ private:
    * Unwrap AWS Bedrock InvokeModelWithResponseStream envelope if present.
    * Bedrock wraps the actual payload as: {"bytes": "<base64>", "p": "..."}.
    * If detected, base64-decodes the "bytes" field and returns the inner payload.
-   * Otherwise returns absl::nullopt and the caller should use the original payload.
+   * Otherwise returns std::nullopt and the caller should use the original payload.
    */
-  absl::optional<std::string> unwrapBedrockEnvelope(absl::string_view payload);
+  std::optional<std::string> unwrapBedrockEnvelope(absl::string_view payload);
 
   /**
    * Process a single complete EventStream message.
