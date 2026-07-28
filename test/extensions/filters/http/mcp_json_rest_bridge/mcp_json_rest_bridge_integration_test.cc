@@ -1524,10 +1524,10 @@ TEST_P(McpJsonRestBridgeIntegrationTest, NoFallbackPathWithExplicitPerRouteConfi
     tool->mutable_http_rule()->set_post("/v1/{parent=projects/*}/keys");
     tool->mutable_http_rule()->set_body("key");
 
+    Protobuf::Any per_route_any;
+    MessageUtil::packFrom(per_route_any, per_route);
     route->mutable_typed_per_filter_config()->insert(
-        {"envoy.filters.http.mcp_json_rest_bridge",
-         MessageUtil::anyConvertAndValidate<ProtobufWkt::Any>(
-             per_route, MessageUtil::unknownTypeValidationVisitor())});
+        {"envoy.filters.http.mcp_json_rest_bridge", per_route_any});
   });
 
   initializeFilter(config);

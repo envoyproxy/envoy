@@ -902,7 +902,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
           (per_route_config == nullptr)
               ? config_->toolListLocal(server_name_, path_)
               : per_route_config->toolListLocal(server_name_, path_, config_->noFallbackPath());
-      if (tool_list_local) {
+      if (is_local) {
         mcp_operation_ = McpOperation::ToolsListLocal;
         serveToolsListLocal(json_rpc, tool_list_local_tools);
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
@@ -1115,7 +1115,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   }
 
   // Set the per-request streaming flag based on the tool's config.
-  bool streaming_enabled =
+  text_content_streaming_enabled_ =
       (per_route_config == nullptr)
           ? config_->textContentStreamingEnabled(tool_name, server_name_, path_)
           : per_route_config->textContentStreamingEnabled(tool_name, server_name_, path_,
