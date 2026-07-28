@@ -1,5 +1,4 @@
 #include "envoy/extensions/queue_policy/fifo/v3/fifo.pb.h"
-#include "envoy/registry/registry.h"
 
 #include "source/common/conn_pool/conn_pool_base.h"
 #include "source/common/queue_policy/queue_policy_base.h"
@@ -89,28 +88,34 @@ public:
 class TestPendingStreamQueue : public Extensions::QueuePolicy::QueueBase<PendingStream> {
 public:
   using ItemPtrType = std::unique_ptr<PendingStream>;
-  using Iterator = QueueBase<PendingStream>::Iterator;
+
+  size_t size() const override { return items_.size(); }
+
+  bool empty() const override { return items_.empty(); }
 
   ConnectionPool::Cancellable* add(ItemPtrType&& item) override {
-    LinkedList::moveIntoListBack(std::move(item), this->items_);
-    return this->items_.back().get();
+    LinkedList::moveIntoListBack(std::move(item), items_);
+    return items_.back().get();
   }
 
-  ItemPtrType remove(PendingStream& item) override { return item.removeFromList(this->items_); }
+  ItemPtrType remove(PendingStream& item) override { return item.removeFromList(items_); }
 
   // Use LIFO ordering so connection-pool tests exercise policy-defined ordering.
-  const ItemPtrType& next() const override { return this->items_.back(); }
-  bool isOverloaded() const override { return this->items_.size() > 1; }
+  const ItemPtrType& next() const override { return items_.back(); }
+  bool isOverloaded() const override { return items_.size() > 1; }
 
-  Iterator begin() override {
-    auto it = this->items_.begin();
-    return Iterator(std::move(it));
+  void forEach(const std::function<bool(PendingStream&)>& cb) override {
+    for (auto it = items_.begin(); it != items_.end();) {
+      PendingStream& item = **it;
+      ++it;
+      if (!cb(item)) {
+        return;
+      }
+    }
   }
 
-  Iterator end() override {
-    auto it = this->items_.end();
-    return Iterator(std::move(it));
-  }
+private:
+  std::list<ItemPtrType> items_;
 };
 
 class TestPendingStreamQueueFactory
@@ -129,15 +134,20 @@ public:
   std::string name() const override { return "envoy.queue_policy.fifo"; }
 };
 
-REGISTER_FACTORY(TestPendingStreamQueueFactory,
-                 Extensions::QueuePolicy::QueuePolicyFactory<PendingStream>);
+// Creates a resolved queue policy bundle for the test factory, mirroring what
+// ClusterInfoImpl produces at cluster configuration load time.
+std::unique_ptr<Upstream::ClusterInfo::PendingRqQueuePolicy> makeTestQueuePolicyBundle() {
+  static TestPendingStreamQueueFactory factory;
+  auto policy = std::make_unique<Upstream::ClusterInfo::PendingRqQueuePolicy>();
+  policy->factory_ = &factory;
+  policy->config_ =
+      std::make_unique<envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig>();
+  return policy;
+}
 
 std::shared_ptr<Upstream::MockClusterInfo> makeClusterWithTestQueuePolicy() {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig fifo_config;
-  cluster->queue_policy_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
-  cluster->queue_policy_config_->set_name("envoy.queue_policy.fifo");
-  std::ignore = cluster->queue_policy_config_->mutable_typed_config()->PackFrom(fifo_config);
+  cluster->pending_rq_queue_policy_ = makeTestQueuePolicyBundle();
   cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
 
   return cluster;
@@ -220,10 +230,7 @@ public:
 
 TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueuePolicy) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig fifo_config;
-  cluster->queue_policy_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
-  cluster->queue_policy_config_->set_name("envoy.queue_policy.fifo");
-  std::ignore = cluster->queue_policy_config_->mutable_typed_config()->PackFrom(fifo_config);
+  cluster->pending_rq_queue_policy_ = makeTestQueuePolicyBundle();
   cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
 
   NiceMock<Event::MockDispatcher> dispatcher;

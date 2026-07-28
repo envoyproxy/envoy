@@ -1,9 +1,8 @@
 #pragma once
 
-#include <list>
+#include <functional>
 #include <memory>
 #include <type_traits>
-#include <utility>
 
 #include "envoy/common/conn_pool.h"
 #include "envoy/config/typed_config.h"
@@ -12,13 +11,13 @@
 #include "source/common/common/linked_object.h"
 
 #include "absl/status/statusor.h"
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace QueuePolicy {
 
-// Base class that handles queuing for objects.
+// Base class that handles queuing for objects. Implementations are free to choose any internal
+// container; the interface is intentionally container-agnostic.
 template <class ItemType> class QueueBase {
 
   static_assert(std::is_base_of_v<ConnectionPool::Cancellable, ItemType>,
@@ -26,77 +25,28 @@ template <class ItemType> class QueueBase {
   static_assert(std::is_base_of_v<LinkedObject<ItemType>, ItemType>,
                 "Queue item type must inherit from LinkedObject");
 
-  using ItemPtrType = std::unique_ptr<ItemType>;
-  using ListType = std::list<ItemPtrType>;
-
 public:
-  QueueBase() = default;
+  using ItemPtrType = std::unique_ptr<ItemType>;
+
   virtual ~QueueBase() = default;
 
-  virtual size_t size() const { return items_.size(); }
+  virtual size_t size() const PURE;
 
-  virtual bool empty() const { return items_.empty(); }
+  virtual bool empty() const PURE;
 
   virtual ConnectionPool::Cancellable* add(ItemPtrType&& item) PURE;
 
   virtual ItemPtrType remove(ItemType& item) PURE;
 
+  // Returns the next item to be dequeued. It is illegal to call this on an empty queue.
   virtual const ItemPtrType& next() const PURE;
+
   virtual bool isOverloaded() const PURE;
 
-  class Iterator {
-  public:
-    Iterator(typename ListType::iterator itor) : itor_(itor) {}
-    Iterator(typename ListType::reverse_iterator itor) : itor_(itor) {}
-
-    Iterator& operator++() {
-      if (auto* it = absl::get_if<typename QueueBase::ListType::iterator>(&itor_)) {
-        ++(*it);
-      } else {
-        ++(absl::get<typename QueueBase::ListType::reverse_iterator>(itor_));
-      }
-      return *this;
-    }
-
-    Iterator& operator--() {
-      if (auto* it = absl::get_if<typename QueueBase::ListType::iterator>(&itor_)) {
-        --(*it);
-      } else {
-        --(absl::get<typename QueueBase::ListType::reverse_iterator>(itor_));
-      }
-      return *this;
-    }
-
-    ItemPtrType& operator*() const {
-      if (auto* it = absl::get_if<typename QueueBase::ListType::iterator>(&itor_)) {
-        return **it;
-      } else {
-        return *(absl::get<typename QueueBase::ListType::reverse_iterator>(itor_));
-      }
-    }
-    bool operator==(const Iterator& other) const { return other.itor_ == itor_; }
-    bool operator!=(const Iterator& other) const { return other.itor_ != itor_; }
-
-  private:
-    absl::variant<typename QueueBase::ListType::iterator,
-                  typename QueueBase::ListType::reverse_iterator>
-        itor_;
-  };
-
-  virtual Iterator begin() PURE;
-  virtual Iterator end() PURE;
-
-protected:
-  QueueBase(QueueBase<ItemType>&& other) noexcept : items_(std::move(other.items_)) {}
-
-  QueueBase<ItemType>& operator=(QueueBase<ItemType>&& other) noexcept {
-    if (this != &other) {
-      items_ = std::move(other.items_);
-    }
-    return *this;
-  }
-
-  std::list<ItemPtrType> items_;
+  // Iterates over the queued items in dequeue order, invoking cb for each item. Iteration stops
+  // early if cb returns false. The callback is allowed to remove the visited item from the queue
+  // (via remove()); implementations must make this safe.
+  virtual void forEach(const std::function<bool(ItemType&)>& cb) PURE;
 };
 
 template <class ItemType> using QueuePolicyUniquePtr = std::unique_ptr<QueueBase<ItemType>>;

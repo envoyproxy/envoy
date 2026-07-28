@@ -6660,16 +6660,16 @@ TEST_F(ClusterInfoImplTest, InvalidQueuePolicyConfig) {
   name: cluster1
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
-  queue_policy_config:
-    name: envoy.queue_policy.invalid
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Struct
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.invalid
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      makeCluster(yaml), EnvoyException,
-      "Didn't find a registered implementation for 'envoy.queue_policy.invalid' with type URL: "
-      "'google.protobuf.Struct'");
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered queue policy implementation for name: "
+                            "'envoy.queue_policy.invalid'");
 }
 
 TEST_F(ClusterInfoImplTest, QueuePolicyCreationFailure) {
@@ -6680,10 +6680,11 @@ TEST_F(ClusterInfoImplTest, QueuePolicyCreationFailure) {
   name: cluster1
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
-  queue_policy_config:
-    name: envoy.queue_policy.rejecting
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Struct
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.rejecting
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException, "queue policy creation failed");

@@ -84,27 +84,40 @@ defaultHappyEyeballsConfig() {
       }());
 }
 
-absl::Status
-validateQueuePolicyConfig(const envoy::config::core::v3::TypedExtensionConfig& queue_policy_config,
-                          Server::Configuration::ServerFactoryContext& server_context) {
+// Resolves the queue policy for cluster pending requests: looks up the factory, translates the
+// typed config and creates a queue policy instance once so that invalid configurations are
+// rejected at config load time rather than when the first connection pool is created. The
+// resolved factory and config are stored on the cluster info so that connection pool creation
+// does not need to repeat this work.
+absl::StatusOr<std::unique_ptr<const ClusterInfo::PendingRqQueuePolicy>>
+resolvePendingRqQueuePolicy(
+    const envoy::config::core::v3::TypedExtensionConfig& queue_policy_config,
+    Server::Configuration::ServerFactoryContext& server_context) {
   using PendingStreamQueueFactory =
       Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
-  absl::Status resolve_status = absl::OkStatus();
-  TRY_ASSERT_MAIN_THREAD {
-    PendingStreamQueueFactory& factory =
-        Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(queue_policy_config);
-    ProtobufTypes::MessagePtr factory_config = Config::Utility::translateToFactoryConfig(
-        queue_policy_config, server_context.messageValidationVisitor(), factory);
-    auto queue = factory.createQueuePolicy(*factory_config, "cluster." + factory.name(),
-                                           server_context.messageValidationVisitor());
-    if (!queue.ok()) {
-      resolve_status = queue.status();
-    }
+  PendingStreamQueueFactory* factory =
+      Config::Utility::getFactory<PendingStreamQueueFactory>(queue_policy_config);
+  if (factory == nullptr) {
+    factory =
+        Config::Utility::getFactoryByName<PendingStreamQueueFactory>(queue_policy_config.name());
   }
-  END_TRY
-  CATCH(EnvoyException & e, { resolve_status = absl::InvalidArgumentError(e.what()); });
+  if (factory == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("Didn't find a registered queue policy implementation for name: '{}'",
+                    queue_policy_config.name()));
+  }
+  ProtobufTypes::MessagePtr factory_config = factory->createEmptyConfigProto();
+  RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(queue_policy_config.typed_config(),
+                                                          server_context.messageValidationVisitor(),
+                                                          *factory_config));
+  auto queue = factory->createQueuePolicy(*factory_config, "cluster." + factory->name(),
+                                          server_context.messageValidationVisitor());
+  RETURN_IF_NOT_OK(queue.status());
 
-  return resolve_status;
+  auto policy = std::make_unique<ClusterInfo::PendingRqQueuePolicy>();
+  policy->factory_ = factory;
+  policy->config_ = std::move(factory_config);
+  return policy;
 }
 
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
@@ -1254,10 +1267,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       typed_metadata_(config.has_metadata()
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
                           : nullptr),
-      queue_policy_config_(config.has_queue_policy_config()
-                               ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
-                                     config.queue_policy_config())
-                               : nullptr),
       common_lb_config_(
           factory_context.serverFactoryContext().clusterManager().getCommonLbConfigPtr(
               config.common_lb_config())),
@@ -1342,9 +1351,11 @@ ClusterInfoImpl::ClusterInfoImpl(
     return;
   }
 
-  if (config.has_queue_policy_config()) {
-    SET_AND_RETURN_IF_NOT_OK(
-        validateQueuePolicyConfig(config.queue_policy_config(), server_context), creation_status);
+  if (config.queuing_policies().has_pending_rq_policy()) {
+    auto policy_or_error =
+        resolvePendingRqQueuePolicy(config.queuing_policies().pending_rq_policy(), server_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    pending_rq_queue_policy_ = std::move(*policy_or_error);
   }
 
   if (config.has_load_balancing_policy() ||

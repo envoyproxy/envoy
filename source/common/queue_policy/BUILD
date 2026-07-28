@@ -18,8 +18,8 @@ envoy_cc_library(
         "//envoy/common:conn_pool_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/protobuf:message_validator_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/types:variant",
     ],
 )

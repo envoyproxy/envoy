@@ -29,7 +29,6 @@ envoy_cc_library(
         "//envoy/stats:timespan_interface",
         "//source/common/common:debug_recursion_checker_lib",
         "//source/common/common:linked_object",
-        "//source/common/config:utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
         "//source/common/stats:timespan_lib",

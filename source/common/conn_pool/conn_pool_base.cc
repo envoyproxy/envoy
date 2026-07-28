@@ -4,7 +4,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/debug_recursion_checker.h"
-#include "source/common/config/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/queue_policy/fifo_queue_policy.h"
@@ -24,22 +23,16 @@ int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clien
 }
 
 PendingStreamQueuePtr createPendingStreamQueue(
-    const OptRef<const envoy::config::core::v3::TypedExtensionConfig> queue_policy_config) {
-  if (!queue_policy_config.has_value()) {
+    const OptRef<const Upstream::ClusterInfo::PendingRqQueuePolicy> queue_policy) {
+  if (!queue_policy.has_value()) {
     return std::make_unique<Extensions::QueuePolicy::FifoQueue<PendingStream>>();
   }
 
-  using PendingStreamQueueFactory = Extensions::QueuePolicy::QueuePolicyFactory<PendingStream>;
-  ProtobufMessage::ValidationVisitor& validation_visitor =
-      ProtobufMessage::getStrictValidationVisitor();
-  PendingStreamQueueFactory& factory =
-      Config::Utility::getAndCheckFactory<PendingStreamQueueFactory>(
-          queue_policy_config.value().get());
-  ProtobufTypes::MessagePtr factory_config = Config::Utility::translateToFactoryConfig(
-      queue_policy_config.value().get(), validation_visitor, factory);
-
-  auto queue =
-      factory.createQueuePolicy(*factory_config, "cluster." + factory.name(), validation_visitor);
+  // The factory and translated config were resolved and validated once at cluster configuration
+  // load time, so no factory lookup or proto translation is needed here.
+  auto& factory = *queue_policy->factory_;
+  auto queue = factory.createQueuePolicy(*queue_policy->config_, "cluster." + factory.name(),
+                                         ProtobufMessage::getStrictValidationVisitor());
   RELEASE_ASSERT(queue.ok(), queue.status().ToString());
   return std::move(*queue);
 }
@@ -81,7 +74,7 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::ClusterConnectivityState& state, Server::OverloadManager& overload_manager)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
       transport_socket_options_(transport_socket_options), cluster_connectivity_state_(state),
-      pending_streams_(createPendingStreamQueue(host_->cluster().queuePolicyConfig())),
+      pending_streams_(createPendingStreamQueue(host_->cluster().pendingRqQueuePolicy())),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
       create_new_connection_load_shed_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().ConnectionPoolNewConnection)),
@@ -851,11 +844,10 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
   ASSERT(!client.hasHandshakeCompleted() && client.readyForStream());
   // Note that this is a O(n) search, but the expected size of pending_streams_ should be small. If
   // this becomes a problem, we could split pending_streams_ into 2 lists.
-  auto it = pending_streams_->begin();
-  auto end = pending_streams_->end();
-  while (client.currentUnusedCapacity() > 0 && it != end) {
-    PendingStream& stream = **it;
-    ++it;
+  pending_streams_->forEach([this, &client](PendingStream& stream) -> bool {
+    if (client.currentUnusedCapacity() <= 0) {
+      return false;
+    }
     if (stream.can_send_early_data_) {
       ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
@@ -870,7 +862,8 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
         updateQueueOverloadedGauge();
       }
     }
-  }
+    return true;
+  });
 }
 
 namespace {

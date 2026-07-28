@@ -755,6 +755,13 @@ message Cluster {
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
+  // Queueing policies for the cluster.
+  message QueuingPolicies {
+    // Queue policy for cluster pending requests. If unset, Envoy uses the FIFO queue policy.
+    // [#extension-category: envoy.queue_policy]
+    core.v3.TypedExtensionConfig pending_rq_policy = 1;
+  }
+
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -1304,9 +1311,8 @@ message Cluster {
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
 
-  // Queueing config for cluster pending requests. If unset, Envoy uses the FIFO queue policy.
-  // [#extension-category: envoy.queue_policy]
-  core.v3.TypedExtensionConfig queue_policy_config = 61;
+  // Queueing policies for the cluster (e.g. the queue policy for cluster pending requests).
+  QueuingPolicies queuing_policies = 61;
 }
 
 // Extensible load balancing policy configuration.

@@ -39,6 +39,16 @@ class FilterChainManager;
 class HashPolicy;
 } // namespace Http
 
+namespace ConnectionPool {
+class PendingStream;
+} // namespace ConnectionPool
+
+namespace Extensions {
+namespace QueuePolicy {
+template <class ItemType> class QueuePolicyFactory;
+} // namespace QueuePolicy
+} // namespace Extensions
+
 namespace Router {
 class ShadowPolicy;
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
@@ -1275,12 +1285,23 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
-   * @return OptRef<const envoy::config::core::v3::TypedExtensionConfig>
-   * an optional value of the configuration for the pending requests queue policy for this
-   * cluster.
+   * Queue policy for cluster pending requests, resolved once at cluster configuration load time
+   * so that connection pool creation does not need to perform a factory lookup or proto
+   * translation.
    */
-  virtual OptRef<const envoy::config::core::v3::TypedExtensionConfig>
-  queuePolicyConfig() const PURE;
+  struct PendingRqQueuePolicy {
+    // Queue policy factory. Points into the static factory registry.
+    Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>* factory_{};
+    // Translated queue policy configuration.
+    std::unique_ptr<const Protobuf::Message> config_;
+  };
+
+  /**
+   * @return OptRef<const PendingRqQueuePolicy> the resolved queue policy for cluster pending
+   * requests, or nullopt when not configured (in which case the default FIFO queue policy is
+   * used).
+   */
+  virtual OptRef<const PendingRqQueuePolicy> pendingRqQueuePolicy() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections

@@ -148,12 +148,11 @@ MockClusterInfo::MockClusterInfo()
         }
         return *typed_metadata_;
       }));
-  ON_CALL(*this, queuePolicyConfig())
-      .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
-            return makeOptRefFromPtr<const envoy::config::core::v3::TypedExtensionConfig>(
-                queue_policy_config_.get());
-          }));
+  ON_CALL(*this, pendingRqQueuePolicy())
+      .WillByDefault(Invoke([this]() -> OptRef<const ClusterInfo::PendingRqQueuePolicy> {
+        return makeOptRefFromPtr<const ClusterInfo::PendingRqQueuePolicy>(
+            pending_rq_queue_policy_.get());
+      }));
   ON_CALL(*this, clusterType())
       .WillByDefault(
           Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> {

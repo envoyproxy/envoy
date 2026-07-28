@@ -13,7 +13,6 @@ envoy_cc_test(
     srcs = ["conn_pool_base_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//envoy/registry",
         "//source/common/conn_pool:conn_pool_base_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
