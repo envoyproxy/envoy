@@ -54,6 +54,24 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "allocate_conn_pool_integration_test",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["allocate_conn_pool_integration_test.cc"],
+    }),
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:quic_client_factory_lib",
+        "//source/extensions/upstreams/http:config",
+    ]),
+)
+
+envoy_cc_test(
     name = "ads_integration_test",
     size = "large",
     srcs = envoy_select_admin_functionality(
