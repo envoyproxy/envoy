@@ -29,6 +29,7 @@
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/http3/codec_stats.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -38,10 +39,7 @@
 
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/listener_factory_context.h"
-
 #if defined(ENVOY_ENABLE_QUIC)
-#include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/quic_stat_names.h"
 #endif
 
@@ -56,6 +54,12 @@
 // TODO(mattklein123): A lot of code should be moved from this header file into the cc file.
 
 namespace Envoy {
+
+namespace Server {
+namespace Configuration {
+class MockListenerFactoryContext;
+} // namespace Configuration
+} // namespace Server
 
 class FakeHttpConnection;
 class FakeUpstream;
@@ -932,31 +936,8 @@ private:
       Network::UdpListenerWorkerRouterImpl listener_worker_router_;
     };
 
-    FakeListener(FakeUpstream& parent, bool is_quic = false)
-        : parent_(parent), name_("fake_upstream"), init_manager_(nullptr),
-          listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
-      if (is_quic) {
-#if defined(ENVOY_ENABLE_QUIC)
-        if (context_ == nullptr) {
-          // Only initialize this when needed to avoid slowing down non-QUIC integration tests.
-          context_ = std::make_unique<
-              testing::NiceMock<Server::Configuration::MockListenerFactoryContext>>();
-        }
-        absl::Status creation_status = absl::OkStatus();
-        udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
-            *context_, creation_status);
-        ASSERT(creation_status.ok());
-        // Initialize QUICHE flags.
-        quiche::FlagRegistry::getInstance();
-#else
-        ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
-#endif
-      } else {
-        udp_listener_config_.listener_factory_ =
-            std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
-      }
-    }
+    FakeListener(FakeUpstream& parent, bool is_quic = false);
+    ~FakeListener() override;
 
     UdpListenerConfigImpl udp_listener_config_;
 

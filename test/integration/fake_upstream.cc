@@ -18,6 +18,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/server_codec_impl.h"
 
 #include "quiche/quic/test_tools/quic_session_peer.h"
@@ -26,6 +27,8 @@
 #include "source/common/listener_manager/connection_handler_impl.h"
 
 #include "test/integration/utility.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -41,6 +44,32 @@ using testing::AssertionResult;
 using testing::AssertionSuccess;
 
 namespace Envoy {
+
+FakeUpstream::FakeListener::FakeListener(FakeUpstream& parent, bool is_quic)
+    : parent_(parent), name_("fake_upstream"), init_manager_(nullptr),
+      listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
+  if (is_quic) {
+#if defined(ENVOY_ENABLE_QUIC)
+    // Only initialize this when needed to avoid slowing down non-QUIC integration tests.
+    context_ =
+        std::make_unique<testing::NiceMock<Server::Configuration::MockListenerFactoryContext>>();
+    auto creation_status = absl::OkStatus();
+    udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
+        parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_, *context_,
+        creation_status);
+    ASSERT(creation_status.ok());
+    // Initialize QUICHE flags.
+    quiche::FlagRegistry::getInstance();
+#else
+    ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
+#endif
+  } else {
+    udp_listener_config_.listener_factory_ =
+        std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
+  }
+}
+
+FakeUpstream::FakeListener::~FakeListener() = default;
 
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                        Event::TestTimeSystem& time_system)
