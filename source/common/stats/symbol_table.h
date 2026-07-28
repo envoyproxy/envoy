@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <stack>
 #include <string>
@@ -28,6 +29,8 @@ using StatNameVec = absl::InlinedVector<StatName, 8>;
 class StatNameList;
 class StatNameSet;
 using StatNameSetPtr = std::unique_ptr<StatNameSet>;
+using StatNameTag = std::pair<StatName, StatName>;
+using StatNameTagSpan = absl::Span<const StatNameTag>;
 
 /**
  * Holds a range of indexes indicating which parts of a stat-name are
@@ -313,6 +316,19 @@ public:
    * @param list The StatNameList representing the stat names.
    */
   void populateList(const StatName* names, uint32_t num_names, StatNameList& list);
+
+  /**
+   * Populates a StatNameList from a name, base-name, and tags. This is not done at
+   * construction time to enable StatNameList to be instantiated directly in
+   * a class that doesn't have a live SymbolTable when it is constructed.
+   *
+   * @param tagged_name The tagged name of the stat.
+   * @param base_name The base name of the stat.
+   * @param name_tags The tags associated with the stat.
+   * @param list The StatNameList representing the stat names.
+   */
+  void populateList(StatName tagged_name, StatName base_name, StatNameTagSpan name_tags,
+                    StatNameList& list);
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const;
@@ -913,6 +929,24 @@ public:
    * @param f The function to call on each stat.
    */
   void iterate(const std::function<bool(StatName)>& f) const;
+  /**
+   * Iterates over each StatName in the list, calling f(StatName, index). f()
+   * should return true to keep iterating, or false to end the iteration.
+   *
+   * @param f The function to call on each stat.
+   */
+  template <typename ConsumeStatNameCb> void iterateWithIndex(const ConsumeStatNameCb& f) const {
+    ASSERT(populated());
+    const uint8_t* p = storage_.get();
+    const uint32_t num_elements = *p++;
+    for (uint32_t i = 0; i < num_elements; ++i) {
+      const StatName stat_name(p);
+      p += stat_name.size();
+      if (!f(stat_name, i)) {
+        break;
+      }
+    }
+  }
 
   /**
    * Frees each StatName in the list. Failure to call this before destruction

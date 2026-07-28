@@ -14,6 +14,10 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/instance_impl.h"
@@ -546,6 +550,66 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
     EXPECT_EQ(1, test3_headers.size());
     EXPECT_EQ("test3_value1,test3_value2", headers.get_("test3"));
   }
+}
+
+// Boots a server backed by a real ThreadLocalStoreImpl (the production store type, unlike the base
+// fixture's TestIsolatedStoreImpl) and verifies the explicit-tags decision made during
+// initialization, observed via ThreadLocalStoreImpl::useExplicitTags(). These live in the
+// ServerInstanceImplTest suite, after WithCustomInlineHeaders, because booting a server finalizes
+// the process-global custom-inline-header registry that the inline-header tests must populate
+// first.
+//
+// With the runtime guard enabled and a default stats config (no custom tags), server initialization
+// turns on the explicit-tags logic on the real stats store. Guards against a regression where an
+// early scope creation would silently cause setUseExplicitTags() to be ignored.
+TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
+  Stats::SymbolTableImpl symbol_table;
+  Stats::AllocatorImpl allocator(symbol_table);
+  auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
+
+  options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+      "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+  server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                      component_factory_);
+  EXPECT_TRUE(real_store->useExplicitTags());
+
+  // Tear down the server (which shuts down threading on real_store) before real_store is destroyed,
+  // and restore the process-global runtime flag so it does not leak into other tests.
+  server_.reset();
+  real_store.reset();
+  thread_local_.reset();
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
+}
+
+// With the runtime guard at its default (false), the explicit-tags logic stays off after init.
+TEST_P(ServerInstanceImplTest, ExplicitTagsDisabledByDefault) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
+  Stats::SymbolTableImpl symbol_table;
+  Stats::AllocatorImpl allocator(symbol_table);
+  auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
+
+  options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+      "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+  server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                      component_factory_);
+  EXPECT_FALSE(real_store->useExplicitTags());
+
+  server_.reset();
+  real_store.reset();
+  thread_local_.reset();
 }
 
 // Validates that server stats are flushed even when server is stuck with initialization.

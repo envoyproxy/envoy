@@ -10,7 +10,6 @@
 
 # docs/examples
 /docs/ @envoyproxy/docs-shepherds
-/examples/ @envoyproxy/docs-shepherds
 /changelogs/ @envoyproxy/docs-shepherds
 
 # access loggers
@@ -27,8 +26,6 @@
 /*/extensions/filters/http/original_src @klarose @mattklein123
 # original_src listener filter extension
 /*/extensions/filters/listener/original_src @klarose @mattklein123
-# original_src common extension
-extensions/filters/common/original_src @klarose @mattklein123
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @wbpcode
 # cdn_loop extension
@@ -69,7 +66,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # starttls transport socket
 /*/extensions/transport_sockets/starttls @cpakulski @botengyao @ggreenway
 # proxy transport socket
-/*extensions/transport_sockets/http_11_proxy @abeyad @ryantheoptimist
+/*/extensions/transport_sockets/http_11_proxy @abeyad @ryantheoptimist
 # internal upstream transport socket
 /*/extensions/transport_sockets/internal_upstream @kyessenov @botengyao
 # sni_cluster extension
@@ -138,7 +135,6 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/wasm_runtime/ @mpwarres @kyessenov @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
-/*/extensions/common/matcher/domain_matcher @agrawroh @kyessenov
 /*/extensions/common/proxy_protocol @ggreenway @wez470
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @kbaichoo
@@ -195,8 +191,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/watchdog/backtrace_action @kbaichoo @jmsadair
 /*/extensions/watchdog/profile_action @kbaichoo @nezdolik
 # Core upstream code
-extensions/upstreams/http @yanavlasov @mattklein123
-extensions/upstreams/tcp @ggreenway @mattklein123
+/*/extensions/upstreams/http @yanavlasov @mattklein123
+/*/extensions/upstreams/tcp @ggreenway @mattklein123
 # OAuth2
 /*/extensions/filters/http/oauth2 @bplotnick @zhaohuabing @mattklein123 @wbpcode
 # HTTP Local Rate Limit
@@ -215,9 +211,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # dynamic metadata input matcher
 /*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
 # environment generic input
-/*/extensions/matching/common_inputs/environment @donyu @mattklein123
-# network common inputs
-/*/extensions/matching/common_inputs/network @agrawroh @kyessenov @wbpcode
+/*/extensions/matching/common_inputs/environment_variable @donyu @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # transform stats matching
@@ -468,12 +462,11 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 /*/extensions/clusters/dns @UNOWNED @UNOWNED
-/*/source/extensions/api_listeners/default_api_listener @UNOWNED @UNOWNED
-/*/source/extensions/listener_managers/listener_manager @yanavlasov @ggreenway
-/*/source/extensions/listener_managers/validation_listener_manager @adisuissa @ggreenway
-/*/source/extensions/matching/common_inputs/transport_socket @agrawroh @kyessenov
-/*/source/extensions/config_subscription/ @adisuissa @UNOWNED
-/*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
+/source/extensions/api_listeners/default_api_listener @UNOWNED @UNOWNED
+/source/extensions/listener_managers/validation_listener_manager @adisuissa @ggreenway
+/source/extensions/matching/common_inputs/transport_socket @agrawroh @kyessenov
+/source/extensions/config_subscription/ @adisuissa @UNOWNED
+/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @wbpcode @yanjunxiang-google

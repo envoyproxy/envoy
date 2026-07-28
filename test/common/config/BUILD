@@ -184,6 +184,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -196,6 +197,7 @@ envoy_cc_test(
     deps = [
         ":xds_test_utility_lib",
         "//source/common/config:context_provider_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -257,6 +259,7 @@ envoy_cc_test(
         "//source/common/config:watched_directory_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

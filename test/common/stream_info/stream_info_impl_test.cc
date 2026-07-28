@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -572,7 +573,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   std::string json;
   const auto test_struct = stream_info.dynamicMetadata().filter_metadata().at("com.test");
   const auto status = Protobuf::util::MessageToJsonString(test_struct, &json);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   // check json contains the key and values we set
   EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
   EXPECT_TRUE(json.find("\"another_key\":\"another_value\"") != std::string::npos);
