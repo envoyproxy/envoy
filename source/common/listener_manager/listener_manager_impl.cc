@@ -33,9 +33,11 @@
 #include "absl/types/span.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
+#include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
+#include "source/common/listener_manager/active_raw_udp_listener_config.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
@@ -281,6 +283,34 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
   }
   return {Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(
       listener_filter.filter_disabled())};
+}
+
+absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>
+ProdListenerComponentFactory::createUdpListenerFactoryImpl(
+    const envoy::config::listener::v3::Listener& config, uint32_t concurrency,
+    Quic::QuicStatNames& quic_stat_names, Configuration::ListenerFactoryContext& context) {
+  if (config.udp_listener_config().has_quic_options()) {
+#ifdef ENVOY_ENABLE_QUIC
+    if (config.has_connection_balance_config()) {
+      return absl::InvalidArgumentError(
+          "connection_balance_config is configured for QUIC listener which "
+          "doesn't work with connection balancer.");
+    }
+    absl::Status creation_status = absl::OkStatus();
+    Network::ActiveUdpListenerFactoryPtr listener_factory =
+        std::make_unique<Quic::ActiveQuicListenerFactory>(
+            config.udp_listener_config().quic_options(), concurrency, quic_stat_names,
+            context.messageValidationVisitor(), context, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    return std::move(listener_factory);
+#else
+    UNREFERENCED_PARAMETER(quic_stat_names);
+    UNREFERENCED_PARAMETER(validation_visitor);
+    UNREFERENCED_PARAMETER(context);
+    return absl::InvalidArgumentError("QUIC is configured but not enabled in the build.");
+#endif
+  }
+  return std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
 }
 
 absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocket(

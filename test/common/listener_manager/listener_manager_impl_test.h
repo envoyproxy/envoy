@@ -96,6 +96,10 @@ protected:
                                                      worker_factory_, enable_dispatcher_stats_,
                                                      server_.quic_stat_names_);
 
+    // Use the real UDP listener factory creation by default.
+    ON_CALL(listener_factory_, createUdpListenerFactory(_, _, _, _))
+        .WillByDefault(Invoke(ProdListenerComponentFactory::createUdpListenerFactoryImpl));
+
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(

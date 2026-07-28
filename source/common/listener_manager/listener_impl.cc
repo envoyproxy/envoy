@@ -719,19 +719,14 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
     udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
         config.udp_listener_config().udp_packet_packet_writer_config(), *listener_factory_context_);
   }
+  absl::StatusOr<Network::ActiveUdpListenerFactoryPtr> udp_listener_factory =
+      parent_.factory_->createUdpListenerFactory(config, concurrency, quic_stat_names_,
+                                                 *listener_factory_context_);
+  RETURN_IF_NOT_OK_REF(udp_listener_factory.status());
+  udp_listener_config_->listener_factory_ = std::move(*udp_listener_factory);
+
   if (config.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
-    if (config.has_connection_balance_config()) {
-      return absl::InvalidArgumentError(
-          "connection_balance_config is configured for QUIC listener which "
-          "doesn't work with connection balancer.");
-    }
-    absl::Status listener_factory_creation_status = absl::OkStatus();
-    udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_, *listener_factory_context_, listener_factory_creation_status);
-    RETURN_IF_NOT_OK_REF(listener_factory_creation_status);
-
     if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
       auto* quic_packet_writer_factory_factory =
           Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
@@ -754,12 +749,7 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
       udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
     }
 #endif
-#else
-    return absl::InvalidArgumentError("QUIC is configured but not enabled in the build.");
 #endif
-  } else {
-    udp_listener_config_->listener_factory_ =
-        std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
   }
   if (udp_listener_config_->writer_factory_ == nullptr) {
     udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
