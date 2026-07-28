@@ -243,8 +243,7 @@ extractions_by_method: {
 })pb");
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  ASSERT_OK(makeConfig());
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
@@ -272,12 +271,12 @@ extractions_by_method: {
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      static_cast<void>(std::make_unique<FilterConfig>(
-          proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
-      EnvoyException,
-      testing::HasSubstr(
-          "multiple field extractions are configured for the dynamic metadata key `name`"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              "multiple field extractions are configured for the dynamic metadata key `name`")));
 }
 
 TEST_F(FilterConfigTestException, MetadataKeyCollidesWithFieldPath) {
@@ -302,12 +301,12 @@ extractions_by_method: {
   *proto_config_.mutable_descriptor_set()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
-  EXPECT_THAT_THROWS_MESSAGE(
-      static_cast<void>(std::make_unique<FilterConfig>(
-          proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_)),
-      EnvoyException,
-      testing::HasSubstr(
-          "multiple field extractions are configured for the dynamic metadata key `parent`"));
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              "multiple field extractions are configured for the dynamic metadata key `parent`")));
 }
 
 TEST_F(FilterConfigTestException, ErrorParsingDescriptorInline) {
