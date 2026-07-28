@@ -11,6 +11,8 @@ routing PRs, questions, etc. to the right place.
 * Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
+* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
+  * xDS APIs, configuration and control plane.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
@@ -128,7 +130,6 @@ without further review.
 * Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
-* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
 * Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
