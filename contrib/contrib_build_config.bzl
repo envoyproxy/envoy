@@ -61,6 +61,12 @@ CONTRIB_EXTENSIONS = {
     "envoy.tap_sinks.udp_sink":                          "//contrib/tap_sinks/udp_sink/source:config",
 
     #
+    # Transport sockets
+    #
+
+    "envoy.transport_sockets.istio_internal_upstream":         "//contrib/istio/transport_sockets/istio_internal_upstream/source:config",
+
+    #
     # Private key providers
     #
 

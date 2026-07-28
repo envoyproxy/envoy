@@ -171,6 +171,13 @@ envoy.filters.http.peak_ewma:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.peak_ewma.v3alpha.PeakEwmaConfig
+envoy.transport_sockets.istio_internal_upstream:
+  categories:
+  - envoy.transport_sockets.upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.istio_internal_upstream.v3.IstioInternalUpstreamTransport
 envoy.filters.http.peer_metadata:
   categories:
   - envoy.filters.http
