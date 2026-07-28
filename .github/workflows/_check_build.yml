@@ -30,6 +30,7 @@ jobs:
       actions: read
       contents: read
       packages: read
+      pull-requests: write
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
@@ -47,6 +48,7 @@ jobs:
       catch-errors: ${{ matrix.catch-errors || false }}
       skip: ${{ matrix.skip != false && true || false }}
       slack-channel: ${{ matrix.slack-channel || '' }}
+      pr-comment-on-failure: ${{ matrix.pr-comment-on-failure || '' }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
       trusted: ${{ inputs.trusted }}
@@ -63,10 +65,19 @@ jobs:
           name: GCC
         - target: openssl
           name: OpenSSL
-          skip: ${{ ! fromJSON(inputs.request).run.check-build-openssl }}
+          skip: ${{ fromJSON(inputs.request).request.pr != '' || ! fromJSON(inputs.request).run.check-build-openssl }}
           catch-errors: true
           slack-channel: '#envoy-openssl'
         - target: openssl.presubmit
           name: OpenSSL (presubmit)
           skip: ${{ fromJSON(inputs.request).request.pr == '' || ! fromJSON(inputs.request).run.check-build-openssl-presubmit }}
           catch-errors: true
+          pr-comment-on-failure: >-
+            **OpenSSL pre-submit check failed**
+
+
+            The `openssl.presubmit` CI job detected test failures when running
+            affected tests with OpenSSL. This check is informational and does
+            not block merging.
+
+            cc: @envoyproxy/envoy-openssl-sync

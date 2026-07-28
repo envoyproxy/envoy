@@ -141,6 +141,10 @@ on:
         type: string
         default: ''
         description: Slack channel for failure notifications (opt-in, e.g. '#envoy-ci'). Leave empty to disable.
+      pr-comment-on-failure:
+        type: string
+        default: ''
+        description: Post a PR comment with this message on failure (catch-errors only). Leave empty to disable.
       source:
         type: string
       summary-post:
@@ -210,6 +214,7 @@ jobs:
       actions: read
       contents: read
       packages: read
+      pull-requests: write
     if: ${{ ! inputs.skip }}
     runs-on: ${{ inputs.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu }}
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
@@ -484,3 +489,26 @@ jobs:
             text:
               type: mrkdwn
               text: ":x: *CI job failed:* `${{ inputs.target }}`\n<${{ env.JOB_URL }}|View workflow run>"
+
+    - name: Comment on PR on failure
+      if: >-
+        steps.ci-run.outputs.exit-code != 0
+        && inputs.pr-comment-on-failure != ''
+        && fromJSON(inputs.request).request.pr != ''
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
+      env:
+        JOB_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      with:
+        script: |
+          const message = ${{ toJSON(inputs.pr-comment-on-failure) }};
+          const body = message + '\n\n[View workflow run](' + process.env.JOB_URL + ')';
+          try {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ fromJSON(inputs.request).request.pr }},
+              body: body
+            });
+          } catch (error) {
+            console.error('Failed to comment on PR:', error);
+          }

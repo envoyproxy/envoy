@@ -53,7 +53,7 @@ jobs:
       actions: read
       contents: read
       packages: read
-      pull-requests: read
+      pull-requests: write
     name: Check (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
     uses: ./.github/workflows/_check_build.yml
     if: ${{ fromJSON(needs.load.outputs.request).run.check-build }}
