@@ -11,8 +11,8 @@ routing PRs, questions, etc. to the right place.
 * Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
-* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
-  * xDS APIs, configuration and control plane.
+* Harvey Tuch ([htuch](https://github.com/htuch)) (h@tuch.id.au)
+  * xDS APIs, configuration and control plane, extensibility and security.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
