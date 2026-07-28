@@ -6,6 +6,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/html/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/admin/admin_html_util.h"
 
 #include "absl/strings/str_replace.h"
@@ -23,7 +24,9 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
     : StatsTextRender(params), active_(params.format_ == StatsFormat::ActiveHtml),
       json_histograms_(!active_ &&
-                       params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed) {
+                       params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Detailed),
+      sanitize_html_stats_names_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_html_stats_names")) {
   AdminHtmlUtil::renderHead(response_headers, response);
 }
 
@@ -58,7 +61,21 @@ void StatsHtmlRender::setupStatsPage(const Admin::UrlHandler& url_handler,
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
   ASSERT(first_histogram_);
-  response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
+  absl::string_view name_view = name;
+  std::string sanitized_name;
+  if (Html::Utility::requiresSanitization(name) && sanitize_html_stats_names_) {
+    sanitized_name = Html::Utility::sanitize(name);
+    name_view = sanitized_name;
+  }
+
+  absl::string_view value_view = value;
+  std::string sanitized_value;
+  if (Html::Utility::requiresSanitization(value)) {
+    sanitized_value = Html::Utility::sanitize(value);
+    value_view = sanitized_value;
+  }
+
+  response.addFragments({name_view, ": \"", value_view, "\"\n"});
 }
 
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
@@ -101,7 +118,11 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
     { StatsJsonRender::generateHistogramDetail(name, histogram, *streamer.makeRootMap()); }
     response.add(");\n</script>\n");
   } else {
-    StatsTextRender::generate(response, name, histogram);
+    if (Html::Utility::requiresSanitization(name) && sanitize_html_stats_names_) {
+      StatsTextRender::generate(response, Html::Utility::sanitize(name), histogram);
+    } else {
+      StatsTextRender::generate(response, name, histogram);
+    }
   }
 }
 
