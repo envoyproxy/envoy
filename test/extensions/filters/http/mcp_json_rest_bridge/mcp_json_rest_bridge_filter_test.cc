@@ -192,6 +192,52 @@ TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathNoOpMode) {
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathNoOpModePreventsPerRouteFallback) {
+  proto_config_.set_no_fallback_path(true);
+  makeFilter();
+
+  // Add an empty per route config (which would normally set up the /mcp fallback)
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_proto;
+  auto per_route_config = std::make_shared<McpJsonRestBridgePerRouteConfig>(per_route_proto);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(per_route_config.get()));
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathWithExplicitPerRouteConfigWorks) {
+  proto_config_.set_no_fallback_path(true);
+  makeFilter();
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_proto;
+  auto* tool_config = per_route_proto.add_tool_config();
+  tool_config->mutable_default_server_info()->set_path("/explicit_mcp");
+  auto per_route_config = std::make_shared<McpJsonRestBridgePerRouteConfig>(per_route_proto);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(per_route_config.get()));
+
+  request_headers_ = {{":method", "POST"}, {":path", "/explicit_mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::Accepted), StrEq(""), _, _,
+                             StrEq("mcp_json_rest_bridge_filter_initialize_ack")));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
   makeFilter();
 
