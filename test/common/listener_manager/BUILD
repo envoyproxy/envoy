@@ -76,7 +76,8 @@ envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
     rbe_pool = "6gig",
-    shard_count = 5,
+    # TODO: Decrease to 5 once "envoy.restart_features.defer_worker_routing_init" is removed
+    shard_count = 10,
     deps = [
         ":listener_manager_impl_test_lib",
         "//envoy/network:socket_interface",
