@@ -20,48 +20,43 @@ namespace {
 
 // Applies certificate-level tls_params to ssl after SSL_set_SSL_CTX (which only transfers cert
 // material).
-absl::Status applyTlsParamsToSsl(const Ssl::TlsParams& p, const Ssl::TlsContext& ctx, SSL* ssl) {
+absl::Status applyTlsParamsToSsl(const Ssl::TlsParams& params, const Ssl::TlsContext& ctx,
+                                 SSL* ssl) {
   using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
-  if (p.min_protocol_version != TlsProto::TLS_AUTO) {
-    if (SSL_set_min_proto_version(ssl, Utility::tlsVersionFromProto(p.min_protocol_version, 0)) !=
-        1) {
+  if (params.min_protocol_version != TlsProto::TLS_AUTO) {
+    if (SSL_set_min_proto_version(
+            ssl, Utility::tlsVersionFromProto(params.min_protocol_version, 0)) != 1) {
       return absl::InternalError(absl::StrCat("Failed to set per-cert min TLS version: ",
                                               Utility::getLastCryptoError().value_or("")));
     }
   }
-  if (p.max_protocol_version != TlsProto::TLS_AUTO) {
-    if (SSL_set_max_proto_version(ssl, Utility::tlsVersionFromProto(p.max_protocol_version, 0)) !=
-        1) {
+  if (params.max_protocol_version != TlsProto::TLS_AUTO) {
+    if (SSL_set_max_proto_version(
+            ssl, Utility::tlsVersionFromProto(params.max_protocol_version, 0)) != 1) {
       return absl::InternalError(absl::StrCat("Failed to set per-cert max TLS version: ",
                                               Utility::getLastCryptoError().value_or("")));
     }
   }
-  // Skip fields a custom handshaker owns to avoid overwriting its configuration.
-  if (!ctx.provides_ciphers_and_curves_) {
-    if (!p.cipher_suites.empty() && SSL_set_strict_cipher_list(ssl, p.cipher_suites.c_str()) != 1) {
-      return absl::InternalError(absl::StrCat("Failed to set per-cert cipher suites: ",
-                                              Utility::getLastCryptoError().value_or("")));
-    }
-    if (!p.ecdh_curves.empty() && SSL_set1_curves_list(ssl, p.ecdh_curves.c_str()) != 1) {
-      return absl::InternalError(absl::StrCat("Failed to set per-cert ECDH curves: ",
-                                              Utility::getLastCryptoError().value_or("")));
-    }
+  const Utility::EffectiveTlsParams effective =
+      Utility::effectiveTlsParams(params, ctx.provides_ciphers_and_curves_, ctx.provides_sigalgs_);
+  if (!effective.cipher_suites.empty() &&
+      SSL_set_strict_cipher_list(ssl, effective.cipher_suites.c_str()) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to set per-cert cipher suites: ",
+                                            Utility::getLastCryptoError().value_or("")));
   }
-  if (!ctx.provides_sigalgs_ && !p.signature_algorithms.empty() &&
-      SSL_set1_sigalgs_list(ssl, p.signature_algorithms.c_str()) != 1) {
+  if (!effective.ecdh_curves.empty() &&
+      SSL_set1_curves_list(ssl, effective.ecdh_curves.c_str()) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to set per-cert ECDH curves: ",
+                                            Utility::getLastCryptoError().value_or("")));
+  }
+  if (!effective.signature_algorithms.empty() &&
+      SSL_set1_sigalgs_list(ssl, effective.signature_algorithms.c_str()) != 1) {
     return absl::InternalError(absl::StrCat("Failed to set per-cert signature algorithms: ",
                                             Utility::getLastCryptoError().value_or("")));
   }
   // Compliance policy must be applied last.
-  if (p.compliance_policy.has_value()) {
-    auto ssl_policy_or_error = Utility::compliancePolicyToSslPolicy(p.compliance_policy.value());
-    if (!ssl_policy_or_error.ok()) {
-      return ssl_policy_or_error.status();
-    }
-    if (SSL_set_compliance_policy(ssl, *ssl_policy_or_error) != 1) {
-      return absl::InternalError(absl::StrCat("Failed to set per-cert compliance policy: ",
-                                              Utility::getLastCryptoError().value_or("")));
-    }
+  if (params.compliance_policy.has_value()) {
+    RETURN_IF_NOT_OK(Utility::applyCompliancePolicyToSsl(params.compliance_policy.value(), ssl));
   }
   return absl::OkStatus();
 }

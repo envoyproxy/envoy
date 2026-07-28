@@ -188,6 +188,12 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni,
       // The selected ctx must adhere to OCSP policy
       return false;
     }
+    // An ECDSA certificate whose effective cipher list contains no ECDSA-capable cipher can never
+    // authenticate, so it must not be selected even though its curve matches. A per-certificate
+    // cipher_suites override can produce this, and another certificate should be used instead.
+    if (ctx.ec_group_curve_name_ != Ssl::EC_CURVE_INVALID_NID && !ctx.canAuthenticateEcdsa()) {
+      return false;
+    }
     // If the client is ECDSA-capable and the context is ECDSA, we check if it is capable of
     // handling the curves in the cert in a given TlsContext. If the client is not ECDSA-capable,
     // we will not std::find anything here and move on. If the context is RSA, we will not find

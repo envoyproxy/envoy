@@ -209,7 +209,7 @@ ContextConfigImpl::ContextConfigImpl(
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
       factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
-      compliance_policy_(Utility::compliancePolicyFromProto(config.tls_params())) {
+      compliance_policy_(Utility::compliancePolicyFromProto(config.tls_params(), creation_status)) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   auto list_or_error = Network::Address::IpList::create(config.key_log().local_address_range());
   SET_AND_RETURN_IF_NOT_OK(list_or_error.status(), creation_status);

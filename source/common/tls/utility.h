@@ -7,6 +7,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/parsed_x509_name.h"
+#include "envoy/ssl/tls_certificate_config.h"
 
 #include "source/common/common/utility.h"
 
@@ -198,11 +199,14 @@ std::vector<std::string> getCertificateCrlDpsForLogging(X509* cert);
 
 /**
  * Extracts at most one CompliancePolicy from a TlsParameters proto. Returns nullopt when none are
- * set, and the first policy when exactly one is set. Logs an ENVOY_BUG for > 1.
+ * set, and the first policy when exactly one is set. Sets creation_status and returns nullopt when
+ * more than one is set. The proto caps this via a max_items rule, so the error case is only
+ * reachable for protos built without PGV validation.
  */
 std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
 compliancePolicyFromProto(
-    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params);
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params,
+    absl::Status& creation_status);
 
 /**
  * Validates cipher_suites, ecdh_curves, and signature_algorithms strings against ssl_ctx,
@@ -231,12 +235,34 @@ unsigned tlsVersionFromProto(
     unsigned default_version);
 
 /**
- * Validates cipher_suites, ecdh_curves, signature_algorithms, and compliance_policy in params
- * against ssl_ctx. Returns an error status if any field is rejected by BoringSSL.
+ * Maps policy to its BoringSSL constant and applies it to ssl_ctx. Compliance policies must be
+ * applied after all other TLS parameters, since they may override them.
  */
-absl::Status
-validateTlsParamsProto(const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params,
-                       SSL_CTX* ssl_ctx);
+absl::Status applyCompliancePolicyToSslCtx(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL_CTX* ssl_ctx);
+
+/**
+ * Per-connection twin of applyCompliancePolicyToSslCtx, for use after SSL_set_SSL_CTX, which
+ * transfers only certificate material and so leaves the policy unapplied.
+ */
+absl::Status applyCompliancePolicyToSsl(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL* ssl);
+
+/**
+ * The subset of certificate-level params that Envoy is responsible for applying. Fields a custom
+ * handshaker owns (per its capabilities) are returned empty so callers skip them rather than
+ * overwriting the handshaker's configuration. The references alias params, which must outlive them.
+ */
+struct EffectiveTlsParams {
+  const std::string& cipher_suites;
+  const std::string& ecdh_curves;
+  const std::string& signature_algorithms;
+};
+
+EffectiveTlsParams effectiveTlsParams(const Ssl::TlsParams& params,
+                                      bool provides_ciphers_and_curves, bool provides_sigalgs);
 
 } // namespace Utility
 } // namespace Tls

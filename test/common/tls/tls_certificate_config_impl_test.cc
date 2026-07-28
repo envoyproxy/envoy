@@ -138,46 +138,6 @@ TEST_F(TlsCertificateConfigImplTest, CertLevelCompliancePolicyParsed) {
   EXPECT_EQ(TlsProto::FIPS_202205, params->compliance_policy.value());
 }
 
-TEST_F(TlsCertificateConfigImplTest, InvalidCertLevelCipherRejected) {
-  const std::string yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
-      tls_params:
-        cipher_suites: "BOGUS-CIPHER"
-        ecdh_curves: "P-256"
-  )EOF";
-
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  EXPECT_FALSE(cfg.ok());
-  EXPECT_THAT(cfg.status().message(), testing::HasSubstr("Failed to initialize cipher suites"));
-}
-
-TEST_F(TlsCertificateConfigImplTest, InvalidCertLevelEcdhCurveRejected) {
-  const std::string yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
-      tls_params:
-        cipher_suites: "ECDHE-RSA-AES128-GCM-SHA256"
-        ecdh_curves: "BOGUS-CURVE"
-  )EOF";
-
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  EXPECT_FALSE(cfg.ok());
-  EXPECT_THAT(cfg.status().message(), testing::HasSubstr("Failed to initialize ECDH curves"));
-}
-
 TEST_F(TlsCertificateConfigImplTest, MultipleCompliancePoliciesRejected) {
   const std::string yaml = R"EOF(
   common_tls_context:
@@ -197,28 +157,6 @@ TEST_F(TlsCertificateConfigImplTest, MultipleCompliancePoliciesRejected) {
   auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   EXPECT_FALSE(cfg.ok());
   EXPECT_THAT(cfg.status().message(), testing::HasSubstr("Only one compliance policy"));
-}
-
-TEST_F(TlsCertificateConfigImplTest, InvalidCertLevelSigAlgRejected) {
-  const std::string yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
-      tls_params:
-        cipher_suites: "ECDHE-RSA-AES128-GCM-SHA256"
-        ecdh_curves: "P-256"
-        signature_algorithms: "bogus_sigalg"
-  )EOF";
-
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  EXPECT_FALSE(cfg.ok());
-  EXPECT_THAT(cfg.status().message(),
-              testing::HasSubstr("Failed to initialize TLS signature algorithms"));
 }
 
 } // namespace Tls

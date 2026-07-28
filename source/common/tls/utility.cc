@@ -642,14 +642,16 @@ std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
 
 std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
 Utility::compliancePolicyFromProto(
-    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params,
+    absl::Status& creation_status) {
   switch (params.compliance_policies_size()) {
   case 0:
     return std::nullopt;
   case 1:
     return params.compliance_policies(0);
   default:
-    IS_ENVOY_BUG("more than one policies are not supported");
+    creation_status =
+        absl::InvalidArgumentError("Only one compliance policy may be specified in tls_params");
     return std::nullopt;
   }
 }
@@ -729,40 +731,42 @@ absl::Status Utility::validateCipherCurveAndSigalgsOnSslCtx(absl::string_view ci
   return absl::OkStatus();
 }
 
-absl::Status Utility::validateTlsParamsProto(
-    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params, SSL_CTX* ssl_ctx) {
-  if (params.compliance_policies_size() > 1) {
+absl::Status Utility::applyCompliancePolicyToSslCtx(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL_CTX* ssl_ctx) {
+  auto ssl_policy_or_error = compliancePolicyToSslPolicy(policy);
+  if (!ssl_policy_or_error.ok()) {
+    return ssl_policy_or_error.status();
+  }
+  if (SSL_CTX_set_compliance_policy(ssl_ctx, *ssl_policy_or_error) != 1) {
     return absl::InvalidArgumentError(
-        "Only one compliance policy may be specified per certificate tls_params");
-  }
-  using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
-  const auto min_ver = params.tls_minimum_protocol_version();
-  const auto max_ver = params.tls_maximum_protocol_version();
-  if (min_ver != TlsProto::TLS_AUTO && max_ver != TlsProto::TLS_AUTO &&
-      static_cast<int>(min_ver) > static_cast<int>(max_ver)) {
-    return absl::InvalidArgumentError(
-        "Per-certificate tls_params: tls_minimum_protocol_version must not exceed "
-        "tls_maximum_protocol_version");
-  }
-  if (absl::Status s = validateCipherCurveAndSigalgsOnSslCtx(
-          absl::StrJoin(params.cipher_suites(), ":"), absl::StrJoin(params.ecdh_curves(), ":"),
-          absl::StrJoin(params.signature_algorithms(), ":"), ssl_ctx);
-      !s.ok()) {
-    return s;
-  }
-  const auto policy = compliancePolicyFromProto(params);
-  if (policy.has_value()) {
-    auto ssl_policy_or_error = compliancePolicyToSslPolicy(policy.value());
-    if (!ssl_policy_or_error.ok()) {
-      return ssl_policy_or_error.status();
-    }
-    if (SSL_CTX_set_compliance_policy(ssl_ctx, *ssl_policy_or_error) != 1) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to apply compliance policy in per-certificate tls_params: ",
-                       getLastCryptoError().value_or("")));
-    }
+        absl::StrCat("Failed to apply compliance policy: ", getLastCryptoError().value_or("")));
   }
   return absl::OkStatus();
+}
+
+absl::Status Utility::applyCompliancePolicyToSsl(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL* ssl) {
+  auto ssl_policy_or_error = compliancePolicyToSslPolicy(policy);
+  if (!ssl_policy_or_error.ok()) {
+    return ssl_policy_or_error.status();
+  }
+  if (SSL_set_compliance_policy(ssl, *ssl_policy_or_error) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to apply per-cert compliance policy: ",
+                                            getLastCryptoError().value_or("")));
+  }
+  return absl::OkStatus();
+}
+
+Utility::EffectiveTlsParams Utility::effectiveTlsParams(const Ssl::TlsParams& params,
+                                                        bool provides_ciphers_and_curves,
+                                                        bool provides_sigalgs) {
+  return EffectiveTlsParams{
+      .cipher_suites = provides_ciphers_and_curves ? EMPTY_STRING : params.cipher_suites,
+      .ecdh_curves = provides_ciphers_and_curves ? EMPTY_STRING : params.ecdh_curves,
+      .signature_algorithms = provides_sigalgs ? EMPTY_STRING : params.signature_algorithms,
+  };
 }
 
 } // namespace Tls

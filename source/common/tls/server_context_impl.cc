@@ -106,6 +106,29 @@ ServerContextImpl::ServerContextImpl(
   if (!creation_status.ok()) {
     return;
   }
+
+  // Validate and apply certificate-level tls_params to each cert's SSL_CTX. This is server-only
+  // because client contexts clear tls_params_ before use. Applying cipher, curve and sigalg
+  // overrides to the SSL_CTX here ensures cert selection (isCipherEnabled) reflects per-cert
+  // restrictions at TLS 1.2.
+  for (Ssl::TlsContext& ctx : tls_contexts_) {
+    if (!ctx.tls_params_.has_value()) {
+      continue;
+    }
+    const Ssl::TlsParams& params = ctx.tls_params_.value();
+    SSL_CTX* ssl_ctx = ctx.ssl_ctx_.get();
+    const Utility::EffectiveTlsParams effective = Utility::effectiveTlsParams(
+        params, ctx.provides_ciphers_and_curves_, ctx.provides_sigalgs_);
+    creation_status = Utility::validateCipherCurveAndSigalgsOnSslCtx(
+        effective.cipher_suites, effective.ecdh_curves, effective.signature_algorithms, ssl_ctx);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+    if (params.compliance_policy.has_value()) {
+      creation_status =
+          Utility::applyCompliancePolicyToSslCtx(params.compliance_policy.value(), ssl_ctx);
+      RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+    }
+  }
+
   // If creation failed, do not create the selector.
   if (add_selector) {
     tls_certificate_selector_ = config.tlsCertificateSelectorFactory().create(*this);
@@ -457,10 +480,14 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
     if (!CBS_get_u16(&cipher_suites, &cipher_id)) {
       return Ssl::CurveNIDVector{};
     }
-    // All tls_context_ share the same set of enabled ciphers, so we can just look at the base
-    // context.
-    if (tls_contexts_[0].isCipherEnabled(cipher_id, client_version)) {
-      return client_capabilities;
+    // Check every ECDSA cert rather than just the first context. Per-cert cipher_suites overrides
+    // are applied to each cert's SSL_CTX in the constructor, so each context reflects its own
+    // effective cipher list.
+    for (const Ssl::TlsContext& ctx : tls_contexts_) {
+      if (ctx.ec_group_curve_name_ != Ssl::EC_CURVE_INVALID_NID &&
+          ctx.isCipherEnabled(cipher_id, client_version)) {
+        return client_capabilities;
+      }
     }
   }
 

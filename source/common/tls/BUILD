@@ -254,6 +254,7 @@ envoy_cc_library(
     ],
     external_deps = ["ssl"],
     deps = [
+        "//envoy/ssl:tls_certificate_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:fmt_lib",

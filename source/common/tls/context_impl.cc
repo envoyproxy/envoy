@@ -114,12 +114,31 @@ ContextImpl::ContextImpl(
     ctx.provides_ciphers_and_curves_ = capabilities_.provides_ciphers_and_curves;
     ctx.provides_sigalgs_ = capabilities_.provides_sigalgs;
     if (i < tls_certificates.size()) {
-      if (const Ssl::TlsParams* p = tls_certificates[i].get().tlsParams(); p != nullptr) {
-        ctx.tls_params_ = *p;
-        using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
-        if (p->compliance_policy.has_value() &&
-            p->compliance_policy.value() == ProtoPolicy::FIPS_202205 && !FIPS_mode()) {
+      if (const Ssl::TlsParams* params = tls_certificates[i].get().tlsParams(); params != nullptr) {
+        ctx.tls_params_ = *params;
+        using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+        if (params->compliance_policy.has_value() &&
+            params->compliance_policy.value() == TlsProto::FIPS_202205 && !FIPS_mode()) {
           ENVOY_LOG(warn, "Per-certificate FIPS conformance policy applied on a non-FIPS build");
+        }
+        // Cross-validate cert-level min and max against the context floor and ceiling. A cert-only
+        // override of one bound is merged with the inherited context bound here, where both values
+        // are available as resolved version constants.
+        const unsigned ctx_min = config.minProtocolVersion();
+        const unsigned ctx_max = config.maxProtocolVersion();
+        const unsigned cert_min =
+            params->min_protocol_version != TlsProto::TLS_AUTO
+                ? Utility::tlsVersionFromProto(params->min_protocol_version, ctx_min)
+                : ctx_min;
+        const unsigned cert_max =
+            params->max_protocol_version != TlsProto::TLS_AUTO
+                ? Utility::tlsVersionFromProto(params->max_protocol_version, ctx_max)
+                : ctx_max;
+        if (cert_min > cert_max) {
+          creation_status = absl::InvalidArgumentError(
+              "Per-certificate tls_params: effective min protocol version exceeds effective max "
+              "(considering inherited context bounds)");
+          return;
         }
       }
     }
@@ -346,29 +365,21 @@ ContextImpl::ContextImpl(
 
   // Compliance policy must be applied last to have a defined behavior.
   if (const auto policy = config.compliancePolicy(); policy.has_value()) {
-    using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
-    if (policy.value() == ProtoPolicy::FIPS_202205 && !fips_mode) {
+    using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+    if (policy.value() == TlsProto::FIPS_202205 && !fips_mode) {
       ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
     }
-    auto ssl_policy_or_error = Utility::compliancePolicyToSslPolicy(policy.value());
-    if (!ssl_policy_or_error.ok()) {
-      creation_status = ssl_policy_or_error.status();
-      return;
-    }
-    creation_status = setCompliancePolicy(*ssl_policy_or_error);
+    creation_status = setCompliancePolicy(policy.value());
     if (!creation_status.ok()) {
       return;
     }
   }
 }
 
-absl::Status ContextImpl::setCompliancePolicy(enum ssl_compliance_policy_t policy) {
+absl::Status ContextImpl::setCompliancePolicy(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy) {
   for (auto& tls_context : tls_contexts_) {
-    int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(), policy);
-    if (rc != 1) {
-      return absl::InvalidArgumentError(absl::StrCat("Failed to apply compliance policy: ",
-                                                     Utility::getLastCryptoError().value_or("")));
-    }
+    RETURN_IF_NOT_OK(Utility::applyCompliancePolicyToSslCtx(policy, tls_context.ssl_ctx_.get()));
   }
 
   return absl::OkStatus();
@@ -679,6 +690,18 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) co
   }
   for (const SSL_CIPHER* our_c : SSL_CTX_get_ciphers(ssl_ctx_.get())) {
     if (SSL_CIPHER_get_id(our_c) == SSL_CIPHER_get_id(c)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool TlsContext::canAuthenticateEcdsa() const {
+  for (const SSL_CIPHER* c : SSL_CTX_get_ciphers(ssl_ctx_.get())) {
+    const int auth_nid = SSL_CIPHER_get_auth_nid(c);
+    // TLS 1.3 cipher suites do not encode authentication and report NID_auth_any, deferring the
+    // choice to the signature algorithms, so any of them can authenticate with ECDSA.
+    if (auth_nid == NID_auth_ecdsa || auth_nid == NID_auth_any) {
       return true;
     }
   }
