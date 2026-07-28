@@ -5,7 +5,6 @@ package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
-import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -28,7 +27,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Similar to the regular SDS, the certificate is configured using the outer common TLS context,
 // e.g. by setting the FIPS compliance policy on the loaded certificate.
-// [#next-free-field: 6]
 message Config {
   // Defines the configuration source of the secrets.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
@@ -61,22 +59,12 @@ message Config {
   // using cached secrets are unaffected. A cache slot is also released when the SDS server
   // removes the secret resource, canceling its subscription.
   //
-  // Secrets that resolved to a certificate are never reclaimed; they are released by an SDS
-  // removal or by the
-  // :ref:`cache_idle_timeout <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.cache_idle_timeout>`.
-  // Deployments where the SDS server issues certificates for arbitrary peer-controlled names
-  // should therefore configure both settings together, otherwise idle resolved secrets can fill
-  // the cache until new names are rejected.
+  // Secrets that resolved to a certificate are never reclaimed and are only released when the
+  // SDS server removes the secret resource or the parent listener or cluster is drained. This
+  // limit is therefore best suited for deployments where the SDS server only resolves a known
+  // set of names; when the server issues certificates for arbitrary peer-controlled names, idle
+  // resolved secrets can fill the cache until new names are rejected.
   //
   // If unset, the number of cached secrets is unlimited.
   google.protobuf.UInt32Value max_secrets = 4 [(validate.rules).uint32 = {gt: 0}];
-
-  // The duration a cached secret can remain unused by any TLS handshake before it is evicted from
-  // the cache, canceling its SDS subscription. Idleness is evaluated periodically, so a secret may
-  // be evicted up to two times this duration after its last use. Prefetched secrets are never
-  // evicted due to idleness. The value must be at least 1ms. If unset, cached secrets are only
-  // removed when the SDS server removes the secret resource or the parent listener or cluster is
-  // drained.
-  google.protobuf.Duration cache_idle_timeout = 5
-      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }

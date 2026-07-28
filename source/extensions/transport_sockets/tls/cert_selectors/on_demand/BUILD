@@ -13,7 +13,6 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//envoy/event:timer_interface",
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/ssl:handshaker_interface",

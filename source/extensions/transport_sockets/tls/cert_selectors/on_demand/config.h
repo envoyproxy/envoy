@@ -1,8 +1,5 @@
 #pragma once
 
-#include <atomic>
-
-#include "envoy/event/timer.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -27,7 +24,6 @@ namespace OnDemand {
   COUNTER(cert_requested)                                                                          \
   COUNTER(cert_updated)                                                                            \
   COUNTER(cert_overflow)                                                                           \
-  COUNTER(cert_evicted)                                                                            \
   COUNTER(cert_reclaimed)                                                                          \
   GAUGE(cert_active, Accumulate)
 
@@ -91,36 +87,8 @@ public:
    */
   Stats::Scope& certScope() const { return *scope_; }
 
-  /**
-   * Mark the context as used by a handshake. May be called from any thread. Checks before
-   * writing so that the hot path does not repeatedly dirty a cache line shared by all workers.
-   */
-  void markUsed() const {
-    if (!used_->load(std::memory_order_relaxed)) {
-      used_->store(true, std::memory_order_relaxed);
-    }
-  }
-
-  /**
-   * @return whether the context was used by a handshake since the last call, clearing the flag.
-   */
-  bool consumeUsed() const { return used_->exchange(false, std::memory_order_relaxed); }
-
-  /**
-   * Share the handshake-use flag with the context this one replaces. Workers may keep serving
-   * the prior context until the thread local update propagates; sharing the flag object ensures
-   * their late use marks are not lost across certificate updates. Must be called on the main
-   * thread before the context is published.
-   */
-  void adoptUsedFlag(const AsyncContext& prior) const { used_ = prior.used_; }
-
 private:
   Stats::ScopeSharedPtr scope_;
-  // Tracks handshake usage for idle eviction, shared between the contexts that replace each
-  // other for one secret name. Starts unused: the grace period for a new cache entry is granted
-  // by CacheEntry::recently_active_ instead, so that there is a single idle period of slack
-  // regardless of how often the certificate is updated.
-  mutable std::shared_ptr<std::atomic<bool>> used_{std::make_shared<std::atomic<bool>>(false)};
 };
 
 class ServerAsyncContext : public AsyncContext,
@@ -259,7 +227,6 @@ private:
   // context was installed for the entry and must also be erased from the thread local caches.
   bool doRemoveCertificateConfig(absl::string_view,
                                  std::optional<uint64_t> expected_generation = {});
-  void evictIdle();
   bool reclaimUnusedEntry();
   const Stats::ScopeSharedPtr stats_scope_;
   CertSelectionStatsSharedPtr stats_;
@@ -267,13 +234,10 @@ private:
   const envoy::config::core::v3::ConfigSource config_source_;
   // The maximum number of cache entries, with 0 meaning unlimited.
   const uint32_t max_secrets_;
-  // The idle duration after which an unused cache entry is evicted, if configured.
-  const std::optional<std::chrono::milliseconds> idle_timeout_;
   // Configured prefetch names remain pinned in the cache even if the secret is removed by the
   // SDS server and later fetched again on-demand.
   const absl::flat_hash_set<std::string> prefetch_names_;
   AsyncContextFactory context_factory_;
-  Event::TimerPtr idle_timer_;
 
   // Main-thread accessible context config subscriptions and callbacks.
   struct CacheEntry {
@@ -289,12 +253,8 @@ private:
     // keeping the insertion cost amortized constant and the list bounded by roughly twice the
     // live pending handshakes.
     size_t next_compact_size_{16};
-    // Prefetched secrets are pinned in the cache: they are never idle-evicted or reclaimed.
+    // Prefetched secrets are pinned in the cache: they are never reclaimed.
     bool prefetched_{false};
-    // Set on main-thread handshake activity (entry creation, fetch attach) and cleared by each
-    // idle sweep, guaranteeing an entry survives at least one full idle period after activity.
-    // SDS updates deliberately do not set this: an updated but never used secret is still idle.
-    bool recently_active_{true};
   };
   absl::flat_hash_map<std::string, CacheEntry> cache_;
   uint64_t next_generation_{0};

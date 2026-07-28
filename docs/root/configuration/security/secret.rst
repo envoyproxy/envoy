@@ -312,20 +312,16 @@ unknown to the SDS server; this prevents abandoned fetches from permanently occu
 If no entry is reclaimable, the handshake is rejected, while handshakes using cached secrets are
 unaffected.
 
-Cached secrets can be removed in three ways: the management server removes the resource (including
-by the expiry of the :ref:`resource TTL <xds_protocol_TTL>`, which is processed as a removal), the
-optional :ref:`cache_idle_timeout
-<envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.cache_idle_timeout>`
-evicts secrets unused by any TLS handshake for the configured duration, or the parent listener or
-cluster is drained. Prefetched secrets are pinned in the cache and are not subject to idle
-eviction. Evicting a secret cancels its SDS subscription; connections that are already established
-with the certificate are not affected, and a later handshake for the same name fetches it again.
+Cached secrets are removed when the management server removes the resource (including by the
+expiry of the :ref:`resource TTL <xds_protocol_TTL>`, which is processed as a removal) or when the
+parent listener or cluster is drained. Removing a secret cancels its SDS subscription; connections
+that are already established with the certificate are not affected, and a later handshake for the
+same name fetches it again. Prefetched secrets are pinned in the cache and are never reclaimed.
 
-Secrets that resolved to a certificate are never reclaimed by the cache limit, so deployments
-where the SDS server issues certificates for arbitrary peer-controlled names should configure
-``max_secrets`` together with ``cache_idle_timeout``; otherwise idle resolved secrets can fill the
-cache until new names are rejected. Envoy logs a warning at configuration load when only the limit
-is set.
+Secrets that resolved to a certificate are never reclaimed by the cache limit and are only
+released by the removal paths above, so the limit is best suited for deployments where the SDS
+server resolves a known set of names; when the server issues certificates for arbitrary
+peer-controlled names, idle resolved secrets can fill the cache until new names are rejected.
 
 In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
 statistics are produced by the on-demand certificate extension. For downstream listeners, they are
@@ -339,7 +335,6 @@ is *cluster.<stat_prefix>.on_demand_secret.*.
      cert_requested, Counter, Total number of new SDS subscriptions created
      cert_updated, Counter, Total number of certificate updates
      cert_overflow, Counter, Total number of handshakes rejected due to the secret cache limit
-     cert_evicted, Counter, Total number of cached secrets evicted due to the cache idle timeout
      cert_reclaimed, Counter, Total number of pending secrets reclaimed to admit new secrets when the cache is full
      cert_active, Gauge, Number of active certificate subscriptions and certificates
 
