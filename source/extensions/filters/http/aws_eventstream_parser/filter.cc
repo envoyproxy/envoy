@@ -261,8 +261,8 @@ Protobuf::Value Filter::headerValueToProtobufValue(
     break;
   case Extensions::Common::Aws::Eventstream::HeaderValueType::ByteArray: {
     const auto& bytes = absl::get<std::string>(header_value.value);
-    pb_value.set_string_value(
-        Hex::encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()));
+    pb_value.set_string_value(Hex::encode(
+        absl::MakeConstSpan(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size())));
     break;
   }
   case Extensions::Common::Aws::Eventstream::HeaderValueType::Uuid: {
