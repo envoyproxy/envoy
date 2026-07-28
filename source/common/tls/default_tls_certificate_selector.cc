@@ -173,6 +173,13 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni,
     cert_matched_sni = &unused;
   }
 
+  // Certificate-level tls_params are deliberately not consulted here. They are applied to the
+  // per-connection SSL object once a certificate is chosen, so a certificate whose params cannot
+  // serve this client fails the handshake rather than being skipped. Skipping it instead would
+  // require evaluating each candidate's effective protocol range, ciphers, groups and signature
+  // algorithms against the ClientHello, which findTlsContext does not receive (it is also the QUIC
+  // entry point, where there is no ClientHello).
+
   // selected_ctx represents the final selected certificate, it should meet all requirements or pick
   // a candidate.
   const Ssl::TlsContext* selected_ctx = nullptr;
@@ -186,12 +193,6 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni,
     auto action = ocspStapleAction(ctx, client_ocsp_capable, ocsp_staple_policy_);
     if (action == Ssl::OcspStapleAction::Fail) {
       // The selected ctx must adhere to OCSP policy
-      return false;
-    }
-    // An ECDSA certificate whose effective cipher list contains no ECDSA-capable cipher can never
-    // authenticate, so it must not be selected even though its curve matches. A per-certificate
-    // cipher_suites override can produce this, and another certificate should be used instead.
-    if (ctx.ec_group_curve_name_ != Ssl::EC_CURVE_INVALID_NID && !ctx.canAuthenticateEcdsa()) {
       return false;
     }
     // If the client is ECDSA-capable and the context is ECDSA, we check if it is capable of

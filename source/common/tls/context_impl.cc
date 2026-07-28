@@ -696,18 +696,6 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) co
   return false;
 }
 
-bool TlsContext::canAuthenticateEcdsa() const {
-  for (const SSL_CIPHER* c : SSL_CTX_get_ciphers(ssl_ctx_.get())) {
-    const int auth_nid = SSL_CIPHER_get_auth_nid(c);
-    // TLS 1.3 cipher suites do not encode authentication and report NID_auth_any, deferring the
-    // choice to the signature algorithms, so any of them can authenticate with ECDSA.
-    if (auth_nid == NID_auth_ecdsa || auth_nid == NID_auth_any) {
-      return true;
-    }
-  }
-  return false;
-}
-
 absl::Status TlsContext::loadCertificateChain(const std::string& data,
                                               const std::string& data_path) {
   cert_chain_file_path_ = data_path;

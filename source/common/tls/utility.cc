@@ -642,16 +642,14 @@ std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
 
 std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
 Utility::compliancePolicyFromProto(
-    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params,
-    absl::Status& creation_status) {
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
   switch (params.compliance_policies_size()) {
   case 0:
     return std::nullopt;
   case 1:
     return params.compliance_policies(0);
   default:
-    creation_status =
-        absl::InvalidArgumentError("Only one compliance policy may be specified in tls_params");
+    IS_ENVOY_BUG("more than one policies are not supported");
     return std::nullopt;
   }
 }

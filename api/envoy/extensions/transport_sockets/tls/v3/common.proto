@@ -316,6 +316,13 @@ message TlsCertificate {
   // for that certificate during the TLS handshake; unset fields continue to use the context-level
   // values. This allows different cipher suites, ECDH curves, protocol versions, signature
   // algorithms, or compliance policies per certificate.
+  //
+  // These parameters do not affect certificate selection, which continues to be based only on SNI,
+  // the client's ECDSA capability, and OCSP capability. They are applied after a certificate has
+  // been selected. For a multi-certificate configuration this means each certificate's parameters
+  // must be compatible with the clients that select it: if the selected certificate's parameters
+  // leave nothing in common with the client, the handshake fails and no other certificate is tried.
+  //
   // Note: because these are overrides rather than constraints, a certificate-level
   // ``tls_minimum_protocol_version`` can lower the floor set by the context-level
   // ``tls_params``, weakening the listener's overall TLS security policy.

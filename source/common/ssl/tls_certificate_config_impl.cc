@@ -139,10 +139,9 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
         .cipher_suites = absl::StrJoin(params.cipher_suites(), ":"),
         .ecdh_curves = absl::StrJoin(params.ecdh_curves(), ":"),
         .signature_algorithms = absl::StrJoin(params.signature_algorithms(), ":"),
-        .compliance_policy = Extensions::TransportSockets::Tls::Utility::compliancePolicyFromProto(
-            params, creation_status),
+        .compliance_policy =
+            Extensions::TransportSockets::Tls::Utility::compliancePolicyFromProto(params),
     };
-    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   }
 }
 

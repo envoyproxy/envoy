@@ -199,14 +199,13 @@ std::vector<std::string> getCertificateCrlDpsForLogging(X509* cert);
 
 /**
  * Extracts at most one CompliancePolicy from a TlsParameters proto. Returns nullopt when none are
- * set, and the first policy when exactly one is set. Sets creation_status and returns nullopt when
- * more than one is set. The proto caps this via a max_items rule, so the error case is only
- * reachable for protos built without PGV validation.
+ * set, and the first policy when exactly one is set. Cardinality is enforced by the proto's
+ * max_items rule, so more than one is only reachable for protos built without PGV validation and
+ * logs an ENVOY_BUG.
  */
 std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
 compliancePolicyFromProto(
-    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params,
-    absl::Status& creation_status);
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params);
 
 /**
  * Validates cipher_suites, ecdh_curves, and signature_algorithms strings against ssl_ctx,

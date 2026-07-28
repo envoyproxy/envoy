@@ -70,10 +70,6 @@ struct TlsContext {
 
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
   bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version) const;
-  // Whether this context's effective cipher list allows it to authenticate with ECDSA at all. A
-  // per-certificate cipher_suites override can leave an ECDSA certificate with no ECDSA-capable
-  // cipher, in which case it must not be selected.
-  bool canAuthenticateEcdsa() const;
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }

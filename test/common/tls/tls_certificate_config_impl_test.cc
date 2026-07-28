@@ -1,3 +1,5 @@
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
+
 #include "source/common/tls/server_context_config_impl.h"
 
 #include "test/common/tls/ssl_certs_test.h"
@@ -138,7 +140,10 @@ TEST_F(TlsCertificateConfigImplTest, CertLevelCompliancePolicyParsed) {
   EXPECT_EQ(TlsProto::FIPS_202205, params->compliance_policy.value());
 }
 
-TEST_F(TlsCertificateConfigImplTest, MultipleCompliancePoliciesRejected) {
+// More than one compliance policy is rejected by the proto's max_items rule, so it never reaches
+// the config code. Enforcing it there instead would also reject it on client certificates, where
+// tls_params is documented as ignored.
+TEST_F(TlsCertificateConfigImplTest, MultipleCompliancePoliciesRejectedByProtoValidation) {
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -154,9 +159,8 @@ TEST_F(TlsCertificateConfigImplTest, MultipleCompliancePoliciesRejected) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  EXPECT_FALSE(cfg.ok());
-  EXPECT_THAT(cfg.status().message(), testing::HasSubstr("Only one compliance policy"));
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(tls_context), EnvoyException,
+                          "no more than 1 item");
 }
 
 } // namespace Tls

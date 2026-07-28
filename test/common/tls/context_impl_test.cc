@@ -16,7 +16,6 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
-#include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
@@ -2281,44 +2280,6 @@ TEST_F(SslContextImplTest, InvalidCertLevelSigAlgRejectedAtContextCreation) {
   EXPECT_FALSE(ctx.ok());
   EXPECT_THAT(ctx.status().message(),
               testing::HasSubstr("Failed to initialize TLS signature algorithms"));
-}
-
-// An ECDSA certificate whose per-cert cipher_suites override leaves it with no ECDSA-capable
-// cipher must not be selected. Both certs here are on curve P-256, so a curve match alone cannot
-// tell them apart and selection has to consult each candidate's effective cipher list.
-TEST_F(SslContextImplTest, EcdsaCertWithoutEcdsaCipherIsNotSelected) {
-  const std::string yaml = R"EOF(
-  common_tls_context:
-    tls_params:
-      tls_minimum_protocol_version: TLSv1_2
-      tls_maximum_protocol_version: TLSv1_2
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_key.pem"
-      tls_params:
-        cipher_suites:
-        - ECDHE-RSA-AES128-GCM-SHA256
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_2_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_2_key.pem"
-  )EOF";
-
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  auto ctx = *manager_.createSslServerContext(*store_.rootScope(), *cfg, nullptr);
-  auto cleanup = cleanUpHelper(ctx);
-  auto server_ctx = std::dynamic_pointer_cast<ServerContextImpl>(ctx);
-  ASSERT_NE(nullptr, server_ctx);
-
-  // An empty SNI forces a full scan across every certificate.
-  bool cert_matched_sni = false;
-  const auto result = server_ctx->findTlsContext("", Ssl::CurveNIDVector{NID_X9_62_prime256v1},
-                                                 false, &cert_matched_sni);
-  EXPECT_THAT(result.first.getCertChainFileName(), testing::HasSubstr("san_dns_ecdsa_2_cert.pem"));
 }
 
 // Invalid certificate-level cipher on a client certificate is accepted: tls_params on client

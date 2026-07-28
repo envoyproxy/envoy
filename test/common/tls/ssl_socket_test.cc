@@ -40,7 +40,6 @@
 #include "test/common/tls/test_data/san_dns4_cert_info.h"
 #include "test/common/tls/test_data/san_dns_cert_info.h"
 #include "test/common/tls/test_data/san_dns_ecdsa_1_cert_info.h"
-#include "test/common/tls/test_data/san_dns_ecdsa_2_cert_info.h"
 #include "test/common/tls/test_data/san_dns_rsa_1_cert_info.h"
 #include "test/common/tls/test_data/san_dns_rsa_2_cert_info.h"
 #include "test/common/tls/test_data/san_multiple_dns_1_cert_info.h"
@@ -2905,85 +2904,48 @@ TEST_P(SslSocketTest, PerCertTlsParamsCompliancePolicyTls13Fails) {
                      "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
-// Regression test: when an ECDSA certificate has a per-cert cipher_suites override that removes
-// all ECDSA ciphers, the server must fall back to the RSA certificate rather than selecting the
-// ECDSA cert and then failing the handshake. This verifies that per-cert cipher overrides are
-// applied to the SSL_CTX so cert selection sees the effective cipher list.
-TEST_P(SslSocketTest, PerCertCipherOverrideDoesNotBlockRsaFallback) {
-  // Client offers both ECDSA and RSA ciphers at TLS 1.2.
-  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
-    sni: "server1.example.com"
-    common_tls_context:
-      tls_params:
-        tls_minimum_protocol_version: TLSv1_2
-        tls_maximum_protocol_version: TLSv1_2
-        cipher_suites:
-        - ECDHE-ECDSA-AES128-GCM-SHA256
-        - ECDHE-RSA-AES128-GCM-SHA256
-      validation_context:
-        verify_certificate_hash: )EOF",
-                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+// Certificate selection does not consider certificate-level tls_params, which are applied to the
+// per-connection SSL object only after a certificate has been chosen. So a certificate whose params
+// contradict the reason it was selected fails the handshake rather than falling back to another
+// certificate. Here the ECDSA cert is preferred because the client is ECDSA-capable, but its own
+// cipher_suites permit only RSA authentication, so no cipher is usable and the unrestricted RSA
+// cert is never tried.
+TEST_P(SslSocketTest, PerCertCipherOverrideContradictingSelectionFails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
 
-  // ECDSA cert has a per-cert cipher override that removes all ECDSA ciphers.
-  // RSA cert has no override. Server should select the RSA cert and succeed.
-  const std::string server_ctx_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_key.pem"
-      tls_params:
-        tls_minimum_protocol_version: TLSv1_2
-        tls_maximum_protocol_version: TLSv1_2
-        cipher_suites:
-        - ECDHE-RSA-AES128-GCM-SHA256
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
-)EOF";
+  auto* ecdsa_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  ecdsa_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_cert.pem"));
+  ecdsa_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_key.pem"));
+  ecdsa_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
 
-  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setExpectedSni("server1.example.com"));
-}
+  auto* rsa_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  rsa_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  rsa_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  updateFilterChain(tls_context, *filter_chain);
 
-// Regression test: with two ECDSA certificates on the same curve, a per-cert cipher_suites
-// override that leaves the first with no ECDSA-capable cipher must not make it selectable. Both
-// certs share curve P-256, so the curve match alone cannot distinguish them and selection has to
-// consult each candidate's effective cipher list. The client sends no SNI to force a full scan.
-TEST_P(SslSocketTest, MultiEcdsaCertSkipsCertWithNoEcdsaCipher) {
-  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
-    common_tls_context:
-      tls_params:
-        tls_minimum_protocol_version: TLSv1_2
-        tls_maximum_protocol_version: TLSv1_2
-        cipher_suites:
-        - ECDHE-ECDSA-AES128-GCM-SHA256
-      validation_context:
-        verify_certificate_hash: )EOF",
-                                                   TEST_SAN_DNS_ECDSA_2_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_ECDSA_1_CERT_256_HASH);
+  auto* client_params = client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->add_cipher_suites("ECDHE-ECDSA-AES128-GCM-SHA256");
+  client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  client_ctx.set_sni("server1.example.com");
 
-  // The first ECDSA cert is restricted to an RSA-auth cipher, leaving it unable to authenticate.
-  // The second has no override and must be selected instead.
-  const std::string server_ctx_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_key.pem"
-      tls_params:
-        cipher_suites:
-        - ECDHE-RSA-AES128-GCM-SHA256
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_2_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_2_key.pem"
-)EOF";
-
-  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options);
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
 // EC cert is selected for a no-EC-capable client.

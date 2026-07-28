@@ -1073,8 +1073,9 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP521EcdsaClientAllCurve
 // RSA cert has tls_params restricting to AES128, ECDSA cert to AES256. Two connections are made:
 // one RSA-only client (selects RSA cert, negotiates AES128) and one ECDSA-only client (selects
 // ECDSA cert, negotiates AES256). Both cipher counters confirm per-cert tls_params take effect.
-// Each client offers only the cipher its own cert permits, so selection succeeds regardless of
-// which certs the ECDSA capability check consults.
+// Certificate selection does not consider per-cert tls_params, so each client offers only the
+// cipher its own cert permits, keeping the selected cert compatible with the params applied to the
+// connection after selection.
 TEST_P(SslCertficateIntegrationTest, MultiCertPerCertTlsParams) {
   // TLS 1.3 ignores the cipher list; cipher-based per-cert tls_params can't be tested there.
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
