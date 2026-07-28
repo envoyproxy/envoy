@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.istio_internal_upstream.v3;
+
+import "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.istio_internal_upstream.v3";
+option java_outer_classname = "IstioInternalUpstreamProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/transport_sockets/istio_internal_upstream/v3;istio_internal_upstreamv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Istio Internal Upstream]
+// [#extension: envoy.transport_sockets.istio_internal_upstream]
+
+// Configuration for the istio internal upstream transport socket. This socket allows
+// for the upstream connection ID to be shared through passthrough state in internal
+// sockets. With that ID, filters running on the other side of the socket can use the ID
+// as a unique key for communication through thread local storage. That allows for
+// filters running upstream of the socket to communicate with filters downstream of
+// the socket.
+message IstioInternalUpstreamTransport {
+  internal_upstream.v3.InternalUpstreamTransport internal_upstream_transport = 1
+      [(validate.rules).message = {required: true}];
+}
