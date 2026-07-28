@@ -35,6 +35,7 @@ checks:
     on-run:
     - check-build
     - check-build-openssl
+    - check-build-openssl-presubmit
     - check-coverage
     - check-runtime
     - check-san
@@ -181,6 +182,20 @@ run:
   check-build-openssl:
     paths:
     - "**/*"
+  check-build-openssl-presubmit:
+    paths:
+    - compat/openssl/**/*
+    - source/common/tls/**/*
+    - source/common/crypto/**/*
+    - source/extensions/transport_sockets/tls/**/*
+    - test/common/tls/**/*
+    - test/common/crypto/**/*
+    - test/extensions/transport_sockets/tls/**/*
+    - envoy/ssl/**/*
+    - envoy/extensions/transport_sockets/tls/**/*
+    - bazel/**/*
+    - .bazelrc
+    - ci/do_ci.sh
   check-coverage:
     paths:
     - "**/*"
