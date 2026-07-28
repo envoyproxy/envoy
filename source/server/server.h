@@ -407,8 +407,6 @@ private:
   std::shared_ptr<Admin> admin_;
   Singleton::ManagerImpl singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  Grpc::AsyncClientManagerPtr async_client_manager_;
-  Config::XdsManagerPtr xds_manager_;
   std::unique_ptr<Runtime::Loader> runtime_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
@@ -425,6 +423,8 @@ private:
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
+  Grpc::AsyncClientManagerPtr async_client_manager_;
+  Config::XdsManagerPtr xds_manager_;
   std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
