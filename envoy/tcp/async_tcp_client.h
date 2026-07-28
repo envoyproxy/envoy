@@ -51,7 +51,7 @@ public:
   /**
    * Close the client. It closes the connection based on close type.
    * The underlying connection will be defer deleted when a Close event is received.
-   * Abrt/NoFlush will abortively closes the connection discarding any unsent data.
+   * Abort/NoFlush will abortively close the connection discarding any unsent data.
    * @param type the connection close type.
    */
   virtual void close(Network::ConnectionCloseType type) PURE;
@@ -63,7 +63,7 @@ public:
 
   /**
    * Write data through the client.
-   * @param data the bufferred data.
+   * @param data the buffered data.
    * @param end_stream indicates if this is the end of the stream, half close
    * should be enabled by setting end_stream to true.
    */

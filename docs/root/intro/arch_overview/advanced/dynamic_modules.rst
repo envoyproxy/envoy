@@ -27,6 +27,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`.
 * As an :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`.
 * As a :ref:`formatter <envoy_v3_api_msg_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter>`.
+* As a :ref:`stats sink <envoy_v3_api_msg_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink>`.
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 * As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.

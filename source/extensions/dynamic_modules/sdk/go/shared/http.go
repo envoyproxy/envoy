@@ -432,6 +432,16 @@ type HttpFilterHandle interface {
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
 
+	// GetLogLevel returns the current effective log level of the host environment's logging
+	// mechanism. The returned level reflects runtime changes, for example those applied via the
+	// admin API.
+	GetLogLevel() LogLevel
+
+	// IsLogLevelEnabled reports whether the given log level is enabled by the host environment's
+	// logging mechanism. It can be used to skip expensive work that is only needed when a message
+	// at the given level would actually be logged.
+	IsLogLevelEnabled(level LogLevel) bool
+
 	// HttpCallout performs an HTTP call to an external service. The call is asynchronous; the
 	// response, or an error, is delivered to the provided callback.
 	//

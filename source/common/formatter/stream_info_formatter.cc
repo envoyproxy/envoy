@@ -2393,6 +2393,20 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return std::nullopt;
                                      });
                                }}},
+                             {"LISTENER_NAME",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<std::string> {
+                                       const auto info =
+                                           stream_info.downstreamAddressProvider().listenerInfo();
+                                       if (info.has_value() && !info->name().empty()) {
+                                         return std::string(info->name());
+                                       }
+                                       return std::nullopt;
+                                     });
+                               }}},
                              {"VIRTUAL_CLUSTER_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
@@ -2623,7 +2637,7 @@ public:
         (*it).second.first, command, sub_command, max_length));
 
     StreamInfoFormatterResult result = (*it).second.second(sub_command, max_length);
-    THROW_IF_NOT_OK_REF(result.status());
+    RETURN_IF_NOT_OK_REF(result.status());
 
     return (std::move(result)).value();
   }

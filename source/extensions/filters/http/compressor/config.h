@@ -25,6 +25,15 @@ private:
       const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
+      const std::string& stats_prefix, Server::Configuration::GenericFactoryContext& context);
+
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& proto_config,

@@ -33,6 +33,20 @@ public:
 
 REGISTER_FACTORY(ClusterTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+// ObjectFactory used by the cluster filter-state write test: the dynamic-module cluster writes
+// through this factory via envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed
+// during host selection, and the access log reads it back on the same request.
+class ClusterWrittenTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.cluster_written_typed_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ClusterWrittenTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 } // namespace
 
 class DynamicModuleClusterIntegrationTest
@@ -317,6 +331,145 @@ TEST_P(DynamicModuleClusterFilterStateIntegrationTest, ReadsFilterStateProducedB
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// =============================================================================
+// Filter-state write ABI: the dynamic-module cluster writes filter state during
+// host selection; the access log reads it back on the same request.
+// =============================================================================
+class DynamicModuleClusterFilterStateWriteIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterFilterStateWriteIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithWriter() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Log both the bytes and the typed filter state the cluster writes during host selection.
+    useAccessLog("%FILTER_STATE(test.cluster_filter_state.written_bytes_key:PLAIN)% "
+                 "%FILTER_STATE(envoy.test.cluster_written_typed_object:PLAIN)%");
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer writes filter
+    // state during host selection.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig writer_config;
+      writer_config.mutable_dynamic_module_config()->set_name("cluster_filter_state_test");
+      writer_config.set_cluster_name("filter_state_writer");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = writer_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(writer_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterFilterStateWriteIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that filter state written by the dynamic-module cluster during host selection (via both
+// the bytes and the typed filter-state ABI setters) is observable at access-log flush on the same
+// request.
+TEST_P(DynamicModuleClusterFilterStateWriteIntegrationTest, WritesFilterStateReadableByAccessLog) {
+  initializeWithWriter();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, testing::HasSubstr("written_bytes_value"));
+  EXPECT_THAT(log, testing::HasSubstr("written_typed_value"));
+}
+
+// =============================================================================
+// Dynamic-metadata set ABI: the dynamic-module cluster annotates the request
+// during host selection; the values are read back from the access log.
+// =============================================================================
+class DynamicModuleClusterDynamicMetadataIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterDynamicMetadataIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithMetadataWriter() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Log the two dynamic-metadata values the cluster writes during host selection.
+    useAccessLog("%DYNAMIC_METADATA(dynamic_modules.test:number_key)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:string_key)%");
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
+    // sets dynamic metadata on the request during host selection.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig writer_config;
+      writer_config.mutable_dynamic_module_config()->set_name("cluster_dynamic_metadata_test");
+      writer_config.set_cluster_name("dynamic_metadata_writer");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = writer_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(writer_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterDynamicMetadataIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that dynamic metadata set by the dynamic-module cluster during host
+// selection is attached to the request's stream info and observable in the
+// access log via %DYNAMIC_METADATA(namespace:key)%.
+TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDuringHostSelection) {
+  initializeWithMetadataWriter();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_EQ("1234 test_value", log);
 }
 
 } // namespace DynamicModules

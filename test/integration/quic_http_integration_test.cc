@@ -6,6 +6,9 @@
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
+#include <utility>
+
+#include "envoy/common/platform.h"
 
 #include "test/test_common/logging.h"
 
@@ -18,6 +21,27 @@ using testing::Eq;
 using testing::Ge;
 
 namespace Quic {
+
+namespace {
+
+// Returns true if a socket can bind() to `address`.
+[[maybe_unused]] bool addressIsBindable(const std::string& address) {
+  const auto addr = Network::Utility::parseInternetAddressNoThrow(address, /*port=*/0);
+  if (addr == nullptr || addr->ip() == nullptr) {
+    return false;
+  }
+  const auto family = addr->ip()->version() == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6;
+  auto& syscalls = Api::OsSysCallsSingleton::get();
+  const auto fd = syscalls.socket(family, SOCK_DGRAM, 0).return_value_;
+  if (!SOCKET_VALID(fd)) {
+    return false;
+  }
+  const auto rc = syscalls.bind(fd, addr->sockAddr(), addr->sockAddrLen()).return_value_;
+  syscalls.close(fd);
+  return rc == 0;
+}
+
+} // namespace
 
 class QuicHttpIntegrationSPATest
     : public QuicHttpIntegrationTestBase,
@@ -629,7 +653,8 @@ TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   // First 6 PING frames should be sent every 1s, and the following ones less frequently.
-  EXPECT_LE(quic_connection_->GetStats().ping_frames_sent, 8u);
+  constexpr uint64_t expected_pings = 9u * TIMEOUT_FACTOR;
+  EXPECT_LE(quic_connection_->GetStats().ping_frames_sent, expected_pings);
 }
 
 TEST_P(QuicHttpIntegrationTest, Http3ClientKeepaliveDisabled) {
@@ -1538,6 +1563,11 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
 }
 
 TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
+  if (!addressIsBindable("127.0.0.2")) {
+    GTEST_SKIP() << "127.0.0.2 is not bindable on a local interface, add an alias. "
+                    "Run `sudo ifconfig lo0 alias 127.0.0.2`) on macOS.";
+  }
+
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1613,6 +1643,11 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
 }
 
 TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
+  if (!addressIsBindable("127.0.0.2")) {
+    GTEST_SKIP() << "127.0.0.2 is not bindable on a local interface, add an alias. "
+                    "Run `sudo ifconfig lo0 alias 127.0.0.2`) on macOS.";
+  }
+
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1773,6 +1808,11 @@ TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
 }
 
 TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
+  if (!addressIsBindable("127.0.0.2")) {
+    GTEST_SKIP() << "127.0.0.2 is not bindable on a local interface, add an alias. "
+                    "Run `sudo ifconfig lo0 alias 127.0.0.2`) on macOS.";
+  }
+
   if (!(TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6) &&
         version_ == Network::Address::IpVersion::v4)) {
     return;
@@ -2055,8 +2095,13 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     envoy::config::core::v3::SocketCmsgHeaders* cmsg =
         listener->mutable_udp_listener_config()->mutable_quic_options()->add_save_cmsg_config();
-    cmsg->mutable_level()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
-    cmsg->mutable_type()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
+    const bool is_ipv4 = GetParam() == Network::Address::IpVersion::v4;
+    cmsg->mutable_level()->set_value(is_ipv4 ? IPPROTO_IP : IPPROTO_IPV6);
+#ifdef __APPLE__
+    cmsg->mutable_type()->set_value(is_ipv4 ? IP_RECVTOS : IPV6_PKTINFO);
+#else
+    cmsg->mutable_type()->set_value(is_ipv4 ? IP_TOS : IPV6_PKTINFO);
+#endif
     cmsg->set_expected_size(128);
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.quic_listener.test");
@@ -2153,6 +2198,129 @@ TEST_P(QuicHttpIntegrationTest, NoSessionTicketResumptionWithoutKeys) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_FALSE(quic_session->IsResumption());
   codec_client_->close();
+}
+
+class QuicKeylogIntegrationTest : public QuicHttpIntegrationTest {
+public:
+  // Allocates a temp key log file path, configures key_log on the listener
+  // (if requested), and calls initialize().
+  std::string setUpKeylog(bool configure, bool local_filter = false, bool remote_filter = false,
+                          bool local_negative = false, bool remote_negative = false) {
+    concurrency_ = 1;
+    config_helper_.addRuntimeOverride("envoy.restart_features.quic_keylog_support", "true");
+    const std::string path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+    if (configure) {
+      configureKeylog(path, local_filter, remote_filter, local_negative, remote_negative);
+    }
+    initialize();
+    return path;
+  }
+
+  // Configures key_log on the listener's QuicDownstreamTransport via the
+  // shared TCP TLS helper, so any future change to the key_log proto layout
+  // flows through here automatically.
+  void configureKeylog(const std::string& path, bool local_filter, bool remote_filter,
+                       bool local_negative, bool remote_negative) {
+    ConfigHelper::ServerSslOptions options;
+    options.setTlsKeyLogFilter(local_filter, remote_filter, local_negative, remote_negative, path,
+                               /*multiple_ips=*/false, version_);
+    config_helper_.addConfigModifier([options](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ts = bootstrap.mutable_static_resources()
+                     ->mutable_listeners(0)
+                     ->mutable_filter_chains(0)
+                     ->mutable_transport_socket();
+      auto quic_transport = MessageUtil::anyConvert<
+          envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
+          *ts->mutable_typed_config());
+      auto* common_tls =
+          quic_transport.mutable_downstream_tls_context()->mutable_common_tls_context();
+      ConfigHelper::initializeTlsKeyLog(*common_tls, options);
+      std::ignore = ts->mutable_typed_config()->PackFrom(quic_transport);
+    });
+  }
+
+  // Drive one QUIC handshake + request so the key log callback fires.
+  void runOneRequest() {
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest(0);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    codec_client_->close();
+  }
+
+  // QUIC always uses TLS 1.3, so all handshakes derive these five secrets.
+  // Wait for all of them to be flushed to disk, then assert their presence.
+  void assertKeylogPopulated(const std::string& path) {
+    EXPECT_TRUE(api_->fileSystem().fileExists(path));
+    constexpr uint32_t kExpectedSecrets = 5;
+    std::vector<std::string> entries =
+        waitForAccessLogEntries(path, /*client_connection=*/nullptr, kExpectedSecrets);
+    const std::string log = absl::StrJoin(entries, "\n");
+    EXPECT_THAT(log, testing::HasSubstr("CLIENT_HANDSHAKE_TRAFFIC_SECRET"));
+    EXPECT_THAT(log, testing::HasSubstr("SERVER_HANDSHAKE_TRAFFIC_SECRET"));
+    EXPECT_THAT(log, testing::HasSubstr("CLIENT_TRAFFIC_SECRET"));
+    EXPECT_THAT(log, testing::HasSubstr("SERVER_TRAFFIC_SECRET"));
+    EXPECT_THAT(log, testing::HasSubstr("EXPORTER_SECRET"));
+  }
+
+  void assertKeylogEmpty(const std::string& path) {
+    EXPECT_TRUE(api_->fileSystem().fileExists(path));
+    EXPECT_EQ(0, api_->fileSystem().fileSize(path));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicKeylogIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(QuicKeylogIntegrationTest, KeylogNoFilter) {
+  const std::string path = setUpKeylog(/*configure=*/true);
+  runOneRequest();
+  assertKeylogPopulated(path);
+}
+
+TEST_P(QuicKeylogIntegrationTest, KeylogLocalFilterMatches) {
+  const std::string path = setUpKeylog(/*configure=*/true, /*local_filter=*/true);
+  runOneRequest();
+  assertKeylogPopulated(path);
+}
+
+TEST_P(QuicKeylogIntegrationTest, KeylogRemoteFilterMatches) {
+  const std::string path = setUpKeylog(/*configure=*/true, /*local_filter=*/false,
+                                       /*remote_filter=*/true);
+  runOneRequest();
+  assertKeylogPopulated(path);
+}
+
+TEST_P(QuicKeylogIntegrationTest, KeylogLocalAndRemoteFilterMatch) {
+  const std::string path = setUpKeylog(/*configure=*/true, /*local_filter=*/true,
+                                       /*remote_filter=*/true);
+  runOneRequest();
+  assertKeylogPopulated(path);
+}
+
+TEST_P(QuicKeylogIntegrationTest, KeylogLocalFilterNoMatch) {
+  const std::string path = setUpKeylog(/*configure=*/true, /*local_filter=*/true,
+                                       /*remote_filter=*/false, /*local_negative=*/true);
+  runOneRequest();
+  assertKeylogEmpty(path);
+}
+
+TEST_P(QuicKeylogIntegrationTest, KeylogRemoteFilterNoMatch) {
+  const std::string path =
+      setUpKeylog(/*configure=*/true, /*local_filter=*/false, /*remote_filter=*/true,
+                  /*local_negative=*/false, /*remote_negative=*/true);
+  runOneRequest();
+  assertKeylogEmpty(path);
+}
+
+// The key log runtime flag installs the SSL_CTX callback, but maybeWriteKeyLog
+// short-circuits when no key log file was opened.
+TEST_P(QuicKeylogIntegrationTest, KeylogNotConfigured) {
+  const std::string path = setUpKeylog(/*configure=*/false);
+  runOneRequest();
+  EXPECT_FALSE(api_->fileSystem().fileExists(path));
 }
 
 TEST_P(QuicHttpIntegrationTest, InconsistentContentLengthHeadersOnlyEnabled) {

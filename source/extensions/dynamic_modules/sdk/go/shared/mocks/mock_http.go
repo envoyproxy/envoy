@@ -860,6 +860,20 @@ func (mr *MockHttpFilterHandleMockRecorder) GetFilterStateTyped(key any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilterStateTyped", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetFilterStateTyped), key)
 }
 
+// GetLogLevel mocks base method.
+func (m *MockHttpFilterHandle) GetLogLevel() shared.LogLevel {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLogLevel")
+	ret0, _ := ret[0].(shared.LogLevel)
+	return ret0
+}
+
+// GetLogLevel indicates an expected call of GetLogLevel.
+func (mr *MockHttpFilterHandleMockRecorder) GetLogLevel() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogLevel", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetLogLevel))
+}
+
 // GetMetadataBool mocks base method.
 func (m *MockHttpFilterHandle) GetMetadataBool(source shared.MetadataSourceType, metadataNamespace, key string) (bool, bool) {
 	m.ctrl.T.Helper()
@@ -1116,6 +1130,20 @@ func (mr *MockHttpFilterHandleMockRecorder) IncrementGaugeValue(id, value any, t
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{id, value}, tagsValues...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementGaugeValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).IncrementGaugeValue), varargs...)
+}
+
+// IsLogLevelEnabled mocks base method.
+func (m *MockHttpFilterHandle) IsLogLevelEnabled(level shared.LogLevel) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsLogLevelEnabled", level)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsLogLevelEnabled indicates an expected call of IsLogLevelEnabled.
+func (mr *MockHttpFilterHandleMockRecorder) IsLogLevelEnabled(level any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsLogLevelEnabled", reflect.TypeOf((*MockHttpFilterHandle)(nil).IsLogLevelEnabled), level)
 }
 
 // Log mocks base method.

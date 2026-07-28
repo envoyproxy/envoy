@@ -88,7 +88,7 @@ public:
   virtual const std::vector<McpBackendConfig>& backends() const = 0;
   virtual bool isMultiplexing() const = 0;
   virtual const std::string& defaultBackendName() const = 0;
-  virtual Server::Configuration::FactoryContext& factoryContext() const = 0;
+  virtual Server::Configuration::ServerFactoryContext& factoryContext() const = 0;
   virtual const McpBackendConfig* findBackend(const std::string& name) const = 0;
 
   virtual bool lazyInitialization() const = 0;
@@ -109,12 +109,12 @@ public:
   McpRouterConfigImpl(
       const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::ServerFactoryContext& context);
 
   const std::vector<McpBackendConfig>& backends() const override { return backends_; }
   bool isMultiplexing() const override { return backends_.size() > 1; }
   const std::string& defaultBackendName() const override { return default_backend_name_; }
-  Server::Configuration::FactoryContext& factoryContext() const override {
+  Server::Configuration::ServerFactoryContext& factoryContext() const override {
     return factory_context_;
   }
   const McpBackendConfig* findBackend(const std::string& name) const override;
@@ -136,7 +136,7 @@ public:
 private:
   std::vector<McpBackendConfig> backends_;
   std::string default_backend_name_;
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   bool lazy_initialization_;
   SessionIdentityConfig session_identity_;
   std::string metadata_namespace_;
@@ -156,7 +156,7 @@ public:
   const std::vector<McpBackendConfig>& backends() const override { return backends_; }
   bool isMultiplexing() const override { return backends_.size() > 1; }
   const std::string& defaultBackendName() const override { return default_backend_name_; }
-  Server::Configuration::FactoryContext& factoryContext() const override {
+  Server::Configuration::ServerFactoryContext& factoryContext() const override {
     return base_config_->factoryContext();
   }
   const McpBackendConfig* findBackend(const std::string& name) const override;

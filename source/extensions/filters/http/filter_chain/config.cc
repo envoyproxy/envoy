@@ -72,10 +72,13 @@ void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks,
 
 } // namespace
 
-Http::FilterFactoryCb FilterChainFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> FilterChainFilterFactory::createFilterFactoryFromProtoTyped(
     const FilterChainConfigProto& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-  auto filter_config = std::make_shared<FilterChainConfig>(proto_config, context, stats_prefix);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config =
+      std::make_shared<FilterChainConfig>(proto_config, context, stats_prefix, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     FilterChains filter_chains = getAllFilterChains(filter_config->filterChain(), callbacks);

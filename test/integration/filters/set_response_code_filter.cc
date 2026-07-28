@@ -95,7 +95,7 @@ private:
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
   }
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
@@ -136,7 +136,7 @@ private:
     };
   }
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::SetResponseCodeFilterConfigDual& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
@@ -163,7 +163,7 @@ REGISTER_FACTORY(UpstreamSetResponseCodeFilterFactoryDual,
                  Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 // Adding below factory to test downstream filter without overriding method
-// createFilterFactoryFromProtoWithServerContextTyped().
+// createHttpFilterFactoryFromProtoTyped().
 class SetResponseCodeFilterFactoryNoServerContext
     : public Extensions::HttpFilters::Common::FactoryBase<
           test::integration::filters::SetResponseCodeFilterConfigNoServerContext,
@@ -189,7 +189,7 @@ REGISTER_FACTORY(SetResponseCodeFilterFactoryNoServerContext,
                  Server::Configuration::NamedHttpFilterConfigFactory);
 
 // Adding below factory to test dual filter without overriding method
-// createFilterFactoryFromProtoWithServerContextTyped().
+// createHttpFilterFactoryFromProtoTyped().
 class SetResponseCodeFilterFactoryDualNoServerContext
     : public Extensions::HttpFilters::Common::DualFactoryBase<
           test::integration::filters::SetResponseCodeFilterConfigDualNoServerContext,

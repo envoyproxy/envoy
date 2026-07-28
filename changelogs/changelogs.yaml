@@ -52,6 +52,8 @@ areas:
     title: circuit_breaker
   composite:
     title: composite
+  credential_injector:
+    title: credential_injector
   dns_resolver:
     title: dns_resolver
   dynamic_modules:
@@ -92,6 +94,8 @@ areas:
     title: redis_proxy
   resource_monitors:
     title: resource_monitors
+  reverse_tunnel:
+    title: reverse_tunnel
   router:
     title: router
   set_metadata_filter:
@@ -114,6 +118,8 @@ areas:
     title: tracing
   wasm:
     title: wasm
+  watchdog:
+    title: watchdog
   dns:
     title: dns
   proxy_protocol:
@@ -122,3 +128,5 @@ areas:
     title: zstd
   server:
     title: server
+  udp:
+    title: udp

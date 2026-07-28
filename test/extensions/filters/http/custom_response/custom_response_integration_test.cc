@@ -31,6 +31,54 @@ namespace {
 
 constexpr char kTestHeaderKey[] = "test-header";
 
+// Matcher that selects a local response policy based on the request `accept` header.
+constexpr absl::string_view kAcceptJsonConfig = R"EOF(
+  custom_response_matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: accept_header
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: accept
+            value_match:
+              exact: "application/json"
+        on_match:
+          action:
+            name: json_action
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+              status_code: 498
+              body:
+                inline_string: "json error"
+)EOF";
+
+// Matcher that selects a redirect policy based on the request `accept` header. The redirect target
+// (`foo.example`) is served by the `foo` virtual host configured in initialize().
+constexpr absl::string_view kAcceptJsonRedirectConfig = R"EOF(
+  custom_response_matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: accept_header
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: accept
+            value_match:
+              exact: "application/json"
+        on_match:
+          action:
+            name: redirect_action
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+              status_code: 299
+              uri: "https://foo.example/gateway_error"
+)EOF";
+
 } // namespace
 
 class CustomResponseIntegrationTest : public HttpProtocolIntegrationTest {
@@ -259,6 +307,37 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
       response->headers().get(::Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
 }
 
+// Verify a custom response is selected based on the request `accept` header.
+TEST_P(CustomResponseIntegrationTest, MatchRequestHeader) {
+  custom_response_filter_config_ =
+      TestUtility::parseYaml<CustomResponse>(std::string(kAcceptJsonConfig));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("original.host");
+  default_request_headers_.setCopy(::Envoy::Http::LowerCaseString("accept"), "application/json");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, internal_server_error_, 0, 0);
+  // The request header matched, so the custom response is applied.
+  EXPECT_EQ("498", response->headers().getStatusValue());
+  EXPECT_EQ("json error", response->body());
+}
+
+// Verify the original response passes through when the request header does not match.
+TEST_P(CustomResponseIntegrationTest, RequestHeaderNoMatch) {
+  custom_response_filter_config_ =
+      TestUtility::parseYaml<CustomResponse>(std::string(kAcceptJsonConfig));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("original.host");
+  default_request_headers_.setCopy(::Envoy::Http::LowerCaseString("accept"), "text/html");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, internal_server_error_, 0, 0);
+  // The request header did not match, so the original response is returned unchanged.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
 // Verify we get the correct local custom response.
 TEST_P(CustomResponseIntegrationTest, LocalReplyWithFormatter) {
 
@@ -301,6 +380,38 @@ TEST_P(CustomResponseIntegrationTest, RedirectPolicyResponse) {
   EXPECT_EQ(
       "x-bar2",
       response->headers().get(::Envoy::Http::LowerCaseString("foo2"))[0]->value().getStringView());
+}
+
+// Verify a redirect policy is selected based on the request `accept` header.
+TEST_P(CustomResponseIntegrationTest, RedirectMatchRequestHeader) {
+  custom_response_filter_config_ =
+      TestUtility::parseYaml<CustomResponse>(std::string(kAcceptJsonRedirectConfig));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("original.host");
+  default_request_headers_.setCopy(::Envoy::Http::LowerCaseString("accept"), "application/json");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, internal_server_error_, 0, 0);
+  // The request header matched, so the response is redirected and the status code is overwritten.
+  EXPECT_EQ("299", response->headers().getStatusValue());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
+}
+
+// Verify the redirect policy is not applied when the request `accept` header does not match.
+TEST_P(CustomResponseIntegrationTest, RedirectRequestHeaderNoMatch) {
+  custom_response_filter_config_ =
+      TestUtility::parseYaml<CustomResponse>(std::string(kAcceptJsonRedirectConfig));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("original.host");
+  default_request_headers_.setCopy(::Envoy::Http::LowerCaseString("accept"), "text/html");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, internal_server_error_, 0, 0);
+  // The request header did not match, so the original response is returned unchanged.
+  EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
 // Verify we get the original response if the route is not found for the
