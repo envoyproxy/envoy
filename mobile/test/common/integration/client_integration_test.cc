@@ -957,27 +957,14 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
                                    std::to_string(request_data.length()));
 
-  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
-  stream_callbacks.on_data_ = [this](const Buffer::Instance& buffer, uint64_t length,
-                                     bool end_stream, envoy_stream_intel) {
-    if (end_stream) {
-      std::string response_body(length, ' ');
-      buffer.copyOut(0, length, response_body.data());
-      EXPECT_EQ(response_body, "Cleartext is not permitted");
-    }
-    cc_.on_data_calls_++;
-  };
-
-  stream_ = createNewStream(std::move(stream_callbacks));
+  stream_ = createNewStream(createDefaultStreamCallbacks());
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
   terminal_callback_.waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls_, 1);
-  ASSERT_EQ(cc_.status_, "400");
-  ASSERT_EQ(cc_.on_data_calls_, 1);
-  ASSERT_EQ(cc_.on_complete_calls_, 1);
+  ASSERT_EQ(cc_.on_error_calls_, 1);
+  ASSERT_EQ(cc_.on_headers_calls_, 0);
 }
 
 TEST_P(ClientIntegrationTest, BasicHttps) {
