@@ -28,6 +28,8 @@ routing PRs, questions, etc. to the right place.
   * Overload manager, security, logging, wasm, data plane.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
   * Dynamic Modules, Reverse Tunnels, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
+  * Load balancing, data plane, overload manager.
 
 # Maintainers
 <!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
@@ -42,8 +44,6 @@ routing PRs, questions, etc. to the right place.
   * Listeners, RBAC, CEL, matching, Istio.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
   * Caches, file filters, and file I/O.
-* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
-  * Load balancing, data plane, overload manager.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
