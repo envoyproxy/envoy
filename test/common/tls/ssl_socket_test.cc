@@ -2948,6 +2948,173 @@ TEST_P(SslSocketTest, PerCertCipherOverrideContradictingSelectionFails) {
                      "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
+// Certificate-level tls_params are overrides, not additional constraints, so a certificate can
+// lower the context floor. The context permits TLSv1.3 only, the certificate lowers its minimum to
+// TLSv1_2 and leaves the maximum inherited, and a TLSv1.2-only client negotiates successfully. This
+// is the weakening the API documentation warns about.
+TEST_P(SslSocketTest, PerCertTlsParamsLowerMinVersionBelowContextFloor) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_cert->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  testUtilV2(createProtocolTestOptions(listener, client_ctx, version_, "TLSv1.2"));
+}
+
+// A certificate-level maximum above the context ceiling raises it. The context permits TLSv1.2
+// only, the certificate raises its maximum to TLSv1_3 and leaves the minimum inherited, and a
+// TLSv1.3-only client negotiates successfully.
+TEST_P(SslSocketTest, PerCertTlsParamsRaiseMaxVersionAboveContextCeiling) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_cert->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  testUtilV2(createProtocolTestOptions(listener, client_ctx, version_, "TLSv1.3"));
+}
+
+// A certificate-level cipher suite that the context-level list excludes is still usable: the
+// certificate's list replaces the context's rather than intersecting with it. The client offers
+// only the certificate-level suite, which the context alone would have rejected.
+TEST_P(SslSocketTest, PerCertTlsParamsAddCipherExcludedByContext) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  server_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  const std::string stats = "ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384";
+  testUtilV2(test_options.setExpectedCiphersuite("ECDHE-RSA-AES256-GCM-SHA384")
+                 .setExpectedServerStats(stats)
+                 .setExpectedClientStats(stats));
+}
+
+// A certificate that sets only cipher_suites keeps the context-level values for every other field.
+// The context restricts curves to P-384 and pins TLSv1.2, and the certificate narrows the ciphers
+// to AES256 only. The negotiated suite proves the certificate-level field was applied, while the
+// negotiated group and version prove the unset fields were inherited: the client offers X25519
+// first, which the default curve list would have permitted had the context value been dropped.
+TEST_P(SslSocketTest, PerCertTlsParamsPartialOverrideInheritsUnsetFields) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  server_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  server_params->add_ecdh_curves("P-384");
+  server_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  // AES128 is offered first, so the certificate-level list is what forces AES256.
+  client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  client_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  client_params->add_ecdh_curves("X25519");
+  client_params->add_ecdh_curves("P-256");
+  client_params->add_ecdh_curves("P-384");
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  testUtilV2(test_options.setExpectedCiphersuite("ECDHE-RSA-AES256-GCM-SHA384")
+                 .setExpectedTlsGroup("P-384")
+                 .setExpectedProtocolVersion("TLSv1.2"));
+}
+
 // EC cert is selected for a no-EC-capable client.
 TEST_P(SslSocketTest, CertWithNotECCapable) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
