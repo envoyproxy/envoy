@@ -258,7 +258,7 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversa
 // decodes it and folds it to '/' would still see a traversal, so '\' is treated as a segment
 // separator by the check as well.
 TEST(HttpRequestBuilderTest, ConstructBaseUrlRejectsBackslashPathTraversal) {
-  json arguments = json::parse(R"json({"id": "..\\..\\admin\\secrets"})json");
+  json arguments = json::parse(R"json({"id": "..\\.."})json");
   EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
