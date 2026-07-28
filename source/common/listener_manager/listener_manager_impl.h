@@ -382,6 +382,9 @@ private:
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,
                                              const ListenerImpl& existing_listener);
 
+  absl::Status initializeWorkerRoutingForUdpListener(ListenerImpl& new_listener,
+                                                     bool in_place_update);
+
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
