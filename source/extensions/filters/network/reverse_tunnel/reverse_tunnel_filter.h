@@ -12,6 +12,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/jwt/check_audience.h"
+#include "source/common/jwt/jwks.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
@@ -65,10 +67,28 @@ public:
   bool validateConnectionLimit(absl::string_view node_id, absl::string_view tenant_id) const;
 
   // Validates the extracted node_id, cluster_id, and tenant_id against expected values.
-  // Returns true if validation passes or no validation is configured.
+  // Returns true if validation passes or no validation is configured. The parsed handshake
+  // request headers are passed so validation format strings can reference them via %REQ(...)%.
   bool validateIdentifiers(absl::string_view node_id, absl::string_view cluster_id,
                            absl::string_view tenant_id,
+                           const Http::RequestHeaderMap& request_headers,
                            const StreamInfo::StreamInfo& stream_info) const;
+
+  // Returns true if inline JWT handshake authentication is configured.
+  bool jwtEnabled() const { return jwt_enabled_; }
+
+  // Returns true if a missing/invalid token must reject the handshake (i.e. not audit mode).
+  bool jwtRequired() const { return jwt_required_; }
+
+  // Verifies the handshake's bearer token against the configured JWKS, issuer, audiences and time
+  // constraints (a token without an ``exp`` claim is rejected). On success, publishes the verified
+  // claims as dynamic metadata under the configured namespace so the validation block can bind
+  // claimed ids to verified claims via %DYNAMIC_METADATA(namespace:claim)%. Returns true iff the
+  // token verified and its claims were published; returns false on any missing/invalid token. The
+  // caller decides enforcement (reject vs. audit) based on jwtRequired(). Must only be called when
+  // jwtEnabled() is true.
+  bool verifyHandshakeJwt(const Http::RequestHeaderMap& headers,
+                          StreamInfo::StreamInfo& stream_info) const;
 
   // Emits validation results as dynamic metadata if configured.
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
@@ -89,7 +109,8 @@ private:
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
       Formatter::FormatterConstSharedPtr node_id_formatter,
       Formatter::FormatterConstSharedPtr cluster_id_formatter,
-      Formatter::FormatterConstSharedPtr tenant_id_formatter);
+      Formatter::FormatterConstSharedPtr tenant_id_formatter,
+      std::unique_ptr<JwtVerify::Jwks> jwt_jwks);
 
   const std::chrono::milliseconds ping_interval_;
   const bool auto_close_connections_;
@@ -114,6 +135,23 @@ private:
   // Whether this filter enforces the per-node concurrent connection cap (owned by the upstream
   // socket interface bootstrap extension) before completing a reverse tunnel handshake.
   const bool enable_connection_limit_{false};
+
+  // Inline JWT handshake authentication (experimental). Enabled when `jwt_validation` is set.
+  const bool jwt_enabled_;
+  // Whether a missing/invalid token rejects the handshake (true unless allow_missing_or_failed).
+  const bool jwt_required_;
+  // Required expected issuer (`iss`); the token's issuer must equal this.
+  const std::string jwt_issuer_;
+  // Allowed audiences (`aud`), with jwt_authn-consistent normalization. Empty means any audience.
+  const JwtVerify::CheckAudience jwt_audiences_;
+  // Clock skew (seconds) applied to `exp`/`nbf` checks. Defaults to 60.
+  const uint64_t jwt_clock_skew_seconds_;
+  // Header carrying the token (default `authorization`, `Bearer ` prefix stripped when present).
+  const Http::LowerCaseString jwt_token_header_;
+  // Namespace under which verified claims are emitted as dynamic metadata.
+  const std::string jwt_claims_namespace_;
+  // Parsed JWKS used to verify the token signature. nullptr when JWT auth is not configured.
+  const std::unique_ptr<JwtVerify::Jwks> jwt_jwks_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;
@@ -149,7 +187,9 @@ private:
   COUNTER(parse_error)                                                                             \
   COUNTER(accepted)                                                                                \
   COUNTER(rejected)                                                                                \
-  COUNTER(validation_failed)
+  COUNTER(validation_failed)                                                                       \
+  COUNTER(jwt_denied)                                                                              \
+  COUNTER(jwt_would_deny)
 
   struct ReverseTunnelStats {
     ALL_REVERSE_TUNNEL_HANDSHAKE_STATS(GENERATE_COUNTER_STRUCT)
