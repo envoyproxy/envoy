@@ -298,15 +298,18 @@ function build_openssl_presubmit() {
     echo "Bazel fastbuild build with OpenSSL..."
     bazel_envoy_binary_build fastbuild
 
-    # Determine the base ref for computing the changed files. CI_TARGET_BRANCH
-    # is set by the CI workflow (e.g. "main") and passed into the Docker
-    # container. Fetch it since the checkout may be shallow.
-    local base_ref
+    # Determine the merge base for computing the PR's changed files.
+    # CI_TARGET_BRANCH is set by the CI workflow (e.g. "main") and passed into
+    # the Docker container. Fetch it since the checkout may be shallow, then use
+    # merge-base to find the fork point so we only see PR changes, not files
+    # that changed on the target branch since the PR was created.
+    local merge_base
     if [[ -n "${CI_TARGET_BRANCH}" ]]; then
         git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
-        base_ref="origin/${CI_TARGET_BRANCH}"
-    else
-        base_ref="HEAD~1"
+        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "")"
+    fi
+    if [[ -z "${merge_base}" ]]; then
+        merge_base="HEAD~1"
     fi
 
     # Map each changed file to its corresponding test target:
@@ -339,7 +342,7 @@ function build_openssl_presubmit() {
                 test_targets+=("//compat/openssl/test/...")
                 ;;
         esac
-    done < <(git diff --name-only "$base_ref" HEAD 2>/dev/null)
+    done < <(git diff --name-only "$merge_base" HEAD 2>/dev/null)
 
     if [[ ${#test_targets[@]} -eq 0 ]]; then
         echo "No affected test targets found, skipping tests."
