@@ -159,6 +159,8 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  bool noFallbackPath() const { return proto_config_.no_fallback_path(); }
+
 private:
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
@@ -189,22 +191,27 @@ public:
           proto_config);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
+  getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path,
+              bool no_fallback_path = false) const;
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getToolsListHttpRule(absl::string_view host, absl::string_view path) const;
+  getToolsListHttpRule(absl::string_view host, absl::string_view path,
+                       bool no_fallback_path = false) const;
 
   // Returns tools to serve a local tools/list response, filtered by host and path.
   std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
-  toolListLocalTools(absl::string_view host, absl::string_view path) const;
+  toolListLocalTools(absl::string_view host, absl::string_view path,
+                     bool no_fallback_path = false) const;
 
   // Returns whether local serving of tools/list is configured for the matching endpoint.
-  bool toolListLocal(absl::string_view host, absl::string_view path) const;
+  bool toolListLocal(absl::string_view host, absl::string_view path,
+                     bool no_fallback_path = false) const;
 
   // Returns whether there is a configured endpoint matching the host and path.
-  bool hasEndpoint(absl::string_view host, absl::string_view path) const;
+  bool hasEndpoint(absl::string_view host, absl::string_view path,
+                   bool no_fallback_path = false) const;
 
   bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
-                                   absl::string_view path) const;
+                                   absl::string_view path, bool no_fallback_path = false) const;
 
 private:
   struct ToolEntry {
@@ -219,6 +226,7 @@ private:
     std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
+    bool is_fallback_path = false;
   };
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute

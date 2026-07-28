@@ -1504,5 +1504,118 @@ TEST_P(McpJsonRestBridgeIntegrationTest, NoFallbackPathNoOpModeIntegrationTest) 
   EXPECT_THAT(response->body(), StrEq("raw backend response"));
 }
 
+TEST_P(McpJsonRestBridgeIntegrationTest, NoFallbackPathWithExplicitPerRouteConfigWorks) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      no_fallback_path: true
+  )EOF";
+
+  // Override config_helper_ directly to add per-route config.
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute per_route;
+    auto* tool_config = per_route.add_tool_config();
+    tool_config->mutable_default_server_info()->set_path("/explicit_mcp");
+    auto* tool = tool_config->add_tools();
+    tool->set_name("create_api_key");
+    tool->mutable_http_rule()->set_post("/v1/{parent=projects/*}/keys");
+    tool->mutable_http_rule()->set_body("key");
+
+    Protobuf::Any per_route_any;
+    MessageUtil::packFrom(per_route_any, per_route);
+    route->mutable_typed_per_filter_config()->insert(
+        {"envoy.filters.http.mcp_json_rest_bridge", per_route_any});
+  });
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // First, verify that a request to "/mcp" goes through unmodified (no fallback).
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {}
+    }
+  })";
+
+  auto response1 = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
+  EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/mcp"));
+  Http::TestResponseHeaderMapImpl response_headers1;
+  response_headers1.setStatus(200);
+  upstream_request_->encodeHeaders(response_headers1, false);
+  Buffer::OwnedImpl response_data1("raw /mcp response");
+  upstream_request_->encodeData(response_data1, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_THAT(response1->body(), StrEq("raw /mcp response"));
+
+  // Now, verify that the explicit per-route config at "/explicit_mcp" is successfully intercepted.
+  const std::string rpc_body = R"({
+    "jsonrpc": "2.0",
+    "id": 321,
+    "method": "tools/call",
+    "params": {
+      "name": "create_api_key",
+      "arguments": {
+        "parent": "projects/foo",
+        "key": {
+          "displayName": "bar"
+        }
+      }
+    }
+  })";
+
+  auto response2 = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/explicit_mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      rpc_body);
+
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
+  EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/v1/projects/foo/keys"));
+
+  Http::TestResponseHeaderMapImpl response_headers2;
+  response_headers2.setStatus(200);
+  response_headers2.setContentType(Http::Headers::get().ContentTypeValues.Json);
+  upstream_request_->encodeHeaders(response_headers2, false);
+  Buffer::OwnedImpl response_data2(R"({"displayName":"bar","createTime":"1970-01-01T00:00:22Z"})");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_THAT(response2->headers().getStatusValue(), StrEq("200"));
+  const std::string expected_rpc_response = R"({
+    "jsonrpc": "2.0",
+    "id": 321,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"displayName\":\"bar\",\"createTime\":\"1970-01-01T00:00:22Z\"}"
+        }
+      ],
+      "isError": false
+    }
+  })";
+  EXPECT_EQ(nlohmann::json::parse(response2->body()), nlohmann::json::parse(expected_rpc_response));
+}
+
 } // namespace
 } // namespace Envoy
