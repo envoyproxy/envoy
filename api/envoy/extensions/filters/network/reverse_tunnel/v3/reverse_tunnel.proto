@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.reverse_tunnel.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/filters/http/jwt_authn/v3/config.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -111,12 +112,13 @@ message Validation {
 // forces the ``x-envoy-reverse-tunnel-tenant-id`` header to equal the verified ``tenant`` claim.
 //
 // .. note::
-//   Experimental, minimal implementation: only inline ``local_jwks`` (synchronous verification) is
-//   supported; asynchronous ``remote_jwks`` fetching is a planned follow-up. The configuration is
-//   deliberately scoped rather than reusing
+//   The JWKS may be supplied inline (``local_jwks``) or fetched over HTTP (``remote_jwks``). Either
+//   way, token verification during the handshake is synchronous: ``remote_jwks`` is fetched and
+//   refreshed in the background (at startup and every ``cache_duration``), never on the handshake
+//   path. The configuration is deliberately scoped rather than reusing the full
 //   :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`, whose
-//   remote-fetch, request-param/cookie extraction and upstream-forwarding fields are not meaningful
-//   for an L4 pre-registration handshake; the security-relevant semantics below mirror ``jwt_authn``.
+//   request-param/cookie extraction and upstream-forwarding fields are not meaningful for an L4
+//   pre-registration handshake; the security-relevant semantics below mirror ``jwt_authn``.
 //
 // .. attention::
 //   Verifying the token proves only that the caller *holds* a valid token; it does **not** by itself
@@ -127,7 +129,7 @@ message Validation {
 //   Without such a binding, a token minted for one tenant can open a tunnel claiming another. Tokens
 //   without an ``exp`` claim are rejected. All top-level claims are published as dynamic metadata
 //   (see ``claims_metadata_namespace``), so do not put secrets in the token.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message JwtHandshakeValidation {
   // Required. Expected token issuer; the JWT ``iss`` claim must equal this value. A
   // ``jwt_validation`` block with an empty ``issuer`` is rejected at config load, so a validly
@@ -148,6 +150,21 @@ message JwtHandshakeValidation {
     // ``filename`` loaded from disk. The keys are read once when the configuration is loaded, which
     // keeps token verification during the handshake fully synchronous.
     config.core.v3.DataSource local_jwks = 3;
+
+    // The JWKS fetched over HTTP, reusing :ref:`jwt_authn's RemoteJwks
+    // <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.RemoteJwks>` (``http_uri``,
+    // ``cache_duration``, ``async_fetch``, ``retry_policy``). The keys are fetched and refreshed in
+    // the background (at startup and every ``cache_duration``) and cached, so verification during
+    // the handshake stays synchronous. Tokens are rejected only before the first successful fetch;
+    // once fetched, keys stay in effect until a later refresh replaces them, and a fetch outage
+    // does not drop them. There is no on-demand refetch on an unknown ``kid``, so a key published
+    // after the last refresh is not recognized for up to ``cache_duration``.
+    //
+    // Fetching is always in the background here, so ``RemoteJwks.async_fetch``'s documented
+    // on-demand, per-worker behavior when it is unset does not apply. ``async_fetch`` only tunes
+    // the background fetch: ``fast_listener`` skips the wait at startup, and
+    // ``failed_refetch_duration`` sets the retry interval after a failed fetch.
+    http.jwt_authn.v3.RemoteJwks remote_jwks = 8;
   }
 
   // Name of the header carrying the token. Defaults to ``authorization``, and a leading ``Bearer``
@@ -166,6 +183,10 @@ message JwtHandshakeValidation {
   // occurred are counted by the ``jwt_would_deny`` stat without closing the connection. Defaults to
   // ``false`` (enforce: a missing or invalid token is rejected with ``401`` and counted by
   // ``jwt_denied``).
+  //
+  // Before the first successful fetch every token fails verification, so with ``remote_jwks`` a JWKS
+  // server that is unreachable at startup, combined with ``allow_missing_or_failed``, admits every
+  // handshake until keys are cached.
   bool allow_missing_or_failed = 6;
 
   // Clock skew, in seconds, allowed when checking the ``exp`` and ``nbf`` time constraints. Mirrors

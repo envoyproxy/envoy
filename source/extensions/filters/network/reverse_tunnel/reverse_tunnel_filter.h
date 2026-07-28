@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/codec.h"
@@ -18,6 +20,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/filters/http/common/jwks_fetcher.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -38,6 +41,19 @@ inline const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor* ge
       base_interface);
 }
 
+// JWKS shared read-only across worker threads for handshake token verification.
+using JwksConstSharedPtr = std::shared_ptr<const JwtVerify::Jwks>;
+
+// Fetches and refreshes a remote JWKS in the background so handshake verification stays
+// synchronous. Defined in the .cc; referenced here only by pointer.
+class JwtRemoteJwksProvider;
+
+// Creates a JwksFetcher for a remote_jwks source. Overridable in tests; production uses the real
+// Extensions::HttpFilters::Common::JwksFetcher.
+using JwksFetcherFactory = std::function<Extensions::HttpFilters::Common::JwksFetcherPtr(
+    Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr,
+    const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)>;
+
 /**
  * Configuration for the reverse tunnel network filter.
  */
@@ -45,7 +61,10 @@ class ReverseTunnelFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   static absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>>
   create(const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
-         Server::Configuration::FactoryContext& context);
+         Server::Configuration::FactoryContext& context,
+         JwksFetcherFactory create_fetcher_fn = nullptr);
+
+  ~ReverseTunnelFilterConfig();
 
   std::chrono::milliseconds pingInterval() const { return ping_interval_; }
   bool autoCloseConnections() const { return auto_close_connections_; }
@@ -109,8 +128,12 @@ private:
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
       Formatter::FormatterConstSharedPtr node_id_formatter,
       Formatter::FormatterConstSharedPtr cluster_id_formatter,
-      Formatter::FormatterConstSharedPtr tenant_id_formatter,
-      std::unique_ptr<JwtVerify::Jwks> jwt_jwks);
+      Formatter::FormatterConstSharedPtr tenant_id_formatter, JwksConstSharedPtr jwt_local_jwks,
+      std::unique_ptr<JwtRemoteJwksProvider> jwt_remote_provider);
+
+  // The JWKS currently in effect: the inline keys for local_jwks, or the most recently fetched keys
+  // for remote_jwks (nullptr until the first successful fetch). Read on the handshake path.
+  JwksConstSharedPtr currentJwks() const;
 
   const std::chrono::milliseconds ping_interval_;
   const bool auto_close_connections_;
@@ -150,8 +173,10 @@ private:
   const Http::LowerCaseString jwt_token_header_;
   // Namespace under which verified claims are emitted as dynamic metadata.
   const std::string jwt_claims_namespace_;
-  // Parsed JWKS used to verify the token signature. nullptr when JWT auth is not configured.
-  const std::unique_ptr<JwtVerify::Jwks> jwt_jwks_;
+  // Inline JWKS (local_jwks); nullptr for remote_jwks or when JWT auth is off.
+  const JwksConstSharedPtr jwt_local_jwks_;
+  // Background remote-JWKS fetcher (remote_jwks); nullptr for local_jwks or when JWT auth is off.
+  const std::unique_ptr<JwtRemoteJwksProvider> jwt_remote_provider_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;
