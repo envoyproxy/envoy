@@ -134,6 +134,7 @@ envoy_cc_test(
     deps = [
         ":stats_render_test_base",
         "//source/server/admin:admin_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
