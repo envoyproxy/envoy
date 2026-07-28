@@ -57,6 +57,26 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
+class MockUdpListenerFactory : public Network::ActiveUdpListenerFactory {
+public:
+  MockUdpListenerFactory() {
+    ON_CALL(*this, isTransportConnectionless()).WillByDefault(Return(true));
+    ON_CALL(*this, socketOptions()).WillByDefault(ReturnRef(socket_options_));
+  }
+
+  MOCK_METHOD(Network::ConnectionHandler::ActiveUdpListenerPtr, createActiveUdpListener,
+              (Runtime::Loader & runtime, uint32_t worker_index,
+               Network::UdpConnectionHandler& parent, Network::SocketSharedPtr&& listen_socket_ptr,
+               Event::Dispatcher& dispatcher, Network::ListenerConfig& config),
+              (override));
+  MOCK_METHOD(bool, isTransportConnectionless, (), (const, override));
+  MOCK_METHOD(const Network::Socket::OptionsSharedPtr&, socketOptions, (), (const, override));
+  MOCK_METHOD(absl::Status, initializeWorkerRouting,
+              (absl::Span<const Network::ListenSocketFactoryPtr>), (override));
+
+  Network::Socket::OptionsSharedPtr socket_options_{std::make_shared<Network::Socket::Options>()};
+};
+
 // Parameterized on (use_matcher, defer_worker_routing_init).
 class ListenerManagerImplTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 public:

@@ -863,6 +863,46 @@ TEST_P(ListenerManagerImplQuicOnlyTest, CidGeneratorRegistersInitTarget) {
   child_target.ready();
   EXPECT_EQ(Init::Manager::State::Initialized, server_init_mgr.state());
 }
+
+class ListenerManagerImplQuicWorkerRoutingTest : public ListenerManagerImplQuicOnlyTest {};
+
+TEST_P(ListenerManagerImplQuicWorkerRoutingTest, InPlaceUpdateDoesNotReinitializeWorkerRouting) {
+  EXPECT_CALL(*worker_, start);
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  auto udp_listener_factory = std::make_unique<NiceMock<MockUdpListenerFactory>>();
+  ON_CALL(*udp_listener_factory, isTransportConnectionless()).WillByDefault(Return(false));
+  EXPECT_CALL(*udp_listener_factory, initializeWorkerRouting).WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(listener_factory_, createUdpListenerFactory)
+      .WillOnce(Return(testing::ByMove(
+          absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>(std::move(udp_listener_factory)))));
+
+  ListenerHandle* listener1 = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::ReusePort, _, 0));
+  EXPECT_CALL(*worker_, addListener);
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(getBasicConfig());
+  EXPECT_TRUE(addOrUpdateListener(listener, "version1"));
+  worker_->callAddCompletion();
+
+  envoy::config::listener::v3::Listener update_proto = listener;
+  update_proto.mutable_filter_chains(0)
+      ->mutable_filter_chain_match()
+      ->mutable_destination_port()
+      ->set_value(1234);
+  ListenerHandle* listener2 = expectListenerOverridden(true, listener1);
+  EXPECT_CALL(listener2->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(update_proto, "version2"));
+  EXPECT_EQ(1UL,
+            server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  EXPECT_CALL(*listener2, onDestroy());
+  EXPECT_CALL(*listener1, onDestroy());
+}
+
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplQuicWorkerRoutingTest,
+                         ::testing::Values(std::make_tuple(false, true)));
 #endif
 
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplQuicOnlyTest,
