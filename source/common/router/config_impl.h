@@ -90,7 +90,14 @@ public:
 
   absl::string_view sanitizedPath() const {
     if (!sanitized_path_computed_) {
-      sanitized_path_ = ignore_path_params_ ? stripPathParams(path()) : path();
+      sanitized_path_ = path();
+      if (ignore_path_params_) {
+        std::optional<std::string> modified_path = stripPathParams(path());
+        if (modified_path.has_value()) {
+          sanitized_path_storage_ = std::move(modified_path).value();
+          sanitized_path_ = sanitized_path_storage_;
+        }
+      }
       sanitized_path_computed_ = true;
     }
     return sanitized_path_;
@@ -98,8 +105,14 @@ public:
 
   absl::string_view sanitizedPathWithoutQuery() const {
     if (!sanitized_path_without_query_computed_) {
-      sanitized_path_without_query_ =
-          ignore_path_params_ ? stripPathParams(pathWithoutQuery()) : pathWithoutQuery();
+      sanitized_path_without_query_ = pathWithoutQuery();
+      if (ignore_path_params_) {
+        std::optional<std::string> modified_path = stripPathParams(pathWithoutQuery());
+        if (modified_path.has_value()) {
+          sanitized_path_without_query_storage_ = std::move(modified_path).value();
+          sanitized_path_without_query_ = sanitized_path_without_query_storage_;
+        }
+      }
       sanitized_path_without_query_computed_ = true;
     }
     return sanitized_path_without_query_;
@@ -129,13 +142,14 @@ public:
     return cookies_;
   }
 
-private:
-  static absl::string_view stripPathParams(absl::string_view path) {
-    const auto pos = path.find(';');
-    return pos != absl::string_view::npos ? path.substr(0, pos) : path;
-  }
+  // Strip parameters from URL path. Return modified path or nullopt if path was
+  // not modified.
+  static std::optional<std::string> stripPathParams(absl::string_view path);
 
+private:
   const Http::RequestHeaderMap& headers_;
+  mutable std::string sanitized_path_storage_;
+  mutable std::string sanitized_path_without_query_storage_;
   mutable absl::string_view path_without_query_;
   mutable absl::string_view sanitized_path_;
   mutable absl::string_view sanitized_path_without_query_;
@@ -845,7 +859,7 @@ public:
 
   // Sanitizes the |path| before passing it to PathMatcher, if configured, this method makes the
   // path matching to ignore the path-parameters.
-  absl::string_view sanitizePathBeforePathMatching(const absl::string_view path) const;
+  std::string sanitizePathBeforePathMatching(const absl::string_view path) const;
 
 protected:
   const PathMatcherSharedPtr path_matcher_;
