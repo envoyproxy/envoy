@@ -141,6 +141,10 @@ on:
         type: string
         default: ''
         description: Slack channel for failure notifications (opt-in, e.g. '#envoy-ci'). Leave empty to disable.
+      pr-comment-on-failure:
+        type: string
+        default: ''
+        description: Post a PR comment with this message on failure (catch-errors only). Leave empty to disable.
       source:
         type: string
       summary-post:
@@ -484,3 +488,33 @@ jobs:
             text:
               type: mrkdwn
               text: ":x: *CI job failed:* `${{ inputs.target }}`\n<${{ env.JOB_URL }}|View workflow run>"
+
+    - name: Save PR comment artifact
+      if: >-
+        steps.ci-run.outputs.exit-code != 0
+        && inputs.pr-comment-on-failure != ''
+        && fromJSON(inputs.request).request.pr != ''
+      run: |
+        jq -n \
+          --argjson pr "$PR_NUMBER" \
+          --arg message "$PR_MESSAGE" \
+          --arg run_id "$RUN_ID" \
+          --arg repo "$REPO" \
+          '{pr: $pr, message: $message, run_id: $run_id, repo: $repo}' \
+          > /tmp/pr-comment.json
+      shell: bash
+      env:
+        PR_NUMBER: ${{ fromJSON(inputs.request).request.pr }}
+        PR_MESSAGE: ${{ inputs.pr-comment-on-failure }}
+        RUN_ID: ${{ github.run_id }}
+        REPO: ${{ github.repository }}
+    - name: Upload PR comment artifact
+      if: >-
+        steps.ci-run.outputs.exit-code != 0
+        && inputs.pr-comment-on-failure != ''
+        && fromJSON(inputs.request).request.pr != ''
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: pr-comment-${{ inputs.target }}
+        path: /tmp/pr-comment.json
+        retention-days: 1
