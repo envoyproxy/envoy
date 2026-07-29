@@ -213,6 +213,54 @@ TEST_P(ProtocolIntegrationTest, RouterVirtualClusters) { testRouterVirtualCluste
 
 TEST_P(ProtocolIntegrationTest, RouterStats) { testRouteStats(); }
 
+TEST_P(ProtocolIntegrationTest, IgnorePathParametersInPathMatchingPerSegmentEnabled) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->set_prefix("/foo/bar");
+        hcm.mutable_route_config()->set_ignore_path_parameters_in_path_matching(true);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setPath("/foo;param1=1/bar;param2=2");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, IgnorePathParametersInPathMatchingPerSegmentDisabled) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->set_prefix("/foo/bar");
+        hcm.mutable_route_config()->set_ignore_path_parameters_in_path_matching(true);
+      });
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.strip_path_parameters_per_segment",
+                                    "false");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setPath("/foo;param1=1/bar;param2=2");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+}
+
 // Change the default route to be restrictive, and send a POST to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
   testRouterNotFoundWithBody();
