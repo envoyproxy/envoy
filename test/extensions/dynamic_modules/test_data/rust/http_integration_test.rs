@@ -1,6 +1,7 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::any::Any;
+use std::cell::{Cell, RefCell};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -201,7 +202,7 @@ struct FilterStateObjectRecreateFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateObjectRecreateFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -269,7 +270,7 @@ struct ConfigSchedulerFilter {
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigSchedulerFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -318,7 +319,7 @@ struct ConfigCalloutFilter {
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigCalloutFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -371,7 +372,7 @@ struct ConfigStreamFilter {
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigStreamFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -403,7 +404,7 @@ struct PassthroughHttpFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PassthroughHttpFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -430,7 +431,7 @@ struct UpstreamConnectionIdFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -451,7 +452,7 @@ struct LogLevelFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -482,29 +483,29 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeadersHttpFilterConfig {
       .collect();
     Box::new(HeadersHttpFilter {
       headers_to_add,
-      request_headers_called: false,
-      request_trailers_called: false,
-      response_headers_called: false,
-      response_trailers_called: false,
+      request_headers_called: Cell::new(false),
+      request_trailers_called: Cell::new(false),
+      response_headers_called: Cell::new(false),
+      response_trailers_called: Cell::new(false),
     })
   }
 }
 
 struct HeadersHttpFilter {
   headers_to_add: Vec<(String, String)>,
-  request_headers_called: bool,
-  request_trailers_called: bool,
-  response_headers_called: bool,
-  response_trailers_called: bool,
+  request_headers_called: Cell<bool>,
+  request_trailers_called: Cell<bool>,
+  response_headers_called: Cell<bool>,
+  response_trailers_called: Cell<bool>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    self.request_headers_called = true;
+    self.request_headers_called.set(true);
     let path_header = envoy_filter
       .get_request_header_value(":path")
       .expect(":path header");
@@ -553,10 +554,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
   }
 
   fn on_request_trailers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
   ) -> envoy_dynamic_module_type_on_http_filter_request_trailers_status {
-    self.request_trailers_called = true;
+    self.request_trailers_called.set(true);
     let foo_trailer = envoy_filter
       .get_request_trailer_value("foo")
       .expect("foo trailer");
@@ -596,11 +597,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    self.response_headers_called = true;
+    self.response_headers_called.set(true);
     let foo_header = envoy_filter
       .get_response_header_value("foo")
       .expect("foo header");
@@ -640,10 +641,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
   }
 
   fn on_response_trailers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
   ) -> envoy_dynamic_module_type_on_http_filter_response_trailers_status {
-    self.response_trailers_called = true;
+    self.response_trailers_called.set(true);
     let foo_trailer = envoy_filter
       .get_response_trailer_value("foo")
       .expect("foo trailer");
@@ -685,10 +686,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
 
 impl Drop for HeadersHttpFilter {
   fn drop(&mut self) {
-    assert!(self.request_headers_called);
-    assert!(self.request_trailers_called);
-    assert!(self.response_headers_called);
-    assert!(self.response_trailers_called);
+    assert!(self.request_headers_called.get());
+    assert!(self.request_trailers_called.get());
+    assert!(self.response_headers_called.get());
+    assert!(self.response_trailers_called.get());
   }
 }
 
@@ -720,13 +721,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PerRouteFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(PerRouteFilter {
       value: self.value.clone(),
-      per_route_config: None,
+      per_route_config: RefCell::new(None),
     })
   }
 }
 struct PerRouteFilter {
   value: String,
-  per_route_config: Option<std::sync::Arc<dyn Any>>,
+  per_route_config: RefCell<Option<std::sync::Arc<dyn Any>>>,
 }
 
 struct PerRoutePerRouteFilterConfig {
@@ -735,13 +736,13 @@ struct PerRoutePerRouteFilterConfig {
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PerRouteFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.set_request_header("x-config", self.value.as_bytes());
-    self.per_route_config = envoy_filter.get_most_specific_route_config();
-    if let Some(ref per_route_config) = self.per_route_config {
+    *self.per_route_config.borrow_mut() = envoy_filter.get_most_specific_route_config();
+    if let Some(ref per_route_config) = *self.per_route_config.borrow() {
       let per_route_config = per_route_config
         .downcast_ref::<PerRoutePerRouteFilterConfig>()
         .expect("wrong type for per route config");
@@ -752,11 +753,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PerRouteFilter {
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    if let Some(ref per_route_config) = self.per_route_config {
+    if let Some(ref per_route_config) = *self.per_route_config.borrow() {
       let per_route_config = per_route_config
         .downcast_ref::<PerRoutePerRouteFilterConfig>()
         .expect("wrong type for per route config");
@@ -778,8 +779,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BodyCallbacksFilter {
       immediate_end_of_stream: self.immediate_end_of_stream,
-      seen_request_body: false,
-      seen_response_body: false,
+      seen_request_body: Cell::new(false),
+      seen_response_body: Cell::new(false),
     })
   }
 }
@@ -787,13 +788,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
 struct BodyCallbacksFilter {
   /// This is true when we should not see end_of_stream=false, configured by the filter config.
   immediate_end_of_stream: bool,
-  seen_request_body: bool,
-  seen_response_body: bool,
+  seen_request_body: Cell<bool>,
+  seen_response_body: Cell<bool>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -801,7 +802,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
   }
 
   fn on_request_body(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
@@ -810,7 +811,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
       // Buffer the request body until the end of stream.
       return envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer;
     }
-    self.seen_request_body = true;
+    self.seen_request_body.set(true);
 
     let mut received_body_len: usize = 0;
     let mut buffered_body_len: usize = 0;
@@ -854,7 +855,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -862,7 +863,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
   }
 
   fn on_response_body(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_body_status {
@@ -870,7 +871,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
       // Buffer the response body until the end of stream.
       return envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationAndBuffer;
     }
-    self.seen_response_body = true;
+    self.seen_response_body.set(true);
 
     let mut buffered_body_len: usize = 0;
     let mut received_body_len: usize = 0;
@@ -915,8 +916,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
 
 impl Drop for BodyCallbacksFilter {
   fn drop(&mut self) {
-    assert!(self.seen_request_body);
-    assert!(self.seen_response_body);
+    assert!(self.seen_request_body.get());
+    assert!(self.seen_response_body.get());
   }
 }
 
@@ -951,7 +952,7 @@ enum SendResponseHttpFilter {
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -969,7 +970,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
   }
 
   fn on_request_body(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
@@ -987,7 +988,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -1012,19 +1013,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpCalloutsFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpCalloutsFilter {
       cluster_name: self.cluster_name.clone(),
-      callout_handle: 0,
+      callout_handle: Cell::new(0),
     })
   }
 }
 
 struct HttpCalloutsFilter {
   cluster_name: String,
-  callout_handle: u64,
+  callout_handle: Cell<u64>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1041,12 +1042,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
       envoy_filter.send_response(500, &[("foo", b"bar")], None, None);
     }
-    self.callout_handle = handle;
+    self.callout_handle.set(handle);
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
   fn on_http_callout_done(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     callout_id: u64,
     result: abi::envoy_dynamic_module_type_http_callout_result,
@@ -1061,7 +1062,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       result,
       envoy_dynamic_module_type_http_callout_result::Success
     );
-    assert_eq!(callout_id, self.callout_handle);
+    assert_eq!(callout_id, self.callout_handle.get());
     assert!(response_headers.is_some());
     assert!(response_body.is_some());
     let response_headers = response_headers.unwrap();
@@ -1095,8 +1096,8 @@ struct HttpFilterSchedulerConfig {}
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpFilterSchedulerConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpFilterScheduler {
-      event_ids: vec![],
-      thread_handles: vec![],
+      event_ids: RefCell::new(vec![]),
+      thread_handles: RefCell::new(vec![]),
     })
   }
 }
@@ -1104,13 +1105,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpFilterSchedulerConfig {
 /// This spawns a thread for each request and response header callback and stops iteration at these
 /// event hooks.
 struct HttpFilterScheduler {
-  event_ids: Vec<u64>,
-  thread_handles: Vec<std::thread::JoinHandle<()>>,
+  event_ids: RefCell<Vec<u64>>,
+  thread_handles: RefCell<Vec<std::thread::JoinHandle<()>>>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpFilterScheduler {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1119,12 +1120,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpFilterScheduler {
       scheduler.commit(0);
       scheduler.commit(1);
     });
-    self.thread_handles.push(thread);
+    self.thread_handles.borrow_mut().push(thread);
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -1133,12 +1134,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpFilterScheduler {
       scheduler.commit(2);
       scheduler.commit(3);
     });
-    self.thread_handles.push(thread);
+    self.thread_handles.borrow_mut().push(thread);
     envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
   }
 
-  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
-    self.event_ids.push(event_id);
+  fn on_scheduled(&self, envoy_filter: &mut EHF, event_id: u64) {
+    self.event_ids.borrow_mut().push(event_id);
     if event_id == 1 {
       envoy_filter.continue_decoding()
     } else if event_id == 3 {
@@ -1149,9 +1150,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpFilterScheduler {
 
 impl Drop for HttpFilterScheduler {
   fn drop(&mut self) {
-    assert_eq!(self.event_ids, vec![0, 1, 2, 3]);
-    assert_eq!(self.thread_handles.len(), 2);
-    for thread in self.thread_handles.drain(..) {
+    assert_eq!(*self.event_ids.borrow(), vec![0, 1, 2, 3]);
+    assert_eq!(self.thread_handles.borrow().len(), 2);
+    for thread in self.thread_handles.borrow_mut().drain(..) {
       thread.join().expect("Failed to join thread");
     }
   }
@@ -1167,7 +1168,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for EarlyResponseDuringUploadCo
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(EarlyResponseDuringUploadFilter {
       response_pause_total: self.response_pause_total,
-      resume_scheduled: false,
+      resume_scheduled: Cell::new(false),
     })
   }
 }
@@ -1179,26 +1180,26 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for EarlyResponseDuringUploadCo
 /// resume and wedge the held response.
 struct EarlyResponseDuringUploadFilter {
   response_pause_total: EnvoyCounterId,
-  resume_scheduled: bool,
+  resume_scheduled: Cell<bool>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for EarlyResponseDuringUploadFilter {
   fn on_request_body(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
     // Post the resume instead of calling it inline so it runs after this body returns Continue and
     // the decode direction is marked continued. An inline resume would not reproduce the wedge.
-    if !self.resume_scheduled {
-      self.resume_scheduled = true;
+    if !self.resume_scheduled.get() {
+      self.resume_scheduled.set(true);
       envoy_filter.new_scheduler().commit(EVENT_RESUME_ENCODING);
     }
     envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -1209,7 +1210,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for EarlyResponseDuringUploadFilter {
     envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
   }
 
-  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+  fn on_scheduled(&self, envoy_filter: &mut EHF, event_id: u64) {
     if event_id == EVENT_RESUME_ENCODING {
       envoy_filter.continue_encoding();
     }
@@ -1221,17 +1222,19 @@ struct FakeExternalCachingFilterConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FakeExternalCachingFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(FakeExternalCachingFilter { rx: None })
+    Box::new(FakeExternalCachingFilter {
+      rx: RefCell::new(None),
+    })
   }
 }
 
 struct FakeExternalCachingFilter {
-  rx: Option<std::sync::mpsc::Receiver<String>>,
+  rx: RefCell<Option<std::sync::mpsc::Receiver<String>>>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1246,7 +1249,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
     //
     // Alternatively, you can use Arc<Mutex<>> or similar constructs.
     let (cx, rx) = std::sync::mpsc::channel();
-    self.rx = Some(rx);
+    *self.rx.borrow_mut() = Some(rx);
     // In real world scenarios, rather than spawning a thread per request,
     // you would typically use a thread pool or an async runtime to handle
     // the asynchronous I/O or computation.
@@ -1270,7 +1273,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
-  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+  fn on_scheduled(&self, envoy_filter: &mut EHF, event_id: u64) {
     match event_id {
       // Event from the on_request_headers when the cache key was not found.
       0 => {
@@ -1280,7 +1283,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
       },
       // Event from the on_scheduled when the cache key was found.
       1 => {
-        let result = self.rx.take().unwrap().recv().unwrap();
+        let result = self.rx.borrow_mut().take().unwrap().recv().unwrap();
         envoy_filter.send_response(200, &[("cached", b"yes")], Some(result.as_bytes()), None);
       },
       // Event from the on_response_headers.
@@ -1294,7 +1297,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -1335,7 +1338,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig 
       entrypoint_set_value: self.entrypoint_set_value,
       header_to_count: self.header_to_count.clone(),
       header_to_set: self.header_to_set.clone(),
-      method: None,
+      method: RefCell::new(None),
     })
   }
 }
@@ -1352,12 +1355,12 @@ struct StatsCallbacksFilter {
   entrypoint_header_values: EnvoyHistogramVecId,
   header_to_count: String,
   header_to_set: String,
-  method: Option<String>,
+  method: RefCell<Option<String>>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1375,7 +1378,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
     envoy_filter
       .increase_gauge_vec(self.entrypoint_pending, &["on_request_headers", method], 1)
       .unwrap();
-    self.method = Some(method.to_owned());
+    *self.method.borrow_mut() = Some(method.to_owned());
 
     // Record histogram value to provided value in header
     if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_count.as_str()) {
@@ -1417,33 +1420,23 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let method_ref = self.method.borrow();
+    let method = method_ref.as_ref().unwrap().as_str();
     envoy_filter
-      .increment_counter_vec(
-        self.entrypoint_total,
-        &["on_response_headers", self.method.as_ref().unwrap()],
-        1,
-      )
+      .increment_counter_vec(self.entrypoint_total, &["on_response_headers", method], 1)
       .unwrap();
     envoy_filter
       .decrease_gauge(self.requests_pending, 1)
       .unwrap();
     envoy_filter
-      .decrease_gauge_vec(
-        self.entrypoint_pending,
-        &["on_request_headers", self.method.as_ref().unwrap()],
-        1,
-      )
+      .decrease_gauge_vec(self.entrypoint_pending, &["on_request_headers", method], 1)
       .unwrap();
     envoy_filter
-      .increase_gauge_vec(
-        self.entrypoint_pending,
-        &["on_response_headers", self.method.as_ref().unwrap()],
-        1,
-      )
+      .increase_gauge_vec(self.entrypoint_pending, &["on_response_headers", method], 1)
       .unwrap();
 
     // Record histogram value to provided value in header
@@ -1456,7 +1449,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
       envoy_filter
         .record_histogram_value_vec(
           self.entrypoint_header_values,
-          &["on_response_headers", self.method.as_ref().unwrap()],
+          &["on_response_headers", method],
           header_val,
         )
         .unwrap();
@@ -1471,7 +1464,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
       envoy_filter
         .set_gauge_vec(
           self.entrypoint_set_value,
-          &["on_response_headers", self.method.as_ref().unwrap()],
+          &["on_response_headers", method],
           header_val,
         )
         .unwrap();
@@ -1480,13 +1473,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 
-  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+  fn on_stream_complete(&self, envoy_filter: &mut EHF) {
+    let method_ref = self.method.borrow();
+    let method = method_ref.as_ref().unwrap().as_str();
     envoy_filter
-      .decrease_gauge_vec(
-        self.entrypoint_pending,
-        &["on_response_headers", self.method.as_ref().unwrap()],
-        1,
-      )
+      .decrease_gauge_vec(self.entrypoint_pending, &["on_response_headers", method], 1)
       .unwrap();
   }
 }
@@ -1512,10 +1503,10 @@ struct StreamingTerminalFilterConfig {}
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamingTerminalFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(StreamingTerminalHttpFilter {
-      request_closed: false,
-      above_watermark_count: 0,
-      below_watermark_count: 0,
-      large_response_bytes_sent: 0,
+      request_closed: Cell::new(false),
+      above_watermark_count: Cell::new(0),
+      below_watermark_count: Cell::new(0),
+      large_response_bytes_sent: Cell::new(0),
     })
   }
 }
@@ -1524,15 +1515,15 @@ const EVENT_ID_START_RESPONSE: u64 = 1;
 const EVENT_ID_READ_REQUEST: u64 = 2;
 
 struct StreamingTerminalHttpFilter {
-  request_closed: bool,
-  above_watermark_count: usize,
-  below_watermark_count: usize,
-  large_response_bytes_sent: usize,
+  request_closed: Cell<bool>,
+  above_watermark_count: Cell<usize>,
+  below_watermark_count: Cell<usize>,
+  large_response_bytes_sent: Cell<usize>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1541,18 +1532,18 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
   }
 
   fn on_request_body(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
     if end_of_stream {
-      self.request_closed = true;
+      self.request_closed.set(true);
     }
     envoy_filter.new_scheduler().commit(EVENT_ID_READ_REQUEST);
     envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer
   }
 
-  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+  fn on_scheduled(&self, envoy_filter: &mut EHF, event_id: u64) {
     match event_id {
       EVENT_ID_START_RESPONSE => {
         envoy_filter.send_response_headers(
@@ -1566,7 +1557,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
         envoy_filter.send_response_data(b"Who are you?", false);
       },
       EVENT_ID_READ_REQUEST => {
-        if !self.request_closed {
+        if !self.request_closed.get() {
           let mut body = Vec::new();
           // The event is scheduled asynchronously and this will be called out of
           // on_request_body. So, we get the buffered body here.
@@ -1583,11 +1574,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
             ("x-status", b"finished"),
             (
               "x-above-watermark-count",
-              self.above_watermark_count.to_string().as_bytes(),
+              self.above_watermark_count.get().to_string().as_bytes(),
             ),
             (
               "x-below-watermark-count",
-              self.below_watermark_count.to_string().as_bytes(),
+              self.below_watermark_count.get().to_string().as_bytes(),
             ),
           ]);
         }
@@ -1596,28 +1587,34 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
     }
   }
 
-  fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {
-    self.above_watermark_count += 1;
+  fn on_downstream_above_write_buffer_high_watermark(&self, _envoy_filter: &mut EHF) {
+    self
+      .above_watermark_count
+      .set(self.above_watermark_count.get() + 1);
   }
 
-  fn on_downstream_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut EHF) {
-    self.below_watermark_count += 1;
-    if self.above_watermark_count == self.below_watermark_count {
+  fn on_downstream_below_write_buffer_low_watermark(&self, envoy_filter: &mut EHF) {
+    self
+      .below_watermark_count
+      .set(self.below_watermark_count.get() + 1);
+    if self.above_watermark_count.get() == self.below_watermark_count.get() {
       // Watermark levels are balanced, we can send more data.
-      self.send_large_response_chunk(_envoy_filter);
+      self.send_large_response_chunk(envoy_filter);
     }
   }
 }
 
 impl StreamingTerminalHttpFilter {
-  fn send_large_response_chunk<EHF: EnvoyHttpFilter>(&mut self, envoy_filter: &mut EHF) {
-    if self.large_response_bytes_sent >= 8 * 1024 {
+  fn send_large_response_chunk<EHF: EnvoyHttpFilter>(&self, envoy_filter: &mut EHF) {
+    if self.large_response_bytes_sent.get() >= 8 * 1024 {
       return;
     }
     let chunk_size = 1024;
     let chunk = vec![b'a'; chunk_size];
     envoy_filter.send_response_data(&chunk, false);
-    self.large_response_bytes_sent += chunk_size;
+    self
+      .large_response_bytes_sent
+      .set(self.large_response_bytes_sent.get() + chunk_size);
   }
 }
 
@@ -1641,7 +1638,7 @@ struct StreamingResponseReentryHttpFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingResponseReentryHttpFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1650,7 +1647,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingResponseReentryHttpFilte
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -1687,7 +1684,7 @@ struct ReentrantStreamCompleteFilter {
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1699,7 +1696,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
-  fn on_scheduled(&mut self, envoy_filter: &mut EHF, _event_id: u64) {
+  fn on_scheduled(&self, envoy_filter: &mut EHF, _event_id: u64) {
     // Completing the response with eos re-enters on_stream_complete before this returns. Use the
     // streaming response ABI (headers then eos data) rather than a local reply so the only re-entry
     // is into on_stream_complete (the encode hooks are gated by sent_local_reply_).
@@ -1707,7 +1704,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
     envoy_filter.send_response_data(b"body", true);
   }
 
-  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+  fn on_stream_complete(&self, envoy_filter: &mut EHF) {
     envoy_filter
       .increment_counter(self.stream_complete_total, 1)
       .unwrap();
@@ -1729,31 +1726,31 @@ struct BufferLimitFilterConfig {}
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BufferLimitFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BufferLimitFilter {
-      initial_buffer_limit: 0,
-      above_watermark_count: 0,
-      below_watermark_count: 0,
+      initial_buffer_limit: Cell::new(0),
+      above_watermark_count: Cell::new(0),
+      below_watermark_count: Cell::new(0),
     })
   }
 }
 
 struct BufferLimitFilter {
-  initial_buffer_limit: u64,
-  above_watermark_count: usize,
-  below_watermark_count: usize,
+  initial_buffer_limit: Cell<u64>,
+  above_watermark_count: Cell<usize>,
+  below_watermark_count: Cell<usize>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BufferLimitFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Get the initial buffer limit.
-    self.initial_buffer_limit = envoy_filter.get_buffer_limit();
+    self.initial_buffer_limit.set(envoy_filter.get_buffer_limit());
 
     // Increase the buffer limit if it's below our desired value.
     let desired_limit: u64 = 65536;
-    if self.initial_buffer_limit < desired_limit {
+    if self.initial_buffer_limit.get() < desired_limit {
       envoy_filter.set_buffer_limit(desired_limit);
     }
 
@@ -1761,14 +1758,14 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BufferLimitFilter {
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
     // Add headers with buffer limit and watermark info.
     envoy_filter.add_response_header(
       "x-initial-buffer-limit",
-      self.initial_buffer_limit.to_string().as_bytes(),
+      self.initial_buffer_limit.get().to_string().as_bytes(),
     );
     let current_limit = envoy_filter.get_buffer_limit();
     envoy_filter.add_response_header(
@@ -1777,22 +1774,26 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BufferLimitFilter {
     );
     envoy_filter.add_response_header(
       "x-above-watermark-count",
-      self.above_watermark_count.to_string().as_bytes(),
+      self.above_watermark_count.get().to_string().as_bytes(),
     );
     envoy_filter.add_response_header(
       "x-below-watermark-count",
-      self.below_watermark_count.to_string().as_bytes(),
+      self.below_watermark_count.get().to_string().as_bytes(),
     );
 
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 
-  fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {
-    self.above_watermark_count += 1;
+  fn on_downstream_above_write_buffer_high_watermark(&self, _envoy_filter: &mut EHF) {
+    self
+      .above_watermark_count
+      .set(self.above_watermark_count.get() + 1);
   }
 
-  fn on_downstream_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut EHF) {
-    self.below_watermark_count += 1;
+  fn on_downstream_below_write_buffer_low_watermark(&self, _envoy_filter: &mut EHF) {
+    self
+      .below_watermark_count
+      .set(self.below_watermark_count.get() + 1);
   }
 }
 
@@ -1809,25 +1810,25 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpStreamBasicConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpStreamBasicFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: 0,
-      received_headers: false,
-      received_data: false,
-      stream_completed: false,
+      stream_handle: Cell::new(0),
+      received_headers: Cell::new(false),
+      received_data: Cell::new(false),
+      stream_completed: Cell::new(false),
     })
   }
 }
 
 struct HttpStreamBasicFilter {
   cluster_name: String,
-  stream_handle: u64,
-  received_headers: bool,
-  received_data: bool,
-  stream_completed: bool,
+  stream_handle: Cell<u64>,
+  received_headers: Cell<bool>,
+  received_data: Cell<bool>,
+  stream_completed: Cell<bool>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1848,7 +1849,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
-    self.stream_handle = handle;
+    self.stream_handle.set(handle);
 
     // For a GET request with no body, we need to end the request stream by sending empty data with
     // end_stream = true.
@@ -1859,14 +1860,14 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
   }
 
   fn on_http_stream_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     stream_handle: u64,
     response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
     _end_stream: bool,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.received_headers = true;
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.received_headers.set(true);
 
     let mut found_status = false;
     for (name, value) in response_headers {
@@ -1880,19 +1881,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
   }
 
   fn on_http_stream_data(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     stream_handle: u64,
     _response_data: &[EnvoyBuffer],
     _end_stream: bool,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.received_data = true;
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.received_data.set(true);
   }
 
-  fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, stream_handle: u64) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.stream_completed = true;
+  fn on_http_stream_complete(&self, envoy_filter: &mut EHF, stream_handle: u64) {
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.stream_completed.set(true);
 
     envoy_filter.send_response(
       200,
@@ -1905,9 +1906,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
 
 impl Drop for HttpStreamBasicFilter {
   fn drop(&mut self) {
-    assert!(self.received_headers);
-    assert!(self.received_data);
-    assert!(self.stream_completed);
+    assert!(self.received_headers.get());
+    assert!(self.received_data.get());
+    assert!(self.stream_completed.get());
   }
 }
 
@@ -1920,31 +1921,31 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpStreamBidirectionalConf
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpStreamBidirectionalFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: 0,
-      data_chunks_sent: 0,
-      trailers_sent: false,
-      received_headers: false,
-      data_chunks_received: 0,
-      received_trailers: false,
-      stream_completed: false,
+      stream_handle: Cell::new(0),
+      data_chunks_sent: Cell::new(0),
+      trailers_sent: Cell::new(false),
+      received_headers: Cell::new(false),
+      data_chunks_received: Cell::new(0),
+      received_trailers: Cell::new(false),
+      stream_completed: Cell::new(false),
     })
   }
 }
 
 struct HttpStreamBidirectionalFilter {
   cluster_name: String,
-  stream_handle: u64,
-  data_chunks_sent: usize,
-  trailers_sent: bool,
-  received_headers: bool,
-  data_chunks_received: usize,
-  received_trailers: bool,
-  stream_completed: bool,
+  stream_handle: Cell<u64>,
+  data_chunks_sent: Cell<usize>,
+  trailers_sent: Cell<bool>,
+  received_headers: Cell<bool>,
+  data_chunks_received: Cell<usize>,
+  received_trailers: Cell<bool>,
+  stream_completed: Cell<bool>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -1965,61 +1966,63 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
-    self.stream_handle = handle;
+    self.stream_handle.set(handle);
 
     // Send data chunks.
     let success = unsafe { envoy_filter.send_http_stream_data(handle, b"chunk1", false) };
     assert!(success);
-    self.data_chunks_sent += 1;
+    self.data_chunks_sent.set(self.data_chunks_sent.get() + 1);
 
     let success = unsafe { envoy_filter.send_http_stream_data(handle, b"chunk2", false) };
     assert!(success);
-    self.data_chunks_sent += 1;
+    self.data_chunks_sent.set(self.data_chunks_sent.get() + 1);
 
     // Send trailers.
     let success =
       unsafe { envoy_filter.send_http_stream_trailers(handle, &[("x-request-trailer", b"value")]) };
     assert!(success);
-    self.trailers_sent = true;
+    self.trailers_sent.set(true);
 
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
   fn on_http_stream_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     stream_handle: u64,
     _response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
     _end_stream: bool,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.received_headers = true;
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.received_headers.set(true);
   }
 
   fn on_http_stream_data(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     stream_handle: u64,
     _response_data: &[EnvoyBuffer],
     _end_stream: bool,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.data_chunks_received += 1;
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self
+      .data_chunks_received
+      .set(self.data_chunks_received.get() + 1);
   }
 
   fn on_http_stream_trailers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     stream_handle: u64,
     _response_trailers: &[(EnvoyBuffer, EnvoyBuffer)],
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.received_trailers = true;
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.received_trailers.set(true);
   }
 
-  fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, stream_handle: u64) {
-    assert_eq!(stream_handle, self.stream_handle);
-    self.stream_completed = true;
+  fn on_http_stream_complete(&self, envoy_filter: &mut EHF, stream_handle: u64) {
+    assert_eq!(stream_handle, self.stream_handle.get());
+    self.stream_completed.set(true);
 
     envoy_filter.send_response(
       200,
@@ -2027,11 +2030,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
         ("x-stream-test", b"bidirectional"),
         (
           "x-chunks-sent",
-          self.data_chunks_sent.to_string().as_bytes(),
+          self.data_chunks_sent.get().to_string().as_bytes(),
         ),
         (
           "x-chunks-received",
-          self.data_chunks_received.to_string().as_bytes(),
+          self.data_chunks_received.get().to_string().as_bytes(),
         ),
       ],
       Some(b"bidirectional_success"),
@@ -2042,12 +2045,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
 
 impl Drop for HttpStreamBidirectionalFilter {
   fn drop(&mut self) {
-    assert_eq!(self.data_chunks_sent, 2);
-    assert!(self.trailers_sent);
-    assert!(self.received_headers);
-    assert!(self.data_chunks_received > 0);
-    assert!(self.received_trailers);
-    assert!(self.stream_completed);
+    assert_eq!(self.data_chunks_sent.get(), 2);
+    assert!(self.trailers_sent.get());
+    assert!(self.received_headers.get());
+    assert!(self.data_chunks_received.get() > 0);
+    assert!(self.received_trailers.get());
+    assert!(self.stream_completed.get());
   }
 }
 
@@ -2059,19 +2062,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamResetConfig {
   fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(UpstreamResetFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: 0,
+      stream_handle: Cell::new(0),
     })
   }
 }
 
 struct UpstreamResetFilter {
   cluster_name: String,
-  stream_handle: u64,
+  stream_handle: Cell<u64>,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -2093,12 +2096,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
-    self.stream_handle = handle;
+    self.stream_handle.set(handle);
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
   fn on_http_stream_headers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _stream_handle: u64,
     _headers: &[(EnvoyBuffer, EnvoyBuffer)],
@@ -2108,7 +2111,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
   }
 
   fn on_http_stream_data(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _stream_handle: u64,
     _data: &[EnvoyBuffer],
@@ -2118,7 +2121,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
   }
 
   fn on_http_stream_trailers(
-    &mut self,
+    &self,
     _envoy_filter: &mut EHF,
     _stream_handle: u64,
     _trailers: &[(EnvoyBuffer, EnvoyBuffer)],
@@ -2126,17 +2129,17 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
     // Not expected in this test.
   }
 
-  fn on_http_stream_complete(&mut self, _envoy_filter: &mut EHF, _stream_handle: u64) {
+  fn on_http_stream_complete(&self, _envoy_filter: &mut EHF, _stream_handle: u64) {
     // Not expected in this test (should get reset instead).
   }
 
   fn on_http_stream_reset(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     stream_handle: u64,
     _reason: envoy_dynamic_module_type_http_stream_reset_reason,
   ) {
-    assert_eq!(stream_handle, self.stream_handle);
+    assert_eq!(stream_handle, self.stream_handle.get());
     envoy_filter.send_response(200, &[("x-reset", b"true")], Some(b"upstream_reset"), None);
   }
 }
@@ -2157,7 +2160,7 @@ struct ListMetadataCallbacksFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -2175,7 +2178,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
   }
 
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
