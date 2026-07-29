@@ -24,6 +24,9 @@ on:
           ## The check run can be viewed here:
 
           # \($icon) \($run_link)
+      allowed-to-fail:
+        type: string
+        default: '[]'
 
 env:
   CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
@@ -44,34 +47,45 @@ jobs:
           check_name: ${{ fromJSON(inputs.needs).load.outputs.check-name }}
           repo: ${{ github.repository }}
           run_id: ${{ github.run_id }}
-          outcomes: ${{ toJSON(fromJSON(inputs.needs).*.result) }}
+          outcomes: ${{ toJSON(fromJSON(inputs.needs)) }}
+          allowed_to_fail: ${{ inputs.allowed-to-fail }}
           load: ${{ toJSON(fromJSON(inputs.needs).load.outputs) }}
         input-format: yaml
         print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
         filter: |
           .repo as $repo
           | .run_id as $run_id
-          | .needs as $result
           | .check_name as $check_name
           | .load as $load
           | $load["check-id"] as $check_id
           | $load["run-id"] as $workflow_id
           | (.load.request | fromjson) as $request
           | $request.config.envoy.icon as $icon
-          | .outcomes
-          | if any(. == "failure") then
+          | (.allowed_to_fail | fromjson) as $allowed_to_fail
+          | (.outcomes | to_entries | map({name: .key, result: .value.result})) as $outcomes
+          | ($outcomes
+             | map(select(.name as $name | ($allowed_to_fail | index($name) | not)))) as $required_outcomes
+          | ($outcomes
+             | map(select((.name as $name | ($allowed_to_fail | index($name))) and .result == "failure"))) as $allowed_failures
+          | if ($required_outcomes | any(.result == "failure")) then
               {name: "failure", icon: ":x:"}
-            elif any(. == "cancelled") then
+            elif ($required_outcomes | any(.result == "cancelled")) then
               {name: "cancelled", icon: ""}
-            elif all(. == "skipped") then
+            elif ($required_outcomes | all(.result == "skipped")) then
               {name: "skipped", icon: ""}
             else
               {name: "success", icon: ":heavy_check_mark:"}
             end
           | . as $outcome
+          | ($allowed_failures | map(.name) | sort | join(", ")) as $allowed_failure_names
           | "\($request.check.name) (\($request.summary.title))" as $run_link_text
           | "[\($run_link_text)](https://github.com/\($repo)/actions/runs/\($run_id))" as $run_link
           | "${{ inputs.template-check-text }}" as $text
+          | (if ($allowed_failures | length) > 0 then
+               "\n\n:warning: Allowed-to-fail checks failed: \($allowed_failure_names)"
+             else
+               ""
+             end) as $allowed_failure_text
           | {"summary-title": "\($icon) \($request.check.name) complete (\($outcome.name))",
              "check-id": $check_id,
              conclusion: $outcome.name,
@@ -85,7 +99,7 @@ jobs:
                  output: {
                    title: "\($request.check.name) (\($outcome.name))",
                    summary: "Check has finished",
-                   text: $text}}}}
+                   text: ($text + $allowed_failure_text)}}}}
 
     - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       name: Print summary
