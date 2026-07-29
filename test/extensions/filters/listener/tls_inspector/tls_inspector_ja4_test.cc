@@ -9,6 +9,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/test_runtime.h"
+#include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -253,8 +255,8 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     SSL_SELECT("t13d1516baad_8daaf6152771_e5627efa2ab1",
-                "t13d1515baad_8daaf6152771_de4a06bb82e3")},
+     SSL_SELECT("t13d1516bd_8daaf6152771_e5627efa2ab1",
+                "t13d1515bd_8daaf6152771_de4a06bb82e3")},
 };
 
 class TlsInspectorJA4Test
@@ -357,6 +359,57 @@ TEST_P(TlsInspectorJA4Test, JA4FingerprintFromCapturedClientHello) {
   if (state == Network::FilterStatus::Continue) {
     EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   }
+}
+
+TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericOldBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ja4_alpn_hex_conversion_fix", "false"}});
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  init();
+
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(0x0303, 0x0303, "", "\x02\x60\x32");
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setJA4Hash(testing::HasSubstr("6032_"))).Times(1);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")))
+      .Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::_)).Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, setRequestedServerName(testing::_)).Times(testing::AtMost(1));
+
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  filter_->onData(*buffer_);
+}
+
+TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericNewBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ja4_alpn_hex_conversion_fix", "true"}});
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  init();
+
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(0x0303, 0x0303, "", "\x02\x60\x32");
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setJA4Hash(testing::AllOf(
+      testing::HasSubstr("62_"),
+      testing::Not(testing::HasSubstr("6032_"))
+  ))).Times(1);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")))
+      .Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::_)).Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, setRequestedServerName(testing::_)).Times(testing::AtMost(1));
+
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  filter_->onData(*buffer_);
 }
 
 } // namespace

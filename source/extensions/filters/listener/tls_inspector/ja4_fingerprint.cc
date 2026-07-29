@@ -1,6 +1,7 @@
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "source/common/common/hex.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_format.h"
@@ -151,9 +152,16 @@ std::string JA4Fingerprinter::getJA4AlpnChars(const SSL_CLIENT_HELLO* ssl_client
 
   char first = proto[0];
   char last = proto[proto.length() - 1];
-  if (!absl::ascii_isalnum(first) || !absl::ascii_isalnum(last)) {
-    // Convert to hex if non-alphanumeric
-    return absl::StrFormat("%02x%02x", static_cast<uint8_t>(first), static_cast<uint8_t>(last));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ja4_alpn_hex_conversion_fix")) {
+    if (!absl::ascii_isalnum(first) || !absl::ascii_isalnum(last)) {
+      return absl::StrFormat("%x%x", (static_cast<uint8_t>(first) >> 4) & 0x0F,
+                                     static_cast<uint8_t>(last) & 0x0F);
+    }
+  } else {
+    if (!absl::ascii_isalnum(first) || !absl::ascii_isalnum(last)) {
+      // Convert to hex if non-alphanumeric
+      return absl::StrFormat("%02x%02x", static_cast<uint8_t>(first), static_cast<uint8_t>(last));
+    }
   }
   return absl::StrFormat("%c%c", first, last);
 }
