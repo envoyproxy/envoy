@@ -9,6 +9,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -79,7 +80,7 @@ public:
    * @return ProtobufTypes::MessagePtr decoded protobuf message in the opaque resource, e.g. the
    *         RouteConfiguration for an Any containing envoy.config.route.v3.RouteConfiguration.
    */
-  virtual ProtobufTypes::MessagePtr decodeResource(const Protobuf::Any& resource) PURE;
+  virtual ArenaWrappedProto<Protobuf::Message> decodeResource(const Protobuf::Any& resource) PURE;
 
   /**
    * @param resource some opaque resource (Protobuf::Message).
