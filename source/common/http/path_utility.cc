@@ -1,6 +1,7 @@
 #include "source/common/http/path_utility.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -29,6 +30,10 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
 /* static */
 bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strip_dotdot_segments_with_parameters")) {
+    stripParametersFromDotSegments(headers);
+  }
   const auto original_path = headers.getPathValue();
   // canonicalPath is supposed to apply on path component in URL instead of :path header
   const auto query_pos = original_path.find('?');
@@ -68,6 +73,31 @@ void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   headers.setPath(absl::StrCat(path_prefix,
                                absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"),
                                path_suffix, query));
+}
+
+void PathUtil::stripParametersFromDotSegments(RequestHeaderMap& headers) {
+  ASSERT(headers.Path());
+  const auto original_path = headers.getPathValue();
+  const absl::string_view::size_type query_or_fragment = original_path.find_first_of("?#");
+  absl::string_view path = original_path.substr(0, query_or_fragment);
+  if (path.find(".;") == absl::string_view::npos) {
+    return;
+  }
+  const absl::string_view query_and_fragment = query_or_fragment == absl::string_view::npos
+                                                   ? absl::string_view{}
+                                                   : original_path.substr(query_or_fragment);
+
+  // Remove parameters from dot and dotdot segments so the subsequent path canonicalization
+  // can correctly collapse them.
+  std::vector<absl::string_view> segments = absl::StrSplit(path, '/');
+  for (auto& segment : segments) {
+    if (absl::StartsWith(segment, "..;")) {
+      segment = "..";
+    } else if (absl::StartsWith(segment, ".;")) {
+      segment = ".";
+    }
+  }
+  headers.setPath(absl::StrCat(absl::StrJoin(segments, "/"), query_and_fragment));
 }
 
 PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& headers) {

@@ -2612,6 +2612,50 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDotsDecoded) {
   EXPECT_EQ(header_map.getPathValue(), "/abc");
 }
 
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePathWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/..;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/abc");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizeDotSegmentsWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/.;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/abc");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizeDotAndDotDotSegmentsWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath(
+      "/.;aa=bb/..;/xyz/.;foo=bar/abc/.;fff,bbb/remove;me=yes/.;skip/..;try=again/lastone;true/.;");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/abc/lastone;true/");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePathWithParametersDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_dotdot_segments_with_parameters", "false"}});
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/..;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/..;foo=bar/abc");
+}
+
 // Verify that %25 is NOT decoded as the % character per
 // https://datatracker.ietf.org/doc/html/rfc3986#section-2.4
 TEST_F(ConnectionManagerUtilityTest, EncodedPercentIsNotDecoded) {
