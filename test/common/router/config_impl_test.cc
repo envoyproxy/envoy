@@ -2546,6 +2546,214 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, IgnorePathParametersInPathMatchingPerSegmentEnabledAllMatchers) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: prefix_vh
+  domains: ["prefix.local"]
+  routes:
+  - match:
+      prefix: "/foo/bar"
+    name: "prefix-long"
+    route: { cluster: prefix-long }
+  - match:
+      prefix: "/foo"
+    name: "prefix-short"
+    route: { cluster: prefix-short }
+  - match:
+      prefix: "/"
+    name: "prefix-fallback"
+    route: { cluster: prefix-fallback }
+- name: exact_vh
+  domains: ["exact.local"]
+  routes:
+  - match:
+      path: "/foo/bar"
+    name: "exact-long"
+    route: { cluster: exact-long }
+  - match:
+      path: "/foo"
+    name: "exact-short"
+    route: { cluster: exact-short }
+  - match:
+      prefix: "/"
+    name: "exact-fallback"
+    route: { cluster: exact-fallback }
+- name: regex_vh
+  domains: ["regex.local"]
+  routes:
+  - match:
+      safe_regex:
+        regex: "^/foo/bar$"
+    name: "regex-long"
+    route: { cluster: regex-long }
+  - match:
+      safe_regex:
+        regex: "^/foo$"
+    name: "regex-short"
+    route: { cluster: regex-short }
+  - match:
+      prefix: "/"
+    name: "regex-fallback"
+    route: { cluster: regex-fallback }
+- name: path_separated_vh
+  domains: ["pathsep.local"]
+  routes:
+  - match:
+      path_separated_prefix: "/foo/bar"
+    name: "pathsep-long"
+    route: { cluster: pathsep-long }
+  - match:
+      path_separated_prefix: "/foo"
+    name: "pathsep-short"
+    route: { cluster: pathsep-short }
+  - match:
+      prefix: "/"
+    name: "pathsep-fallback"
+    route: { cluster: pathsep-fallback }
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+  route_configuration.set_ignore_path_parameters_in_path_matching(true);
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"prefix-long", "prefix-short", "prefix-fallback", "exact-long", "exact-short",
+       "exact-fallback", "regex-long", "regex-short", "regex-fallback", "pathsep-long",
+       "pathsep-short", "pathsep-fallback"},
+      {});
+  TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+  EXPECT_EQ("prefix-long",
+            config.route(genHeaders("prefix.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("prefix-long",
+            config.route(genHeaders("prefix.local", "/foo/bar", "GET"), 0)->routeName());
+  EXPECT_EQ("exact-long",
+            config.route(genHeaders("exact.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("exact-long",
+            config.route(genHeaders("exact.local", "/foo/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("regex-long",
+            config.route(genHeaders("regex.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("pathsep-long",
+            config.route(genHeaders("pathsep.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("pathsep-short",
+            config.route(genHeaders("pathsep.local", "/foo;a=1", "GET"), 0)->routeName());
+  EXPECT_EQ("pathsep-fallback",
+            config.route(genHeaders("pathsep.local", "/foobar;a=1", "GET"), 0)->routeName());
+}
+
+TEST_F(RouteMatcherTest, IgnorePathParametersInPathMatchingPerSegmentDisabledAllMatchers) {
+  mergeValues({{"envoy.reloadable_features.strip_path_parameters_per_segment", "false"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: prefix_vh
+  domains: ["prefix.local"]
+  routes:
+  - match:
+      prefix: "/foo/bar"
+    name: "prefix-long"
+    route: { cluster: prefix-long }
+  - match:
+      prefix: "/foo"
+    name: "prefix-short"
+    route: { cluster: prefix-short }
+  - match:
+      prefix: "/"
+    name: "prefix-fallback"
+    route: { cluster: prefix-fallback }
+- name: exact_vh
+  domains: ["exact.local"]
+  routes:
+  - match:
+      path: "/foo/bar"
+    name: "exact-long"
+    route: { cluster: exact-long }
+  - match:
+      path: "/foo"
+    name: "exact-short"
+    route: { cluster: exact-short }
+  - match:
+      prefix: "/"
+    name: "exact-fallback"
+    route: { cluster: exact-fallback }
+- name: regex_vh
+  domains: ["regex.local"]
+  routes:
+  - match:
+      safe_regex:
+        regex: "^/foo/bar$"
+    name: "regex-long"
+    route: { cluster: regex-long }
+  - match:
+      safe_regex:
+        regex: "^/foo$"
+    name: "regex-short"
+    route: { cluster: regex-short }
+  - match:
+      prefix: "/"
+    name: "regex-fallback"
+    route: { cluster: regex-fallback }
+- name: path_separated_vh
+  domains: ["pathsep.local"]
+  routes:
+  - match:
+      path_separated_prefix: "/foo/bar"
+    name: "pathsep-long"
+    route: { cluster: pathsep-long }
+  - match:
+      path_separated_prefix: "/foo"
+    name: "pathsep-short"
+    route: { cluster: pathsep-short }
+  - match:
+      prefix: "/"
+    name: "pathsep-fallback"
+    route: { cluster: pathsep-fallback }
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+  route_configuration.set_ignore_path_parameters_in_path_matching(true);
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"prefix-long", "prefix-short", "prefix-fallback", "exact-long", "exact-short",
+       "exact-fallback", "regex-long", "regex-short", "regex-fallback", "pathsep-long",
+       "pathsep-short", "pathsep-fallback"},
+      {});
+  TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+  EXPECT_EQ("prefix-short",
+            config.route(genHeaders("prefix.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("exact-short",
+            config.route(genHeaders("exact.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("regex-short",
+            config.route(genHeaders("regex.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("pathsep-short",
+            config.route(genHeaders("pathsep.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+  EXPECT_EQ("pathsep-fallback",
+            config.route(genHeaders("pathsep.local", "/foobar;a=1", "GET"), 0)->routeName());
+}
+
+TEST_F(RouteMatcherTest, IgnorePathParametersInPathMatchingDefaultUnchanged) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: no_ignore_vh
+  domains: ["no-ignore.local"]
+  routes:
+  - match:
+      path: "/foo/bar"
+    name: "exact-long"
+    route: { cluster: exact-long }
+  - match:
+      prefix: "/"
+    name: "fallback"
+    route: { cluster: fallback }
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+
+  factory_context_.cluster_manager_.initializeClusters({"exact-long", "fallback"}, {});
+  TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+  EXPECT_EQ("fallback",
+            config.route(genHeaders("no-ignore.local", "/foo;a=1/bar;b=2", "GET"), 0)->routeName());
+}
+
 // Tests that when 'ignore_port_in_host_matching' is true, port from host header
 // is ignored in host matching.
 TEST_F(RouteMatcherTest, IgnorePortInHostMatching) {
