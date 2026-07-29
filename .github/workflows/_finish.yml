@@ -126,12 +126,12 @@ jobs:
           const dir = '/tmp/pr-comments';
           if (!fs.existsSync(dir)) return;
           for (const subdir of fs.readdirSync(dir)) {
-            const filePath = path.join(dir, subdir, 'pr-comment.json');
-            if (!fs.existsSync(filePath)) continue;
-            const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-            const jobUrl = `https://github.com/${data.repo}/actions/runs/${data.run_id}`;
-            const body = data.message + '\n\n[View workflow run](' + jobUrl + ')';
             try {
+              const filePath = path.join(dir, subdir, 'pr-comment.json');
+              if (!fs.existsSync(filePath)) continue;
+              const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              const jobUrl = `https://github.com/${data.repo}/actions/runs/${data.run_id}`;
+              const body = data.message + '\n\n[View workflow run](' + jobUrl + ')';
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -139,7 +139,7 @@ jobs:
                 body: body
               });
             } catch (error) {
-              console.error(`Failed to comment on PR #${data.pr}:`, error);
+              console.error(`Failed to process ${subdir}:`, error);
             }
           }
 
