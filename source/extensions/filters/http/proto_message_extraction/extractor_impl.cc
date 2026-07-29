@@ -42,15 +42,15 @@ ABSL_CONST_INIT const char* const kTypeServiceBaseUrl = "type.googleapis.com";
 void extract(ProtoExtractorInterface& extractor, Protobuf::field_extraction::MessageData& message,
              std::vector<ExtractedMessageMetadata>& vect) {
   ExtractedMessageMetadata data = extractor.ExtractMessage(message);
-  ENVOY_LOG_MISC(debug, "Extracted fields: {}", data.extracted_message.DebugString());
+  ENVOY_LOG_MISC(debug, "Extracted fields: {}", data.extracted_message->DebugString());
 
   // Only need to keep the result from the first and the last.
   // Always overwrite the 2nd result as the last one.
   if (vect.size() < 2) {
-    vect.push_back(data);
+    vect.push_back(std::move(data));
   } else {
     // copy and override the second one as the last one.
-    vect[1] = data;
+    vect[1] = std::move(data);
   }
 }
 
