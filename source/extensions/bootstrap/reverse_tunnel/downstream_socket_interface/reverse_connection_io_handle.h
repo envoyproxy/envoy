@@ -195,6 +195,29 @@ public:
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
 
+  // Check and signal to the listener that a new connection is available.
+  void maybePushConn() {
+    if (listener_want_read_ && !established_connections_.empty()) {
+      activateFileEvents(Event::FileReadyType::Read);
+    }
+  }
+
+  /**
+   * Enable the file events.
+   */
+  void enableFileEvents(uint32_t events) override {
+    listener_want_read_ = events & Event::FileReadyType::Read;
+    // Cancel the existing events for overload management.
+    // If the listener wants to read we will push in the maybePushConn().
+    Network::IoSocketHandleImpl::enableFileEvents(0);
+    maybePushConn();
+  }
+
+  void resetFileEvents() override {
+    listener_want_read_ = false;
+    Network::IoSocketHandleImpl::resetFileEvents();
+  }
+
   // Network::ConnectionCallbacks.
   /**
    * Called when connection events occur.
@@ -220,12 +243,6 @@ public:
     ENVOY_LOG(info, "Bind called on rc socket handle: {}", address->logicalName());
     return Api::SysCallIntResult{0, 0};
   }
-
-  /**
-   * Get the file descriptor for the pipe monitor used to wake up accept().
-   * @return the file descriptor for the pipe monitor
-   */
-  int getPipeMonitorFd() const;
 
   // Callbacks from RCConnectionWrapper.
   /**
@@ -444,18 +461,6 @@ private:
    */
   void cleanup();
 
-  // Pipe trigger mechanism helpers
-  /**
-   * Create trigger pipe used to wake up accept() when a connection is established.
-   */
-  void createTriggerPipe();
-
-  /**
-   * Check if trigger pipe is ready for use.
-   * @return true if initialized and ready
-   */
-  bool isTriggerPipeReady() const;
-
   // Host/cluster mapping management
   /**
    * Update cluster -> host mappings from the cluster manager. Called before connection initiation
@@ -513,15 +518,11 @@ private:
   // Mapping from wrapper to host. This designates the number of successful connections to a host.
   absl::flat_hash_map<RCConnectionWrapper*, std::string> conn_wrapper_to_host_map_;
 
-  // Simple pipe-based trigger mechanism to wake up accept() when a connection is established.
-  // Inlined directly for simplicity and reduced test coverage requirements.
-  int trigger_pipe_read_fd_{-1};
-  int trigger_pipe_write_fd_{-1};
-
-  // Connection management : We store the established connections in a queue.
-  // and pop the last established connection when data is read on trigger_pipe_read_fd_
-  // to determine the connection that got established last.
+  // Established tunnels wait here until the listener accepts them. accept() pops the front
+  // entry, and maybePushConn() injects a read event so the listener keeps draining the queue
+  // without the fd ever being registered for kernel readability.
   std::queue<Envoy::Network::ClientConnectionPtr> established_connections_;
+  bool listener_want_read_{false}; // Whether the listener wants to read data.
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
@@ -529,9 +530,6 @@ private:
   bool is_reverse_conn_started_{
       false}; // Whether reverse connections have been started on worker thread
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
-
-  // Store original socket FD for cleanup.
-  os_fd_t original_socket_fd_{-1};
 };
 
 } // namespace ReverseConnection
