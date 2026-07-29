@@ -49,11 +49,16 @@ public:
    * @param socket the socket to be added.
    * @param ping_interval the interval at which ping keepalives are sent.
    * @param rebalanced true if adding socket after rebalancing.
+   * @param tenant_id tenant identifier supplied by the peer.
+   * @param initiator_worker_id the initiator worker (dispatcher name) that opened the tunnel.
+   * @param initiator_connection_id the initiator's per-connection identifier.
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket,
                            const std::chrono::seconds& ping_interval, bool rebalanced = true,
-                           absl::string_view tenant_id = {});
+                           absl::string_view tenant_id = {},
+                           absl::string_view initiator_worker_id = {},
+                           absl::string_view initiator_connection_id = {});
 
   /**
    * Returns true if a new reverse connection can be accepted for the given node, scoped by tenant
@@ -71,11 +76,16 @@ public:
    * @param cluster_id cluster_id of receiving cluster.
    * @param socket the socket to be added.
    * @param ping_interval the interval at which ping keepalives are sent.
+   * @param tenant_id tenant identifier supplied by the peer.
+   * @param initiator_worker_id the initiator worker (dispatcher name) that opened the tunnel.
+   * @param initiator_connection_id the initiator's per-connection identifier.
    */
   void handoffSocketToWorker(const std::string& node_id, const std::string& cluster_id,
                              Network::ConnectionSocketPtr socket,
                              const std::chrono::seconds& ping_interval,
-                             absl::string_view tenant_id = {});
+                             absl::string_view tenant_id = {},
+                             absl::string_view initiator_worker_id = {},
+                             absl::string_view initiator_connection_id = {});
 
   /**
    * Get an available reverse connection socket.
