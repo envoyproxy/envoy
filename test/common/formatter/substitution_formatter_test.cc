@@ -5971,8 +5971,8 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterGridTest) {
 TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
   // Empty JSON config.
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%COALESCE()%").IgnoreError(),
-                              EnvoyException, "COALESCE requires parameters");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE()%"),
+                HasStatus(absl::StatusCode::kInvalidArgument, "COALESCE requires parameters"));
   }
 
   // Invalid JSON.
