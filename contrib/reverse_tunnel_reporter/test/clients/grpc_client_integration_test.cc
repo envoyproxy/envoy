@@ -506,6 +506,31 @@ TEST_P(GrpcClientIntegrationTest, LoadTest) {
 }
 #endif // defined(NDEBUG)
 
+// This is a bit prone to time flakiness esp in asan, tsan etc builds so increase timeouts if
+// needed. Leaving it here to catch segfaults etc under load.
+TEST_P(GrpcClientIntegrationTest, ManyTunnelsSingleListenerDrain) {
+  initialize();
+  makeNewServer();
+
+  int num_tunnels = 100;
+
+  addListenerLds(getDownstreamListener("node-1", num_tunnels));
+
+  test_server_->waitForGauge("listener.upstreamListener.downstream_cx_active",
+                             testing::Eq(num_tunnels),
+                             std::chrono::milliseconds(sendInterval * 20));
+  test_server_->waitForGauge("http.node-1.downstream_cx_active", testing::Eq(num_tunnels),
+                             std::chrono::milliseconds(sendInterval * 20));
+  validateEqual(std::chrono::milliseconds(sendInterval * 20), getConns({"node-1"}));
+
+  auto client = makeHttpConnection(egressPort);
+  auto resp = makeClientRequest("/direct", client);
+  completeReq(std::chrono::milliseconds(1000), resp);
+
+  removeListenerLds("node-1");
+  validateEqual(std::chrono::milliseconds(sendInterval * 30), getConns({}));
+}
+
 TEST_P(GrpcClientIntegrationTest, ListenerDrain) {
   drain_time_ = slowRouteDelay + std::chrono::seconds(3);
   initialize();
