@@ -19,6 +19,10 @@ public:
   // Merges two or more adjacent slashes in path part of URI into one.
   // Requires the Path header be present.
   static void mergeSlashes(RequestHeaderMap& headers);
+  // Removes URL path parameters in dot and dotdot segments to allow canonicalization to
+  // interpret them correctly.
+  // Requires the Path header be present.
+  static void stripParametersFromDotSegments(RequestHeaderMap& headers);
 
   enum class UnescapeSlashesResult {
     // No escaped slash sequences were found and URL path has not been modified.
