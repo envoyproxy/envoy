@@ -264,6 +264,15 @@ private:
                               const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Handles decoding errors: sets dynamic metadata and sends a local reply.
+  // IMPORTANT PROTOCOL RULE:
+  // 1. For JSON-RPC application/protocol errors (-32600, -32601, -32602), MUST use Http::Code::OK
+  //    (200). Many MCP SDK clients inspect HTTP status before JSON-RPC decoding and will fail with
+  //    a transport exception on non-200 responses, discarding the structured JSON-RPC error
+  //    code/message.
+  // 2. Only use non-200 HTTP codes (400, 405, 413) for transport-level or framing syntax failures:
+  //    - 405 Method Not Allowed (non-POST request)
+  //    - 413 Payload Too Large (exceeding maxRequestBodySize)
+  //    - 400 Bad Request for malformed JSON syntax (-32700 parse error)
   void sendErrorResponse(
       Http::Code response_code, BridgeStatus status, absl::string_view response_body,
       std::function<void(Http::ResponseHeaderMap&)> modify_headers = nullptr,
