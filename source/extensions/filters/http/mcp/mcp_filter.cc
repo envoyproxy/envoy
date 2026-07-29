@@ -201,16 +201,17 @@ bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) con
   return false;
 }
 
-bool McpFilter::shouldRejectRequest() const {
-  const auto* override_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<McpOverrideConfig>(decoder_callbacks_);
-
-  if (override_config) {
-    return override_config->trafficMode() ==
-           envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP;
+envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode McpFilter::trafficMode() {
+  if (!traffic_mode_.has_value()) {
+    const auto* override_config =
+        Http::Utility::resolveMostSpecificPerFilterConfig<McpOverrideConfig>(decoder_callbacks_);
+    traffic_mode_ = override_config ? override_config->trafficMode() : config_->trafficMode();
   }
+  return *traffic_mode_;
+}
 
-  return config_->shouldRejectNonMcp();
+bool McpFilter::shouldRejectRequest() {
+  return trafficMode() == envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP;
 }
 
 uint32_t McpFilter::getMaxRequestBodySize() const {
@@ -226,6 +227,11 @@ uint32_t McpFilter::getMaxRequestBodySize() const {
 
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
+  if (trafficMode() == envoy::extensions::filters::http::mcp::v3::Mcp::NOOP) {
+    ENVOY_LOG(debug, "MCP filter in NOOP mode, passing through without inspection");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (isValidMcpDeleteRequest(headers)) {
     is_mcp_request_ = true;
     ENVOY_LOG(debug, "valid MCP DELETE session-termination request, passing through");

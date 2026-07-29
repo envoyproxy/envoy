@@ -60,7 +60,9 @@ TEST(DubboRequestTest, DubboRequestTest) {
   }
 
   // Static attributes test.
-  { EXPECT_EQ("dubbo", request.protocol()); }
+  {
+    EXPECT_EQ("dubbo", request.protocol());
+  }
 
   // Basic attributes test.
   {

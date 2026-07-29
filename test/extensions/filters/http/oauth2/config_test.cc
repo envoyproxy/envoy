@@ -1017,9 +1017,10 @@ TEST(ConfigTest, EndSessionEndpointWithoutOpenId) {
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value(), EnvoyException,
-      "OAuth2 filter: end session endpoint is only supported for OpenID Connect.");
+  const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_THAT(result,
+              HasStatusMessage(
+                  "OAuth2 filter: end session endpoint is only supported for OpenID Connect."));
 }
 
 TEST(ConfigTest, ValidCookieDomainAndPath) {

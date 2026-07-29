@@ -62,6 +62,21 @@ public:
               (const absl::string_view type_url, absl::string_view resource), (override));
 };
 
+class MockXdsConfigTrackerFactory : public XdsConfigTrackerFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Empty>();
+  }
+
+  std::string name() const override { return "envoy.xds_config_tracker.mock"; };
+
+  XdsConfigTrackerPtr createXdsConfigTracker(const Protobuf::Any&,
+                                             ProtobufMessage::ValidationVisitor&, Api::Api&,
+                                             Event::Dispatcher&) override {
+    return std::make_unique<testing::NiceMock<MockXdsConfigTracker>>();
+  }
+};
+
 class MockXdsResourcesDelegate : public XdsResourcesDelegate {
 public:
   MockXdsResourcesDelegate();
