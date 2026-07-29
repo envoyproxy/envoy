@@ -185,6 +185,8 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
+  // TODO(guoyilin42): Per JSON-RPC 2.0, a missing method field is an Invalid Request (-32600);
+  // -32601 is for a well-formed request naming a nonexistent method.
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::BadRequest),
                              StrEq(R"json({"code":-32601,"message":"Missing method field"})json"),
@@ -835,11 +837,10 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::BadRequest),
-                     StrEq(R"json({"code":-32602,"message":"Failed to build HTTP request"})json"),
-                     _, _, StrEq("mcp_json_rest_bridge_request_tool_transcoding_failure")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::BadRequest),
+                             StrEq(R"json({"code":-32602,"message":"Invalid tool arguments"})json"),
+                             _, _, StrEq("mcp_json_rest_bridge_request_tool_transcoding_failure")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -867,8 +868,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(
-      R"json({"code":-32602,"message":"Failed to build HTTP request"})json");
+  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Invalid tool arguments"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -877,7 +877,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32602,"message":"Failed to build HTTP request"},"id":123,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32602,"message":"Invalid tool arguments"},"id":123,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
@@ -1035,6 +1035,7 @@ TEST_F(McpJsonRestBridgeFilterTest, BackendErrorReturnsToolCallError) {
   Buffer::OwnedImpl response_body("Server error");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getStatusValue(), StrEq("200"));
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
   EXPECT_THAT(response_headers_.getContentLengthValue(),
               StrEq(std::to_string(response_body.length())));
@@ -1042,6 +1043,56 @@ TEST_F(McpJsonRestBridgeFilterTest, BackendErrorReturnsToolCallError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"Server error","type":"text"}],"isError":true}})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, BackendUnauthorizedPreserves401Status) {
+  makeFilter();
+
+  request_headers_ = {{":path", "/mcp"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  response_headers_ = {
+      {"content-type", "application/json"}, {"content-length", "123456"}, {":status", "401"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body("Unauthorized");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getStatusValue(), StrEq("401"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, BackendForbiddenPreserves403Status) {
+  makeFilter();
+
+  request_headers_ = {{":path", "/mcp"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}}}})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  response_headers_ = {
+      {"content-type", "application/json"}, {"content-length", "123456"}, {":status", "403"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body("Forbidden");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getStatusValue(), StrEq("403"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, RejectInvalidUtf8BackendResponse) {
