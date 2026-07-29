@@ -123,7 +123,7 @@ impl StatSink for TestStatSink {
         let last_cumulative = (0..bucket_count)
           .filter_map(|bucket_index| snapshot.histogram_bucket(index, bucket_index))
           .map(|bucket| bucket.cumulative_count)
-          .last()
+          .next_back()
           .unwrap_or(0);
         if bucket_count > 0 && last_cumulative == histogram.sample_count {
           envoy_log_info!(

@@ -7261,7 +7261,12 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
     return false;
   }
   unsafe {
-    stub_write(STUB_HISTOGRAM_NAME, name_buffer, name_buffer_capacity, name_size);
+    stub_write(
+      STUB_HISTOGRAM_NAME,
+      name_buffer,
+      name_buffer_capacity,
+      name_size,
+    );
     *sample_count_out = STUB_HISTOGRAM_SAMPLE_COUNT;
     *sample_sum_out = STUB_HISTOGRAM_SAMPLE_SUM;
   }

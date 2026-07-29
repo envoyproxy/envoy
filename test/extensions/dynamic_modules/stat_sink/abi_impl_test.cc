@@ -5,13 +5,12 @@
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
 #include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
 
-#include "circllhist.h"
-
 #include "test/extensions/dynamic_modules/stat_sink/test_util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "circllhist.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -612,9 +611,8 @@ TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramOutOfRange) {
   EXPECT_EQ(12345u, name_size);
 
   // An out-of-range histogram index yields no buckets, and a bucket read fails without writing.
-  EXPECT_EQ(0u,
-            envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
-                snapshotHandle(), 1));
+  EXPECT_EQ(0u, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+                    snapshotHandle(), 1));
   double upper_bound = -1;
   uint64_t cumulative_count = 42;
   EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
