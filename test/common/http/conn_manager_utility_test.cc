@@ -1699,6 +1699,35 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
       headers.get_("x-forwarded-client-cert"));
 }
 
+// Verify the Issuer of the client cert is forwarded in the XFCC header when requested.
+TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertWithIssuer) {
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  std::string peer_subject("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com");
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
+  std::string peer_issuer("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test CA");
+  EXPECT_CALL(*ssl, issuerPeerCertificate()).WillOnce(ReturnRef(peer_issuer));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  std::vector<Http::ClientCertDetailsType> details = {Http::ClientCertDetailsType::Subject,
+                                                      Http::ClientCertDetailsType::Issuer};
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+  TestRequestHeaderMapImpl headers;
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
+            "Francisco/OU=Lyft/CN=test.lyft.com\";Issuer=\"/C=US/ST=CA/L=San "
+            "Francisco/OU=Lyft/CN=Test CA\"",
+            headers.get_("x-forwarded-client-cert"));
+}
+
 // This test assumes the following scenario:
 // The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
@@ -1947,6 +1976,35 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonFormat) {
   EXPECT_EQ(R"([{"by":["test://foo.com/be","http://backend.foo.com"],"hash":"abcdefg",)"
             R"("subject":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com",)"
             R"("uri":["test://foo.com/fe","http://frontend.foo.com"],"dns":["www.example.com"]}])",
+            headers.get_("x-forwarded-client-cert"));
+}
+
+// JSON format: the Issuer of the client cert is forwarded as the "issuer" field.
+TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonFormatWithIssuer) {
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  std::string peer_subject("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com");
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
+  std::string peer_issuer("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test CA");
+  EXPECT_CALL(*ssl, issuerPeerCertificate()).WillOnce(ReturnRef(peer_issuer));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  ON_CALL(config_, clientCertFormat()).WillByDefault(Return(Http::ClientCertFormat::Json));
+  std::vector<Http::ClientCertDetailsType> details = {Http::ClientCertDetailsType::Subject,
+                                                      Http::ClientCertDetailsType::Issuer};
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+  TestRequestHeaderMapImpl headers;
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(R"([{"by":["test://foo.com/be"],"hash":"abcdefg",)"
+            R"("subject":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com",)"
+            R"("issuer":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test CA"}])",
             headers.get_("x-forwarded-client-cert"));
 }
 
