@@ -26,7 +26,7 @@ on:
           # \($icon) \($run_link)
       allowed-to-fail:
         type: string
-        default: '[]'
+        default: ''
 
 env:
   CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
@@ -48,7 +48,8 @@ jobs:
           repo: ${{ github.repository }}
           run_id: ${{ github.run_id }}
           outcomes: ${{ toJSON(fromJSON(inputs.needs)) }}
-          allowed_to_fail: ${{ inputs.allowed-to-fail }}
+          allowed_to_fail: |
+            ${{ inputs.allowed-to-fail }}
           load: ${{ toJSON(fromJSON(inputs.needs).load.outputs) }}
         input-format: yaml
         print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
@@ -61,7 +62,7 @@ jobs:
           | $load["run-id"] as $workflow_id
           | (.load.request | fromjson) as $request
           | $request.config.envoy.icon as $icon
-          | (.allowed_to_fail | fromjson) as $allowed_to_fail
+          | (.allowed_to_fail // "" | split("\n") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $allowed_to_fail
           | (.outcomes | to_entries | map({name: .key, result: .value.result})) as $outcomes
           | ($outcomes
              | map(select(.name as $name | ($allowed_to_fail | index($name) | not)))) as $required_outcomes

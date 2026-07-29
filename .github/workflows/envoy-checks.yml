@@ -140,5 +140,7 @@ jobs:
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}
-      # Example: '["runtime"]'
-      allowed-to-fail: '[]'
+      # Example (newline separated):
+      # allowed-to-fail: |
+      #   runtime
+      allowed-to-fail: ""
