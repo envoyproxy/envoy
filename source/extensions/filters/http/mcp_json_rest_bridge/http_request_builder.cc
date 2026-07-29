@@ -140,6 +140,41 @@ absl::StatusOr<json> constructRequestBody(absl::string_view body_rule,
   return getJsonValue(arguments, body_rule);
 }
 
+// Substitutes `value` for every `{element}` and `{element=pattern}` occurrence in `url`.
+//
+// This is the literal equivalent of the RE2 pattern `\{element(?:=[^}]+)?\}`, which used to be
+// compiled on every request. `element` is only ever a literal name (`template_regex` restricts it
+// to `[a-zA-Z0-9_.]+`), so no regex is needed to find it.
+void substitutePathTemplateVariable(std::string& url, absl::string_view element,
+                                    absl::string_view value) {
+  const std::string opening = absl::StrCat("{", element);
+  size_t pos = 0;
+  while ((pos = url.find(opening, pos)) != std::string::npos) {
+    // Index just past `{element`. A match closes either immediately, or after an `=pattern` of
+    // one or more non-'}' characters.
+    const size_t after_name = pos + opening.size();
+    size_t closing = std::string::npos;
+    if (after_name < url.size() && url[after_name] == '}') {
+      closing = after_name;
+    } else if (after_name < url.size() && url[after_name] == '=') {
+      const size_t candidate = url.find('}', after_name + 1);
+      // `[^}]+` requires at least one character between '=' and '}'.
+      if (candidate != std::string::npos && candidate > after_name + 1) {
+        closing = candidate;
+      }
+    }
+    if (closing == std::string::npos) {
+      // Not a match: a longer name that merely starts with `element` (`{elementary}`), or an
+      // unterminated `{element`. Advance one character, as a regex scan would.
+      ++pos;
+      continue;
+    }
+    url.replace(pos, closing - pos + 1, value.data(), value.size());
+    // Resume past the substituted value so it is never scanned again, as RE2::GlobalReplace did.
+    pos += value.size();
+  }
+}
+
 } // namespace
 
 absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
@@ -155,8 +190,7 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     // in addition to the specified reserved characters.
     std::string value_str = Http::Utility::PercentEncoding::encode(
         jsonValueToString(*template_value_json), ReservedChars);
-    std::string var_pattern = "\\{" + RE2::QuoteMeta(element) + "(?:=[^}]+)?\\}";
-    RE2::GlobalReplace(&base_url, var_pattern, value_str);
+    substitutePathTemplateVariable(base_url, element, value_str);
   }
   return base_url;
 }
