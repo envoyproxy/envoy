@@ -108,8 +108,71 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.needs.outputs.value).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
+    - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
+      name: Handle OpenSSL informational failures
+      id: openssl-check
+      if: fromJSON(steps.needs.outputs.value).conclusion == 'failure'
+      with:
+        github-token: ${{ steps.appauth.outputs.token }}
+        script: |
+          const { data: { jobs } } = await github.rest.actions.listJobsForWorkflowRun({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: context.runId,
+            per_page: 100
+          });
+          const failedJobs = jobs.filter(j => j.conclusion === 'failure');
+          if (failedJobs.length === 0) return;
+          const allOpenssl = failedJobs.every(j => /openssl/i.test(j.name));
+          if (!allOpenssl) return;
+
+          core.info(`All ${failedJobs.length} failed job(s) are OpenSSL-related — overriding check to success`);
+          core.setOutput('override', 'true');
+
+          const needsData = JSON.parse(process.env.NEEDS_DATA);
+          const checkName = Object.keys(needsData.checks)[0];
+          const check = needsData.checks[checkName];
+          await github.rest.checks.update({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            check_run_id: parseInt(needsData['check-id']),
+            conclusion: 'success',
+            output: {
+              title: `${check.name} (success)`,
+              summary: 'Check has finished (OpenSSL failure overridden)',
+              text: check.output.text
+            }
+          });
+
+          const prNumber = process.env.PR_NUMBER;
+          if (!prNumber) return;
+          const failedNames = failedJobs.map(j => j.name.split(' / ').pop()).join(', ');
+          const body = [
+            '**OpenSSL CI check failed**',
+            '',
+            'The OpenSSL CI job detected failures when building/testing with OpenSSL.',
+            'This check is informational and does not block merging.',
+            '',
+            `Failed: ${failedNames}`,
+            '',
+            'cc: @envoyproxy/envoy-openssl-sync',
+            '',
+            `[View workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+          ].join('\n');
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: parseInt(prNumber),
+            body
+          });
+      env:
+        NEEDS_DATA: ${{ steps.needs.outputs.value }}
+        PR_NUMBER: ${{ fromJSON(fromJSON(inputs.needs).load.outputs.request).request.pr }}
+
     # This is necessary to ensure that any retests have their checks updated
     - name: Fail the job
-      if: ${{ fromJSON(steps.needs.outputs.value).conclusion != 'success' }}
+      if: >-
+        fromJSON(steps.needs.outputs.value).conclusion != 'success'
+        && steps.openssl-check.outputs.override != 'true'
       run: |
         exit 1

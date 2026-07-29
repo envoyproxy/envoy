@@ -466,7 +466,8 @@ jobs:
 
     - name: Notify Slack on failure
       if: >-
-        steps.ci-run.outputs.exit-code != 0
+        always()
+        && steps.ci-run.outputs.exit-code != 0
         && inputs.slack-channel != ''
         && github.event.workflow_run.event == 'push'
         && github.repository == 'envoyproxy/envoy'
