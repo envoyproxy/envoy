@@ -791,16 +791,23 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                                                  random_value);
 }
 
-absl::string_view
+absl::optional<std::string>
 RouteEntryImplBase::sanitizePathBeforePathMatching(const absl::string_view path) const {
-  absl::string_view ret = path;
   if (vhost_->globalRouteConfig().ignorePathParametersInPathMatching()) {
-    auto pos = ret.find_first_of(';');
-    if (pos != absl::string_view::npos) {
-      ret.remove_suffix(ret.length() - pos);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.strip_path_parameters_per_segment")) {
+      absl::optional<std::string> modified_path = Http::PathUtil::removePathParameters(path);
+      if (modified_path.has_value()) {
+        return modified_path;
+      }
+    } else {
+      const auto pos = path.find(';');
+      if (pos != absl::string_view::npos) {
+        return std::string(path.substr(0, pos));
+      }
     }
   }
-  return ret;
+  return std::nullopt;
 }
 
 bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const {
@@ -1422,9 +1429,12 @@ PrefixRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& h
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
-  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
-    return clusterEntry(headers, stream_info, random_value);
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
+    const absl::string_view path = headers.getPathValue();
+    const auto sanitized = sanitizePathBeforePathMatching(path);
+    if (path_matcher_->match(sanitized.has_value() ? absl::string_view(*sanitized) : path)) {
+      return clusterEntry(headers, stream_info, random_value);
+    }
   }
   return nullptr;
 }
@@ -1456,9 +1466,12 @@ PathRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& hea
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
-  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
-    return clusterEntry(headers, stream_info, random_value);
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
+    const absl::string_view path = headers.getPathValue();
+    const auto sanitized = sanitizePathBeforePathMatching(path);
+    if (path_matcher_->match(sanitized.has_value() ? absl::string_view(*sanitized) : path)) {
+      return clusterEntry(headers, stream_info, random_value);
+    }
   }
 
   return nullptr;
@@ -1482,7 +1495,7 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing
   // the route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(path_matcher_->match(sanitizePathBeforePathMatching(path)));
+  ASSERT(path_matcher_->match(sanitizePathBeforePathMatching(path).value_or(std::string(path))));
   finalizePathHeaderForRedirect(headers, path, insert_envoy_original_path);
 }
 
@@ -1498,7 +1511,9 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    if (path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
+    const absl::string_view path = headers.getPathValue();
+    const auto sanitized = sanitizePathBeforePathMatching(path);
+    if (path_matcher_->match(sanitized.has_value() ? absl::string_view(*sanitized) : path)) {
       return clusterEntry(headers, stream_info, random_value);
     }
   }
@@ -1565,8 +1580,10 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return nullptr;
   }
-  absl::string_view sanitized_path = sanitizePathBeforePathMatching(
-      Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
+  const absl::string_view raw_path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  const auto sanitized_opt = sanitizePathBeforePathMatching(raw_path);
+  const absl::string_view sanitized_path =
+      sanitized_opt.has_value() ? absl::string_view(*sanitized_opt) : raw_path;
   const size_t sanitized_size = sanitized_path.size();
   const size_t matcher_size = matcher().size();
   if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
