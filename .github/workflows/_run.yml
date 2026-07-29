@@ -489,25 +489,21 @@ jobs:
               type: mrkdwn
               text: ":x: *CI job failed:* `${{ inputs.target }}`\n<${{ env.JOB_URL }}|View workflow run>"
 
-    - name: Save PR comment artifact
+    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      name: Save PR comment artifact
       if: >-
         steps.ci-run.outputs.exit-code != 0
         && inputs.pr-comment-on-failure != ''
         && fromJSON(inputs.request).request.pr != ''
-      run: |
-        jq -n \
-          --argjson pr "$PR_NUMBER" \
-          --arg message "$PR_MESSAGE" \
-          --arg run_id "$RUN_ID" \
-          --arg repo "$REPO" \
-          '{pr: $pr, message: $message, run_id: $run_id, repo: $repo}' \
-          > /tmp/pr-comment.json
-      shell: bash
-      env:
-        PR_NUMBER: ${{ fromJSON(inputs.request).request.pr }}
-        PR_MESSAGE: ${{ inputs.pr-comment-on-failure }}
-        RUN_ID: ${{ github.run_id }}
-        REPO: ${{ github.repository }}
+      with:
+        input: |
+          pr: ${{ fromJSON(inputs.request).request.pr }}
+          message: ${{ toJSON(inputs.pr-comment-on-failure) }}
+          run_id: "${{ github.run_id }}"
+          repo: "${{ github.repository }}"
+        input-format: yaml
+        output-path: /tmp/pr-comment.json
+        filter: .
     - name: Upload PR comment artifact
       if: >-
         steps.ci-run.outputs.exit-code != 0
