@@ -54,7 +54,6 @@ jobs:
       env: ${{ steps.data.outputs.value }}
       caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
-      labels: ${{ steps.labels.outputs.value }}
     steps:
     - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: started
@@ -87,23 +86,6 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         vars: ${{ toJSON(vars) }}
         working-directory: requested
-
-    - name: Compute labels
-      uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
-      id: labels
-      with:
-        input-format: yaml
-        input: |
-          target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
-          pr-labels: ${{ toJSON(github.event.pull_request.labels) }}
-        options: -c
-        filter: |
-          .["target-branch"] as $branch
-          | (.["pr-labels"] // [] | map(.name)) as $existing
-          | if ($branch | test("^release/v")) then
-              ["backport"]
-              + (if ($existing | contains(["changelog:not-required"])) then [] else ["changelog:required"] end)
-            else [] end
 
     - uses: envoyproxy/toolshed/actions/github/checkout@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: checkout-target
@@ -257,35 +239,3 @@ jobs:
       app-key: ${{ secrets.app-key }}
     with:
       env: ${{ needs.incoming.outputs.env }}
-
-  label:
-    if: >-
-      ${{ (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI)
-          && github.event_name == 'pull_request_target'
-          && github.event.action == 'opened'
-          && needs.incoming.outputs.labels != '[]' }}
-    needs: incoming
-    runs-on: ubuntu-24.04
-    permissions:
-      pull-requests: write
-    steps:
-    - name: Add labels to PR
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
-      with:
-        script: |
-          const ALLOWLIST = new Set(['backport', 'changelog:required']);
-          const requested = JSON.parse(process.env.LABELS_JSON);
-          const labels = requested.filter(l => ALLOWLIST.has(l));
-          if (labels.length === 0) return;
-          try {
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              labels,
-            });
-          } catch (e) {
-            core.warning(`Failed to add labels: ${e.message}`);
-          }
-      env:
-        LABELS_JSON: ${{ needs.incoming.outputs.labels }}
