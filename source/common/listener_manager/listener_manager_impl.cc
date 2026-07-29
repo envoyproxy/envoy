@@ -305,7 +305,6 @@ ProdListenerComponentFactory::createUdpListenerFactoryImpl(
     return listener_factory;
 #else
     UNREFERENCED_PARAMETER(quic_stat_names);
-    UNREFERENCED_PARAMETER(validation_visitor);
     UNREFERENCED_PARAMETER(context);
     return absl::InvalidArgumentError("QUIC is configured but not enabled in the build.");
 #endif
