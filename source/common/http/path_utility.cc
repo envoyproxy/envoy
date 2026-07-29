@@ -1,6 +1,7 @@
 #include "source/common/http/path_utility.h"
 
 #include <optional>
+#include <string>
 
 #include "source/common/common/logger.h"
 #include "source/common/runtime/runtime_features.h"
@@ -135,6 +136,41 @@ absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path)
     ret.remove_suffix(ret.length() - offset);
   }
   return ret;
+}
+
+std::optional<std::string> PathUtil::removePathParameters(const RequestHeaderMap& headers) {
+  return removePathParameters(headers.getPathValue());
+}
+
+std::optional<std::string> PathUtil::removePathParameters(const absl::string_view path) {
+  const size_t query_or_fragment_pos = path.find_first_of("?#");
+  const absl::string_view path_portion = path.substr(0, query_or_fragment_pos);
+
+  if (path_portion.find(';') == absl::string_view::npos) {
+    return std::nullopt;
+  }
+
+  const absl::string_view query_and_fragment = (query_or_fragment_pos != absl::string_view::npos)
+                                                   ? path.substr(query_or_fragment_pos)
+                                                   : absl::string_view{};
+
+  std::string result;
+  result.reserve(path.size());
+
+  bool in_parameter = false;
+  for (char c : path_portion) {
+    if (c == '/') {
+      in_parameter = false;
+      result.push_back(c);
+    } else if (c == ';') {
+      in_parameter = true;
+    } else if (!in_parameter) {
+      result.push_back(c);
+    }
+  }
+
+  result.append(query_and_fragment.data(), query_and_fragment.size());
+  return result;
 }
 
 } // namespace Http
