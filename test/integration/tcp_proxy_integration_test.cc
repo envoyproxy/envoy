@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.h"
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/socket_option_impl.h"
@@ -24,6 +25,7 @@
 #include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_random_generator.h"
 
 #include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
