@@ -1,0 +1,85 @@
+--- a/toolchain/internal/repo.bzl
++++ b/toolchain/internal/repo.bzl
+@@ -506,6 +506,73 @@
+     ),
+ })
+
++def _stub_libxml2(rctx):
++    """Provide a stub libxml2.so.2 for lld.
++
++    LLVM 22.x release tarballs ship lld with a dynamic dependency on
++    libxml2, used only by the COFF backend for Windows manifest embedding.
++    ELF linking never calls into it, but its presence breaks hermetic
++    builds on Linux hosts without libxml2 installed.
++
++    Rather than stripping the DT_NEEDED entry (which leaves stale version
++    references), we compile a tiny stub libxml2.so.2 from the extracted
++    clang and place it in lib/ where lld's RUNPATH ($ORIGIN/../lib) finds it.
++
++    Upstream fix (static linking): https://github.com/llvm/llvm-project/pull/166867
++    Remove this workaround when upgrading to LLVM >= 23.
++    """
++    if _os(rctx) != "linux":
++        return
++
++    rctx.file("_libxml2_stub/stub.c", content = """\
++void xmlSetGenericErrorFunc() {}
++void *xmlReadMemory() { return 0; }
++void *xmlDocGetRootElement() { return 0; }
++void *xmlNewDoc() { return 0; }
++void *xmlDocSetRootElement() { return 0; }
++void xmlDocDumpFormatMemoryEnc() {}
++void xmlUnlinkNode() {}
++void xmlFreeNode() {}
++void *xmlAddChild() { return 0; }
++void *xmlNewProp() { return 0; }
++void *xmlNewNs() { return 0; }
++void *xmlStrdup() { return 0; }
++void *xmlCopyNamespace() { return 0; }
++void xmlFreeNs() {}
++void xmlFreeDoc() {}
++void (*xmlFree)(void *) = 0;
++""", executable = False)
++
++    rctx.file("_libxml2_stub/stub.ver", content = """\
++LIBXML2_2.4.30 {
++    global:
++        xmlSetGenericErrorFunc; xmlDocGetRootElement; xmlNewDoc;
++        xmlDocSetRootElement; xmlDocDumpFormatMemoryEnc; xmlUnlinkNode;
++        xmlFreeNode; xmlAddChild; xmlNewProp; xmlNewNs; xmlStrdup;
++        xmlCopyNamespace; xmlFreeNs; xmlFreeDoc; xmlFree;
++};
++LIBXML2_2.6.0 {
++    global: xmlReadMemory;
++};
++""", executable = False)
++
++    result = rctx.execute([
++        "bin/clang",
++        "-shared",
++        "-nostdlib",
++        "-o", "lib/libxml2.so.2",
++        "_libxml2_stub/stub.c",
++        "-Wl,-soname=libxml2.so.2",
++        "-Wl,--version-script=_libxml2_stub/stub.ver",
++    ])
++    if result.return_code != 0:
++        # buildifier: disable=print
++        print("[toolchains_llvm] WARNING: failed to build libxml2 stub: " +
++              result.stdout + result.stderr)
++
++    rctx.delete("_libxml2_stub")
++
++
+ def llvm_repo_impl(rctx):
+     os = _os(rctx)
+     if os == "windows":
+@@ -526,6 +593,8 @@
+
+     updated_attrs = _download_llvm(rctx)
+
++    _stub_libxml2(rctx)
++
+     # We try to avoid patches to the downloaded repo so that it is easier for
+     # users to bring their own LLVM distribution through `http_archive`. If we
+     # do want to make changes, then we should do it through a patch file, and
