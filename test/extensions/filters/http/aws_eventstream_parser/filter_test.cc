@@ -837,7 +837,7 @@ TEST_F(AwsEventstreamParserFilterTest, MultipleDeferredFallbackActions) {
   on_missing2->set_key("input_tokens");
   on_missing2->mutable_value()->set_number_value(99);
 
-  content_parser->mutable_typed_config()->PackFrom(json_config);
+  ASSERT_TRUE(content_parser->mutable_typed_config()->PackFrom(json_config));
 
   config_ = std::make_shared<FilterConfig>(proto_config, context_);
   filter_ = std::make_unique<Filter>(config_);
@@ -879,7 +879,7 @@ TEST_F(AwsEventstreamParserFilterTest, OnMissingWithoutValueDoesNotWriteMetadata
   on_missing->set_metadata_namespace("envoy.lb");
   on_missing->set_key("tokens");
 
-  content_parser->mutable_typed_config()->PackFrom(json_config);
+  ASSERT_TRUE(content_parser->mutable_typed_config()->PackFrom(json_config));
 
   config_ = std::make_shared<FilterConfig>(proto_config, context_);
   filter_ = std::make_unique<Filter>(config_);
@@ -2000,7 +2000,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleOnMissingWithoutValue) {
   on_missing_content->set_key("dummy");
   on_missing_content->mutable_value()->set_string_value("x");
 
-  content_parser->mutable_typed_config()->PackFrom(json_config);
+  ASSERT_TRUE(content_parser->mutable_typed_config()->PackFrom(json_config));
 
   // Add a header rule with on_missing but NO value set
   auto* header_rule = response_rules->add_header_rules();
