@@ -171,9 +171,8 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
   Effect effect = Effect::None;
   EXPECT_CALL(rejections, inc()).Times(10);
   // There were 10 attempts to change un-changeable headers above.
-  EXPECT_TRUE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, effect)
-          .ok());
+  EXPECT_OK(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, effect));
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {":scheme", "https"},
@@ -223,9 +222,8 @@ TEST_F(MutationUtilsTest, TestNonAppendableHeaders) {
   Envoy::Stats::MockCounter rejections;
   Effect effect = Effect::None;
   EXPECT_CALL(rejections, inc()).Times(2);
-  EXPECT_TRUE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, effect)
-          .ok());
+  EXPECT_OK(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, effect));
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {":path", "/foo"},
@@ -289,17 +287,15 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithContentLength) {
   s->mutable_header()->set_raw_value("10");
   Effect effect = Effect::None;
 
-  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
-                                                  effect,
-                                                  /*remove_content_length=*/true)
-                  .ok());
+  EXPECT_OK(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+                                                effect,
+                                                /*remove_content_length=*/true));
   // When `remove_content_length` is true, content_length headers is not added.
   EXPECT_EQ(headers.ContentLength(), nullptr);
 
-  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
-                                                  effect,
-                                                  /*remove_content_length=*/false)
-                  .ok());
+  EXPECT_OK(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+                                                effect,
+                                                /*remove_content_length=*/false));
   // When `remove_content_length` is false, content_length headers is added.
   EXPECT_EQ(headers.getContentLengthValue(), "10");
 }
@@ -532,7 +528,7 @@ TEST_F(MutationUtilsTest, TestHeaderMutationSetResultExceedsMaxCount) {
 
   auto status =
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, effect);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   s = mutation.add_set_headers();
   s->mutable_header()->set_key("h6");
@@ -589,7 +585,7 @@ TEST_F(MutationUtilsTest, TestHeaderMutationExceedsMaxKb) {
 
   auto status =
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, effect);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   ASSERT_EQ(headers.byteSize(), 1017);
   EXPECT_THAT(effect, Effect::MutationApplied);
 

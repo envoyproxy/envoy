@@ -149,6 +149,11 @@ public:
   processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
+  void setDestination(absl::string_view destination) { destination_ = destination; }
+  const std::string& destination() const {
+    return cluster_info_ != nullptr ? cluster_info_->name() : destination_;
+  }
+
   void incrementRequestBodySentCount() { request_body_sent_++; }
   void incrementResponseBodySentCount() { response_body_sent_++; }
   uint32_t requestBodySentCount() const { return request_body_sent_; }
@@ -176,7 +181,12 @@ private:
   // The number of body ProcessingRequests sent to the external processor. This number may not be
   // equal to call_count_ if using FULL_DUPLEX_STREAMED_MODE.
   uint32_t request_body_sent_{0}, response_body_sent_{0};
+  // The fallback destination of the external processor (cluster name for envoy_grpc,
+  // target URI for google_grpc) which is only populated when cluster_info_ is unavailable.
+  std::string destination_;
+
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
+
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
   std::string http_response_code_details_;
@@ -248,7 +258,7 @@ public:
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix, bool is_upstream,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-               Server::Configuration::CommonFactoryContext& context);
+               Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -560,7 +570,7 @@ public:
   // ExternalProcessorCallbacks
   void handleErrorResponse(absl::Status processing_status);
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
+      Grpc::ResponsePtr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
   void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void onGrpcClose() override;
   void onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status);

@@ -725,7 +725,7 @@ void ClusterManagerImpl::applyUpdates(ClusterManagerCluster& cluster, uint32_t p
 
 absl::StatusOr<bool>
 ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                       const std::string& version_info,
+                                       absl::string_view version_info,
                                        const bool avoid_cds_removal) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
@@ -776,7 +776,7 @@ ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster
   // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
   // before destroy to avoid early initialization complete.
   auto status_or_cluster =
-      loadCluster(cluster, new_hash, version_info, /*added_via_api=*/true,
+      loadCluster(cluster, new_hash, std::string(version_info), /*added_via_api=*/true,
                   /*required_for_ads=*/false, warming_clusters_, avoid_cds_removal);
   RETURN_IF_NOT_OK_REF(status_or_cluster.status());
   const ClusterDataPtr previous_cluster = std::move(status_or_cluster.value());
@@ -811,7 +811,7 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   warming_clusters_.erase(warming_it);
 }
 
-bool ClusterManagerImpl::removeCluster(const std::string& cluster_name, const bool remove_ignored) {
+bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const bool remove_ignored) {
   bool removed = false;
   auto existing_active_cluster = active_clusters_.find(cluster_name);
   if (existing_active_cluster != active_clusters_.end() &&
@@ -822,7 +822,8 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name, const bo
     active_clusters_.erase(existing_active_cluster);
 
     ENVOY_LOG(debug, "removing cluster {}", cluster_name);
-    tls_.runOnAllThreads([cluster_name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    tls_.runOnAllThreads([cluster_name = std::string(cluster_name)](
+                             OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
       ASSERT(cluster_manager->thread_local_clusters_.contains(cluster_name) ||
              cluster_manager->thread_local_deferred_clusters_.contains(cluster_name));
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
@@ -1080,11 +1081,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   return tcpConnPool(host, priority, context);
 }
 
-void ClusterManagerImpl::drainConnections(const std::string& cluster,
+void ClusterManagerImpl::drainConnections(absl::string_view cluster,
                                           DrainConnectionsHostPredicate predicate) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call", "drainConnections called for cluster {}",
                   cluster);
-  tls_.runOnAllThreads([cluster, predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+  tls_.runOnAllThreads([cluster = std::string(cluster),
+                        predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
     if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
       cluster_entry->second->drainConnPools(
@@ -1115,7 +1117,7 @@ void ClusterManagerImpl::drainOrCloseConnPools(DrainConnectionsPoolPredicate pre
       });
 }
 
-absl::Status ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
+absl::Status ClusterManagerImpl::checkActiveStaticCluster(absl::string_view cluster) {
   const auto& it = active_clusters_.find(cluster);
   if (it == active_clusters_.end()) {
     return absl::InvalidArgumentError(fmt::format("Unknown gRPC client cluster '{}'", cluster));

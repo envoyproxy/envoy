@@ -63,6 +63,10 @@ jobs:
           name: GCC
         - target: openssl
           name: OpenSSL
-          skip: ${{ ! fromJSON(inputs.request).run.check-build-openssl }}
+          skip: ${{ fromJSON(inputs.request).request.pr != '' || ! fromJSON(inputs.request).run.check-build-openssl }}
           catch-errors: true
           slack-channel: '#envoy-openssl'
+        - target: openssl.presubmit
+          name: OpenSSL (presubmit)
+          skip: ${{ fromJSON(inputs.request).request.pr == '' || ! fromJSON(inputs.request).run.check-build-openssl-presubmit }}
+          catch-errors: true

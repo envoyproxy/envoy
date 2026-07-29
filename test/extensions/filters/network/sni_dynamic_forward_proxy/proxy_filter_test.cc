@@ -12,6 +12,7 @@
 #include "test/mocks/upstream/basic_resource_limit.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/transport_socket_match.h"
+#include "test/test_common/status_utility.h"
 
 using testing::AtLeast;
 using testing::Eq;
@@ -43,7 +44,7 @@ public:
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     absl::Status status = absl::OkStatus();
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_, status);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
 
@@ -330,7 +331,7 @@ public:
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     absl::Status status = absl::OkStatus();
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_, status);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
 

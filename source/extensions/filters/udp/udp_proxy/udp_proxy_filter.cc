@@ -72,7 +72,7 @@ void UdpProxyFilter::onClusterAddOrUpdate(absl::string_view cluster_name,
       std::make_unique<ClusterInfo>(*this, cluster, absl::flat_hash_set<ActiveSession*>{}));
 }
 
-void UdpProxyFilter::onClusterRemoval(const std::string& cluster) {
+void UdpProxyFilter::onClusterRemoval(absl::string_view cluster) {
   if (!cluster_infos_.contains(cluster)) {
     return;
   }

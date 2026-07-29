@@ -127,7 +127,7 @@ TEST(TcpGrpcAccessLog, TlsLifetimeCheck) {
                          common_config,
                      Common::GrpcAccessLoggerType type) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
-          std::make_pair(MessageUtil::hash(common_config), type);
+          std::ignore = std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;
         });
     // Set tls callback in the TcpGrpcAccessLog constructor,

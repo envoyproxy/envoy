@@ -129,12 +129,12 @@ public:
    *
    * But note that the tracer may have its own sampling decision logic (e.g. custom sampler,
    * external tracing context, etc.), and it may not use the Envoy tracing decision at all,
-   * then the desicion may be ignored by the tracer.
+   * then the decision may be ignored by the tracer.
    *
    * The method is used to return whether the Envoy tracing decision is used by the tracer
    * or not.
    *
-   * When the Envoy tracing decision is refreshed becase route refresh or other reasons, if
+   * When the Envoy tracing decision is refreshed because route refresh or other reasons, if
    * the Envoy tracing decision is used by the tracer, the sampled value will be updated
    * by the HTTP connection manager based on the new Envoy tracing decision.
    */

@@ -17,7 +17,7 @@ namespace Cors {
 using CorsPolicyImpl =
     Router::CorsPolicyImplBase<envoy::extensions::filters::http::cors::v3::CorsPolicy>;
 
-Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cors::v3::Cors&, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   CorsFilterConfigSharedPtr config =
@@ -27,7 +27,7 @@ Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cors::v3::Cors&, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& context) {
   CorsFilterConfigSharedPtr config =

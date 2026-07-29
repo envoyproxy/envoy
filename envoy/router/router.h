@@ -1654,7 +1654,7 @@ public:
 
   // TODO(vikaschoudhary16): Remove this api.
   // This api is only used to enable TCP tunneling semantics in the upstream codec.
-  // TCP proxy extension uses this API when proxyingn TCP tunnel via HTTP CONNECT or POST.
+  // TCP proxy extension uses this API when proxying TCP tunnel via HTTP CONNECT or POST.
   /**
    * Enable TCP tunneling semantics on the upstream codec. Reading a remote half-close
    * will not fully close the connection. This is off by default.

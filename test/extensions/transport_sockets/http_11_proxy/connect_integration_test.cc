@@ -1,3 +1,4 @@
+#include "envoy/config/common/key_value/v3/config.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"

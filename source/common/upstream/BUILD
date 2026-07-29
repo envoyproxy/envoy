@@ -252,6 +252,7 @@ envoy_cc_library(
         "//envoy/upstream:upstream_interface",
         "//source/common/config:well_known_names",
         "//source/common/runtime:runtime_lib",
+        "@abseil-cpp//absl/functional:function_ref",
     ],
 )
 

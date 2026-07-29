@@ -14,6 +14,40 @@ fn test_loggers() {
   envoy_log_error!("message with an argument: {}", "argument");
 }
 
+// Mock storage backing the log level callbacks so the unit tests can exercise the SDK wrappers
+// without the Envoy host symbols.
+static MOCK_LOG_LEVEL: std::sync::Mutex<abi::envoy_dynamic_module_type_log_level> =
+  std::sync::Mutex::new(abi::envoy_dynamic_module_type_log_level::Info);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_get_log_level(
+) -> abi::envoy_dynamic_module_type_log_level {
+  *MOCK_LOG_LEVEL.lock().unwrap()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_log_enabled(
+  level: abi::envoy_dynamic_module_type_log_level,
+) -> bool {
+  // A level is enabled when it is at or above the currently configured level.
+  (*MOCK_LOG_LEVEL.lock().unwrap() as u32) <= (level as u32)
+}
+
+#[test]
+fn test_log_level_callbacks() {
+  use abi::envoy_dynamic_module_type_log_level as Level;
+
+  *MOCK_LOG_LEVEL.lock().unwrap() = Level::Warn;
+  assert_eq!(get_log_level(), Level::Warn);
+  assert!(!is_log_enabled(Level::Info));
+  assert!(is_log_enabled(Level::Warn));
+  assert!(is_log_enabled(Level::Error));
+
+  *MOCK_LOG_LEVEL.lock().unwrap() = Level::Trace;
+  assert_eq!(get_log_level(), Level::Trace);
+  assert!(is_log_enabled(Level::Trace));
+}
+
 #[test]
 fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   struct TestHttpFilterConfig;
@@ -1527,11 +1561,14 @@ struct MockUpstreamHost {
 }
 
 static MOCK_UPSTREAM_HOST: std::sync::Mutex<Option<MockUpstreamHost>> = std::sync::Mutex::new(None);
+static MOCK_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(0);
 static MOCK_START_TLS_RESULT: std::sync::atomic::AtomicBool =
   std::sync::atomic::AtomicBool::new(false);
 
 fn reset_upstream_host_mock() {
   *MOCK_UPSTREAM_HOST.lock().unwrap() = None;
+  MOCK_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
   MOCK_START_TLS_RESULT.store(false, std::sync::atomic::Ordering::SeqCst);
 }
 
@@ -1665,6 +1702,13 @@ pub extern "C" fn envoy_dynamic_module_callback_network_filter_has_upstream_host
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) -> bool {
   MOCK_UPSTREAM_HOST.lock().unwrap().is_some()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> u64 {
+  MOCK_UPSTREAM_CONNECTION_ID.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 #[no_mangle]
@@ -1835,6 +1879,62 @@ fn test_has_upstream_host_false() {
   };
 
   assert!(!filter.has_upstream_host());
+}
+
+#[test]
+fn test_get_upstream_connection_id() {
+  reset_upstream_host_mock();
+  MOCK_UPSTREAM_CONNECTION_ID.store(54321, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 54321);
+}
+
+#[test]
+fn test_get_upstream_connection_id_unavailable() {
+  reset_upstream_host_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 0);
+}
+
+static MOCK_HTTP_UPSTREAM_CONNECTION_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_connection_id(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) -> u64 {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_get_upstream_connection_id() {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(98765, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 98765);
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_http_get_upstream_connection_id_unavailable() {
+  MOCK_HTTP_UPSTREAM_CONNECTION_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  assert_eq!(filter.get_upstream_connection_id(), 0);
 }
 
 // =============================================================================
@@ -3905,6 +4005,70 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
   RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
+// Single-slot store backing the filter state object FFI stubs below.
+static FILTER_STATE_OBJECT: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
+  std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_set_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  module_object: abi::envoy_dynamic_module_type_filter_state_object_module_ptr,
+  _destructor: abi::envoy_dynamic_module_type_filter_state_object_destructor,
+  _life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+) -> bool {
+  FILTER_STATE_OBJECT.store(module_object, std::sync::atomic::Ordering::SeqCst);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_filter_state_object(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_filter_state_object_module_ptr {
+  FILTER_STATE_OBJECT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_filter_state_object_round_trip() {
+  use std::sync::atomic::Ordering;
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+  struct Live;
+  impl Drop for Live {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, Ordering::SeqCst);
+    }
+  }
+  extern "C" fn destructor(object: *mut std::ffi::c_void) {
+    drop(unsafe { Box::from_raw(object as *mut Live) });
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let object = Box::into_raw(Box::new(Live)) as *mut std::ffi::c_void;
+  // SAFETY: `object` is a freshly boxed Live and `destructor` frees exactly that type without
+  // unwinding.
+  assert!(unsafe {
+    envoy_filter.set_filter_state_object(
+      b"key",
+      object,
+      destructor,
+      abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    )
+  });
+
+  // The rebuilt filter recovers the same pointer across recreate_stream.
+  let recovered = envoy_filter.get_filter_state_object(b"key");
+  assert_eq!(recovered, Some(object));
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 0);
+
+  // Envoy calls the destructor once when the entry is destroyed; the boxed value is freed exactly
+  // once with no double free.
+  destructor(recovered.unwrap());
+  assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
+}
+
 static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
 
 #[no_mangle]
@@ -4772,6 +4936,24 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_filter_st
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
   _key: abi::envoy_dynamic_module_type_module_buffer,
   _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
   false
 }
@@ -6736,6 +6918,25 @@ const STUB_COUNTERS: [(&str, u64, u64); 2] = [("counter_0", 10, 5), ("counter_1"
 const STUB_GAUGES: [(&str, u64); 1] = [("gauge_0", 42)];
 const STUB_TEXT_READOUTS: [(&str, &str); 1] = [("text_0", "value_0")];
 
+// Tag-extracted names and tags, indexed to match STUB_COUNTERS. counter_0 carries two tags,
+// counter_1 carries none, exercising both the empty and multi-tag paths.
+const STUB_COUNTER_TAG_EXTRACTED_NAMES: [&str; 2] = ["cluster.rq_total", "counter_1"];
+const STUB_COUNTER_TAGS: [&[(&str, &str)]; 2] = [
+  &[
+    ("envoy.cluster_name", "foo"),
+    ("envoy.response_code", "200"),
+  ],
+  &[],
+];
+
+// Tag data for the single stub gauge and text readout, matching STUB_GAUGES / STUB_TEXT_READOUTS.
+// Both carry one tag so the gauge and text-readout tag wrappers are exercised distinctly from the
+// counter ones, guarding against a wrapper wired to the wrong ABI callback.
+const STUB_GAUGE_TAG_EXTRACTED_NAMES: [&str; 1] = ["cluster.cx_active"];
+const STUB_GAUGE_TAGS: [&[(&str, &str)]; 1] = [&[("envoy.cluster_name", "bar")]];
+const STUB_TEXT_READOUT_TAG_EXTRACTED_NAMES: [&str; 1] = ["control_plane.identifier"];
+const STUB_TEXT_READOUT_TAGS: [&[(&str, &str)]; 1] = [&[("envoy.control_plane", "xds")]];
+
 // Counts stub_write invocations on the calling thread so tests can assert the grow-and-retry
 // behavior (each ABI getter call writes its name once, plus a value for text readouts). It is
 // thread-local so it stays correct even if tests run in parallel.
@@ -6796,6 +6997,184 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
     stub_write(name, name_buffer, name_buffer_capacity, name_size);
     *value_out = value;
     *delta_out = delta;
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+) -> bool {
+  if index >= STUB_COUNTER_TAG_EXTRACTED_NAMES.len() {
+    return false;
+  }
+  unsafe {
+    stub_write(
+      STUB_COUNTER_TAG_EXTRACTED_NAMES[index],
+      name_buffer,
+      name_buffer_capacity,
+      name_size,
+    );
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  tag_count: *mut usize,
+) -> bool {
+  if index >= STUB_COUNTER_TAGS.len() {
+    return false;
+  }
+  unsafe {
+    *tag_count = STUB_COUNTER_TAGS[index].len();
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  tag_index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_buffer: *mut std::ffi::c_char,
+  value_buffer_capacity: usize,
+  value_size: *mut usize,
+) -> bool {
+  if index >= STUB_COUNTER_TAGS.len() || tag_index >= STUB_COUNTER_TAGS[index].len() {
+    return false;
+  }
+  let (name, value) = STUB_COUNTER_TAGS[index][tag_index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    stub_write(value, value_buffer, value_buffer_capacity, value_size);
+  }
+  true
+}
+
+// The gauge and text-readout tag callbacks share the counter tag code paths, but each stub serves
+// its own canned data so the corresponding SDK wrappers are exercised distinctly.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+) -> bool {
+  if index >= STUB_GAUGE_TAG_EXTRACTED_NAMES.len() {
+    return false;
+  }
+  unsafe {
+    stub_write(
+      STUB_GAUGE_TAG_EXTRACTED_NAMES[index],
+      name_buffer,
+      name_buffer_capacity,
+      name_size,
+    );
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  tag_count: *mut usize,
+) -> bool {
+  if index >= STUB_GAUGE_TAGS.len() {
+    return false;
+  }
+  unsafe { *tag_count = STUB_GAUGE_TAGS[index].len() };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  tag_index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_buffer: *mut std::ffi::c_char,
+  value_buffer_capacity: usize,
+  value_size: *mut usize,
+) -> bool {
+  if index >= STUB_GAUGE_TAGS.len() || tag_index >= STUB_GAUGE_TAGS[index].len() {
+    return false;
+  }
+  let (name, value) = STUB_GAUGE_TAGS[index][tag_index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    stub_write(value, value_buffer, value_buffer_capacity, value_size);
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+) -> bool {
+  if index >= STUB_TEXT_READOUT_TAG_EXTRACTED_NAMES.len() {
+    return false;
+  }
+  unsafe {
+    stub_write(
+      STUB_TEXT_READOUT_TAG_EXTRACTED_NAMES[index],
+      name_buffer,
+      name_buffer_capacity,
+      name_size,
+    );
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  tag_count: *mut usize,
+) -> bool {
+  if index >= STUB_TEXT_READOUT_TAGS.len() {
+    return false;
+  }
+  unsafe { *tag_count = STUB_TEXT_READOUT_TAGS[index].len() };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  tag_index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  value_buffer: *mut std::ffi::c_char,
+  value_buffer_capacity: usize,
+  value_size: *mut usize,
+) -> bool {
+  if index >= STUB_TEXT_READOUT_TAGS.len() || tag_index >= STUB_TEXT_READOUT_TAGS[index].len() {
+    return false;
+  }
+  let (name, value) = STUB_TEXT_READOUT_TAGS[index][tag_index];
+  unsafe {
+    stub_write(name, name_buffer, name_buffer_capacity, name_size);
+    stub_write(value, value_buffer, value_buffer_capacity, value_size);
   }
   true
 }
@@ -6956,6 +7335,55 @@ fn test_metric_snapshot_reads_all_entry_types() {
   assert!(!snapshot.text_readout(1, &mut name, &mut text_value));
   assert_eq!(name.as_slice(), b"text_0");
   assert_eq!(text_value.as_slice(), b"value_0");
+}
+
+#[test]
+fn test_metric_snapshot_reads_tags() {
+  let mut dummy = 0u8;
+  let snapshot = stats_sink::MetricSnapshot::new(&mut dummy as *mut _ as *mut std::ffi::c_void);
+
+  let mut name = Vec::new();
+  let mut value = Vec::new();
+
+  // counter_0: tag-extracted name plus two tags.
+  assert!(snapshot.counter_tag_extracted_name(0, &mut name));
+  assert_eq!(name.as_slice(), b"cluster.rq_total");
+  assert_eq!(snapshot.counter_tag_count(0), Some(2));
+  assert!(snapshot.counter_tag(0, 0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"envoy.cluster_name");
+  assert_eq!(value.as_slice(), b"foo");
+  assert!(snapshot.counter_tag(0, 1, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"envoy.response_code");
+  assert_eq!(value.as_slice(), b"200");
+
+  // counter_1: no tags.
+  assert_eq!(snapshot.counter_tag_count(1), Some(0));
+
+  // Out-of-range metric and tag indices return None/false.
+  assert_eq!(snapshot.counter_tag_count(2), None);
+  assert!(!snapshot.counter_tag(0, 2, &mut name, &mut value));
+  assert!(!snapshot.counter_tag(2, 0, &mut name, &mut value));
+
+  // gauge_0: one tag. Exercises the gauge tag wrappers, which are distinct entry points from the
+  // counter ones.
+  assert!(snapshot.gauge_tag_extracted_name(0, &mut name));
+  assert_eq!(name.as_slice(), b"cluster.cx_active");
+  assert_eq!(snapshot.gauge_tag_count(0), Some(1));
+  assert!(snapshot.gauge_tag(0, 0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"envoy.cluster_name");
+  assert_eq!(value.as_slice(), b"bar");
+  assert_eq!(snapshot.gauge_tag_count(1), None);
+  assert!(!snapshot.gauge_tag(0, 1, &mut name, &mut value));
+
+  // text_0: one tag. Exercises the text-readout tag wrappers.
+  assert!(snapshot.text_readout_tag_extracted_name(0, &mut name));
+  assert_eq!(name.as_slice(), b"control_plane.identifier");
+  assert_eq!(snapshot.text_readout_tag_count(0), Some(1));
+  assert!(snapshot.text_readout_tag(0, 0, &mut name, &mut value));
+  assert_eq!(name.as_slice(), b"envoy.control_plane");
+  assert_eq!(value.as_slice(), b"xds");
+  assert_eq!(snapshot.text_readout_tag_count(1), None);
+  assert!(!snapshot.text_readout_tag(0, 1, &mut name, &mut value));
 }
 
 #[test]

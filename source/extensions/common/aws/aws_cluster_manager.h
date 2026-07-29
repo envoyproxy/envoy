@@ -120,7 +120,7 @@ public:
 private:
   // Callbacks for cluster manager
   void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override;
-  void onClusterRemoval(const std::string&) override;
+  void onClusterRemoval(absl::string_view) override;
 
   /**
    * Create all queued clusters, if we were unable to create them in real time due to envoy cluster

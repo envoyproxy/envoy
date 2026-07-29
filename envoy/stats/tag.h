@@ -1,10 +1,10 @@
 #pragma once
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
-
-#include "envoy/common/optref.h"
+#include <vector>
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"

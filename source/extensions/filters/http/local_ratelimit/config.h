@@ -14,16 +14,16 @@ namespace LocalRateLimitFilter {
  * Config registration for the local rate limit filter. @see NamedHttpFilterConfigFactory.
  */
 class LocalRateLimitFilterConfig
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit> {
 public:
-  LocalRateLimitFilterConfig() : FactoryBase("envoy.filters.http.local_ratelimit") {}
+  LocalRateLimitFilterConfig() : ExceptionFreeFactoryBase("envoy.filters.http.local_ratelimit") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
       const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& context) override;

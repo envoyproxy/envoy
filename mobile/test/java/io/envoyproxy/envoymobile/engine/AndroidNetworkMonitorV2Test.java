@@ -21,7 +21,6 @@ import android.telephony.TelephonyManager;
 import android.net.LinkProperties;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.GrantPermissionRule;
-import static androidx.test.core.app.ApplicationProvider.getApplicationContext;
 import android.os.Build;
 import android.os.Looper;
 
@@ -39,12 +38,8 @@ import org.robolectric.annotation.Config;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyConnectionType;
-import android.os.Looper;
-import android.os.Handler;
 
-/**
- * Tests functionality of AndroidNetworkMonitorV2
- */
+/** Tests functionality of AndroidNetworkMonitorV2 */
 @RunWith(RobolectricTestRunner.class)
 // Individual tests may override this to test different Android SDK versions.
 @Config(sdk = Build.VERSION_CODES.O)
@@ -257,9 +252,9 @@ public class AndroidNetworkMonitorV2Test {
   }
 
   // Tests that the broadcast receiver is triggered when the default network changes from cell to
-  // WIFI on Android M.
+  // WIFI on Android N.
   @Test
-  @Config(sdk = Build.VERSION_CODES.M)
+  @Config(sdk = Build.VERSION_CODES.N)
   public void testBroadcastReceiver() {
     Network activeNetwork = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_WIFI,
                                                         ConnectivityManager.TYPE_WIFI, 0);

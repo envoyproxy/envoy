@@ -77,6 +77,19 @@ public:
   MOCK_METHOD(void, setUnhealthy, (UnhealthyType));
 };
 
+class MockHostLbPolicyData : public HostLbPolicyData {
+public:
+  explicit MockHostLbPolicyData(bool receives_orca_load_report = true);
+  ~MockHostLbPolicyData() override;
+
+  bool receivesOrcaLoadReport() const override { return receives_orca_load_report_; }
+  MOCK_METHOD(absl::Status, onOrcaLoadReport,
+              (const OrcaLoadReport& report, OptRef<const StreamInfo::StreamInfo> stream_info),
+              (override));
+
+  const bool receives_orca_load_report_;
+};
+
 class MockHostDescription : public HostDescription {
 public:
   MockHostDescription();
@@ -169,7 +182,8 @@ public:
   CreateConnectionData
   createOrcaReportingConnection(Event::Dispatcher& dispatcher,
                                 Network::TransportSocketOptionsConstSharedPtr,
-                                const envoy::config::core::v3::Metadata*) const override {
+                                Network::UpstreamTransportSocketFactory&,
+                                Network::Address::InstanceConstSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }

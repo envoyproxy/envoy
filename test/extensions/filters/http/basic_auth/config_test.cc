@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/basic_auth/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -14,6 +15,7 @@ namespace HttpFilters {
 namespace BasicAuth {
 
 using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(Factory, ValidConfig) {
   const std::string yaml = R"(
@@ -50,9 +52,9 @@ TEST(Factory, InvalidConfigNoColon) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException);
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or, HasStatusMessage(
+                             "basic auth: invalid htpasswd format, username:password is expected"));
 }
 
 TEST(Factory, InvalidConfigDuplicateUsers) {
@@ -69,9 +71,8 @@ TEST(Factory, InvalidConfigDuplicateUsers) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: duplicate users");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or, HasStatusMessage("basic auth: duplicate users"));
 }
 
 TEST(Factory, InvalidConfigNoUser) {
@@ -88,9 +89,8 @@ TEST(Factory, InvalidConfigNoUser) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: empty user name or password");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or, HasStatusMessage("basic auth: empty user name or password"));
 }
 
 TEST(Factory, InvalidConfigNoPassword) {
@@ -107,9 +107,8 @@ TEST(Factory, InvalidConfigNoPassword) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: empty user name or password");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or, HasStatusMessage("basic auth: empty user name or password"));
 }
 
 TEST(Factory, InvalidConfigNoHash) {
@@ -126,9 +125,9 @@ TEST(Factory, InvalidConfigNoHash) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: invalid htpasswd format, invalid SHA hash length");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or,
+              HasStatusMessage("basic auth: invalid htpasswd format, invalid SHA hash length"));
 }
 
 TEST(Factory, InvalidConfigNotSHA) {
@@ -145,9 +144,9 @@ TEST(Factory, InvalidConfigNotSHA) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: unsupported htpasswd format: please use {SHA}");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or,
+              HasStatusMessage("basic auth: unsupported htpasswd format: please use {SHA}"));
 }
 
 TEST(Factory, ValidConfigWithServerContext) {
@@ -164,8 +163,7 @@ TEST(Factory, ValidConfigWithServerContext) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  auto callback =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  auto callback = factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   callback(filter_callback);

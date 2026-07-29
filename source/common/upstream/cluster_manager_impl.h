@@ -241,7 +241,7 @@ public:
 
   // Upstream::ClusterManager
   absl::StatusOr<bool> addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                          const std::string& version_info,
+                                          absl::string_view version_info,
                                           const bool avoid_cds_removal = false) override;
 
   void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
@@ -280,7 +280,7 @@ public:
     }
   }
 
-  OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
+  OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
       return *it->second->cluster_;
@@ -288,7 +288,7 @@ public:
     return std::nullopt;
   }
 
-  OptRef<const Cluster> getActiveOrWarmingCluster(const std::string& cluster_name) const override {
+  OptRef<const Cluster> getActiveOrWarmingCluster(absl::string_view cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
       return *it->second->cluster_;
@@ -299,7 +299,7 @@ public:
     return std::nullopt;
   }
 
-  bool hasCluster(const std::string& cluster_name) const override {
+  bool hasCluster(absl::string_view cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);
   }
@@ -312,7 +312,7 @@ public:
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
-  bool removeCluster(const std::string& cluster, const bool remove_ignored = false) override;
+  bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) override;
   void shutdown() override {
     shutdown_ = true;
     if (resume_cds_ != nullptr) {
@@ -379,7 +379,7 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
-  void drainConnections(const std::string& cluster,
+  void drainConnections(absl::string_view cluster,
                         DrainConnectionsHostPredicate predicate) override;
 
   void drainConnections(DrainConnectionsHostPredicate predicate,
@@ -388,7 +388,7 @@ public:
   void drainOrCloseConnPools(DrainConnectionsPoolPredicate predicate,
                              ConnectionPool::DrainBehavior drain_behavior) override;
 
-  absl::Status checkActiveStaticCluster(const std::string& cluster) override;
+  absl::Status checkActiveStaticCluster(absl::string_view cluster) override;
 
   // Upstream::MissingClusterNotifier
   void notifyMissingCluster(absl::string_view name) override;

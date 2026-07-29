@@ -33,6 +33,40 @@ struct {
   __type(value, int);
 } envoy_sockhash SEC(".maps");
 
+// Optional proxy-port allowlist that scopes which connections the sock_ops program registers. User
+// space fills both maps after load. envoy_accel_filter[0] is nonzero when the allowlist is active
+// and envoy_accel_ports is a bitmap with one bit per TCP port (0-65535), set for every port covered
+// by the configured accelerated_ports ranges. A connection whose local and peer ports are both unset
+// stays off the sockhash so unrelated same-host traffic is never redirected. The word count must
+// stay in sync with AccelBitmapWords in bpf_datapath.cc.
+#define ENVOY_PORT_BITMAP_WORDS 1024
+
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __uint(max_entries, ENVOY_PORT_BITMAP_WORDS);
+  __type(key, __u32);
+  __type(value, __u64);
+} envoy_accel_ports SEC(".maps");
+
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __uint(max_entries, 1);
+  __type(key, __u32);
+  __type(value, __u32);
+} envoy_accel_filter SEC(".maps");
+
+// Returns nonzero when the port bit is set in the allowlist bitmap. The port is masked to 16 bits so
+// the word index stays within envoy_accel_ports.
+static __always_inline int envoy_port_allowed(__u32 port) {
+  port &= 0xffff;
+  __u32 word = port >> 6;
+  __u64 *bits = bpf_map_lookup_elem(&envoy_accel_ports, &word);
+  if (bits == NULL) {
+    return 0;
+  }
+  return (*bits >> (port & 63)) & 1;
+}
+
 // Builds the key for the socket owning skops. Ports are stored network order in the low 16 bits. The
 // kernel exposes local_port host order in the low 16 bits, so it is converted with htons, and
 // remote_port network order in the high 16 bits, so it is normalized down with htons(ntohl()).
@@ -55,6 +89,18 @@ int envoy_sockops(struct bpf_sock_ops *skops) {
   switch (skops->op) {
   case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
   case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB: {
+    // When the allowlist is active, only register a connection whose local or peer port is in one of
+    // the configured ranges. local_port is already host order and remote_port is network order, so
+    // remote_port is converted with ntohl before the lookup.
+    __u32 zero = 0;
+    __u32 *filter = bpf_map_lookup_elem(&envoy_accel_filter, &zero);
+    if (filter && *filter) {
+      __u32 lport = skops->local_port;
+      __u32 rport = bpf_ntohl(skops->remote_port);
+      if (!envoy_port_allowed(lport) && !envoy_port_allowed(rport)) {
+        break;
+      }
+    }
     struct sock_key key = {};
     sockops_key(skops, &key);
     bpf_sock_hash_update(skops, &envoy_sockhash, &key, BPF_NOEXIST);

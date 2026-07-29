@@ -1,5 +1,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
+#include <algorithm>
+#include <cstring>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
@@ -27,6 +30,18 @@ bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
     return false;
   }
   return ::memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.size()) == 0;
+}
+
+ReverseConnectionUtility::RpingPrefixMatch
+ReverseConnectionUtility::classifyRpingPrefix(absl::string_view data) {
+  const size_t len = std::min(data.size(), PING_MESSAGE.size());
+  const absl::string_view peek = data.substr(0, len);
+  if (len == PING_MESSAGE.size()) {
+    return isPingMessage(peek) ? RpingPrefixMatch::Complete : RpingPrefixMatch::NotRping;
+  }
+  // Fewer than a full keepalive: a viable prefix if it matches RPING so far.
+  return peek == PING_MESSAGE.substr(0, len) ? RpingPrefixMatch::PartialPrefix
+                                             : RpingPrefixMatch::NotRping;
 }
 
 Buffer::InstancePtr ReverseConnectionUtility::createPingResponse() {
@@ -89,6 +104,34 @@ std::string ReverseConnectionUtility::buildTenantScopedIdentifier(absl::string_v
   return std::string(absl::StrCat(tenant, TENANT_SCOPE_DELIMITER, identifier));
 }
 
+std::string ReverseConnectionUtility::buildClusterScopedIdentifier(absl::string_view node_id,
+                                                                   absl::string_view cluster_id) {
+  // cluster_id carries the tenant prefix; prefixing the base node yields "[tenant:]cluster:node".
+  const TenantScopedIdentifierView node = splitTenantScopedIdentifier(node_id);
+  // Without a cluster, keep the node's own tenant so isolation is preserved.
+  if (cluster_id.empty()) {
+    return buildTenantScopedIdentifier(node.tenant, node.identifier);
+  }
+  return buildTenantScopedIdentifier(cluster_id, node.identifier);
+}
+
+std::pair<std::string, std::string>
+ReverseConnectionUtility::splitClusterScopedIdentifier(absl::string_view value) {
+  const TenantScopedIdentifierView first = splitTenantScopedIdentifier(value);
+  if (first.tenant.empty()) {
+    // "node" — cluster absent, so attribute the whole value to the node.
+    return {std::string(value), std::string()};
+  }
+  const TenantScopedIdentifierView second = splitTenantScopedIdentifier(first.identifier);
+  if (second.tenant.empty()) {
+    // "cluster:node" — no tenant prefix.
+    return {std::string(second.identifier), std::string(first.tenant)};
+  }
+  // "tenant:cluster:node".
+  return {buildTenantScopedIdentifier(first.tenant, second.identifier),
+          buildTenantScopedIdentifier(first.tenant, second.tenant)};
+}
+
 std::shared_ptr<PingMessageHandler> ReverseConnectionMessageHandlerFactory::createPingHandler() {
   return std::make_shared<PingMessageHandler>();
 }
@@ -121,6 +164,13 @@ void ReverseConnectionUtility::applySslQuietClose(Network::Connection& connectio
       ENVOY_LOG(warn, "reverse_tunnel: Failed to cast to SslHandshakerImpl or ssl() returned null");
     }
   }
+}
+
+uint64_t ReverseConnectionUtility::diffMs(const Envoy::MonotonicTime& start,
+                                          const Envoy::MonotonicTime& end) {
+  ASSERT(start <= end, "Invalid the start of the period must be before the end");
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return ms.count();
 }
 
 } // namespace ReverseConnection

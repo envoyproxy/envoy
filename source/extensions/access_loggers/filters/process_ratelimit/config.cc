@@ -12,7 +12,7 @@ namespace AccessLoggers {
 namespace Filters {
 namespace ProcessRateLimit {
 
-AccessLog::FilterPtr ProcessRateLimitFilterFactory::createFilter(
+absl::StatusOr<AccessLog::FilterPtr> ProcessRateLimitFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config,
     Server::Configuration::GenericFactoryContext& context) {
   auto factory_config =

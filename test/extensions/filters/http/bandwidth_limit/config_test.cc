@@ -31,6 +31,24 @@ TEST(Factory, GlobalEmptyConfig) {
   callback(filter_callback);
 }
 
+TEST(Factory, CreateFilterWithServerContext) {
+  const std::string yaml = R"(
+  stat_prefix: test
+  )";
+
+  BandwidthLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  auto callback =
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", server_context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  callback(filter_callback);
+}
+
 TEST(Factory, RouteSpecificFilterConfig) {
   const std::string config_yaml = R"(
   stat_prefix: test

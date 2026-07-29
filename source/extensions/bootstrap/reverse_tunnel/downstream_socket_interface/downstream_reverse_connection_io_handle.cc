@@ -20,6 +20,10 @@ DownstreamReverseConnectionIOHandle::DownstreamReverseConnectionIOHandle(
             "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {} for "
             "connection key: {}",
             fd_, connection_key_);
+  // Register with the parent so it can null this back-pointer if it is torn down first.
+  if (parent_ != nullptr) {
+    parent_->registerChildIoHandle(*this);
+  }
 }
 
 // DownstreamReverseConnectionIOHandle destructor implementation
@@ -28,6 +32,9 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
       debug,
       "DownstreamReverseConnectionIOHandle: destroying handle for FD: {} with connection key: {}",
       fd_, connection_key_);
+  if (parent_ != nullptr) {
+    parent_->unregisterChildIoHandle(*this);
+  }
   SET_SOCKET_INVALID(fd_);
 }
 

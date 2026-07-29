@@ -31,10 +31,13 @@ TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFailWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW(GrpcJsonTranscoderFilterConfig().createFilterFactoryFromProtoWithServerContext(
-                   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder(),
-                   "stats", context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      GrpcJsonTranscoderFilterConfig()
+          .createHttpFilterFactoryFromProto(
+              envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder(),
+              "stats", context)
+          .value(),
+      ProtoValidationException);
 }
 
 class GrpcJsonTranscoderFilterFactoryTest : public testing::Test {
@@ -70,7 +73,7 @@ TEST_F(GrpcJsonTranscoderFilterFactoryTest, CreateFilterFactoryFromProtoWithServ
   GrpcJsonTranscoderFilterConfig factory;
 
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(config_, "stats", context);
+      factory.createHttpFilterFactoryFromProto(config_, "stats", context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
