@@ -48,7 +48,7 @@ jobs:
           repo: ${{ github.repository }}
           run_id: ${{ github.run_id }}
           outcomes: ${{ toJSON(fromJSON(inputs.needs)) }}
-          allowed_to_fail: |
+          allowed_to_fail: |-
             ${{ inputs.allowed-to-fail }}
           load: ${{ toJSON(fromJSON(inputs.needs).load.outputs) }}
         input-format: yaml
