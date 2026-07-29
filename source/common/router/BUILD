@@ -422,6 +422,7 @@ envoy_cc_library(
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/orca:orca_parser",
         "//source/common/stream_info:uint32_accessor_lib",
+        "//source/common/upstream:host_utility_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",

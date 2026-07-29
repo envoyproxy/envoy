@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::NiceMock;
 
 // Simple filter for test purposes. This filter will be injected into the filter chain during
 // tests. The filter reacts only to few keywords. If received payload does not contain

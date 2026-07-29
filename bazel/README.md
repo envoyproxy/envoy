@@ -404,7 +404,7 @@ for more details.
 ## Supported compiler versions
 
 We now require Clang >= 18 due to C++20 support (for Clang >= 14, your mileage may vary) and tcmalloc requirement. GCC >= 13 is also known to work for C++20.
-Currently the CI is running with Clang 18.
+Currently the CI is running with Clang 22.
 
 ## Clang STL debug symbols
 

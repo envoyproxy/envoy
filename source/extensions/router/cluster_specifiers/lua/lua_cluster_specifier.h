@@ -17,7 +17,10 @@ using LuaClusterSpecifierConfigProto =
 
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
-  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls);
+  // creation_status is set (and construction stops early) if the supplied code cannot be parsed or
+  // if the required envoy_on_route() function is missing.
+  PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
+                  absl::Status& creation_status);
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
     return lua_state_.createCoroutine();
