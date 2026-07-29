@@ -302,7 +302,7 @@ ProdListenerComponentFactory::createUdpListenerFactoryImpl(
             config.udp_listener_config().quic_options(), concurrency, quic_stat_names,
             context.messageValidationVisitor(), context, creation_status);
     RETURN_IF_NOT_OK(creation_status);
-    return std::move(listener_factory);
+    return listener_factory;
 #else
     UNREFERENCED_PARAMETER(quic_stat_names);
     UNREFERENCED_PARAMETER(validation_visitor);
