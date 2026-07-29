@@ -146,6 +146,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/common:mock_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",

@@ -71,6 +71,7 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_macros",
         "//source/common/http:message_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
     ],

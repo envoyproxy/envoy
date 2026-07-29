@@ -202,6 +202,22 @@ The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt
 * Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
 * Field ``claim_name`` specifies the claim from the verified JWT.
 
+A ``claim_name`` is resolved against the JWT payload in two steps:
+
+#. It is split on ``.`` and walked as a path into nested JSON objects, so ``nested.claim.key``
+   resolves to ``key`` inside ``claim`` inside ``nested``. This is always attempted first.
+#. Only if the nested walk does not resolve, the whole ``claim_name`` is looked up as a single
+   literal top-level claim name. This is what makes claim names which themselves contain dots
+   reachable, in particular URL-namespaced claims such as
+   ``http://example.org/parent_token``.
+
+Because the nested path takes precedence, a payload holding both a literal ``a.b`` claim and a
+nested ``a`` object containing ``b`` resolves ``a.b`` to the nested value. The literal lookup is
+performed by default, but this behavior can be disabled via the
+``envoy.reloadable_features.jwt_authn_literal_claim_name_fallback`` runtime flag, restoring the
+previous behavior in which a ``claim_name`` containing dots was only ever treated as a nested
+path.
+
 .. literalinclude:: _include/jwt-authn-claim-filter.yaml
     :language: yaml
     :lines: 32-41

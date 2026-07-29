@@ -110,5 +110,16 @@ StructUtils::FindResult StructUtils::GetValue(const std::string& nested_names,
   return MISSING;
 }
 
+StructUtils::FindResult StructUtils::GetLiteralValue(const std::string& name,
+                                                     const Protobuf::Value*& found) {
+  const auto& fields = struct_pb_.fields();
+  const auto it = fields.find(name);
+  if (it == fields.end()) {
+    return MISSING;
+  }
+  found = &it->second;
+  return OK;
+}
+
 } // namespace JwtVerify
 } // namespace Envoy

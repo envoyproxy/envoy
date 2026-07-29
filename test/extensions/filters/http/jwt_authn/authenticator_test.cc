@@ -12,6 +12,7 @@
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -224,6 +225,53 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
 
   ASSERT_EQ(headers.get_("x-jwt-claim-object-key"),
             Envoy::Base64::encode(expected_json.data(), expected_json.size()));
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/33603: a claim whose name is a
+// URL is a single literal claim name, not a "."-separated path into nested objects.
+TEST_F(AuthenticatorTest, TestClaimToHeaderWithUrlClaimName) {
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(UrlClaimNameToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  EXPECT_EQ(headers.get_("x-jwt-claim-url-name"), "xyz");
+  // The sibling claim literally named "parent_token" is not shadowed by the URL-named one.
+  EXPECT_EQ(headers.get_("x-jwt-claim-parent-token"), "abc");
+  EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "johndoe@example.org");
+  EXPECT_EQ(headers.get_("x-jwt-claim-url-value"), "http://example.org/about");
+  // Claims configured as nested paths but absent from this token are still skipped.
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
+}
+
+// The same token with the guard off: this is the pre-fix behavior operators get by reverting.
+TEST_F(AuthenticatorTest, TestClaimToHeaderWithUrlClaimNameRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_authn_literal_claim_name_fallback", "false"}});
+
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(UrlClaimNameToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  EXPECT_FALSE(headers.has("x-jwt-claim-url-name"));
+  // Claims which do not depend on the fallback are unaffected either way.
+  EXPECT_EQ(headers.get_("x-jwt-claim-parent-token"), "abc");
+  EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "johndoe@example.org");
+  EXPECT_EQ(headers.get_("x-jwt-claim-url-value"), "http://example.org/about");
 }
 
 // This test verifies whether the claim is successfully added to header or not

@@ -358,7 +358,8 @@ message JwtProvider {
 
   // Add JWT claim to HTTP Header
   // Specify the claim name you want to copy in which HTTP header. For examples, following config:
-  // The claim must be of type; string, int, double, bool. Array type claims are not supported
+  // Claims of type string, int, double and bool are copied verbatim. Claims of type array or
+  // object are serialized to JSON and copied base64-encoded.
   //
   // .. literalinclude:: /_configs/repo/jwt_authn.yaml
   //    :language: yaml
@@ -912,5 +913,26 @@ message JwtClaimToHeader {
   // The field name for the JWT Claim : it can be a nested claim of type (eg. "claim.nested.key", "sub")
   // String separated with "." in case of nested claims. The nested claim name must use dot "." to separate
   // the JSON name path.
+  //
+  // The claim is looked up in two steps:
+  //
+  // 1. ``claim_name`` is split on "." and walked as a path into nested JSON objects, so
+  //    ``nested.key`` resolves to ``key`` inside the ``nested`` object. This is always tried first.
+  //
+  // 2. Only if step 1 does not resolve, ``claim_name`` is looked up as a single literal top-level
+  //    claim name. This is what makes claim names which themselves contain dots reachable, in
+  //    particular URL-namespaced claims such as ``http://example.org/parent_token``.
+  //
+  // Because the nested path always takes precedence, a payload which contains both a literal
+  // ``a.b`` claim and a nested ``a`` object holding ``b`` resolves ``a.b`` to the nested value.
+  //
+  // Note as a security consideration that a nested claim can therefore shadow a literal one: a
+  // payload containing ``{"http://example": {"com/role": ...}}`` resolves the claim name
+  // ``http://example.com/role``, so operators whose issuer permits attacker-influenced claim
+  // names should account for this where the resulting header feeds an authorization decision.
+  //
+  // Step 2 can be disabled, restoring the previous behavior in which a ``claim_name`` containing
+  // dots was only ever treated as a nested path, by setting the runtime guard
+  // ``envoy.reloadable_features.jwt_authn_literal_claim_name_fallback`` to ``false``.
   string claim_name = 2 [(validate.rules).string = {min_len: 1}];
 }

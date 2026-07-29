@@ -13,8 +13,10 @@
 #include "source/common/jwt/struct_utils.h"
 #include "source/common/jwt/verify.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 #include "absl/time/time.h"
 
@@ -339,7 +341,22 @@ bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
                                             const std::string& header_name) {
   StructUtils payload_getter(jwt_->payload_pb_);
   const Protobuf::Value* claim_value;
-  const auto status = payload_getter.GetValue(claim_name, claim_value);
+
+  auto status = payload_getter.GetValue(claim_name, claim_value);
+
+  // A `claim_name` the nested walk cannot resolve may instead be a literal top-level claim name
+  // containing dots, such as "http://example.org/parent_token". The nested walk always wins, so
+  // no config which resolves today changes meaning, and its status survives an unresolved retry.
+  if (status != StructUtils::OK && absl::StrContains(claim_name, '.') &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.jwt_authn_literal_claim_name_fallback")) {
+    const Protobuf::Value* literal_claim_value;
+    if (payload_getter.GetLiteralValue(claim_name, literal_claim_value) == StructUtils::OK) {
+      claim_value = literal_claim_value;
+      status = StructUtils::OK;
+    }
+  }
+
   std::string str_claim_value;
   if (status == StructUtils::OK) {
     switch (claim_value->kind_case()) {
@@ -376,6 +393,11 @@ bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
                 claim_name, str_claim_value, header_name);
       return true;
     }
+  } else {
+    ENVOY_LOG(debug,
+              "[jwt_auth] claim : {} could not be resolved in the payload (status {}); the "
+              "header : {} is not added",
+              claim_name, static_cast<int>(status), header_name);
   }
   return false;
 }

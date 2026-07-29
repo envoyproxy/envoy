@@ -178,6 +178,13 @@ providers:
       claim_name: "nested.nested-2.key-4"
     - header_name: "x-jwt-claim-object-key"
       claim_name: "nested.nested-2.key-5"
+    # A URL-shaped claim name: the dots belong to the literal claim name, not to a nested path.
+    - header_name: "x-jwt-claim-url-name"
+      claim_name: "http://example.org/parent_token"
+    - header_name: "x-jwt-claim-url-value"
+      claim_name: "some_url_value"
+    - header_name: "x-jwt-claim-parent-token"
+      claim_name: "parent_token"
 rules:
 - match:
     path: "/"
@@ -232,6 +239,8 @@ providers:
     claim_to_headers:
     - header_name: "x-jwt-claim-nested"
       claim_name: "nested.key-1"
+    - header_name: "x-jwt-claim-url-name"
+      claim_name: "http://example.org/parent_token"
     clear_route_cache: true
 rules:
 - match:
@@ -431,6 +440,29 @@ const char NestedGoodToken[] =
     "MTbcqdaSzwdbJPeGQzHyensPG6BfDjdv39b_gdO_eH1azaVwi4HnChoJcsGrBjsH6-IyJVR6Ux_"
     "43fo3Wbs0SB82hLpiWPsucO7l4CyII5d5jPQbAM9ajcvAmh7FprIsf35acOT2bQ8dmrSD9KSjsYomkF_OAci-"
     "osyRzYOgkGHIDGDyjj87xaPPuzIw";
+
+// Regression token for https://github.com/envoyproxy/envoy/issues/33603: the payload carries a
+// claim whose name is a URL. Signed with the RS256 private key at the top of this file (see
+// the other tokens here for the same convention); iss/aud/exp are set to match ExampleConfig.
+// {
+//   "iss": "https://example.com",
+//   "sub": "johndoe@example.org",
+//   "aud": "example_service",
+//   "exp": 2001001001,
+//   "flavour": "chocolate",
+//   "parent_token": "abc",
+//   "some_url_value": "http://example.org/about",
+//   "http://example.org/parent_token": "xyz"
+// }
+const char UrlClaimNameToken[] =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoiam9obmR"
+    "vZUBleGFtcGxlLm9yZyIsImF1ZCI6ImV4YW1wbGVfc2VydmljZSIsImV4cCI6MjAwMTAwMTAwMSwiZmxhdm91ciI6ImN"
+    "ob2NvbGF0ZSIsInBhcmVudF90b2tlbiI6ImFiYyIsInNvbWVfdXJsX3ZhbHVlIjoiaHR0cDovL2V4YW1wbGUub3JnL2F"
+    "ib3V0IiwiaHR0cDovL2V4YW1wbGUub3JnL3BhcmVudF90b2tlbiI6Inh5eiJ9.Zk-lfWCsb5Wx8IQYLDd_q9zkIGhD9f"
+    "7x77zf8fcwnE_DSu14ATkrBxc-9flXo0ljzUchY5IlHiy-RsYXtTe_9EJGGfS1tC_B7ukxstwrpKSMW8yjn7Vwd4Ld0U"
+    "aY-elJs9Lo-630jWNQenbdywXgcK_N8B6tImf0oV8jdi8IwL7oMn9YssvHuvCAq-KjyRMqhJoDUWCw24aEwvJRVh6MI9"
+    "B-SPz4xoVtqIDhR_ojo2RKzPEdvshTY65zA5vidfqQgcE-3oZcRe3dkHcHSriVTmG2FXnMag1z1ZbK0_6rViGoF4W9Of"
+    "V9OKzFA4gw1lP199WrTMWTPH25khQ9H-BWAg";
 
 // Expected base64 payload value.
 const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
