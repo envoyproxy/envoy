@@ -109,27 +109,29 @@ jobs:
         token: ${{ steps.appauth.outputs.token }}
 
     - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
-      name: Download PR comment artifacts
-      id: download-pr-comments
+      name: Download CI report artifacts
+      id: download-ci-reports
       continue-on-error: true
       with:
-        pattern: pr-comment-*
-        path: /tmp/pr-comments
-    - if: steps.download-pr-comments.outcome == 'success'
-      name: Post PR comments
+        pattern: ci-report-*
+        path: /tmp/ci-reports
+    - if: steps.download-ci-reports.outcome == 'success'
+      name: Post PR comments from CI reports
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
       with:
         github-token: ${{ steps.appauth.outputs.token }}
         script: |
           const fs = require('fs');
           const path = require('path');
-          const dir = '/tmp/pr-comments';
+          const dir = '/tmp/ci-reports';
           if (!fs.existsSync(dir)) return;
-          for (const subdir of fs.readdirSync(dir)) {
+          for (const artifactDir of fs.readdirSync(dir)) {
             try {
-              const filePath = path.join(dir, subdir, 'pr-comment.json');
-              if (!fs.existsSync(filePath)) continue;
-              const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              const reportPath = path.join(dir, artifactDir, 'report.json');
+              if (!fs.existsSync(reportPath)) continue;
+              const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+              if (!report['pr-comment']) continue;
+              const data = JSON.parse(report['pr-comment']);
               const jobUrl = `https://github.com/${data.repo}/actions/runs/${data.run_id}`;
               const body = data.message + '\n\n[View workflow run](' + jobUrl + ')';
               await github.rest.issues.createComment({
@@ -139,7 +141,7 @@ jobs:
                 body: body
               });
             } catch (error) {
-              console.error(`Failed to process ${subdir}:`, error);
+              console.error(`Failed to process ${artifactDir}:`, error);
             }
           }
 
