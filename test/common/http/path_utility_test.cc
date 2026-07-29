@@ -252,5 +252,32 @@ TEST_F(PathUtilityTest, UnescapeSlashes) {
             unescapeSlashes("%2fa%5Cb%2fc%5c?%2fabcd%5C%%2f%")); // query is untouched
 }
 
+TEST_F(PathUtilityTest, RemovePathParameters) {
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters(""));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/"));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/abc"));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/abc/def"));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/abc/def?param=1;2"));
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters("/abc/def?param=1#frag;2"));
+
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;param=1/def"));
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;p1=1;p2=2/def"));
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;p1=1/def;p2=2"));
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;;p=1/def"));
+  EXPECT_EQ("/abc/def", *PathUtil::removePathParameters("/abc;/def"));
+  EXPECT_EQ("/abc//def", *PathUtil::removePathParameters("/abc/;p=1/def"));
+  EXPECT_EQ("/abc", *PathUtil::removePathParameters("/abc;p=1"));
+  EXPECT_EQ("/abc/def?param=1;2", *PathUtil::removePathParameters("/abc;p=1/def?param=1;2"));
+  EXPECT_EQ("/abc/def#frag;2", *PathUtil::removePathParameters("/abc;p=1/def#frag;2"));
+  EXPECT_EQ("/abc/def?q=1#f;2", *PathUtil::removePathParameters("/abc;p=1/def?q=1#f;2"));
+
+  // Verify header map parameter overload
+  pathHeaderEntry("/foo/bar?query=val");
+  EXPECT_EQ(std::nullopt, PathUtil::removePathParameters(headers_));
+
+  pathHeaderEntry("/foo;param=1/bar;param=2?query=val;123#frag");
+  EXPECT_EQ("/foo/bar?query=val;123#frag", *PathUtil::removePathParameters(headers_));
+}
+
 } // namespace Http
 } // namespace Envoy
