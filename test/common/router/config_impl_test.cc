@@ -34,6 +34,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -44,6 +45,8 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using ::testing::_;
 using ::testing::ContainerEq;
 using ::testing::ContainsRegex;
@@ -52,6 +55,7 @@ using ::testing::Eq;
 using ::testing::IsEmpty;
 using ::testing::MockFunction;
 using ::testing::NiceMock;
+using ::testing::Not;
 using ::testing::Pair;
 using ::testing::Return;
 using ::testing::ReturnRef;
@@ -1504,9 +1508,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(invalid_route), factory_context_, true,
                         creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
-  EXPECT_TRUE(
-      absl::StrContains(creation_status_.message(), "Failed to create path rewrite formatter: "));
+  EXPECT_THAT(creation_status_,
+              HasStatusMessage(testing::HasSubstr("Failed to create path rewrite formatter: ")));
 }
 
 TEST_F(RouteMatcherTest, TestRoutesWithInvalidHostRewriteFormatter) {
@@ -1526,9 +1529,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(invalid_route), factory_context_, true,
                         creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
-  EXPECT_TRUE(
-      absl::StrContains(creation_status_.message(), "Failed to create host rewrite formatter: "));
+  EXPECT_THAT(creation_status_,
+              HasStatusMessage(testing::HasSubstr("Failed to create host rewrite formatter: ")));
 }
 
 // Virtual cluster that contains neither pattern nor regex. This must be checked while pattern is
@@ -5723,7 +5725,7 @@ internal_only_headers:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_, Not(IsOk()));
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateDomainConfig) {
@@ -5749,7 +5751,7 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_, Not(IsOk()));
 }
 
 // Test to detect if hostname matches are case-insensitive
@@ -7241,7 +7243,7 @@ virtual_hosts:
 
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                                 creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_, Not(IsOk()));
 }
 
 TEST_F(RouteMatcherTest, TestWeightedClusterHeaderManipulation) {
@@ -9309,7 +9311,7 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   // path_rewrite with header substitution
   {
@@ -9380,7 +9382,7 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   // CEL header substitution: header present
   {
@@ -9429,7 +9431,7 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("redirect.lyft.com", "/api/resource", false, false);
@@ -12876,7 +12878,7 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
@@ -12902,7 +12904,7 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
-  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_OK(creation_status_);
 
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();

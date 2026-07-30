@@ -10,6 +10,7 @@
 
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -1498,7 +1499,7 @@ TEST(ValidateHeaders, ForbiddenCharacters) {
     Http::HeaderString invalid_key(absl::string_view("x-MiXeD-CaSe"));
     headers.addViaMove(std::move(invalid_key),
                        Http::HeaderString(absl::string_view("hello world")));
-    EXPECT_TRUE(HeaderUtility::checkValidRequestHeaders(headers).ok());
+    EXPECT_OK(HeaderUtility::checkValidRequestHeaders(headers));
   }
 
   {

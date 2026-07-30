@@ -71,7 +71,10 @@ public:
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   static void shutdownAll();
 
-  void shutdown() override { shutdown_ = true; }
+  void shutdown() override {
+    shutdown_ = true;
+    xds_config_tracker_.reset();
+  }
   bool isShutdown() { return shutdown_; }
 
   // TODO (dmitri-d) return a naked pointer instead of the wrapper once the legacy mux has been

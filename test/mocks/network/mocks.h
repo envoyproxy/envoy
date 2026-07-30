@@ -499,6 +499,7 @@ public:
 
 class MockListenerInfo : public ListenerInfo {
 public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));

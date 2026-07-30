@@ -61,7 +61,8 @@ TEST(SessionCodecTest, SubjectWithAtSymbol) {
 
 TEST(SessionCodecTest, ParseInvalidCustomFormat) {
   const std::vector<std::string> invalid_inputs = {
-      "invalid", "no_backends@user",
+      "invalid",
+      "no_backends@user",
       "route@user@backend",  // Missing colon
       "route@user@:session", // Empty backend name
   };
