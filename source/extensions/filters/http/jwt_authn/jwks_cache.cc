@@ -51,8 +51,9 @@ public:
     }
 
     // Resolve each claim_to_headers entry to an explicit path once here rather than per request.
-    // Entries which do not set exactly one of claim_name and claim_path are rejected by
-    // FilterConfigImpl, so the resolved path of such an entry is never used.
+    // FilterConfigImpl checks that every entry sets exactly one of claim_name and claim_path
+    // before it constructs the JwksCache, so by this point claim_path being empty means
+    // claim_name is set, and vice versa.
     for (const auto& claim_to_header : jwt_provider_.claim_to_headers()) {
       ClaimToHeader entry{{}, claim_to_header.header_name()};
       if (claim_to_header.claim_path().empty()) {

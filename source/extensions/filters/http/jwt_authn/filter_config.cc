@@ -24,14 +24,30 @@ FilterConfigImpl::FilterConfigImpl(
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
+  // claim_name and claim_path are two ways of naming the same thing, so requiring exactly one
+  // avoids having to define a precedence between them. PGV cannot express this constraint. This
+  // check runs before JwksCache::create() so that the cache never resolves a claim path for an
+  // entry which is about to be rejected.
+  for (const auto& provider_pair : proto_config_.providers()) {
+    for (const auto& claim_to_header : std::get<1>(provider_pair).claim_to_headers()) {
+      if (claim_to_header.claim_name().empty() == claim_to_header.claim_path().empty()) {
+        creation_status = absl::InvalidArgumentError(
+            fmt::format("Provider '{}' has a claim_to_headers entry for header '{}' which does "
+                        "not set exactly one of claim_name and claim_path",
+                        std::get<0>(provider_pair), claim_to_header.header_name()));
+        return;
+      }
+    }
+  }
+
   auto jwks_cache_or =
       JwksCache::create(proto_config_, context, Common::JwksFetcher::create, stats_);
   SET_AND_RETURN_IF_NOT_OK(jwks_cache_or.status(), creation_status);
   jwks_cache_ = std::move(jwks_cache_or.value());
 
-  // Validate the parts of the provider config which the PGV annotations cannot express.
-  // Note that the PGV well-known regex for URI is not implemented in C++, otherwise we could add a
-  // PGV rule instead of checking the URI manually.
+  // Validate the provider URI, which the PGV annotations cannot express either: the PGV well-known
+  // regex for URI is not implemented in C++, otherwise we could add a PGV rule instead of checking
+  // the URI manually.
   for (const auto& provider_pair : proto_config_.providers()) {
     const auto provider_value = std::get<1>(provider_pair);
     if (provider_value.has_remote_jwks()) {
@@ -40,18 +56,6 @@ FilterConfigImpl::FilterConfigImpl(
       if (!url.initialize(provider_uri, /*is_connect=*/false)) {
         creation_status = absl::InvalidArgumentError(fmt::format(
             "Provider '{}' has an invalid URI: '{}'", std::get<0>(provider_pair), provider_uri));
-        return;
-      }
-    }
-
-    // claim_name and claim_path are two ways of naming the same thing, so requiring exactly one
-    // avoids having to define a precedence between them.
-    for (const auto& claim_to_header : provider_value.claim_to_headers()) {
-      if (claim_to_header.claim_name().empty() == claim_to_header.claim_path().empty()) {
-        creation_status = absl::InvalidArgumentError(
-            fmt::format("Provider '{}' has a claim_to_headers entry for header '{}' which does "
-                        "not set exactly one of claim_name and claim_path",
-                        std::get<0>(provider_pair), claim_to_header.header_name()));
         return;
       }
     }
