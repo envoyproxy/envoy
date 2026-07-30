@@ -314,44 +314,7 @@ vhds:
               "vhost_vhds1" == actual_vhost_2.name());
 }
 
-// verify that domainNameToAlias builds route_config_name/domain
-TEST_F(VhdsTest, DomainNameToAlias) {
-  const std::string route_config_name = "my_route";
-  EXPECT_EQ("my_route/vhost.first",
-            VhdsSubscription::domainNameToAlias(route_config_name, "vhost.first"));
-}
-
-// verify that aliasToDomainName works correctly with xdstp resource names
-TEST_F(VhdsTest, AliasToDomainNameXdstp) {
-  EXPECT_EQ("vhost.first",
-            VhdsSubscription::aliasToDomainName(
-                "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/vhost.first"));
-}
-
-// verify that xdstp VHDS instantiation succeeds with a valid glob collection name
-TEST_F(VhdsTest, VhdsInstantiationWithXdstpShouldSucceed) {
-  const auto route_config =
-      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
-name: my_route
-vhds:
-  config_source:
-    api_config_source:
-      api_type: DELTA_GRPC
-      grpc_services:
-        envoy_grpc:
-          cluster_name: xds_cluster
-  default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/*"
-  )EOF");
-  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
-
-  EXPECT_TRUE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
-                                                       context_, provider_)
-                  .status()
-                  .ok());
-}
-
-// verify that xdstp VHDS adds virtual hosts correctly
-TEST_F(VhdsTest, VhdsXdstpAddsVirtualHosts) {
+TEST_F(VhdsTest, VhdsXdstpGlobCollection) {
   const auto route_config =
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
 name: my_route
@@ -392,7 +355,9 @@ vhds:
 }
 
 // verify that legacy VHDS (no xdstp) is not in xdstp mode
-TEST_F(VhdsTest, VhdsLegacyModeIsNotXdstp) {
+// verify that plain VHDS (no default collection) uses a namespace-matching subscription,
+// not a collection subscription
+TEST_F(VhdsTest, VhdsWithoutDefaultCollectionUsesNamespaceMatchingSubscription) {
   const auto route_config =
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);

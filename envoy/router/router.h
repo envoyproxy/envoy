@@ -1426,7 +1426,7 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
-   * @return whether on-demand virtual host discovery is enabled.
+   * @return whether on-demand VHDS is enabled.
    */
   virtual bool onDemandVhdsEnabled() const PURE;
 
