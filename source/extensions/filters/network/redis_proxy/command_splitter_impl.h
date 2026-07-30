@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,17 +28,14 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
-struct ResponseValues {
-  const std::string OK = "OK";
-  const std::string InvalidRequest = "invalid request";
-  const std::string NoUpstreamHost = "no upstream host";
-  const std::string UpstreamFailure = "upstream failure";
-  const std::string UpstreamProtocolError = "upstream protocol error";
-  const std::string AuthRequiredError = "NOAUTH Authentication required.";
-  const std::string UnsupportedProtocol = "NOPROTO unsupported protocol version";
-};
-
-using Response = ConstSingleton<ResponseValues>;
+/**
+ * Build the HELLO command reply (Map for a RESP3 downstream; the encoder converts to a flat
+ * array on a RESP2 downstream) for the given negotiated protocol version. Exposed so
+ * ``ProxyFilter`` can emit a deferred HELLO reply after an external-auth round trip completes
+ * for ``HELLO N AUTH <user> <pass>`` — the splitter's HELLO handler returns control before
+ * the reply is built in that case.
+ */
+Common::Redis::RespValuePtr buildHelloReply(uint32_t downstream_version);
 
 /**
  * All command level stats. @see stats_macros.h
@@ -160,6 +158,27 @@ public:
   }
   void onResponse(Common::Redis::RespValuePtr&& response) override;
   Common::Redis::Client::Transaction& transaction() override { return callbacks_.transaction(); }
+  void setDownstreamRespVersion(uint32_t version) override {
+    callbacks_.setDownstreamRespVersion(version);
+  }
+  Common::Redis::RespProtocolVersion protocolVersion() const override {
+    return callbacks_.protocolVersion();
+  }
+  AuthAttempt attemptDownstreamAuthInline(const std::string& username, const std::string& password,
+                                          uint32_t requested_version) override {
+    return callbacks_.attemptDownstreamAuthInline(username, password, requested_version);
+  }
+  // Forward the version state through the decorator so any command answered through this
+  // wrapper is encoded against the real filter's per-connection RESP version, not the
+  // default RESP2. (HELLO is dispatched before fault injection runs and so does not flow
+  // through DelayFaultRequest in practice; the forward stays correct for any future fault-
+  // wrapped command that observes the version.)
+  uint32_t currentDownstreamRespVersion() const override {
+    return callbacks_.currentDownstreamRespVersion();
+  }
+  std::optional<uint32_t> takePendingHelloAuthVersion() override {
+    return callbacks_.takePendingHelloAuthVersion();
+  }
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -557,6 +576,11 @@ private:
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   bool latency_in_micros, CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
+  // Handle a downstream ``HELLO`` command: protocol-version exact-match, AUTH/SETNAME option
+  // parsing, inline-auth dispatch, and the local HELLO reply. Always terminal (returns nullptr);
+  // factored out of ``makeRequest`` to keep that dispatcher readable.
+  SplitRequestPtr handleHelloCommand(const Common::Redis::RespValue& request,
+                                     SplitCallbacks& callbacks);
 
   RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
@@ -576,6 +600,13 @@ private:
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
+  // HELLO is answered locally (handleHelloCommand) and does not route through
+  // handler_lookup_table_, but the ``command.hello.*`` stats its old cluster-scope registration
+  // emitted must survive for operators alarming on them. Latency exists for schema parity and
+  // is not recorded — the local reply has no round trip to time. One intended gap: the deferred
+  // external-auth path (AuthAttempt::ImplOwnsResponse) is total-only, since success/error
+  // resolve inside the filter after the round trip (see handleHelloCommand).
+  std::optional<CommandStats> hello_command_stats_;
 };
 
 } // namespace CommandSplitter

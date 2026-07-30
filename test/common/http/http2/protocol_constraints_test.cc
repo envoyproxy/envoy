@@ -3,12 +3,16 @@
 
 #include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::HasSubstr;
+using ::testing::Not;
 
 namespace Envoy {
 namespace Http {
@@ -27,7 +31,7 @@ protected:
 
 TEST_F(ProtocolConstraintsTest, DefaultStatusOk) {
   ProtocolConstraints constraints(http2CodecStats(), options_, true);
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_OK(constraints.status());
 }
 
 TEST_F(ProtocolConstraintsTest, OutboundControlFrameFlood) {
@@ -36,11 +40,11 @@ TEST_F(ProtocolConstraintsTest, OutboundControlFrameFlood) {
   ProtocolConstraints constraints(http2CodecStats(), options_, true);
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_TRUE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_OK(constraints.checkOutboundFrameLimits());
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_THAT(constraints.checkOutboundFrameLimits(),
+              HasStatusMessage("Too many control frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
-  EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
   EXPECT_EQ(3,
             stats_store_
@@ -55,13 +59,13 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFlood) {
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_TRUE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_OK(constraints.checkOutboundFrameLimits());
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
+  EXPECT_THAT(constraints.checkOutboundFrameLimits(),
+              HasStatusMessage("Too many frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
-  EXPECT_EQ("Too many frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
   EXPECT_EQ(6,
             stats_store_.gauge("http2.outbound_frames_active", Stats::Gauge::ImportMode::Accumulate)
@@ -84,10 +88,10 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFloodStatusIsIdempotent) {
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
+  // The status should still reflect the first violation.
+  EXPECT_THAT(constraints.checkOutboundFrameLimits(),
+              HasStatusMessage("Too many control frames in the outbound queue."));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
-  // The status should still reflect the first violation
-  EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
   EXPECT_EQ(0, stats_store_.counter("http2.outbound_flood").value());
 }
@@ -98,8 +102,8 @@ TEST_F(ProtocolConstraintsTest, InboundZeroLenData) {
   const uint8_t type = NGHTTP2_DATA;
   const bool end_stream = false;
   const bool is_empty = true;
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(
       constraints.trackInboundFrame(type, end_stream, is_empty)));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.status()));
@@ -117,8 +121,8 @@ TEST_F(ProtocolConstraintsTest, OutboundAndInboundFrameFloodStatusIsIdempotent) 
   const uint8_t type = NGHTTP2_DATA;
   const bool end_stream = false;
   const bool is_empty = true;
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(
       constraints.trackInboundFrame(type, end_stream, is_empty)));
 
@@ -137,8 +141,8 @@ TEST_F(ProtocolConstraintsTest, InboundZeroLenDataWithPadding) {
   const uint8_t type = NGHTTP2_DATA;
   const bool end_stream = false;
   const bool is_empty = true;
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(
       constraints.trackInboundFrame(type, end_stream, is_empty)));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.status()));
@@ -151,13 +155,13 @@ TEST_F(ProtocolConstraintsTest, InboundZeroLenDataEndStreamResetCounter) {
   const uint8_t type = NGHTTP2_DATA;
   const bool is_empty = true;
   bool end_stream = false;
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   end_stream = true;
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   end_stream = false;
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(
       constraints.trackInboundFrame(type, end_stream, is_empty)));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.status()));
@@ -173,10 +177,10 @@ TEST_F(ProtocolConstraintsTest, Priority) {
   const uint8_t type = NGHTTP2_PRIORITY;
   const bool end_stream = false;
   const bool is_empty = false;
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
+  EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrame(type, end_stream, is_empty)));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   EXPECT_EQ("Too many PRIORITY frames", constraints.status().message());
@@ -200,7 +204,7 @@ TEST_F(ProtocolConstraintsTest, WindowUpdate) {
   const bool end_stream = false;
   const bool is_empty = false;
   for (uint32_t i = 0; i < 15; ++i) {
-    EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+    EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   }
   EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrame(type, end_stream, is_empty)));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
@@ -220,15 +224,15 @@ TEST_F(ProtocolConstraintsTest, WindowUpdateActiveStreamsDecrement) {
   const bool end_stream = false;
   const bool is_empty = false;
   for (uint32_t i = 0; i < 9; ++i) {
-    EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+    EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   }
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_OK(constraints.status());
 
   // Close one stream. active_streams becomes 1.
   // inbound_window_update_frames should be decremented by 2: 9 - 2 = 7.
   // New limit: 5 + 2 * (1 + 0) = 7.
   constraints.decrementActiveStreamCount();
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_OK(constraints.status());
 
   // One more WINDOW_UPDATE should fail. 7 + 1 = 8 > 7.
   EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrame(type, end_stream, is_empty)));
@@ -247,15 +251,15 @@ TEST_F(ProtocolConstraintsTest, WindowUpdateOpenedStreamsNoDecrement) {
   const bool end_stream = false;
   const bool is_empty = false;
   for (uint32_t i = 0; i < 9; ++i) {
-    EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+    EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   }
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_OK(constraints.status());
 
   // Close one stream. active_streams becomes 1.
   // inbound_window_update_frames should NOT be decremented.
   // Limit still uses opened_streams (2): 5 + 2 * (2 + 0) = 9.
   constraints.decrementActiveStreamCount();
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_OK(constraints.status());
 
   // One more WINDOW_UPDATE should fail. 9 + 1 = 10 > 9.
   EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrame(type, end_stream, is_empty)));
@@ -274,15 +278,15 @@ TEST_F(ProtocolConstraintsTest, PriorityActiveStreamsDecrement) {
   const bool end_stream = false;
   const bool is_empty = false;
   for (uint32_t i = 0; i < 30; ++i) {
-    EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
+    EXPECT_OK(constraints.trackInboundFrame(type, end_stream, is_empty));
   }
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_OK(constraints.status());
 
   // Close one stream. active_streams becomes 1.
   // inbound_priority_frames should be decremented by max (10): 30 - 10 = 20.
   // New limit: 10 * (1 + 1) = 20.
   constraints.decrementActiveStreamCount();
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_OK(constraints.status());
 
   // One more PRIORITY frame should fail. 20 + 1 = 21 > 20.
   EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrame(type, end_stream, is_empty)));

@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/gcp_authn/crypto_utils.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
@@ -16,6 +17,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 class CryptoUtilsTest : public testing::Test {
 public:
@@ -31,7 +34,7 @@ TEST_F(CryptoUtilsTest, GetFingerprintFromPemSuccess) {
   std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
 
   auto fingerprint = fingerprinter.getFingerprintFromPem(cert_pem);
-  ASSERT_TRUE(fingerprint.ok());
+  ASSERT_OK(fingerprint);
   // SPELLCHECKER(off)
   EXPECT_EQ(fingerprint.value(), "wH4U/EO5x7PZLxAE+R06ngcdnJOlivx2tMFDA646DzQ");
   // SPELLCHECKER(on)
@@ -40,15 +43,13 @@ TEST_F(CryptoUtilsTest, GetFingerprintFromPemSuccess) {
 TEST_F(CryptoUtilsTest, GetFingerprintFromPemEmpty) {
   CertFingerprinterImpl fingerprinter;
   auto fingerprint = fingerprinter.getFingerprintFromPem("");
-  EXPECT_FALSE(fingerprint.ok());
-  EXPECT_EQ(fingerprint.status().message(), "Certificate PEM content is empty");
+  EXPECT_THAT(fingerprint, HasStatusMessage("Certificate PEM content is empty"));
 }
 
 TEST_F(CryptoUtilsTest, GetFingerprintFromPemInvalid) {
   CertFingerprinterImpl fingerprinter;
   auto fingerprint = fingerprinter.getFingerprintFromPem("invalid cert content");
-  EXPECT_FALSE(fingerprint.ok());
-  EXPECT_EQ(fingerprint.status().message(), "Failed to parse certificate from PEM");
+  EXPECT_THAT(fingerprint, HasStatusMessage("Failed to parse certificate from PEM"));
 }
 
 } // namespace

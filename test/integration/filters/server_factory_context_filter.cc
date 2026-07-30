@@ -15,7 +15,7 @@
 
 namespace Envoy {
 
-using ResponsePtr = std::unique_ptr<helloworld::HelloReply>;
+using ResponsePtr = Grpc::ResponsePtr<helloworld::HelloReply>;
 using FilterConfigSharedPtr =
     std::shared_ptr<const test::integration::filters::ServerFactoryContextFilterConfig>;
 

@@ -22,7 +22,7 @@ envoy_cc_library(
         "//envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/thread:terminate_thread_lib",
+        "//source/common/thread:signal_thread_lib",
         "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
 )

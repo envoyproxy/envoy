@@ -52,6 +52,8 @@ areas:
     title: circuit_breaker
   composite:
     title: composite
+  credential_injector:
+    title: credential_injector
   dns_resolver:
     title: dns_resolver
   dynamic_modules:
@@ -74,6 +76,8 @@ areas:
     title: load_report
   logging:
     title: logging
+  mcp_json_rest_bridge:
+    title: mcp_json_rest_bridge
   mcp_router:
     title: mcp_router
   mysql_proxy:
@@ -92,6 +96,8 @@ areas:
     title: redis_proxy
   resource_monitors:
     title: resource_monitors
+  reverse_tunnel:
+    title: reverse_tunnel
   router:
     title: router
   set_metadata_filter:
@@ -114,6 +120,8 @@ areas:
     title: tracing
   wasm:
     title: wasm
+  watchdog:
+    title: watchdog
   dns:
     title: dns
   proxy_protocol:

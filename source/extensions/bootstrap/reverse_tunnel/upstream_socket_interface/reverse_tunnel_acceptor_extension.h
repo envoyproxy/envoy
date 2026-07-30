@@ -25,6 +25,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -73,7 +74,14 @@ public:
   Stats::Gauge* total_clusters_gauge_{nullptr};
   Stats::Gauge* total_nodes_gauge_{nullptr};
 
+  Stats::Histogram* cx_upgrade_time_{nullptr};
+  Stats::Histogram* cx_idle_expire_time_{nullptr};
+  Stats::Histogram* cx_post_upgrade_lifetime_{nullptr};
+
 private:
+  Stats::Histogram* getHistogram(absl::string_view name, Stats::Scope& stats_store,
+                                 absl::string_view stat_prefix);
+
   // Thread-local dispatcher.
   Event::Dispatcher& dispatcher_;
   // Thread-local socket manager.
@@ -187,6 +195,11 @@ public:
   bool enableTenantIsolation() const { return enable_tenant_isolation_; }
 
   /**
+   * @return the configured maximum number of concurrently accepted reverse connections per node.
+   */
+  uint32_t maxConnectionsPerNode() const { return max_connections_per_node_; }
+
+  /**
    * @return whether lifecycle access logs are configured.
    */
   bool hasAccessLogs() const { return !access_logs_.empty(); }
@@ -236,6 +249,18 @@ public:
     }
   }
 
+  void updateIdleExpireTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_idle_expire_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
+    }
+  }
+
+  void updateUpgradeTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_upgrade_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
+    }
+  }
+
   /**
    * Test-only method to set the thread local slot.
    * @param slot the thread local slot to set.
@@ -268,6 +293,7 @@ private:
   uint32_t ping_failure_threshold_{3};
   bool enable_detailed_stats_{false};
   bool enable_tenant_isolation_{false};
+  const uint32_t max_connections_per_node_{0};
   AccessLog::InstanceSharedPtrVector access_logs_;
   ReverseTunnelReporterPtr reporter_{nullptr};
 

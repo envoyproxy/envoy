@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/sse_to_metadata/filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -39,11 +40,43 @@ TEST(SseToMetadataConfigTest, ValidConfig) {
 
   SseToMetadataConfig factory;
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
+  EXPECT_OK(cb_or);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
   cb_or.value()(filter_callback);
+}
+
+TEST(SseToMetadataConfigTest, CreateFilterWithServerContext) {
+  const std::string yaml = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+  )EOF";
+
+  envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  SseToMetadataConfig factory;
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
+  cb(filter_callback);
 }
 
 TEST(SseToMetadataConfigTest, MultipleMetadataDescriptors) {
@@ -80,7 +113,7 @@ TEST(SseToMetadataConfigTest, MultipleMetadataDescriptors) {
 
   SseToMetadataConfig factory;
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
+  EXPECT_OK(cb_or);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
@@ -119,7 +152,7 @@ TEST(SseToMetadataConfigTest, MultipleRules) {
 
   SseToMetadataConfig factory;
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
+  EXPECT_OK(cb_or);
 }
 
 TEST(SseToMetadataConfigTest, EmptyConfig) {
@@ -210,7 +243,7 @@ TEST(SseToMetadataConfigTest, EmptyNamespaceDefaultsToFilterName) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SseToMetadataConfig factory;
   auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
+  EXPECT_OK(cb_or);
 }
 
 TEST(SseToMetadataConfigTest, InvalidConfigMissingKey) {

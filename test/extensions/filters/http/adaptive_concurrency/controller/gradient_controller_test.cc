@@ -15,11 +15,13 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
 using testing::Return;
 
@@ -36,7 +38,7 @@ GradientControllerConfig makeConfig(const std::string& yaml_config,
   TestUtility::loadFromYamlAndValidate(yaml_config, proto);
   absl::Status creation_status = absl::OkStatus();
   GradientControllerConfig config{proto, runtime, creation_status};
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
   return config;
 }
 
@@ -165,9 +167,10 @@ TEST_F(GradientControllerConfigTest, MissingMinRTTValues) {
   TestUtility::loadFromYamlAndValidate(yaml, proto);
   absl::Status creation_status = absl::OkStatus();
   GradientControllerConfig config{proto, runtime_, creation_status};
-  EXPECT_FALSE(creation_status.ok());
-  EXPECT_EQ(creation_status.message(),
-            "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set");
+  EXPECT_THAT(
+      creation_status,
+      HasStatusMessage(
+          "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set"));
 }
 
 TEST_F(GradientControllerConfigTest, Clamping) {

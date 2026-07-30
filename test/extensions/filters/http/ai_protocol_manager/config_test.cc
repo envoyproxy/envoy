@@ -61,6 +61,34 @@ TEST(AiProtocolManagerConfigTest, IsRegistered) {
   EXPECT_EQ(factory->name(), "envoy.filters.http.ai_protocol_manager");
 }
 
+// The filter is a dual factory: it is also registered in the upstream HTTP
+// filter registry so it can be placed in upstream filter chains.
+TEST(AiProtocolManagerConfigTest, IsRegisteredAsUpstreamFilter) {
+  Server::Configuration::UpstreamHttpFilterConfigFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.ai_protocol_manager");
+  ASSERT_NE(factory, nullptr);
+  // The upstream registration resolves to the dual factory itself, not merely a
+  // same-named factory.
+  EXPECT_THAT(factory, testing::WhenDynamicCastTo<AiProtocolManagerFilterConfigFactory*>(
+                           testing::NotNull()));
+}
+
+// Creating the filter from an upstream factory context yields the same stream
+// filter as the downstream path.
+TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromUpstreamContext) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+  NiceMock<Server::Configuration::MockUpstreamFactoryContext> context;
+
+  AiProtocolManagerFilterConfigFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

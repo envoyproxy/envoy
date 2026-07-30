@@ -20,6 +20,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -28,6 +29,10 @@
 namespace Envoy {
 namespace Router {
 namespace {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 class VhdsTest : public testing::Test {
 public:
@@ -99,10 +104,9 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_TRUE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
-                                                       context_, provider_)
-                  .status()
-                  .ok());
+  EXPECT_OK(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_, context_,
+                                                     provider_)
+                .status());
 }
 
 // verify that api_type: GRPC fails validation
@@ -120,10 +124,10 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_FALSE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
-                                                        context_, provider_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                       context_, provider_)
+                  .status(),
+              Not(IsOk()));
 }
 
 // Verify that VHDS over GRPC fails when ADS is using DELTA_GRPC.
@@ -143,10 +147,10 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_FALSE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
-                                                        context_, provider_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                       context_, provider_)
+                  .status(),
+              Not(IsOk()));
 }
 
 // verify that ADS with DELTA_GRPC in bootstrap passes validation
@@ -166,10 +170,9 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_TRUE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
-                                                       context_, provider_)
-                  .status()
-                  .ok());
+  EXPECT_OK(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_, context_,
+                                                     provider_)
+                .status());
 }
 
 // verify that ADS without ADS configured in bootstrap fails validation
@@ -187,9 +190,8 @@ vhds:
 
   auto result = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
                                                          context_, provider_);
-  EXPECT_FALSE(result.status().ok());
-  EXPECT_EQ(result.status().message(),
-            "vhds: ADS config source specified but no ADS configured in bootstrap.");
+  EXPECT_THAT(result, HasStatusMessage(
+                          "vhds: ADS config source specified but no ADS configured in bootstrap."));
 }
 
 // verify that ADS without DELTA_GRPC api_type in bootstrap fails validation
@@ -211,9 +213,9 @@ vhds:
 
   auto result = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
                                                          context_, provider_);
-  EXPECT_FALSE(result.status().ok());
-  EXPECT_EQ(result.status().message(),
-            "vhds: ADS must use DELTA_GRPC api_type when used as VHDS config source.");
+  EXPECT_THAT(
+      result,
+      HasStatusMessage("vhds: ADS must use DELTA_GRPC api_type when used as VHDS config source."));
 }
 
 // verify addition/updating of virtual hosts
@@ -232,9 +234,8 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
-                  .ok());
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, removed_resources, "1"));
 
   EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
   EXPECT_TRUE(messageDifferencer_.Equals(
@@ -295,9 +296,8 @@ vhds:
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
-                  .ok());
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, removed_resources, "1"));
   EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
 
   config_update_info->onRdsUpdate(updated_route_config, "2");

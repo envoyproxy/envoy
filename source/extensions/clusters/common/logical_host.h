@@ -59,6 +59,11 @@ public:
   absl::string_view observabilityName() const override { return {}; }
   Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override;
 
+  // Upstream::HostImplBase
+  // Public (protected in the base class) so that tests can verify the sorted list is
+  // kept in sync with the raw list across address refreshes.
+  SharedConstAddressVector sortedAddressListOrNull() const override;
+
 protected:
   LogicalHost(
       const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
@@ -74,6 +79,9 @@ private:
   // The first entry in the address_list_ should match the value in address_.
   Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
   SharedConstAddressVector address_list_or_null_ ABSL_GUARDED_BY(address_lock_);
+  // Happy eyeballs sorted copy of address_list_or_null_, updated together with it so that
+  // the raw and sorted lists stay consistent. nullptr unless there are multiple addresses.
+  SharedConstAddressVector sorted_address_list_or_null_ ABSL_GUARDED_BY(address_lock_);
   Network::Address::InstanceConstSharedPtr health_check_address_ ABSL_GUARDED_BY(address_lock_);
   mutable absl::Mutex address_lock_;
 };

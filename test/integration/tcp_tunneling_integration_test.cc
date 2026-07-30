@@ -503,9 +503,6 @@ TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) {
-  // TODO(yanavlasov): fix the test
-  GTEST_SKIP() << "Test is too flaky for CI. "
-                  "https://github.com/envoyproxy/envoy/issues/39856#issuecomment-3637976574";
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -525,11 +522,9 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) 
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // Send CONNECT request and immediately send some data without waiting for 200
-  // response from Envoy.
-  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  codec_client_->sendData(*request_encoder_, "premature data", false);
-  response_ = std::move(encoder_decoder.second);
+  // response from Envoy. Encode the CONNECT headers and the premature data into a single
+  // socket write so the data cannot race behind the synthesized 200 tunnel response.
+  response_ = codec_client_->makeRequestWithBody(connect_headers_, "premature data", false);
 
   // Envoy will try top open upstream connection before the premature CONNECT data is detected.
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
@@ -568,6 +563,53 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataAllowedByDefault) {
   response_->waitForHeaders();
   response_->waitForBodyData(strlen("upstream_send_data"));
   EXPECT_EQ("upstream_send_data", response_->body());
+
+  codec_client_->sendData(*request_encoder_, "", true);
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+  ASSERT_TRUE(fake_raw_upstream_connection_->close());
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForEndStream());
+    ASSERT_FALSE(response_->reset());
+  }
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataAfterResponseTunneled) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        for (auto& filter : *hcm.mutable_http_filters()) {
+          if (filter.name() == "envoy.filters.http.router") {
+            envoy::extensions::filters::http::router::v3::Router router_config;
+            if (filter.has_typed_config()) {
+              std::ignore = filter.typed_config().UnpackTo(&router_config);
+            }
+            router_config.mutable_reject_connect_request_early_data()->set_value(true);
+            std::ignore = filter.mutable_typed_config()->PackFrom(router_config);
+            break;
+          }
+        }
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send the CONNECT request and wait for the 200 response before sending any data.
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
+  response_->waitForHeaders();
+  EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+  // Data sent after the 200 response has started is legitimate tunnel data, so it is
+  // forwarded upstream rather than rejected as early CONNECT data.
+  codec_client_->sendData(*request_encoder_, "late data", false);
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForData(
+      FakeRawConnection::waitForInexactMatch("late data")));
 
   codec_client_->sendData(*request_encoder_, "", true);
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
