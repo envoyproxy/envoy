@@ -111,14 +111,6 @@ message ProcessingRequest {
   // The initial sizes for the to-sidestream windows are generally
   // expected to be in the range of 32K to 64K.
   //
-  // In ``FULL_DUPLEX_STREAMED`` body send mode, for backward compatibility
-  // with existing ext_proc servers that do not support flow control, if
-  // the ext_proc server's first response does not include a window
-  // update, or if the data plane does not receive the first response
-  // from the ext_proc server within the configured timeout, then the
-  // data plane will assume that the ext_proc server does not support
-  // flow control, and it will proceed without it.
-  //
   // [#not-implemented-hide:]
   message FlowControlInit {
     // Downstream-to-sidestream initial window size.
