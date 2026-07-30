@@ -1704,15 +1704,16 @@ TEST_F(LoadAwareLocalityLbTest, StoreUtilizationRejectsNonFiniteValue) {
   EXPECT_EQ(LocalityLbHostData::kNeverReported, slot.lastUpdateTime());
 }
 
-// When paired with an endpoint-picking child that also consumes ORCA (e.g. CSWRR), both attach
-// their own HostLbPolicyData to the same host and a single in-band report fans out to each. The
-// two derive independent values from it and share no state.
+// When paired with an endpoint-picking child that also consumes ORCA (e.g.
+// ClientSideWeightedRoundRobin), both attach their own HostLbPolicyData to the same host and a
+// single in-band report fans out to each. The two derive independent values from it and share no
+// state.
 TEST_F(LoadAwareLocalityLbTest, OrcaReportFansOutToLocalityAndChildDataIndependently) {
   auto host = makeWeightTrackingMockHost();
 
   host->addLbPolicyData(std::make_unique<LocalityLbHostData>(simTime(), makeMetricNames({})));
 
-  // A CSWRR-style child's data on the same host.
+  // A ClientSideWeightedRoundRobin child's data on the same host.
   Common::OrcaWeightManagerConfig child_config{};
   child_config.error_utilization_penalty = 0.0;
   host->addLbPolicyData(std::make_unique<Common::OrcaHostLbPolicyData>(
