@@ -19,9 +19,8 @@ SdsApiStats SdsApi::generateStats(Stats::Scope& scope) {
 SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
                Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-               std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api,
-               bool warm)
-    : init_target_(fmt::format("SdsApi {}", sds_config_name), [this, warm] { initialize(warm); }),
+               std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api)
+    : init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
       dispatcher_(dispatcher), api_(api),
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), resource_type_helper_(validation_visitor, "name"),
@@ -205,12 +204,12 @@ absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
   return absl::OkStatus();
 }
 
-void SdsApi::initialize(bool warm) {
+void SdsApi::initialize() {
   // Don't put any code here that can throw exceptions, this has been the cause of multiple
   // hard-to-diagnose regressions.
-  subscription_->start({sds_config_name_});
-  if (!warm) {
-    init_target_.ready();
+  if (!started_) {
+    started_ = true;
+    subscription_->start({sds_config_name_});
   }
 }
 
@@ -238,7 +237,7 @@ TlsCertificateSdsApiSharedPtr
 TlsCertificateSdsApi::create(Server::Configuration::ServerFactoryContext& server_context,
                              const envoy::config::core::v3::ConfigSource& sds_config,
                              const std::string& sds_config_name,
-                             std::function<void()> destructor_cb, bool warm) {
+                             std::function<void()> destructor_cb) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(
@@ -247,7 +246,7 @@ TlsCertificateSdsApi::create(Server::Configuration::ServerFactoryContext& server
       sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
-      server_context.api(), warm);
+      server_context.api());
 }
 
 std::vector<std::string> TlsCertificateSdsApi::getDataSourceFilenames() {
@@ -300,7 +299,7 @@ void TlsCertificateSdsApi::resolveSecret(const FileContentMap& files) {
 CertificateValidationContextSdsApiSharedPtr CertificateValidationContextSdsApi::create(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::core::v3::ConfigSource& sds_config, const std::string& sds_config_name,
-    std::function<void()> destructor_cb, bool warm) {
+    std::function<void()> destructor_cb) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
@@ -309,7 +308,7 @@ CertificateValidationContextSdsApiSharedPtr CertificateValidationContextSdsApi::
       sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
-      server_context.api(), warm);
+      server_context.api());
 }
 
 void CertificateValidationContextSdsApi::validateConfig(
@@ -375,7 +374,7 @@ TlsSessionTicketKeysSdsApiSharedPtr
 TlsSessionTicketKeysSdsApi::create(Server::Configuration::ServerFactoryContext& server_context,
                                    const envoy::config::core::v3::ConfigSource& sds_config,
                                    const std::string& sds_config_name,
-                                   std::function<void()> destructor_cb, bool warm) {
+                                   std::function<void()> destructor_cb) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(
@@ -384,7 +383,7 @@ TlsSessionTicketKeysSdsApi::create(Server::Configuration::ServerFactoryContext& 
       sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
-      server_context.api(), warm);
+      server_context.api());
 }
 
 void TlsSessionTicketKeysSdsApi::validateConfig(
@@ -397,8 +396,8 @@ std::vector<std::string> TlsSessionTicketKeysSdsApi::getDataSourceFilenames() { 
 GenericSecretSdsApiSharedPtr
 GenericSecretSdsApi::create(Server::Configuration::ServerFactoryContext& server_context,
                             const envoy::config::core::v3::ConfigSource& sds_config,
-                            const std::string& sds_config_name, std::function<void()> destructor_cb,
-                            bool warm) {
+                            const std::string& sds_config_name,
+                            std::function<void()> destructor_cb) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(
@@ -407,7 +406,7 @@ GenericSecretSdsApi::create(Server::Configuration::ServerFactoryContext& server_
       sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
-      server_context.api(), warm);
+      server_context.api());
 }
 
 void GenericSecretSdsApi::validateConfig(

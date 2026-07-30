@@ -19,7 +19,7 @@ AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
                                        RemoveCb remove_cb)
     : factory_context_(factory_context), cert_name_(cert_name),
       cert_provider_(factory_context_.secretManager().findOrCreateTlsCertificateProvider(
-          config_source, cert_name_, factory_context_, init_manager, false)),
+          config_source, cert_name_, factory_context_, init_manager)),
       update_cb_(update_cb),
       update_cb_handle_(cert_provider_->addUpdateCallback([this]() { return loadCert(); })),
       remove_cb_(remove_cb), remove_cb_handle_(cert_provider_->addRemoveCallback(

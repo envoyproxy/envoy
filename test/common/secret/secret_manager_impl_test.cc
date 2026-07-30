@@ -315,7 +315,7 @@ api_config_source:
       ->set_value(Base64::decode("CjUKMy92YXIvcnVuL3NlY3JldHMva3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3Vud"
                                  "C90b2tlbhILeC10b2tlbi1iaW4="));
   auto secret_provider1 = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
 
   // The base64 encoded proto binary is identical to the one above, but in different field order.
   // It is also identical to the YAML below.
@@ -328,7 +328,7 @@ api_config_source:
       ->set_value(Base64::decode("Egt4LXRva2VuLWJpbgo1CjMvdmFyL3J1bi9zZWNyZXRzL2t1YmVybmV0ZXMuaW8vc"
                                  "2VydmljZWFjY291bnQvdG9rZW4="));
   auto secret_provider2 = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
 
   API_NO_BOOST(envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig)
   file_based_metadata_config;
@@ -346,7 +346,7 @@ secret_data:
                     ->mutable_typed_config()
                     ->PackFrom(file_based_metadata_config);
   auto secret_provider3 = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
 
   EXPECT_EQ(secret_provider1, secret_provider2);
   EXPECT_EQ(secret_provider2, secret_provider3);
@@ -375,7 +375,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
   EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
 
   auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
   const std::string yaml =
       R"EOF(
 name: "abc.com"
@@ -401,6 +401,37 @@ tls_certificate:
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
+}
+
+TEST_F(SecretManagerImplTest, SdsDynamicSecretWarmFalseSubscriptionOnce) {
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+
+  envoy::config::core::v3::ConfigSource config_source;
+
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+
+  // 1st call: creates provider and starts subscription.
+  auto secret_provider1 = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, {});
+
+  auto* subscription =
+      secret_context.server_context_.cluster_manager_.subscription_factory_.subscription_;
+  ASSERT_NE(subscription, nullptr);
+
+  // Expect that start() is NOT called again on the subscription.
+  EXPECT_CALL(*subscription, start(_)).Times(0);
+
+  // 2nd call: should reuse provider and NOT call start() again.
+  auto secret_provider2 = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, {});
+
+  EXPECT_EQ(secret_provider1, secret_provider2);
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
@@ -472,7 +503,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
   const std::string yaml =
       R"EOF(
 name: "abc.com"
@@ -745,7 +776,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
   const std::string expected_secrets_config_dump = R"EOF(
 dynamic_warming_secrets:
 - name: "abc.com"
@@ -1093,7 +1124,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
   EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
 
   auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context.server_context_, init_manager, true);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
   const std::string yaml =
       R"EOF(
 name: "abc.com"
