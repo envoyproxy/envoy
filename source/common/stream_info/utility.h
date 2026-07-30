@@ -226,6 +226,7 @@ public:
   std::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
   std::optional<std::chrono::nanoseconds> lastDownstreamHeaderRxByteReceived();
   std::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
+  std::optional<std::chrono::nanoseconds> downstreamHandshakeStart();
   std::optional<std::chrono::nanoseconds> downstreamHandshakeComplete();
   std::optional<std::chrono::nanoseconds> lastDownstreamAckReceived();
 

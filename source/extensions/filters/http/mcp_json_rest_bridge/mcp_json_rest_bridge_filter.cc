@@ -185,8 +185,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::REQUEST_NOT_POST;
   case BridgeStatus::RequestTooLarge:
     return BridgeStatusValues::REQUEST_TOO_LARGE;
-  case BridgeStatus::RequestParseError:
-    return BridgeStatusValues::REQUEST_PARSE_ERROR;
+  case BridgeStatus::RequestFailedToParseJsonRpc:
+    return BridgeStatusValues::REQUEST_FAILED_TO_PARSE_JSON_RPC;
   case BridgeStatus::RequestUnsupportedProtocolVersion:
     return BridgeStatusValues::REQUEST_UNSUPPORTED_PROTOCOL_VERSION;
   case BridgeStatus::RequestInitializeNotValid:
@@ -217,8 +217,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::RESPONSE_INVALID_UTF8;
   case BridgeStatus::ResponseBackendError:
     return BridgeStatusValues::RESPONSE_BACKEND_ERROR;
-  case BridgeStatus::ResponseParseError:
-    return BridgeStatusValues::RESPONSE_PARSE_ERROR;
+  case BridgeStatus::ResponseFailedToParseJsonRpc:
+    return BridgeStatusValues::RESPONSE_FAILED_TO_PARSE_JSON_RPC;
   }
   return "UNKNOWN";
 }
@@ -547,7 +547,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
 
   if (request_body_json.is_discarded()) {
     ENVOY_STREAM_LOG(error, "Failed to parse JSON-RPC request body.", *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestParseError,
+    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestFailedToParseJsonRpc,
                       generateErrorJsonResponse(-32700, "JSON parse error").dump());
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -994,7 +994,7 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       setResponseMetadata(getResponseCode(response_headers) >=
                                   static_cast<int>(Http::Code::BadRequest)
                               ? BridgeStatus::ResponseBackendError
-                              : BridgeStatus::ResponseParseError,
+                              : BridgeStatus::ResponseFailedToParseJsonRpc,
                           getResponseCode(response_headers));
       break;
     }
