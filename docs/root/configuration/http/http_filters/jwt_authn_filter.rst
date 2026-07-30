@@ -197,26 +197,13 @@ Copy validated JWT claims to HTTP request headers example
 If a JWT is valid, you can add some of its claims of type (string, integer, boolean) to a new HTTP header to pass to the upstream. You can specify claims and headers in
 `claim_to_headers` field. Nested claims are also supported.
 
-The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>` is a repeat of message :ref:`JWTClaimToHeader <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JWTClaimToHeader>` which has two fields:
+The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>` is a repeat of message :ref:`JWTClaimToHeader <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JWTClaimToHeader>` which has these fields:
 
 * Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
-* Field ``claim_name`` specifies the claim from the verified JWT.
-
-A ``claim_name`` is resolved against the JWT payload in two steps:
-
-#. It is split on ``.`` and walked as a path into nested JSON objects, so ``nested.claim.key``
-   resolves to ``key`` inside ``claim`` inside ``nested``. This is always attempted first.
-#. Only if the nested walk does not resolve, the whole ``claim_name`` is looked up as a single
-   literal top-level claim name. This is what makes claim names which themselves contain dots
-   reachable, in particular URL-namespaced claims such as
-   ``http://example.org/parent_token``.
-
-Because the nested path takes precedence, a payload holding both a literal ``a.b`` claim and a
-nested ``a`` object containing ``b`` resolves ``a.b`` to the nested value. The literal lookup is
-performed by default, but this behavior can be disabled via the
-``envoy.reloadable_features.jwt_authn_literal_claim_name_fallback`` runtime flag, restoring the
-previous behavior in which a ``claim_name`` containing dots was only ever treated as a nested
-path.
+* Field ``claim_name`` specifies the claim from the verified JWT, split on ``.`` to address nested
+  claims: ``nested.claim.key`` resolves to ``key`` inside ``claim`` inside ``nested``.
+* Field ``claim_path`` specifies the same thing as an explicit list of segments, for claims whose
+  own names contain dots. Exactly one of ``claim_name`` and ``claim_path`` must be set.
 
 .. literalinclude:: _include/jwt-authn-claim-filter.yaml
     :language: yaml
@@ -232,6 +219,37 @@ In this example the `tenants` claim is an object, therefore the JWT claim ("sub"
     x-jwt-claim-sub: <JWT Claim>
     x-jwt-claim-nested-key: <JWT Claim>
     x-jwt-tenants: <Base64 encoded JSON JWT Claim>
+
+Claim names which contain dots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Because ``claim_name`` is always split on ``.``, a claim whose own name contains a dot is not
+addressable through it. Use :ref:`claim_path
+<envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.claim_path>` instead,
+which takes the path one segment at a time and matches each segment in full. Given the payload:
+
+.. code-block:: json
+
+    {"a.b": {"c.d": "x.y.z"}}
+
+the value ``x.y.z`` is copied to a header by:
+
+.. code-block:: yaml
+
+    claim_to_headers:
+    - header_name: x-jwt-claim-c-d
+      claim_path:
+      - key: a.b
+      - key: c.d
+
+The single-segment case covers the URL-namespaced claims issued by many OIDC providers:
+
+.. code-block:: yaml
+
+    claim_to_headers:
+    - header_name: x-jwt-claim-parent-token
+      claim_path:
+      - key: http://example.org/parent_token
 
 Statistics
 ----------

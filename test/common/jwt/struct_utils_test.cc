@@ -79,7 +79,7 @@ TEST(StructUtilsTest, GetValueNestedLookup) {
   EXPECT_EQ("deep", value);
 }
 
-// The mechanism behind issue #33603: the fallback that fixes it lives in the caller, not here.
+// The mechanism behind issue #33603: a claim whose own name contains a dot needs claim_path.
 TEST(StructUtilsTest, GetValueDoesNotMatchLiteralKeyWithDots) {
   const auto payload = makeStruct(UrlClaimPayload);
   StructUtils utils(payload);
@@ -112,85 +112,83 @@ TEST(StructUtilsTest, GetValueWrongTypeIntermediate) {
 }
 
 // ---------------------------------------------------------------------------
-// GetLiteralValue: exact whole-string top-level key only.
+// GetValueByPath: explicit segments, each matched in full.
 // ---------------------------------------------------------------------------
 
-TEST(StructUtilsTest, GetLiteralValueWithDots) {
+// No "."-joined string addresses "x.y.z" here: every way of splitting one either stops at "a.b"
+// or names segments which do not exist.
+TEST(StructUtilsTest, GetValueByPathNestedDottedKeys) {
+  const auto payload = makeStruct(R"({"a.b": {"c.d": "x.y.z"}})");
+  StructUtils utils(payload);
+
+  const Protobuf::Value* found = nullptr;
+  EXPECT_EQ(StructUtils::OK, utils.GetValueByPath({"a.b", "c.d"}, found));
+  EXPECT_EQ("x.y.z", found->string_value());
+
+  EXPECT_EQ(StructUtils::MISSING, utils.GetValue("a.b.c.d", found));
+}
+
+TEST(StructUtilsTest, GetValueByPathSingleSegmentWithDots) {
   const auto payload = makeStruct(UrlClaimPayload);
   StructUtils utils(payload);
 
   const Protobuf::Value* found = nullptr;
-  EXPECT_EQ(StructUtils::OK, utils.GetLiteralValue("http://example.org/parent_token", found));
+  EXPECT_EQ(StructUtils::OK, utils.GetValueByPath({"http://example.org/parent_token"}, found));
   EXPECT_EQ("xyz", found->string_value());
-}
 
-TEST(StructUtilsTest, GetLiteralValueSiblingClaims) {
-  const auto payload = makeStruct(UrlClaimPayload);
-  StructUtils utils(payload);
-
-  const Protobuf::Value* found = nullptr;
-  EXPECT_EQ(StructUtils::OK, utils.GetLiteralValue("parent_token", found));
+  EXPECT_EQ(StructUtils::OK, utils.GetValueByPath({"parent_token"}, found));
   EXPECT_EQ("abc", found->string_value());
-
-  EXPECT_EQ(StructUtils::OK, utils.GetLiteralValue("some_url_value", found));
-  EXPECT_EQ("http://example.org/about", found->string_value());
-
-  EXPECT_EQ(StructUtils::OK, utils.GetLiteralValue("flavour", found));
-  EXPECT_EQ("chocolate", found->string_value());
 }
 
-TEST(StructUtilsTest, GetLiteralValueDoesNotWalkNestedPaths) {
+TEST(StructUtilsTest, GetValueByPathDepthThree) {
   const auto payload = makeStruct(NestedPayload);
   StructUtils utils(payload);
 
   const Protobuf::Value* found = nullptr;
-  EXPECT_EQ(StructUtils::MISSING, utils.GetLiteralValue("nested.key-1", found));
-  EXPECT_EQ(StructUtils::MISSING, utils.GetLiteralValue("nested.nested-2.key-2", found));
-
-  EXPECT_EQ(StructUtils::OK, utils.GetLiteralValue("nested", found));
-  EXPECT_EQ(Protobuf::Value::kStructValue, found->kind_case());
+  EXPECT_EQ(StructUtils::OK, utils.GetValueByPath({"nested", "nested-2", "key-2"}, found));
+  EXPECT_EQ("value2", found->string_value());
 }
 
-// A dot-free name resolves identically through both methods, which is why the caller can skip
-// the fallback entirely when there is no dot.
-TEST(StructUtilsTest, GetLiteralValueAgreesWithGetValueWithoutDots) {
+// A dotted key part way along a path, rather than at either end.
+TEST(StructUtilsTest, GetValueByPathDottedKeyMidPath) {
+  const auto payload = makeStruct(R"({"a": {"b.c": {"d": "deep"}}})");
+  StructUtils utils(payload);
+
+  const Protobuf::Value* found = nullptr;
+  EXPECT_EQ(StructUtils::OK, utils.GetValueByPath({"a", "b.c", "d"}, found));
+  EXPECT_EQ("deep", found->string_value());
+}
+
+// A non-terminal segment which is not an object is WRONG_TYPE, distinct from MISSING.
+TEST(StructUtilsTest, GetValueByPathNonObjectIntermediate) {
+  const auto payload = makeStruct(R"({"a.b": "scalar"})");
+  StructUtils utils(payload);
+
+  const Protobuf::Value* found = nullptr;
+  EXPECT_EQ(StructUtils::WRONG_TYPE, utils.GetValueByPath({"a.b", "c.d"}, found));
+}
+
+TEST(StructUtilsTest, GetValueByPathMissingSegment) {
+  const auto payload = makeStruct(R"({"a.b": {"c.d": "x.y.z"}})");
+  StructUtils utils(payload);
+
+  const Protobuf::Value* found = nullptr;
+  EXPECT_EQ(StructUtils::MISSING, utils.GetValueByPath({"a.b", "no-such-key"}, found));
+  EXPECT_EQ(StructUtils::MISSING, utils.GetValueByPath({"no-such-key"}, found));
+  // "a" alone is not a prefix of the key "a.b".
+  EXPECT_EQ(StructUtils::MISSING, utils.GetValueByPath({"a", "b", "c.d"}, found));
+}
+
+// GetValue is a "."-splitting adapter over GetValueByPath, and nothing more.
+TEST(StructUtilsTest, GetValueMatchesTheEquivalentExplicitPath) {
   const auto payload = makeStruct(NestedPayload);
   StructUtils utils(payload);
 
-  const Protobuf::Value* nested_found = nullptr;
-  const Protobuf::Value* literal_found = nullptr;
-  EXPECT_EQ(StructUtils::OK, utils.GetValue("sub", nested_found));
-  EXPECT_EQ(StructUtils::OK, utils.GetLiteralValue("sub", literal_found));
-  EXPECT_EQ(nested_found, literal_found);
-
-  EXPECT_EQ(StructUtils::MISSING, utils.GetValue("no_such_claim", nested_found));
-  EXPECT_EQ(StructUtils::MISSING, utils.GetLiteralValue("no_such_claim", literal_found));
-}
-
-// GetLiteralValue has no notion of an intermediate element, so it never produces WRONG_TYPE.
-TEST(StructUtilsTest, GetLiteralValueMissingClaim) {
-  const auto payload = makeStruct(R"({"a": "scalar"})");
-  StructUtils utils(payload);
-
-  const Protobuf::Value* found = nullptr;
-  EXPECT_EQ(StructUtils::MISSING, utils.GetLiteralValue("a.b", found));
-  EXPECT_EQ(StructUtils::MISSING, utils.GetLiteralValue("no_such_claim", found));
-}
-
-// PRECEDENCE MECHANISM: when a payload holds both a literal "a.b" key and a nested a -> {b}, the
-// two methods address the two different values. A caller layering GetLiteralValue behind GetValue
-// therefore keeps resolving "a.b" to the nested value, so no config which resolves today changes
-// meaning.
-TEST(StructUtilsTest, NestedAndLiteralKeysAreDistinctlyAddressable) {
-  const auto payload = makeStruct(R"({"a": {"b": "from-nested"}, "a.b": "from-literal"})");
-  StructUtils utils(payload);
-
-  const Protobuf::Value* found = nullptr;
-  EXPECT_EQ(StructUtils::OK, utils.GetValue("a.b", found));
-  EXPECT_EQ("from-nested", found->string_value());
-
-  EXPECT_EQ(StructUtils::OK, utils.GetLiteralValue("a.b", found));
-  EXPECT_EQ("from-literal", found->string_value());
+  const Protobuf::Value* split_found = nullptr;
+  const Protobuf::Value* path_found = nullptr;
+  EXPECT_EQ(StructUtils::OK, utils.GetValue("nested.nested-2.key-2", split_found));
+  EXPECT_EQ(StructUtils::OK, utils.GetValueByPath({"nested", "nested-2", "key-2"}, path_found));
+  EXPECT_EQ(split_found, path_found);
 }
 
 // ---------------------------------------------------------------------------

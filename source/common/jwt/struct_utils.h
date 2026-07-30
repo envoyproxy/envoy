@@ -8,6 +8,8 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace JwtVerify {
 
@@ -44,20 +46,17 @@ public:
   // NOLINTNEXTLINE(readability-identifier-naming)
   FindResult GetStringList(const std::string& name, std::vector<std::string>* list);
 
-  // Find the value with nested names: `nested_names` is split on "." and walked as a path into
-  // nested JSON objects, so "a.b.c" resolves to `c` inside `b` inside `a`. Returns MISSING if a
-  // path element does not exist, and WRONG_TYPE if an intermediate element is not an object.
-  //
-  // A claim whose name literally contains a "." is therefore not reachable here; use
-  // GetLiteralValue. Falling back from one lookup to the other is the caller's choice.
+  // Walk `path`, matching each segment in full against a key of the enclosing object. Returns
+  // MISSING if a segment has no such key, and WRONG_TYPE if a non-terminal segment is not an
+  // object. Segments are never split, so keys containing "." are reachable.
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  FindResult GetValueByPath(absl::Span<const std::string> path, const Protobuf::Value*& found);
+
+  // Find the value at the path obtained by splitting `nested_names` on ".", so "a.b.c" resolves
+  // to `c` inside `b` inside `a`. A claim whose own name contains a "." is therefore not
+  // reachable here; use GetValueByPath.
   // NOLINTNEXTLINE(readability-identifier-naming)
   FindResult GetValue(const std::string& nested_names, const Protobuf::Value*& found);
-
-  // Find the value for a single top-level key, matched as an exact whole string. `name` is never
-  // split, so this reaches claims whose names contain dots, such as the URL-namespaced
-  // "http://example.org/parent_token". Returns MISSING if there is no such top-level key.
-  // NOLINTNEXTLINE(readability-identifier-naming)
-  FindResult GetLiteralValue(const std::string& name, const Protobuf::Value*& found);
 
 private:
   const Protobuf::Struct& struct_pb_;

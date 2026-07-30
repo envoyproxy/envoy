@@ -905,34 +905,58 @@ message PerRouteConfig {
 
 // This message specifies a combination of header name and claim name.
 message JwtClaimToHeader {
+  // Specifies a segment in a path for retrieving a claim from the JWT payload.
+  // Currently, only key-based segments (claim names) are supported.
+  message PathSegment {
+    oneof segment {
+      option (validate.required) = true;
+
+      // If specified, use this key to retrieve the value in the enclosing JSON object. The key is
+      // matched in full, so it may itself contain dots.
+      string key = 1 [(validate.rules).string = {min_len: 1}];
+    }
+  }
+
   // The HTTP header name to copy the claim to.
   // The header name will be sanitized and replaced.
   string header_name = 1
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
-  // The field name for the JWT Claim : it can be a nested claim of type (eg. "claim.nested.key", "sub")
-  // String separated with "." in case of nested claims. The nested claim name must use dot "." to separate
-  // the JSON name path.
+  // The name of the claim to copy, split on "." to address nested claims: ``sub`` selects the
+  // top-level ``sub`` claim, and ``nested.claim.key`` selects ``key`` inside ``claim`` inside
+  // ``nested``.
   //
-  // The claim is looked up in two steps:
+  // Because the name is always split, a claim whose own name contains a dot -- a URL-namespaced
+  // claim such as ``http://example.org/parent_token`` -- is not addressable this way. Use
+  // :ref:`claim_path
+  // <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.claim_path>` for
+  // those.
   //
-  // 1. ``claim_name`` is split on "." and walked as a path into nested JSON objects, so
-  //    ``nested.key`` resolves to ``key`` inside the ``nested`` object. This is always tried first.
+  // Exactly one of ``claim_name`` and ``claim_path`` must be set.
+  string claim_name = 2;
+
+  // The path to the claim to copy, given as an explicit list of segments. Each segment is matched
+  // in full against a key of the enclosing JSON object, so claim names containing dots are
+  // addressable. For the payload ``{"a.b": {"c.d": "x.y.z"}}``, the value ``x.y.z`` is selected
+  // by:
   //
-  // 2. Only if step 1 does not resolve, ``claim_name`` is looked up as a single literal top-level
-  //    claim name. This is what makes claim names which themselves contain dots reachable, in
-  //    particular URL-namespaced claims such as ``http://example.org/parent_token``.
+  // .. code-block:: yaml
   //
-  // Because the nested path always takes precedence, a payload which contains both a literal
-  // ``a.b`` claim and a nested ``a`` object holding ``b`` resolves ``a.b`` to the nested value.
+  //   claim_to_headers:
+  //   - header_name: x-jwt-claim
+  //     claim_path:
+  //     - key: a.b
+  //     - key: c.d
   //
-  // Note as a security consideration that a nested claim can therefore shadow a literal one: a
-  // payload containing ``{"http://example": {"com/role": ...}}`` resolves the claim name
-  // ``http://example.com/role``, so operators whose issuer permits attacker-influenced claim
-  // names should account for this where the resulting header feeds an authorization decision.
+  // and a URL-namespaced top-level claim by:
   //
-  // Step 2 can be disabled, restoring the previous behavior in which a ``claim_name`` containing
-  // dots was only ever treated as a nested path, by setting the runtime guard
-  // ``envoy.reloadable_features.jwt_authn_literal_claim_name_fallback`` to ``false``.
-  string claim_name = 2 [(validate.rules).string = {min_len: 1}];
+  // .. code-block:: yaml
+  //
+  //   claim_to_headers:
+  //   - header_name: x-jwt-claim
+  //     claim_path:
+  //     - key: http://example.org/parent_token
+  //
+  // Exactly one of ``claim_name`` and ``claim_path`` must be set.
+  repeated PathSegment claim_path = 3 [(validate.rules).repeated = {min_items: 1}];
 }

@@ -378,6 +378,71 @@ providers:
   EXPECT_TRUE(creation_status.ok());
 }
 
+TEST(HttpJwtAuthnFilterConfigTest, ClaimToHeaderWithClaimPathOnly) {
+  // claim_name has no PGV min_len, so a claim_path-only entry must reach the filter's own check.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    claim_to_headers:
+    - header_name: x-jwt-claim
+      claim_path:
+      - key: "a.b"
+      - key: "c.d"
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_TRUE(creation_status.ok());
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, ClaimToHeaderWithBothClaimNameAndClaimPath) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    claim_to_headers:
+    - header_name: x-jwt-claim
+      claim_name: sub
+      claim_path:
+      - key: sub
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("does not set exactly one of claim_name and claim_path")));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, ClaimToHeaderWithNeitherClaimNameNorClaimPath) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    claim_to_headers:
+    - header_name: x-jwt-claim
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("does not set exactly one of claim_name and claim_path")));
+}
+
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksAsyncFetchRefetchDurationVeryBig) {
   // failed_refetch_duration.duration.seconds should be less than:
   // 9223372036 = max_int64 / 1e9, which is about 300 years.

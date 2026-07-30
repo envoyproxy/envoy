@@ -178,13 +178,29 @@ providers:
       claim_name: "nested.nested-2.key-4"
     - header_name: "x-jwt-claim-object-key"
       claim_name: "nested.nested-2.key-5"
-    # A URL-shaped claim name: the dots belong to the literal claim name, not to a nested path.
+    # Claim names which themselves contain dots are addressed one segment at a time.
     - header_name: "x-jwt-claim-url-name"
-      claim_name: "http://example.org/parent_token"
+      claim_path:
+      - key: "http://example.org/parent_token"
     - header_name: "x-jwt-claim-url-value"
       claim_name: "some_url_value"
     - header_name: "x-jwt-claim-parent-token"
       claim_name: "parent_token"
+    - header_name: "x-jwt-claim-dotted-nested"
+      claim_path:
+      - key: "a.b"
+      - key: "c.d"
+    - header_name: "x-jwt-claim-dotted-object"
+      claim_path:
+      - key: "a.b"
+    - header_name: "x-jwt-claim-dotted-list"
+      claim_path:
+      - key: "g.h"
+      - key: "list"
+    - header_name: "x-jwt-claim-dotted-unresolvable"
+      claim_path:
+      - key: "a.b"
+      - key: "no-such-segment"
 rules:
 - match:
     path: "/"
@@ -240,7 +256,8 @@ providers:
     - header_name: "x-jwt-claim-nested"
       claim_name: "nested.key-1"
     - header_name: "x-jwt-claim-url-name"
-      claim_name: "http://example.org/parent_token"
+      claim_path:
+      - key: "http://example.org/parent_token"
     clear_route_cache: true
 rules:
 - match:
@@ -463,6 +480,25 @@ const char UrlClaimNameToken[] =
     "aY-elJs9Lo-630jWNQenbdywXgcK_N8B6tImf0oV8jdi8IwL7oMn9YssvHuvCAq-KjyRMqhJoDUWCw24aEwvJRVh6MI9"
     "B-SPz4xoVtqIDhR_ojo2RKzPEdvshTY65zA5vidfqQgcE-3oZcRe3dkHcHSriVTmG2FXnMag1z1ZbK0_6rViGoF4W9Of"
     "V9OKzFA4gw1lP199WrTMWTPH25khQ9H-BWAg";
+
+// A payload whose dotted claim names are nested, which no "."-joined claim_name can address.
+// Signed with the RS256 private key at the top of this file; iss/aud/exp match ExampleConfig.
+// {
+//   "iss": "https://example.com",
+//   "sub": "test@example.com",
+//   "aud": "example_service",
+//   "exp": 2001001001,
+//   "a.b": {"c.d": "x.y.z"},
+//   "g.h": {"list": ["str1", "str2"]}
+// }
+const char DottedClaimNameToken[] =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBl"
+    "eGFtcGxlLmNvbSIsImF1ZCI6ImV4YW1wbGVfc2VydmljZSIsImV4cCI6MjAwMTAwMTAwMSwiYS5iIjp7ImMuZCI6Ingue"
+    "S56In0sImcuaCI6eyJsaXN0IjpbInN0cjEiLCJzdHIyIl19fQ.XRVSVP-ETjG4cT1dXtX5AnQCLxbAydK2BRY3eYPVZHN"
+    "qc7m4W0bYA_wH6LYTLLBo9bKR_q09eI_AcVHy49l6NEo9DYws5dN0Laoto0JjqUy6xxXYP7ewJKkuQLrvA1y5U0cShpEo"
+    "M6SoX3aOi_wUK_9yUQDWo-SoIjKfH13Dz8AAxe7PB3QcKyAd2sn19VNgrCsUiHLbPwpZw_kL5agCwa5QzStD7T4SqobPF"
+    "i0hph5jR4dwBINEMCbyt1m6q3iPOa7knqVz6gZaZGe0yDvIIFWwIPPdPUdhxf9K0xuTANxLnkXNHf31qDTVciC2dnDXkS"
+    "unexTLCGC5QazU1XrLzA";
 
 // Expected base64 payload value.
 const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
