@@ -41,7 +41,7 @@ private:
   // A `StreamInfo` is required, but in this context we don't have one, so create an empty one.
   // This allows formatters that don't require any stream info to succeed, such as extensions that
   // load data externally for API keys and similar.
-  const StreamInfo::StreamInfoImpl stream_info_;
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 } // namespace Http
