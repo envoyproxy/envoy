@@ -430,6 +430,8 @@ protected:
     absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
     uint32_t cookie_count_;
+    uint64_t discarded_host_header_size_{0};
+    uint32_t discarded_host_header_count_{0};
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
     bool remote_rst_ : 1;
@@ -646,6 +648,7 @@ protected:
   StreamImpl* getStreamUnchecked(int32_t stream_id);
   int saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value);
   void recordHistogramsForStream(StreamImpl& stream);
+  int checkHeaderLimits(StreamImpl& stream);
 
   /**
    * Copies any frames pending internally by nghttp2 into outbound buffer.
