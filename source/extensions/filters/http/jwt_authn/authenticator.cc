@@ -89,7 +89,7 @@ private:
   void startVerify();
 
   // Copy the JWT Claim to HTTP Header. Returns true iff header is added.
-  bool addJWTClaimToHeader(absl::Span<const std::string> claim_path,
+  bool addJWTClaimToHeader(absl::Span<const absl::string_view> claim_path,
                            const std::string& header_name);
 
   // The jwks cache object.
@@ -337,7 +337,7 @@ void AuthenticatorImpl::verifyKey() {
   handleGoodJwt(/*cache_hit=*/false);
 }
 
-bool AuthenticatorImpl::addJWTClaimToHeader(absl::Span<const std::string> claim_path,
+bool AuthenticatorImpl::addJWTClaimToHeader(absl::Span<const absl::string_view> claim_path,
                                             const std::string& header_name) {
   StructUtils payload_getter(jwt_->payload_pb_);
   const Protobuf::Value* claim_value;

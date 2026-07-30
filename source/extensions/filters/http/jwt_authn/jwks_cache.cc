@@ -54,6 +54,9 @@ public:
     // FilterConfigImpl checks that every entry sets exactly one of claim_name and claim_path
     // before it constructs the JwksCache, so by this point claim_path being empty means
     // claim_name is set, and vice versa.
+    // The stored segments are views into jwt_provider_, never into a temporary: claim_name() and
+    // key() both return a reference to a string the proto owns, and absl::StrSplit deletes its
+    // rvalue-std::string overloads, so splitting a temporary here would not compile.
     for (const auto& claim_to_header : jwt_provider_.claim_to_headers()) {
       ClaimToHeader entry{{}, claim_to_header.header_name()};
       if (claim_to_header.claim_path().empty()) {

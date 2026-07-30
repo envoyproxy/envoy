@@ -87,7 +87,7 @@ StructUtils::FindResult StructUtils::GetStringList(const std::string& name,
   return WRONG_TYPE;
 }
 
-StructUtils::FindResult StructUtils::GetValueByPath(absl::Span<const std::string> path,
+StructUtils::FindResult StructUtils::GetValueByPath(absl::Span<const absl::string_view> path,
                                                     const Protobuf::Value*& found) {
   const Protobuf::Struct* current_struct = &struct_pb_;
   for (size_t i = 0; i < path.size(); ++i) {
@@ -110,7 +110,7 @@ StructUtils::FindResult StructUtils::GetValueByPath(absl::Span<const std::string
 
 StructUtils::FindResult StructUtils::GetValue(const std::string& nested_names,
                                               const Protobuf::Value*& found) {
-  const std::vector<std::string> name_vector = absl::StrSplit(nested_names, '.');
+  const std::vector<absl::string_view> name_vector = absl::StrSplit(nested_names, '.');
   return GetValueByPath(name_vector, found);
 }
 

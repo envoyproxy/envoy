@@ -52,8 +52,11 @@ public:
   class JwksData {
   public:
     // A `claim_to_headers` entry with its claim path resolved once, at config load.
+    // The segments point into the JwtProvider proto, which the FilterConfig owns and never
+    // mutates after construction, and which every in-flight request keeps alive via its
+    // FilterConfigSharedPtr. They must not point at anything shorter-lived.
     struct ClaimToHeader {
-      std::vector<std::string> claim_path_;
+      std::vector<absl::string_view> claim_path_;
       std::string header_name_;
     };
 
