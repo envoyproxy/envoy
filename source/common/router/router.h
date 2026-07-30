@@ -331,10 +331,8 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
-  bool continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster, Http::RequestHeaderMap& headers,
-                             bool end_stream, Upstream::HostConstSharedPtr&& host,
-                             absl::string_view host_selection_details = {},
-                             absl::optional<Http::Code> failure_status = absl::nullopt);
+  bool continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_stream,
+                             GenericConnPoolPtr generic_conn_pool);
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
@@ -574,9 +572,8 @@ private:
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
 
-  std::unique_ptr<GenericConnPool>
-  createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                 Upstream::HostConstSharedPtr host);
+  GenericConnPoolPtr createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                                    const Upstream::HostConstSharedPtr& host);
   UpstreamRequestPtr createUpstreamRequest();
   absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
                                                      const Http::HeaderMap& headers) const;
@@ -617,9 +614,7 @@ private:
                               absl::optional<uint64_t> code);
   void doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry);
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
-                       Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster,
-                       absl::string_view host_selection_details,
-                       absl::optional<Http::Code> failure_status = absl::nullopt);
+                       GenericConnPoolPtr generic_conn_pool);
   void updateStatsOnNoRetry(RetryStatus retry_status);
   void updateStatsOnDoRetry(RetryState::DoRetryType do_retry_type);
 
@@ -638,6 +633,10 @@ private:
   void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
                                   UpstreamRequest& upstream_request);
   bool isEarlyConnectData();
+  GenericConnPoolPtr createConnPoolOrHandleFailure(Upstream::HostConstSharedPtr host,
+                                                   Upstream::ThreadLocalCluster* cluster,
+                                                   absl::string_view selection_details,
+                                                   absl::optional<Http::Code> failure_status);
 
   RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;
@@ -648,8 +647,7 @@ private:
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_{};
   RouteStatsContextOptRef route_stats_context_;
-  std::function<void(Upstream::HostConstSharedPtr&& host, absl::string_view details)>
-      on_host_selected_;
+  std::function<void(GenericConnPoolPtr)> on_host_selected_;
   std::unique_ptr<Upstream::AsyncHostSelectionHandle> host_selection_cancelable_;
   Event::TimerPtr response_timeout_;
   TimeoutData timeout_;
