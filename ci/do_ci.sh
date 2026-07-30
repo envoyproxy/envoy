@@ -306,9 +306,10 @@ function build_openssl_presubmit() {
     local merge_base
     if [[ -n "${CI_TARGET_BRANCH}" ]]; then
         git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
-        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "")"
-    fi
-    if [[ -z "${merge_base}" ]]; then
+        # Shallow clones may lack enough history for merge-base;
+        # fall back to diffing against the target branch directly.
+        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
+    else
         merge_base="HEAD~1"
     fi
 
