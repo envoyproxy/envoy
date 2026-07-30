@@ -532,8 +532,13 @@ Migrating from zone-aware routing? The per-request zone routing counters
 ``lb_zone_routing_cross_zone``) are still emitted with equivalent semantics,
 recorded for the locality this policy selects. They are not incremented
 while the priority is in panic mode.
-``lb_recalculate_zone_structures`` is still emitted at cluster scope when
-per-locality routing structures are rebuilt on membership changes (as in
-zone-aware routing), not per weight-update tick. The per-tick counter closest
-to ``lb_zone_routing_all_directly`` is
+``lb_recalculate_zone_structures`` is emitted at cluster scope when a
+priority's per-locality routing structures are rebuilt, not per weight-update
+tick. Its semantics are **not** equivalent to zone-aware routing, which
+increments it on every membership change but only for priority 0 and only when
+a local cluster is configured. This policy increments it for any priority, but
+only when locality topology changes -- a locality or priority is added or
+removed. Membership churn within existing localities does not increment it, so
+expect a substantially lower rate than zone-aware reported for the same
+cluster. The per-tick counter closest to ``lb_zone_routing_all_directly`` is
 ``load_aware_locality.local_preferred_total``.
