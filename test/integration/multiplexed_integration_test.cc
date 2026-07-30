@@ -3341,6 +3341,45 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   tcp_client_->close();
 }
 
+TEST_P(Http2FrameIntegrationTest, HostExceedsHeaderMapSizeLimit) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_max_request_headers_kb()->set_value(2); });
+  beginSession();
+
+  uint32_t request_idx = 0;
+  std::string large_host(2000, 'a');
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", large_host}});
+  sendFrame(request);
+
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, frame.type());
+  tcp_client_->close();
+  if (GetParam().http2_implementation == Http2Impl::Nghttp2) {
+    test_server_->waitForCounterGe("http2.header_list_size_too_large", 1);
+  }
+}
+
+TEST_P(Http2FrameIntegrationTest, HostExceedsHeaderMapCountLimit) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(4);
+      });
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", "two.example.com"}});
+  sendFrame(request);
+
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, frame.type());
+  tcp_client_->close();
+  test_server_->waitForCounterGe("http2.header_overflow", 1);
+}
+
 // Tests that an empty metadata map from upstream is ignored.
 TEST_P(MetadataIntegrationTest, UpstreamSendingEmptyMetadata) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
