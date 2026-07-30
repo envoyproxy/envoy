@@ -9,6 +9,7 @@
 #endif
 
 #include <cstdint>
+#include <iterator>
 #include <list>
 #include <memory>
 #include <string>
@@ -800,9 +801,9 @@ TEST(PacketLoss, LossTest) {
 
   // Send a packet.
   char buf[2048];
-  memset(buf, 0, ABSL_ARRAYSIZE(buf));
-  EXPECT_EQ(ABSL_ARRAYSIZE(buf), sendto(fd, buf, ABSL_ARRAYSIZE(buf), 0,
-                                        reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+  memset(buf, 0, std::size(buf));
+  EXPECT_EQ(std::size(buf), sendto(fd, buf, std::size(buf), 0,
+                                   reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
   // Verify the packet is dropped.
   IoSocketHandleImpl handle(fd);
@@ -824,8 +825,8 @@ TEST(PacketLoss, LossTest) {
   EXPECT_EQ(0, packets_read);
 
   // Send another packet.
-  EXPECT_EQ(ABSL_ARRAYSIZE(buf), sendto(fd, buf, ABSL_ARRAYSIZE(buf), 0,
-                                        reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+  EXPECT_EQ(std::size(buf), sendto(fd, buf, std::size(buf), 0,
+                                   reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
   // Make sure the drop count is now 2.
   Utility::readFromSocket(handle, *address, processor, time_source, recv_msg_method,
