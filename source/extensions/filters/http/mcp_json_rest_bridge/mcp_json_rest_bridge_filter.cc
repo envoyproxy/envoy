@@ -592,6 +592,10 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
     // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
     // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+    // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+    // certain authorization errors, we assume authorization checks (e.g., OAuth token
+    // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+    // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
     if (response_code != static_cast<int>(Http::Code::Unauthorized) &&
         response_code != static_cast<int>(Http::Code::Forbidden)) {
       response_headers.setStatus(enumToInt(Http::Code::OK));
@@ -622,6 +626,10 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
     // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
     // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+    // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+    // certain authorization errors, we assume authorization checks (e.g., OAuth token
+    // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+    // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
     if (response_code != static_cast<int>(Http::Code::Unauthorized) &&
         response_code != static_cast<int>(Http::Code::Forbidden)) {
       response_headers.setStatus(enumToInt(Http::Code::OK));
@@ -1062,6 +1070,10 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
       // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
       // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+      // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+      // certain authorization errors, we assume authorization checks (e.g., OAuth token
+      // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+      // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
       if (status_code != static_cast<int>(Http::Code::Unauthorized) &&
           status_code != static_cast<int>(Http::Code::Forbidden)) {
         response_headers->setStatus(enumToInt(Http::Code::OK));
