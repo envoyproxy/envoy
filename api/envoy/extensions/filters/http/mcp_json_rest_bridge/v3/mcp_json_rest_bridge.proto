@@ -147,8 +147,8 @@ message McpJsonRestBridge {
   // This allows the route to be re-selected based on the updated request path or method.
   bool disable_clear_route_cache = 7;
 
-  // When set to true, the filter will not set up a fallback path at "/mcp" when host/path are not specified.
-  bool no_fallback_path = 8;
+  // When set to true, the filter will take no action unless per-route config is available.
+  bool per_route_only = 8;
 }
 
 // Options for trace context extraction.

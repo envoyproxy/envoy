@@ -1451,12 +1451,12 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallStreamingErrorResponse) {
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
 }
 
-TEST_P(McpJsonRestBridgeIntegrationTest, NoFallbackPathNoOpModeIntegrationTest) {
+TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteOnlyNoOpModeIntegrationTest) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
-      no_fallback_path: true
+      per_route_only: true
   )EOF";
 
   initializeFilter(config);
@@ -1504,12 +1504,12 @@ TEST_P(McpJsonRestBridgeIntegrationTest, NoFallbackPathNoOpModeIntegrationTest) 
   EXPECT_THAT(response->body(), StrEq("raw backend response"));
 }
 
-TEST_P(McpJsonRestBridgeIntegrationTest, NoFallbackPathWithExplicitPerRouteConfigWorks) {
+TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteOnlyWithExplicitPerRouteConfigWorks) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
-      no_fallback_path: true
+      per_route_only: true
   )EOF";
 
   // Override config_helper_ directly to add per-route config.

@@ -178,12 +178,12 @@ TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAccepte
             Http::FilterHeadersStatus::Continue);
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathNoOpMode) {
-  proto_config_.set_no_fallback_path(true);
+TEST_F(McpJsonRestBridgeFilterTest, PerRouteOnlyNoOpMode) {
+  proto_config_.set_per_route_only(true);
   makeFilter();
 
-  // With no_fallback_path enabled and no default server host/path specified,
-  // even a request to "/mcp" should just pass through since no fallback path is configured.
+  // With per_route_only enabled and no per-route config, a request to "/mcp" should pass through
+  // instead of matching the hardcoded fallback path.
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::Continue);
@@ -192,11 +192,11 @@ TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathNoOpMode) {
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathNoOpModePreventsPerRouteFallback) {
-  proto_config_.set_no_fallback_path(true);
+TEST_F(McpJsonRestBridgeFilterTest, PerRouteOnlyWithEmptyPerRouteConfigMatchesFallback) {
+  proto_config_.set_per_route_only(true);
   makeFilter();
 
-  // Add an empty per route config (which would normally set up the /mcp fallback)
+  // Add an empty per route config (which sets up the /mcp fallback)
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
       per_route_proto;
   auto per_route_config = std::make_shared<McpJsonRestBridgePerRouteConfig>(per_route_proto);
@@ -204,16 +204,15 @@ TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathNoOpModePreventsPerRouteFallba
   EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
       .WillRepeatedly(Return(per_route_config.get()));
 
+  // Since per-route config is present, per_route_only does not skip it. The empty per-route config
+  // has a fallback to /mcp, so it should match.
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
-            Http::FilterHeadersStatus::Continue);
-
-  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
-  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+            Http::FilterHeadersStatus::StopIteration);
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, NoFallbackPathWithExplicitPerRouteConfigWorks) {
-  proto_config_.set_no_fallback_path(true);
+TEST_F(McpJsonRestBridgeFilterTest, PerRouteOnlyWithExplicitPerRouteConfigWorks) {
+  proto_config_.set_per_route_only(true);
   makeFilter();
 
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute

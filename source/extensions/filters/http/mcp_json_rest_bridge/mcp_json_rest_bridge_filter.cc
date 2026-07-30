@@ -237,30 +237,23 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
   const auto& tool_config = proto_config_.tool_config();
   std::string host = tool_config.default_server_info().host();
   std::string path = tool_config.default_server_info().path();
-  bool skip_endpoint_setup = false;
   if (host.empty() && path.empty()) {
-    if (proto_config_.no_fallback_path()) {
-      skip_endpoint_setup = true;
-    } else {
-      path = "/mcp";
+    path = "/mcp";
+  }
+  EndpointKey key{host, path};
+  auto& endpoint_config = endpoint_configs_[key];
+  for (const auto& tool : tool_config.tools()) {
+    if (endpoint_config.tool_entries
+            .try_emplace(tool.name(),
+                         ToolEntry{tool.http_rule(), tool.text_content_streaming_enabled(), &tool})
+            .second) {
+      endpoint_config.tools.push_back(&tool);
     }
   }
-  if (!skip_endpoint_setup) {
-    EndpointKey key{host, path};
-    auto& endpoint_config = endpoint_configs_[key];
-    for (const auto& tool : tool_config.tools()) {
-      if (endpoint_config.tool_entries
-              .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
-                                                  tool.text_content_streaming_enabled(), &tool})
-              .second) {
-        endpoint_config.tools.push_back(&tool);
-      }
-    }
-    if (tool_config.has_tool_list_http_rule()) {
-      endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
-    }
-    endpoint_config.tool_list_local = tool_config.has_tool_list_local();
+  if (tool_config.has_tool_list_http_rule()) {
+    endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
   }
+  endpoint_config.tool_list_local = tool_config.has_tool_list_local();
 
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
 }
@@ -357,20 +350,16 @@ McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
     : proto_config_(proto_config) {
   if (proto_config_.tool_config().empty()) {
     EndpointKey key{"", "/mcp"};
-    auto& endpoint_config = endpoint_configs_[key];
-    endpoint_config.is_fallback_path = true;
+    endpoint_configs_.try_emplace(key, EndpointConfig());
   } else {
     for (const auto& tool_config : proto_config_.tool_config()) {
       std::string host = tool_config.default_server_info().host();
       std::string path = tool_config.default_server_info().path();
-      bool is_fallback = false;
       if (host.empty() && path.empty()) {
         path = "/mcp";
-        is_fallback = true;
       }
       EndpointKey key{host, path};
       auto& endpoint_config = endpoint_configs_[key];
-      endpoint_config.is_fallback_path = is_fallback;
       for (const auto& tool : tool_config.tools()) {
         if (endpoint_config.tool_entries
                 .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
@@ -394,13 +383,10 @@ McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgePerRouteConfig::getHttpRule(absl::string_view tool_name, absl::string_view host,
-                                             absl::string_view path, bool no_fallback_path) const {
+                                             absl::string_view path) const {
   for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
-      if (no_fallback_path && it->second.is_fallback_path) {
-        continue;
-      }
       auto tool_it = it->second.tool_entries.find(tool_name);
       if (tool_it != it->second.tool_entries.end()) {
         return tool_it->second.http_rule;
@@ -413,14 +399,10 @@ McpJsonRestBridgePerRouteConfig::getHttpRule(absl::string_view tool_name, absl::
 
 bool McpJsonRestBridgePerRouteConfig::textContentStreamingEnabled(absl::string_view tool_name,
                                                                   absl::string_view host,
-                                                                  absl::string_view path,
-                                                                  bool no_fallback_path) const {
+                                                                  absl::string_view path) const {
   for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
-      if (no_fallback_path && it->second.is_fallback_path) {
-        continue;
-      }
       auto tool_it = it->second.tool_entries.find(tool_name);
       if (tool_it != it->second.tool_entries.end()) {
         return tool_it->second.text_content_streaming_enabled;
@@ -432,14 +414,10 @@ bool McpJsonRestBridgePerRouteConfig::textContentStreamingEnabled(absl::string_v
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgePerRouteConfig::getToolsListHttpRule(absl::string_view host,
-                                                      absl::string_view path,
-                                                      bool no_fallback_path) const {
+                                                      absl::string_view path) const {
   for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
-      if (no_fallback_path && it->second.is_fallback_path) {
-        continue;
-      }
       if (it->second.tool_list_http_rule.has_value()) {
         return *it->second.tool_list_http_rule;
       }
@@ -449,21 +427,16 @@ McpJsonRestBridgePerRouteConfig::getToolsListHttpRule(absl::string_view host,
 }
 
 std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
-McpJsonRestBridgePerRouteConfig::toolListLocalTools(absl::string_view host, absl::string_view path,
-                                                    bool no_fallback_path) const {
+McpJsonRestBridgePerRouteConfig::toolListLocalTools(absl::string_view host,
+                                                    absl::string_view path) const {
   std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*> tools;
   absl::flat_hash_set<absl::string_view> added_tools;
   for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
-    if (it != endpoint_configs_.end()) {
-      if (no_fallback_path && it->second.is_fallback_path) {
-        continue;
-      }
-      if (it->second.tool_list_local) {
-        for (const auto* tool : it->second.tools) {
-          if (added_tools.insert(tool->name()).second) {
-            tools.push_back(tool);
-          }
+    if (it != endpoint_configs_.end() && it->second.tool_list_local) {
+      for (const auto* tool : it->second.tools) {
+        if (added_tools.insert(tool->name()).second) {
+          tools.push_back(tool);
         }
       }
     }
@@ -471,14 +444,11 @@ McpJsonRestBridgePerRouteConfig::toolListLocalTools(absl::string_view host, absl
   return tools;
 }
 
-bool McpJsonRestBridgePerRouteConfig::toolListLocal(absl::string_view host, absl::string_view path,
-                                                    bool no_fallback_path) const {
+bool McpJsonRestBridgePerRouteConfig::toolListLocal(absl::string_view host,
+                                                    absl::string_view path) const {
   for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
     if (it != endpoint_configs_.end()) {
-      if (no_fallback_path && it->second.is_fallback_path) {
-        continue;
-      }
       if (it->second.tool_list_local) {
         return true;
       }
@@ -487,14 +457,10 @@ bool McpJsonRestBridgePerRouteConfig::toolListLocal(absl::string_view host, absl
   return false;
 }
 
-bool McpJsonRestBridgePerRouteConfig::hasEndpoint(absl::string_view host, absl::string_view path,
-                                                  bool no_fallback_path) const {
+bool McpJsonRestBridgePerRouteConfig::hasEndpoint(absl::string_view host,
+                                                  absl::string_view path) const {
   for (const auto& key : getEndpointLookupKeys(host, path)) {
-    auto it = endpoint_configs_.find(key);
-    if (it != endpoint_configs_.end()) {
-      if (no_fallback_path && it->second.is_fallback_path) {
-        continue;
-      }
+    if (endpoint_configs_.contains(key)) {
       return true;
     }
   }
@@ -515,9 +481,14 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
           decoder_callbacks_);
+  if (config_->perRouteOnly() && per_route_config == nullptr) {
+    mcp_operation_ = McpOperation::Unspecified;
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   bool has_endpoint = false;
   if (per_route_config != nullptr) {
-    has_endpoint = per_route_config->hasEndpoint(server_name, path, config_->noFallbackPath());
+    has_endpoint = per_route_config->hasEndpoint(server_name, path);
   } else {
     has_endpoint = config_->hasEndpoint(server_name, path);
   }
@@ -868,14 +839,12 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
 
   if (method == McpConstants::Methods::TOOLS_LIST) {
     std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
-        tool_list_local_tools =
-            (per_route_config == nullptr) ? config_->toolListLocalTools(server_name_, path_)
-                                          : per_route_config->toolListLocalTools(
-                                                server_name_, path_, config_->noFallbackPath());
+        tool_list_local_tools = (per_route_config == nullptr)
+                                    ? config_->toolListLocalTools(server_name_, path_)
+                                    : per_route_config->toolListLocalTools(server_name_, path_);
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
         (per_route_config == nullptr) ? config_->getToolsListHttpRule(server_name_, path_)
-                                      : per_route_config->getToolsListHttpRule(
-                                            server_name_, path_, config_->noFallbackPath());
+                                      : per_route_config->getToolsListHttpRule(server_name_, path_);
     if (http_rule.ok() && !http_rule->get().empty()) {
       mcp_operation_ = McpOperation::ToolsList;
       // We don't support pagination for the tools/list request for now.
@@ -898,11 +867,10 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
                                      : json::object());
       return;
     } else {
-      bool is_local =
-          (per_route_config == nullptr)
-              ? config_->toolListLocal(server_name_, path_)
-              : per_route_config->toolListLocal(server_name_, path_, config_->noFallbackPath());
-      if (is_local) {
+      bool tool_list_local = (per_route_config == nullptr)
+                                 ? config_->toolListLocal(server_name_, path_)
+                                 : per_route_config->toolListLocal(server_name_, path_);
+      if (tool_list_local) {
         mcp_operation_ = McpOperation::ToolsListLocal;
         serveToolsListLocal(json_rpc, tool_list_local_tools);
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
@@ -1102,8 +1070,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
       (per_route_config == nullptr) ? config_->getHttpRule(tool_name, server_name_, path_)
-                                    : per_route_config->getHttpRule(tool_name, server_name_, path_,
-                                                                    config_->noFallbackPath());
+                                    : per_route_config->getHttpRule(tool_name, server_name_, path_);
 
   if (!http_rule.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
@@ -1118,8 +1085,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   text_content_streaming_enabled_ =
       (per_route_config == nullptr)
           ? config_->textContentStreamingEnabled(tool_name, server_name_, path_)
-          : per_route_config->textContentStreamingEnabled(tool_name, server_name_, path_,
-                                                          config_->noFallbackPath());
+          : per_route_config->textContentStreamingEnabled(tool_name, server_name_, path_);
 
   const auto arguments_it = params.find(McpConstants::ARGUMENTS_FIELD);
   if (arguments_it != params.end() && !arguments_it->is_object()) {

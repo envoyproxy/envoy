@@ -1,1 +1,0 @@
-Added ``no_fallback_path`` config to ``McpJsonRestBridge``. When set, the filter will not set up a fallback path at ``/mcp`` when no host or path are specified in config, and instead will perform no action on any incoming request.
