@@ -12,6 +12,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -30,8 +31,6 @@
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/notification.h"
 #include "source/common/common/utility.h"
-#include "envoy/config/listener/v3/listener.pb.h"
-
 #include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
@@ -1076,8 +1075,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // that no subscription requests are sent until all subscriptions have been registered
     // in the init callbacks. The pause is lifted when resume goes out of scope.
     const auto listener_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>();
-    Config::ScopedResume resume =
-        xds_manager.pause(Config::dependentTypeUrls(listener_type_url));
+    Config::ScopedResume resume = xds_manager.pause(Config::dependentTypeUrls(listener_type_url));
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);

@@ -719,7 +719,8 @@ TEST_F(RdsImplTest, OnDemandVhdsEnabledWithoutDefaultCollection) {
   EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
 }
 
-// When a default virtual host collection is configured, on-demand virtual host discovery is disabled.
+// When a default virtual host collection is configured, on-demand virtual host discovery is
+// disabled.
 TEST_F(RdsImplTest, OnDemandVhdsDisabledWithDefaultCollection) {
   setup();
 

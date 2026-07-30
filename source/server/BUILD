@@ -449,6 +449,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_map",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

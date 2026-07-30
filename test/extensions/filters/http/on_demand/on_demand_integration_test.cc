@@ -1048,10 +1048,10 @@ TEST_P(OnDemandVhdsWithBodyIntegrationTest, VhdsOnDemandUpdateWithBody) {
 }
 
 // Test class for VHDS subscribing to an xdstp default virtual host collection
-// (default_virtual_host_resource_locator). On-demand virtual host discovery is disabled in this mode.
-class VhdsXdstpCollectionIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<VhdsIntegrationTestParam> {
+// (default_virtual_host_resource_locator). On-demand virtual host discovery is disabled in this
+// mode.
+class VhdsXdstpCollectionIntegrationTest : public HttpIntegrationTest,
+                                           public testing::TestWithParam<VhdsIntegrationTestParam> {
 public:
   VhdsXdstpCollectionIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
@@ -1128,12 +1128,11 @@ public:
         {"xdstp://test/envoy.config.route.v3.VirtualHost/default/*"}, {}, vhds_stream_.get()));
 
     // Deliver the initial virtual host via the xdstp collection response.
-    sendDeltaVhdsResponse(
-        vhds_stream_,
-        {{collectionResourceName("sni.lyft.com"),
-          TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-              virtualHostYaml("vhost_0", "sni.lyft.com"))}},
-        {}, "1");
+    sendDeltaVhdsResponse(vhds_stream_,
+                          {{collectionResourceName("sni.lyft.com"),
+                            TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+                                virtualHostYaml("vhost_0", "sni.lyft.com"))}},
+                          {}, "1");
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
 
