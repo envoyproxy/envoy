@@ -11,6 +11,8 @@
 
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 
+#include "source/common/upstream/host_utility.h"
+#include "source/extensions/load_balancing_policies/common/orca_weight_manager.h"
 #include "source/extensions/load_balancing_policies/load_aware_locality/config.h"
 #include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
 
@@ -1697,6 +1699,41 @@ TEST_F(LoadAwareLocalityLbTest, StoreUtilizationRejectsNonFiniteValue) {
   // Non-finite value rejected: slot remains at its initial state.
   EXPECT_DOUBLE_EQ(0.0, slot.utilization());
   EXPECT_EQ(LocalityLbHostData::kNeverReported, slot.lastUpdateTime());
+}
+
+// When paired with an endpoint-picking child that also consumes ORCA (e.g. CSWRR), both attach
+// their own HostLbPolicyData to the same host and a single in-band report fans out to each. The
+// two derive independent values from it and share no state.
+TEST_F(LoadAwareLocalityLbTest, OrcaReportFansOutToLocalityAndChildDataIndependently) {
+  auto host = makeWeightTrackingMockHost();
+
+  host->addLbPolicyData(std::make_unique<LocalityLbHostData>(simTime(), makeMetricNames({})));
+
+  // A CSWRR-style child's data on the same host.
+  Common::OrcaWeightManagerConfig child_config{};
+  child_config.error_utilization_penalty = 0.0;
+  host->addLbPolicyData(std::make_unique<Common::OrcaHostLbPolicyData>(
+      std::make_shared<Common::OrcaLoadReportHandler>(child_config, simTime())));
+
+  // One report, fanned out exactly as the router does for in-band reports.
+  auto report = makeOrcaReport(0.5);
+  report.set_rps_fractional(100);
+  uint32_t recipients = 0;
+  Upstream::HostUtility::forEachOrcaLoadReportRecipient(
+      *host, [&report, &recipients](Upstream::HostLbPolicyData& data) {
+        ++recipients;
+        EXPECT_TRUE(data.onOrcaLoadReport(report, std::nullopt).ok());
+      });
+  EXPECT_EQ(2, recipients);
+
+  auto locality_data = host->typedLbPolicyData<LocalityLbHostData>();
+  ASSERT_TRUE(locality_data.has_value());
+  EXPECT_DOUBLE_EQ(0.5, locality_data->utilization());
+
+  // The child derives a qps/utilization weight from the same report: 100 / 0.5.
+  auto child_data = host->typedLbPolicyData<Common::OrcaHostLbPolicyData>();
+  ASSERT_TRUE(child_data.has_value());
+  EXPECT_EQ(200, child_data->weight_.load());
 }
 
 } // namespace

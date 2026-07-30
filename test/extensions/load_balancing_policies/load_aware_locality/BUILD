@@ -35,6 +35,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.load_balancing_policies.load_aware_locality"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/upstream:host_utility_lib",
+        "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
         "//source/extensions/load_balancing_policies/load_aware_locality:config",
         "//source/extensions/load_balancing_policies/load_aware_locality:load_aware_locality_lb_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
