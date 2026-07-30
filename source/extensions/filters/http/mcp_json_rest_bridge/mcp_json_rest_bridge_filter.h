@@ -18,6 +18,9 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "third_party/envoy/src/envoy/stats/scope.h"
+#include "third_party/envoy/src/envoy/stats/stats.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/hash/hash.h"
 #include "absl/status/statusor.h"
@@ -30,6 +33,19 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 
 inline constexpr char FilterName[] = "envoy.filters.http.mcp_json_rest_bridge";
+
+struct McpJsonRestBrigeStatNames {
+  McpJsonRestBridgeStatNames(Stats::SymbolTable &symbol_table)
+      : mcp_method(symbol_table, "mcp_method"),
+        mcp_param(symbol_table, "mcp_param"),
+        status(symbol_table, "status"),
+        request_count(symbol_table, "http.mcp_json_rest_bridge.request_count") {}
+
+  Stats::StatNameManagedStorage mcp_method;
+  Stats::StatNameManagedStorage mcp_param;
+  Stats::StatNameManagedStorage mcp_status;
+  Stats::StatNameManagedStorage request_count;
+};
 
 struct EndpointKey {
   std::string host;
@@ -115,7 +131,7 @@ class McpJsonRestBridgeFilterConfig : public Logger::Loggable<Logger::Id::config
 public:
   explicit McpJsonRestBridgeFilterConfig(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-          proto_config);
+          proto_config, Stats::Scope& scope);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
@@ -159,6 +175,8 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  void incRequestCount(absl::string_view method, absl::string_view param, absl::string_view status);
+
 private:
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
@@ -179,6 +197,9 @@ private:
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
   bool clear_route_cache_;
+  Stats::Scope& scope_;
+  McpJsonRestBridgeStatNames stat_names_;
+  Stats::StatNameDynamicPool dynamic_stat_name_pool_;
 };
 
 class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,

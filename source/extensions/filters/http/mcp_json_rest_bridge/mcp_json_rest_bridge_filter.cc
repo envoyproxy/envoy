@@ -225,8 +225,9 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
 
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-        proto_config)
-    : proto_config_(proto_config), fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        proto_config, Stats::Scope& scope)
+    : proto_config_(proto_config), scope_(scope),
+      fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                        proto_config_.server_info(), fallback_protocol_version,
                                        std::string(McpConstants::FALLBACK_PROTOCOL_VERSION))),
       max_request_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_request_body_size,
