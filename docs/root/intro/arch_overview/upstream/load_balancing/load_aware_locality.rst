@@ -92,9 +92,13 @@ The policy is implemented as a ``ThreadAwareLoadBalancer``:
   publishes an immutable snapshot to worker threads via a thread-local slot.
   The snapshot carries only advisory per-priority locality weights; it does
   not carry priority loads, panic state, or health information.
-- Workers rebuild per-locality child LB instances via a membership-update
-  callback registered on the cluster priority set, independent of the
-  weight snapshot and ``weight_update_period``.
+- Workers create a per-locality child LB when a locality first gains hosts,
+  and rebuild a priority's children only when its locality topology changes.
+  Membership and host-attribute changes within an existing locality are
+  delivered to the child in place via ``updateHosts`` rather than by
+  recreating it. This is driven by a priority-update callback registered on
+  the cluster priority set, independent of the weight snapshot and
+  ``weight_update_period``.
 - Priority selection, health/degraded mode, and panic detection use standard
   ``LoadBalancerBase`` machinery over live worker-thread host-set state,
   recomputed on membership and health callbacks. Failover between priorities

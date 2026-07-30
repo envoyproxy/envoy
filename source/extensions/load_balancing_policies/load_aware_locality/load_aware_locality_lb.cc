@@ -344,11 +344,6 @@ WorkerLocalLbFactory::createWorkerChildLb(Upstream::PrioritySetImpl& per_localit
   return child_worker_factory_->create(child_params);
 }
 
-bool WorkerLocalLbFactory::recreateChildOnHostChange() const {
-  ASSERT(child_worker_factory_ != nullptr);
-  return child_worker_factory_->recreateOnHostChangeDeprecated();
-}
-
 Upstream::LoadBalancerPtr WorkerLocalLbFactory::create(Upstream::LoadBalancerParams params) {
   return std::make_unique<WorkerLocalLb>(*this, params.priority_set);
 }
@@ -468,7 +463,7 @@ void WorkerLocalLb::buildPerPriorityLocalities() {
 }
 
 void WorkerLocalLb::syncLocalityState(PerLocalityState& state, const Upstream::HostSet& host_set,
-                                      size_t locality_index, bool recreate_child) {
+                                      size_t locality_index) {
   static const Upstream::HostVector empty_hosts;
   const auto& all_localities = host_set.hostsPerLocality().get();
   const auto& healthy_localities = host_set.healthyHostsPerLocality().get();
@@ -486,8 +481,8 @@ void WorkerLocalLb::syncLocalityState(PerLocalityState& state, const Upstream::H
   state.locality =
       all_hosts.empty() ? envoy::config::core::v3::Locality() : all_hosts[0]->locality();
 
-  const auto sync_source = [this, is_local, recreate_child](PerSourceLocalityState& source_state,
-                                                            const Upstream::HostVector& new_hosts) {
+  const auto sync_source = [this, is_local](PerSourceLocalityState& source_state,
+                                            const Upstream::HostVector& new_hosts) {
     if (new_hosts.empty()) {
       if (source_state.priority_set != nullptr) {
         source_state.lb.reset();
@@ -523,18 +518,9 @@ void WorkerLocalLb::syncLocalityState(PerLocalityState& state, const Upstream::H
       }
     }
 
-    const bool membership_changed = !hosts_added.empty() || !hosts_removed.empty();
-    if (!membership_changed) {
-      // Host identity is unchanged, but child policies still need an update to observe in-place
-      // host attribute changes such as weight or metadata.
-      updateLocalityHosts(source_state, new_hosts, is_local, {}, {});
-      return;
-    }
-
+    // Delivered even when the deltas are empty, so child policies observe in-place host attribute
+    // changes such as weight or metadata.
     updateLocalityHosts(source_state, new_hosts, is_local, hosts_added, hosts_removed);
-    if (recreate_child) {
-      source_state.lb = factory_.createWorkerChildLb(*source_state.priority_set);
-    }
   };
 
   sync_source(state.stateFor(PriorityRoutingWeights::SelectionSource::Healthy), healthy_hosts);
@@ -556,7 +542,7 @@ void WorkerLocalLb::buildPerLocality(uint32_t priority, const Upstream::HostSet&
   per_locality.resize(locality_hosts.size());
 
   for (size_t i = 0; i < locality_hosts.size(); ++i) {
-    syncLocalityState(per_locality[i], host_set, i, /*recreate_child=*/false);
+    syncLocalityState(per_locality[i], host_set, i);
   }
 }
 
@@ -592,9 +578,8 @@ void WorkerLocalLb::syncPriority(uint32_t priority, bool allow_rebuild) {
 
   per_priority_locality_[priority].has_local_locality =
       host_set->hostsPerLocality().hasLocalLocality();
-  const bool recreate_child = factory_.recreateChildOnHostChange();
   for (size_t i = 0; i < locality_hosts.size(); ++i) {
-    syncLocalityState(per_locality[i], *host_set, i, recreate_child);
+    syncLocalityState(per_locality[i], *host_set, i);
   }
   // A membership delta can flip a locality's identity (e.g. draining to empty), so rebuild the
   // index-aligned weights on the next pick.

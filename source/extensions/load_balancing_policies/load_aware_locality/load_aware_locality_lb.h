@@ -219,9 +219,6 @@ public:
   Upstream::LoadBalancerPtr
   createWorkerChildLb(Upstream::PrioritySetImpl& per_locality_priority_set);
 
-  // Whether the child policy requires the worker LB to be recreated on host membership changes.
-  bool recreateChildOnHostChange() const;
-
   Envoy::Random::RandomGenerator& random() const { return random_; }
   Runtime::Loader& runtime() const { return runtime_; }
   uint32_t healthyPanicThreshold() const { return healthy_panic_threshold_; }
@@ -294,7 +291,7 @@ private:
                            const Upstream::HostVector& hosts_removed);
 
   void syncLocalityState(PerLocalityState& state, const Upstream::HostSet& host_set,
-                         size_t locality_index, bool recreate_child);
+                         size_t locality_index);
 
   struct PrioritySourcePick {
     uint32_t priority;

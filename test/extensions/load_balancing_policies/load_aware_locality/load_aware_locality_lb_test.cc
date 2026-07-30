@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -71,11 +72,12 @@ class RecordingWorkerChildFactory : public Upstream::LoadBalancerFactory {
 public:
   using Inspector = std::function<void(Upstream::LoadBalancerContext&)>;
 
-  explicit RecordingWorkerChildFactory(bool recreate_on_host_change, Inspector inspector = nullptr)
-      : recreate_on_host_change_(recreate_on_host_change), inspector_(std::move(inspector)) {}
+  explicit RecordingWorkerChildFactory(Inspector inspector = nullptr)
+      : inspector_(std::move(inspector)) {}
 
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
     ++create_count_;
+    child_priority_sets_.push_back(&params.priority_set);
     auto lb = std::make_unique<NiceMock<Upstream::MockLoadBalancer>>();
     Upstream::HostConstSharedPtr host;
     const auto& host_sets = params.priority_set.hostSetsPerPriority();
@@ -99,15 +101,42 @@ public:
     return lb;
   }
 
-  bool recreateOnHostChangeDeprecated() const override { return recreate_on_host_change_; }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
   uint32_t createCount() const { return create_count_; }
 
+  // Live handles to the per-locality priority sets handed to each child LB, so a test can observe
+  // the in-place host updates a child received.
+  // SAFETY: each is owned by the worker LB's PerSourceLocalityState and is destroyed when that
+  // locality's source drains or its priority is rebuilt. Only read these in tests that trigger
+  // neither after the LBs are created.
+  const std::vector<const Upstream::PrioritySet*>& childPrioritySets() const {
+    return child_priority_sets_;
+  }
+
 private:
-  const bool recreate_on_host_change_;
   const Inspector inspector_;
   uint32_t create_count_{0};
+  std::vector<const Upstream::PrioritySet*> child_priority_sets_;
 };
+
+// Number of child priority sets whose current host list contains `host`. Counting rather than
+// indexing keeps assertions independent of child creation order.
+uint32_t countChildPrioritySetsContaining(const RecordingWorkerChildFactory& factory,
+                                          const Upstream::HostSharedPtr& host) {
+  uint32_t count = 0;
+  for (const auto* priority_set : factory.childPrioritySets()) {
+    const auto& host_sets = priority_set->hostSetsPerPriority();
+    if (host_sets.empty()) {
+      continue;
+    }
+    const auto& hosts = host_sets[0]->hosts();
+    if (std::find(hosts.begin(), hosts.end(), host) != hosts.end()) {
+      ++count;
+    }
+  }
+  return count;
+}
 
 // A child LB that always selects asynchronously: chooseHost returns no host plus a cancellation
 // handle and (in production) would retain the context to call back later, mimicking dynamic modules
@@ -1189,7 +1218,6 @@ TEST_F(LoadAwareLocalityLbTest, ChildContextForwardsMethodsExceptRetryPriorityAn
   int inspected = 0;
   Upstream::PrioritySetImpl child_priority_set;
   auto child_factory = std::make_shared<RecordingWorkerChildFactory>(
-      /*recreate_on_host_change=*/false,
       [&child_priority_set, h, &inspected](Upstream::LoadBalancerContext& context) {
         ++inspected;
         std::ignore = context.computeHashKey();
@@ -1510,12 +1538,14 @@ TEST_F(LoadAwareLocalityLbTest, InitializePropagatesChildFactoryError) {
   EXPECT_THAT(status.message(), testing::HasSubstr("mock_null_factory"));
 }
 
-TEST_F(LoadAwareLocalityLbTest, ChildRecreatedWhenUnderlyingFactoryRequiresIt) {
+// Existing per-locality children receive membership updates in place, so adding a host allocates
+// no new child LB.
+TEST_F(LoadAwareLocalityLbTest, ChildNotRecreatedOnMembershipChange) {
   auto local = makeWeightTrackingMockHost();
   auto remote = makeWeightTrackingMockHost();
   setupLocalities({{local}, {remote}});
 
-  auto child_factory = std::make_shared<RecordingWorkerChildFactory>(true);
+  auto child_factory = std::make_shared<RecordingWorkerChildFactory>();
   auto factory = makeWorkerFactoryWithChild(child_factory);
 
   auto worker_lb = factory->create({priority_set_, nullptr});
@@ -1525,7 +1555,7 @@ TEST_F(LoadAwareLocalityLbTest, ChildRecreatedWhenUnderlyingFactoryRequiresIt) {
 
   auto extra = makeWeightTrackingMockHost();
   reshapeLocalities(0, {{local}, {remote, extra}}, /*added=*/{extra});
-  EXPECT_GT(child_factory->createCount(), initial_create_count);
+  EXPECT_EQ(child_factory->createCount(), initial_create_count);
 }
 
 TEST_F(LoadAwareLocalityLbTest, AddedPriorityBuildsOnlyItsOwnChildLbs) {
@@ -1533,7 +1563,7 @@ TEST_F(LoadAwareLocalityLbTest, AddedPriorityBuildsOnlyItsOwnChildLbs) {
   auto remote = makeWeightTrackingMockHost();
   setupLocalities({{local}, {remote}});
 
-  auto child_factory = std::make_shared<RecordingWorkerChildFactory>(false);
+  auto child_factory = std::make_shared<RecordingWorkerChildFactory>();
   auto factory = makeWorkerFactoryWithChild(child_factory);
   auto worker_lb = factory->create({priority_set_, nullptr});
   ASSERT_NE(nullptr, worker_lb);
@@ -1557,20 +1587,24 @@ TEST_F(LoadAwareLocalityLbTest, ExistingPriorityDeltaSyncsWhenPriorityCountGrows
   auto h2b = makeWeightTrackingMockHost();
   setupLocalities({{h1}, {h2a, h2b}});
 
-  auto child_factory = std::make_shared<RecordingWorkerChildFactory>(true);
+  auto child_factory = std::make_shared<RecordingWorkerChildFactory>();
   auto factory = makeWorkerFactoryWithChild(child_factory);
   auto worker_lb = factory->create({priority_set_, nullptr});
   ASSERT_NE(nullptr, worker_lb);
   const uint32_t initial_create_count = child_factory->createCount();
+  // h2b starts in both of locality 1's child sets: healthy (which mirrors all hosts) and all-hosts.
+  ASSERT_EQ(2, countChildPrioritySetsContaining(*child_factory, h2b));
 
   // Grow the priority set without a callback (as intermediate host-set creation does), then
   // deliver a P0 membership delta while the priority counts still disagree.
   setupPriorityLocalities(1, {{makeWeightTrackingMockHost()}});
   reshapeLocalities(0, {{h1}, {h2a}}, /*added=*/{}, /*removed=*/{h2b});
 
-  // P1 is built (+2) and P0's own delta is not dropped: locality 1's healthy and all-hosts
-  // children are recreated (+2) under the recreate-on-host-change contract.
-  EXPECT_EQ(child_factory->createCount(), initial_create_count + 4);
+  // Only P1's children are built (+2 for its single locality); P0's delta lands in place.
+  EXPECT_EQ(child_factory->createCount(), initial_create_count + 2);
+  // P0's delta is not dropped while the priority counts disagree: a full reshape strips h2b from
+  // locality 1's healthy and all-hosts children alike.
+  EXPECT_EQ(0, countChildPrioritySetsContaining(*child_factory, h2b));
 }
 
 TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateSyncsExistingPriorityWhileGrowthPending) {
@@ -1579,11 +1613,13 @@ TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateSyncsExistingPriorityWhileGrowth
   auto h2b = makeWeightTrackingMockHost();
   setupLocalities({{h1}, {h2a, h2b}});
 
-  auto child_factory = std::make_shared<RecordingWorkerChildFactory>(true);
+  auto child_factory = std::make_shared<RecordingWorkerChildFactory>();
   auto factory = makeWorkerFactoryWithChild(child_factory);
   auto worker_lb = factory->create({priority_set_, nullptr});
   ASSERT_NE(nullptr, worker_lb);
   const uint32_t initial_create_count = child_factory->createCount();
+  // h2b starts in both of locality 1's child sets: healthy (which mirrors all hosts) and all-hosts.
+  ASSERT_EQ(2, countChildPrioritySetsContaining(*child_factory, h2b));
 
   // Grow the priority set without a callback, then deliver a P0 health-only (empty-delta) update
   // while the priority counts still disagree.
@@ -1591,9 +1627,11 @@ TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateSyncsExistingPriorityWhileGrowth
   reshapeLocalities(0, /*localities=*/{}, /*added=*/{}, /*removed=*/{}, /*has_local=*/false,
                     std::vector<Upstream::HostVector>{{h1}, {h2a}});
 
-  // P1 stays pending (an empty delta cannot rebuild), but P0's healthy flip is applied: locality
-  // 2's healthy child is recreated under the recreate-on-host-change contract.
-  EXPECT_EQ(child_factory->createCount(), initial_create_count + 1);
+  // P1 stays pending: an empty delta cannot rebuild, so no children are allocated.
+  EXPECT_EQ(child_factory->createCount(), initial_create_count);
+  // P0's flip is not dropped while the priority counts disagree: h2b leaves locality 1's healthy
+  // child but remains in its all-hosts child.
+  EXPECT_EQ(1, countChildPrioritySetsContaining(*child_factory, h2b));
 }
 
 // Wraps metric names for LocalityLbHostData's shared_ptr constructor.
