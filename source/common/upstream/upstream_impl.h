@@ -1130,8 +1130,8 @@ private:
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   // Per-cluster upstream (client) codec factory, recovered from extension_protocol_options_ (an
-  // options entry that also implements the factory interface). Held to pin lifetime;
-  // upstreamHttpClientCodecFactory() returns a view into it.
+  // options entry that also implements the factory interface). Lifetime is pinned by
+  // extension_protocol_options_; upstreamHttpClientCodecFactory() returns a view into it.
   const Http::ClientCodecFactory* upstream_client_codec_factory_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
