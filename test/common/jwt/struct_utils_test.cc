@@ -221,7 +221,7 @@ TEST(StructUtilsTest, TypedGettersWithNestedNames) {
 }
 
 // Every production caller of the typed getters passes a hardcoded dot-free registered name
-// (alg/kid/iss/sub/iat/nbf/exp/jti/aud, and the JWK fields), so none needs the literal fallback.
+// (alg/kid/iss/sub/iat/nbf/exp/jti/aud, and the JWK fields), so none of them needs claim_path.
 TEST(StructUtilsTest, TypedGettersDoNotMatchLiteralKeysWithDots) {
   const auto payload = makeStruct(R"(
 {

@@ -957,6 +957,8 @@ message JwtClaimToHeader {
   //     claim_path:
   //     - key: http://example.org/parent_token
   //
-  // Exactly one of ``claim_name`` and ``claim_path`` must be set.
-  repeated PathSegment claim_path = 3 [(validate.rules).repeated = {min_items: 1}];
+  // Exactly one of ``claim_name`` and ``claim_path`` must be set. Note that a ``min_items`` PGV
+  // rule cannot express this: a repeated field has no presence, so ``min_items: 1`` would make
+  // ``claim_path`` mandatory and reject every ``claim_name`` config.
+  repeated PathSegment claim_path = 3;
 }

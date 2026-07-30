@@ -241,7 +241,7 @@ TEST_F(AuthenticatorTest, TestClaimPathWithUrlClaimName) {
   expectVerifyStatus(Status::Ok, headers);
 
   EXPECT_EQ(headers.get_("x-jwt-claim-url-name"), "xyz");
-  // The sibling claim literally named "parent_token" is not shadowed by the URL-named one.
+  // The sibling claim named "parent_token" is a separate claim and resolves independently.
   EXPECT_EQ(headers.get_("x-jwt-claim-parent-token"), "abc");
   EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "johndoe@example.org");
   EXPECT_EQ(headers.get_("x-jwt-claim-url-value"), "http://example.org/about");
