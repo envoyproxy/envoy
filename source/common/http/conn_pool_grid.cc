@@ -438,6 +438,11 @@ bool ConnectivityGrid::hasActiveConnections() const {
   }
   return false;
 }
+
+bool ConnectivityGrid::hasReadyConnection() const {
+  return false; // Connection readiness is not supported for the grid.
+}
+
 ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& decoder,
                                                          ConnectionPool::Callbacks& callbacks,
                                                          const Instance::StreamOptions& options) {
