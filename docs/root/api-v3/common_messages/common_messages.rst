@@ -9,6 +9,7 @@ Common messages
   ../config/core/v3/backoff.proto
   ../service/discovery/v3/discovery.proto
   ../extensions/filters/common/fault/v3/fault.proto
+  ../extensions/filters/common/jwks/v3/jwks.proto
   ../config/core/v3/base.proto
   ../config/core/v3/cel.proto
   ../extensions/filters/common/matcher/action/v3/skip_action.proto
