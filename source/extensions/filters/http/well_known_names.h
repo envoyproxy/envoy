@@ -108,6 +108,8 @@ public:
   const std::string ExternalProcessing = "envoy.filters.http.ext_proc";
   // Set metadata filter
   const std::string SetMetadata = "envoy.filters.http.set_metadata";
+  // MCP JSON REST bridge filter
+  const std::string McpJsonRestBridge = "envoy.filters.http.mcp_json_rest_bridge";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;
