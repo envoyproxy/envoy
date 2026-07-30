@@ -1,4 +1,4 @@
-name: Check/build
+name: Check/build (OpenSSL)
 
 permissions:
   contents: read
@@ -16,7 +16,7 @@ on:
         required: true
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-build
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-build-openssl
   cancel-in-progress: true
 
 
@@ -29,7 +29,7 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
-    name: ${{ matrix.name ||matrix.target }}
+    name: ${{ matrix.name || matrix.target }}
     with:
       bazel-cache: true
       bazel-extra: '--config=rbe'
@@ -51,10 +51,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - target: api
-          name: API
-        - target: compile_time_options
-          name: Compile time options
-          docker-ci: true
-        - target: gcc
-          name: GCC
+        - target: openssl
+          name: OpenSSL
+          skip: ${{ fromJSON(inputs.request).request.pr != '' || ! fromJSON(inputs.request).run.check-build-openssl }}
+        - target: openssl.presubmit
+          name: OpenSSL (presubmit)
+          skip: ${{ fromJSON(inputs.request).request.pr == '' || ! fromJSON(inputs.request).run.check-build-openssl-presubmit }}
