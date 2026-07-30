@@ -598,9 +598,11 @@ WorkerLocalLb::pickLocalityLb(const std::vector<PerLocalityState>& per_locality,
     return lb;
   }
   // Stale routing snapshot: the preferred locality's child LB was torn down after a host
-  // change but before the routing weights were recomputed. Scan for any locality with a
-  // usable LB.
-  for (size_t i = 0; i < per_locality.size(); ++i) {
+  // change but before the routing weights were recomputed. Scan from the next index onward,
+  // wrapping, so concurrent drains spread over different fallbacks instead of all landing on
+  // the same locality.
+  for (size_t j = 1; j < per_locality.size(); ++j) {
+    const size_t i = (preferred_idx + j) % per_locality.size();
     lb = per_locality[i].stateFor(source).lb.get();
     if (lb != nullptr) {
       actual_idx = i;

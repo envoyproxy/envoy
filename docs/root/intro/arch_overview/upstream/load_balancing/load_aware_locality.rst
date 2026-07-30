@@ -417,6 +417,15 @@ Caveats and known limitations
   traffic can be briefly overloaded after a mass restart. Backends that never
   report ORCA leave the policy in this all-local mode permanently: the policy
   assumes ORCA-reporting backends.
+- **Weights briefly lag membership.** Locality weights are computed on the
+  main thread and published as an advisory snapshot, so a worker can hold a
+  snapshot that still assigns weight to a locality whose hosts have since
+  drained. When the locality a pick selects has no usable child LB, the pick
+  is redirected to the next locality that does, scanning by index and wrapping
+  around. For up to one ``weight_update_period`` the published weights are
+  therefore not honored exactly, and the redirected share lands on a single
+  fallback locality rather than being spread proportionally across the
+  remaining ones.
 - **Hash-based child policies.** Ring hash and Maglev build their hash
   structures once over the full cluster host set and select from those
   structures directly, ignoring the per-locality host slice this policy hands
