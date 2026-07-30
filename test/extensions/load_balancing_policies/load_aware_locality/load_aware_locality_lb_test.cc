@@ -400,6 +400,9 @@ protected:
 
   Upstream::LoadBalancerPtr createWorkerLb() {
     EXPECT_NE(nullptr, factory_);
+    if (factory_ == nullptr) {
+      return nullptr;
+    }
     auto worker_lb = factory_->create({priority_set_, nullptr});
     EXPECT_NE(nullptr, worker_lb);
     return worker_lb;

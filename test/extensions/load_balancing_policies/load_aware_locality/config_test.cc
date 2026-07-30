@@ -48,10 +48,8 @@ loadAwareConfig(std::initializer_list<envoy::config::core::v3::TypedExtensionCon
   return config;
 }
 
-const LoadAwareLocalityLbConfig& typedConfig(const Upstream::LoadBalancerConfigPtr& config) {
-  const auto* typed = dynamic_cast<const LoadAwareLocalityLbConfig*>(config.get());
-  EXPECT_NE(nullptr, typed);
-  return *typed;
+const LoadAwareLocalityLbConfig* typedConfig(const Upstream::LoadBalancerConfigPtr& config) {
+  return dynamic_cast<const LoadAwareLocalityLbConfig*>(config.get());
 }
 
 void expectFactoryCreateSucceeds(const Upstream::LoadBalancerConfigPtr& config,
@@ -67,7 +65,7 @@ void expectFactoryCreateSucceeds(const Upstream::LoadBalancerConfigPtr& config,
 
   auto worker_factory = lb->factory();
   ASSERT_NE(nullptr, worker_factory);
-  EXPECT_NE(nullptr, worker_factory->create({priority_set, nullptr}));
+  ASSERT_NE(nullptr, worker_factory->create({priority_set, nullptr}));
 }
 
 class FailingLoadConfigFactory : public Upstream::MockTypedLoadBalancerFactory {
@@ -96,7 +94,9 @@ TEST(LoadAwareLocalityConfigTest, Defaults) {
   auto result = factory.loadConfig(context, loadAwareConfig({roundRobinEndpointPolicy()}));
   ASSERT_TRUE(result.ok());
 
-  const auto& config = typedConfig(result.value());
+  const auto* typed_config = typedConfig(result.value());
+  ASSERT_NE(nullptr, typed_config);
+  const auto& config = *typed_config;
   EXPECT_EQ(std::chrono::milliseconds(1000), config.weightUpdatePeriod());
   EXPECT_DOUBLE_EQ(0.1, config.utilizationVarianceThreshold());
   // Default alpha derived from weight_update_period=1s and smoothing_time_constant=5s.
@@ -121,7 +121,9 @@ TEST(LoadAwareLocalityConfigTest, Overrides) {
   auto result = factory.loadConfig(context, config_proto);
   ASSERT_TRUE(result.ok());
 
-  const auto& config = typedConfig(result.value());
+  const auto* typed_config = typedConfig(result.value());
+  ASSERT_NE(nullptr, typed_config);
+  const auto& config = *typed_config;
   EXPECT_EQ(std::chrono::milliseconds(2000), config.weightUpdatePeriod());
   EXPECT_DOUBLE_EQ(0.05, config.utilizationVarianceThreshold());
   // Alpha derived from weight_update_period=2s and smoothing_time_constant=4s.
@@ -167,7 +169,9 @@ TEST(LoadAwareLocalityConfigTest, FirstSupportedChildWins) {
       factory.loadConfig(context, loadAwareConfig({unknown_policy, roundRobinEndpointPolicy()}));
   ASSERT_TRUE(result.ok());
 
-  const auto& config = typedConfig(result.value());
+  const auto* typed_config = typedConfig(result.value());
+  ASSERT_NE(nullptr, typed_config);
+  const auto& config = *typed_config;
   EXPECT_EQ("envoy.load_balancing_policies.round_robin", config.endpointPickingPolicyName());
   expectFactoryCreateSucceeds(result.value(), context);
 }
@@ -331,7 +335,9 @@ TEST(LoadAwareLocalityConfigTest, MetricNamesReachConfig) {
   auto result = factory.loadConfig(context, config_proto);
   ASSERT_TRUE(result.ok());
 
-  const auto& config = typedConfig(result.value());
+  const auto* typed_config = typedConfig(result.value());
+  ASSERT_NE(nullptr, typed_config);
+  const auto& config = *typed_config;
   ASSERT_EQ(2u, config.metricNamesForComputingUtilization().size());
   EXPECT_EQ("named_metrics.foo", config.metricNamesForComputingUtilization()[0]);
   EXPECT_EQ("named_metrics.bar", config.metricNamesForComputingUtilization()[1]);
