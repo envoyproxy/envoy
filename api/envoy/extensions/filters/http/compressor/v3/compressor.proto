@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.compressor.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -54,6 +55,14 @@ message Compressor {
     // * ``text/xml``
     //
     repeated string content_type = 3;
+
+    // Allows specifying which mime-types yield compression using
+    // envoy.type.matcher.v3.StringMatcher.
+    //
+    // When this field is specified, the default content type list is not used.
+    // Compression is applied when at least one configured matcher matches the
+    // response content-type header.
+    repeated type.matcher.v3.StringMatcher content_type_matcher = 4;
   }
 
   // Configuration for filter behavior on the request direction.

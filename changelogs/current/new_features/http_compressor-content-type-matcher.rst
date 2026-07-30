@@ -1,0 +1,1 @@
+* compressor: added support for ``content_type_matcher`` in ``ResponseDirectionConfig``, allowing fine-grained MIME type matching via string matchers.

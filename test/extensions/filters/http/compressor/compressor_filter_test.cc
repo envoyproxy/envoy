@@ -72,7 +72,7 @@ public:
     auto compressor_factory = std::make_unique<TestCompressorFactory>("test");
     compressor_factory_ = compressor_factory.get();
     config_ = std::make_shared<CompressorFilterConfig>(compressor, "test.", *stats_.rootScope(),
-                                                       runtime_, std::move(compressor_factory));
+                                                       runtime_, std::move(compressor_factory), server_factory_context_);
     filter_ = std::make_unique<CompressorFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -1818,20 +1818,22 @@ TEST_P(InsertVaryHeaderTest, ValidateStatusHeaderEnabled) {
 
 class MultipleFiltersTest : public testing::Test {
 protected:
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+
   void setUpFilters(const std::string& json1, const std::string& json2) {
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson(json1, compressor);
     auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
     compressor_factory1->setExpectedCompressCalls(0);
     auto config1 = std::make_shared<CompressorFilterConfig>(
-        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1));
+        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1), server_factory_context_);
     filter1_ = std::make_unique<CompressorFilter>(config1);
 
     TestUtility::loadFromJson(json2, compressor);
     auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
     compressor_factory2->setExpectedCompressCalls(0);
     auto config2 = std::make_shared<CompressorFilterConfig>(
-        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2));
+        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2), server_factory_context_);
     filter2_ = std::make_unique<CompressorFilter>(config2);
   }
 
@@ -2274,7 +2276,7 @@ protected:
                               compressor);
     auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
     auto config1 = std::make_shared<CompressorFilterConfig>(
-        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1));
+        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1), server_factory_context_);
     filter1_ = std::make_unique<CompressorFilter>(config1);
 
     TestUtility::loadFromJson(fmt::format(R"EOF(
@@ -2292,7 +2294,7 @@ protected:
                               compressor);
     auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
     auto config2 = std::make_shared<CompressorFilterConfig>(
-        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2));
+        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2), server_factory_context_);
     filter2_ = std::make_unique<CompressorFilter>(config2);
   }
 
@@ -2414,12 +2416,13 @@ TEST(CompressorFilterConfigTests, MakeCompressorTest) {
   const envoy::extensions::filters::http::compressor::v3::Compressor compressor_cfg;
   NiceMock<Runtime::MockLoader> runtime;
   Stats::TestUtil::TestStore stats;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   auto compressor_factory(std::make_unique<Compression::Compressor::MockCompressorFactory>());
   EXPECT_CALL(*compressor_factory, createCompressor());
   EXPECT_CALL(*compressor_factory, statsPrefix());
   EXPECT_CALL(*compressor_factory, contentEncoding());
   CompressorFilterConfig config(compressor_cfg, "test.compressor.", *stats.rootScope(), runtime,
-                                std::move(compressor_factory));
+                                std::move(compressor_factory), factory_context);
   Envoy::Compression::Compressor::CompressorPtr compressor = config.makeCompressor();
 }
 
@@ -2564,6 +2567,208 @@ TEST_F(CompressorPerRouteLibraryTest, GetCompressorFactoryUsesPerRoute) {
   // Should still use main factory since no per-route compressor library override.
   const auto& per_route_factory = CompressorFilterTestingPeer::compressorFactory(*filter_);
   EXPECT_EQ(per_route_factory.contentEncoding(), "test");
+}
+
+TEST_F(CompressorFilterTest, ContentTypeMatcherExactMatch) {
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  },
+  "response_direction_config": {
+    "common_config": {
+      "content_type_matcher": [
+        {
+          "exact": "application/custom"
+        }
+      ]
+    }
+  }
+}
+)EOF");
+
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
+
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"},
+      {"content-length", "256"},
+      {"content-type", "application/custom"}};
+
+  response_stats_prefix_ = "response.";
+
+  doResponseCompression(headers, false);
+}
+
+TEST_F(CompressorFilterTest, ContentTypeMatcherExactMismatch) {
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  },
+  "response_direction_config": {
+    "common_config": {
+      "content_type_matcher": [
+        {
+          "exact": "application/custom"
+        }
+      ]
+    }
+  }
+}
+)EOF");
+
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
+
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"},
+      {"content-length", "256"},
+      {"content-type", "application/test"}};
+
+  response_stats_prefix_ = "response.";
+
+  doResponseNoCompression(headers);
+}
+
+TEST_F(CompressorFilterTest, ContentTypeMatcherOverridesDefaultContentTypes) {
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  },
+  "response_direction_config": {
+    "common_config": {
+      "content_type_matcher": [
+        {
+          "exact": "application/custom"
+        }
+      ]
+    }
+  }
+}
+)EOF");
+
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
+
+  // Use content type which belongs to the default list
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"},
+      {"content-length", "256"},
+      {"content-type", "application/json"}};
+
+  response_stats_prefix_ = "response.";
+
+  doResponseNoCompression(headers);
+}
+
+TEST_F(CompressorFilterTest, ContentTypeMatcherPrefixMatch) {
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  },
+  "response_direction_config": {
+    "common_config": {
+      "content_type_matcher": [
+        {
+          "prefix": "application/"
+        }
+      ]
+    }
+  }
+}
+)EOF");
+
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
+
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"},
+      {"content-length", "256"},
+      {"content-type", "application/custom"}};
+
+  response_stats_prefix_ = "response.";
+
+  doResponseCompression(headers, false);
+}
+
+TEST_F(CompressorFilterTest, ContentTypeMatcherIgnoresParameters) {
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  },
+  "response_direction_config": {
+    "common_config": {
+      "content_type_matcher": [
+        {
+          "exact": "application/custom"
+        }
+      ]
+    }
+  }
+}
+)EOF");
+
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
+
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"},
+      {"content-length", "256"},
+      {"content-type", "application/custom; charset=utf-8"}};
+
+  response_stats_prefix_ = "response.";
+
+  doResponseCompression(headers, false);
+}
+
+TEST_F(CompressorFilterTest, ContentTypeMatcherRegexMatchesAnyContentType) {
+  setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  },
+  "response_direction_config": {
+    "common_config": {
+      "content_type_matcher": [
+        {
+          "safe_regex": {
+            "google_re2": {},
+            "regex": ".*"
+          }
+        }
+      ]
+    }
+  }
+}
+)EOF");
+
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
+
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"},
+      {"content-length", "256"},
+      {"content-type", "application/not-in-default-list"}};
+
+  response_stats_prefix_ = "response.";
+
+  doResponseCompression(headers, false);
 }
 
 } // namespace

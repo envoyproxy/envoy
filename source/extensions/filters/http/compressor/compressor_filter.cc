@@ -91,31 +91,50 @@ void compressAndUpdateStats(const Compression::Compressor::CompressorPtr& compre
 CompressorFilterConfig::DirectionConfig::DirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+    Server::Configuration::CommonFactoryContext& context)
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
-      content_type_values_(contentTypeSet(proto_config.content_type())),
+      content_type_values_(contentTypeSet(proto_config.content_type(), !proto_config.content_type_matcher().empty())),
+      content_type_matchers_(contentTypeMatcherList(proto_config.content_type_matcher(), context)),
       stats_{generateStats(stats_prefix, scope)} {}
+
+std::vector<Matchers::StringMatcherPtr>
+CompressorFilterConfig::DirectionConfig::contentTypeMatcherList(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& matchers,
+    Server::Configuration::CommonFactoryContext& context) {
+  std::vector<Matchers::StringMatcherPtr> list;
+  list.reserve(matchers.size());
+  for (const auto& matcher : matchers) {
+    list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+  }
+  return list;
+}
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-    Compression::Compressor::CompressorFactoryPtr compressor_factory)
+    Compression::Compressor::CompressorFactoryPtr compressor_factory,
+    Server::Configuration::CommonFactoryContext& context)
     : common_stats_prefix_(fmt::format("{}compressor.{}.{}", stats_prefix,
                                        proto_config.compressor_library().name(),
                                        compressor_factory->statsPrefix())),
-      request_direction_config_(proto_config, common_stats_prefix_, scope, runtime),
-      response_direction_config_(proto_config, common_stats_prefix_, scope, runtime),
+      request_direction_config_(proto_config, common_stats_prefix_, scope, runtime, context),
+      response_direction_config_(proto_config, common_stats_prefix_, scope, runtime, context),
       content_encoding_(compressor_factory->contentEncoding()),
       compressor_factory_(std::move(compressor_factory)),
       choose_first_(proto_config.choose_first()) {}
 
 StringUtil::CaseUnorderedSet CompressorFilterConfig::DirectionConfig::contentTypeSet(
-    const Protobuf::RepeatedPtrField<std::string>& types) {
+    const Protobuf::RepeatedPtrField<std::string>& types, bool has_matchers) {
   const auto& default_content_encodings = defaultContentEncoding();
-  return types.empty() ? StringUtil::CaseUnorderedSet(default_content_encodings.begin(),
-                                                      default_content_encodings.end())
-                       : StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
+
+  if (types.empty() && !has_matchers) {
+    return StringUtil::CaseUnorderedSet(default_content_encodings.begin(),
+                                        default_content_encodings.end());
+  }
+
+  return StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
 }
 
 uint32_t CompressorFilterConfig::DirectionConfig::contentLengthUint(Protobuf::uint32 length) {
@@ -124,9 +143,10 @@ uint32_t CompressorFilterConfig::DirectionConfig::contentLengthUint(Protobuf::ui
 
 CompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+    Server::Configuration::CommonFactoryContext& context)
     : DirectionConfig(proto_config.request_direction_config().common_config(),
-                      stats_prefix + "request.", scope, runtime),
+                      stats_prefix + "request.", scope, runtime, context),
       is_set_{proto_config.has_request_direction_config()} {}
 
 absl::flat_hash_set<uint32_t>
@@ -136,11 +156,12 @@ uncompressibleResponseCodesSet(const Protobuf::RepeatedField<uint32_t>& codes) {
 
 CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+    Server::Configuration::CommonFactoryContext& context)
     : DirectionConfig(commonConfig(proto_config),
                       proto_config.has_response_direction_config() ? stats_prefix + "response."
                                                                    : stats_prefix,
-                      scope, runtime),
+                      scope, runtime, context),
       disable_on_etag_header_(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().disable_on_etag_header()
@@ -525,22 +546,17 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
 
   for (const auto& filter_config : (*typed_state).filter_configs_) {
     // A compressor filter may be limited to compress certain Content-Types. If the response's
-    // content type doesn't match the list of content types this filter is enabled for then
-    // it must be excluded from the decision process.
+    // content type doesn't match the configured content type values or matchers, then it must be
+    // excluded from the decision process.
     // For example, there are two compressor filters in the chain e.g. "gzip" and "deflate".
     // "gzip" is configured to compress only "text/html" and "deflate" is configured to compress
     // only "application/javascript". Then comes a request with Accept-Encoding header
     // "gzip;q=1,deflate;q=.5". The corresponding response content type is "application/javascript".
     // If "gzip" is not excluded from the decision process then it will take precedence over
     // "deflate" and the resulting response won't be compressed at all.
-    if (!content_type_value.empty() &&
-        !filter_config->responseDirectionConfig().contentTypeValues().empty()) {
-      auto iter =
-          filter_config->responseDirectionConfig().contentTypeValues().find(content_type_value);
-      if (iter == filter_config->responseDirectionConfig().contentTypeValues().end()) {
-        // Skip adding this filter to the list of allowed compressors.
-        continue;
-      }
+    if (!filter_config->responseDirectionConfig().isContentTypeAllowed(headers)) {
+      // Skip adding this filter to the list of allowed compressors.
+      continue;
     }
 
     // There could be many compressors registered for the same content encoding, e.g. consider a
@@ -714,13 +730,34 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
 bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
     const Http::RequestOrResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type != nullptr && !content_type_values_.empty()) {
-    const absl::string_view value =
-        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
-    return content_type_values_.find(value) != content_type_values_.end();
+  if (content_type == nullptr) {
+    return true;
   }
 
-  return true;
+  // If both configuration lists are empty, go for default behavior.
+  if (content_type_values_.empty() && content_type_matchers_.empty()) {
+    return true;
+  }
+
+  const absl::string_view value =
+      StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
+
+  // Check explicit content_type set if populated
+  if (!content_type_values_.empty() && content_type_values_.find(value) != content_type_values_.end()) {
+    return true;
+  }
+
+  // Check content_type_matcher list if populated
+  if (!content_type_matchers_.empty()) {
+    for (const auto& matcher : content_type_matchers_) {
+      if (matcher->match(value)) {
+        return true;
+      }
+    }
+  }
+
+  // If lists were configured but nothing matched, reject it
+  return false;
 }
 
 bool CompressorFilter::checkIsEtagAllowedLogResponseStats(Http::ResponseHeaderMap& headers) const {
