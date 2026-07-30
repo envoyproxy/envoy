@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.reverse_tunnel.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/extensions/filters/http/jwt_authn/v3/config.proto";
+import "envoy/extensions/filters/common/jwks/v3/jwks.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -151,8 +151,8 @@ message JwtHandshakeValidation {
     // keeps token verification during the handshake fully synchronous.
     config.core.v3.DataSource local_jwks = 3;
 
-    // The JWKS fetched over HTTP, reusing :ref:`jwt_authn's RemoteJwks
-    // <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.RemoteJwks>` (``http_uri``,
+    // The JWKS fetched over HTTP. See :ref:`RemoteJwks
+    // <envoy_v3_api_msg_extensions.filters.common.jwks.v3.RemoteJwks>` (``http_uri``,
     // ``cache_duration``, ``async_fetch``, ``retry_policy``). The keys are fetched and refreshed in
     // the background (at startup and every ``cache_duration``) and cached, so verification during
     // the handshake stays synchronous. Tokens are rejected only before the first successful fetch;
@@ -166,7 +166,7 @@ message JwtHandshakeValidation {
     // ``failed_refetch_duration`` sets the retry interval after a failed fetch. A ``cache_duration``
     // or ``failed_refetch_duration`` below one second is raised to one second to avoid a refetch
     // loop with no pause.
-    http.jwt_authn.v3.RemoteJwks remote_jwks = 8;
+    common.jwks.v3.RemoteJwks remote_jwks = 8;
   }
 
   // Name of the header carrying the token. Defaults to ``authorization``, and a leading ``Bearer``

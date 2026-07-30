@@ -123,6 +123,7 @@ proto_library(
         "//envoy/extensions/early_data/v3:pkg",
         "//envoy/extensions/filters/common/dependency/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
+        "//envoy/extensions/filters/common/jwks/v3:pkg",
         "//envoy/extensions/filters/common/matcher/action/v3:pkg",
         "//envoy/extensions/filters/common/set_filter_state/v3:pkg",
         "//envoy/extensions/filters/http/a2a/v3:pkg",

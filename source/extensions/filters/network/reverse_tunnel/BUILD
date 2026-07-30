@@ -86,6 +86,7 @@ envoy_cc_library(
         "//source/common/router:retry_policy_lib",
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//source/extensions/filters/http/jwt_authn:jwks_async_fetcher_lib",
+        "@envoy_api//envoy/extensions/filters/common/jwks/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
     ],

@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "envoy/extensions/filters/common/jwks/v3/jwks.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/lock_guard.h"
@@ -25,8 +26,30 @@ namespace ReverseTunnel {
 namespace {
 
 using RemoteJwks = envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
+using CommonRemoteJwks = envoy::extensions::filters::common::jwks::v3::RemoteJwks;
 using JwtHandshakeValidationProto =
     envoy::extensions::filters::network::reverse_tunnel::v3::JwtHandshakeValidation;
+
+// The background JWKS fetcher takes jwt_authn's RemoteJwks, not the common one, so translate.
+// TODO(kanurag94): remove once the fetcher accepts the common RemoteJwks directly.
+RemoteJwks toJwtAuthnRemoteJwks(const CommonRemoteJwks& src) {
+  RemoteJwks dst;
+  *dst.mutable_http_uri() = src.http_uri();
+  if (src.has_cache_duration()) {
+    *dst.mutable_cache_duration() = src.cache_duration();
+  }
+  if (src.has_async_fetch()) {
+    dst.mutable_async_fetch()->set_fast_listener(src.async_fetch().fast_listener());
+    if (src.async_fetch().has_failed_refetch_duration()) {
+      *dst.mutable_async_fetch()->mutable_failed_refetch_duration() =
+          src.async_fetch().failed_refetch_duration();
+    }
+  }
+  if (src.has_retry_policy()) {
+    *dst.mutable_retry_policy() = src.retry_policy();
+  }
+  return dst;
+}
 
 // Counters for the remote JWKS background fetcher. They live on the config and are updated on the
 // main thread, unlike the per-connection handshake counters in ReverseTunnelStats.
@@ -38,9 +61,7 @@ struct ReverseTunnelJwksStats {
   ALL_REVERSE_TUNNEL_JWKS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-// Builds the retry policy for a remote_jwks fetch, or a null policy when none is configured. This
-// duplicates jwt_authn's jwks_cache.cc, including the retry-on string; both can move to a shared
-// JwksAsyncFetcher helper when that file is next touched.
+// Builds the retry policy for a remote_jwks fetch, or a null policy when none is configured.
 absl::StatusOr<Router::RetryPolicyConstSharedPtr>
 buildRemoteJwksRetryPolicy(const RemoteJwks& remote_jwks,
                            Server::Configuration::ServerFactoryContext& server_context) {
@@ -61,13 +82,10 @@ buildRemoteJwksRetryPolicy(const RemoteJwks& remote_jwks,
   return Router::RetryPolicyConstSharedPtr{std::move(policy_or_error.value())};
 }
 
-// Raises a cache_duration or failed_refetch_duration below one second up to one second. The reused
-// JwksAsyncFetcher fetches again after these durations, so a value below one second (including
-// zero) would fetch immediately and repeat with no pause. Returns an error only for a duration that
-// is out of range.
-// TODO(kanurag94): this is not reverse-tunnel-specific. JwksAsyncFetcher's getCacheDuration
-// truncates a sub-second cache_duration to zero and getFailedRefetchDuration has no floor, so both
-// can drive enableTimer(0). Fix it in jwks_async_fetcher.cc and drop this clamp.
+// Raises a cache_duration or failed_refetch_duration below one second up to one second. The
+// background fetcher waits these durations between fetches, so a shorter value would fetch again
+// with no real pause. Returns an error only for an out-of-range duration.
+// TODO(kanurag94): remove once the background fetcher floors these durations itself.
 absl::Status clampRefetchDurationsToOneSecond(RemoteJwks& remote_jwks) {
   const auto raise_to_one_second = [](Protobuf::Duration& duration) -> absl::Status {
     const auto ms = DurationUtil::durationToMillisecondsNoThrow(duration);
@@ -99,8 +117,8 @@ absl::Status clampRefetchDurationsToOneSecond(RemoteJwks& remote_jwks) {
 } // namespace
 
 // Fetches a remote JWKS in the background, at startup and every cache_duration, so verification
-// during the handshake stays synchronous. It reuses jwt_authn's JwksAsyncFetcher and keeps its own
-// copy of the keys that worker threads can read safely.
+// during the handshake stays synchronous. Holds its own copy of the keys for worker threads to
+// read safely.
 class JwtHandshakeValidator::RemoteJwksProvider {
 public:
   RemoteJwksProvider(const RemoteJwks& remote_jwks, Router::RetryPolicyConstSharedPtr retry_policy,
@@ -130,12 +148,11 @@ private:
   // Kept here because JwksAsyncFetcher holds it by const reference and must outlive the fetcher.
   const RemoteJwks remote_jwks_;
   ReverseTunnelJwksStats stats_;
-  // A mutex, not a thread-local slot like jwt_authn's setJwksToAllThreads. Handshakes are
-  // per-connection, so this lock is taken rarely and a TLS slot would be complexity for no gain.
+  // Guards the fetched keys. Handshakes are per-connection, so this lock is rarely contended.
   Thread::MutexBasicLockable mutex_;
   JwksConstSharedPtr jwks_ ABSL_GUARDED_BY(mutex_);
-  // Declared last so it is destroyed first: the this-capturing callback it installs must not fire
-  // into a half-destroyed provider. Reordering this member would be a use-after-free.
+  // Declared last so it is destroyed first. Its callback captures this, so the fetcher must stop
+  // before the members it touches are gone.
   HttpFilters::JwtAuthn::JwksAsyncFetcherPtr async_fetcher_;
 };
 
@@ -169,7 +186,7 @@ JwtHandshakeValidator::create(const JwtHandshakeValidationProto& jwt,
     break;
   }
   case JwtHandshakeValidationProto::kRemoteJwks: {
-    const auto& remote_jwks = jwt.remote_jwks();
+    const RemoteJwks remote_jwks = toJwtAuthnRemoteJwks(jwt.remote_jwks());
     Http::Utility::Url url;
     if (!url.initialize(remote_jwks.http_uri().uri(), /*is_connect_request=*/false)) {
       return absl::InvalidArgumentError(
@@ -184,7 +201,7 @@ JwtHandshakeValidator::create(const JwtHandshakeValidationProto& jwt,
                       retry_policy_or_error.status().message()));
     }
     // The handshake never fetches on demand, so force background fetch on. Without async_fetch the
-    // reused fetcher would do nothing and no keys would ever load.
+    // fetcher would do nothing and no keys would ever load.
     RemoteJwks normalized = remote_jwks;
     if (!normalized.has_async_fetch()) {
       normalized.mutable_async_fetch();
@@ -241,8 +258,7 @@ bool JwtHandshakeValidator::verify(const Http::RequestHeaderMap& headers,
     ENVOY_LOG(debug, "reverse_tunnel: jwt: missing token header '{}'", token_header_.get());
     return false;
   }
-  // A well-formed client sends one token header. If there are several, use the first (as jwt_authn
-  // does) and just note it at debug.
+  // If several token headers are present, use the first, as jwt_authn does.
   if (token_values.size() > 1) {
     ENVOY_LOG(debug, "reverse_tunnel: jwt: {} values on token header '{}'; using the first",
               token_values.size(), token_header_.get());
