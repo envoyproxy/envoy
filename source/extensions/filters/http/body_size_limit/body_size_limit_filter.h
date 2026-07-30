@@ -4,7 +4,8 @@
 #include <memory>
 
 #include "envoy/extensions/filters/http/body_size_limit/v3/body_size_limit.pb.h"
-#include "envoy/http/filter.h"
+
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,26 +32,20 @@ using BodySizeLimitFilterConfigSharedPtr = std::shared_ptr<BodySizeLimitFilterCo
  * A streaming filter that rejects requests exceeding a configured body size limit
  * without buffering the request body.
  */
-class BodySizeLimitFilter : public Http::StreamDecoderFilter,
+class BodySizeLimitFilter : public Http::PassThroughDecoderFilter,
                             public Logger::Loggable<Logger::Id::http> {
 public:
   BodySizeLimitFilter(BodySizeLimitFilterConfigSharedPtr config);
-
-  // Http::StreamFilterBase
-  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   void sizeExceeded(uint64_t length, const char* logMessage, const char* replyText);
 
   BodySizeLimitFilterConfigSharedPtr config_;
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
   uint64_t bytes_received_{};
 };
 

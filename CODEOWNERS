@@ -446,6 +446,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 # AI Protocol Manager filter
 /*/extensions/filters/http/ai_protocol_manager @penguingao @botengyao @tyxia
+# HTTP body size limit filter
+/*/extensions/filters/http/body_size_limit @wbpcode @ivaradi
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

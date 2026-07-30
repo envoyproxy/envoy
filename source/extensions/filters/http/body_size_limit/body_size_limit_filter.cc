@@ -32,9 +32,9 @@ Http::FilterHeadersStatus BodySizeLimitFilter::decodeHeaders(Http::RequestHeader
 
   // If Content-Length is present and exceeds the limit, reject immediately.
   auto cl = headers.getContentLengthValue();
-  int64_t content_length;
+  uint64_t content_length = 0;
   if (!cl.empty() && absl::SimpleAtoi(cl, &content_length)) {
-    if (content_length > static_cast<int64_t>(config_->maxRequestBytes())) {
+    if (content_length > config_->maxRequestBytes()) {
       sizeExceeded(content_length, "content length exceeds maximum", "content length too large");
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -57,42 +57,32 @@ Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, b
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus BodySizeLimitFilter::decodeTrailers(Http::RequestTrailerMap&) {
-  return Http::FilterTrailersStatus::Continue;
-}
-
-void BodySizeLimitFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  callbacks_ = &callbacks;
-}
-
 void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* logMessage,
                                        const char* replyText) {
-  const auto& provider = callbacks_->streamInfo().downstreamAddressProvider();
+  const auto& provider = decoder_callbacks_->streamInfo().downstreamAddressProvider();
   const auto& client_addr = provider.remoteAddress(); // Network::Address::Instance
-  std::string client_address;
-  if (client_addr && client_addr->ip()) {
-    client_address =
-        client_addr->ip()->addressAsString() + ":" + std::to_string(client_addr->ip()->port());
+  absl::string_view client_address;
+  if (client_addr) {
+    client_address = client_addr->asStringView();
   }
 
-  std::string path("/");
-  auto headers = callbacks_->requestHeaders();
+  absl::string_view path("/");
+  auto headers = decoder_callbacks_->requestHeaders();
   if (headers) {
     path = headers->getPathValue();
   }
 
-  auto upstream_info = callbacks_->streamInfo().upstreamInfo();
-  std::string target_host;
+  auto upstream_info = decoder_callbacks_->streamInfo().upstreamInfo();
+  absl::string_view target_host;
   if (upstream_info && upstream_info->upstreamHost() && upstream_info->upstreamHost()->address()) {
-    target_host = upstream_info->upstreamHost()->address()->asString();
+    target_host = upstream_info->upstreamHost()->address()->asStringView();
   }
 
   ENVOY_LOG(error, "{} ({} > {}), client: {}, target: {}{}", logMessage, length,
-            static_cast<int64_t>(config_->maxRequestBytes()), client_address.c_str(), target_host,
-            path.c_str());
+            config_->maxRequestBytes(), client_address, target_host, path);
 
-  callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, replyText, nullptr, std::nullopt,
-                             logMessage);
+  decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, replyText, nullptr, std::nullopt,
+                                     logMessage);
 }
 
 } // namespace BodySizeLimitFilter
