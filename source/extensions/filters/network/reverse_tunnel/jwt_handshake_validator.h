@@ -17,7 +17,6 @@
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
 
 #include "absl/status/statusor.h"
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +27,8 @@ namespace ReverseTunnel {
 using JwksConstSharedPtr = std::shared_ptr<const JwtVerify::Jwks>;
 
 // Creates a JwksFetcher for a remote_jwks source. Overridable in tests; production uses the real
-// Extensions::HttpFilters::Common::JwksFetcher.
+// Extensions::HttpFilters::Common::JwksFetcher. Structurally the same as jwt_authn's
+// CreateJwksFetcherCb, but declared here so this header does not include jwks_async_fetcher.h.
 using JwksFetcherFactory = std::function<Extensions::HttpFilters::Common::JwksFetcherPtr(
     Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr,
     const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)>;

@@ -54,6 +54,7 @@ envoy_cc_library(
     deps = [
         "jwks_async_fetcher_lib",
         ":jwt_cache_lib",
+        ":stats_lib",
         "//source/common/config:datasource_lib",
         "//source/common/jwt:jwt_lib",
         "//source/common/router:retry_policy_lib",
@@ -134,6 +135,7 @@ envoy_cc_library(
     deps = [
         ":jwks_cache_lib",
         ":matchers_lib",
+        ":stats_lib",
         "//envoy/router:string_accessor_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_macros",

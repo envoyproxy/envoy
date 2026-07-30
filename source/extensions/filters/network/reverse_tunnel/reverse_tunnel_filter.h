@@ -12,6 +12,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -88,6 +89,7 @@ public:
   // JwtHandshakeValidator::verify.
   bool verifyHandshakeJwt(const Http::RequestHeaderMap& headers,
                           StreamInfo::StreamInfo& stream_info) const {
+    ASSERT(jwt_validator_ != nullptr);
     return jwt_validator_->verify(headers, stream_info);
   }
 

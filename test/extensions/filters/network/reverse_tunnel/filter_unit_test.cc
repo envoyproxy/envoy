@@ -2622,6 +2622,8 @@ TEST_F(ReverseTunnelJwtTest, ValidTokenAccepted) {
 TEST_F(ReverseTunnelJwtTest, MissingTokenRejectedBeforeRegistration) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   setJwt(cfg, kIssuer);
+  // expectRejectedBeforeRegistration asserts accepted == 0, proving the flow returned before
+  // processAcceptedConnection, so no socket is registered for a missing token.
   expectRejectedBeforeRegistration(cfg, /*authorization=*/"");
 }
 
@@ -2685,6 +2687,8 @@ TEST_F(ReverseTunnelJwtTest, VerifiedClaimBindsIdentifier) {
 }
 
 TEST_F(ReverseTunnelJwtTest, ValidationReqCommandMatchesRequestHeader) {
+  // Regression: before the formatter context carried the request headers, %REQ(...)% rendered empty
+  // and both the match and mismatch cases passed silently. This test fails if that plumbing breaks.
   // Builds a handshake whose node-id header is `node`, also carrying the x-expected-node-id header
   // that node_id_format references.
   auto make_request = [this](const std::string& node, const std::string& expected) {
@@ -2848,6 +2852,8 @@ TEST_F(ReverseTunnelJwtTest, RemoteJwksFetchFailureRejectsToken) {
 TEST_F(ReverseTunnelJwtTest, RemoteJwksNotYetFetchedRejectsToken) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   setRemoteJwt(cfg, kIssuer);
+  // NeverCompletes with fast_listener (set by setRemoteJwt) leaves the initial fetch outstanding,
+  // so the handshake runs with no keys cached yet.
   const std::string written =
       runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)),
                    makeFetcherFactory(FetchOutcome::NeverCompletes));
@@ -3154,6 +3160,9 @@ TEST_F(ReverseTunnelJwtTest, RemoteJwksRepeatedFetchFailure) {
   ASSERT_TRUE(refetch_timer->enabled());
   refetch_timer->invokeCallback();
   EXPECT_EQ(2, fetch_calls);
+  // Both failed fetches are counted.
+  EXPECT_EQ(
+      2, factory_context_.store_.counter("reverse_tunnel.handshake.jwt_jwks_fetch_failed").value());
 
   EXPECT_THAT(driveHandshake(config_or_error.value(),
                              makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),

@@ -1,4 +1,4 @@
-Added experimental inline JWT authentication for the reverse tunnel handshake via the new
+Added experimental JWT authentication for the reverse tunnel handshake via the new
 :ref:`jwt_validation <envoy_v3_api_field_extensions.filters.network.reverse_tunnel.v3.ReverseTunnel.jwt_validation>`
 field on the ``envoy.filters.network.reverse_tunnel`` filter. When configured, the bearer token
 carried in the handshake request is verified (signature, issuer, audiences, and ``exp``) before the

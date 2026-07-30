@@ -163,7 +163,9 @@ message JwtHandshakeValidation {
     // Fetching is always in the background here, so ``RemoteJwks.async_fetch``'s documented
     // on-demand, per-worker behavior when it is unset does not apply. ``async_fetch`` only tunes
     // the background fetch: ``fast_listener`` skips the wait at startup, and
-    // ``failed_refetch_duration`` sets the retry interval after a failed fetch.
+    // ``failed_refetch_duration`` sets the retry interval after a failed fetch. A ``cache_duration``
+    // or ``failed_refetch_duration`` below one second is raised to one second to avoid a refetch
+    // loop with no pause.
     http.jwt_authn.v3.RemoteJwks remote_jwks = 8;
   }
 

@@ -38,7 +38,9 @@ struct ReverseTunnelJwksStats {
   ALL_REVERSE_TUNNEL_JWKS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-// Builds the retry policy for a remote_jwks fetch, or a null policy when none is configured.
+// Builds the retry policy for a remote_jwks fetch, or a null policy when none is configured. This
+// duplicates jwt_authn's jwks_cache.cc, including the retry-on string; both can move to a shared
+// JwksAsyncFetcher helper when that file is next touched.
 absl::StatusOr<Router::RetryPolicyConstSharedPtr>
 buildRemoteJwksRetryPolicy(const RemoteJwks& remote_jwks,
                            Server::Configuration::ServerFactoryContext& server_context) {
@@ -61,9 +63,12 @@ buildRemoteJwksRetryPolicy(const RemoteJwks& remote_jwks,
 }
 
 // Raises a cache_duration or failed_refetch_duration below one second up to one second. The reused
-// JwksAsyncFetcher refetches after these durations, so a value below one second (including zero)
-// would refetch immediately and repeat with no pause. Returns an error only for a duration that is
-// out of range.
+// JwksAsyncFetcher fetches again after these durations, so a value below one second (including
+// zero) would fetch immediately and repeat with no pause. Returns an error only for a duration that
+// is out of range.
+// TODO(kanurag94): this is not reverse-tunnel-specific. JwksAsyncFetcher's getCacheDuration
+// truncates a sub-second cache_duration to zero and getFailedRefetchDuration has no floor, so both
+// can drive enableTimer(0). Fix it in jwks_async_fetcher.cc and drop this clamp.
 absl::Status clampRefetchDurationsToOneSecond(RemoteJwks& remote_jwks) {
   const auto raise_to_one_second = [](Protobuf::Duration& duration) -> absl::Status {
     const auto ms = DurationUtil::durationToMillisecondsNoThrow(duration);
@@ -126,8 +131,12 @@ private:
   // Kept here because JwksAsyncFetcher holds it by const reference and must outlive the fetcher.
   const RemoteJwks remote_jwks_;
   ReverseTunnelJwksStats stats_;
+  // A mutex, not a thread-local slot like jwt_authn's setJwksToAllThreads. Handshakes are
+  // per-connection, so this lock is taken rarely and a TLS slot would be complexity for no gain.
   Thread::MutexBasicLockable mutex_;
   JwksConstSharedPtr jwks_ ABSL_GUARDED_BY(mutex_);
+  // Declared last so it is destroyed first: the this-capturing callback it installs must not fire
+  // into a half-destroyed provider. Reordering this member would be a use-after-free.
   HttpFilters::JwtAuthn::JwksAsyncFetcherPtr async_fetcher_;
 };
 
