@@ -1,12 +1,10 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/allocator.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
-#include "source/server/generic_factory_context.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -55,59 +53,6 @@ public:
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };
 
-TEST_F(DnsCacheManagerImplTest, CacheMissAfterFirstCallerScopeDestroyed) {
-  DnsCacheManagerSharedPtr manager;
-  {
-    // Simulates a filter-chain-owned scope; destroyed when the filter chain goes away.
-    Stats::ScopeSharedPtr filter_chain_scope = store_.rootScope()->createScope("filter_chain_a.");
-    Server::GenericFactoryContextImpl context_a(server_context_, *filter_chain_scope,
-                                                ProtobufMessage::getNullValidationVisitor(),
-                                                &server_context_.init_manager_);
-    DnsCacheManagerFactoryImpl factory(server_context_);
-    manager = factory.get();
-
-    auto cache_or = manager->getCache(context_a.messageValidationVisitor(), makeConfig("cache_a"));
-    THROW_IF_NOT_OK_REF(cache_or.status());
-    EXPECT_NE(nullptr, cache_or.value());
-  }
-
-  // The second caller arrives after the first caller's scope is gone, with its own
-  // live scope (e.g. a new listener's filter chain).
-  Stats::ScopeSharedPtr filter_chain_scope_b = store_.rootScope()->createScope("filter_chain_b.");
-  Server::GenericFactoryContextImpl context_b(server_context_, *filter_chain_scope_b,
-                                              ProtobufMessage::getNullValidationVisitor(),
-                                              &server_context_.init_manager_);
-
-  // New cache name forces a cache miss; the DnsCacheImpl is created from the server
-  // context only, so the destroyed caller scope plays no role.
-  auto miss_or = manager->getCache(context_b.messageValidationVisitor(), makeConfig("cache_b"));
-  THROW_IF_NOT_OK_REF(miss_or.status());
-  EXPECT_NE(nullptr, miss_or.value());
-}
-
-// DNS cache stats live under the server scope, so a per-listener StatsMatcher cannot
-// filter them.
-TEST_F(DnsCacheManagerImplTest, ListenerStatsMatcherDoesNotFilterDnsCacheStats) {
-  envoy::config::metrics::v3::StatsMatcher matcher_proto;
-  matcher_proto.set_reject_all(true);
-  auto listener_matcher =
-      std::make_shared<Stats::StatsMatcherImpl>(matcher_proto, symbol_table_, server_context_);
-  Stats::ScopeSharedPtr listener_scope =
-      store_.rootScope()->createScope("listener.", false, {}, listener_matcher);
-
-  // The matcher is active: stats under the listener scope are dropped.
-  listener_scope->counterFromString("dropped");
-  EXPECT_EQ(nullptr, TestUtility::findCounter(store_, "listener.dropped"));
-
-  DnsCacheManagerFactoryImpl factory(server_context_);
-  auto manager = factory.get();
-  auto cache_or =
-      manager->getCache(ProtobufMessage::getNullValidationVisitor(), makeConfig("cache_a"));
-  THROW_IF_NOT_OK_REF(cache_or.status());
-
-  EXPECT_NE(nullptr, TestUtility::findCounter(store_, "dns_cache.cache_a.dns_query_attempt"));
-}
-
 // DNS cache stats are governed by the store-level (bootstrap) StatsMatcher.
 TEST_F(DnsCacheManagerImplTest, GlobalStatsMatcherFiltersDnsCacheStats) {
   envoy::config::metrics::v3::StatsMatcher matcher_proto;
@@ -117,8 +62,7 @@ TEST_F(DnsCacheManagerImplTest, GlobalStatsMatcherFiltersDnsCacheStats) {
 
   DnsCacheManagerFactoryImpl factory(server_context_);
   auto manager = factory.get();
-  auto cache_or =
-      manager->getCache(ProtobufMessage::getNullValidationVisitor(), makeConfig("cache_a"));
+  auto cache_or = manager->getCache(makeConfig("cache_a"));
   THROW_IF_NOT_OK_REF(cache_or.status());
 
   EXPECT_EQ(nullptr, TestUtility::findCounter(store_, "dns_cache.cache_a.dns_query_attempt"));

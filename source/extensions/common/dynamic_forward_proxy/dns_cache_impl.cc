@@ -17,7 +17,6 @@ namespace DynamicForwardProxy {
 
 absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
     Server::Configuration::ServerFactoryContext& server_context,
-    ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
   const uint32_t max_hosts = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024);
   if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts) {
@@ -37,14 +36,12 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
     resolved_address_filter = std::move(*matcher_or_error);
   }
 
-  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(server_context, validation_visitor, config,
-                                                        std::move(*resolver_or_error),
-                                                        std::move(resolved_address_filter)));
+  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(
+      server_context, config, std::move(*resolver_or_error), std::move(resolved_address_filter)));
 }
 
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::ServerFactoryContext& server_context,
-    ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Network::DnsResolverSharedPtr&& resolver,
     Envoy::Matcher::AddressMatcherPtr resolved_address_filter)
@@ -60,6 +57,7 @@ DnsCacheImpl::DnsCacheImpl(
       min_refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_min_refresh_rate, 5000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
       file_system_(server_context.api().fileSystem()),
+      validation_visitor_(server_context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)),
       resolved_address_filter_(std::move(resolved_address_filter)) {
@@ -67,7 +65,7 @@ DnsCacheImpl::DnsCacheImpl(
     return std::make_shared<ThreadLocalHostInfo>(*this, dispatcher);
   });
 
-  loadCacheEntries(config, validation_visitor);
+  loadCacheEntries(config);
 
   // Preresolved hostnames are resolved without a read lock on primary hosts because it is done
   // during object construction.
@@ -783,14 +781,13 @@ DnsCacheImpl::parseValue(absl::string_view value, std::optional<MonotonicTime>& 
 }
 
 void DnsCacheImpl::loadCacheEntries(
-    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
   if (!config.has_key_value_config()) {
     return;
   }
   auto& factory =
       Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(config.key_value_config().config());
-  key_value_store_ = factory.createStore(config.key_value_config(), validation_visitor,
+  key_value_store_ = factory.createStore(config.key_value_config(), validation_visitor_,
                                          main_thread_dispatcher_, file_system_);
   KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
     std::optional<MonotonicTime> resolution_time;

@@ -51,7 +51,6 @@ public:
   // Create a DnsCacheImpl or return a failed status;
   static absl::StatusOr<std::shared_ptr<DnsCacheImpl>> createDnsCacheImpl(
       Server::Configuration::ServerFactoryContext& server_context,
-      ProtobufMessage::ValidationVisitor& validation_visitor,
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
 
   ~DnsCacheImpl() override;
@@ -77,7 +76,6 @@ public:
 
 private:
   DnsCacheImpl(Server::Configuration::ServerFactoryContext& server_context,
-               ProtobufMessage::ValidationVisitor& validation_visitor,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
                Network::DnsResolverSharedPtr&& resolver,
                Envoy::Matcher::AddressMatcherPtr resolved_address_filter);
@@ -211,8 +209,7 @@ private:
                      const std::chrono::seconds ttl);
   void removeCacheEntry(const std::string& host);
   void loadCacheEntries(
-      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   PrimaryHostInfo* createHost(const std::string& host, uint16_t default_port);
   std::optional<Network::DnsResponse> parseValue(absl::string_view value,
                                                  std::optional<MonotonicTime>& resolution_time);
@@ -235,6 +232,7 @@ private:
   const std::chrono::milliseconds min_refresh_interval_;
   const std::chrono::milliseconds timeout_interval_;
   Filesystem::Instance& file_system_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
   absl::Mutex ip_version_to_remove_lock_;

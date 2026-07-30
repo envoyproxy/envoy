@@ -37,13 +37,11 @@ envoy_cc_test(
     srcs = ["dns_cache_manager_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/protobuf:message_validator_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
-        "//source/server:generic_factory_context_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",
