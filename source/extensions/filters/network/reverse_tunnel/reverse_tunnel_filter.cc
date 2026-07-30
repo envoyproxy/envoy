@@ -1,21 +1,12 @@
 #include "source/extensions/filters/network/reverse_tunnel/reverse_tunnel_filter.h"
 
-#include <algorithm>
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
-#include "envoy/event/timer.h"
-#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/formatter/http_formatter_context.h"
-#include "envoy/init/manager.h"
 #include "envoy/network/connection.h"
 #include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/assert.h"
-#include "source/common/common/lock_guard.h"
-#include "source/common/common/thread.h"
-#include "source/common/config/datasource.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
@@ -23,26 +14,15 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/init/target_impl.h"
-#include "source/common/jwt/check_audience.h"
-#include "source/common/jwt/jwt.h"
-#include "source/common/jwt/status.h"
-#include "source/common/jwt/verify.h"
 #include "source/common/network/connection_socket_impl.h"
-#include "source/common/protobuf/message_validator_impl.h"
-#include "source/common/router/retry_policy_impl.h"
-#include "source/common/router/string_accessor_impl.h"
-#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
-#include "source/extensions/filters/http/common/jwks_fetcher.h"
 #include "source/server/generic_factory_context.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
-#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -72,181 +52,7 @@ private:
   Http::RequestDecoder& decoder_;
 };
 
-// These are the default intervals for the remote JWKS background refresh. They match jwt_authn's
-// async fetcher.
-constexpr std::chrono::seconds DefaultCacheDuration{600};
-constexpr std::chrono::seconds RefetchBeforeExpired{5};
-constexpr std::chrono::seconds DefaultFailedRefetch{1};
-// This is the shortest interval the cache refresh or the failed refetch may use. The proto allows
-// smaller values, down to zero, which would start a new fetch immediately and repeat without pause.
-constexpr std::chrono::milliseconds MinRefetchInterval{1000};
-// After this many failures in a row, log at warning level again instead of staying at debug, so
-// that a long JWKS outage keeps showing up in the log instead of going quiet after the first line.
-constexpr uint32_t WarnEveryFailures{60};
-
-// Builds the retry policy for a remote_jwks fetch, or a null policy when none is configured.
-absl::StatusOr<Router::RetryPolicyConstSharedPtr> buildRemoteJwksRetryPolicy(
-    const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
-    Server::Configuration::ServerFactoryContext& server_context) {
-  if (!remote_jwks.has_retry_policy()) {
-    return Router::RetryPolicyConstSharedPtr{};
-  }
-  if (absl::Status status = Http::Utility::validateCoreRetryPolicy(remote_jwks.retry_policy());
-      !status.ok()) {
-    return status;
-  }
-  const envoy::config::route::v3::RetryPolicy route_retry_policy =
-      Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks.retry_policy(),
-                                                   "5xx,gateway-error,connect-failure,reset");
-  auto policy_or_error = Router::RetryPolicyImpl::create(
-      route_retry_policy, ProtobufMessage::getNullValidationVisitor(), server_context);
-  if (!policy_or_error.status().ok()) {
-    return policy_or_error.status();
-  }
-  return Router::RetryPolicyConstSharedPtr{std::move(policy_or_error.value())};
-}
-
 } // namespace
-
-// Counters for the remote JWKS background fetcher. They live on the config and are updated on the
-// main thread, unlike the per-connection handshake counters in ReverseTunnelStats.
-#define ALL_REVERSE_TUNNEL_JWKS_STATS(COUNTER)                                                     \
-  COUNTER(jwt_jwks_fetch_success)                                                                  \
-  COUNTER(jwt_jwks_fetch_failed)
-
-struct ReverseTunnelJwksStats {
-  ALL_REVERSE_TUNNEL_JWKS_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-// Fetches a remote JWKS in the background, at startup and then every cache_duration, so that
-// verification during the handshake stays synchronous. This is like jwt_authn's JwksAsyncFetcher,
-// except it always fetches because the filter never fetches on demand, and it keeps its own copy of
-// the keys that worker threads can read safely.
-class JwtRemoteJwksProvider : public Logger::Loggable<Logger::Id::filter>,
-                              public Extensions::HttpFilters::Common::JwksFetcher::JwksReceiver {
-public:
-  JwtRemoteJwksProvider(
-      const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
-      Router::RetryPolicyConstSharedPtr retry_policy,
-      Server::Configuration::ServerFactoryContext& server_context, Init::Manager& init_manager,
-      Stats::Scope& scope, JwksFetcherFactory create_fetcher_fn)
-      : remote_jwks_(remote_jwks), retry_policy_(std::move(retry_policy)),
-        server_context_(server_context), create_fetcher_fn_(std::move(create_fetcher_fn)),
-        stats_{
-            ALL_REVERSE_TUNNEL_JWKS_STATS(POOL_COUNTER_PREFIX(scope, "reverse_tunnel.handshake."))},
-        debug_name_(
-            absl::StrCat("reverse_tunnel jwt remote_jwks uri=", remote_jwks_.http_uri().uri())) {
-    good_refetch_duration_ = getCacheDuration(remote_jwks_);
-    if (good_refetch_duration_ > RefetchBeforeExpired) {
-      good_refetch_duration_ -= RefetchBeforeExpired;
-    }
-    failed_refetch_duration_ =
-        remote_jwks_.has_async_fetch() && remote_jwks_.async_fetch().has_failed_refetch_duration()
-            ? std::max(MinRefetchInterval,
-                       std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-                           remote_jwks_.async_fetch().failed_refetch_duration())))
-            : std::chrono::duration_cast<std::chrono::milliseconds>(DefaultFailedRefetch);
-
-    refetch_timer_ =
-        server_context_.mainThreadDispatcher().createTimer([this]() -> void { fetch(); });
-
-    // The handshake never fetches on demand, so the keys are only refreshed in the background. By
-    // default the listener waits for the first fetch through the init target. Setting
-    // async_fetch.fast_listener skips that wait. Either way the wait ends after the first attempt,
-    // whether it succeeds or not. If it fails, the listener still starts and rejects every
-    // handshake until a later fetch succeeds.
-    if (remote_jwks_.has_async_fetch() && remote_jwks_.async_fetch().fast_listener()) {
-      fetch();
-      return;
-    }
-    init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void { fetch(); });
-    init_manager.add(*init_target_);
-  }
-
-  // The most recently fetched keys, or nullptr before the first successful fetch. Worker threads
-  // read this during the handshake and the main thread updates it when a fetch completes.
-  JwksConstSharedPtr currentJwks() {
-    Thread::LockGuard lock(mutex_);
-    return jwks_;
-  }
-
-  // These implement JwksFetcher::JwksReceiver. Do not free fetcher_ inside them. The fetcher calls
-  // these callbacks and then resets itself, so freeing it here would crash. The next fetch replaces
-  // it after cancelling the old one.
-  void onJwksSuccess(JwtVerify::JwksPtr&& jwks) override {
-    // create_fetcher_fn_ is a public seam. A real fetcher only reports success with valid keys.
-    ASSERT(jwks != nullptr && jwks->getStatus() == JwtVerify::Status::Ok);
-    {
-      Thread::LockGuard lock(mutex_);
-      jwks_ = std::move(jwks);
-    }
-    ENVOY_LOG(debug, "{}: fetched", debug_name_);
-    consecutive_failures_ = 0;
-    handleFetchDone();
-    refetch_timer_->enableTimer(good_refetch_duration_);
-    stats_.jwt_jwks_fetch_success_.inc();
-  }
-  void onJwksError(Failure) override {
-    if (consecutive_failures_ % WarnEveryFailures == 0) {
-      ENVOY_LOG(warn, "{}: fetch failed", debug_name_);
-    } else {
-      ENVOY_LOG(debug, "{}: fetch failed", debug_name_);
-    }
-    ++consecutive_failures_;
-    handleFetchDone();
-    refetch_timer_->enableTimer(failed_refetch_duration_);
-    stats_.jwt_jwks_fetch_failed_.inc();
-  }
-
-private:
-  static std::chrono::milliseconds
-  getCacheDuration(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks) {
-    if (!remote_jwks.has_cache_duration()) {
-      return std::chrono::duration_cast<std::chrono::milliseconds>(DefaultCacheDuration);
-    }
-    // Work in milliseconds rather than whole seconds so that a value like 1.5 seconds is not
-    // rounded down to 1 second.
-    return std::max(MinRefetchInterval,
-                    std::chrono::milliseconds(
-                        DurationUtil::durationToMilliseconds(remote_jwks.cache_duration())));
-  }
-
-  void fetch() {
-    if (fetcher_ != nullptr) {
-      fetcher_->cancel();
-    }
-    ENVOY_LOG(debug, "{}: starting fetch", debug_name_);
-    fetcher_ = create_fetcher_fn_(server_context_.clusterManager(), retry_policy_, remote_jwks_);
-    fetcher_->fetch(Tracing::NullSpan::instance(), *this);
-  }
-
-  void handleFetchDone() {
-    if (init_target_ != nullptr) {
-      init_target_->ready();
-      init_target_.reset();
-    }
-  }
-
-  // This keeps its own copy because ReverseTunnelFilterConfig does not hold the proto config after
-  // create() returns.
-  const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks remote_jwks_;
-  const Router::RetryPolicyConstSharedPtr retry_policy_;
-  Server::Configuration::ServerFactoryContext& server_context_;
-  const JwksFetcherFactory create_fetcher_fn_;
-  ReverseTunnelJwksStats stats_;
-
-  Thread::MutexBasicLockable mutex_;
-  JwksConstSharedPtr jwks_ ABSL_GUARDED_BY(mutex_);
-
-  std::chrono::milliseconds good_refetch_duration_;
-  std::chrono::milliseconds failed_refetch_duration_;
-  // The number of failures since the last success. Only touched on the main thread.
-  uint32_t consecutive_failures_{0};
-  Event::TimerPtr refetch_timer_;
-  Extensions::HttpFilters::Common::JwksFetcherPtr fetcher_;
-  std::unique_ptr<Init::TargetImpl> init_target_;
-  const std::string debug_name_;
-};
 
 // Stats helper implementation.
 ReverseTunnelFilter::ReverseTunnelStats
@@ -317,70 +123,28 @@ absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>> ReverseTunnelFilterCo
     }
   }
 
-  // Set up the JWKS for handshake JWT authentication if it is configured. This runs here rather
-  // than in the constructor so that a bad configuration fails at config load time. An inline
-  // local_jwks is parsed now, and a remote_jwks starts a background fetcher. Verification during
-  // the handshake stays synchronous in both cases.
-  using JwtProto = envoy::extensions::filters::network::reverse_tunnel::v3::JwtHandshakeValidation;
-  JwksConstSharedPtr jwt_local_jwks;
-  std::unique_ptr<JwtRemoteJwksProvider> jwt_remote_provider;
+  // Build the JWT handshake validator if it is configured. This runs here rather than in the
+  // constructor so that a bad configuration fails at config load time.
+  JwtHandshakeValidatorPtr jwt_validator;
   if (proto_config.has_jwt_validation()) {
-    const auto& jwt = proto_config.jwt_validation();
-    // An issuer is required. Without one, a validly signed token from any issuer would be accepted.
-    if (jwt.issuer().empty()) {
-      return absl::InvalidArgumentError("reverse_tunnel jwt_validation: `issuer` is required");
+    auto validator_or_error = JwtHandshakeValidator::create(proto_config.jwt_validation(), context,
+                                                            std::move(create_fetcher_fn));
+    if (!validator_or_error.ok()) {
+      return validator_or_error.status();
     }
-    switch (jwt.jwks_source_specifier_case()) {
-    case JwtProto::kLocalJwks: {
-      auto jwks_or_error = Config::DataSource::read(jwt.local_jwks(), /*allow_empty=*/false,
-                                                    context.serverFactoryContext().api());
-      if (!jwks_or_error.ok()) {
-        return absl::InvalidArgumentError(
-            fmt::format("reverse_tunnel jwt_validation: failed to load local_jwks: {}",
-                        jwks_or_error.status().message()));
-      }
-      auto jwks = JwtVerify::Jwks::createFrom(jwks_or_error.value(), JwtVerify::Jwks::JWKS);
-      if (jwks->getStatus() != JwtVerify::Status::Ok) {
-        return absl::InvalidArgumentError(
-            fmt::format("reverse_tunnel jwt_validation: invalid local_jwks: {}",
-                        JwtVerify::getStatusString(jwks->getStatus())));
-      }
-      jwt_local_jwks = std::move(jwks);
-      break;
-    }
-    case JwtProto::kRemoteJwks: {
-      auto retry_policy_or_error =
-          buildRemoteJwksRetryPolicy(jwt.remote_jwks(), context.serverFactoryContext());
-      if (!retry_policy_or_error.ok()) {
-        return absl::InvalidArgumentError(
-            fmt::format("reverse_tunnel jwt_validation: invalid remote_jwks retry_policy: {}",
-                        retry_policy_or_error.status().message()));
-      }
-      jwt_remote_provider = std::make_unique<JwtRemoteJwksProvider>(
-          jwt.remote_jwks(), std::move(retry_policy_or_error.value()),
-          context.serverFactoryContext(), context.initManager(), context.scope(),
-          create_fetcher_fn
-              ? std::move(create_fetcher_fn)
-              : JwksFetcherFactory(&Extensions::HttpFilters::Common::JwksFetcher::create));
-      break;
-    }
-    case JwtProto::JWKS_SOURCE_SPECIFIER_NOT_SET:
-      return absl::InvalidArgumentError(
-          "reverse_tunnel jwt_validation: a JWKS source (local_jwks or remote_jwks) is required");
-    }
+    jwt_validator = std::move(validator_or_error.value());
   }
 
   return std::shared_ptr<ReverseTunnelFilterConfig>(new ReverseTunnelFilterConfig(
       proto_config, std::move(node_id_formatter), std::move(cluster_id_formatter),
-      std::move(tenant_id_formatter), std::move(jwt_local_jwks), std::move(jwt_remote_provider)));
+      std::move(tenant_id_formatter), std::move(jwt_validator)));
 }
 
 ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
     Formatter::FormatterConstSharedPtr node_id_formatter,
     Formatter::FormatterConstSharedPtr cluster_id_formatter,
-    Formatter::FormatterConstSharedPtr tenant_id_formatter, JwksConstSharedPtr jwt_local_jwks,
-    std::unique_ptr<JwtRemoteJwksProvider> jwt_remote_provider)
+    Formatter::FormatterConstSharedPtr tenant_id_formatter, JwtHandshakeValidatorPtr jwt_validator)
     : ping_interval_(proto_config.has_ping_interval()
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
@@ -412,43 +176,9 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
       use_http_upgrade_(proto_config.use_http_upgrade()),
       skip_rebalancing_(proto_config.skip_rebalancing()),
       enable_connection_limit_(proto_config.enable_connection_limit()),
-      jwt_enabled_(proto_config.has_jwt_validation()),
-      jwt_required_(proto_config.has_jwt_validation() &&
-                    !proto_config.jwt_validation().allow_missing_or_failed()),
-      jwt_issuer_(proto_config.has_jwt_validation() ? proto_config.jwt_validation().issuer()
-                                                    : std::string()),
-      jwt_audiences_([&proto_config]() {
-        std::vector<std::string> audiences;
-        if (proto_config.has_jwt_validation()) {
-          audiences.assign(proto_config.jwt_validation().audiences().begin(),
-                           proto_config.jwt_validation().audiences().end());
-        }
-        return JwtVerify::CheckAudience(audiences);
-      }()),
-      jwt_clock_skew_seconds_(proto_config.has_jwt_validation() &&
-                                      proto_config.jwt_validation().clock_skew_seconds() > 0
-                                  ? proto_config.jwt_validation().clock_skew_seconds()
-                                  : JwtVerify::kClockSkewInSecond),
-      jwt_token_header_(proto_config.has_jwt_validation() &&
-                                !proto_config.jwt_validation().token_header().empty()
-                            ? Http::LowerCaseString(proto_config.jwt_validation().token_header())
-                            : Http::LowerCaseString("authorization")),
-      jwt_claims_namespace_(
-          proto_config.has_jwt_validation() &&
-                  !proto_config.jwt_validation().claims_metadata_namespace().empty()
-              ? proto_config.jwt_validation().claims_metadata_namespace()
-              : "envoy.filters.network.reverse_tunnel.jwt"),
-      jwt_local_jwks_(std::move(jwt_local_jwks)),
-      jwt_remote_provider_(std::move(jwt_remote_provider)) {}
+      jwt_validator_(std::move(jwt_validator)) {}
 
 ReverseTunnelFilterConfig::~ReverseTunnelFilterConfig() = default;
-
-JwksConstSharedPtr ReverseTunnelFilterConfig::currentJwks() const {
-  if (jwt_remote_provider_ != nullptr) {
-    return jwt_remote_provider_->currentJwks();
-  }
-  return jwt_local_jwks_;
-}
 
 bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_id,
                                                         absl::string_view tenant_id) const {
@@ -515,85 +245,6 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
     }
   }
 
-  return true;
-}
-
-// TODO(kanurag94): this verifies the handshake token inline, on top of //source/common/jwt. If
-// another synchronous L4 caller ever needs the same thing, move it into a shared helper rather than
-// copying it.
-bool ReverseTunnelFilterConfig::verifyHandshakeJwt(const Http::RequestHeaderMap& headers,
-                                                   StreamInfo::StreamInfo& stream_info) const {
-  ASSERT(jwt_enabled_);
-
-  // Extract the token from the configured header.
-  const auto token_values = headers.get(jwt_token_header_);
-  if (token_values.empty()) {
-    ENVOY_LOG(debug, "reverse_tunnel: jwt: missing token header '{}'", jwt_token_header_.get());
-    return false;
-  }
-  // A well-formed client sends one token header. If there are several, use the first (as jwt_authn
-  // does) and just note it at debug.
-  if (token_values.size() > 1) {
-    ENVOY_LOG(debug, "reverse_tunnel: jwt: {} values on token header '{}'; using the first",
-              token_values.size(), jwt_token_header_.get());
-  }
-  absl::string_view token = token_values[0]->value().getStringView();
-  // Strip a leading "Bearer " prefix when present (case-insensitive), matching jwt_authn.
-  static constexpr absl::string_view bearer_prefix = "Bearer ";
-  if (absl::StartsWithIgnoreCase(token, bearer_prefix)) {
-    token = token.substr(bearer_prefix.size());
-  }
-
-  JwtVerify::Jwt jwt;
-  if (jwt.parseFromString(std::string(token)) != JwtVerify::Status::Ok) {
-    ENVOY_LOG(debug, "reverse_tunnel: jwt: token parse failed");
-    return false;
-  }
-
-  // Verify the signature and the time constraints, meaning exp and nbf, against the configured JWKS
-  // before trusting any claim in the payload. With remote_jwks the keys may not be fetched yet, or
-  // a refresh may be failing with nothing cached. Treat either case as a verification failure.
-  const JwksConstSharedPtr jwks = currentJwks();
-  if (jwks == nullptr) {
-    ENVOY_LOG(debug, "reverse_tunnel: jwt: no JWKS available yet");
-    return false;
-  }
-  const uint64_t now = std::chrono::duration_cast<std::chrono::seconds>(
-                           stream_info.timeSource().systemTime().time_since_epoch())
-                           .count();
-  const JwtVerify::Status status = JwtVerify::verifyJwt(jwt, *jwks, now, jwt_clock_skew_seconds_);
-  if (status != JwtVerify::Status::Ok) {
-    ENVOY_LOG(debug, "reverse_tunnel: jwt: verification failed: {}",
-              JwtVerify::getStatusString(status));
-    return false;
-  }
-
-  // An expiration is required. A token without exp would otherwise be valid forever.
-  if (jwt.exp_ == 0) {
-    ENVOY_LOG(debug, "reverse_tunnel: jwt: token has no `exp` claim");
-    return false;
-  }
-
-  // The issuer must match. Checked after signature verification so the payload can be trusted.
-  if (jwt.iss_ != jwt_issuer_) {
-    ENVOY_LOG(debug, "reverse_tunnel: jwt: issuer mismatch (expected '{}', got '{}')", jwt_issuer_,
-              jwt.iss_);
-    return false;
-  }
-
-  // Check the audience, normalized (scheme / trailing slash) like jwt_authn. Passes when no
-  // audience is configured.
-  if (!jwt_audiences_.areAudiencesAllowed(jwt.audiences_)) {
-    ENVOY_LOG(debug, "reverse_tunnel: jwt: audience not allowed");
-    return false;
-  }
-
-  // The token is verified. Publish the claims as dynamic metadata so the validation block can match
-  // a claimed identifier against a real claim with %DYNAMIC_METADATA(namespace:claim)%. This runs
-  // just before validateIdentifiers(), which is where those bindings are read.
-  stream_info.setDynamicMetadata(jwt_claims_namespace_, jwt.payload_pb_);
-  ENVOY_LOG(debug, "reverse_tunnel: jwt: verified; claims published to namespace '{}'",
-            jwt_claims_namespace_);
   return true;
 }
 

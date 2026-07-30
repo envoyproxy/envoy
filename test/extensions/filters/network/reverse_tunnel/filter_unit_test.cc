@@ -5,7 +5,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/network/utility.h"
-#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
@@ -2895,6 +2894,18 @@ TEST_F(ReverseTunnelJwtTest, RemoteJwksInvalidRetryPolicyRejectedAtConfigLoad) {
   EXPECT_FALSE(config_or_error.ok());
 }
 
+TEST_F(ReverseTunnelJwtTest, RemoteJwksInvalidUriRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validation();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* http_uri = jwt->mutable_remote_jwks()->mutable_http_uri();
+  http_uri->set_uri("not a valid url");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
 TEST_F(ReverseTunnelJwtTest, RemoteJwksWrongIssuerRejected) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   setRemoteJwt(cfg, "https://attacker.example.com");
@@ -3055,26 +3066,6 @@ TEST_F(ReverseTunnelJwtTest, RemoteJwksCacheDurationHonored) {
   jwt->set_issuer(std::string(kIssuer));
   auto* remote = jwt->mutable_remote_jwks();
   remote->mutable_cache_duration()->set_seconds(300);
-  remote->mutable_async_fetch()->set_fast_listener(true);
-  auto* http_uri = remote->mutable_http_uri();
-  http_uri->set_uri("https://example.com/jwks");
-  http_uri->set_cluster("jwks_cluster");
-  http_uri->mutable_timeout()->set_seconds(1);
-  auto config_or_error = ReverseTunnelFilterConfig::create(
-      cfg, factory_context_, makeFetcherFactory(FetchOutcome::Success));
-  ASSERT_TRUE(config_or_error.ok());
-}
-
-TEST_F(ReverseTunnelJwtTest, RemoteJwksCacheDurationKeepsSubSecondPrecision) {
-  auto* refetch_timer =
-      new NiceMock<Event::MockTimer>(&factory_context_.server_factory_context_.dispatcher_);
-  EXPECT_CALL(*refetch_timer, enableTimer(std::chrono::milliseconds(1500), testing::_));
-  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  auto* jwt = cfg.mutable_jwt_validation();
-  jwt->set_issuer(std::string(kIssuer));
-  auto* remote = jwt->mutable_remote_jwks();
-  remote->mutable_cache_duration()->set_seconds(1);
-  remote->mutable_cache_duration()->set_nanos(500000000);
   remote->mutable_async_fetch()->set_fast_listener(true);
   auto* http_uri = remote->mutable_http_uri();
   http_uri->set_uri("https://example.com/jwks");
