@@ -1204,7 +1204,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretWarmFalseSubscriptionOnce) {
 
   EXPECT_EQ(secret_provider1, secret_provider2);
 
-  // 3nd call: a warming provider must be distinct since its init target should not
+  // 3rd call: a warming provider must be distinct since its init target should not
   // become ready until the secret is received.
   auto secret_provider3 = secret_manager->findOrCreateTlsCertificateProvider(
       config_source, "abc.com", secret_context.server_context_, {}, true);
