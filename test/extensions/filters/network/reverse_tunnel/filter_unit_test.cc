@@ -2733,6 +2733,21 @@ TEST_F(ReverseTunnelJwtTest, CustomTokenHeaderAccepted) {
   EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
 }
 
+TEST_F(ReverseTunnelJwtTest, MultipleTokenHeadersUsesFirst) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += makeRtHeaders("n", "c", "t");
+  // Two token headers: verification uses the first (valid) one and ignores the rest.
+  req += absl::StrCat("authorization: Bearer ", kGoodToken, "\r\n");
+  req += "authorization: Bearer second\r\n";
+  req += "Content-Length: 0\r\n\r\n";
+  const std::string written = runHandshake(cfg, req);
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+}
+
 TEST_F(ReverseTunnelJwtTest, AuditModeAllowsMissingToken) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   setJwt(cfg, kIssuer, {}, /*allow_missing_or_failed=*/true);
@@ -2908,6 +2923,34 @@ TEST_F(ReverseTunnelJwtTest, RemoteJwksInvalidUriRejectedAtConfigLoad) {
   http_uri->set_uri("not a valid url");
   http_uri->set_cluster("jwks_cluster");
   http_uri->mutable_timeout()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksNegativeCacheDurationRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validation();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  remote->mutable_cache_duration()->set_seconds(-1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksNegativeFailedRefetchRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validation();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  remote->mutable_async_fetch()->mutable_failed_refetch_duration()->set_seconds(-1);
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
   EXPECT_FALSE(config_or_error.ok());
 }
