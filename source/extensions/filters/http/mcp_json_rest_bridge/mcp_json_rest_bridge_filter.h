@@ -48,7 +48,7 @@ enum class BridgeStatus {
   Ok,
   RequestNotPost,
   RequestTooLarge,
-  RequestParseError,
+  RequestFailedToParseJsonRpc,
   RequestUnsupportedProtocolVersion,
   RequestInitializeNotValid,
   RequestMethodNotSupported,
@@ -64,7 +64,7 @@ enum class BridgeStatus {
   ResponseTooLarge,
   ResponseInvalidUtf8,
   ResponseBackendError,
-  ResponseParseError,
+  ResponseFailedToParseJsonRpc,
 };
 
 absl::string_view bridgeStatusToString(BridgeStatus status);
@@ -74,12 +74,12 @@ inline constexpr absl::string_view STATUS = "status";
 inline constexpr absl::string_view OK = "mcp_json_rest_bridge_ok";
 inline constexpr absl::string_view REQUEST_NOT_POST = "mcp_json_rest_bridge_request_not_post";
 inline constexpr absl::string_view REQUEST_TOO_LARGE = "mcp_json_rest_bridge_request_too_large";
-inline constexpr absl::string_view REQUEST_PARSE_ERROR =
+inline constexpr absl::string_view REQUEST_FAILED_TO_PARSE_JSON_RPC =
     "mcp_json_rest_bridge_request_failed_to_parse_json_rpc";
 inline constexpr absl::string_view REQUEST_UNSUPPORTED_PROTOCOL_VERSION =
     "mcp_json_rest_bridge_request_unsupported_protocol_version";
 inline constexpr absl::string_view REQUEST_INITIALIZE_NOT_VALID =
-    "mcp_json_rest_bridge_request_initialize_request_not_valid";
+    "mcp_json_rest_bridge_request_initialize_not_valid";
 inline constexpr absl::string_view REQUEST_METHOD_NOT_SUPPORTED =
     "mcp_json_rest_bridge_request_method_not_supported";
 inline constexpr absl::string_view REQUEST_METHOD_NOT_FOUND =
@@ -104,7 +104,7 @@ inline constexpr absl::string_view RESPONSE_INVALID_UTF8 =
     "mcp_json_rest_bridge_response_invalid_utf8";
 inline constexpr absl::string_view RESPONSE_BACKEND_ERROR =
     "mcp_json_rest_bridge_response_backend_error";
-inline constexpr absl::string_view RESPONSE_PARSE_ERROR =
+inline constexpr absl::string_view RESPONSE_FAILED_TO_PARSE_JSON_RPC =
     "mcp_json_rest_bridge_response_failed_to_parse_json";
 } // namespace BridgeStatusValues
 

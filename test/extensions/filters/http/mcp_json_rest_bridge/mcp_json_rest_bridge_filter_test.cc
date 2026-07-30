@@ -473,11 +473,11 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidProtocolVersionParamsReturnsError) {
           Eq(Http::Code::BadRequest),
           StrEq(
               R"json({"code":-32602,"message":"Missing valid protocolVersion in initialize request"})json"),
-          _, _, StrEq("mcp_json_rest_bridge_request_initialize_request_not_valid")));
+          _, _, StrEq("mcp_json_rest_bridge_request_initialize_not_valid")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "mcp_json_rest_bridge_request_initialize_request_not_valid",
+    "status": "mcp_json_rest_bridge_request_initialize_not_valid",
     "method": "initialize",
     "params": {
       "protocolVersion": 123
