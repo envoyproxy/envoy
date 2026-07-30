@@ -22,18 +22,17 @@ std::shared_ptr<Network::ConnectionInfoSetterImpl> connectionInfoProvider() {
 }
 
 StreamInfo::StreamInfoImpl createStreamInfo() {
-  CONSTRUCT_ON_FIRST_USE(
-      StreamInfo::StreamInfoImpl,
-      StreamInfo::StreamInfoImpl(Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(),
-                                 connectionInfoProvider(),
-                                 StreamInfo::FilterState::LifeSpan::FilterChain));
+  return StreamInfo::StreamInfoImpl(Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(),
+                                    connectionInfoProvider(),
+                                    StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 TEST(MatchingData, HttpResponseStatusCodeInput) {
   HttpResponseStatusCodeInput input;
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(createStreamInfo());
+  auto stream_info = createStreamInfo();
+  HttpMatchingDataImpl data(stream_info);
 
   {
     auto result = input.get(data);
@@ -62,7 +61,8 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(createStreamInfo());
+  auto stream_info = createStreamInfo();
+  HttpMatchingDataImpl data(stream_info);
   {
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
