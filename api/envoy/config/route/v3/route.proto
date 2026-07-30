@@ -177,17 +177,10 @@ message Vhds {
   //
   // Envoy currently supports only glob collections.
   //
-  // If unspecified or empty, Envoy defaults to sending a wildcard subscription.
-  string default_virtual_host_resource_name = 2;
-
-  // The virtual host resource name to use for on-demand VHDS requests.
-  // The string should contain the token ``{domain}``, which will be replaced with
-  // the domain being fetched. For example, if set to
-  // ``xdstp://authority/vhds/on-demand/{domain}``, if VHDS needs the domain for
-  // "example.com", it will subscribe to the resource
-  // ``xdstp://authority/vhds/on-demand/example.com``.
+  // When this field is specified, Envoy subscribes to the whole collection and
+  // on-demand virtual host discovery is disabled.
   //
-  // If unspecified or empty, Envoy will default to subscribing
-  // to non-xdstp resource ``<route configuration name>/<domain>``.
-  string on_demand_virtual_host_resource_name = 3;
+  // If unspecified or empty, Envoy defaults to sending a wildcard subscription and
+  // on-demand virtual host discovery remains available.
+  string default_virtual_host_resource_name = 2;
 }

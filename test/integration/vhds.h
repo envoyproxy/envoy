@@ -140,18 +140,6 @@ enum class RouteConfigType { Rds, Static };
 using VhdsIntegrationTestParam = std::tuple<Network::Address::IpVersion, Grpc::ClientType,
                                             Grpc::LegacyOrUnified, RouteConfigType>;
 
-const char RdsConfigWithOnDemandTemplate[] = R"EOF(
-name: my_route
-vhds:
-  config_source:
-    api_config_source:
-      api_type: DELTA_GRPC
-      grpc_services:
-        envoy_grpc:
-          cluster_name: xds_cluster
-  on_demand_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my_route/{domain}"
-)EOF";
-
 const char RdsConfigWithXdstp[] = R"EOF(
 name: my_route
 vhds:
@@ -164,7 +152,7 @@ vhds:
   default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my_route/*"
 )EOF";
 
-const char RdsConfigWithXdstpAndOnDemandTemplate[] = R"EOF(
+const char RdsConfigWithXdstpDefaultCollection[] = R"EOF(
 name: my_route
 vhds:
   config_source:
@@ -174,7 +162,6 @@ vhds:
         envoy_grpc:
           cluster_name: xds_cluster
   default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/default/*"
-  on_demand_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/on-demand/{domain}"
 )EOF";
 
 class VhdsIntegrationTest : public HttpIntegrationTest,

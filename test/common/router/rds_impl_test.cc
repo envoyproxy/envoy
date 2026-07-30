@@ -628,7 +628,7 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
-  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
 
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
@@ -683,7 +683,50 @@ rds:
   EXPECT_NO_THROW(post_cb());
 }
 
-TEST_F(RdsImplTest, VirtualHostUpdateUsesOnDemandResourceNameTemplate) {
+// A plain VHDS configuration (no default collection) keeps on-demand virtual host discovery
+// enabled.
+TEST_F(RdsImplTest, OnDemandVhdsEnabledWithoutDefaultCollection) {
+  setup();
+
+  const std::string response_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "vhds": {
+        "config_source": {
+          "resource_api_version": "V3",
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+)EOF";
+  auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
+}
+
+// When a default virtual host collection is configured, on-demand virtual host discovery is
+// disabled: the whole collection is delivered up front, so there is nothing to fetch on demand.
+TEST_F(RdsImplTest, OnDemandVhdsDisabledWithDefaultCollection) {
   setup();
 
   const std::string response_json = R"EOF(
@@ -706,8 +749,8 @@ TEST_F(RdsImplTest, VirtualHostUpdateUsesOnDemandResourceNameTemplate) {
             }
           }
         },
-        "on_demand_virtual_host_resource_name":
-          "xdstp://test/envoy.config.route.v3.VirtualHost/on-demand/{domain}"
+        "default_virtual_host_resource_name":
+          "xdstp://test/envoy.config.route.v3.VirtualHost/foo_route_config/*"
       }
     }
   ]
@@ -721,25 +764,7 @@ TEST_F(RdsImplTest, VirtualHostUpdateUsesOnDemandResourceNameTemplate) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
-  EXPECT_TRUE(rds_->configCast()->usesVhds());
-
-  Event::PostCb post_cb;
-  testing::NiceMock<Event::MockDispatcher> local_thread_dispatcher;
-  testing::MockFunction<void(bool)> mock_callback;
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
-    post_cb = std::move(cb);
-  });
-
-  rds_->requestVirtualHostsUpdate(
-      "testing", local_thread_dispatcher,
-      std::make_shared<Http::RouteConfigUpdatedCallback>(
-          Http::RouteConfigUpdatedCallback(mock_callback.AsStdFunction())));
-
-  ASSERT_TRUE(static_cast<bool>(post_cb));
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              requestOnDemandUpdate(testing::UnorderedElementsAre(
-                  "xdstp://test/envoy.config.route.v3.VirtualHost/on-demand/testing")));
-  post_cb();
+  EXPECT_FALSE(rds_->configCast()->onDemandVhdsEnabled());
 }
 
 TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {

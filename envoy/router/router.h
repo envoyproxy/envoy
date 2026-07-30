@@ -1426,9 +1426,9 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
-   * @return whether router configuration uses VHDS.
+   * @return whether on-demand virtual host discovery is enabled.
    */
-  virtual bool usesVhds() const PURE;
+  virtual bool onDemandVhdsEnabled() const PURE;
 
   /**
    * @return bool whether most specific header mutations should take precedence. The default
