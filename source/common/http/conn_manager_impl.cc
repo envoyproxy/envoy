@@ -298,15 +298,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
              StreamInfo::CoreResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
-      const bool reset_with_error =
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error");
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
-              StreamInfo::CoreResponseFlag::UpstreamProtocolError) &&
-          !Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.reset_ignore_upstream_reason")) {
-        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
-      } else if (reset_with_error && stream.filter_manager_.streamInfo().hasResponseFlag(
-                                         StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
+              StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
