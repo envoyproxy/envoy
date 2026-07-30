@@ -76,7 +76,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    [this]() {
                      if (config_update_info_->protobufConfigurationCast()
                              .vhds()
-                             .default_virtual_host_resource_name()
+                             .default_virtual_host_resource_locator()
                              .empty()) {
                        subscription_->start(
                            {config_update_info_->protobufConfigurationCast().name()});
@@ -88,7 +88,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                             "name"),
       route_config_provider_(route_config_provider) {
   const auto& vhds = config_update_info_->protobufConfigurationCast().vhds();
-  const auto& default_resource_name = vhds.default_virtual_host_resource_name();
+  const auto& default_resource_name = vhds.default_virtual_host_resource_locator();
 
   if (default_resource_name.empty()) {
     // Legacy mode: use namespace-matching subscription.

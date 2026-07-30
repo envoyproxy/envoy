@@ -1048,7 +1048,7 @@ TEST_P(OnDemandVhdsWithBodyIntegrationTest, VhdsOnDemandUpdateWithBody) {
 }
 
 // Test class for VHDS subscribing to an xdstp default virtual host collection
-// (default_virtual_host_resource_name). On-demand virtual host discovery is disabled in this mode.
+// (default_virtual_host_resource_locator). On-demand virtual host discovery is disabled in this mode.
 class VhdsXdstpCollectionIntegrationTest
     : public HttpIntegrationTest,
       public testing::TestWithParam<VhdsIntegrationTestParam> {
@@ -1147,7 +1147,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsXdstpCollectionIntegrationTest,
                          VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
 
-// Verify that when default_virtual_host_resource_name is configured:
+// Verify that when default_virtual_host_resource_locator is configured:
 // 1. VHDS subscribes to the xdstp glob collection at startup.
 // 2. Virtual hosts from the initial collection response are routable.
 // 3. On-demand virtual host discovery is disabled: a request to an unknown domain does NOT trigger

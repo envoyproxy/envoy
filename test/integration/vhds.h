@@ -149,7 +149,7 @@ vhds:
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
-  default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my_route/*"
+  default_virtual_host_resource_locator: "xdstp://test/envoy.config.route.v3.VirtualHost/my_route/*"
 )EOF";
 
 const char RdsConfigWithXdstpDefaultCollection[] = R"EOF(
@@ -161,7 +161,7 @@ vhds:
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
-  default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/default/*"
+  default_virtual_host_resource_locator: "xdstp://test/envoy.config.route.v3.VirtualHost/default/*"
 )EOF";
 
 class VhdsIntegrationTest : public HttpIntegrationTest,

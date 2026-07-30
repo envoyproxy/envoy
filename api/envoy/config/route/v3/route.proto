@@ -182,5 +182,5 @@ message Vhds {
   //
   // If unspecified or empty, Envoy defaults to sending a wildcard subscription and
   // on-demand virtual host discovery remains available.
-  string default_virtual_host_resource_name = 2;
+  string default_virtual_host_resource_locator = 2;
 }

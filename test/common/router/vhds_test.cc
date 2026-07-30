@@ -325,7 +325,7 @@ vhds:
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
-  default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/*"
+  default_virtual_host_resource_locator: "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/*"
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 

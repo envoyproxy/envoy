@@ -3286,7 +3286,7 @@ TEST_P(AdsIntegrationTest, MultipleXdstpVhdsCollectionsOverAds) {
     route.set_name(name);
     auto* vhds = route.mutable_vhds();
     vhds->mutable_config_source()->mutable_ads();
-    vhds->set_default_virtual_host_resource_name(xdstp_collection);
+    vhds->set_default_virtual_host_resource_locator(xdstp_collection);
     return route;
   };
 
