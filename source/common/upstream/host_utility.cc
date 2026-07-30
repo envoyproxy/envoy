@@ -138,7 +138,7 @@ HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
 }
 
 HostUtility::OverrideHostSelectionResult
-HostUtility::selectOverrideHost(const HostMap* host_map, HostStatusSet status,
+HostUtility::selectOverrideHost(const HostLookupTable* host_map, HostStatusSet status,
                                 LoadBalancerContext* context) {
   if (context == nullptr) {
     return {};
@@ -156,15 +156,12 @@ HostUtility::selectOverrideHost(const HostMap* host_map, HostStatusSet status,
     return {nullptr, strict_mode, OverrideHostSelectionStatus::NotFound};
   }
 
-  auto host_iter = host_map->find(override_host->host);
+  HostConstSharedPtr host = host_map->findHost(override_host->host);
 
   // The override host cannot be found in the host map.
-  if (host_iter == host_map->end()) {
+  if (host == nullptr) {
     return {nullptr, strict_mode, OverrideHostSelectionStatus::NotFound};
   }
-
-  HostConstSharedPtr host = host_iter->second;
-  ASSERT(host != nullptr);
 
   if (status[static_cast<uint32_t>(host->healthStatus())]) {
     return {host, strict_mode, OverrideHostSelectionStatus::Success};

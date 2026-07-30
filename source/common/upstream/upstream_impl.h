@@ -70,6 +70,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/functional/function_ref.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -764,12 +765,12 @@ public:
                    const HostVector& hosts_removed,
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt,
-                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
+                   HostLookupTableConstSharedPtr cross_priority_host_map = nullptr) override;
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
-  HostMapConstSharedPtr crossPriorityHostMap() const override {
-    return const_cross_priority_host_map_;
+  HostLookupTableConstSharedPtr crossPriorityHostMap() const override {
+    return cross_priority_lookup_;
   }
 
 protected:
@@ -793,8 +794,12 @@ protected:
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
 
-  // Read only all host map for fast host searching. This will never be null.
-  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
+  // Read only cross-priority host lookup table for fast host searching. This will never be null.
+  // The worker-local set just stores and serves whatever `updateHosts` published. The flat or
+  // persistent backing is built by `MainPrioritySetImpl::updateCrossPriorityHostMap` per that
+  // cluster's setting (see `setUsePersistentCrossPriorityHostMap()`).
+  mutable HostLookupTableConstSharedPtr cross_priority_lookup_{
+      makeFlatHostLookupTable(std::make_shared<HostMap>())};
 
 private:
   // This is a matching vector to store the callback handles for host_sets_. It is kept separately
@@ -832,26 +837,56 @@ private:
   };
 };
 
+// Persistent cross-priority host map backing. Forward-declared to keep the `immer` dependency out
+// of this widely-included header. The definition lives in persistent_host_map.h and .cc.
+class PersistentCrossPriorityHostMap;
+
 /**
  * Specialized PrioritySetImpl designed for the main thread. It will update and maintain the read
  * only cross priority host map when the host set changes.
  */
 class MainPrioritySetImpl : public PrioritySetImpl, public Logger::Loggable<Logger::Id::upstream> {
 public:
+  MainPrioritySetImpl();
+  ~MainPrioritySetImpl() override;
+
   // PrioritySet
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt,
-                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
-  HostMapConstSharedPtr crossPriorityHostMap() const override;
+                   HostLookupTableConstSharedPtr cross_priority_host_map = nullptr) override;
+  HostLookupTableConstSharedPtr crossPriorityHostMap() const override;
+
+  // Selects the persistent cross-priority host map backing for this cluster in place of the legacy
+  // flat copy-on-write map, trading the per-update O(N) copy for O(delta) updates. Must be called
+  // on the main thread before the first host update. Dynamic-modules clusters opt in through the
+  // cluster ABI.
+  void setUsePersistentCrossPriorityHostMap(bool use_persistent) {
+    use_persistent_cross_priority_host_map_ = use_persistent;
+  }
 
 protected:
   void updateCrossPriorityHostMap(uint32_t priority, const HostVector& hosts_added,
                                   const HostVector& hosts_removed);
 
+  // Legacy flat backing, used unless the persistent backing is selected. This preserves the exact
+  // pre-existing behavior. Read only map will never be null.
+  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
+
+private:
+  // Persistent backing, used when `use_persistent_cross_priority_host_map_` is set. Built lazily on
+  // the first persistent update so flat-path clusters never construct an `immer` map. `immer` is
+  // confined to the PersistentCrossPriorityHostMap implementation.
+  std::unique_ptr<PersistentCrossPriorityHostMap> persistent_host_map_;
+  // Whether this cluster uses the persistent backing. Set once before the first host update. See
+  // `setUsePersistentCrossPriorityHostMap()`.
+  bool use_persistent_cross_priority_host_map_{false};
+  // Tracks the backing used by the last update so a switch of the backing reseeds the newly-active
+  // backing from the currently-published map.
+  bool last_update_used_persistent_{false};
 };
 
 /**
@@ -1409,14 +1444,16 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param all_hosts all known hosts prior to this host update across all priorities.
+   * @param host_lookup resolves a host address string to the existing host across all priorities
+   * prior to this update, or returns nullptr if absent. Backed by the cross-priority host lookup
+   * table or by a cluster-local flat map.
    * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
    */
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             const HostMap& all_hosts,
+                             absl::FunctionRef<HostSharedPtr(const std::string&)> host_lookup,
                              const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 

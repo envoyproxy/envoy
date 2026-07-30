@@ -546,6 +546,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "e2da4f41bae8869f8dee56f4c104e699e7de3a483b5e451fda8e76fbcc66c59a",
         urls = ["https://github.com/Maratyszcza/FP16/archive/{version}.zip"],
     ),
+    immer = dict(
+        # Pinned past the v0.9.1 release to pick up the upstream fix for
+        # https://github.com/arximboldi/immer/issues/274 (pull request 323), which corrects the
+        # allocation size of the empty map node. Move back to a tagged release once one ships it.
+        version = "71813305ed1af2173f199e8ee209df5d6a16e766",
+        strip_prefix = "immer-{version}",
+        sha256 = "470a1926a1ff57d0de42bc6f68710d988eda31e30ac142c81bcea9a59cdb7828",
+        urls = ["https://github.com/arximboldi/immer/archive/{version}.tar.gz"],
+    ),
     simdutf = dict(
         # NOTE: Update together with v8 and proxy_wasm_cpp_host.
         version = "8.1.0",

@@ -905,7 +905,8 @@ TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressSuccess) {
   host_map->insert({"10.0.0.1:8080", host1_});
   host_map->insert({"10.0.0.2:8080", host2_});
   host_map->insert({"10.0.0.3:8080", host3_});
-  ON_CALL(priority_set_, crossPriorityHostMap()).WillByDefault(Return(host_map));
+  ON_CALL(priority_set_, crossPriorityHostMap())
+      .WillByDefault(Return(Upstream::makeFlatHostLookupTable(host_map)));
 
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;

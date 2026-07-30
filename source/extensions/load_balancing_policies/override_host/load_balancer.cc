@@ -38,7 +38,8 @@ using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideH
 using ::Envoy::Http::HeaderMap;
 using ::Envoy::Server::Configuration::ServerFactoryContext;
 using ::Envoy::Upstream::HostConstSharedPtr;
-using ::Envoy::Upstream::HostMapConstSharedPtr;
+using ::Envoy::Upstream::HostLookupTableConstSharedPtr;
+using ::Envoy::Upstream::HostSharedPtr;
 using ::Envoy::Upstream::LoadBalancerConfig;
 using ::Envoy::Upstream::LoadBalancerContext;
 using ::Envoy::Upstream::LoadBalancerParams;
@@ -292,22 +293,21 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext
 
 HostConstSharedPtr
 OverrideHostLoadBalancer::LoadBalancerImpl::findHost(absl::string_view endpoint) {
-  HostMapConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
+  HostLookupTableConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
   if (hosts == nullptr) {
     return nullptr;
   }
 
-  ENVOY_LOG(trace, "Looking up {} in {}", endpoint,
-            absl::StrJoin(*hosts, ", ",
-                          [](std::string* out, Envoy::Upstream::HostMap::const_reference entry) {
-                            absl::StrAppend(out, entry.first);
-                          }));
-
-  if (const auto host_iterator = hosts->find(endpoint); host_iterator != hosts->end()) {
-    // TODO(yanavlasov): Validate that host health status did not change.
-    return host_iterator->second;
+  if (ENVOY_LOG_CHECK_LEVEL(trace)) {
+    std::vector<absl::string_view> addresses;
+    hosts->forEach([&addresses](const std::string& address, const HostSharedPtr&) {
+      addresses.push_back(address);
+    });
+    ENVOY_LOG(trace, "Looking up {} in {}", endpoint, absl::StrJoin(addresses, ", "));
   }
-  return nullptr;
+
+  // TODO(yanavlasov): Validate that host health status did not change.
+  return hosts->findHost(endpoint);
 }
 
 HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(

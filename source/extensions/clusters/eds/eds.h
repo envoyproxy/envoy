@@ -60,7 +60,7 @@ private:
                               LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
                               PriorityStateManager& priority_state_manager,
-                              const HostMap& all_hosts,
+                              const HostLookupTable& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
   const std::string& edsServiceName() const {
