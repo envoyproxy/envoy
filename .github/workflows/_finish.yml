@@ -55,6 +55,7 @@ jobs:
           check_name: ${{ fromJSON(inputs.needs).load.outputs.check-name }}
           repo: ${{ github.repository }}
           run_id: ${{ github.run_id }}
+          branch: ${{ github.event.workflow_run.head_branch }}
           outcomes: ${{ toJSON(fromJSON(inputs.needs)) }}
           allowed_to_fail: ${{ toJSON(inputs.allowed-to-fail) }}
           load: ${{ toJSON(fromJSON(inputs.needs).load.outputs) }}
@@ -65,6 +66,7 @@ jobs:
         filter: |
           .repo as $repo
           | .run_id as $run_id
+          | (.branch // "main") as $branch
           | (.slack_channel // "") as $slack_channel
           | (.slack_channel_allowed_failure // "") as $slack_channel_allowed_failure
           | .check_name as $check_name
@@ -104,11 +106,11 @@ jobs:
              end) as $allowed_failure_text
           | (if $slack_channel != "" and ($required_failures | length) > 0 then
                {"channel": $slack_channel,
-                "text": ":x: *CI failed on `main`:* `\($req_names)`\\n<\($run_url)|View workflow run>"}
+                "text": ":x: *CI failed on `\($branch)`:* `\($req_names)`\\n<\($run_url)|View workflow run>"}
              else null end) as $notify_required
           | (if $slack_channel_allowed_failure != "" and ($allowed_failures | length) > 0 then
                {"channel": $slack_channel_allowed_failure,
-                "text": ":x: *OpenSSL CI failed on `main`:* `\($atf_names)`\\n<\($run_url)|View workflow run>"}
+                "text": ":x: *OpenSSL CI failed on `\($branch)`:* `\($atf_names)`\\n<\($run_url)|View workflow run>"}
              else null end) as $notify_openssl
           | {"summary-title": "\($icon) \($request.check.name) complete (\($outcome.name))",
              "check-id": $check_id,
@@ -151,7 +153,7 @@ jobs:
     - name: Notify Slack (required failures)
       if: >-
         github.event.workflow_run.event == 'push'
-        && github.event.workflow_run.head_branch == 'main'
+        && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/v'))
         && github.repository == 'envoyproxy/envoy'
         && fromJSON(steps.needs.outputs.value)['notify-required'] != null
       uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
@@ -169,7 +171,7 @@ jobs:
     - name: Notify Slack (OpenSSL failures)
       if: >-
         github.event.workflow_run.event == 'push'
-        && github.event.workflow_run.head_branch == 'main'
+        && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/v'))
         && github.repository == 'envoyproxy/envoy'
         && fromJSON(steps.needs.outputs.value)['notify-openssl'] != null
       uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3

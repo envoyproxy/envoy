@@ -150,7 +150,7 @@ jobs:
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
       && (fromJSON(needs.load.outputs.request).run.check-build
           || fromJSON(needs.load.outputs.request).run.check-build-openssl
-          || fromJSON(needs.load.outputs.request).run.check-build-openssl-pr
+          || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
           || fromJSON(needs.load.outputs.request).run.check-coverage
           || fromJSON(needs.load.outputs.request).run.check-san)
     needs:
