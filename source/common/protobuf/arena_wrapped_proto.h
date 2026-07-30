@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+#include <memory>
 #include <utility>
 
 #include "envoy/common/optref.h"
@@ -44,6 +46,29 @@ public:
   }
 
   ~ArenaWrappedProto() = default; // Destructor of arena_ frees proto_ automatically.
+
+  // Allow construction from nullptr.
+  ArenaWrappedProto(std::nullptr_t) : arena_(nullptr), proto_(nullptr) {}
+
+  // Conversion constructor from std::unique_ptr.
+  // This is implicit to facilitate migration from std::unique_ptr to ArenaWrappedProto.
+  ArenaWrappedProto(std::unique_ptr<ProtoT>&& heap_proto) {
+    if (heap_proto) {
+      arena_ = std::make_unique<google::protobuf::Arena>();
+      proto_ = google::protobuf::Arena::Create<ProtoT>(arena_.get());
+      proto_->Swap(heap_proto.get());
+    } else {
+      arena_ = nullptr;
+      proto_ = nullptr;
+    }
+  }
+
+  // Boolean conversion (e.g., if (wrapper))
+  explicit operator bool() const { return proto_ != nullptr; }
+
+  // Comparison with nullptr.
+  bool operator==(std::nullptr_t) const { return proto_ == nullptr; }
+  bool operator!=(std::nullptr_t) const { return proto_ != nullptr; }
 
   // --- Transparent Accessors ---
 

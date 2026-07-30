@@ -35,6 +35,23 @@ TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
   EXPECT_NE(dynamic_cast<CdnLoopFilter*>(filter.get()), nullptr);
 }
 
+TEST(CdnLoopFilterFactoryTest, CreateFilterWithServerContext) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  Http::StreamDecoderFilterSharedPtr filter;
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
+
+  envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
+  config.set_cdn_id("cdn");
+  CdnLoopFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(config, "stats", server_context).value();
+  cb(filter_callbacks);
+  EXPECT_NE(filter.get(), nullptr);
+  EXPECT_NE(dynamic_cast<CdnLoopFilter*>(filter.get()), nullptr);
+}
+
 TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

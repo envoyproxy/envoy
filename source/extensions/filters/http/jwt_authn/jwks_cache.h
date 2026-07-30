@@ -95,7 +95,7 @@ public:
   virtual JwtAuthnFilterStats& stats() PURE;
 
   // Factory function to create an instance.
-  static JwksCachePtr
+  static absl::StatusOr<JwksCachePtr>
   create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
          Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
          JwtAuthnFilterStats& stats);

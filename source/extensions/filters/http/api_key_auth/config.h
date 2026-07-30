@@ -20,6 +20,16 @@ private:
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const ApiKeyAuthProto& config, const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const ApiKeyAuthProto& config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
+  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
+  // (ServerFactoryContext) paths. Stats are scoped to the given scope.
+  static absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const ApiKeyAuthProto& proto_config, const std::string& stats_prefix,
+                      Stats::Scope& scope);
+
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const ApiKeyAuthPerRouteProto& proto_config,
                                        Server::Configuration::ServerFactoryContext&,

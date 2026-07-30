@@ -45,7 +45,7 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
                                                const std::string& body,
                                                const HeaderValueOptionVector& headers,
                                                const HeaderValueOptionVector& downstream_headers) {
-  auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  CheckResponsePtr response;
   auto status = response->mutable_status();
   status->set_code(response_status);
 
@@ -89,7 +89,7 @@ CheckResponsePtr TestCommon::makeErrorCheckResponse(Grpc::Status::GrpcStatus res
                                                     envoy::type::v3::StatusCode http_status_code,
                                                     const std::string& body,
                                                     const HeaderValueOptionVector& headers) {
-  auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  CheckResponsePtr response;
   auto status = response->mutable_status();
   status->set_code(response_status);
 

@@ -248,6 +248,23 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
   return cluster_options;
 }
 
+void appendBindAddressNoPortOption(UpstreamLocalAddress& upstream_local_address) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion")) {
+    return;
+  }
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    return;
+  }
+  if (upstream_local_address.address_ != nullptr &&
+      upstream_local_address.address_->ip() != nullptr &&
+      upstream_local_address.address_->ip()->port() == 0) {
+    ::Envoy::Network::Socket::appendOptions(
+        upstream_local_address.socket_options_,
+        ::Envoy::Network::SocketOptionFactory::buildBindAddressNoPort());
+  }
+}
+
 absl::StatusOr<std::vector<::Envoy::Upstream::UpstreamLocalAddress>>
 parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
                 const std::optional<std::string>& cluster_name,
@@ -271,7 +288,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
                                             base_socket_options);
     ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
                                             cluster_socket_options);
-
+    appendBindAddressNoPortOption(upstream_local_address);
     upstream_local_addresses.push_back(upstream_local_address);
 
     for (const auto& extra_source_address : bind_config->extra_source_addresses()) {
@@ -295,6 +312,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
         ::Envoy::Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
                                                 cluster_socket_options);
       }
+      appendBindAddressNoPortOption(extra_upstream_local_address);
       upstream_local_addresses.push_back(extra_upstream_local_address);
     }
 
@@ -310,6 +328,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
                                               base_socket_options);
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
                                               cluster_socket_options);
+      appendBindAddressNoPortOption(additional_upstream_local_address);
       upstream_local_addresses.push_back(additional_upstream_local_address);
     }
   } else {
@@ -519,6 +538,7 @@ HostDescriptionImpl::HostDescriptionImpl(
     uint32_t priority, const AddressVector& address_list, absl::string_view stat_name)
     : HostDescriptionImplBase(cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
                               locality, health_check_config, priority, creation_status),
+      sorted_address_list_or_null_(makeSortedAddressListOrNull(*cluster, address_list)),
       address_(dest_address),
       address_list_or_null_(makeAddressListOrNull(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)),
@@ -565,6 +585,20 @@ HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressLi
   return std::make_shared<AddressVector>(address_list);
 }
 
+HostDescription::SharedConstAddressVector
+HostDescriptionImplBase::makeSortedAddressListOrNull(const ClusterInfo& cluster,
+                                                     const AddressVector& address_list) {
+  if (address_list.size() <= 1) {
+    return {};
+  }
+  const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+      happy_eyeballs_config =
+          cluster.happyEyeballsConfig().has_value() ? *cluster.happyEyeballsConfig()
+                                                    : defaultHappyEyeballsConfig();
+  return std::make_shared<AddressVector>(
+      Network::HappyEyeballsConnectionProvider::sortAddresses(address_list, happy_eyeballs_config));
+}
+
 Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
     const envoy::config::core::v3::Metadata* endpoint_metadata,
@@ -590,8 +624,8 @@ Host::CreateConnectionData HostImplBase::createConnection(
           ? resolveTransportSocketFactory(address(), metadata().get(), transport_socket_options)
           : transportSocketFactory();
 
-  return createConnection(dispatcher, cluster(), address(), addressListOrNull(), factory, options,
-                          transport_socket_options, shared_from_this());
+  return createConnection(dispatcher, cluster(), address(), sortedAddressListOrNull(), factory,
+                          options, transport_socket_options, shared_from_this());
 }
 
 void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
@@ -637,7 +671,7 @@ Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Network::UpstreamTransportSocketFactory& factory,
     Network::Address::InstanceConstSharedPtr orca_address) const {
   return createOrcaConnection(dispatcher, std::move(transport_socket_options), factory,
-                              std::move(orca_address), address(), addressListOrNull(),
+                              std::move(orca_address), address(), sortedAddressListOrNull(),
                               shared_from_this());
 }
 
@@ -647,13 +681,13 @@ Host::CreateConnectionData HostImplBase::createOrcaConnection(
     Network::UpstreamTransportSocketFactory& factory,
     Network::Address::InstanceConstSharedPtr orca_address,
     const Network::Address::InstanceConstSharedPtr& host_address,
-    const SharedConstAddressVector& address_list, HostDescriptionConstSharedPtr host) const {
+    const SharedConstAddressVector& sorted_address_list, HostDescriptionConstSharedPtr host) const {
   // The original-port address list applies only when dialing the host's own address. Compare
   // by value: pointer identity doesn't survive LogicalHost re-resolution.
   const bool use_address_list = *orca_address == *host_address;
   return createConnection(dispatcher, cluster(), orca_address,
-                          use_address_list ? address_list : SharedConstAddressVector{}, factory,
-                          /*options=*/nullptr, transport_socket_options, std::move(host));
+                          use_address_list ? sorted_address_list : SharedConstAddressVector{},
+                          factory, /*options=*/nullptr, transport_socket_options, std::move(host));
 }
 
 std::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
@@ -713,7 +747,7 @@ std::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetPr
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
-    const SharedConstAddressVector& address_list_or_null,
+    const SharedConstAddressVector& sorted_address_list,
     Network::UpstreamTransportSocketFactory& socket_factory,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
@@ -736,15 +770,11 @@ Host::CreateConnectionData HostImplBase::createConnection(
         proxy_address.value(), upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
-  } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
+  } else if (sorted_address_list != nullptr && sorted_address_list->size() > 1) {
     ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
-    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
-        happy_eyeballs_config =
-            cluster.happyEyeballsConfig().has_value() ? *cluster.happyEyeballsConfig()
-                                                      : defaultHappyEyeballsConfig();
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
-        dispatcher, *address_list_or_null, source_address_selector, socket_factory,
-        transport_socket_options, host, options, happy_eyeballs_config);
+        dispatcher, sorted_address_list, source_address_selector, socket_factory,
+        transport_socket_options, host, options);
   } else {
     auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
         address, options, makeOptRefFromPtr(transport_socket_options.get()));

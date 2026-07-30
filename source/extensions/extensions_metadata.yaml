@@ -317,8 +317,10 @@ envoy.filters.http.admission_control:
 envoy.filters.http.ai_protocol_manager:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
 envoy.filters.http.alternate_protocols_cache:
@@ -739,7 +741,7 @@ envoy.filters.http.rate_limit_quota:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: wip
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
@@ -804,6 +806,13 @@ envoy.filters.http.sse_to_metadata:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata
+envoy.filters.http.aws_eventstream_parser:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.aws_eventstream_parser.v3.AwsEventstreamParser
 envoy.filters.http.header_mutation:
   categories:
   - envoy.filters.http

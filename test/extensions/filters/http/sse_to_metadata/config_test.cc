@@ -47,6 +47,38 @@ TEST(SseToMetadataConfigTest, ValidConfig) {
   cb_or.value()(filter_callback);
 }
 
+TEST(SseToMetadataConfigTest, CreateFilterWithServerContext) {
+  const std::string yaml = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+  )EOF";
+
+  envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  SseToMetadataConfig factory;
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
+  cb(filter_callback);
+}
+
 TEST(SseToMetadataConfigTest, MultipleMetadataDescriptors) {
   const std::string yaml = R"EOF(
   response_rules:

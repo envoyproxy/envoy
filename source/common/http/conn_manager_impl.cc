@@ -914,9 +914,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       has_explicit_global_flush_timeout_(
           connection_manager.config_->streamFlushTimeout().has_value()),
       header_validator_(
-          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())),
-      trace_refresh_after_route_refresh_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.trace_refresh_after_route_refresh")) {
+          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())) {
   ASSERT(!connection_manager.config_->isRoutable() ||
              ((connection_manager.config_->routeConfigProvider() == nullptr &&
                connection_manager.config_->scopedRouteConfigProvider() != nullptr &&
@@ -1094,7 +1092,7 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
-  if (trace_refresh_after_route_refresh_ && connection_manager_tracing_config_.has_value()) {
+  if (connection_manager_tracing_config_.has_value()) {
     const Tracing::Decision tracing_decision =
         Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
     ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
@@ -1613,11 +1611,6 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   const Tracing::Decision tracing_decision =
       Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
 
-  if (!trace_refresh_after_route_refresh_) {
-    ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
-                                              connection_manager_.config_->tracingStats());
-  }
-
   Tracing::HttpTraceContext trace_context(*request_headers_);
   active_span_ = connection_manager_.tracer().startSpan(
       *this, trace_context, filter_manager_.streamInfo(), tracing_decision);
@@ -1833,10 +1826,6 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshTracing() {
-  if (!trace_refresh_after_route_refresh_) {
-    return;
-  }
-
   if (!connection_manager_tracing_config_.has_value() || active_span_ == nullptr ||
       request_headers_ == nullptr) {
     return;

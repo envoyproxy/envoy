@@ -40,6 +40,81 @@ void copyToModuleBuffer(absl::string_view src, char* buffer, size_t capacity, si
   *size_out = src.size();
 }
 
+// Resolves the Metric at index from a snapshot collection, or nullptr when out of range. The
+// counter collection holds CounterSnapshot (metric under counter_), while the gauge and text
+// readout collections hold metric reference wrappers directly; these overloads hide that shape
+// difference from the tag helpers below.
+const Envoy::Stats::Metric*
+metricAt(const std::vector<Envoy::Stats::MetricSnapshot::CounterSnapshot>& counters, size_t index) {
+  return index < counters.size() ? &counters[index].counter_.get() : nullptr;
+}
+template <typename MetricRefs>
+const Envoy::Stats::Metric* metricAt(const MetricRefs& metrics, size_t index) {
+  return index < metrics.size() ? &metrics[index].get() : nullptr;
+}
+
+// Serializes the metric's tag-extracted name directly into the module buffer. Uses the borrowed
+// tagExtractedStatName() and serializeToBuffer, so no intermediate std::string is composed (the
+// same allocation-free path as the counter/gauge name callbacks). Returns false when index is out
+// of range.
+template <typename MetricRefs>
+bool getTagExtractedName(const MetricRefs& metrics, size_t index, char* name_buffer,
+                         size_t name_buffer_capacity, size_t* name_size) {
+  const Envoy::Stats::Metric* metric = metricAt(metrics, index);
+  if (metric == nullptr) {
+    return false;
+  }
+  *name_size = metric->constSymbolTable().serializeToBuffer(metric->tagExtractedStatName(),
+                                                            name_buffer, name_buffer_capacity);
+  return true;
+}
+
+// Reports the number of tags on the metric at index. Counts via iterateTagStatNames so the tag
+// StatNames are not materialized into a std::string vector. Returns false when index is out of
+// range.
+template <typename MetricRefs>
+bool getTagCount(const MetricRefs& metrics, size_t index, size_t* tag_count) {
+  const Envoy::Stats::Metric* metric = metricAt(metrics, index);
+  if (metric == nullptr) {
+    return false;
+  }
+  size_t count = 0;
+  metric->iterateTagStatNames([&count](Envoy::Stats::StatName, Envoy::Stats::StatName) {
+    ++count;
+    return true;
+  });
+  *tag_count = count;
+  return true;
+}
+
+// Serializes the name and value of one tag directly into the module buffers. Iterates the borrowed
+// tag StatNames and serializeToBuffers the requested pair, so no std::string is composed. Returns
+// false when either index is out of range.
+template <typename MetricRefs>
+bool getTag(const MetricRefs& metrics, size_t index, size_t tag_index, char* name_buffer,
+            size_t name_buffer_capacity, size_t* name_size, char* value_buffer,
+            size_t value_buffer_capacity, size_t* value_size) {
+  const Envoy::Stats::Metric* metric = metricAt(metrics, index);
+  if (metric == nullptr) {
+    return false;
+  }
+  const Envoy::Stats::SymbolTable& symbol_table = metric->constSymbolTable();
+  size_t current = 0;
+  bool found = false;
+  metric->iterateTagStatNames([&](Envoy::Stats::StatName tag_name,
+                                  Envoy::Stats::StatName tag_value) {
+    if (current == tag_index) {
+      *name_size = symbol_table.serializeToBuffer(tag_name, name_buffer, name_buffer_capacity);
+      *value_size = symbol_table.serializeToBuffer(tag_value, value_buffer, value_buffer_capacity);
+      found = true;
+      return false;
+    }
+    ++current;
+    return true;
+  });
+  return found;
+}
+
 } // namespace
 
 extern "C" {
@@ -108,6 +183,73 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
   // module buffer. Names stay allocation-free above.
   copyToModuleBuffer(readout.value(), value_buffer, value_buffer_capacity, value_size);
   return true;
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size) {
+  return getTagExtractedName(toFlushContext(snapshot_envoy_ptr)->snapshot_.counters(), index,
+                             name_buffer, name_buffer_capacity, name_size);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count) {
+  return getTagCount(toFlushContext(snapshot_envoy_ptr)->snapshot_.counters(), index, tag_count);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
+  return getTag(toFlushContext(snapshot_envoy_ptr)->snapshot_.counters(), index, tag_index,
+                name_buffer, name_buffer_capacity, name_size, value_buffer, value_buffer_capacity,
+                value_size);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size) {
+  return getTagExtractedName(toFlushContext(snapshot_envoy_ptr)->snapshot_.gauges(), index,
+                             name_buffer, name_buffer_capacity, name_size);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count) {
+  return getTagCount(toFlushContext(snapshot_envoy_ptr)->snapshot_.gauges(), index, tag_count);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
+  return getTag(toFlushContext(snapshot_envoy_ptr)->snapshot_.gauges(), index, tag_index,
+                name_buffer, name_buffer_capacity, name_size, value_buffer, value_buffer_capacity,
+                value_size);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size) {
+  return getTagExtractedName(toFlushContext(snapshot_envoy_ptr)->snapshot_.textReadouts(), index,
+                             name_buffer, name_buffer_capacity, name_size);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count) {
+  return getTagCount(toFlushContext(snapshot_envoy_ptr)->snapshot_.textReadouts(), index,
+                     tag_count);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
+  return getTag(toFlushContext(snapshot_envoy_ptr)->snapshot_.textReadouts(), index, tag_index,
+                name_buffer, name_buffer_capacity, name_size, value_buffer, value_buffer_capacity,
+                value_size);
 }
 
 envoy_dynamic_module_type_metrics_result

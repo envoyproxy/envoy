@@ -122,6 +122,35 @@ request_rules:
   cb(filter_callbacks);
 }
 
+// Tests that a valid config is properly consumed via a server factory context.
+TEST(HeaderToMetadataFilterConfigTest, CreateFilterWithServerContext) {
+  const std::string yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: default
+      value: 'true'
+      type: STRING
+  )EOF";
+
+  HeaderToMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  HeaderToMetadataConfig factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
+}
+
 // Tests that per route config properly overrides the global config.
 TEST(HeaderToMetadataFilterConfigTest, PerRouteConfig) {
   const std::string yaml = R"EOF(
