@@ -421,6 +421,7 @@ envoy_cc_library(
         "//source/common/common:notification_lib",
         "//source/common/common:perf_tracing_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:dependent_type_urls_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_manager_lib",
         "//source/common/config:xds_resource_lib",

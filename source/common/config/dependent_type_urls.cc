@@ -26,6 +26,7 @@ const std::vector<std::string>& dependentTypeUrls(absl::string_view type_url) {
       {Envoy::Config::getTypeUrl<envoy::config::listener::v3::Listener>(),
        {Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
         Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
+        Config::getTypeUrl<envoy::config::route::v3::VirtualHost>(),
         Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()}},
       {Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
        {Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
