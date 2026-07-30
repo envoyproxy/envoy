@@ -86,7 +86,7 @@ private:
                  Server::Configuration::ServerFactoryContext& server_context,
                  OptRef<Init::Manager> init_manager, bool warm) {
       const std::string map_key =
-          absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
+          absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name, warm);
 
       std::shared_ptr<SecretType> secret_provider = dynamic_secret_providers_[map_key].lock();
       if (!secret_provider) {
@@ -114,6 +114,8 @@ private:
       if (init_manager) {
         init_manager->add(*secret_provider->initTarget());
       } else {
+        // A secret provider can be shared across multiple warming and non-warming users,
+        // so this line can be called repeatedly.
         secret_provider->start();
       }
       return secret_provider;

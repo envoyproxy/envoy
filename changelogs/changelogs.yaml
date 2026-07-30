@@ -100,6 +100,8 @@ areas:
     title: reverse_tunnel
   router:
     title: router
+  sds:
+    title: sds
   set_metadata_filter:
     title: set_metadata_filter
   sockets:
