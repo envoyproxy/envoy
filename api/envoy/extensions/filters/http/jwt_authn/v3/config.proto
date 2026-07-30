@@ -363,7 +363,7 @@ message JwtProvider {
   //
   // .. literalinclude:: /_configs/repo/jwt_authn.yaml
   //    :language: yaml
-  //    :lines: 44-48
+  //    :lines: 44-51
   //    :linenos:
   //    :lineno-start: 44
   //    :caption: :download:`jwt_authn.yaml </_configs/repo/jwt_authn.yaml>`
