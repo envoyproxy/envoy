@@ -22,7 +22,7 @@ namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
 
 absl::Status LocalityLbHostData::onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
-                                                  const StreamInfo::StreamInfo&) {
+                                                  OptRef<const StreamInfo::StreamInfo>) {
   const double util =
       Common::OrcaLoadReportHandler::getUtilizationFromOrcaReport(report, *metric_names_);
   // Signal-less reports do not refresh freshness; they age out instead of pinning idle.

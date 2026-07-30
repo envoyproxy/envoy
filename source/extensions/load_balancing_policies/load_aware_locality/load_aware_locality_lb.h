@@ -57,7 +57,7 @@ public:
   bool receivesOrcaLoadReport() const override { return true; }
 
   absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
-                                const StreamInfo::StreamInfo&) override;
+                                OptRef<const StreamInfo::StreamInfo>) override;
 
   double utilization() const { return utilization_.load(std::memory_order_relaxed); }
   MonotonicTime lastUpdateTime() const { return last_update_time_.load(std::memory_order_acquire); }
