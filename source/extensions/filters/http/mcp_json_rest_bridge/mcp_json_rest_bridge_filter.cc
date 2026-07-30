@@ -696,7 +696,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
                         getResponseCode(encoder_callbacks_->responseHeaders()));
     mcp_operation_ = McpOperation::OperationFailed;
     decoder_callbacks_->sendLocalReply(
-        Http::Code::InternalServerError, error_json.dump(),
+        Http::Code::OK, error_json.dump(),
         [](Http::ResponseHeaderMap& headers) {
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },

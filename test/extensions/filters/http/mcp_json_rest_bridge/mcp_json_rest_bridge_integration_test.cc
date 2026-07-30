@@ -1032,7 +1032,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallResponseBodyExceedsLimit) {
   upstream_request_->encodeData(response_data, true);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("500"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
   EXPECT_THAT(response->headers().getContentLengthValue(),
               StrEq(std::to_string(response->body().size())));

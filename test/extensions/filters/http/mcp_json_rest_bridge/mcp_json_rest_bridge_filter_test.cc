@@ -1918,7 +1918,7 @@ tool_config:
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(
-          Eq(Http::Code::InternalServerError),
+          Eq(Http::Code::OK),
           StrEq(
               R"json({"error":{"code":-32000,"message":"Response body too large"},"id":123,"jsonrpc":"2.0"})json"),
           _, _, StrEq("mcp_json_rest_bridge_response_too_large")));
