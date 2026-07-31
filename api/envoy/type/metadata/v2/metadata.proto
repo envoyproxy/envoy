@@ -40,17 +40,13 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 //
 message MetadataKey {
   // Specifies the segment in a path to retrieve value from Metadata.
-  // Supports both key-based segments (field names in a Struct) and index-based
-  // segments (element access in a ListValue).
+  // Currently it is only supported to specify the key, i.e. field name, as one segment of a path.
   message PathSegment {
     oneof segment {
       option (validate.required) = true;
 
       // If specified, use the key to retrieve the value in a Struct.
       string key = 1 [(validate.rules).string = {min_bytes: 1}];
-
-      // If specified, use this index to retrieve a value from a ListValue.
-      uint32 index = 2;
     }
   }
 
@@ -62,7 +58,8 @@ message MetadataKey {
   // e.g. ``[prop, xyz]`` for a struct or ``[prop, foo]`` for a string in the example,
   // which depends on the particular scenario.
   //
-  // Path segments support both struct field access (via ``key``) and list element access (via ``index``).
+  // Note: Due to that only the key type segment is supported, the path can not specify a list
+  // unless the list is the last segment.
   repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 

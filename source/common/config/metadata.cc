@@ -12,16 +12,15 @@ SINGLETON_MANAGER_REGISTRATION(const_metadata_shared_pool);
 
 MetadataKey::MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key)
     : key_(metadata_key.key()) {
-  for (const auto& seg : metadata_key.path()) {
-    PathSegment path_seg;
-    if (seg.has_key()) {
-      path_seg.type_ = PathSegment::Type::Key;
-      path_seg.key_ = seg.key();
-    } else if (seg.has_index()) {
-      path_seg.type_ = PathSegment::Type::Index;
-      path_seg.index_ = seg.index();
+  path_.reserve(metadata_key.path().size());
+  for (const auto& segment : metadata_key.path()) {
+    PathSegment path_segment;
+    if (segment.has_key()) {
+      path_segment.key_ = segment.key();
+    } else {
+      path_segment.index_ = segment.index();
     }
-    path_.push_back(path_seg);
+    path_.push_back(std::move(path_segment));
   }
 }
 
@@ -52,28 +51,14 @@ const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Me
 
 const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_value,
                                              const std::vector<std::string>& path) {
-  const Protobuf::Struct* data_struct = &struct_value;
-  const Protobuf::Value* val = nullptr;
-  // go through path to select sub entries
-  for (const auto& p : path) {
-    if (nullptr == data_struct) { // sub entry not found
-      return Protobuf::Value::default_instance();
-    }
-    const auto entry_it = data_struct->fields().find(p);
-    if (entry_it == data_struct->fields().end()) {
-      return Protobuf::Value::default_instance();
-    }
-    val = &(entry_it->second);
-    if (val->has_struct_value()) {
-      data_struct = &(val->struct_value());
-    } else {
-      data_struct = nullptr;
-    }
+  std::vector<PathSegment> segments;
+  segments.reserve(path.size());
+  for (const auto& key : path) {
+    PathSegment segment;
+    segment.key_ = key;
+    segments.push_back(std::move(segment));
   }
-  if (nullptr == val) {
-    return Protobuf::Value::default_instance();
-  }
-  return *val;
+  return structValue(struct_value, segments);
 }
 
 const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_value,
@@ -82,7 +67,7 @@ const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_valu
   const Protobuf::Value* val = nullptr;
 
   for (const auto& segment : path) {
-    if (segment.type_ == PathSegment::Type::Key) {
+    if (!segment.key_.empty()) {
       // Handle struct field access
       if (nullptr == data_struct) {
         ENVOY_LOG_MISC(debug, "MetadataKey path segment expects Struct but found null");
@@ -96,7 +81,7 @@ const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_valu
       val = &(entry_it->second);
       data_struct = val->has_struct_value() ? &(val->struct_value()) : nullptr;
 
-    } else { // PathSegment::Type::Index
+    } else {
       // Handle list element access
       if (val == nullptr || val->kind_case() != Protobuf::Value::kListValue) {
         ENVOY_LOG_MISC(debug, "MetadataKey path segment expects ListValue but found {}",
