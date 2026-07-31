@@ -50,7 +50,7 @@ protected:
         // with --config=docker-clang-libc++
         sizeof(stream_info) == 656 ||
         // with protobuf v35
-        sizeof(stream_info) == 672 || sizeof(stream_info) == 696
+        sizeof(stream_info) == 672 || sizeof(stream_info) == 696)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
