@@ -85,6 +85,8 @@ private:
                  const std::string& config_name,
                  Server::Configuration::ServerFactoryContext& server_context,
                  OptRef<Init::Manager> init_manager, bool warm) {
+      // Warming and non-warming providers have different init targets: the warming
+      // target only fires after a secret is fetched, while non-warming one pre-fetches.
       const std::string map_key =
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name, warm);
 
