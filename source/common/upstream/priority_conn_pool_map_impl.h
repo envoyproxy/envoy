@@ -51,6 +51,16 @@ bool PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::empty() const {
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
+bool PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::hasReadyConnection() const {
+  for (const auto& pool_map : conn_pool_maps_) {
+    if (pool_map->hasReadyConnection()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
 void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::clear() {
   for (auto& pool_map : conn_pool_maps_) {
     pool_map->clear();

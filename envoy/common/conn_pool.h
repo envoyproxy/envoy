@@ -105,6 +105,11 @@ public:
    * @return true if a connection was preconnected, false otherwise.
    */
   virtual bool maybePreconnect(float preconnect_ratio) PURE;
+
+  /**
+   * @return true if the pool has an established connection that can serve a new stream.
+   */
+  virtual bool hasReadyConnection() const PURE;
 };
 
 enum class PoolFailureReason {
