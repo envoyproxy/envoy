@@ -1300,8 +1300,7 @@ absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listen
 }
 
 void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
-  if (!listener.udpListenerConfig().has_value() ||
-      listener.udpListenerConfig()->listenerFactory().isTransportConnectionless()) {
+  if (!listener.udpListenerConfig().has_value()) {
     // Close the listen sockets right away to avoid leaving TCP connections in accept queue
     // already waiting for long timeout. However, connection-oriented UDP listeners shouldn't
     // close the socket because they need to receive packets for existing connections via the

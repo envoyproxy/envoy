@@ -97,6 +97,13 @@ public:
         0, concurrency, conn_handler_, listen_socket_, dispatcher_, listener_config_);
   }
 
+  Network::UdpRecvData makeRecvData(uint32_t peer_port) {
+    Network::UdpRecvData data;
+    data.addresses_.local_ = listen_socket_->connectionInfoProvider().localAddress();
+    data.addresses_.peer_ = Network::Utility::getAddressWithPort(*local_address_, peer_port);
+    return data;
+  }
+
   std::string listener_stat_prefix_{"listener_stat_prefix"};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
   NiceMock<MockUdpConnectionHandler> conn_handler_;
@@ -193,6 +200,20 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveErrorStopIteration) {
 
   Network::UdpRecvData data;
   active_listener_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
+}
+
+TEST_P(ActiveUdpListenerTest, RegularShutdownDestroysListener) {
+  setup();
+
+  auto test_filter = std::make_unique<NiceMock<Network::MockUdpListenerReadFilter>>(cb_);
+  EXPECT_CALL(*test_filter, onData(_)).Times(0);
+  active_listener_->addReadFilter(std::move(test_filter));
+
+  active_listener_->shutdownListener({});
+  EXPECT_EQ(active_listener_->listener(), nullptr);
+
+  // Packets after teardown are dropped.
+  active_listener_->onData(makeRecvData(1000));
 }
 
 } // namespace

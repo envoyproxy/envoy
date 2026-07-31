@@ -98,7 +98,10 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
-  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
+  void shutdownListener(const Network::ExtraShutdownListenerOptions& options) override {
+    if (options.non_dispatched_udp_packet_handler_) {
+      return;
+    }
     // The read filter should be deleted before the UDP listener is deleted.
     // The read filter refers to the UDP listener to send packets to downstream.
     // If the UDP listener is deleted before the read filter, the read filter may try to use it
