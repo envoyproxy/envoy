@@ -32,9 +32,9 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -354,17 +354,19 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificates) {
 }
 
 TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSelectorIsUsed) {
-  class TestUpstreamTlsCertificateSelectorFactory : public Ssl::UpstreamTlsCertificateSelectorFactory {
+  class TestUpstreamTlsCertificateSelectorFactory
+      : public Ssl::UpstreamTlsCertificateSelectorFactory {
   public:
-    Ssl::UpstreamTlsCertificateSelectorPtr createUpstreamTlsCertificateSelector(
-        Ssl::TlsCertificateSelectorContext&) override {
+    Ssl::UpstreamTlsCertificateSelectorPtr
+    createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext&) override {
       return nullptr;
     }
 
     absl::Status onConfigUpdate() override { return absl::OkStatus(); }
   };
 
-  class TestUpstreamTlsCertificateSelectorConfigFactory : public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
+  class TestUpstreamTlsCertificateSelectorConfigFactory
+      : public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
   public:
     absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
     createUpstreamTlsCertificateSelectorFactory(const Protobuf::Message&,
@@ -390,8 +392,9 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
   typed_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
   )EOF";
-  TestUtility::loadFromYaml(TestEnvironment::substitute(custom_tls_certificate_selector_yaml),
-                            *tls_context.mutable_common_tls_context()->mutable_custom_tls_certificate_selector());
+  TestUtility::loadFromYaml(
+      TestEnvironment::substitute(custom_tls_certificate_selector_yaml),
+      *tls_context.mutable_common_tls_context()->mutable_custom_tls_certificate_selector());
 
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:

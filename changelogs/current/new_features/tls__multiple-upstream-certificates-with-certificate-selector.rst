@@ -1,4 +1,4 @@
-Allow multiple `tls_certificates <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.tlscertificate>`
+Allow multiple :ref:`tls_certificates <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.tlscertificate>`
 in a client context, for
 :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.commontlscontext>`
 , when a
