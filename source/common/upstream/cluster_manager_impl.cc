@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/conn_pool.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -1034,6 +1035,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
   if (pool == nullptr) {
     return std::nullopt;
   }
+  // Record that this cluster is used as an HTTP pool on this worker.
+  markPoolTypeUsed(ConnectionPoolType::Http);
 
   HttpPoolData data(
       [this, priority, protocol, context]() -> void {
@@ -1059,6 +1062,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   if (pool == nullptr) {
     return std::nullopt;
   }
+  // Record that this cluster is used as a TCP pool on this worker.
+  markPoolTypeUsed(ConnectionPoolType::Tcp);
 
   TcpPoolData data(
       [this, priority, context]() -> void {
@@ -1461,6 +1466,19 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
   });
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::withThreadLocalCluster(
+    ThreadLocalClusterManagerImpl& cluster_manager, const std::string& cluster_name,
+    const std::function<void(ClusterEntry&)>& fn) {
+  if (cluster_manager.destroying_) {
+    return;
+  }
+  auto it = cluster_manager.thread_local_clusters_.find(cluster_name);
+  if (it == cluster_manager.thread_local_clusters_.end() || !it->second) {
+    return;
+  }
+  fn(*it->second);
+}
+
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
   HostConstSharedPtr logical_host =
@@ -1533,6 +1551,156 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
         name);
     lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }
+
+  // Proactively establish connections to newly added hosts, if opted in.
+  for (const auto& host : hosts_added) {
+    maybeBootstrapPreconnectFloorForHost(host);
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::markPoolTypeUsed(
+    ConnectionPoolType type) {
+  if (cluster_info_->eagerPreconnectFloor() == 0 || used_pool_types_.has(type)) {
+    return;
+  }
+  used_pool_types_.mark(type);
+  for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
+    for (const auto& host : host_set->hosts()) {
+      maybeBootstrapPreconnectFloorForHost(host);
+    }
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::
+    maybeBootstrapPreconnectFloorForHost(const HostConstSharedPtr& host) {
+  // No floor to maintain.
+  if (cluster_info_->eagerPreconnectFloor() == 0) {
+    return;
+  }
+  // Maintain the floor only for pool kinds this cluster has actually used.
+  if (!used_pool_types_.any()) {
+    return;
+  }
+  // Main thread does not handle proxied traffic so it does not need to preconnect.
+  if (Envoy::Thread::MainThread::isMainThread()) {
+    return;
+  }
+  if (!hostEligibleForPreconnectFloor(host)) {
+    return;
+  }
+  const std::string cluster_name(cluster_info_->name());
+  parent_.thread_local_dispatcher_.post([&parent = parent_, cluster_name, host]() {
+    withThreadLocalCluster(parent, cluster_name, [&](ClusterEntry& entry) {
+      entry.bootstrapPreconnectFloorForHost(host);
+    });
+  });
+}
+
+bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::hostEligibleForPreconnectFloor(
+    const HostConstSharedPtr& host) const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.eager_preconnect_floor")) {
+    return false;
+  }
+  if (!hostIsCurrentMember(host)) {
+    return false;
+  }
+  if (host->coarseHealth() != Host::Health::Healthy) {
+    ENVOY_LOG(trace, "eager preconnect floor: skipping unhealthy host {} in cluster {}",
+              host->address()->asString(), cluster_info_->name());
+    return false;
+  }
+  // Do not maintain the floor for a host that keeps failing to connect.
+  if (host->consecutiveEagerPreconnectFloorFailures() >=
+      cluster_info_->eagerPreconnectFloorFailureThreshold()) {
+    return false;
+  }
+  // Only open the initial connection and rely on connection pool management to maintain the floor.
+  if (hostHasReadyConnection(host)) {
+    return false;
+  }
+  return true;
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::
+    bootstrapPreconnectFloorForHost(const HostConstSharedPtr& host) {
+  if (!hostEligibleForPreconnectFloor(host)) {
+    return;
+  }
+  // Open a bootstrap connection for each pool kind the cluster has used.
+  for (const ConnectionPoolType type : used_pool_types_.list()) {
+    auto* pool = poolForType(type, host, nullptr);
+    if (pool == nullptr) {
+      continue;
+    }
+    if (pool->maybePreconnect(0)) {
+      ENVOY_LOG(debug,
+                "eager preconnect floor: bootstrapped a {} connection to host {} in cluster {}",
+                (type == ConnectionPoolType::Http ? "HTTP" : "TCP"), host->address()->asString(),
+                cluster_info_->name());
+    }
+  }
+}
+
+bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::hostIsCurrentMember(
+    const HostConstSharedPtr& host) const {
+  const HostMapConstSharedPtr host_map = priority_set_.crossPriorityHostMap();
+  ASSERT(host_map != nullptr && host->address() != nullptr);
+  if (host_map == nullptr || host->address() == nullptr) {
+    return false;
+  }
+  const auto it = host_map->find(host->address()->asString());
+  return it != host_map->end() && it->second.get() == host.get();
+}
+
+Envoy::ConnectionPool::Instance*
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::poolForType(
+    ConnectionPoolType type, const HostConstSharedPtr& host, LoadBalancerContext* context) {
+  Envoy::ConnectionPool::Instance* pool = nullptr;
+  switch (type) {
+  case ConnectionPoolType::Http:
+    pool = httpConnPoolImpl(host, ResourcePriority::Default, std::nullopt, context);
+    break;
+  case ConnectionPoolType::Tcp:
+    pool = tcpConnPoolImpl(host, ResourcePriority::Default, context);
+    break;
+  }
+  return pool;
+}
+
+bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::hostHasReadyConnectionOfType(
+    ConnectionPoolType type, const HostConstSharedPtr& host) const {
+  switch (type) {
+  case ConnectionPoolType::Http: {
+    auto* container = parent_.getHttpConnPoolsContainer(host);
+    if (container == nullptr || container->pools_ == nullptr) {
+      return false;
+    }
+    return container->pools_->hasReadyConnection();
+  }
+  case ConnectionPoolType::Tcp: {
+    auto* container = parent_.getTcpConnPoolsContainer(host);
+    if (container == nullptr) {
+      return false;
+    }
+    for (const auto& [key, pool] : container->pools_) {
+      if (pool->hasReadyConnection()) {
+        return true;
+      }
+    }
+    return false;
+  }
+  }
+  return false;
+}
+
+bool ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::hostHasReadyConnection(
+    const HostConstSharedPtr& host) const {
+  for (const ConnectionPoolType type : used_pool_types_.list()) {
+    if (hostHasReadyConnectionOfType(type, host)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools(
@@ -1901,6 +2069,34 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
   return &container_iter->second;
 }
 
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::TcpConnPoolsContainer*
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::getTcpConnPoolsContainer(
+    const HostConstSharedPtr& host) {
+  auto container_iter = host_tcp_conn_pool_map_.find(host);
+  if (container_iter == host_tcp_conn_pool_map_.end()) {
+    return nullptr;
+  }
+  return &container_iter->second;
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::maybeRebootstrapPreconnectFloorForHost(
+    const HostConstSharedPtr& host) {
+  // Re-bootstrap the preconnect floor after a pool drains (transient floor
+  // maintenance failure, GOAWAY, or an idle timeout the pool-internal refill couldn't recover)
+  // and its container has been erased.
+  if (host->cluster().eagerPreconnectFloor() == 0 ||
+      host->coarseHealth() != Host::Health::Healthy) {
+    return;
+  }
+  const std::string cluster_name(host->cluster().name());
+  HostConstSharedPtr host_ref = host;
+  thread_local_dispatcher_.post([this, cluster_name, host_ref]() {
+    withThreadLocalCluster(*this, cluster_name, [&](ClusterEntry& entry) {
+      entry.maybeBootstrapPreconnectFloorForHost(host_ref);
+    });
+  });
+}
+
 ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
     ClusterUpdateCallbacks& cb) {
@@ -2126,6 +2322,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     host_http_conn_pool_map_.erase(
         host); // NOTE: `container` is erased after this point in the lambda.
   }
+
+  maybeRebootstrapPreconnectFloorForHost(host);
 }
 
 HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
@@ -2254,6 +2452,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
           host); // NOTE: `container` is erased after this point in the lambda.
     }
   }
+
+  maybeRebootstrapPreconnectFloorForHost(host);
 }
 
 absl::StatusOr<ClusterManagerPtr> ProdClusterManagerFactory::clusterManagerFromProto(

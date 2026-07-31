@@ -1242,6 +1242,16 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
+      preconnect_enabled_matcher_(
+          config.preconnect_policy().has_preconnect_enabled_metadata()
+              ? std::make_unique<const Matchers::MetadataMatcher>(
+                    config.preconnect_policy().preconnect_enabled_metadata(),
+                    factory_context.serverFactoryContext())
+              : nullptr),
+      eager_preconnect_floor_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(), eager_preconnect_floor, 0)),
+      eager_preconnect_floor_failure_threshold_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.preconnect_policy(), eager_preconnect_floor_failure_threshold, 3)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       traffic_stats_(generateStats(
           stats_scope_, factory_context.serverFactoryContext().clusterManager().clusterStatNames(),
@@ -1364,6 +1374,15 @@ ClusterInfoImpl::ClusterInfoImpl(
     creation_status =
         absl::InvalidArgumentError("Only one of max_requests_per_connection from Cluster or "
                                    "HttpProtocolOptions can be specified");
+    return;
+  }
+
+  // eager_preconnect_floor warms and refills a set of upstream connections per host.
+  // Not compatible with connection_pool_per_downstream_connection, where each pool is bound
+  // to a single downstream connection and torn down when it closes.
+  if (connection_pool_per_downstream_connection_ && eager_preconnect_floor_ > 0) {
+    creation_status = absl::InvalidArgumentError("eager_preconnect_floor is incompatible with "
+                                                 "connection_pool_per_downstream_connection");
     return;
   }
 
@@ -1828,6 +1847,16 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
 
 bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
+}
+
+bool ClusterInfoImpl::shouldPreconnect(const Host& host) const {
+  // No matcher means every host is eligible (default behavior).
+  if (preconnect_enabled_matcher_ == nullptr) {
+    return true;
+  }
+  static const auto empty_metadata = envoy::config::core::v3::Metadata::default_instance();
+  const auto metadata = host.metadata();
+  return preconnect_enabled_matcher_->match(metadata != nullptr ? *metadata : empty_metadata);
 }
 
 ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) const {

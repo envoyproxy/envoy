@@ -169,6 +169,7 @@ public:
   bool maybePreconnect(float preconnect_ratio) override {
     return maybePreconnectImpl(preconnect_ratio);
   }
+  bool hasReadyConnection() const override { return !ready_clients_.empty(); }
   ConnectionPool::Cancellable* newPendingStream(Envoy::ConnectionPool::AttachContext& context,
                                                 bool can_send_early_data) override;
   Upstream::HostDescriptionConstSharedPtr host() const override {

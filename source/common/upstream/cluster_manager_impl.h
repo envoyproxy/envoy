@@ -43,6 +43,8 @@
 #include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/btree_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -597,6 +599,33 @@ private:
           connections_;
     };
 
+    // Types of connection pools the cluster manager maintains to hosts.
+    enum class ConnectionPoolType : uint8_t { Http, Tcp };
+    static constexpr std::array<ConnectionPoolType, 2> kAllConnectionPoolTypes{
+        ConnectionPoolType::Http, ConnectionPoolType::Tcp};
+
+    class UsedConnectionPoolTypes {
+    public:
+      void mark(ConnectionPoolType type) { bits_ |= (1u << static_cast<uint8_t>(type)); }
+      bool has(ConnectionPoolType type) const {
+        return (bits_ & (1u << static_cast<uint8_t>(type))) != 0;
+      }
+      bool any() const { return bits_ != 0; }
+
+      absl::InlinedVector<ConnectionPoolType, kAllConnectionPoolTypes.size()> list() const {
+        absl::InlinedVector<ConnectionPoolType, kAllConnectionPoolTypes.size()> types;
+        for (const ConnectionPoolType type : kAllConnectionPoolTypes) {
+          if (has(type)) {
+            types.push_back(type);
+          }
+        }
+        return types;
+      }
+
+    private:
+      uint32_t bits_{0};
+    };
+
     class ClusterEntry : public ThreadLocalCluster {
     public:
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
@@ -646,6 +675,10 @@ private:
         drop_category_ = drop_category;
       }
 
+      // Proactively opens the first (bootstrap) connection for a single host and lets
+      // the connection pool grow to and maintain the configured floor.
+      void maybeBootstrapPreconnectFloorForHost(const HostConstSharedPtr& host);
+
     private:
       Http::ConnectionPool::Instance*
       httpConnPoolImpl(HostConstSharedPtr host, ResourcePriority priority,
@@ -655,6 +688,13 @@ private:
       Tcp::ConnectionPool::Instance* tcpConnPoolImpl(HostConstSharedPtr host,
                                                      ResourcePriority priority,
                                                      LoadBalancerContext* context);
+
+      Envoy::ConnectionPool::Instance* poolForType(ConnectionPoolType type,
+                                                   const HostConstSharedPtr& host,
+                                                   LoadBalancerContext* context);
+      bool hostHasReadyConnection(const HostConstSharedPtr& host) const;
+      bool hostHasReadyConnectionOfType(ConnectionPoolType type,
+                                        const HostConstSharedPtr& host) const;
 
       HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context);
 
@@ -675,6 +715,16 @@ private:
       // Stores QUICHE specific objects which live through out the life time of the cluster and can
       // be shared across its hosts.
       Http::PersistentQuicInfoPtr quic_info_;
+
+      // Opens a bootstrap connection for each used pool kind for this worker to the given host.
+      void bootstrapPreconnectFloorForHost(const HostConstSharedPtr& host);
+      bool hostEligibleForPreconnectFloor(const HostConstSharedPtr& host) const;
+      // Returns true if the host is still a member of this cluster's priority set on this worker.
+      bool hostIsCurrentMember(const HostConstSharedPtr& host) const;
+      // Marks the pool type as used and bootstraps the preconnect floor for every current host.
+      void markPoolTypeUsed(ConnectionPoolType type);
+      // Types of connection pools the cluster has used.
+      UsedConnectionPoolTypes used_pool_types_;
 
       // Expected override host statues. Every bit in the HostStatusSet represent an enum value
       // of envoy::config::core::v3::HealthStatus. The specific correspondence is shown below:
@@ -725,6 +775,12 @@ private:
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
                                                   bool allocate = false);
+    TcpConnPoolsContainer* getTcpConnPoolsContainer(const HostConstSharedPtr& host);
+
+    // Looks up the ClusterEntry `cluster_name` on `cluster_manager` and invokes `fn` with it.
+    static void withThreadLocalCluster(ThreadLocalClusterManagerImpl& cluster_manager,
+                                       const std::string& cluster_name,
+                                       const std::function<void(ClusterEntry&)>& fn);
 
     // Upstream::ClusterLifecycleCallbackHandler
     ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) override;
@@ -775,6 +831,8 @@ private:
   private:
     static ThreadLocalClusterManagerStats generateStats(Stats::Scope& scope,
                                                         const std::string& thread_name);
+    // Rebootstrap the preconnect floor for a host after connection pool recreation.
+    void maybeRebootstrapPreconnectFloorForHost(const HostConstSharedPtr& host);
 
     Quic::EnvoyQuicNetworkObserverRegistryPtr network_observer_registry_;
   };
