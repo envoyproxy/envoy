@@ -157,7 +157,7 @@ std::string JA4Fingerprinter::getJA4AlpnChars(const SSL_CLIENT_HELLO* ssl_client
       // Per JA4 spec, output exactly 2 hex chars for non-alphanumeric ALPNs:
       // Extract the high nibble (>> 4) of the first byte and low nibble (& 0x0F) of the last byte.
       return absl::StrFormat("%x%x", (static_cast<uint8_t>(first) >> 4) & 0x0F,
-                                     static_cast<uint8_t>(last) & 0x0F);
+                             static_cast<uint8_t>(last) & 0x0F);
     }
   } else {
     if (!absl::ascii_isalnum(first) || !absl::ascii_isalnum(last)) {
