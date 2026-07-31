@@ -6,6 +6,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
 import "envoy/config/listener/v3/quic_config.proto";
 
+import "google/protobuf/duration.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -18,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: UDP listener config]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message UdpListenerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.UdpListenerConfig";
@@ -44,6 +45,15 @@ message UdpListenerConfig {
   // and raw UDP will use kernel sendmsg.
   // [#extension-category: envoy.udp_packet_writer]
   core.v3.TypedExtensionConfig udp_packet_packet_writer_config = 8;
+
+  // Idle timeout for the per-flow tracking used during hot restart handoff. Only applies
+  // to connectionless (raw) UDP listeners. QUIC listeners track connections themselves.
+  // During hot restart the parent instance keeps serving flows it has seen a datagram for
+  // within this timeout and forwards the rest to the child instance.
+  // Should not be set lower than the idle timeout of the proxying filter (e.g. the udp_proxy
+  // :ref:`idle_timeout <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>`),
+  // otherwise live sessions may be handed to the child instance mid-drain. Defaults to 1 minute.
+  google.protobuf.Duration flow_idle_timeout = 9;
 }
 
 message ActiveRawUdpListenerConfig {

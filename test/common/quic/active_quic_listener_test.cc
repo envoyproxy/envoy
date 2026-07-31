@@ -464,14 +464,9 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   readFromClientSockets();
 }
 
-class MockNonDispatchedUdpPacketHandler : public Network::NonDispatchedUdpPacketHandler {
-public:
-  MOCK_METHOD(void, handle, (uint32_t worker_index, const Network::UdpRecvData& packet));
-};
-
 TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
   initialize();
-  MockNonDispatchedUdpPacketHandler mock_packet_forwarding;
+  Network::MockNonDispatchedUdpPacketHandler mock_packet_forwarding;
   Network::ExtraShutdownListenerOptions options;
   options.non_dispatched_udp_packet_handler_ = mock_packet_forwarding;
   quic_listener_->shutdownListener(options);

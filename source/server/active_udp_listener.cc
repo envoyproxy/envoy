@@ -86,7 +86,10 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
     : ActiveUdpListenerBase(worker_index, concurrency, parent, listen_socket, std::move(listener),
-                            &config) {
+                            &config),
+      flow_sweep_timer_(udp_listener_->dispatcher().createTimer([this] { sweepIdleFlows(); })),
+      flow_idle_timeout_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+          config.udpListenerConfig()->config(), flow_idle_timeout, 60000))) {
   // Create the filter chain on creating a new udp listener.
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
@@ -103,11 +106,51 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
 }
 
 void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
+  if (udp_listener_ == nullptr) {
+    // Already shut down.
+    return;
+  }
+
+  const MonotonicTime now = udp_listener_->dispatcher().approximateMonotonicTime();
+  if (non_dispatched_udp_packet_handler_.has_value()) {
+    auto flow_it = flow_last_activity_.find(data.addresses_);
+    if (flow_it == flow_last_activity_.end()) {
+      // Draining for hot restart: this flow isn't ours, hand it to the child instance.
+      non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
+      return;
+    }
+    flow_it->second = now;
+  } else {
+    auto [flow_it, inserted] = flow_last_activity_.try_emplace(data.addresses_, now);
+    if (inserted) {
+      if (flow_last_activity_.size() == 1) {
+        flow_sweep_timer_->enableTimer(flow_idle_timeout_);
+      }
+    } else {
+      flow_it->second = now;
+    }
+  }
+
   for (auto& read_filter : read_filters_) {
     Network::FilterStatus status = read_filter->onData(data);
     if (status == Network::FilterStatus::StopIteration) {
       return;
     }
+  }
+}
+
+void ActiveRawUdpListener::sweepIdleFlows() {
+  const MonotonicTime cutoff =
+      udp_listener_->dispatcher().approximateMonotonicTime() - flow_idle_timeout_;
+  for (auto it = flow_last_activity_.begin(); it != flow_last_activity_.end();) {
+    if (it->second < cutoff) {
+      flow_last_activity_.erase(it++);
+    } else {
+      ++it;
+    }
+  }
+  if (!flow_last_activity_.empty()) {
+    flow_sweep_timer_->enableTimer(flow_idle_timeout_);
   }
 }
 
