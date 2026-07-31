@@ -143,6 +143,7 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 4318
+    # [START upstream_compressor_config]
     # The following snippet enables OTLP request compression when used over HTTP/1.1
     # with protobuf or JSON payloads.
     typed_extension_protocol_options:
@@ -170,6 +171,7 @@ static_resources:
         - name: envoy.filters.http.upstream_codec
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
+    # [END upstream_compressor_config]
 
   - name: httpbingo
     type: LOGICAL_DNS
