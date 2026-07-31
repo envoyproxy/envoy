@@ -52,7 +52,7 @@ protected:
         // with protobuf v35
         sizeof(stream_info) == 672 || sizeof(stream_info) == 696 ||
         // with ArenaWrappedProto metadata
-        sizeof(stream_info) == 680)
+        sizeof(stream_info) == 680 || sizeof(stream_info) == 704 || sizeof(stream_info) == 656)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
