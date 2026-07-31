@@ -37,7 +37,7 @@ independently sourced, the following steps should be followed:
 To build Envoy from a release tarball, you can download a release tarball from Assets section in each release in project [Releases page](https://github.com/envoyproxy/envoy/releases).
 Given all required [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements) are installed, the following steps should be followed:
 
-1. Download and extract source code of a release tarball from the Releases page. For example: https://github.com/envoyproxy/envoy/releases/tag/v1.24.0.
+1. Download and extract source code of a release tarball from the Releases page. For example: https://github.com/envoyproxy/envoy/releases/tag/v1.39.0.
 1. `python3 tools/github/write_current_source_version.py` from the repository root.
 1. `bazel build -c opt envoy` from the repository root.
 
@@ -76,6 +76,7 @@ for how to update or override dependencies.
     sudo apt-get install \
        autoconf \
        curl \
+       libxml2-dev \
        libtool \
        patch \
        python3-pip \
@@ -92,6 +93,7 @@ for how to update or override dependencies.
         libstdc++ \
         libstdc++-static \
         libtool \
+        libxml2-devel \
         lld \
         patch \
         python3-pip
@@ -99,7 +101,9 @@ for how to update or override dependencies.
 
     ### Linux
     Envoy uses a hermetic Clang toolchain that is automatically downloaded by Bazel, so you do not
-    need to install Clang manually. To use it, add `--config=clang` to your build command:
+    need to install Clang manually. Note that despite the toolchain being hermetic, `libxml2` must
+    be installed on the host (included in the package lists above). To use the hermetic toolchain,
+    add `--config=clang` to your build command:
     ```console
     bazel build --config=clang envoy
     ```
@@ -136,8 +140,7 @@ for how to update or override dependencies.
     _notes_: See Homebrew python setup notes: https://docs.brew.sh/Homebrew-and-Python.
 
     The full version of Xcode (not just Command Line Tools) is also required to build Envoy on macOS.
-    Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
-    Apple clang version 11.0.0 (clang-1100.0.33.8).
+    Envoy compiles and passes tests with a recent version of Xcode and its bundled Apple clang.
 
     #### Troubleshooting
     If you see some error messages like the following:
@@ -207,23 +210,23 @@ for how to update or override dependencies.
     and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
     package.
     ```cmd
-    mklink %USERPROFILE%\Python39\python3.exe %USERPROFILE%\Python39\python.exe
-    set PATH=%USERPROFILE%\Python39;%PATH%
-    set PATH=%USERPROFILE%\Python39\Scripts;%PATH%
+    mklink %USERPROFILE%\Python3\python3.exe %USERPROFILE%\Python3\python.exe
+    set PATH=%USERPROFILE%\Python3;%PATH%
+    set PATH=%USERPROFILE%\Python3\Scripts;%PATH%
     pip install wheel
     ```
 
-    [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
+    [Build Tools for Visual Studio 2022](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022):
     For building with MSVC, you must install at least the VC++ workload.
-    You may alternately install the entire Visual Studio 2019 and use the Build Tools installed in that
+    You may alternately install the entire Visual Studio 2022 and use the Build Tools installed in that
     package. Earlier versions of VC++ Build Tools/Visual Studio are not recommended or supported.
     If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC` environment variable
     to the path of the VC++ package to allow Bazel to find your installation of VC++. NOTE: ensure that
     the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2,
     which is determined by their relative ordering in your PATH.
     ```cmd
-    set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
-    set PATH=%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64;%PATH%
+    set BAZEL_VC=%USERPROFILE%\VSBT2022\VC
+    set PATH=%USERPROFILE%\VSBT2022\VC\Tools\MSVC\<version>\bin\Hostx64\x64;%PATH%
     ```
 
     The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
@@ -277,7 +280,7 @@ for how to update or override dependencies.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
-   Make sure you have go version 1.17 or later.
+   Make sure you have go version 1.24 or later.
 1. `go install github.com/bazelbuild/buildtools/buildifier@latest` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
    in your shell for buildifier to work. If GOPATH is not set, it is $HOME/go by default.
 1. `go install github.com/bazelbuild/buildtools/buildozer@latest` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
@@ -403,7 +406,7 @@ for more details.
 
 ## Supported compiler versions
 
-We now require Clang >= 18 due to C++20 support (for Clang >= 14, your mileage may vary) and tcmalloc requirement. GCC >= 13 is also known to work for C++20.
+We require Clang >= 18 due to C++20 and tcmalloc requirements. GCC >= 13 is also known to work.
 Currently the CI is running with Clang 22.
 
 ## Clang STL debug symbols
@@ -566,7 +569,7 @@ them with elevated privileges, e.g. `sudo test`. However, that may not always be
 particularly if the test needs to run in a CI pipeline. `tools/bazel-test-docker.sh` may be used in
 such situations to run the tests in a privileged docker container.
 
-The script works by wrapping the test execution in the current repository's circle ci build
+The script works by wrapping the test execution in the current repository's CI build
 container, then executing it either locally or on a remote docker container. In both cases, the
 container runs with the `--privileged` flag, allowing it to execute operations which would otherwise
 be restricted.
@@ -647,10 +650,10 @@ a TSAN-instrumented version of libc++ and can be run under the docker sandbox:
 bazel test -c dbg --config=docker-tsan //test/...
 ```
 
-Alternatively, you can build a local copy of TSAN-instrumented libc++. Follow the [quick start](#quick-start-bazel-build-for-developers) instruction to setup Clang+LLVM environment. Download LLVM sources from the [LLVM official site](https://github.com/llvm/llvm-project)
+Alternatively, you can build a local copy of TSAN-instrumented libc++. Follow the [quick start](#quick-start-bazel-build-for-developers) instruction to setup Clang+LLVM environment. Download LLVM sources from the [LLVM official site](https://github.com/llvm/llvm-project). The LLVM version used should match the hermetic toolchain version (currently 22.1.x).
 
 ```
-curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-11.0.1.tar.gz" | tar zx
+curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-22.1.8.tar.gz" | tar zx
 
 ```
 
@@ -661,7 +664,7 @@ mkdir tsan
 pushd tsan
 
 cmake -GNinja -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx" -DLLVM_USE_LINKER=lld -DLLVM_USE_SANITIZER=Thread -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-11.0.1/llvm"
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-22.1.8/llvm"
 ninja install-cxx install-cxxabi
 
 rm -rf /opt/libcxx_tsan/include
@@ -881,11 +884,6 @@ FUZZ_COVERAGE=true VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh
 ```
 This generates a coverage report for fuzz targets after running the target for one minute against fuzzing engine libfuzzer using its coprus as initial seed inputs. The full coverage report will be available in `generated/fuzz_coverage/coverage.html`.
 
-Coverage for every PR is available in Circle in the "artifacts" tab of the coverage job. You will
-need to navigate down and open "coverage.html" but then you can navigate per normal. NOTE: We
-have seen some issues with seeing the artifacts tab. If you can't see it, log out of Circle, and
-then log back in and it should start working.
-
 The latest coverage report for main is available
 [here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/fuzz_coverage/index.html).
 
@@ -958,7 +956,7 @@ The compilation database could also be used to setup editors with cross referenc
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [clangd](https://clangd.llvm.org/) with supported editors.
 
-This requires Python 3.8.0+, download from [here](https://www.python.org/downloads/) if you do not have it installed already.
+This requires Python 3.10+, download from [here](https://www.python.org/downloads/) if you do not have it installed already.
 
 Use the following command to prepare a compilation database:
 
@@ -998,7 +996,7 @@ using multiple compilation modes or multiple trees.
 You may use any [Remote Caching](https://docs.bazel.build/versions/master/remote-caching.html) backend
 as an alternative to this.
 
-This requires Go 1.11+, follow the [instructions](https://golang.org/doc/install#install) to install
+This requires Go 1.17+, follow the [instructions](https://golang.org/doc/install#install) to install
 if you don't have one. To start the cache, run the following from the root of the Envoy repository (or anywhere else
 that the Go toolchain can find the necessary dependencies):
 
