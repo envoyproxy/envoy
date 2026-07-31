@@ -16,7 +16,7 @@ namespace {
 constexpr absl::string_view FilterChainName = "envoy.filters.http.filter_chain";
 
 // Helper to process filter config and create filter factories
-FilterFactoriesVector createFilterFactoriesFromConfig(
+absl::StatusOr<FilterFactoriesVector> createFilterFactoriesFromConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
     Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix) {
   FilterFactoriesVector filter_factories;
@@ -27,14 +27,14 @@ FilterFactoriesVector createFilterFactoriesFromConfig(
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             filter_config);
     if (factory.name() == FilterChainName) {
-      throw EnvoyException("FilterChain filter cannot be configured recursively.");
+      return absl::InvalidArgumentError("FilterChain filter cannot be configured recursively.");
     }
 
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         filter_config, context.messageValidationVisitor(), factory);
     auto callback_or_error =
         factory.createHttpFilterFactoryFromProto(*message, stats_prefix, context);
-    THROW_IF_NOT_OK_REF(callback_or_error.status());
+    RETURN_IF_NOT_OK_REF(callback_or_error.status());
 
     auto filter_config_provider =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(context)
@@ -45,7 +45,7 @@ FilterFactoriesVector createFilterFactoriesFromConfig(
 }
 
 // Helper to process filter config and create filter factories
-FilterFactoriesVector createFilterFactoriesFromConfig(
+absl::StatusOr<FilterFactoriesVector> createFilterFactoriesFromConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
     Server::Configuration::FactoryContext& context, const std::string& stats_prefix) {
   FilterFactoriesVector filter_factories;
@@ -56,13 +56,13 @@ FilterFactoriesVector createFilterFactoriesFromConfig(
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             filter_config);
     if (factory.name() == FilterChainName) {
-      throw EnvoyException("FilterChain filter cannot be configured recursively.");
+      return absl::InvalidArgumentError("FilterChain filter cannot be configured recursively.");
     }
 
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         filter_config, context.messageValidationVisitor(), factory);
     auto callback_or_error = factory.createFilterFactoryFromProto(*message, stats_prefix, context);
-    THROW_IF_NOT_OK_REF(callback_or_error.status());
+    RETURN_IF_NOT_OK_REF(callback_or_error.status());
 
     auto filter_config_provider =
         Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
@@ -78,8 +78,11 @@ FilterFactoriesVector createFilterFactoriesFromConfig(
 
 FilterChain::FilterChain(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
-    Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix)
-    : filter_factories_(createFilterFactoriesFromConfig(proto_config, context, stats_prefix)) {
+    Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix,
+    absl::Status& creation_status) {
+  auto filter_factories_or = createFilterFactoriesFromConfig(proto_config, context, stats_prefix);
+  SET_AND_RETURN_IF_NOT_OK(filter_factories_or.status(), creation_status);
+  filter_factories_ = std::move(filter_factories_or.value());
   for (const auto& factory : filter_factories_) {
     filters_.insert(factory->name());
   }
@@ -87,8 +90,11 @@ FilterChain::FilterChain(
 
 FilterChain::FilterChain(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
-    Server::Configuration::FactoryContext& context, const std::string& stats_prefix)
-    : filter_factories_(createFilterFactoriesFromConfig(proto_config, context, stats_prefix)) {
+    Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
+    absl::Status& creation_status) {
+  auto filter_factories_or = createFilterFactoriesFromConfig(proto_config, context, stats_prefix);
+  SET_AND_RETURN_IF_NOT_OK(filter_factories_or.status(), creation_status);
+  filter_factories_ = std::move(filter_factories_or.value());
   for (const auto& factory : filter_factories_) {
     filters_.insert(factory->name());
   }
@@ -98,17 +104,18 @@ FilterChainPerRouteConfig::FilterChainPerRouteConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute&
         proto_config,
     Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix,
-    absl::Status&) {
-  filter_chain_ = std::make_shared<FilterChain>(proto_config.filter_chain(), context, stats_prefix);
+    absl::Status& creation_status) {
+  filter_chain_ = std::make_shared<FilterChain>(proto_config.filter_chain(), context, stats_prefix,
+                                                creation_status);
 }
 
 FilterChainConfig::FilterChainConfig(const FilterChainConfigProto& proto_config,
                                      Server::Configuration::FactoryContext& context,
-                                     const std::string& stats_prefix)
+                                     const std::string& stats_prefix, absl::Status& creation_status)
     : stats_(createStats(stats_prefix, context.scope())) {
   if (proto_config.has_default_filter_chain()) {
-    default_filter_chain_ =
-        std::make_shared<FilterChain>(proto_config.default_filter_chain(), context, stats_prefix);
+    default_filter_chain_ = std::make_shared<FilterChain>(proto_config.default_filter_chain(),
+                                                          context, stats_prefix, creation_status);
   }
 }
 

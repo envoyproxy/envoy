@@ -55,12 +55,8 @@ absl::StatusOr<Http::FilterFactoryCb>
 AwsRequestSigningFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& server_context) {
-  auto result = createFilterFactoryFromProtoHelper(config, stats_prefix, server_context,
-                                                   server_context.scope());
-  if (!result.ok()) {
-    ExceptionUtil::throwEnvoyException(std::string(result.status().message()));
-  }
-  return std::move(result.value());
+  return createFilterFactoryFromProtoHelper(config, stats_prefix, server_context,
+                                            server_context.scope());
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

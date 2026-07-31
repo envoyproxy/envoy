@@ -23,6 +23,7 @@ on:
         default: |
           WORKSPACE
           bazel/repository_locations.bzl
+          bazel/toolchains.bzl
           api/bazel/repository_locations.bzl
           .bazelversion
           .github/workflows/_request_cache_bazel.yml

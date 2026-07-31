@@ -23,6 +23,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -52,12 +53,14 @@
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
@@ -1419,10 +1422,10 @@ TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
     auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
-    EXPECT_FALSE(cluster_or_error.ok());
-    EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_EQ(cluster_or_error.status().message(),
-              "STRICT_DNS clusters must NOT have a custom resolver name set");
+    EXPECT_THAT(
+        cluster_or_error,
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  testing::Eq("STRICT_DNS clusters must NOT have a custom resolver name set")));
   } else {
     EXPECT_THROW_WITH_MESSAGE(
         auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
@@ -2033,6 +2036,30 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
+// The dispatcher can fail to create a client connection (e.g. when binding the upstream socket to
+// a configured network namespace fails at runtime). createConnection must surface the null
+// connection to the caller rather than crash on a null dereference.
+TEST_F(HostImplTest, CreateConnectionFailure) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "lyft.com", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN));
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(nullptr));
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  EXPECT_EQ(nullptr, connection_data.connection_);
+  EXPECT_EQ(host.get(), connection_data.host_description_.get());
+}
+
 TEST_F(HostImplTest, OrcaReportingAddressDefaultsToDataAddress) {
   MockClusterMockPrioritySet cluster;
   Network::Address::InstanceConstSharedPtr address =
@@ -2359,6 +2386,68 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
+// Verifies that the happy eyeballs sort of the address list runs once when the host is
+// created, and not again on each connection attempt.
+TEST_F(HostImplTest, HappyEyeballsSortsAddressListOncePerHost) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  AddressVector address_list = {
+      address,
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
+
+  // Creating the host sorts the address list exactly once.
+  std::shared_ptr<Upstream::HostImpl> host;
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "sort address with happy_eyeballs config", 1, {
+    host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+        cluster.info_, "lyft.com", address,
+        std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+        std::make_shared<const envoy::config::core::v3::Locality>(locality),
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+        envoy::config::core::v3::UNKNOWN, address_list));
+  });
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  auto connection1 = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection1, setBufferLimits(0));
+  EXPECT_CALL(*connection1, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection1, connectionInfoSetter());
+  EXPECT_CALL(*connection1, streamInfo());
+  auto connection2 = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection2, setBufferLimits(0));
+  EXPECT_CALL(*connection2, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection2, connectionInfoSetter());
+  EXPECT_CALL(*connection2, streamInfo());
+  // Both connections should be created with the first address in the list.
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection1))
+      .WillOnce(Return(connection2));
+  EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
+
+  // Creating connections reuses the sorted list and does not sort again.
+  Envoy::Upstream::Host::CreateConnectionData connection_data1;
+  Envoy::Upstream::Host::CreateConnectionData connection_data2;
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "sort address with happy_eyeballs config", 0, {
+    connection_data1 = host->createConnection(dispatcher, options, transport_socket_options);
+    connection_data2 = host->createConnection(dispatcher, options, transport_socket_options);
+  });
+  // The created connections will be wrapped in HappyEyeballsConnectionImpls.
+  EXPECT_NE(connection1, connection_data1.connection_.get());
+  EXPECT_NE(connection2, connection_data2.connection_.get());
+}
+
 TEST_F(HostImplTest, HealthFlags) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
@@ -2519,6 +2608,19 @@ TEST_F(HostImplTest, HealthcheckHostname) {
           envoy::config::core::v3::Locality().default_instance()),
       config, 1);
   EXPECT_EQ("foo", descr->hostnameForHealthChecks());
+}
+
+std::optional<Network::Socket::Option::Details>
+findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
+                  envoy::config::core::v3::SocketOption::SocketState state,
+                  Network::Socket& socket) {
+  for (const auto& option : options) {
+    const auto details = option->getOptionDetails(socket, state);
+    if (details.has_value() && details->name_ == name) {
+      return details;
+    }
+  }
+  return std::nullopt;
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -4333,6 +4435,101 @@ public:
   TestRandomGenerator random_;
 };
 
+TEST_F(StaticClusterImplTest, AppendBindAddressNoPortOption) {
+  NiceMock<Network::MockSocket> socket;
+
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    GTEST_SKIP() << "IP_BIND_ADDRESS_NO_PORT is not supported on this platform";
+  }
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    upstream_bind_config:
+      source_address:
+        address: 127.0.0.6
+        port_value: 0
+    load_assignment:
+      cluster_name: staticcluster
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 80
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster config;
+  TestUtility::loadFromYaml(yaml, config);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+
+  {
+    // port 0, guard ON -> option present.
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_TRUE(option.has_value());
+  }
+
+  {
+    // port 0, guard OFF -> option absent.
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion", "false"}});
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_FALSE(option.has_value());
+  }
+
+  {
+    // non-zero port -> option absent regardless of guard.
+    const std::string yaml_nonzero_port = R"EOF(
+      name: staticcluster
+      connect_timeout: 0.25s
+      type: static
+      upstream_bind_config:
+        source_address:
+          address: 127.0.0.6
+          port_value: 5000
+      load_assignment:
+        cluster_name: staticcluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 80
+    )EOF";
+    envoy::config::cluster::v3::Cluster config_nonzero_port;
+    TestUtility::loadFromYaml(yaml_nonzero_port, config_nonzero_port);
+    std::shared_ptr<StaticClusterImpl> cluster =
+        createCluster(config_nonzero_port, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_FALSE(option.has_value());
+  }
+}
+
 // Test creating and extending a priority set.
 TEST(PrioritySet, Extend) {
   PrioritySetImpl priority_set;
@@ -4934,11 +5131,8 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherRejectAll) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          reject_all: true
+    stats_matcher:
+      reject_all: true
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4965,13 +5159,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherInclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          inclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_cx"
+    stats_matcher:
+      inclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_cx"
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4999,13 +5190,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherExclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          exclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_rq"
+    stats_matcher:
+      exclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_rq"
     load_assignment:
         endpoints:
           - lb_endpoints:

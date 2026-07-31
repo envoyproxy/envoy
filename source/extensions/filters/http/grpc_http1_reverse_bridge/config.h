@@ -12,13 +12,13 @@ namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
 class Config
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig,
           envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute> {
 public:
-  Config() : FactoryBase("envoy.filters.http.grpc_http1_reverse_bridge") {}
+  Config() : ExceptionFreeFactoryBase("envoy.filters.http.grpc_http1_reverse_bridge") {}
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,
       const std::string& stat_prefix,
       Envoy::Server::Configuration::FactoryContext& context) override;

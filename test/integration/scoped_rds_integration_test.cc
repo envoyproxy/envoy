@@ -29,7 +29,9 @@ class InlineScopedRoutesIntegrationTest
     : public HttpIntegrationTest,
       public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  InlineScopedRoutesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  InlineScopedRoutesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    skip_tag_extraction_rule_check_ = false;
+  }
 
   void setScopedRoutesConfig(absl::string_view config_yaml) {
     config_helper_.addConfigModifier(

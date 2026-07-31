@@ -14,13 +14,14 @@ namespace GrpcJsonTranscoder {
  * Config registration for the gRPC JSON transcoder filter. @see NamedHttpFilterConfigFactory.
  */
 class GrpcJsonTranscoderFilterConfig
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder> {
 public:
-  GrpcJsonTranscoderFilterConfig() : FactoryBase("envoy.filters.http.grpc_json_transcoder") {}
+  GrpcJsonTranscoderFilterConfig()
+      : ExceptionFreeFactoryBase("envoy.filters.http.grpc_json_transcoder") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
           proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;

@@ -21,7 +21,6 @@
 #include "source/common/grpc/codec.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/response_decoder_impl_base.h"
-#include "source/extensions/load_balancing_policies/common/orca_weight_manager.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/status/status.h"
@@ -65,20 +64,21 @@ void applyOrcaOobConnectionOverrides(
  * Cluster-level manager owning per-host ORCA OOB streams. Modeled on
  * source/extensions/health_checkers/grpc/health_checker_impl.h: per-host nested OobSession holds
  * a CodecClient and Http stream callbacks; the manager reacts to PrioritySet::addMemberUpdateCb
- * to add/remove sessions. All activity runs on the supplied dispatcher's thread; the only
- * cross-thread surface is OrcaHostLbPolicyData atomics (workers read; this manager writes via the
- * shared OrcaLoadReportHandler).
+ * to add/remove sessions. All activity runs on the supplied dispatcher's thread. Each decoded
+ * report is delivered to the host's `HostLbPolicyData` via `onOrcaLoadReport`, the same entry point
+ * as the in-band request path.
  */
 class OrcaOobManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
   OrcaOobManager(OrcaOobManagerConfig config, const Upstream::PrioritySet& priority_set,
                  Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                 Stats::Scope& stats_scope, OrcaLoadReportHandlerSharedPtr report_handler);
+                 Stats::Scope& stats_scope);
   virtual ~OrcaOobManager();
 
   // Iterate priority set, open a session per existing host, register member-update callback.
-  // Init order constraint: caller must invoke OrcaWeightManager::initialize() FIRST so the
-  // OrcaHostLbPolicyData attachment exists before sessions decode their first report.
+  // Init order: recipients' per-host data must be attached before the first report is decoded
+  // (for ClientSideWeightedRoundRobin, call OrcaWeightManager::initialize() first); a report that
+  // finds no recipient is counted as a report error.
   absl::Status initialize();
 
 protected:
@@ -173,7 +173,6 @@ private:
 
   const OrcaOobManagerConfig config_;
   const Upstream::PrioritySet& priority_set_;
-  OrcaLoadReportHandlerSharedPtr report_handler_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;
   // node_hash_map for pointer/reference stability across rehash.
   absl::node_hash_map<Upstream::HostConstSharedPtr, OobSessionPtr> oob_sessions_;

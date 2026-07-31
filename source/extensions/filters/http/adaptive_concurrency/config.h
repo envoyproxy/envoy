@@ -14,12 +14,13 @@ namespace AdaptiveConcurrency {
  * Config registration for the adaptive concurrency limit filter. @see NamedHttpFilterConfigFactory.
  */
 class AdaptiveConcurrencyFilterFactory
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency> {
 public:
-  AdaptiveConcurrencyFilterFactory() : FactoryBase("envoy.filters.http.adaptive_concurrency") {}
+  AdaptiveConcurrencyFilterFactory()
+      : ExceptionFreeFactoryBase("envoy.filters.http.adaptive_concurrency") {}
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
           proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override {
@@ -35,7 +36,7 @@ public:
   }
 
 private:
-  Http::FilterFactoryCb createFilterFactory(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
       const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
           proto_config,
       const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,

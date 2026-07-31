@@ -11,7 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();

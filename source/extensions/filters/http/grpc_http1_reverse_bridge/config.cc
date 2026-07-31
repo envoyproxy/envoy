@@ -11,7 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
-Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> Config::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,
     const std::string&, Server::Configuration::FactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {

@@ -35,6 +35,11 @@ message Mcp {
     // - GET requests for SSE streams (with Accept: text/event-stream)
     // - DELETE requests for session termination (with MCP-Session-Id header)
     REJECT_NO_MCP = 1;
+
+    // Disables MCP processing entirely. The filter performs no inspection,
+    // attribute extraction, trace context propagation, or rejection; all
+    // traffic is proxied as-is.
+    NOOP = 2;
   }
 
   // Where to store parsed MCP request attributes.
