@@ -234,8 +234,8 @@ An example configuration of the filter as an upstream HTTP filter for OTLP reque
 
 .. literalinclude:: /_configs/repo/envoy-otel-http.yaml
     :language: yaml
-    :start-after: # [START upstream_compressor_config]
-    :end-before: # [END upstream_compressor_config]
+    :start-after: OTLP request compression
+    :end-before: httpbingo
     :caption: :download:`envoy-otel-http.yaml </_configs/repo/envoy-otel-http.yaml>`
 
 .. _compressor-statistics:
