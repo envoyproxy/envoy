@@ -83,7 +83,8 @@ CompressorFilterFactory::createRouteSpecificFilterConfigTyped(
  * Static registration for the compressor filter. @see NamedHttpFilterConfigFactory.
  */
 REGISTER_FACTORY(CompressorFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
-REGISTER_FACTORY(UpstreamCompressorFilterFactory, Server::Configuration::UpstreamHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamCompressorFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace Compressor
 } // namespace HttpFilters

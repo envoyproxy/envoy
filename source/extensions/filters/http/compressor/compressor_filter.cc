@@ -519,8 +519,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   uint32_t registration_count{0};
 
   auto typed_state =
-      streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(
-          compressorRegistryKey());
+      streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(compressorRegistryKey());
   ASSERT(typed_state != nullptr);
 
   for (const auto& filter_config : (*typed_state).filter_configs_) {
@@ -696,8 +695,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
   const absl::string_view encoding_decision_key{"encoding_decision"};
 
   // Check if we have already cached our decision on encoding.
-  const StreamInfo::FilterStateSharedPtr& filter_state =
-      streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = streamInfo().filterState();
   if (auto typed_state =
           filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
       typed_state != nullptr) {

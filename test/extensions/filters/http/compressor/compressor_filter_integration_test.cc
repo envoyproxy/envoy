@@ -904,12 +904,12 @@ TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusCompress
                 .getStringView());
 }
 
-class CompressorUpstreamIntegrationTest : public Event::SimulatedTimeSystem,
-                                           public HttpIntegrationTest,
-                                           public testing::TestWithParam<Network::Address::IpVersion> {
+class CompressorUpstreamIntegrationTest
+    : public Event::SimulatedTimeSystem,
+      public HttpIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CompressorUpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  CompressorUpstreamIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }
@@ -1026,7 +1026,7 @@ TEST_P(CompressorUpstreamIntegrationTest, UpstreamRequestCompression) {
   auto response = sendRequestAndWaitForResponse(request_headers, 1024, response_headers, 10);
 
   EXPECT_TRUE(upstream_request_->complete());
-  
+
   EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
             upstream_request_->headers()
                 .get(Http::CustomHeaders::get().ContentEncoding)[0]

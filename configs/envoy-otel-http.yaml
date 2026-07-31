@@ -165,9 +165,9 @@ static_resources:
                   default_value: true
                 min_content_length: 512
                 content_type:
-                  - application/grpc
-                  - application/x-protobuf
-                  - application/json
+                - application/grpc
+                - application/x-protobuf
+                - application/json
         - name: envoy.filters.http.upstream_codec
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
