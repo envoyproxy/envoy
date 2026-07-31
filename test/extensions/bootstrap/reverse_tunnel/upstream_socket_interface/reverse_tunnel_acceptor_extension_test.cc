@@ -464,9 +464,9 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, CreateEmptyConfigProto) {
   auto proto = socket_interface_->createEmptyConfigProto();
   EXPECT_NE(proto, nullptr);
 
-  auto* typed_proto =
-      dynamic_cast<envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
-                       UpstreamReverseConnectionSocketInterface*>(proto.get());
+  auto* typed_proto = Protobuf::DynamicCastMessage<
+      envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+          UpstreamReverseConnectionSocketInterface>(proto.get());
   EXPECT_NE(typed_proto, nullptr);
 }
 

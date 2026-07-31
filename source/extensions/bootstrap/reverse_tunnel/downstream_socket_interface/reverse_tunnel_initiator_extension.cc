@@ -69,7 +69,8 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
     TimeSource& time_source, const std::string& event, const std::string& node_id,
     const std::string& cluster_id, const std::string& tenant_id,
     const std::string& upstream_cluster, const std::string& host_address,
-    const std::string& connection_key, const std::string& error_message) {
+    const std::string& connection_key, const std::string& worker_id,
+    const std::string& connection_id, const std::string& error_message) {
   if (access_logs_.empty()) {
     return;
   }
@@ -88,6 +89,8 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
   fields["upstream_cluster"].set_string_value(upstream_cluster);
   fields["host_address"].set_string_value(host_address);
   fields["connection_key"].set_string_value(connection_key);
+  fields["worker_id"].set_string_value(worker_id);
+  fields["connection_id"].set_string_value(connection_id);
   fields["error"].set_string_value(error_message);
   stream_info.setDynamicMetadata("envoy.reverse_tunnel.initiator", metadata);
 

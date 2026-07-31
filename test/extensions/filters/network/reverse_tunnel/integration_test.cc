@@ -1129,7 +1129,7 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto,
                                Server::Configuration::FactoryContext&) override {
-    const auto& config = dynamic_cast<const Protobuf::Struct&>(proto);
+    const auto& config = Protobuf::DynamicCastMessage<Protobuf::Struct>(proto);
 
     // Extract namespace and metadata from config.
     std::string namespace_key = "envoy.test.reverse_tunnel";
