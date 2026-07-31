@@ -2145,8 +2145,6 @@ TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteOnlyWithExplicitPerRouteConfigW
   EXPECT_EQ(nlohmann::json::parse(response2->body()), nlohmann::json::parse(expected_rpc_response));
 }
 
-DO NOT SUBMIT CHANGE MARKER
-
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallHeadersOnly204SyntheticSuccessResult) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
