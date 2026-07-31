@@ -945,7 +945,7 @@ public:
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const override {
-    return makeOptRefFromPtr(upstream_client_codec_factory_.get());
+    return makeOptRefFromPtr(upstream_client_codec_factory_);
   }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
 
@@ -1130,9 +1130,9 @@ private:
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   // Per-cluster upstream (client) codec factory, recovered from extension_protocol_options_ (an
-  // options entry that also implements the factory interface). Held to pin lifetime;
-  // upstreamHttpClientCodecFactory() returns a view into it.
-  const std::shared_ptr<const Http::ClientCodecFactory> upstream_client_codec_factory_;
+  // options entry that also implements the factory interface). Lifetime is pinned by
+  // extension_protocol_options_; upstreamHttpClientCodecFactory() returns a view into it.
+  const Http::ClientCodecFactory* upstream_client_codec_factory_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint32_t max_requests_per_connection_;
