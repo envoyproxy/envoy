@@ -215,8 +215,7 @@ message ServerToolConfig {
     ToolsListLocal tool_list_local = 4;
   }
 
-  // [#not-implemented-hide:]
-  // Default server info for tools without specific ones.
+  // Default server info for tools without specific ones. If not provided, a fallback path of '/mcp' will be used.
   McpServerInfo default_server_info = 5;
 }
 
