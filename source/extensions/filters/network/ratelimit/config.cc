@@ -37,8 +37,8 @@ absl::StatusOr<Network::FilterFactoryCb> RateLimitConfigFactory::createFilterFac
   return [config_with_hash_key, &context, timeout,
           filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(
-        filter_config,
-        Filters::Common::RateLimit::rateLimitClient(context, config_with_hash_key, timeout)));
+        filter_config, Filters::Common::RateLimit::rateLimitClient(context.serverFactoryContext(),
+                                                                   config_with_hash_key, timeout)));
   };
 }
 

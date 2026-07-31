@@ -26,7 +26,7 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
     const bool enable_per_opcode_response_bytes_metrics,
     const bool enable_per_opcode_decoder_error_metrics, const bool enable_latency_threshold_metrics,
     const std::chrono::milliseconds default_latency_threshold,
-    const LatencyThresholdOverrideList& latency_threshold_overrides, Stats::Scope& scope)
+    const LatencyThresholdOverrideMap& latency_threshold_override_map, Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
       stat_name_set_(scope.symbolTable().makeSet("Zookeeper")),
       stat_prefix_(stat_name_set_->add(stat_prefix)), auth_(stat_name_set_->add("auth")),
@@ -38,7 +38,7 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(
       enable_per_opcode_decoder_error_metrics_(enable_per_opcode_decoder_error_metrics),
       enable_latency_threshold_metrics_(enable_latency_threshold_metrics),
       default_latency_threshold_(default_latency_threshold),
-      latency_threshold_override_map_(parseLatencyThresholdOverrides(latency_threshold_overrides)) {
+      latency_threshold_override_map_(latency_threshold_override_map) {
   // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
   // lists commons schemes: "world", "auth", "digest", "host", "x509", and
   // "ip". These are used in filter.cc by appending "_rq".
@@ -171,20 +171,24 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& resp_coun
   opcode_info.latency_name_ = stat_name_set_->add(absl::StrCat(name, "_latency"));
 }
 
-int32_t ZooKeeperFilterConfig::getOpCodeIndex(LatencyThresholdOverride_Opcode opcode) {
+absl::StatusOr<int32_t>
+ZooKeeperFilterConfig::getOpCodeIndex(LatencyThresholdOverride_Opcode opcode) {
   const OpcodeMap& opcode_map = opcodeMap();
   auto it = opcode_map.find(opcode);
   if (it != opcode_map.end()) {
     return it->second;
   }
-  throw EnvoyException(fmt::format("Unknown opcode from config: {}", static_cast<int32_t>(opcode)));
+  return absl::InvalidArgumentError(
+      fmt::format("Unknown opcode from config: {}", static_cast<int32_t>(opcode)));
 }
 
-LatencyThresholdOverrideMap ZooKeeperFilterConfig::parseLatencyThresholdOverrides(
+absl::StatusOr<LatencyThresholdOverrideMap> ZooKeeperFilterConfig::parseLatencyThresholdOverrides(
     const LatencyThresholdOverrideList& latency_threshold_overrides) {
   LatencyThresholdOverrideMap latency_threshold_override_map;
   for (const auto& threshold_override : latency_threshold_overrides) {
-    latency_threshold_override_map[getOpCodeIndex(threshold_override.opcode())] =
+    absl::StatusOr<int32_t> opcode_index = getOpCodeIndex(threshold_override.opcode());
+    RETURN_IF_NOT_OK_REF(opcode_index.status());
+    latency_threshold_override_map[opcode_index.value()] =
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(threshold_override, threshold));
   }
   return latency_threshold_override_map;

@@ -11,17 +11,21 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 class AiProtocolManagerFilterConfigFactory
-    : public Common::FactoryBase<
+    : public Common::DualFactoryBase<
           envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager> {
 public:
-  AiProtocolManagerFilterConfigFactory() : FactoryBase("envoy.filters.http.ai_protocol_manager") {}
+  AiProtocolManagerFilterConfigFactory()
+      : DualFactoryBase("envoy.filters.http.ai_protocol_manager") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager&
           proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, DualInfo info,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
+
+using UpstreamAiProtocolManagerFilterConfigFactory = AiProtocolManagerFilterConfigFactory;
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters

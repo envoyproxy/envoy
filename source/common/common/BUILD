@@ -181,7 +181,10 @@ envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
-    deps = [":utility_lib"],
+    deps = [
+        ":utility_lib",
+        "@abseil-cpp//absl/types:span",
+    ],
 )
 
 envoy_cc_library(

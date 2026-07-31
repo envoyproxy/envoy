@@ -1,10 +1,15 @@
-#include "source/common/thread/terminate_thread.h"
+#include "source/common/thread/signal_thread.h"
 
 #include <sys/types.h>
 
 #include <csignal>
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 
 #include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Thread {
@@ -23,6 +28,18 @@ bool terminateThread(const ThreadId& tid) {
 #else
   // Windows, currently unsupported termination of thread.
   ENVOY_LOG_MISC(error, "Windows is currently unsupported for terminateThread.");
+  return false;
+#endif
+}
+
+bool signalThread(const ThreadId& tid, int signal) {
+#ifdef __linux__
+  return syscall(SYS_tgkill, getpid(), toPlatformTid(tid.getId()), signal) == 0;
+#else
+  // Only Linux supports the tgkill system call.
+  UNREFERENCED_PARAMETER(tid);
+  UNREFERENCED_PARAMETER(signal);
+  ENVOY_LOG_MISC(error, "signalThread is only supported on Linux.");
   return false;
 #endif
 }

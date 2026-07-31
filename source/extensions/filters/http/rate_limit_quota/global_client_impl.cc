@@ -273,7 +273,7 @@ createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_
 }
 
 void GlobalRateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-  if (response == nullptr) {
+  if (!response) {
     return;
   }
   main_dispatcher_.post(
