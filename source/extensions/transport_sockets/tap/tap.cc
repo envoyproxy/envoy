@@ -59,16 +59,13 @@ Network::IoResult TapSocket::doRead(Buffer::Instance& buffer) {
 }
 
 Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
-  auto doWrite = [&]() -> Network::IoResult {
-    return transport_socket_->doWrite(buffer, end_stream);
-  };
   if (tapper_ == nullptr) {
-    return doWrite();
+    return transport_socket_->doWrite(buffer, end_stream);
   }
   // The wrapped socket drains whatever it writes and only reports how much on return, so the bytes
   // handed to the tapper have to be snapshotted before delegating.
   Buffer::OwnedImpl copy(buffer);
-  const Network::IoResult result = doWrite();
+  const Network::IoResult result = transport_socket_->doWrite(buffer, end_stream);
   if (result.bytes_processed_ > 0) {
     tapper_->onWrite(copy, result.bytes_processed_, end_stream);
   }
