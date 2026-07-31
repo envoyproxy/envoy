@@ -174,10 +174,11 @@ buildRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
   const envoy::config::route::v3::RetryPolicy route_retry_policy =
       Http::Utility::convertCoreToRouteRetryPolicy(retry_policy,
                                                    "5xx,gateway-error,connect-failure,reset");
-  // RetryPolicyImpl::create only fails when max_interval < base_interval, which the
-  // validateCoreRetryPolicy check above already rejects, so it cannot fail here.
   auto policy_or_error = Router::RetryPolicyImpl::create(
       route_retry_policy, ProtobufMessage::getNullValidationVisitor(), server_context);
+  if (!policy_or_error.ok()) {
+    return policy_or_error.status();
+  }
   return Router::RetryPolicyConstSharedPtr{std::move(policy_or_error.value())};
 }
 

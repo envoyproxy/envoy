@@ -147,7 +147,7 @@ message ReverseTunnel {
   // Default: false (rebalancing enabled).
   bool skip_rebalancing = 8;
 
-  // Optional inline JWT authentication for the handshake. When set, the bearer token carried in the
+  // Optional JWT authentication for the handshake. When set, the bearer token carried in the
   // handshake request is verified before the connection is accepted or its socket registered, so a
   // forged or expired token can never produce a usable reverse tunnel. This runs on the real
   // accepted socket, before registration, so it does not interfere with socket reuse. A missing or
@@ -163,6 +163,11 @@ message ReverseTunnel {
   //
   // forces the ``x-envoy-reverse-tunnel-tenant-id`` header to equal the verified ``tenant`` claim.
   // Without such a binding, a token minted for one tenant can open a tunnel claiming another.
+  //
+  // Token verification is synchronous. With ``remote_jwks`` the keys are fetched and refreshed in the
+  // background (at startup and every ``cache_duration``) and cached, never on the accept path. Before
+  // the first successful fetch, or while a refresh is failing with nothing cached, every token is
+  // rejected. ``token_header`` defaults to ``authorization`` and ``clock_skew_seconds`` to 60.
   //
   // See :ref:`JwtHandshakeValidator
   // <envoy_v3_api_msg_extensions.filters.common.jwks.v3.JwtHandshakeValidator>`.

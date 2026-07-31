@@ -15,26 +15,14 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: JWT handshake validation]
-// Configuration for verifying a bearer JWT presented while a connection is being established,
-// shared by extensions that authenticate a handshake before accepting the connection.
+// Configuration for verifying a bearer JWT during handshake authentication, shared by extensions
+// that authenticate a connection or request by validating a token.
 
-// Validation of a bearer JWT presented while establishing a connection. The token is verified
-// **before** the connection is accepted, so a forged or expired token cannot produce a usable
-// connection. A missing or invalid token rejects the handshake unless ``allow_missing_or_failed``
-// is set.
-//
-// On success, the verified claims are emitted as dynamic metadata under ``claims_metadata_namespace``
-// so the consuming extension can bind a claimed handshake identifier to a verified claim via
-// ``%DYNAMIC_METADATA(namespace:claim)%``.
-//
-// .. note::
-//   The JWKS may be supplied inline (``local_jwks``) or fetched over HTTP (``remote_jwks``). Either
-//   way, token verification is synchronous: ``remote_jwks`` is fetched and refreshed in the
-//   background (at startup and every ``cache_duration``), never on the verification path. The
-//   configuration is deliberately scoped rather than reusing the full :ref:`JwtProvider
-//   <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`, whose request-param/cookie
-//   extraction and upstream-forwarding fields are not meaningful for a pre-acceptance handshake; the
-//   security-relevant semantics below mirror ``jwt_authn``.
+// Validation of a bearer JWT. A consuming extension verifies the token against the configured JWKS,
+// issuer, audiences, and time constraints. On success it publishes the verified claims as dynamic
+// metadata under ``claims_metadata_namespace``, so the consumer can bind a claimed identifier to a
+// verified claim via ``%DYNAMIC_METADATA(namespace:claim)%``. What a validation failure does, and
+// any per-field defaults, are defined by the consuming extension.
 //
 // .. attention::
 //   Verifying the token proves only that the caller *holds* a valid token; it does **not** by itself
@@ -45,46 +33,30 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   ``claims_metadata_namespace``), so do not put secrets in the token.
 // [#next-free-field: 9]
 message JwtHandshakeValidator {
-  // Required. Expected token issuer; the JWT ``iss`` claim must equal this value. A block with an
-  // empty ``issuer`` is rejected at config load, so a validly signed token from an unexpected issuer
-  // is never accepted.
-  string issuer = 1 [(validate.rules).string = {max_len: 1024}];
+  // Required. Expected token issuer. The JWT ``iss`` claim must equal this value.
+  string issuer = 1 [(validate.rules).string = {min_len: 1 max_len: 1024}];
 
-  // Allowed audiences. If non-empty, the JWT must carry at least one of these in its ``aud`` claim;
-  // matching is normalized (scheme and trailing slash) exactly as in ``jwt_authn``. If empty, the
-  // audience is not checked.
+  // Allowed audiences. If non-empty, the JWT must carry at least one of these in its ``aud`` claim.
+  // If empty, the audience is not checked.
   repeated string audiences = 2;
 
-  // Source of the JSON Web Key Set (JWKS) used to verify the signature of the handshake token.
-  // Exactly one source must be configured.
+  // Source of the JSON Web Key Set (JWKS) used to verify the token signature. Exactly one source
+  // must be configured.
   oneof jwks_source_specifier {
     option (validate.required) = true;
 
-    // The JWKS provided inline as a data source: an ``inline_string``, ``inline_bytes``, or a
-    // ``filename`` loaded from disk. The keys are read once when the configuration is loaded, which
-    // keeps token verification fully synchronous.
+    // The JWKS provided inline as a data source (``inline_string``, ``inline_bytes``, or
+    // ``filename``). The keys are read once when the configuration is loaded.
     config.core.v3.DataSource local_jwks = 3;
 
     // The JWKS fetched over HTTP. See :ref:`RemoteJwks
-    // <envoy_v3_api_msg_extensions.filters.common.jwks.v3.RemoteJwks>` (``http_uri``,
-    // ``cache_duration``, ``async_fetch``, ``retry_policy``). The keys are fetched and refreshed in
-    // the background (at startup and every ``cache_duration``) and cached, so verification stays
-    // synchronous. Tokens are rejected only before the first successful fetch; once fetched, keys
-    // stay in effect until a later refresh replaces them, and a fetch outage does not drop them.
-    // There is no on-demand refetch on an unknown ``kid``, so a key published after the last refresh
-    // is not recognized for up to ``cache_duration``.
-    //
-    // Fetching is always in the background here, so ``RemoteJwks.async_fetch``'s documented
-    // on-demand, per-worker behavior when it is unset does not apply. ``async_fetch`` only tunes
-    // the background fetch: ``fast_listener`` skips the wait at startup, and
-    // ``failed_refetch_duration`` sets the retry interval after a failed fetch. A ``cache_duration``
-    // or ``failed_refetch_duration`` below one second is raised to one second to avoid a refetch
-    // loop with no pause.
+    // <envoy_v3_api_msg_extensions.filters.common.jwks.v3.RemoteJwks>` for the fetch, cache,
+    // ``async_fetch``, and ``retry_policy`` options.
     RemoteJwks remote_jwks = 8;
   }
 
-  // Name of the header carrying the token. Defaults to ``authorization``, and a leading ``Bearer``
-  // prefix (with its trailing space) is stripped when present.
+  // Name of the header carrying the token. When unset, the consuming extension applies its own
+  // default (commonly ``authorization``, with a leading ``Bearer`` prefix stripped).
   string token_header = 4 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
 
   // Namespace under which verified claims are emitted as dynamic metadata. If unset, the consuming
@@ -94,17 +66,12 @@ message JwtHandshakeValidator {
   string claims_metadata_namespace = 5
       [(validate.rules).string = {max_len: 255 ignore_empty: true}];
 
-  // If ``true``, a missing or invalid token does **not** reject the handshake (verified claims are
-  // simply not published). Useful for a staged rollout / audit mode, where rejections that *would*
-  // have occurred are counted without closing the connection. Defaults to ``false`` (a missing or
-  // invalid token is rejected).
-  //
-  // Before the first successful fetch every token fails verification, so with ``remote_jwks`` a JWKS
-  // server that is unreachable at startup, combined with ``allow_missing_or_failed``, admits every
-  // handshake until keys are cached.
+  // If ``true``, a missing or invalid token does **not** fail validation; the verified claims are
+  // simply not published. Useful for a staged rollout or audit mode. Defaults to ``false``. How a
+  // validation failure is handled is defined by the consuming extension.
   bool allow_missing_or_failed = 6;
 
-  // Clock skew, in seconds, allowed when checking the ``exp`` and ``nbf`` time constraints. Mirrors
-  // ``jwt_authn``'s field of the same name. Defaults to 60 seconds when unset (``0``).
+  // Clock skew, in seconds, allowed when checking the ``exp`` and ``nbf`` time constraints. When
+  // unset (``0``), the consuming extension applies its own default.
   uint32 clock_skew_seconds = 7;
 }
