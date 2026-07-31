@@ -645,6 +645,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_packet_writer_interface",
     hdrs = envoy_select_enable_http3(["quic_packet_writer_interface.h"]),
+    visibility = ["//third_party/envoy:envoy_visible"],
     deps = envoy_select_enable_http3([
         "//envoy/network:io_handle_interface",
         "//envoy/stats:stats_interface",
