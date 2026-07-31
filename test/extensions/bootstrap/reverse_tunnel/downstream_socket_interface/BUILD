@@ -136,14 +136,17 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/formatter:substitution_formatter_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_address_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
         "//test/common/formatter:command_extension_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg_cc_proto",
     ],
 )

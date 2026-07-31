@@ -286,6 +286,78 @@ function build_openssl() {
     bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
 }
 
+function build_openssl_presubmit() {
+    # Lightweight OpenSSL CI for pre-submit (PRs). Instead of running the full
+    # test suite, it builds the binary (to catch link errors) and then runs only
+    # the tests whose source files were modified in the PR. The full test suite
+    # continues to run on post-submit via the regular "openssl" target.
+    BAZEL_BUILD_OPTIONS+=("--config=openssl")
+    setup_clang_toolchain
+
+    # Build the full binary to ensure everything links with OpenSSL.
+    echo "Bazel fastbuild build with OpenSSL..."
+    bazel_envoy_binary_build fastbuild
+
+    # Determine the merge base for computing the PR's changed files.
+    # CI_TARGET_BRANCH is set by the CI workflow (e.g. "main") and passed into
+    # the Docker container. Fetch it since the checkout may be shallow, then use
+    # merge-base to find the fork point so we only see PR changes, not files
+    # that changed on the target branch since the PR was created.
+    local merge_base
+    if [[ -n "${CI_TARGET_BRANCH}" ]]; then
+        git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
+        # Shallow clones may lack enough history for merge-base;
+        # fall back to diffing against the target branch directly.
+        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
+    else
+        merge_base="HEAD~1"
+    fi
+
+    # Map each changed file to its corresponding test target:
+    #   source/X/Y/  -> //test/X/Y/...
+    #   test/X/Y/    -> //test/X/Y/...
+    #   envoy/X/Y/   -> //test/X/Y/...   (public headers)
+    #   compat/openssl/ -> //compat/openssl/test/...
+    local -a test_targets=()
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        case "$file" in
+            source/*/*)
+                local dir
+                dir="$(dirname "$file")"
+                dir="${dir#source/}"
+                test_targets+=("//test/${dir}/...")
+                ;;
+            test/*/*)
+                local dir
+                dir="$(dirname "$file")"
+                test_targets+=("//${dir}/...")
+                ;;
+            envoy/*/*)
+                local dir
+                dir="$(dirname "$file")"
+                dir="${dir#envoy/}"
+                test_targets+=("//test/${dir}/...")
+                ;;
+            compat/openssl/*)
+                test_targets+=("//compat/openssl/test/...")
+                ;;
+        esac
+    done < <(git diff --name-only "$merge_base" HEAD 2>/dev/null)
+
+    if [[ ${#test_targets[@]} -eq 0 ]]; then
+        echo "No affected test targets found, skipping tests."
+        return
+    fi
+
+    # Deduplicate targets (multiple files in the same directory produce duplicates).
+    # shellcheck disable=SC2207
+    mapfile -t test_targets < <(printf '%s\n' "${test_targets[@]}" | sort -u)
+
+    echo "Testing affected targets with OpenSSL: ${test_targets[*]}"
+    bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${test_targets[@]}"
+}
+
 shift
 
 if [[ "$CI_TARGET" =~ bazel.* ]]; then
@@ -833,6 +905,10 @@ case $CI_TARGET in
 
     openssl)
         build_openssl
+        ;;
+
+    openssl.presubmit)
+        build_openssl_presubmit
         ;;
 
     publish)
