@@ -44,15 +44,13 @@ protected:
   void assertStreamInfoSize(const StreamInfoImpl& stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 688 ||
+        sizeof(stream_info) == 680 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 712 ||
+        sizeof(stream_info) == 704 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 664 ||
+        sizeof(stream_info) == 656 ||
         // with protobuf v35
-        sizeof(stream_info) == 672 || sizeof(stream_info) == 696 ||
-        // with ArenaWrappedProto metadata
-        sizeof(stream_info) == 680 || sizeof(stream_info) == 704 || sizeof(stream_info) == 656)
+        sizeof(stream_info) == 672 || sizeof(stream_info) == 696
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
