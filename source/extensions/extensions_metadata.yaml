@@ -1412,6 +1412,13 @@ envoy.rate_limit_descriptors.expr:
   status: stable
   type_urls:
   - envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
+envoy.rate_limit_descriptors.jwt_claim:
+  categories:
+  - envoy.rate_limit_descriptors
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor
 envoy.regex_engines.google_re2:
   categories:
   - envoy.regex_engines

@@ -75,7 +75,8 @@ message Descriptor {
   // :ref:`JwtClaimToHeader.claim_name
   // <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.claim_name>`.
   // Only string-valued claims are supported; non-string claims (numbers,
-  // booleans, arrays, objects) are treated as absent.
+  // booleans, arrays, objects) are treated as absent. An empty string-valued
+  // claim populates the descriptor with an empty value.
   string claim_name = 4 [(validate.rules).string = {min_len: 1}];
 
   // The default value to use if the header is absent, is not a
@@ -85,6 +86,7 @@ message Descriptor {
   // If true, Envoy skips this descriptor entry (rather than aborting the
   // whole descriptor for this action list) when the header is absent, the
   // JWT cannot be parsed, or the named claim is absent/non-string, and
-  // ``default_value`` is also empty.
+  // ``default_value`` is also empty. An empty string-valued claim is present
+  // and produces an entry with an empty value regardless of this setting.
   bool skip_if_absent = 6;
 }

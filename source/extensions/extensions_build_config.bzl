@@ -431,6 +431,7 @@ EXTENSIONS = {
     #
 
     "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
+    "envoy.rate_limit_descriptors.jwt_claim":            "//source/extensions/rate_limit_descriptors/jwt_claim:config",
 
     #
     # IO socket
