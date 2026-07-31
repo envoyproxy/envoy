@@ -56,12 +56,17 @@ message Compressor {
     //
     repeated string content_type = 3;
 
-    // Allows specifying which mime-types yield compression using
+    // Allows specifying which content types yield compression using
     // envoy.type.matcher.v3.StringMatcher.
     //
     // When this field is specified, the default content type list is not used.
-    // Compression is applied when at least one configured matcher matches the
-    // response content-type header.
+    // If both ``content_type`` and ``content_type_matcher`` are specified,
+    // compression is applied when either an exact content type matches or any
+    // configured string matcher matches the content-type header.
+    //
+    // The content-type header value is lowercased before applying the string
+    // matcher. String matchers should therefore be configured with lowercase
+    // values.
     repeated type.matcher.v3.StringMatcher content_type_matcher = 4;
   }
 

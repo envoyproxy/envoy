@@ -82,9 +82,7 @@ public:
     uint32_t minimumLength() const { return min_content_length_; }
     bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
-    const std::vector<Matchers::StringMatcherPtr>& contentTypeMatchers() const {
-      return content_type_matchers_; 
-    }
+    bool isContentTypeAllowed(absl::string_view normalized_content_type) const;
 
   protected:
     const Runtime::FeatureFlag compression_enabled_;

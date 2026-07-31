@@ -13,6 +13,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -40,6 +41,10 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
 // True when the ETag uses the weak form (RFC 7232): ``W/`` prefix, case-insensitive on ``W``.
 bool isWeakEtag(absl::string_view value) {
   return value.length() >= 2 && (value[0] == 'w' || value[0] == 'W') && value[1] == '/';
+}
+
+std::string normalizeContentTypeValue(absl::string_view value) {
+  return std::string(StringUtil::trim(StringUtil::cropRight(value, ";")));
 }
 
 // Default minimum length of an upstream response that allows compression.
@@ -527,12 +532,11 @@ std::unique_ptr<CompressorFilter::EncodingDecision>
 CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
-  absl::string_view content_type_value;
+  std::string content_type_value;
 
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
-    content_type_value =
-        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
+    content_type_value = normalizeContentTypeValue(content_type->value().getStringView());
   }
 
   // Find all compressors enabled for the filter chain.
@@ -554,8 +558,8 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // "gzip;q=1,deflate;q=.5". The corresponding response content type is "application/javascript".
     // If "gzip" is not excluded from the decision process then it will take precedence over
     // "deflate" and the resulting response won't be compressed at all.
-    if (!filter_config->responseDirectionConfig().isContentTypeAllowed(headers)) {
-      // Skip adding this filter to the list of allowed compressors.
+    if (!content_type_value.empty() &&
+      !filter_config->responseDirectionConfig().isContentTypeAllowed(content_type_value)) {
       continue;
     }
 
@@ -729,34 +733,41 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
 
 bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
     const Http::RequestOrResponseHeaderMap& headers) const {
+  
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type == nullptr) {
     return true;
   }
+
+  return isContentTypeAllowed(
+      normalizeContentTypeValue(content_type->value().getStringView()));
+}
+
+bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
+    absl::string_view value) const {
 
   // If both configuration lists are empty, go for default behavior.
   if (content_type_values_.empty() && content_type_matchers_.empty()) {
     return true;
   }
 
-  const absl::string_view value =
-      StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
-
   // Check explicit content_type set if populated
-  if (!content_type_values_.empty() && content_type_values_.find(value) != content_type_values_.end()) {
+  if (!content_type_values_.empty() &&
+      content_type_values_.find(value) != content_type_values_.end()) {
     return true;
   }
 
   // Check content_type_matcher list if populated
   if (!content_type_matchers_.empty()) {
+    const std::string lower_case_value = absl::AsciiStrToLower(value);
+
     for (const auto& matcher : content_type_matchers_) {
-      if (matcher->match(value)) {
+      if (matcher->match(lower_case_value)) {
         return true;
       }
     }
   }
 
-  // If lists were configured but nothing matched, reject it
   return false;
 }
 
