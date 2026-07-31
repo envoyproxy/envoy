@@ -282,6 +282,12 @@ TEST_F(ConnectivityGridTest, NoServerNameOverride) {
   EXPECT_EQ(host_impl_hostname_, grid_->getOriginHostname());
 }
 
+// hasReadyConnection() is not supported for the grid and always reports false.
+TEST_F(ConnectivityGridTest, HasReadyConnectionUnsupported) {
+  initialize();
+  EXPECT_FALSE(grid_->hasReadyConnection());
+}
+
 // Test the first pool successfully connecting.
 TEST_F(ConnectivityGridTest, Success) {
   initialize();

@@ -18,5 +18,6 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
+        "@abseil-cpp//absl/cleanup",
     ],
 )
