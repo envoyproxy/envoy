@@ -360,6 +360,7 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
         Ssl::TlsCertificateSelectorContext&) override {
       return nullptr;
     }
+
     absl::Status onConfigUpdate() override { return absl::OkStatus(); }
   };
 
@@ -375,11 +376,11 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
       return std::make_unique<Protobuf::StringValue>();
     }
+
     std::string name() const override { return "test-tls-context-provider"; }
   };
 
   TestUpstreamTlsCertificateSelectorConfigFactory provider_factory;
-  // Inject factory that accepts the test custom TLS selector.
   Registry::InjectFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory> registered_factory(
       provider_factory);
 
@@ -391,6 +392,7 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(custom_tls_certificate_selector_yaml),
                             *tls_context.mutable_common_tls_context()->mutable_custom_tls_certificate_selector());
+
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
     filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
