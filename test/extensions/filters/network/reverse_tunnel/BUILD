@@ -59,6 +59,8 @@ envoy_extension_cc_test(
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/common/jwks/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
     ],
 )
