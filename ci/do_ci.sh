@@ -216,7 +216,7 @@ function bazel_envoy_api_build() {
     setup_clang_toolchain
     export CLANG_TOOLCHAIN_SETUP=1
     echo "Run protoxform test"
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+    bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
         --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
         --//tools/api_proto_plugin:extra_args=api_version:3.7 \
         //tools/protoprint:protoprint_test
