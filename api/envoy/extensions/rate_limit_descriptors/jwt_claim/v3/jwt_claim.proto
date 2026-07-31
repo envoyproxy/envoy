@@ -2,9 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.rate_limit_descriptors.jwt_claim.v3;
 
-import "validate/validate.proto";
-
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.rate_limit_descriptors.jwt_claim.v3";
 option java_outer_classname = "JwtClaimProto";
@@ -51,16 +50,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    or :ref:`metadata
 //    <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>`
 //    descriptor action instead of this extension.
+// [#next-free-field: 7]
 message Descriptor {
   // The key to use in the descriptor entry.
   string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
 
   // The name of the HTTP header containing the JWT, e.g. "authorization".
-  string header_name = 2 [(validate.rules).string = {
-    min_len: 1
-    well_known_regex: HTTP_HEADER_NAME
-    strict: false
-  }];
+  string header_name = 2
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The value prefix to strip before parsing the remainder as a JWT, e.g.
   // "Bearer " (with a trailing space) for an "authorization" header
