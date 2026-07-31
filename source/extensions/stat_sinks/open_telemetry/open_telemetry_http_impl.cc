@@ -46,6 +46,9 @@ void OpenTelemetryHttpMetricsExporter::send(MetricsExportRequestPtr&& metrics) {
   // User-Agent header follows the OTLP specification.
   message->headers().setReferenceUserAgent(AccessLoggers::OpenTelemetry::getOtlpUserAgentHeader());
 
+  // Content length is needed for the compression pass.
+  message->headers().setContentLength(request_body.size());
+
   // Add custom headers from config.
   headers_applicator_->apply(message->headers());
   message->body().add(request_body);
