@@ -281,8 +281,8 @@ private:
   // Checks for per-route config first, then falls back to main config.
   Envoy::Compression::Compressor::CompressorFactory& getCompressorFactory() const;
 
-  // Returns the appropriate content encoding for the current route.
   std::string getContentEncoding() const;
+  StreamInfo::StreamInfo& streamInfo() const;
 
   Envoy::Compression::Compressor::CompressorPtr response_compressor_;
   Envoy::Compression::Compressor::CompressorPtr request_compressor_;

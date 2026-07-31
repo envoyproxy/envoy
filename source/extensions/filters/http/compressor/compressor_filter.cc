@@ -311,7 +311,7 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   // the method isAcceptEncodingAllowed() the first filter is making a decision which encoder needs
   // to be used for a request, with e.g. "Accept-Encoding: deflate;q=0.75, gzip;q=0.5", and caches
   // it in the state. All other compression filters in the sequence use the cached decision.
-  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks.streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = streamInfo().filterState();
   if (auto registry = filter_state->getDataMutable<CompressorRegistry>(key); registry != nullptr) {
     registry->filter_configs_.push_back(config_);
   } else {
@@ -519,7 +519,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   uint32_t registration_count{0};
 
   auto typed_state =
-      decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(
+      streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(
           compressorRegistryKey());
   ASSERT(typed_state != nullptr);
 
@@ -697,7 +697,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
 
   // Check if we have already cached our decision on encoding.
   const StreamInfo::FilterStateSharedPtr& filter_state =
-      decoder_callbacks_->streamInfo().filterState();
+      streamInfo().filterState();
   if (auto typed_state =
           filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
       typed_state != nullptr) {
@@ -886,6 +886,14 @@ std::string CompressorFilter::getContentEncoding() const {
     return per_route_config_->contentEncoding().value();
   }
   return config_->contentEncoding();
+}
+
+StreamInfo::StreamInfo& CompressorFilter::streamInfo() const {
+  if (decoder_callbacks_ != nullptr && decoder_callbacks_->upstreamCallbacks().has_value()) {
+    return decoder_callbacks_->upstreamCallbacks()->upstreamStreamInfo();
+  }
+  ASSERT(decoder_callbacks_ != nullptr);
+  return decoder_callbacks_->streamInfo();
 }
 
 } // namespace Compressor
