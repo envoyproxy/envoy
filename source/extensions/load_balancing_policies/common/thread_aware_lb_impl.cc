@@ -153,18 +153,19 @@ absl::Status ThreadAwareLoadBalancerBase::initialize() {
 
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this, defer_refresh_during_batch](uint32_t, const HostVector&, const HostVector&) {
-        // Refresh eagerly here for individual updates. Defer to the end-of-batch MemberUpdateCb
-        // only while a batch update is in progress and refresh coalescing is enabled.
-        if (!defer_refresh_during_batch || !priority_set_.batchUpdateActive()) {
+        // Refresh eagerly here if we didn't enable coalescing or the batch-aware update.
+        if (!defer_refresh_during_batch) {
           processDirtyPriorities();
           refresh();
         }
       });
   member_update_cb_ = priority_set_.addMemberUpdateCb(
       [this, defer_refresh_during_batch](const HostVector&, const HostVector&) {
-        // The end-of-batch callback only refreshes for coalesced batch updates; individual updates
-        // are already handled by the PriorityUpdateCb above.
-        if (defer_refresh_during_batch && priority_set_.batchUpdateActive()) {
+        // If we enabled coalescing and the batch-aware update. The cluster manager will post the
+        // update to the worker threads at the member update callback. We can safely refresh here
+        // because our member update callback is registered before the cluster manager's, so we will
+        // always refresh before the worker threads snapshot the new state.
+        if (defer_refresh_during_batch) {
           processDirtyPriorities();
           refresh();
         }

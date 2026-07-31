@@ -587,7 +587,7 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         // load balancer's own end-of-batch callback (registered earlier) has rebuilt its factory,
         // so workers never snapshot a stale factory. Posting here, before the connection draining
         // below, preserves the membership-update-then-drain ordering of the non-batch path.
-        auto& pending = cluster_data_ref.pending_batch_update_params_;
+        auto& pending = cluster_data_ref.pending_update_params_;
         if (!pending.per_priority_update_params_.empty()) {
           cm_stats_.cluster_updated_.inc();
           postThreadLocalClusterUpdate(cluster_data_ref, std::move(pending));
@@ -623,45 +623,48 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         const auto merge_timeout = PROTOBUF_GET_MS_OR_DEFAULT(
             cm_cluster.cluster().info()->lbConfig(), update_merge_window, 1000);
 
-        // If a batch host update is in progress on the main thread and batch-aware updates are
-        // enabled, accumulate this per-priority update instead of posting it now. The whole batch
-        // is posted to the worker threads as a single update at the end of the batch, from the
-        // member update callback above. This avoids one cross-thread post per priority and, paired
-        // with the thread-aware load balancer deferring its factory rebuild to the end of the
-        // batch, ensures workers never observe a partially-updated cluster.
-        if (batch_aware_update && cluster.prioritySet().batchUpdateActive()) {
-          if (merge_timeout > 0) {
-            // This update can never be merged but we still need to update the last_updated_ time
-            // so that a subsequent mergeable update is merged relative to this update rather than
-            // being treated as out-of-merge-window and delivered immediately.
-            scheduleUpdate(cm_cluster, priority, /*mergeable=*/false, merge_timeout);
-          }
-          // TODO(wbpcode): do we actually need to distinguish between the batch update and
-          // non-batch update here? For the batch update, we will accumulate all the updates and
-          // post them at the end of the batch by the member update callback above. for non-batch
-          // update, we still could accumulate the updates and post them by the member update
-          // callback above because the member update callback will be called after every priority
-          // update callback in the non-batch update case. That's say we actually could handle them
-          // in the same way. But let us keep the existing logic first and do it later if we want to
-          // change it.
-          cluster_data_ref.pending_batch_update_params_.per_priority_update_params_.emplace_back(
-              priority, hosts_added, hosts_removed);
-          return;
-        }
-
         // Should we save this update and merge it with other updates?
         //
         // Note that we can only _safely_ merge updates that have no added/removed hosts. That is,
         // only those updates that signal a change in host healthcheck state, weight or metadata.
         //
         // We've discussed merging updates related to hosts being added/removed, but it's really
-        // tricky to merge those given that downstream consumers of these updates expect to see the
-        // full list of updates, not a condensed one. This is because they use the broadcasted
+        // tricky to merge those given that downstream consumers of these updates expect to see
+        // the full list of updates, not a condensed one. This is because they use the broadcasted
         // HostSharedPtrs within internal maps to track hosts. If we fail to broadcast the entire
         // list of removals, these maps will leak those HostSharedPtrs.
         //
         // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
         bool scheduled = false;
+
+        // If batch-aware updates are enabled, accumulate this per-priority update instead of
+        // posting it now. The whole batch is posted to the worker threads as a single update at the
+        // end of the batch, from the member update callback above. This avoids one cross-thread
+        // post per priority and, paired with the thread-aware load balancer deferring its factory
+        // rebuild to the end of the batch, ensures workers never observe a partially-updated
+        // cluster.
+        if (batch_aware_update) {
+          // If there are any hosts added or removed, or if the cluster is currently in a batch
+          // update, we cannot merge this update with any other updates.
+          const bool is_mergeable = hosts_added.empty() && hosts_removed.empty() &&
+                                    !cluster.prioritySet().batchUpdateActive();
+
+          if (merge_timeout > 0) {
+            scheduled = scheduleUpdate(cm_cluster, priority, is_mergeable, merge_timeout);
+          }
+
+          if (!scheduled) {
+            // If this update was not scheduled for later, then we push it to the pending update
+            // params so that it will be delivered to the worker threads at the following member
+            // update callback. If we are in a batch update, the member update callback will be
+            // called at the end of the batch. If we are not in a batch update, the member update
+            // callback will be called after the priority update callback.
+            cluster_data_ref.pending_update_params_.per_priority_update_params_.emplace_back(
+                priority, hosts_added, hosts_removed);
+          }
+          return;
+        }
+
         // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
         const bool is_mergeable = hosts_added.empty() && hosts_removed.empty();
 

@@ -203,6 +203,22 @@ public:
 
     return factory_.stats_.counter("cluster_manager.cluster_updated").value();
   }
+
+  // Drives the cluster's priority-set callbacks to simulate an individual (non-batch) main-thread
+  // host update on the given priority, then returns the value of the cluster_manager.cluster_updated
+  // counter. Unlike a batch update, an individual update fires the per-priority callback and then
+  // the member update callback within the same update cycle (batchUpdateActive() stays false).
+  uint64_t runIndividualUpdate(MockClusterMockPrioritySet& cluster, uint32_t priority,
+                               const std::string& url) {
+    auto& priority_set = cluster.priority_set_;
+    HostVector hosts = {makeTestHost(cluster.info_, url)};
+    priority_set.getMockHostSet(priority)->hosts_ = hosts;
+    // MockPrioritySet::runUpdateCallbacks fires the priority update callback followed by the member
+    // update callback, mirroring the real non-batch PrioritySetImpl::updateHosts flow.
+    priority_set.getMockHostSet(priority)->runCallbacks(hosts, {});
+
+    return factory_.stats_.counter("cluster_manager.cluster_updated").value();
+  }
 };
 
 // With enable_batch_aware_update enabled, per-priority updates delivered during a main-thread batch
@@ -255,6 +271,43 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, WithoutBatchAwareUpdatePostsPerPrior
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
 
   EXPECT_EQ(2, runTwoPriorityBatchUpdate(*cluster));
+
+  factory_.tls_.shutdownThread();
+}
+
+// With enable_batch_aware_update enabled, an individual (non-batch) host update is also accumulated
+// and posted cross-thread from the end-of-cycle member update callback rather than directly from
+// the per-priority callback. Verify it results in exactly one cross-thread post (cluster_updated
+// incremented once) and that the update lands on the worker thread's priority set.
+TEST_F(ClusterManagerImplThreadAwareLbTest, BatchAwareUpdatePostsIndividualUpdateOnce) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update", "true"}});
+
+  auto cluster = initRingHashCluster();
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+
+  EXPECT_EQ(1, runIndividualUpdate(*cluster, 0, "tcp://127.0.0.1:81"));
+
+  const auto& worker_priority_set =
+      cluster_manager_->getThreadLocalCluster("cluster_0")->prioritySet();
+  ASSERT_LE(1, worker_priority_set.hostSetsPerPriority().size());
+  ASSERT_EQ(1, worker_priority_set.hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("127.0.0.1:81",
+            worker_priority_set.hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+
+  factory_.tls_.shutdownThread();
+}
+
+// Without enable_batch_aware_update, an individual host update is posted directly from the
+// per-priority callback. It should still result in exactly one cross-thread post.
+TEST_F(ClusterManagerImplThreadAwareLbTest, WithoutBatchAwareUpdatePostsIndividualUpdateOnce) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update", "false"}});
+
+  auto cluster = initRingHashCluster();
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+
+  EXPECT_EQ(1, runIndividualUpdate(*cluster, 0, "tcp://127.0.0.1:81"));
 
   factory_.tls_.shutdownThread();
 }

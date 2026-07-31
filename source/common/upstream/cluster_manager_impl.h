@@ -860,11 +860,9 @@ private:
     SystemTime last_updated_;
     Common::CallbackHandlePtr member_update_cb_;
     Common::CallbackHandlePtr priority_update_cb_;
-    // Accumulates per-priority host updates while a batch host update is in progress on the main
-    // thread (see the priority update callback in onClusterInit()). At the end of the batch these
-    // are posted to the worker threads as a single batched update, avoiding one cross-thread post
-    // per priority. Empty outside of a batch update.
-    ThreadLocalClusterUpdateParams pending_batch_update_params_;
+    // Accumulates per-priority host updates on the main thread (see the priority update callback in
+    // onClusterInit()).
+    ThreadLocalClusterUpdateParams pending_update_params_;
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
     const bool avoid_cds_removal_ : 1;

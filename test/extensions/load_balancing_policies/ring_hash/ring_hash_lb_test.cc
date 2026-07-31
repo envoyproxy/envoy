@@ -1409,6 +1409,39 @@ TEST(ThreadAwareLbBatchRefreshTest, BatchUpdateRefreshesPerPriorityWhenBatchAwar
   EXPECT_EQ(4, lb.create_count_);
 }
 
+// Regression coverage for https://github.com/envoyproxy/envoy/issues/45055: an individual
+// (non-batch) host update must rebuild the factory, so a worker cannot snapshot a stale factory
+// after a transient health-check flap. With both flags enabled the rebuild is deferred to the
+// member update callback (batchUpdateActive() is false for an individual update), but it must still
+// happen. refresh() rebuilds every priority, so one individual update to a two-priority set yields
+// two createLoadBalancer() calls.
+TEST(ThreadAwareLbBatchRefreshTest, IndividualUpdateRefreshesFactoryWhenBothFlagsEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"},
+       {"envoy.reloadable_features.enable_batch_aware_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+
+  PrioritySetImpl priority_set;
+  setHostsForPriority(priority_set, info, 0, "tcp://127.0.0.1:80");
+  setHostsForPriority(priority_set, info, 1, "tcp://127.0.0.2:80");
+
+  RefreshCountingLoadBalancer lb(priority_set, stats, context.runtime_loader_,
+                                 context.api_.random_);
+  EXPECT_OK(lb.initialize());
+  EXPECT_EQ(2, lb.create_count_);
+
+  // An individual update to a single priority still refreshes the whole factory.
+  lb.create_count_ = 0;
+  setHostsForPriority(priority_set, info, 0, "tcp://127.0.0.1:81");
+  EXPECT_EQ(2, lb.create_count_);
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/44349.
 // Null entries in PriorityState (from non-contiguous priority levels) must not segfault.
 TEST_P(RingHashLoadBalancerTest, ValidateEndpointsSkipsNullPriorityEntries) {
