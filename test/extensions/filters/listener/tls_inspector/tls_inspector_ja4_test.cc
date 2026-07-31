@@ -373,7 +373,8 @@ TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericOldBehavior) {
       Tls::Test::generateClientHello(0x0303, 0x0303, "", "\x02\x60\x32");
   mockSysCallForPeek(client_hello);
 
-  EXPECT_CALL(socket_, setJA4Hash(testing::MatchesRegex("^t[0-9]{2}[di][0-9]{4}6032_.*"))).Times(1);
+  EXPECT_CALL(socket_, setJA4Hash(testing::MatchesRegex("^t[0-9]{2}[di][0-9]{4}6032_.*")))
+      .Times(1);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")))
       .Times(testing::AtMost(1));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
@@ -397,7 +398,8 @@ TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericNewBehavior) {
       Tls::Test::generateClientHello(0x0303, 0x0303, "", "\x02\x60\x32");
   mockSysCallForPeek(client_hello);
 
-  EXPECT_CALL(socket_, setJA4Hash(testing::MatchesRegex("^t[0-9]{2}[di][0-9]{4}62_.*"))).Times(1);
+  EXPECT_CALL(socket_, setJA4Hash(testing::MatchesRegex("^t[0-9]{2}[di][0-9]{4}62_.*")))
+      .Times(1);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")))
       .Times(testing::AtMost(1));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
