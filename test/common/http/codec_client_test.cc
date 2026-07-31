@@ -357,7 +357,34 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
   request_encoder.getStream().addCallbacks(callbacks);
 
   // When we get a remote close with an active request we should try to send zero bytes through
-  // the codec.
+  // the codec. The reason is RemoteConnectionTermination because the close was remote-initiated
+  // on an established connection.
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteConnectionTermination, _));
+  EXPECT_CALL(*codec_, dispatch(_));
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+  connection_cb_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Verify that disabling the runtime guard reverts the codec back to emitting the legacy
+// ``ConnectionTermination`` reset reason on a peer-originated close, so existing consumers
+// continue to see the same value as before the new behavior was introduced.
+TEST_F(CodecClientTest, DisconnectBeforeHeadersWithGuardDisabled) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"emit_remote_connection_termination", false}});
+  initialize();
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
   EXPECT_CALL(*codec_, dispatch(_));
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
@@ -419,7 +446,7 @@ TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
 
   // When we get a remote close with an active request validate idleTimer is reset after client
   // close
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteConnectionTermination, _));
   EXPECT_CALL(*codec_, dispatch(_));
   EXPECT_NE(client_->numActiveRequests(), 0);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);

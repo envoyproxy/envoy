@@ -176,6 +176,7 @@ void MultiplexedActiveClientBase::onStreamDestroy() {
 void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) {
   switch (reason) {
   case StreamResetReason::ConnectionTermination:
+  case StreamResetReason::RemoteConnectionTermination:
   case StreamResetReason::LocalConnectionFailure:
   case StreamResetReason::RemoteConnectionFailure:
   case StreamResetReason::ConnectionTimeout:

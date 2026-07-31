@@ -129,7 +129,7 @@ TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversionWithUhvOverride
       EXPECT_EQ("400", response->headers().getStatusValue());
     } else {
       ASSERT_TRUE(response->reset());
-      EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
     }
   } else {
     waitForNextUpstreamRequest();
@@ -378,7 +378,7 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsRejectedWithUhvO
       EXPECT_EQ("400", response->headers().getStatusValue());
     } else {
       ASSERT_TRUE(response->reset());
-      EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteConnectionTermination, response->resetReason());
     }
   } else {
     waitForNextUpstreamRequest();

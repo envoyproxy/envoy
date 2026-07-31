@@ -254,6 +254,7 @@ void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_vi
     case Http::StreamResetReason::RemoteReset:
     case Http::StreamResetReason::RemoteRefusedStreamReset:
     case Http::StreamResetReason::RemoteConnectionFailure:
+    case Http::StreamResetReason::RemoteConnectionTermination:
     case Http::StreamResetReason::RemoteResetNoError:
       if (!already_complete) {
         event = Network::ConnectionEvent::RemoteClose;
@@ -503,7 +504,7 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
 }
 
 StreamInfo::DetectedCloseType CombinedUpstream::detectedCloseType() const {
-  return StreamInfo::DetectedCloseType::Normal;
+  return detected_close_type_;
 }
 
 CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
@@ -649,8 +650,29 @@ void CombinedUpstream::doneReading() {
   }
 }
 
-void CombinedUpstream::onUpstreamReset(Http::StreamResetReason, absl::string_view,
+void CombinedUpstream::onUpstreamReset(Http::StreamResetReason reason, absl::string_view,
                                        UpstreamRequest&) {
+  // Mirror HttpUpstream::onResetStream: peer-originated stream/connection resets propagate to
+  // tcp_proxy as a remote close so the downstream RST can be observed via detectedCloseType().
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.map_http_stream_reset_to_tcp_rst")) {
+    switch (reason) {
+    case Http::StreamResetReason::RemoteReset:
+    case Http::StreamResetReason::RemoteRefusedStreamReset:
+    case Http::StreamResetReason::RemoteConnectionFailure:
+    case Http::StreamResetReason::RemoteConnectionTermination:
+      detected_close_type_ = StreamInfo::DetectedCloseType::RemoteReset;
+      break;
+    default:
+      detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
+      break;
+    }
+  } else {
+    // When the guard is disabled, behave like the pre-feature CombinedUpstream and always
+    // report Normal, matching HttpUpstream::onResetStream's else branch so the disabled-guard
+    // path is not order-dependent across repeated resets.
+    detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
+  }
   upstream_callbacks_.onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
