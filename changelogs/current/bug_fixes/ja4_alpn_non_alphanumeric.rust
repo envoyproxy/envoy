@@ -1,0 +1,1 @@
+Fixed a bug where JA4 fingerprint generation did not correctly encode non-alphanumeric ALPN characters as spec-compliant hexadecimal values. The fix is guarded by the runtime flag 'envoy.reloadable_features.ja4_alpn_hex_conversion_fix'.
