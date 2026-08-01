@@ -205,9 +205,10 @@ public:
   }
 
   // Drives the cluster's priority-set callbacks to simulate an individual (non-batch) main-thread
-  // host update on the given priority, then returns the value of the cluster_manager.cluster_updated
-  // counter. Unlike a batch update, an individual update fires the per-priority callback and then
-  // the member update callback within the same update cycle (batchUpdateActive() stays false).
+  // host update on the given priority, then returns the value of the
+  // cluster_manager.cluster_updated counter. Unlike a batch update, an individual update fires the
+  // per-priority callback and then the member update callback within the same update cycle
+  // (batchUpdateActive() stays false).
   uint64_t runIndividualUpdate(MockClusterMockPrioritySet& cluster, uint32_t priority,
                                const std::string& url) {
     auto& priority_set = cluster.priority_set_;
