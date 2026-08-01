@@ -35,12 +35,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -187,13 +189,13 @@ TEST_P(GrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
-  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
+  EXPECT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz"));
   // Update to foo type should resend Node.
   expectSendMessage("foo", {"x", "y"}, "", true);
-  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo").ok());
+  EXPECT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo"));
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, "", true);
-  EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
+  EXPECT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar"));
   // Adding a new foo resource to the watch shouldn't send Node.
   expectSendMessage("foo", {"z", "x", "y"}, "");
   auto foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_, {});
@@ -1516,18 +1518,17 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
   // No disconnect and replacement of the original async_client.
   EXPECT_CALL(async_stream_, resetStream()).Times(0);
   EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _)).Times(0);
-  EXPECT_FALSE(grpc_mux_
-                   ->updateMuxSource(
-                       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(
-                           replaced_async_client_),
-                       /*failover_async_client=*/nullptr,
-                       /*scope=*/*stats_.rootScope(),
-                       /*backoff_strategy=*/
-                       std::make_unique<JitteredExponentialBackOffStrategy>(
-                           SubscriptionFactory::RetryInitialDelayMs,
-                           SubscriptionFactory::RetryMaxDelayMs, random_),
-                       ads_config_wrong_settings)
-                   .ok());
+  EXPECT_THAT(
+      grpc_mux_->updateMuxSource(
+          /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+          /*failover_async_client=*/nullptr,
+          /*scope=*/*stats_.rootScope(),
+          /*backoff_strategy=*/
+          std::make_unique<JitteredExponentialBackOffStrategy>(
+              SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+              random_),
+          ads_config_wrong_settings),
+      Not(IsOk()));
   // Ending test, removing subscriptions for type_url_foo.
   expectSendMessage("type_url_foo", {}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     &async_stream_);
@@ -1890,6 +1891,27 @@ TEST_P(GrpcMuxImplTest, XdsResourcesDelegateOnResourceLoadFailed) {
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
 
   grpc_mux_->shutdown();
+}
+
+TEST_P(GrpcMuxImplTest, ShutdownPreventsSending) {
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, "", true);
+  grpc_mux_->start();
+
+  grpc_mux_->shutdown();
+
+  // We do not expect any messages to be sent here as the mux has been shutdown.
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _)).Times(0);
+  auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
+}
+
+TEST_P(GrpcMuxImplTest, RequestOnDemandUpdateDoesNothing) {
+  setup();
+  // Should not throw or crash.
+  grpc_mux_->requestOnDemandUpdate("foo", {"z"});
 }
 
 } // namespace

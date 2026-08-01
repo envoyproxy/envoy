@@ -70,7 +70,7 @@ public:
   GrpcJsonReverseTranscoderConfig(
       const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
           GrpcJsonReverseTranscoder& transcoder_config,
-      Api::Api& api);
+      Api::Api& api, absl::Status& creation_status);
 
   // Takes the value of the path header of a gRPC request and returns its path descriptor.
   // NOLINTNEXTLINE(readability-identifier-naming)

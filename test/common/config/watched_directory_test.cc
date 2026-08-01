@@ -4,6 +4,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -29,7 +30,7 @@ TEST(WatchedDirectory, All) {
     called = true;
     return absl::OkStatus();
   });
-  EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
+  EXPECT_OK(cb(Filesystem::Watcher::Events::MovedTo));
   EXPECT_TRUE(called);
 }
 
@@ -46,7 +47,7 @@ TEST(WatchedDirectory, CallbackNotSetDoesNotCrash) {
   auto wd = *WatchedDirectory::create(config, dispatcher);
   // We are not calling setCallback() to simulate the case where file loading fails
   // before the callback can be set. The watch callback checks for null and returns OkStatus.
-  EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
+  EXPECT_OK(cb(Filesystem::Watcher::Events::MovedTo));
 }
 
 // Verify that with watch_modify enabled, WatchedDirectory subscribes to both
@@ -70,7 +71,7 @@ TEST(WatchedDirectory, WatchModifyEnabled) {
     called = true;
     return absl::OkStatus();
   });
-  EXPECT_TRUE(cb(Filesystem::Watcher::Events::Modified).ok());
+  EXPECT_OK(cb(Filesystem::Watcher::Events::Modified));
   EXPECT_TRUE(called);
 }
 

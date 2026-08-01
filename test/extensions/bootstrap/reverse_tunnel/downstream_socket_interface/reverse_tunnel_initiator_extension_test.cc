@@ -1,10 +1,13 @@
 #include <memory>
 
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
+#include "envoy/extensions/formatter/file_content/v3/file_content.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
@@ -13,9 +16,11 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -213,6 +218,9 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeaderFormatters) {
 
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  // The handshake formatters are built in onServerInitialized(), so they are absent until it runs.
+  EXPECT_EQ(custom_extension->handshakeHeaders(), nullptr);
+  custom_extension->onServerInitialized(server_);
   const auto& handshake_headers = custom_extension->handshakeHeaders();
   ASSERT_NE(handshake_headers, nullptr);
   ASSERT_EQ(handshake_headers->size(), 1);
@@ -229,9 +237,11 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeUnknownFormatterThrows) {
   formatter->set_name("envoy.formatter.does_not_exist");
   std::ignore = formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
 
-  EXPECT_THROW_WITH_REGEX(
-      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config), EnvoyException,
-      "does_not_exist");
+  // Construction succeeds; the formatters are resolved (and validated) in onServerInitialized().
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_THROW_WITH_REGEX(custom_extension->onServerInitialized(server_), EnvoyException,
+                          "does_not_exist");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeadersLiteralWithoutFormatters) {
@@ -776,7 +786,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogNoOpsWhenEmpty) {
   // emitAccessLog should be a no-op when no access logs are configured.
   Event::SimulatedTimeSystem time_system;
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
-                            "upstream_cluster", "10.0.0.1:443", "conn-key-1", "");
+                            "upstream_cluster", "10.0.0.1:443", "conn-key-1", "worker_0", "42", "");
   // No crash, no side effects — just verifying the early return.
 }
 
@@ -800,11 +810,13 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogCallsLoggers) {
         EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "my_upstream");
         EXPECT_EQ(metadata.fields().at("host_address").string_value(), "10.0.0.1:443");
         EXPECT_EQ(metadata.fields().at("connection_key").string_value(), "conn-123");
+        EXPECT_EQ(metadata.fields().at("worker_id").string_value(), "worker_1");
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "555");
         EXPECT_EQ(metadata.fields().at("error").string_value(), "");
       }));
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
-                            "my_upstream", "10.0.0.1:443", "conn-123", "");
+                            "my_upstream", "10.0.0.1:443", "conn-123", "worker_1", "555", "");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithError) {
@@ -824,7 +836,8 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithError) {
       }));
 
   extension_->emitAccessLog(time_system, "handshake_failure", "node1", "cluster1", "tenant1",
-                            "my_upstream", "10.0.0.1:443", "conn-456", "connection refused");
+                            "my_upstream", "10.0.0.1:443", "conn-456", "worker_1", "456",
+                            "connection refused");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogMultipleLoggers) {
@@ -841,7 +854,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogMultipleLoggers) {
   EXPECT_CALL(*mock_log2, log(_, _));
 
   extension_->emitAccessLog(time_system, "connection_closed", "node1", "cluster1", "tenant1",
-                            "my_upstream", "10.0.0.1:443", "conn-789", "");
+                            "my_upstream", "10.0.0.1:443", "conn-789", "worker_1", "789", "");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogConnectionClosedFullMetadata) {
@@ -861,12 +874,14 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogConnectionClosedFullMet
         EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "us-west-cluster");
         EXPECT_EQ(metadata.fields().at("host_address").string_value(), "192.168.1.100:8443");
         EXPECT_EQ(metadata.fields().at("connection_key").string_value(), "conn-close-001");
+        EXPECT_EQ(metadata.fields().at("worker_id").string_value(), "worker_3");
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "1001");
         EXPECT_EQ(metadata.fields().at("error").string_value(), "");
       }));
 
   extension_->emitAccessLog(time_system, "connection_closed", "node-abc", "cluster-xyz",
                             "tenant-123", "us-west-cluster", "192.168.1.100:8443", "conn-close-001",
-                            "");
+                            "worker_3", "1001", "");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithEmptyOptionalFields) {
@@ -881,12 +896,14 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithEmptyOptionalFields
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
         EXPECT_EQ(metadata.fields().at("event").string_value(), "handshake_success");
         EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "");
+        EXPECT_EQ(metadata.fields().at("worker_id").string_value(), "");
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "");
         EXPECT_EQ(metadata.fields().at("error").string_value(), "");
-        EXPECT_EQ(metadata.fields().size(), 8);
+        EXPECT_EQ(metadata.fields().size(), 10);
       }));
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "",
-                            "my_upstream", "10.0.0.1:443", "conn-empty", "");
+                            "my_upstream", "10.0.0.1:443", "conn-empty", "", "", "");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogVerifiesMetadataNamespace) {
@@ -902,7 +919,8 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogVerifiesMetadataNamespa
         EXPECT_TRUE(filter_metadata.contains("envoy.reverse_tunnel.initiator"));
       }));
 
-  extension_->emitAccessLog(time_system, "handshake_success", "n", "c", "t", "u", "h", "k", "");
+  extension_->emitAccessLog(time_system, "handshake_success", "n", "c", "t", "u", "h", "k", "w",
+                            "1", "");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogErrorFieldAlwaysPresent) {
@@ -920,7 +938,90 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogErrorFieldAlwaysPresent
       }));
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
-                            "upstream", "10.0.0.1:443", "conn-1", "");
+                            "upstream", "10.0.0.1:443", "conn-1", "worker_0", "1", "");
+}
+
+// Verifies that a provider-backed handshake formatter (%FILE_CONTENT%) resolves to the file
+// content on the worker thread that assembles the handshake request.
+//
+// %FILE_CONTENT% reads its value from a ThreadLocal slot populated via ThreadLocal::Slot::set(),
+// which only reaches worker threads that are already registered with the ThreadLocal system. The
+// test therefore mirrors the server's ordering: construct the extension, register the worker
+// thread, then call onServerInitialized() to build the formatters. It uses a real
+// ThreadLocal::InstanceImpl and a real worker OS thread because ThreadLocal storage is
+// per-OS-thread, so the value must be read on the worker itself.
+TEST(ReverseTunnelInitiatorExtensionFileContentTest, FileContentResolvesOnWorkerThread) {
+  ThreadLocal::InstanceImpl tls;
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr main_dispatcher = api->allocateDispatcher("test_main_thread");
+  Event::DispatcherPtr worker_dispatcher = api->allocateDispatcher("test_worker_thread");
+
+  Stats::IsolatedStoreImpl stats_store;
+  Stats::ScopeSharedPtr scope = stats_store.createScope("test.");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context, threadLocal()).WillByDefault(ReturnRef(tls));
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(*main_dispatcher));
+  ON_CALL(context, api()).WillByDefault(ReturnRef(*api));
+  ON_CALL(context, scope()).WillByDefault(ReturnRef(*scope));
+  NiceMock<Server::MockInstance> server;
+
+  // A static, present, non-empty token file.
+  const std::string token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.reverse-tunnel-token";
+  const std::string token_path =
+      TestEnvironment::writeStringToFileForTest("reverse_tunnel_token.jwt", token);
+
+  // Register the main thread first (as the server does before creating bootstrap extensions).
+  tls.registerThread(*main_dispatcher, true);
+  main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface config;
+  config.set_stat_prefix("reverse_connections");
+  auto* hdr = config.mutable_http_handshake()->add_additional_headers();
+  hdr->mutable_header()->set_key("authorization");
+  hdr->mutable_header()->set_value(fmt::format("Bearer %FILE_CONTENT({})%", token_path));
+  auto* formatter = config.mutable_http_handshake()->add_formatters();
+  formatter->set_name("envoy.formatter.file_content");
+  std::ignore = formatter->mutable_typed_config()->PackFrom(
+      envoy::extensions::formatter::file_content::v3::FileContent());
+
+  // Construct the extension. The handshake formatters are not built yet; onServerInitialized()
+  // below builds them.
+  auto extension = std::make_unique<ReverseTunnelInitiatorExtension>(context, config);
+
+  // Register the worker thread after construction, as the ListenerManager does (workers register
+  // after the bootstrap extensions are created).
+  tls.registerThread(*worker_dispatcher, false);
+
+  // Build the handshake formatters now that the worker is registered. This creates the
+  // file_content provider's ThreadLocal slot and propagates its content to the worker thread.
+  extension->onServerInitialized(server);
+  ASSERT_NE(extension->handshakeHeaders(), nullptr);
+  ASSERT_EQ(extension->handshakeHeaders()->size(), 1);
+  main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Evaluate the handshake header value on the real worker OS thread, exactly like
+  // RCConnectionWrapper::connect() does on the worker dispatcher.
+  std::string worker_value;
+  Thread::ThreadPtr worker_thread = api->threadFactory().createThread([&]() {
+    // Drain the dispatcher so the queued thread registration and slot set() posts are applied to
+    // this OS thread's ThreadLocal storage.
+    worker_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+    StreamInfo::StreamInfoImpl stream_info(api->timeSource(), nullptr,
+                                           StreamInfo::FilterState::LifeSpan::Connection);
+    worker_value = extension->handshakeHeaders()->at(0).value_formatter->format({}, stream_info);
+  });
+  worker_thread->join();
+
+  // The formatter resolves to the file content on the worker thread.
+  EXPECT_EQ(worker_value, "Bearer " + token);
+
+  // Destroy the provider on the main thread, then shut down ThreadLocal.
+  extension.reset();
+  main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  tls.shutdownGlobalThreading();
+  tls.shutdownThread();
 }
 
 } // namespace ReverseConnection

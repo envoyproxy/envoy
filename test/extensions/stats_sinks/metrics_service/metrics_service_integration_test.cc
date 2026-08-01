@@ -24,10 +24,9 @@ class MetricsServiceIntegrationTest : public Grpc::GrpcClientIntegrationParamTes
                                       public HttpIntegrationTest {
 public:
   MetricsServiceIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'grpc.metrics_service.streams_closed_14' and
-    // stat_prefix 'metrics_service'.
-    skip_tag_extraction_rule_check_ = true;
+    // grpc.metrics_service.streams_closed_* is now covered by the grpc.$.** rule (#36673), so
+    // the tag-extraction check can be enabled here. Toward #21595.
+    skip_tag_extraction_rule_check_ = false;
   }
 
   void createUpstreams() override {

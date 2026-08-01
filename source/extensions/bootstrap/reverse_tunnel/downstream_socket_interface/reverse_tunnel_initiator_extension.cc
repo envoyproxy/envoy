@@ -48,24 +48,9 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
     additional_headers_ = {config.http_handshake().additional_headers().begin(),
                            config.http_handshake().additional_headers().end()};
     use_http_upgrade_ = config.http_handshake().use_http_upgrade();
-
-    if (!config.http_handshake().formatters().empty()) {
-      Server::GenericFactoryContextImpl formatter_context(context,
-                                                          context.messageValidationVisitor());
-      auto command_parsers =
-          returnOrThrow(Formatter::SubstitutionFormatStringUtils::parseFormatters(
-              config.http_handshake().formatters(), formatter_context));
-      auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
-      handshake_headers->reserve(additional_headers_.size());
-      for (const auto& header : additional_headers_) {
-        auto value_formatter = returnOrThrow(
-            Formatter::FormatterImpl::create(header.header().value(), true, command_parsers));
-        handshake_headers->push_back(HandshakeHeader{Http::LowerCaseString(header.header().key()),
-                                                     header.append_action(),
-                                                     std::move(value_formatter)});
-      }
-      handshake_headers_ = std::move(handshake_headers);
-    }
+    // The formatters that evaluate these headers are built in onServerInitialized(), once the
+    // worker threads are registered with the ThreadLocal system that provider-backed formatters
+    // depend on.
   }
   // Instantiate access loggers from config.
   Server::GenericFactoryContextImpl generic_context(context, context.scope(),
@@ -84,7 +69,8 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
     TimeSource& time_source, const std::string& event, const std::string& node_id,
     const std::string& cluster_id, const std::string& tenant_id,
     const std::string& upstream_cluster, const std::string& host_address,
-    const std::string& connection_key, const std::string& error_message) {
+    const std::string& connection_key, const std::string& worker_id,
+    const std::string& connection_id, const std::string& error_message) {
   if (access_logs_.empty()) {
     return;
   }
@@ -103,6 +89,8 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
   fields["upstream_cluster"].set_string_value(upstream_cluster);
   fields["host_address"].set_string_value(host_address);
   fields["connection_key"].set_string_value(connection_key);
+  fields["worker_id"].set_string_value(worker_id);
+  fields["connection_id"].set_string_value(connection_id);
   fields["error"].set_string_value(error_message);
   stream_info.setDynamicMetadata("envoy.reverse_tunnel.initiator", metadata);
 
@@ -116,6 +104,31 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
 // ReverseTunnelInitiatorExtension implementation
 void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance&) {
   ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::onServerInitialized");
+
+  // Provider-backed formatters (e.g. %FILE_CONTENT%, and secret/SDS-backed formatters) resolve
+  // their value through a provider whose data lives in a ThreadLocal slot. That slot is populated
+  // via ThreadLocal::Slot::set(), which only reaches worker threads already registered with the
+  // ThreadLocal system and is not replayed for threads that register later. onServerInitialized()
+  // runs after the ListenerManager has registered the worker threads, so building the formatters
+  // here lets the provider's set() reach every worker thread that later assembles a handshake
+  // request. Built any earlier, the slot would be populated only on the main thread and the
+  // formatter would resolve to an empty value on the workers.
+  if (config_.has_http_handshake() && !config_.http_handshake().formatters().empty()) {
+    Server::GenericFactoryContextImpl formatter_context(context_,
+                                                        context_.messageValidationVisitor());
+    auto command_parsers = returnOrThrow(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+        config_.http_handshake().formatters(), formatter_context));
+    auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
+    handshake_headers->reserve(additional_headers_.size());
+    for (const auto& header : additional_headers_) {
+      auto value_formatter = returnOrThrow(
+          Formatter::FormatterImpl::create(header.header().value(), true, command_parsers));
+      handshake_headers->push_back(HandshakeHeader{Http::LowerCaseString(header.header().key()),
+                                                   header.append_action(),
+                                                   std::move(value_formatter)});
+    }
+    handshake_headers_ = std::move(handshake_headers);
+  }
 }
 
 void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {

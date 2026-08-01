@@ -155,6 +155,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
     "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
+    "log_level" => Some(Box::new(LogLevelFilterConfig {})),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -434,6 +435,32 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
     assert!(envoy_filter.get_upstream_connection_id() > 0);
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+struct LogLevelFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LogLevelFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LogLevelFilter {})
+  }
+}
+
+struct LogLevelFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let level = (get_log_level() as u32).to_string();
+    envoy_filter.set_response_header("x-log-level", level.as_bytes());
+    let info_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Info).to_string();
+    envoy_filter.set_response_header("x-log-info-enabled", info_enabled.as_bytes());
+    let error_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Error).to_string();
+    envoy_filter.set_response_header("x-log-error-enabled", error_enabled.as_bytes());
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }

@@ -43,6 +43,7 @@ build --define disable_known_issue_asserts=true
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
+build --cxxopt=-Wno-nullability-completeness
 build --define=signal_trace=disabled
 
 # Override PGV validation with NOP functions for binary size savings.
@@ -72,13 +73,11 @@ build:ios --define=envoy_full_protos=enabled
 build:android --define=logger=android
 build:android --java_language_version=8
 build:android --tool_java_language_version=8
-build:android --cxxopt=-Wno-nullability-completeness
 
 # Default flags for Android
 build:mobile-android --config=mobile-clang
 build:mobile-android --java_language_version=8
 build:mobile-android --tool_java_language_version=8
-build:mobile-android --cxxopt=-Wno-nullability-completeness
 test:mobile-android --build_tests_only
 test:mobile-android --define=static_extension_registration=disabled
 

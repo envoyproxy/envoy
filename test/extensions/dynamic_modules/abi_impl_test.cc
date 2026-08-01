@@ -1,5 +1,6 @@
 #include <thread>
 
+#include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -94,6 +95,33 @@ TEST(CommonAbiImplTest, GetConcurrencyBeforeServerContextFailsClosed) {
   EXPECT_ENVOY_BUG(EXPECT_EQ(0u, envoy_dynamic_module_callback_get_concurrency()),
                    "envoy_dynamic_module_callback_get_concurrency called before the server "
                    "context was initialized");
+}
+
+// =============================================================================
+// Log Level Tests
+// =============================================================================
+
+// Verifies that `get_log_level` reflects the level configured on the dynamic modules logger for
+// every level in the enum.
+TEST(CommonAbiImplTest, GetLogLevelReflectsConfiguredLevel) {
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+
+  const std::pair<spdlog::level::level_enum, envoy_dynamic_module_type_log_level> cases[] = {
+      {spdlog::level::trace, envoy_dynamic_module_type_log_level_Trace},
+      {spdlog::level::debug, envoy_dynamic_module_type_log_level_Debug},
+      {spdlog::level::info, envoy_dynamic_module_type_log_level_Info},
+      {spdlog::level::warn, envoy_dynamic_module_type_log_level_Warn},
+      {spdlog::level::err, envoy_dynamic_module_type_log_level_Error},
+      {spdlog::level::critical, envoy_dynamic_module_type_log_level_Critical},
+      {spdlog::level::off, envoy_dynamic_module_type_log_level_Off},
+  };
+  for (const auto& [spdlog_level, abi_level] : cases) {
+    logger.set_level(spdlog_level);
+    EXPECT_EQ(abi_level, envoy_dynamic_module_callback_get_log_level());
+  }
+
+  logger.set_level(original_level);
 }
 
 // =============================================================================
@@ -392,6 +420,22 @@ WEAK_STUB(ClusterLbContextGetOverrideHost,
 WEAK_STUB(ClusterLbContextGetDownstreamConnectionSni,
           envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(nullptr,
                                                                                          nullptr))
+WEAK_STUB(ClusterLbContextGetFilterStateBytes,
+          envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr))
+WEAK_STUB(ClusterLbContextGetFilterStateTyped,
+          envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr))
+WEAK_STUB(ClusterLbContextSetFilterStateBytes,
+          envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  {nullptr, 0}))
+WEAK_STUB(ClusterLbContextSetFilterStateTyped,
+          envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  {nullptr, 0}))
 WEAK_STUB(ClusterLbGetClusterName,
           envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(ClusterLbGetHostsCount,
@@ -1373,12 +1417,51 @@ WEAK_STUB(StatSinkSnapshotGetGaugeCount,
 WEAK_STUB(StatSinkSnapshotGetGauge,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(nullptr, 0, nullptr, 0,
                                                                      nullptr, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogram,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(nullptr, 0, nullptr, 0,
+                                                                         nullptr, nullptr, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramBucketCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(nullptr, 0))
+WEAK_STUB(StatSinkSnapshotGetHistogramBucket,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(nullptr, 0, 0,
+                                                                                nullptr, nullptr))
 WEAK_STUB(StatSinkSnapshotGetTextReadoutCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(nullptr))
 WEAK_STUB(StatSinkSnapshotGetTextReadout,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(nullptr, 0, nullptr, 0,
                                                                             nullptr, nullptr, 0,
                                                                             nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(nullptr, 0,
+                                                                                 nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(nullptr, 0, 0, nullptr,
+                                                                           0, nullptr, nullptr, 0,
+                                                                           nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(nullptr, 0, 0, nullptr, 0,
+                                                                         nullptr, nullptr, 0,
+                                                                         nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(nullptr, 0,
+                                                                                      nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+              nullptr, 0, 0, nullptr, 0, nullptr, nullptr, 0, nullptr))
 WEAK_STUB(StatSinkConfigDefineGauge,
           envoy_dynamic_module_callback_stat_sink_config_define_gauge(nullptr, {nullptr, 0},
                                                                       nullptr))
@@ -1686,6 +1769,14 @@ WEAK_STUB(ListenerFilterSetFilterState,
 WEAK_STUB(ListenerFilterGetFilterState,
           envoy_dynamic_module_callback_listener_filter_get_filter_state(nullptr, {nullptr, 0},
                                                                          nullptr))
+WEAK_STUB(ListenerFilterSetFilterStateTyped,
+          envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(nullptr,
+                                                                               {nullptr, 0},
+                                                                               {nullptr, 0}))
+WEAK_STUB(ListenerFilterGetFilterStateTyped,
+          envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(nullptr,
+                                                                               {nullptr, 0},
+                                                                               nullptr))
 
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))

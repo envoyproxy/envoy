@@ -13,13 +13,13 @@ namespace SetMetadataFilter {
 /**
  * Config registration for the header-to-metadata filter. @see NamedHttpFilterConfigFactory.
  */
-class SetMetadataConfig
-    : public Common::FactoryBase<envoy::extensions::filters::http::set_metadata::v3::Config> {
+class SetMetadataConfig : public Common::ExceptionFreeFactoryBase<
+                              envoy::extensions::filters::http::set_metadata::v3::Config> {
 public:
-  SetMetadataConfig() : FactoryBase("envoy.filters.http.set_metadata") {}
+  SetMetadataConfig() : ExceptionFreeFactoryBase("envoy.filters.http.set_metadata") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 

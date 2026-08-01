@@ -3,6 +3,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -11,6 +12,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace FileSystemBuffer {
+
+using StatusHelpers::HasStatus;
 
 using ::testing::HasSubstr;
 
@@ -72,24 +75,63 @@ public:
   }
 };
 
-// Declared here because it's only visible for the sake of this test.
-const BufferBehavior& selectBufferBehavior(const ProtoBufferBehavior& behavior);
-TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionOnUnsetBufferBehavior) {
-  BufferBehavior just_to_add_coverage_for_destructor;
-  ProtoBufferBehavior unset_behavior;
-  EXPECT_THROW_WITH_REGEX(selectBufferBehavior(unset_behavior), EnvoyException,
-                          "invalid BufferBehavior");
+// First layer: the proto ``(validate.required)`` rule rejects an unset behavior during config
+// ingestion, before the FileSystemBufferFilterConfig constructor runs.
+TEST_F(FileSystemBufferFilterConfigTest, ProtoValidationRejectsUnsetBufferBehavior) {
+  auto proto_config = configFromYaml(R"(
+    request:
+      behavior: {}
+  )");
+  EXPECT_THROW_WITH_REGEX(captureConfigFromProto(proto_config), ProtoValidationException,
+                          "is required");
 }
 
-TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfiguredInvalidPath) {
+// Second layer: the constructor independently rejects an unset request behavior as a config load
+// time error, in case a config reaches it without proto validation.
+TEST_F(FileSystemBufferFilterConfigTest, ConstructorRejectsUnsetRequestBufferBehavior) {
+  auto proto_config = configFromYaml(R"(
+    request:
+      behavior: {}
+  )");
+  absl::Status creation_status;
+  FileSystemBufferFilterConfig config(nullptr, nullptr, proto_config, creation_status);
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         HasSubstr("request buffer behavior is set but empty")));
+}
+
+// As above, but for the response direction.
+TEST_F(FileSystemBufferFilterConfigTest, ConstructorRejectsUnsetResponseBufferBehavior) {
+  auto proto_config = configFromYaml(R"(
+    response:
+      behavior: {}
+  )");
+  absl::Status creation_status;
+  FileSystemBufferFilterConfig config(nullptr, nullptr, proto_config, creation_status);
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         HasSubstr("response buffer behavior is set but empty")));
+}
+
+// Declared here because it's only visible for the sake of this test.
+const BufferBehavior& selectBufferBehavior(const ProtoBufferBehavior& behavior);
+// Because config validation guarantees the behavior is set, reaching ``selectBufferBehavior`` with
+// an unset behavior is a programming error rather than a recoverable runtime condition.
+TEST_F(FileSystemBufferFilterConfigTest, PanicsOnUnsetBufferBehavior) {
+  BufferBehavior just_to_add_coverage_for_destructor;
+  ProtoBufferBehavior unset_behavior;
+  EXPECT_DEATH(selectBufferBehavior(unset_behavior), "unset oneof");
+}
+
+TEST_F(FileSystemBufferFilterConfigTest, FailsWithConfiguredInvalidPath) {
   auto proto_config = configFromYaml(R"(
     storage_buffer_path: "/hat/banana/this/is/not/a/valid/path"
     manager_config:
       thread_pool:
         thread_count: 1
   )");
-  EXPECT_THROW_WITH_REGEX(captureConfigFromProto(proto_config), EnvoyException,
-                          "is not a directory");
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto status_or = factory()->createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_THAT(status_or,
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("is not a directory")));
 }
 
 TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfigured0BytesMemoryBufferLimit) {

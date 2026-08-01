@@ -13,13 +13,13 @@ namespace Fault {
 /**
  * Config registration for the fault injection filter. @see NamedHttpFilterConfigFactory.
  */
-class FaultFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::fault::v3::HTTPFault> {
+class FaultFilterFactory : public Common::ExceptionFreeFactoryBase<
+                               envoy::extensions::filters::http::fault::v3::HTTPFault> {
 public:
-  FaultFilterFactory() : FactoryBase("envoy.filters.http.fault") {}
+  FaultFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.fault") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::fault::v3::HTTPFault& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 

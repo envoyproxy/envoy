@@ -108,11 +108,7 @@ createRetryPolicy(const AsyncClient::StreamOptions& options,
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options,
                                  absl::Status& creation_status)
-    : parent_(parent),
-
-      discard_response_body_(options.discard_response_body),
-      new_async_client_retry_logic_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_async_client_retry_respect_buffer_limits")),
+    : parent_(parent), discard_response_body_(options.discard_response_body),
       buffer_limit_(options.buffer_limit_), stream_callbacks_(callbacks),
       stream_id_(parent.config_->random_.random()),
       router_(options.filter_config_ ? options.filter_config_ : parent.config_,
@@ -264,21 +260,6 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   // parallels handling in the main Http::ConnectionManagerImpl as well.
   if (local_closed_) {
     return;
-  }
-
-  if (!new_async_client_retry_logic_) {
-    if (buffered_body_ != nullptr) {
-      // TODO(shikugawa): Currently, data is dropped when the retry buffer overflows and there is no
-      // ability implement any error handling. We need to implement buffer overflow handling in the
-      // future. Options include configuring the max buffer size, or for use cases like gRPC
-      // streaming, deleting old data in the retry buffer.
-      if (buffered_body_->length() + data.length() > kDefaultDecoderBufferLimit) {
-        ENVOY_LOG_EVERY_POW_2(
-            warn, "the buffer size limit (64KB) for async client retries has been exceeded.");
-      } else {
-        buffered_body_->add(data);
-      }
-    }
   }
 
   if (router_.awaitingHost()) {

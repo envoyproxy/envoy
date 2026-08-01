@@ -8,6 +8,8 @@
 #include <memory>
 #include <utility>
 
+#include "envoy/common/platform.h"
+
 #include "test/test_common/logging.h"
 
 #include "quiche/quic/test_tools/quic_connection_peer.h"
@@ -19,6 +21,27 @@ using testing::Eq;
 using testing::Ge;
 
 namespace Quic {
+
+namespace {
+
+// Returns true if a socket can bind() to `address`.
+[[maybe_unused]] bool addressIsBindable(const std::string& address) {
+  const auto addr = Network::Utility::parseInternetAddressNoThrow(address, /*port=*/0);
+  if (addr == nullptr || addr->ip() == nullptr) {
+    return false;
+  }
+  const auto family = addr->ip()->version() == Network::Address::IpVersion::v4 ? AF_INET : AF_INET6;
+  auto& syscalls = Api::OsSysCallsSingleton::get();
+  const auto fd = syscalls.socket(family, SOCK_DGRAM, 0).return_value_;
+  if (!SOCKET_VALID(fd)) {
+    return false;
+  }
+  const auto rc = syscalls.bind(fd, addr->sockAddr(), addr->sockAddrLen()).return_value_;
+  syscalls.close(fd);
+  return rc == 0;
+}
+
+} // namespace
 
 class QuicHttpIntegrationSPATest
     : public QuicHttpIntegrationTestBase,
@@ -1540,6 +1563,11 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
 }
 
 TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
+  if (!addressIsBindable("127.0.0.2")) {
+    GTEST_SKIP() << "127.0.0.2 is not bindable on a local interface, add an alias. "
+                    "Run `sudo ifconfig lo0 alias 127.0.0.2`) on macOS.";
+  }
+
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1615,6 +1643,11 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
 }
 
 TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
+  if (!addressIsBindable("127.0.0.2")) {
+    GTEST_SKIP() << "127.0.0.2 is not bindable on a local interface, add an alias. "
+                    "Run `sudo ifconfig lo0 alias 127.0.0.2`) on macOS.";
+  }
+
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1775,6 +1808,11 @@ TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
 }
 
 TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
+  if (!addressIsBindable("127.0.0.2")) {
+    GTEST_SKIP() << "127.0.0.2 is not bindable on a local interface, add an alias. "
+                    "Run `sudo ifconfig lo0 alias 127.0.0.2`) on macOS.";
+  }
+
   if (!(TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6) &&
         version_ == Network::Address::IpVersion::v4)) {
     return;
@@ -2057,8 +2095,13 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     envoy::config::core::v3::SocketCmsgHeaders* cmsg =
         listener->mutable_udp_listener_config()->mutable_quic_options()->add_save_cmsg_config();
-    cmsg->mutable_level()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
-    cmsg->mutable_type()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
+    const bool is_ipv4 = GetParam() == Network::Address::IpVersion::v4;
+    cmsg->mutable_level()->set_value(is_ipv4 ? IPPROTO_IP : IPPROTO_IPV6);
+#ifdef __APPLE__
+    cmsg->mutable_type()->set_value(is_ipv4 ? IP_RECVTOS : IPV6_PKTINFO);
+#else
+    cmsg->mutable_type()->set_value(is_ipv4 ? IP_TOS : IPV6_PKTINFO);
+#endif
     cmsg->set_expected_size(128);
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.quic_listener.test");

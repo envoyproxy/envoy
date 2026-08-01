@@ -230,6 +230,21 @@ absl::Span<const std::string> ConnectionInfoImplBase::pemEncodedPeerCertificateC
       });
 }
 
+absl::Span<const std::string>
+ConnectionInfoImplBase::pemEncodedValidatedPeerCertificateChain() const {
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::PemEncodedValidatedPeerCertificateChain, [this](SSL*) {
+        std::vector<std::string> result;
+        OptRef<const std::vector<bssl::UniquePtr<X509>>> chain = validatedPeerCertChain();
+        if (chain.has_value()) {
+          for (const auto& cert : *chain) {
+            result.emplace_back(certToPem(*cert));
+          }
+        }
+        return result;
+      });
+}
+
 bool ConnectionInfoImplBase::peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const {
   const bssl::UniquePtr<GENERAL_NAMES>& sans =
       getCachedValueOrCreate<bssl::UniquePtr<GENERAL_NAMES>>(
@@ -508,7 +523,7 @@ const std::string& ConnectionInfoImplBase::sessionId() const {
 
     unsigned int session_id_length = 0;
     const uint8_t* session_id = SSL_SESSION_get_id(session, &session_id_length);
-    return Hex::encode(session_id, session_id_length);
+    return Hex::encode(absl::Span(session_id, session_id_length));
   });
 }
 

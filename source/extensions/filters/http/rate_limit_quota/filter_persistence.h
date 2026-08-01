@@ -67,7 +67,7 @@ public:
   };
 
   // Get an existing TLS store by index, or create one if not found.
-  static std::shared_ptr<TlsStore>
+  static absl::StatusOr<std::shared_ptr<TlsStore>>
   getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
               Server::Configuration::FactoryContext& context, absl::string_view target_address,
               absl::string_view domain);
