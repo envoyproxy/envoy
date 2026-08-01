@@ -69,6 +69,14 @@ actions:
                       extra_fields);
 }
 
+TEST(JwtClaimDescriptorFactoryTest, ProvidesExtensionMetadata) {
+  JwtClaimDescriptorFactory factory;
+
+  EXPECT_EQ("envoy.rate_limit_descriptors.jwt_claim", factory.name());
+  EXPECT_EQ("envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor",
+            factory.createEmptyConfigProto()->GetTypeName());
+}
+
 TEST_F(JwtClaimDescriptorTest, ExtractsSimpleClaim) {
   setupTest(yamlFor());
   const std::string jwt = makeJwt(R"({"sub":"user-123"})");
