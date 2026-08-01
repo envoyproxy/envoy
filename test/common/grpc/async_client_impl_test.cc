@@ -675,6 +675,97 @@ TEST_F(EnvoyAsyncClientImplTest, MultipleFramesWithResetInBetween) {
   http_callbacks->onData(data, false);
 }
 
+// Helper that starts a stream successfully and hands back the HTTP-level callbacks so the test can
+// drive server-side events after the fact.
+class WaitForRemoteCloseTest : public EnvoyAsyncClientImplTest {
+protected:
+  Http::AsyncClient::Stream*
+  startStream(AsyncStreamCallbacks<helloworld::HelloReply>& grpc_callbacks,
+              Http::AsyncClient::StreamCallbacks*& http_callbacks,
+              AsyncStream<helloworld::HelloRequest>& grpc_stream) {
+    ON_CALL(Const(http_stream_), streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(http_stream_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    EXPECT_CALL(http_client_, start(_, _))
+        .WillOnce(Invoke([&http_callbacks, this](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+          http_callbacks = &callbacks;
+          return &http_stream_;
+        }));
+    // sendHeaders succeeds (does not reset), so the stream stays open.
+    EXPECT_CALL(http_stream_, sendHeaders(_, _));
+    grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                      Http::AsyncClient::StreamOptions());
+    return &http_stream_;
+  }
+
+  // Deliver a full sequence of server-side events (initial metadata, a data frame, and a stream
+  // reset) that would each dispatch a callback on a live stream.
+  void deliverServerEvents(Http::AsyncClient::StreamCallbacks* http_callbacks) {
+    // Server initial metadata.
+    http_callbacks->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+                                  Http::TestResponseHeaderMapImpl{{":status", "200"}}),
+                              false);
+    // A single (empty) gRPC data frame: 1 byte of flags followed by a 4 byte length.
+    Buffer::OwnedImpl data;
+    uint8_t flags = 0;
+    uint32_t len = 0;
+    data.add(&flags, 1);
+    data.add(&len, 4);
+    http_callbacks->onData(data, false);
+    // Server (remote) close.
+    http_callbacks->onReset();
+  }
+
+  StreamInfo::StreamInfoImpl stream_info_{context_.time_system_, nullptr,
+                                          StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream_;
+};
+
+// After the owner detaches via waitForRemoteCloseAndDelete(), the underlying gRPC stream must not
+// deliver any further callbacks. This is the guard that makes the ext_proc "graceful gRPC close"
+// mode (envoy.reloadable_features.ext_proc_graceful_grpc_close) safe: the ext_proc
+// ProcessorStreamImpl half-closes, calls waitForRemoteCloseAndDelete(), and is then destroyed while
+// this AsyncStreamImpl lives on awaiting the server's close.
+TEST_F(WaitForRemoteCloseTest, NoStreamCallbacksAfterWaitForRemoteCloseAndDelete) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks = nullptr;
+  AsyncStream<helloworld::HelloRequest> grpc_stream;
+  startStream(grpc_callbacks, http_callbacks, grpc_stream);
+  ASSERT_NE(grpc_stream, nullptr);
+  ASSERT_NE(http_callbacks, nullptr);
+
+  // The owner detaches. From here, no callbacks may be delivered.
+  grpc_stream.waitForRemoteCloseAndDelete();
+
+  EXPECT_CALL(grpc_callbacks, onReceiveInitialMetadata_(_)).Times(0);
+  EXPECT_CALL(grpc_callbacks, onReceiveMessage_(_)).Times(0);
+  EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_)).Times(0);
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(_, _)).Times(0);
+
+  deliverServerEvents(http_callbacks);
+}
+
+// Same scenario as above, but the callbacks object is actually destroyed after detaching (as the
+// ext_proc ProcessorStreamImpl is). Delivering server events must not touch the freed object; this
+// would be caught as a use-after-free under ASAN if the reference were not reset.
+TEST_F(WaitForRemoteCloseTest, StreamSurvivesCallbacksDestroyedAfterWaitForRemoteCloseAndDelete) {
+  auto grpc_callbacks =
+      std::make_unique<NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>>>();
+  Http::AsyncClient::StreamCallbacks* http_callbacks = nullptr;
+  AsyncStream<helloworld::HelloRequest> grpc_stream;
+  startStream(*grpc_callbacks, http_callbacks, grpc_stream);
+  ASSERT_NE(grpc_stream, nullptr);
+  ASSERT_NE(http_callbacks, nullptr);
+
+  grpc_stream.waitForRemoteCloseAndDelete();
+
+  // The owner destroys the callbacks object while the underlying stream lives on.
+  grpc_callbacks.reset();
+
+  // Must be a no-op rather than a use-after-free.
+  deliverServerEvents(http_callbacks);
+}
+
 } // namespace
 } // namespace Grpc
 } // namespace Envoy
