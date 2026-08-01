@@ -7,6 +7,7 @@ import "envoy/config/core/v3/udp_socket_config.proto";
 import "envoy/config/listener/v3/quic_config.proto";
 
 import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
