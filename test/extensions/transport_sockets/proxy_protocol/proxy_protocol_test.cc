@@ -4,6 +4,7 @@
 #include "envoy/network/proxy_protocol.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
@@ -13,6 +14,7 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -46,12 +48,28 @@ public:
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
+    
+    std::vector<TlvFormatter> added_tlvs;
+    for (const auto& entry : config.added_tlvs()) {
+      TlvFormatter tlv;
+      tlv.type_ = static_cast<uint8_t>(entry.type());
+      if (entry.has_format_string()) {
+        auto formatter_or_error = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+            entry.format_string(), context_);
+        tlv.formatter_ = std::move(formatter_or_error.value());
+      } else {
+        tlv.static_value_ = std::vector<uint8_t>(entry.value().begin(), entry.value().end());
+      }
+      added_tlvs.push_back(std::move(tlv));
+    }
+
     proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(
-        std::move(inner_socket), socket_options, config, stats_);
+        std::move(inner_socket), socket_options, config, stats_, added_tlvs);
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
     proxy_protocol_socket_->onConnected();
   }
 
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   NiceMock<Network::MockTransportSocket>* inner_socket_;
   NiceMock<Network::MockIoHandle> io_handle_;
   std::unique_ptr<UpstreamProxyProtocolSocket> proxy_protocol_socket_;
@@ -1061,6 +1079,46 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
                       reinterpret_cast<const uint8_t*>(buffer.linearize(length)), buffer.length())),
                   Hex::encode(expected));
 
+        buffer.drain(length);
+        return {length, Api::IoError::none()};
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  auto resp = proxy_protocol_socket_->doWrite(msg, false);
+  EXPECT_EQ(resp.bytes_processed_, expected.size());
+}
+
+// Test verifies that format strings are properly evaluated in TLVs.
+TEST_F(ProxyProtocolTest, V2FormatStringTlv) {
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto tlv = config.add_added_tlvs();
+  tlv->set_type(0x55);
+  tlv->set_format_string("%UPSTREAM_REMOTE_ADDRESS%");
+  
+  // Set up mock remote address
+  auto remote_address = Network::Utility::resolveUrl("tcp://10.0.0.1:8080");
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(remote_address);
+  transport_callbacks_.connection_.stream_info_.upstreamInfo()->setUpstreamRemoteAddress(remote_address);
+
+  initialize(config, nullptr);
+
+  // The proxy protocol header contains a TLV with type 0x55 and value "10.0.0.1:8080"
+  // Proxy protocol header + 0x55 + length (13) + value ("10.0.0.1:8080")
+  std::vector<uint8_t> expected = {
+      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, // proxy protocol magic
+      0x20, 0x00, 0x00, 0x10, // version 2, local connection, length 16 (3 byte header + 13 bytes address)
+      0x55, 0x00, 0x0d, // type 0x55, length 13
+      0x31, 0x30, 0x2e, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x3a, 0x38, 0x30, 0x38, 0x30 // "10.0.0.1:8080"
+  };
+
+  EXPECT_CALL(io_handle_, write(_))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        const auto length = buffer.length();
+        EXPECT_EQ(Hex::encode(absl::Span<const uint8_t>(
+                      reinterpret_cast<const uint8_t*>(buffer.linearize(length)), buffer.length())),
+                  Hex::encode(expected));
         buffer.drain(length);
         return {length, Api::IoError::none()};
       }));

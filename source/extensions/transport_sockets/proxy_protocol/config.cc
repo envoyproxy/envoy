@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
 
 namespace Envoy {
@@ -27,8 +28,26 @@ UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
   auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
   RETURN_IF_NOT_OK_REF(factory_or_error.status());
+
+  std::vector<TlvFormatter> formatters;
+  for (const auto& entry : outer_config.config().added_tlvs()) {
+    TlvFormatter tlv_formatter;
+    tlv_formatter.type_ = static_cast<uint8_t>(entry.type());
+    if (entry.has_format_string()) {
+      auto formatter_or_error =
+          Formatter::SubstitutionFormatStringUtils::fromProtoConfig(entry.format_string(), context);
+      RETURN_IF_NOT_OK_REF(formatter_or_error.status());
+      tlv_formatter.formatter_ = std::move(formatter_or_error.value());
+    } else {
+      tlv_formatter.static_value_ =
+          std::vector<uint8_t>(entry.value().begin(), entry.value().end());
+    }
+    formatters.push_back(std::move(tlv_formatter));
+  }
+
   return std::make_unique<UpstreamProxyProtocolSocketFactory>(
-      std::move(factory_or_error.value()), outer_config.config(), context.statsScope());
+      std::move(factory_or_error.value()), outer_config.config(), context.statsScope(),
+      std::move(formatters));
 }
 
 ProtobufTypes::MessagePtr UpstreamProxyProtocolSocketConfigFactory::createEmptyConfigProto() {
