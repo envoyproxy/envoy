@@ -1332,6 +1332,37 @@ TEST_F(Http1ServerConnectionImplTest, AllowCustomMethod) {
   EXPECT_OK(status);
 }
 
+// The QUERY method of RFC 10008 is accepted without `allow_custom_methods`, and its mandatory
+// request content is delivered to the decoder.
+TEST_F(Http1ServerConnectionImplTest, QueryMethodWithContentLength) {
+  initialize();
+
+  MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{{":authority", "example.com"},
+                                            {":path", "/search"},
+                                            {":method", "QUERY"},
+                                            {"content-type", "application/sql"},
+                                            {"content-length", "9"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+
+  Buffer::OwnedImpl expected_data1("SELECT 1;");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
+
+  Buffer::OwnedImpl expected_data2;
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), true));
+
+  Buffer::OwnedImpl buffer("QUERY /search HTTP/1.1\r\nhost: example.com\r\n"
+                           "content-type: application/sql\r\ncontent-length: 9\r\n\r\nSELECT 1;");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_OK(status);
+  EXPECT_EQ(0U, buffer.length());
+}
+
 TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   initialize();
 

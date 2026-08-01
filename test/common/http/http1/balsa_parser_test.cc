@@ -4,6 +4,8 @@
 
 #include "source/common/http/http1/balsa_parser.h"
 
+#include "test/test_common/test_runtime.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -98,6 +100,65 @@ TEST(BalsaParserMethodValidationTest, ParsesCustomMethodContainingEveryTokenChar
   EXPECT_EQ(request.size(), parser.execute(request.data(), request.size()));
   EXPECT_EQ(ParserStatus::Ok, parser.getStatus()) << parser.errorMessage();
   EXPECT_EQ(kValidHttpTokenCharacters, parser.methodName());
+}
+
+// The QUERY method of RFC 10008 is accepted without opting in to custom methods.
+TEST(BalsaParserMethodValidationTest, ParsesQueryMethod) {
+  const std::string request =
+      "QUERY / HTTP/1.1\r\nhost: example.com\r\ncontent-length: 3\r\n\r\nfoo";
+
+  RecordingCallbacks callbacks;
+  BalsaParser parser(MessageType::Request, &callbacks, request.size(), false, false);
+
+  EXPECT_EQ(request.size(), parser.execute(request.data(), request.size()));
+  EXPECT_EQ(ParserStatus::Ok, parser.getStatus()) << parser.errorMessage();
+  EXPECT_EQ("QUERY", parser.methodName());
+}
+
+TEST(BalsaParserMethodValidationTest, RejectsQueryMethodWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_allow_query_method", "false"}});
+
+  const std::string request = "QUERY / HTTP/1.1\r\nhost: example.com\r\n\r\n";
+
+  RecordingCallbacks callbacks;
+  BalsaParser parser(MessageType::Request, &callbacks, request.size(), false, false);
+
+  parser.execute(request.data(), request.size());
+
+  EXPECT_EQ(ParserStatus::Error, parser.getStatus());
+  EXPECT_EQ("HPE_INVALID_METHOD", parser.errorMessage());
+}
+
+// Disabling the runtime guard must not affect methods other than QUERY.
+TEST(BalsaParserMethodValidationTest, ParsesGetMethodWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_allow_query_method", "false"}});
+
+  const std::string request = "GET / HTTP/1.1\r\nhost: example.com\r\n\r\n";
+
+  RecordingCallbacks callbacks;
+  BalsaParser parser(MessageType::Request, &callbacks, request.size(), false, false);
+
+  EXPECT_EQ(request.size(), parser.execute(request.data(), request.size()));
+  EXPECT_EQ(ParserStatus::Ok, parser.getStatus()) << parser.errorMessage();
+  EXPECT_EQ("GET", parser.methodName());
+}
+
+// QUERY is still accepted via `allow_custom_methods` when the runtime guard is disabled, because
+// that path does not consult the list of known methods.
+TEST(BalsaParserMethodValidationTest, ParsesQueryMethodWithCustomMethodsWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_allow_query_method", "false"}});
+
+  const std::string request = "QUERY / HTTP/1.1\r\nhost: example.com\r\n\r\n";
+
+  RecordingCallbacks callbacks;
+  BalsaParser parser(MessageType::Request, &callbacks, request.size(), false, true);
+
+  EXPECT_EQ(request.size(), parser.execute(request.data(), request.size()));
+  EXPECT_EQ(ParserStatus::Ok, parser.getStatus()) << parser.errorMessage();
+  EXPECT_EQ("QUERY", parser.methodName());
 }
 
 } // namespace
