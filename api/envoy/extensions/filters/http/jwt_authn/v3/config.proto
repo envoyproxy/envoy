@@ -906,15 +906,10 @@ message PerRouteConfig {
 // This message specifies a combination of header name and claim name.
 message JwtClaimToHeader {
   // Specifies a segment in a path for retrieving a claim from the JWT payload.
-  // Currently, only key-based segments (claim names) are supported.
   message PathSegment {
-    oneof segment {
-      option (validate.required) = true;
-
-      // If specified, use this key to retrieve the value in the enclosing JSON object. The key is
-      // matched in full, so it may itself contain dots.
-      string key = 1 [(validate.rules).string = {min_len: 1}];
-    }
+    // The key to retrieve the value with in the enclosing JSON object. The key is matched in
+    // full, so it may itself contain dots.
+    string key = 1 [(validate.rules).string = {min_len: 1}];
   }
 
   // The HTTP header name to copy the claim to.
