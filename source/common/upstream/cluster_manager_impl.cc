@@ -620,22 +620,21 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         // This fires when a cluster is about to have an updated member set. We need to send this
         // out to all of the thread local configurations.
 
-        const auto merge_timeout = PROTOBUF_GET_MS_OR_DEFAULT(
-            cm_cluster.cluster().info()->lbConfig(), update_merge_window, 1000);
-
         // Should we save this update and merge it with other updates?
         //
         // Note that we can only _safely_ merge updates that have no added/removed hosts. That is,
         // only those updates that signal a change in host healthcheck state, weight or metadata.
         //
         // We've discussed merging updates related to hosts being added/removed, but it's really
-        // tricky to merge those given that downstream consumers of these updates expect to see
-        // the full list of updates, not a condensed one. This is because they use the broadcasted
+        // tricky to merge those given that downstream consumers of these updates expect to see the
+        // full list of updates, not a condensed one. This is because they use the broadcasted
         // HostSharedPtrs within internal maps to track hosts. If we fail to broadcast the entire
         // list of removals, these maps will leak those HostSharedPtrs.
         //
         // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
         bool scheduled = false;
+        const auto merge_timeout = PROTOBUF_GET_MS_OR_DEFAULT(
+            cm_cluster.cluster().info()->lbConfig(), update_merge_window, 1000);
 
         // If batch-aware updates are enabled, accumulate this per-priority update instead of
         // posting it now. The whole batch is posted to the worker threads as a single update at the
