@@ -104,8 +104,7 @@ TEST(BalsaParserMethodValidationTest, ParsesCustomMethodContainingEveryTokenChar
 
 // The QUERY method of RFC 10008 is accepted without opting in to custom methods.
 TEST(BalsaParserMethodValidationTest, ParsesQueryMethod) {
-  const std::string request =
-      "QUERY / HTTP/1.1\r\nhost: example.com\r\ncontent-length: 3\r\n\r\nfoo";
+  const std::string request = "QUERY / HTTP/1.1\r\nhost: example.com\r\n\r\n";
 
   RecordingCallbacks callbacks;
   BalsaParser parser(MessageType::Request, &callbacks, request.size(), false, false);
