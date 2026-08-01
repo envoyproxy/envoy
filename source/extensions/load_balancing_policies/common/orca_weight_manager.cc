@@ -116,7 +116,7 @@ absl::Status OrcaLoadReportHandler::updateClientSideDataFromOrcaLoadReport(
 }
 
 absl::Status OrcaHostLbPolicyData::onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
-                                                    const StreamInfo::StreamInfo&) {
+                                                    OptRef<const StreamInfo::StreamInfo>) {
   ASSERT(report_handler_ != nullptr);
   return report_handler_->updateClientSideDataFromOrcaLoadReport(report, *this);
 }

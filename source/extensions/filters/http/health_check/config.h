@@ -11,12 +11,13 @@ namespace HttpFilters {
 namespace HealthCheck {
 
 class HealthCheckFilterConfig
-    : public Common::FactoryBase<envoy::extensions::filters::http::health_check::v3::HealthCheck> {
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::http::health_check::v3::HealthCheck> {
 public:
-  HealthCheckFilterConfig() : FactoryBase("envoy.filters.http.health_check") {}
+  HealthCheckFilterConfig() : ExceptionFreeFactoryBase("envoy.filters.http.health_check") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
@@ -25,7 +26,7 @@ private:
       const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& context) override;
 
-  Http::FilterFactoryCb createFilterFactoryHelper(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryHelper(
       const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
       const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
       Stats::Scope& scope);

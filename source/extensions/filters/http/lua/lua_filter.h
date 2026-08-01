@@ -36,8 +36,10 @@ struct LuaFilterStats {
  */
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
+  // creation_status is set (and construction stops early) if the supplied code cannot be parsed.
   PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                  Stats::Gauge& vm_count_gauge, uint32_t concurrency);
+                  Stats::Gauge& vm_count_gauge, uint32_t concurrency,
+                  absl::Status& creation_status);
   ~PerLuaCodeSetup();
 
   Extensions::Filters::Common::Lua::CoroutinePtr createCoroutine() {
@@ -196,6 +198,10 @@ public:
   Http::FilterHeadersStatus start(int function_ref);
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(Http::HeaderMap& trailers);
+
+  // The status of the last coroutine execution driven by this wrapper. The Filter checks this
+  // after start()/onData()/onTrailers() return and reports errors via Filter::scriptError().
+  const absl::Status& coroutineStatus() const { return coroutine_status_; }
 
   void onReset() {
     if (http_request_) {
@@ -382,11 +388,14 @@ private:
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
 
-  // Resumes the coroutine only if it is safe to do so.
-  void resumeCoroutine(int num_args, const std::function<void()>& yield_callback) {
+  // Resumes the coroutine only if it is safe to do so. Returns the coroutine execution status;
+  // OK when resumption was skipped because the stream was reset.
+  absl::Status resumeCoroutine(int num_args,
+                               const Filters::Common::Lua::YieldCallback& yield_callback) {
     if (!on_reset_called_) {
-      coroutine_.resume(num_args, yield_callback);
+      return coroutine_.resume(num_args, yield_callback);
     }
+    return absl::OkStatus();
   }
 
   // Filters::Common::Lua::BaseLuaObject
@@ -438,7 +447,10 @@ private:
   Filters::Common::Lua::LuaDeathRef<RouteWrapper> route_wrapper_;
   Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> stats_scope_wrapper_;
   State state_{State::Running};
-  std::function<void()> yield_callback_;
+  Filters::Common::Lua::YieldCallback yield_callback_;
+  // Set by start()/onData()/onTrailers() from the coroutine execution status; checked by the
+  // Filter after those methods return.
+  absl::Status coroutine_status_{absl::OkStatus()};
   Http::AsyncClient::Request* http_request_{};
   TimeSource& time_source_;
 
@@ -465,7 +477,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                Api::Api& api, Stats::Scope& scope, const std::string& stat_prefix,
-               uint32_t concurrency);
+               uint32_t concurrency, absl::Status& creation_status);
 
   PerLuaCodeSetup* perLuaCodeSetup(std::optional<absl::string_view> name = std::nullopt) const {
     if (!name.has_value()) {
@@ -508,7 +520,8 @@ using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
-                       Server::Configuration::ServerFactoryContext& context);
+                       Server::Configuration::ServerFactoryContext& context,
+                       absl::Status& creation_status);
 
   bool disabled() const { return disabled_; }
   absl::string_view name() const { return name_; }
@@ -531,7 +544,7 @@ public:
       : config_(config), time_source_(time_source), stats_(config->stats()) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
-  void scriptError(const Filters::Common::Lua::LuaException& e);
+  void scriptError(const absl::Status& status);
 
   // Http::StreamFilterBase
   void onDestroy() override;

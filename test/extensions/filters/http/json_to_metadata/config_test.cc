@@ -2,6 +2,7 @@
 #include "source/extensions/filters/http/json_to_metadata/filter.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -10,6 +11,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JsonToMetadata {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(Factory, Basic) {
   const std::string yaml_request = R"(
@@ -117,13 +120,13 @@ response_rules:
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml_request, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "json to metadata filter: neither `on_present` nor `on_missing` set");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status(),
+      HasStatusMessage("json to metadata filter: neither `on_present` nor `on_missing` set"));
   TestUtility::loadFromYaml(yaml_response, *proto_config);
-  EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "json to metadata filter: neither `on_present` nor `on_missing` set");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status(),
+      HasStatusMessage("json to metadata filter: neither `on_present` nor `on_missing` set"));
 }
 
 TEST(Factory, NoValueIntOnMissing) {
@@ -157,13 +160,13 @@ response_rules:
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml_request, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "json to metadata filter: cannot specify on_missing rule with empty value");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status(),
+      HasStatusMessage("json to metadata filter: cannot specify on_missing rule with empty value"));
   TestUtility::loadFromYaml(yaml_response, *proto_config);
-  EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "json to metadata filter: cannot specify on_missing rule with empty value");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status(),
+      HasStatusMessage("json to metadata filter: cannot specify on_missing rule with empty value"));
 }
 
 TEST(Factory, NoValueIntOnError) {
@@ -197,13 +200,13 @@ response_rules:
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml_request, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "json to metadata filter: cannot specify on_error rule with empty value");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status(),
+      HasStatusMessage("json to metadata filter: cannot specify on_error rule with empty value"));
   TestUtility::loadFromYaml(yaml_response, *proto_config);
-  EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "json to metadata filter: cannot specify on_error rule with empty value");
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status(),
+      HasStatusMessage("json to metadata filter: cannot specify on_error rule with empty value"));
 }
 
 TEST(Factory, NoRuleInRouteConfig) {
@@ -217,10 +220,11 @@ TEST(Factory, NoRuleInRouteConfig) {
                     .createRouteSpecificFilterConfig(*proto_config, context,
                                                      ProtobufMessage::getNullValidationVisitor())
                     .status();
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(),
-            "json_to_metadata_filter: Per route configs must at least specify one of request_rules "
-            "or response_rules.");
+  EXPECT_THAT(
+      status,
+      HasStatusMessage(
+          "json_to_metadata_filter: Per route configs must at least specify one of request_rules "
+          "or response_rules."));
 }
 
 TEST(Factory, PerRouteConfig) {

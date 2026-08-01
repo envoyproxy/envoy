@@ -2,6 +2,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -9,6 +10,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace Formatter {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 class ReqWithoutQueryTest : public ::testing::Test {
 public:
@@ -167,9 +171,9 @@ TEST_F(ReqWithoutQueryTest, TestParserNotRecognizingCommand) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_FALSE(Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_).status(),
+      Not(IsOk()));
 }
 
 } // namespace Formatter

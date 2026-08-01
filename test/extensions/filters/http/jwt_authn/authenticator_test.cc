@@ -47,7 +47,10 @@ public:
       JwtVerify::CheckAudience* check_audience = nullptr,
       const std::optional<std::string>& provider = std::make_optional<std::string>(ProviderName),
       bool allow_failed = false, bool allow_missing = false) {
-    filter_config_ = std::make_unique<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
+    absl::Status creation_status = absl::OkStatus();
+    filter_config_ =
+        std::make_shared<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_, creation_status);
+    ASSERT_TRUE(creation_status.ok()) << creation_status;
     raw_fetcher_ = new MockJwksFetcher;
     fetcher_.reset(raw_fetcher_);
     auth_ = Authenticator::create(
