@@ -958,6 +958,39 @@ TEST_F(HttpHealthCheckerImplTest, LastHealthCheckHttpStatusClearedOnNetworkFailu
                    .has_value());
 }
 
+// Tests that a failure to create the health check connection (e.g. a network namespace binding
+// failure that makes the upstream connection factory return a null connection) is handled as a
+// network health check failure instead of crashing on a null dereference.
+TEST_F(HttpHealthCheckerImplTest, ConnectionCreateFailure) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(testing::AnyNumber());
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  // Create only the session timers; the connection cannot be created, so no client connection or
+  // codec mocks must be allocated for this session.
+  TestSessionPtr new_test_session(new TestSession());
+  new_test_session->timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  new_test_session->interval_timer_ = new Event::MockTimer(&dispatcher_);
+  test_sessions_.emplace_back(std::move(new_test_session));
+
+  // The upstream connection cannot be created; the factory returns a null connection.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  // The first check fails gracefully instead of crashing.
+  health_checker_->start();
+
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_GE(cluster_->info_->stats_store_.counter("health_check.failure").value(), 1UL);
+  EXPECT_GE(cluster_->info_->stats_store_.counter("health_check.network_failure").value(), 1UL);
+}
+
 TEST_F(HttpHealthCheckerImplTest, Degraded) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(2);
