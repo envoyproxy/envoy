@@ -102,10 +102,16 @@ TEST_P(ProtocolIntegrationTest, QueryMethod) {
   EXPECT_EQ(64U, response->body().size());
 }
 
-// With the runtime guard disabled, a downstream HTTP/1 QUERY request is rejected by the codec as
-// it was before RFC 10008 support was added. HTTP/2 and HTTP/3 have no such method allowlist, so
-// they are unaffected by the guard.
+// With the runtime guard disabled, a downstream QUERY request is rejected by the HTTP/1 codec as
+// it was before RFC 10008 support was added. Only an HTTP/1 downstream is covered: the runtime
+// override applies to the whole test process, so for an HTTP/2 or HTTP/3 downstream the request
+// would be forwarded to the HTTP/1 fake upstream and rejected by its server codec instead. Envoy's
+// own upstream HTTP/1 codec parses responses and never validates request methods.
 TEST_P(DownstreamProtocolIntegrationTest, QueryMethodRuntimeGuardDisabled) {
+  if (GetParam().downstream_protocol != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "The QUERY method runtime guard is only consulted by the HTTP/1 codec";
+  }
+
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_allow_query_method", "false");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -118,18 +124,10 @@ TEST_P(DownstreamProtocolIntegrationTest, QueryMethodRuntimeGuardDisabled) {
                                      {"content-type", "application/sql"}},
       128);
 
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("400", response->headers().getStatusValue());
-    EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
-  } else {
-    waitForNextUpstreamRequest();
-    EXPECT_EQ("QUERY", upstream_request_->headers().getMethodValue());
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-  }
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
 }
 
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
