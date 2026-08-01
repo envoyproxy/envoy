@@ -470,6 +470,7 @@ envoy_cc_test_binary(
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
         "//source/extensions/load_balancing_policies/random:config",
