@@ -72,6 +72,29 @@ static constexpr absl::string_view simple_config_yaml_without_enforce = R"(
       denominator: HUNDRED
 )";
 
+static constexpr absl::string_view custom_retry_after_config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval: 1000s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+response_headers_to_add:
+  - header:
+      key: retry-after
+      value: '120'
+enable_retry_after_header: true
+)";
+
 class FilterTest : public testing::Test {
 public:
   FilterTest() = default;
@@ -1136,6 +1159,24 @@ TEST_F(FilterTest, RequestRateLimitedWithRetryAfterHeader) {
         // The bucket refills one token every 1000 seconds, so that is when the next token is
         // available.
         EXPECT_EQ("1000", response_headers.get_("retry-after"));
+      }));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_2_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(FilterTest, RequestRateLimitedPreservesCustomRetryAfterHeader) {
+  setup(std::string(custom_retry_after_config_yaml));
+
+  EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
+      .WillOnce(Invoke([](Http::Code, absl::string_view,
+                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+        EXPECT_EQ("120", response_headers.get_("retry-after"));
       }));
 
   Http::TestRequestHeaderMapImpl request_headers;

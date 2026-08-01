@@ -194,6 +194,7 @@ message LocalRateLimit {
   // Specifies whether the filter emits a ``Retry-After`` header when it enforces an HTTP 429
   // response. The value is the number of seconds until the next token is available in the bucket
   // that rejected the request, clamped to at least 1.
+  // If ``response_headers_to_add`` sets a ``Retry-After`` header, the filter does not overwrite it.
   //
   // Disabled by default.
   bool enable_retry_after_header = 19;

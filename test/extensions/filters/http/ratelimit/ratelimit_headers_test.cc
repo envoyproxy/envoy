@@ -234,7 +234,7 @@ TEST(RetryAfterHeaderTest, UsesLargestOverLimitReset) {
       descriptorStatus(RateLimitResponse::OVER_LIMIT, 10),
       descriptorStatus(RateLimitResponse::OVER_LIMIT, 60),
   };
-  Http::TestResponseHeaderMapImpl headers{{"retry-after", "5"}};
+  Http::TestResponseHeaderMapImpl headers;
   // The OK status is ignored, and the largest over-limit reset is selected.
   Http::TestResponseHeaderMapImpl expected_headers{{"retry-after", "60"}};
 

@@ -109,6 +109,13 @@ void populateRetryAfterHeader(const Filters::Common::RateLimit::DescriptorStatus
     return;
   }
 
+  const auto& retry_after_header =
+      HttpFilters::Common::RateLimit::RetryAfterHeaders::get().RetryAfter;
+  // Do not overwrite a Retry-After header returned by the rate limit service.
+  if (!headers.get(retry_after_header).empty()) {
+    return;
+  }
+
   using Response = envoy::service::ratelimit::v3::RateLimitResponse;
   std::optional<int64_t> max_reset_seconds;
 
@@ -126,8 +133,7 @@ void populateRetryAfterHeader(const Filters::Common::RateLimit::DescriptorStatus
   if (max_reset_seconds.has_value()) {
     // Avoid telling clients to retry immediately, which could cause a tight loop of 429 responses.
     const int64_t retry_after_seconds = std::max<int64_t>(1, *max_reset_seconds);
-    headers.setCopy(HttpFilters::Common::RateLimit::RetryAfterHeaders::get().RetryAfter,
-                    absl::StrCat(retry_after_seconds));
+    headers.setCopy(retry_after_header, absl::StrCat(retry_after_seconds));
   }
 }
 

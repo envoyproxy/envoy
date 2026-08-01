@@ -34,6 +34,7 @@ When :ref:`enable_retry_after_header
 is enabled and the filter enforces a 429 response, the response includes ``Retry-After`` using the
 ``delay-seconds`` form. The delay is the number of seconds until the next token is available in the
 bucket that rejected the request, clamped to at least one second.
+If ``response_headers_to_add`` sets a ``Retry-After`` header, the filter does not overwrite it.
 
 The header is not emitted for an upstream-generated 429 response, when rate limiting is not
 enforced, or when a custom status other than 429 is configured. The option is disabled by default.

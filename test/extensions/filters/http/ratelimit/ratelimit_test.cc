@@ -1195,6 +1195,39 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithRetryAfterHeader) {
                                std::move(descriptor_statuses_ptr), nullptr, nullptr, "", nullptr);
 }
 
+TEST_F(HttpRateLimitFilterTest, LimitResponsePreservesRlsRetryAfterHeader) {
+  setUpTest(enable_retry_after_header_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(ContainsHeader("retry-after", "5"), true));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+
+  Filters::Common::RateLimit::DescriptorStatusList descriptor_statuses{
+      Envoy::RateLimit::buildDescriptorStatus(
+          1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE, "first", 0, 60)};
+  descriptor_statuses[0].set_code(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT);
+  auto descriptor_statuses_ptr =
+      std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(descriptor_statuses);
+  Http::ResponseHeaderMapPtr rls_headers{new Http::TestResponseHeaderMapImpl{{"retry-after", "5"}}};
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit,
+                               std::move(descriptor_statuses_ptr), std::move(rls_headers), nullptr,
+                               "", nullptr);
+}
+
 TEST_F(HttpRateLimitFilterTest, OkResponseWithoutRetryAfterHeader) {
   setUpTest(enable_retry_after_header_config_);
   InSequence s;

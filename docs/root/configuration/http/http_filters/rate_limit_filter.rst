@@ -30,6 +30,7 @@ enabled and the filter enforces a 429 response, the response includes ``Retry-Af
 ``delay-seconds`` form. The delay is the largest ``duration_until_reset`` among the over-limit
 descriptor statuses returned by the rate limit service, clamped to at least one second. This makes
 the delay long enough for every matched over-limit rule reported by the service to reset.
+If the rate limit service returns a ``Retry-After`` header, the filter does not overwrite it.
 
 The header is not emitted for an upstream-generated 429 response, when rate limiting is not
 enforced, when a custom status other than 429 is configured, or when the service does not return an

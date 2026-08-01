@@ -204,7 +204,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               decoder_callbacks_->streamInfo());
         if (used_config_->enableRetryAfterHeader() &&
             used_config_->status() == Http::Code::TooManyRequests &&
-            token_bucket_context_ != nullptr) {
+            token_bucket_context_ != nullptr &&
+            headers.get(HttpFilters::Common::RateLimit::RetryAfterHeaders::get().RetryAfter)
+                .empty()) {
           // Clamp to at least one second to avoid telling clients to retry immediately, which could
           // cause a tight loop of 429 responses.
           const uint64_t retry_after_seconds =
