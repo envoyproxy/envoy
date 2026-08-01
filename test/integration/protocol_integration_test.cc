@@ -73,6 +73,65 @@ TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
   testTrailers(10, 20, true, true);
 }
 
+// A QUERY request (RFC 10008) is routed upstream with its method and mandatory content intact,
+// for every combination of downstream and upstream protocol.
+TEST_P(ProtocolIntegrationTest, QueryMethod) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/sql"}},
+      128);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("QUERY", upstream_request_->headers().getMethodValue());
+  EXPECT_EQ("application/sql", upstream_request_->headers().getContentTypeValue());
+  EXPECT_EQ(128U, upstream_request_->bodyLength());
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(64, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(64U, response->body().size());
+}
+
+// With the runtime guard disabled, a downstream HTTP/1 QUERY request is rejected by the codec as
+// it was before RFC 10008 support was added. HTTP/2 and HTTP/3 have no such method allowlist, so
+// they are unaffected by the guard.
+TEST_P(DownstreamProtocolIntegrationTest, QueryMethodRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_allow_query_method", "false");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/sql"}},
+      128);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+    EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
+  } else {
+    waitForNextUpstreamRequest();
+    EXPECT_EQ("QUERY", upstream_request_->headers().getMethodValue());
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+}
+
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
   // Shut down the server with active connection pool connections.
