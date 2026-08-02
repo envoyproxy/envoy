@@ -198,13 +198,11 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MissingMethod) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
-  // TODO(guoyilin42): Per JSON-RPC 2.0, a missing method field is an Invalid Request (-32600);
-  // -32601 is for a well-formed request naming a nonexistent method.
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Missing method field"}})json"));
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Missing method field"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, MethodFieldNotString) {
@@ -233,11 +231,11 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MethodFieldNotString) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method field is not a string"}})json"));
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Method field is not a string"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallInvalidParams) {
@@ -267,7 +265,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallInvalidParams) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -303,7 +301,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallNonStringToolName) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -346,7 +344,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallNonObjectArguments) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -380,7 +378,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, UnsupportedMcpProtocolVersionHeader) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -412,7 +410,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MissingIdField) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -445,7 +443,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, UnsupportedMethod) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -481,7 +479,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InitializeMissingProtocolVersion) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -524,7 +522,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, UnknownTool) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -571,7 +569,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InvalidArguments) {
       request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
@@ -1034,7 +1032,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallResponseBodyExceedsLimit) {
   upstream_request_->encodeData(response_data, true);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("500"));
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
   EXPECT_THAT(response->headers().getContentLengthValue(),
               StrEq(std::to_string(response->body().size())));
@@ -2261,6 +2259,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallHeadersOnly5xxSyntheticErrorRe
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
   EXPECT_THAT(response->headers().getContentLengthValue(),
               StrEq(std::to_string(response->body().size())));
