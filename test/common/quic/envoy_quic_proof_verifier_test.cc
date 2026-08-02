@@ -152,6 +152,8 @@ typed_config:
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   auto* quic_verify_callback = new MockProofVerifierCallback();
   Event::MockTimer* verify_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  // TimedCertValidator hands its timer back for deferred deletion when validation completes.
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_EQ(quic::QUIC_PENDING,
             verifier_->VerifyCertChain(
                 std::string(cert_view->subject_alt_name_domains()[0]), 54321, {leaf_cert_},
@@ -257,6 +259,8 @@ typed_config:
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   auto* quic_verify_callback = new MockProofVerifierCallback();
   Event::MockTimer* verify_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  // TimedCertValidator hands its timer back for deferred deletion when validation completes.
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_EQ(
       quic::QUIC_PENDING,
       verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
