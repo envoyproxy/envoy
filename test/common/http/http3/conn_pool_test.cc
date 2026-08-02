@@ -109,7 +109,7 @@ public:
   std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
-  Ssl::ClientContextSharedPtr ssl_context_{new Ssl::MockClientContext()};
+  Ssl::ClientContextSharedPtr ssl_context_{new NiceMock<Ssl::MockClientContext>()};
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_{store_.symbolTable()};
   // Needs to out-live pool_;
@@ -166,7 +166,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
       context_, creation_status_};
 
-  Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
+  Ssl::ClientContextSharedPtr ssl_context(new NiceMock<Ssl::MockClientContext>());
   EXPECT_CALL(factory, sslCtx())
       .WillOnce(Return(ssl_context))
       .WillOnce(Return(nullptr))

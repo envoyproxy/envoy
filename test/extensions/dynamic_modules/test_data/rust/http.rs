@@ -54,6 +54,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
+    "response_flags_callbacks" => Some(Box::new(ResponseFlagsCallbacksFilterConfig {})),
     "config_init_failure" => None,
     _ => panic!("Unknown filter name: {name}"),
   }
@@ -1383,5 +1384,107 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     }
 
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+  }
+}
+
+/// Response flags surfaced as response headers by the `response_flags_callbacks` filter.
+struct ResponseFlags {
+  failed_local_health_check: bool,
+  no_healthy_upstream: bool,
+  upstream_request_timeout: bool,
+  local_reset: bool,
+  upstream_remote_reset: bool,
+  upstream_connection_failure: bool,
+  upstream_connection_termination: bool,
+  upstream_overflow: bool,
+  dns_resolution_failed: bool,
+}
+
+impl ResponseFlags {
+  /// Pairs each flag with the response header key used to surface it when set.
+  fn as_headers(&self) -> [(&'static str, bool); 9] {
+    [
+      (
+        "x-response-flag-failed-local-health-check",
+        self.failed_local_health_check,
+      ),
+      (
+        "x-response-flag-no-healthy-upstream",
+        self.no_healthy_upstream,
+      ),
+      (
+        "x-response-flag-upstream-request-timeout",
+        self.upstream_request_timeout,
+      ),
+      ("x-response-flag-local-reset", self.local_reset),
+      (
+        "x-response-flag-upstream-remote-reset",
+        self.upstream_remote_reset,
+      ),
+      (
+        "x-response-flag-upstream-connection-failure",
+        self.upstream_connection_failure,
+      ),
+      (
+        "x-response-flag-upstream-connection-termination",
+        self.upstream_connection_termination,
+      ),
+      ("x-response-flag-upstream-overflow", self.upstream_overflow),
+      (
+        "x-response-flag-dns-resolution-failed",
+        self.dns_resolution_failed,
+      ),
+    ]
+  }
+}
+
+/// Reads the `response.flags` bitmask through the attribute API and maps each bit. The bit
+/// positions come from the ABI `response_flag` enum so no magic numbers are needed.
+fn map_response_flags<EHF: EnvoyHttpFilter>(envoy_filter: &EHF) -> ResponseFlags {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+  let flags = envoy_filter
+    .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseFlags)
+    .map_or(0u64, |v| v as u64);
+  let is_set = |flag: Flag| (flags & (1u64 << (flag as u64))) != 0;
+  ResponseFlags {
+    failed_local_health_check: is_set(Flag::FailedLocalHealthCheck),
+    no_healthy_upstream: is_set(Flag::NoHealthyUpstream),
+    upstream_request_timeout: is_set(Flag::UpstreamRequestTimeout),
+    local_reset: is_set(Flag::LocalReset),
+    upstream_remote_reset: is_set(Flag::UpstreamRemoteReset),
+    upstream_connection_failure: is_set(Flag::UpstreamConnectionFailure),
+    upstream_connection_termination: is_set(Flag::UpstreamConnectionTermination),
+    upstream_overflow: is_set(Flag::UpstreamOverflow),
+    dns_resolution_failed: is_set(Flag::DnsResolutionFailed),
+  }
+}
+
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test reading the response flags
+/// via the attribute API and surfacing the set ones as response headers.
+struct ResponseFlagsCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ResponseFlagsCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(ResponseFlagsCallbacksFilter {})
+  }
+}
+
+/// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
+struct ResponseFlagsCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ResponseFlagsCallbacksFilter {
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let response_flags = map_response_flags(envoy_filter);
+    for (header_key, is_set) in response_flags.as_headers() {
+      if is_set {
+        envoy_filter.set_response_header(header_key, b"true");
+      }
+    }
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }

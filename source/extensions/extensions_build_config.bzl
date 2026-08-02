@@ -162,6 +162,7 @@ EXTENSIONS = {
     "envoy.filters.http.a2a":                           "//source/extensions/filters/http/a2a:config",
     "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
     "envoy.filters.http.admission_control":             "//source/extensions/filters/http/admission_control:config",
+    "envoy.filters.http.ai_protocol_manager":           "//source/extensions/filters/http/ai_protocol_manager:config",
     "envoy.filters.http.alternate_protocols_cache":     "//source/extensions/filters/http/alternate_protocols_cache:config",
     "envoy.filters.http.api_key_auth":                  "//source/extensions/filters/http/api_key_auth:config",
     "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
@@ -228,6 +229,7 @@ EXTENSIONS = {
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
     "envoy.filters.http.sse_to_metadata":               "//source/extensions/filters/http/sse_to_metadata:config",
+    "envoy.filters.http.aws_eventstream_parser":   "//source/extensions/filters/http/aws_eventstream_parser:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
     "envoy.filters.http.transform":                     "//source/extensions/filters/http/transform:config",
 
@@ -292,6 +294,7 @@ EXTENSIONS = {
 
     "envoy.filters.udp.session.http_capsule":           "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
     "envoy.filters.udp.session.dynamic_forward_proxy":  "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:config",
+    "envoy.filters.udp.session.ext_authz":              "//source/extensions/filters/udp/udp_proxy/session_filters/ext_authz:config",
 
     #
     # Resource monitors
@@ -406,6 +409,7 @@ EXTENSIONS = {
 
     "envoy.upstreams.http.dynamic_modules":              "//source/extensions/upstreams/http/dynamic_modules:config",
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
+    "envoy.upstreams.http.reverse_tunnel":              "//source/extensions/upstreams/http/reverse_tunnel:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
     "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",
 
@@ -413,6 +417,7 @@ EXTENSIONS = {
     # Watchdog actions
     #
 
+    "envoy.watchdog.backtrace_action":                  "//source/extensions/watchdog/backtrace_action:config",
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
 
     #

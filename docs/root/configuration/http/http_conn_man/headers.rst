@@ -193,6 +193,7 @@ The following keys are supported:
 5. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
 6. ``URI`` The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
+8. ``Issuer`` The Issuer field of the current client certificate. The value is always double-quoted.
 
 A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer `RFC 5280`_.
 
@@ -216,7 +217,7 @@ text format are available as JSON object fields, but with the following structur
 * ``by``, ``uri``, ``dns``, and ``chain`` are JSON arrays of strings (since they can have multiple values).
   For ``chain``, each string is the PEM-encoded representation of a single certificate
   in the peer certificate chain. This is the peer provided chain, not the validated chain.
-* ``hash``, ``cert``, and ``subject`` are JSON strings.
+* ``hash``, ``cert``, ``subject``, and ``issuer`` are JSON strings.
 * Unlike the text format, ``cert`` and ``chain`` PEM values are not URL-encoded; instead,
   special characters (such as newlines in PEM data) are escaped using standard JSON escaping rules.
 * Only fields with non-empty values are included in the JSON object.

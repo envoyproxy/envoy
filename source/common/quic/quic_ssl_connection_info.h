@@ -25,6 +25,53 @@ public:
 
   X509* validatedPeerIssuer() const override;
 
+  uint16_t ciphersuiteId() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    ASSERT(crypto_stream != nullptr);
+    return crypto_stream->CiphersuiteId();
+  }
+
+  std::string ciphersuiteString() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    ASSERT(crypto_stream != nullptr);
+    return std::string(crypto_stream->CiphersuiteString());
+  }
+
+  uint16_t tlsGroupId() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    ASSERT(crypto_stream != nullptr);
+    return crypto_stream->TlsGroupId();
+  }
+
+  absl::string_view tlsGroupString() const override {
+    auto* crypto_stream = session_.GetCryptoStream();
+    ASSERT(crypto_stream != nullptr);
+    return crypto_stream->TlsGroupString();
+  }
+
+  const std::string& tlsVersion() const override {
+    static const std::string version("TLSv1.3");
+    return version;
+  }
+
+  const std::string& alpn() const override {
+    if (!alpn_.has_value()) {
+      auto* crypto_stream = session_.GetCryptoStream();
+      ASSERT(crypto_stream != nullptr);
+      alpn_ = std::string(crypto_stream->Alpn());
+    }
+    return *alpn_;
+  }
+
+  const std::string& sni() const override {
+    if (!sni_.has_value()) {
+      auto* crypto_stream = session_.GetCryptoStream();
+      ASSERT(crypto_stream != nullptr);
+      sni_ = std::string(crypto_stream->Sni());
+    }
+    return *sni_;
+  }
+
   // QUIC SSL object doesn't cache local certs after the handshake, and the X509-based local
   // certificate getters are not usable on its CRYPTO_BUFFER-based SSL object.
   // TODO(danzh) cache these fields during cert chain retrieval.
@@ -53,6 +100,8 @@ private:
   // and cached. Null if conversion hasn't happened, was queried before the handshake delivered
   // the peer chain, or failed.
   mutable bssl::UniquePtr<STACK_OF(X509)> peer_cert_chain_;
+  mutable std::optional<std::string> alpn_;
+  mutable std::optional<std::string> sni_;
 };
 
 } // namespace Quic

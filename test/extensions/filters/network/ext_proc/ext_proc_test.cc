@@ -166,7 +166,7 @@ TEST_F(NetworkExtProcFilterTest, ReceiveMessageAfterProcessingComplete) {
   filter_->onGrpcError(Grpc::Status::Internal, "test error");
 
   // Create a message to send - the filter should ignore it
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
   auto* read_data = response->mutable_read_data();
   read_data->set_data("data");
   read_data->set_end_of_stream(false);
@@ -201,7 +201,7 @@ TEST_F(NetworkExtProcFilterTest, ReceiveEmptyMessage) {
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
 
   // Create a message with neither read_data nor write_data
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
 
   // Ensure no data is injected into either filter chain
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
@@ -403,8 +403,7 @@ TEST_F(NetworkExtProcFilterTest, NormalProcessingReadData) {
   // Expect data to be injected to the filter chain
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 
   // Check data counters
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
@@ -444,8 +443,7 @@ TEST_F(NetworkExtProcFilterTest, NormalProcessingWriteData) {
   // Expect data to be injected to the filter chain
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 
   // Check data counters
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
@@ -544,8 +542,7 @@ TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusEdgeCases) {
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
   EXPECT_CALL(read_callbacks_, disableClose(false));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 
   // Test write callbacks with multiple enable/disable
   EXPECT_CALL(*stream_ptr, send(_, false));
@@ -561,8 +558,7 @@ TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusEdgeCases) {
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
   EXPECT_CALL(write_callbacks_, disableClose(false));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 }
 
 // Test downstream connection close event
@@ -1045,8 +1041,7 @@ TEST_F(NetworkExtProcFilterTest, TimerStopsOnResponse) {
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
   EXPECT_CALL(read_callbacks_, disableClose(false));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 
   // No timeout should occur
   EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
@@ -1099,8 +1094,7 @@ TEST_F(NetworkExtProcFilterTest, WriteTimerStopsOnWriteResponse) {
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
   EXPECT_CALL(write_callbacks_, disableClose(false));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 
   EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
@@ -1267,23 +1261,21 @@ TEST_F(NetworkExtProcFilterTest, LoggingInfoLatencyTracking) {
   // Start processing
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
   response->mutable_read_data()->set_data("modified");
   connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
   filter_->onReceiveMessage(std::move(response));
 
   Buffer::OwnedImpl data_second("test_second");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_second, false));
-  auto response_second =
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response_second = Grpc::ResponsePtr<ProcessingResponse>();
   response_second->mutable_read_data()->set_data("modified");
   connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
   filter_->onReceiveMessage(std::move(response_second));
 
   Buffer::OwnedImpl write_data("write");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(write_data, false));
-  auto write_response =
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto write_response = Grpc::ResponsePtr<ProcessingResponse>();
   write_response->mutable_write_data()->set_data("write");
   connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(50));
   filter_->onReceiveMessage(std::move(write_response));
@@ -1345,7 +1337,7 @@ TEST_F(NetworkExtProcFilterTest, HandleConnectionStatusClose) {
   Buffer::OwnedImpl data("test");
   filter_->onData(data, false);
 
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
   response->set_connection_status(envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE);
 
   EXPECT_CALL(connection_,
@@ -1364,7 +1356,7 @@ TEST_F(NetworkExtProcFilterTest, HandleConnectionStatusCloseRst) {
   Buffer::OwnedImpl data("test");
   filter_->onData(data, false);
 
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
   response->set_connection_status(
       envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE_RST);
 
@@ -1384,7 +1376,7 @@ TEST_F(NetworkExtProcFilterTest, HandleConnectionStatusUnknown) {
   Buffer::OwnedImpl data("test");
   filter_->onData(data, false);
 
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
   response->set_connection_status(
       static_cast<envoy::service::network_ext_proc::v3::ProcessingResponse_ConnectionStatus>(999));
 
@@ -1396,7 +1388,7 @@ TEST_F(NetworkExtProcFilterTest, HandleConnectionStatusUnknown) {
 TEST_F(NetworkExtProcFilterTest, RecordCallCompletionNullStartTime) {
   // Directly calling onReceiveMessage without a pending call should trigger recordCallCompletion
   // with nullopt start time
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
   response->mutable_read_data()->set_data("test");
 
   filter_->onReceiveMessage(std::move(response));
@@ -1509,8 +1501,7 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestream) {
   // Expect the stream to be gracefully closed
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 
   // Verify stream closed counter
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
@@ -1550,8 +1541,7 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestreamBalancedCallbacks) {
   EXPECT_CALL(read_callbacks_, disableClose(false));
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 
   // Verify stream closed counter
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
@@ -1589,8 +1579,7 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestreamMultipleOutstandingBalancedCallb
   EXPECT_CALL(read_callbacks_, disableClose(false));
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
 
-  filter_->onReceiveMessage(
-      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
 
   // Verify stream closed counter
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
@@ -1612,7 +1601,7 @@ TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataAllowed) {
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
   auto* dynamic_metadata = response->mutable_dynamic_metadata();
   Protobuf::Struct struct_obj;
   auto& fields = *struct_obj.mutable_fields();
@@ -1640,7 +1629,7 @@ TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataNotAllowed) {
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
-  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
   auto* dynamic_metadata = response->mutable_dynamic_metadata();
   Protobuf::Struct struct_obj;
   auto& fields = *struct_obj.mutable_fields();

@@ -84,12 +84,10 @@ ProxyFilterConfig::ProxyFilterConfig(
     Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory& cluster_store_factory,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context)
     : cluster_store_(cluster_store_factory.get()), dns_cache_manager_(std::move(cache_manager)),
-      dns_cache_(std::move(cache)),
-      cluster_manager_(context.serverFactoryContext().clusterManager()),
-      main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
-      tls_slot_(context.serverFactoryContext().threadLocal()),
+      dns_cache_(std::move(cache)), cluster_manager_(context.clusterManager()),
+      main_thread_dispatcher_(context.mainThreadDispatcher()), tls_slot_(context.threadLocal()),
       cluster_init_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config.sub_cluster_config(),
                                                        cluster_init_timeout, 5000)),
       save_upstream_address_(proto_config.save_upstream_address()),

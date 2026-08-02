@@ -25,6 +25,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -73,7 +74,14 @@ public:
   Stats::Gauge* total_clusters_gauge_{nullptr};
   Stats::Gauge* total_nodes_gauge_{nullptr};
 
+  Stats::Histogram* cx_upgrade_time_{nullptr};
+  Stats::Histogram* cx_idle_expire_time_{nullptr};
+  Stats::Histogram* cx_post_upgrade_lifetime_{nullptr};
+
 private:
+  Stats::Histogram* getHistogram(absl::string_view name, Stats::Scope& stats_store,
+                                 absl::string_view stat_prefix);
+
   // Thread-local dispatcher.
   Event::Dispatcher& dispatcher_;
   // Thread-local socket manager.
@@ -143,6 +151,24 @@ public:
   absl::flat_hash_map<std::string, uint64_t> getCrossWorkerStatMap();
 
   /**
+   * A currently-reachable reverse-tunnel node: its tenant-scoped node_id (the cluster's host key),
+   * the tenant-scoped cluster_id it belongs to, and its connection count.
+   */
+  struct ReachableTunnel {
+    std::string node_id;
+    std::string cluster_id;
+    uint64_t connection_count{0};
+  };
+
+  /**
+   * Enumerate currently-reachable reverse-tunnel nodes across all workers by scanning the
+   * "<stat_prefix>.tunnels.<node_id>" gauges and keeping those with a positive count. Main-thread
+   * safe (reads the process-wide stats store) and eventually consistent. Returns empty unless
+   * detailed stats are enabled.
+   */
+  std::vector<ReachableTunnel> reachableTunnels() const;
+
+  /**
    * Update the cross-thread aggregated stats for the connection.
    * @param node_id the node identifier for the connection.
    * @param cluster_id the cluster identifier for the connection.
@@ -167,6 +193,11 @@ public:
    * @return whether tenant isolation is enabled.
    */
   bool enableTenantIsolation() const { return enable_tenant_isolation_; }
+
+  /**
+   * @return the configured maximum number of concurrently accepted reverse connections per node.
+   */
+  uint32_t maxConnectionsPerNode() const { return max_connections_per_node_; }
 
   /**
    * @return whether lifecycle access logs are configured.
@@ -218,6 +249,18 @@ public:
     }
   }
 
+  void updateIdleExpireTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_idle_expire_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
+    }
+  }
+
+  void updateUpgradeTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_upgrade_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
+    }
+  }
+
   /**
    * Test-only method to set the thread local slot.
    * @param slot the thread local slot to set.
@@ -250,6 +293,7 @@ private:
   uint32_t ping_failure_threshold_{3};
   bool enable_detailed_stats_{false};
   bool enable_tenant_isolation_{false};
+  const uint32_t max_connections_per_node_{0};
   AccessLog::InstanceSharedPtrVector access_logs_;
   ReverseTunnelReporterPtr reporter_{nullptr};
 

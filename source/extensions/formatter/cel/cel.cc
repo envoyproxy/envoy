@@ -83,7 +83,8 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
   if (command == "CEL" || command == "TYPED_CEL") {
     auto parse_status = google::api::expr::parser::Parse(subcommand);
     if (!parse_status.ok()) {
-      throw EnvoyException("Not able to parse expression: " + parse_status.status().ToString());
+      return absl::InvalidArgumentError(
+          absl::StrCat("Not able to parse expression: ", parse_status.status().ToString()));
     }
     Server::Configuration::ServerFactoryContext& context =
         Server::Configuration::ServerFactoryContextInstance::get();
@@ -94,7 +95,7 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
 
   return nullptr;
 #else
-  throw EnvoyException("CEL is not available for use in this environment.");
+  return absl::UnimplementedError("CEL is not available for use in this environment.");
 #endif
 }
 

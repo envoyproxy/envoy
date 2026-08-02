@@ -77,6 +77,7 @@ envoy_cc_library(
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:client_connection_factory_lib",
+        "//source/common/quic:quic_packet_writer_interface",
         "//source/common/quic:quic_server_factory_lib",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",

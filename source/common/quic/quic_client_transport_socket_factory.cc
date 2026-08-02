@@ -4,12 +4,14 @@
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_impl.h"
 
+#include "absl/strings/str_cat.h"
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
 namespace Envoy {
@@ -17,9 +19,21 @@ namespace Quic {
 
 namespace {
 
+// The QUICHE client handshaker requires direct access to the private key, so client certificates
+// configured with a private key provider cannot be supported on QUIC.
+absl::Status validateClientCertificatesForQuic(const Ssl::ClientContextConfig& config) {
+  for (const auto& tls_certificate : config.tlsCertificates()) {
+    if (tls_certificate.get().privateKeyMethod() != nullptr) {
+      return absl::UnimplementedError(
+          "client certificates with a private key provider are not supported on QUIC");
+    }
+  }
+  return absl::OkStatus();
+}
+
 // Installs the configured client certificate chain and private key on the QUICHE client SSL
 // context so that upstream QUIC connections present a certificate when the peer requests one.
-// QUICHE's SSL context uses the CRYPTO_BUFFER-based method, so the chain is installed via
+// The QUICHE SSL context uses the CRYPTO_BUFFER-based method, so the chain is installed via
 // SSL_CTX_set_chain_and_key rather than the X509-based APIs.
 absl::Status configureQuicClientCertChain(SSL_CTX* quic_ssl_ctx,
                                           const Ssl::TlsContext& tls_context) {
@@ -30,6 +44,8 @@ absl::Status configureQuicClientCertChain(SSL_CTX* quic_ssl_ctx,
   EVP_PKEY* private_key = SSL_CTX_get0_privatekey(tls_context.ssl_ctx_.get());
   if (private_key == nullptr) {
     // The private key is not directly accessible when a private key provider is configured.
+    // Configurations with a provider are rejected at config load time and on SDS updates, so
+    // reaching this is a bug (reported by the caller).
     return absl::UnimplementedError(
         "client certificates with a private key provider are not supported on QUIC");
   }
@@ -63,7 +79,7 @@ absl::Status configureQuicClientCertChain(SSL_CTX* quic_ssl_ctx,
   }
   if (SSL_CTX_set_chain_and_key(quic_ssl_ctx, raw_chain.data(), raw_chain.size(), private_key,
                                 nullptr) != 1) {
-    return absl::InvalidArgumentError("failed to install client certificate chain for QUIC");
+    return absl::InternalError("failed to install client certificate chain for QUIC");
   }
   return absl::OkStatus();
 }
@@ -81,6 +97,10 @@ QuicClientTransportSocketFactory::create(
   auto factory = std::unique_ptr<QuicClientTransportSocketFactory>(
       new QuicClientTransportSocketFactory(std::move(config), context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
+  if (factory->client_certificates_enabled_) {
+    // Reject incompatible client certificates at config load time.
+    RETURN_IF_NOT_OK(validateClientCertificatesForQuic(*factory->clientContextConfig()));
+  }
   factory->initialize();
   return factory;
 }
@@ -104,12 +124,24 @@ QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status)
     : QuicTransportSocketFactoryBase(factory_context.statsScope(), "client"),
-      tls_slot_(factory_context.serverFactoryContext().threadLocal()) {
+      tls_slot_(factory_context.serverFactoryContext().threadLocal()),
+      client_certificates_enabled_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_upstream_client_certificates")) {
   auto factory_or_error = Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
       std::move(config), factory_context.serverFactoryContext().sslContextManager(),
       factory_context.statsScope());
   SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
   fallback_factory_ = std::move(*factory_or_error);
+  // Reject SDS updates that deliver a certificate incompatible with QUIC so the update is
+  // surfaced as a config rejection with the usual observability signals, instead of connections
+  // failing later. Static configurations are rejected in create(); a failure in getCryptoConfig()
+  // after these checks is an ENVOY_BUG.
+  fallback_factory_->setSecretUpdateValidationHook([this]() -> absl::Status {
+    if (!client_certificates_enabled_) {
+      return absl::OkStatus();
+    }
+    return validateClientCertificatesForQuic(*clientContextConfig());
+  });
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalQuicConfig>(); });
 }
 
@@ -150,21 +182,19 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
 
     registerCertCompression(tls_config.crypto_config_->ssl_ctx());
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.quic_upstream_client_certificates")) {
-      // The cert selector is rejected at config load time for QUIC, so a production context is
-      // always a plain ClientContextImpl with at most one TLS certificate. The downcast can only
-      // fail for mock contexts in tests.
-      auto* client_context_impl =
-          dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(
-              tls_config.client_context_.get());
-      if (client_context_impl != nullptr && !client_context_impl->getTlsContexts().empty()) {
-        absl::Status status = configureQuicClientCertChain(
-            tls_config.crypto_config_->ssl_ctx(), client_context_impl->getTlsContexts()[0]);
-        if (!status.ok()) {
-          ENVOY_LOG(warn, "Not sending client certificates on QUIC connections: {}",
-                    status.message());
-        }
+    if (client_certificates_enabled_) {
+      absl::Status status = configureQuicClientCertChain(
+          tls_config.crypto_config_->ssl_ctx(), tls_config.client_context_->getTlsContext());
+      if (!status.ok()) {
+        // Incompatible configurations are rejected at config load time and incompatible SDS
+        // updates are rejected by the secret update validation hook, both using the same latched
+        // runtime flag value, so a failure here means a bug. Fail closed rather than sending
+        // connections without the configured client certificate.
+        IS_ENVOY_BUG(absl::StrCat("Failed to install client certificate chain for QUIC: ",
+                                  status.message()));
+        tls_config.client_context_ = nullptr;
+        tls_config.crypto_config_ = nullptr;
+        return nullptr;
       }
     }
   }

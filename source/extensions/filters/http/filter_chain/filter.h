@@ -37,10 +37,11 @@ using FilterFactoriesVector = std::vector<FilterFactory>;
 class FilterChain {
 public:
   FilterChain(const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
-              Server::Configuration::ServerFactoryContext& context,
-              const std::string& stats_prefix);
+              Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix,
+              absl::Status& creation_status);
   FilterChain(const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
-              Server::Configuration::FactoryContext& context, const std::string& stats_prefix);
+              Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
+              absl::Status& creation_status);
 
   absl::Span<const FilterFactory> filterFactories() const { return filter_factories_; }
   bool hasFilter(absl::string_view filter_name) const { return filters_.contains(filter_name); }
@@ -75,8 +76,8 @@ using FilterChainPerRouteConfigConstSharedPtr = std::shared_ptr<const FilterChai
 class FilterChainConfig {
 public:
   FilterChainConfig(const FilterChainConfigProto& proto_config,
-                    Server::Configuration::FactoryContext& context,
-                    const std::string& stats_prefix);
+                    Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
+                    absl::Status& creation_status);
 
   OptRef<const FilterChain> filterChain() const {
     return makeOptRefFromPtr(default_filter_chain_.get());

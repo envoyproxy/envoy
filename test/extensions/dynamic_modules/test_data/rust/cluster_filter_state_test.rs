@@ -1,13 +1,16 @@
-//! Integration test for the cluster filter-state read ABI.
+//! Integration test for the cluster filter-state ABI (read and write).
 //!
-//! Exposes both an HTTP filter and a cluster from the same shared library:
+//! Exposes both an HTTP filter and clusters from the same shared library:
 //! - The HTTP filter writes two filter state entries (bytes + typed) during ``on_request_headers``.
-//! - The cluster reads those entries in ``choose_host`` and returns its pre-registered upstream
-//!   only when both values match the expected payload, otherwise it returns ``NoHost`` so the
-//!   request fails with a 503.
+//! - The ``filter_state_reader`` cluster reads those entries in ``choose_host`` and returns its
+//!   pre-registered upstream only when both values match the expected payload, otherwise it
+//!   returns ``NoHost`` so the request fails with a 503.
+//! - The ``filter_state_writer`` cluster writes two filter state entries (bytes + typed) in
+//!   ``choose_host`` before selecting its upstream, so the access log can read them back on the
+//!   same request.
 //!
-//! The C++ test harness registers an ``ObjectFactory`` under
-//! ``envoy.test.cluster_typed_object`` so the typed write/read path is exercised.
+//! The C++ test harness registers ``ObjectFactory``s under ``envoy.test.cluster_typed_object`` and
+//! ``envoy.test.cluster_written_typed_object`` so the typed read and write paths are exercised.
 
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::{Arc, Mutex};
@@ -16,6 +19,11 @@ const BYTES_KEY: &[u8] = b"test.cluster_filter_state.bytes_key";
 const BYTES_VALUE: &[u8] = b"bytes_value";
 const TYPED_KEY: &[u8] = b"envoy.test.cluster_typed_object";
 const TYPED_VALUE: &[u8] = b"typed_value";
+
+const WRITTEN_BYTES_KEY: &[u8] = b"test.cluster_filter_state.written_bytes_key";
+const WRITTEN_BYTES_VALUE: &[u8] = b"written_bytes_value";
+const WRITTEN_TYPED_KEY: &[u8] = b"envoy.test.cluster_written_typed_object";
+const WRITTEN_TYPED_VALUE: &[u8] = b"written_typed_value";
 
 declare_all_init_functions!(
   my_program_init,
@@ -85,6 +93,9 @@ fn new_cluster_config_fn(
     "filter_state_reader" => Some(Box::new(FilterStateReaderClusterConfig {
       upstream_address,
     })),
+    "filter_state_writer" => Some(Box::new(FilterStateWriterClusterConfig {
+      upstream_address,
+    })),
     _ => None,
   }
 }
@@ -147,6 +158,71 @@ impl ClusterLb for FilterStateReaderLb {
         bytes_match,
         typed_match
       );
+      return HostSelectionResult::NoHost;
+    }
+    let hosts = self.hosts.lock().unwrap();
+    if hosts.0.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    HostSelectionResult::Selected(hosts.0[0])
+  }
+}
+
+// -------------------------------------------------------------------------------------
+// Cluster that writes filter state during host selection.
+// -------------------------------------------------------------------------------------
+
+struct FilterStateWriterClusterConfig {
+  upstream_address: String,
+}
+
+impl ClusterConfig for FilterStateWriterClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(FilterStateWriterCluster {
+      upstream_address: self.upstream_address.clone(),
+      hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
+    })
+  }
+}
+
+struct FilterStateWriterCluster {
+  upstream_address: String,
+  hosts: SharedHostList,
+}
+
+impl Cluster for FilterStateWriterCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    let addresses = vec![self.upstream_address.clone()];
+    let weights = vec![1u32];
+    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+      self.hosts.lock().unwrap().0 = host_ptrs;
+    }
+    envoy_cluster.pre_init_complete();
+  }
+
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    Box::new(FilterStateWriterLb {
+      hosts: self.hosts.clone(),
+    })
+  }
+}
+
+struct FilterStateWriterLb {
+  hosts: SharedHostList,
+}
+
+impl ClusterLb for FilterStateWriterLb {
+  fn choose_host(
+    &mut self,
+    context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    let Some(ctx) = context else {
+      return HostSelectionResult::NoHost;
+    };
+    if !ctx.set_filter_state_bytes(WRITTEN_BYTES_KEY, WRITTEN_BYTES_VALUE)
+      || !ctx.set_filter_state_typed(WRITTEN_TYPED_KEY, WRITTEN_TYPED_VALUE)
+    {
       return HostSelectionResult::NoHost;
     }
     let hosts = self.hosts.lock().unwrap();

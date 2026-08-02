@@ -36,6 +36,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -180,8 +181,11 @@ protected:
     auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
     builder_ = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
         std::move(builder_ptr));
+    absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, 200ms, 10000, *stats_store_.rootScope(),
-                                             "", is_upstream_filter, builder_, factory_context_);
+                                             "", is_upstream_filter, builder_, factory_context_,
+                                             creation_status);
+    ASSERT_OK(creation_status);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -216,6 +220,21 @@ protected:
     response_header_mode: "SEND"
     request_body_mode: "STREAMED"
     response_body_mode: "FULL_DUPLEX_STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  )EOF");
+  }
+
+  void initializeTestGoogleGrpc() {
+    initialize(R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: "ext_proc_server_uri"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
     request_trailer_mode: "SEND"
     response_trailer_mode: "SEND"
   )EOF");
@@ -6300,6 +6319,32 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatencyReturnContinue) {
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 }
 
+TEST_F(HttpFilterTest, ClusterMissingLoggingInfo) {
+  do_start_option_ = OnGrpcError;
+  initializeTestSendAll();
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->logStreamInfo();
+
+  ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server");
+}
+
+TEST_F(HttpFilterTest, GoogleGrpcMissingLoggingInfo) {
+  do_start_option_ = OnGrpcError;
+  initializeTestGoogleGrpc();
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->logStreamInfo();
+
+  ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server_uri");
+}
+
 TEST_F(HttpFilterTest, ResponseCaseToStringCoverage) {
   EXPECT_EQ("request headers",
             responseCaseToString(ProcessingResponse::ResponseCase::kRequestHeaders));
@@ -6395,6 +6440,50 @@ TEST_F(HttpFilterTest, DeferredCloseAlreadyClosed) {
   // Null out the stream
   wrapper.stream_ = nullptr;
   wrapper.closeStreamOnTimer();
+}
+
+// When the ThreadLocalStreamManager is destroyed (e.g. its ThreadLocal slot is torn down by an
+// ext_proc config update) while it still owns open streams, the destructor must close each of them.
+// Otherwise the underlying gRPC streams are left with dangling callbacks references.
+TEST_F(HttpFilterTest, ThreadLocalStreamManagerClosesOpenStreamOnDestruction) {
+  initialize("");
+
+  // Standalone manager so we can control its destruction directly.
+  auto manager = std::make_unique<ThreadLocalStreamManager>();
+  auto stream = std::make_unique<NiceMock<MockStream>>();
+  auto* raw_stream = stream.get();
+  manager->store(std::move(stream), config_->stats(), std::chrono::milliseconds(100));
+
+  // The stream is still open, so the manager destructor must close it.
+  EXPECT_CALL(*raw_stream, close()).WillOnce(Return(true));
+  manager.reset();
+
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// The observability-mode config-update scenario: onDestroy() defers stream closure with a timer,
+// then a config update tears down the ThreadLocalStreamManager before the timer fires. The manager
+// destructor must close the still-open stream instead of dropping it with the underlying gRPC
+// stream's dangling callbacks reference.
+TEST_F(HttpFilterTest, ThreadLocalStreamManagerClosesDeferredStreamOnDestruction) {
+  initialize("");
+
+  auto manager = std::make_unique<ThreadLocalStreamManager>();
+  auto stream = std::make_unique<NiceMock<MockStream>>();
+  auto* raw_stream = stream.get();
+  manager->store(std::move(stream), config_->stats(), std::chrono::milliseconds(100));
+
+  // Arm the deferred-close timer, mirroring observability-mode onDestroy(). Use a dedicated
+  // MockTimer (not tracked in timers_) since it is destroyed with the manager below.
+  auto* deferred_close_timer = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*deferred_close_timer, enableTimer(std::chrono::milliseconds(100), _));
+  manager->deferredErase(raw_stream, dispatcher_);
+
+  // Config update destroys the manager before the timer fires: the stream must still be closed.
+  EXPECT_CALL(*raw_stream, close()).WillOnce(Return(true));
+  manager.reset();
+
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 TEST_F(HttpFilterTest, BufferedPartialBodyMutationAndLeftover) {
@@ -6513,6 +6602,7 @@ TEST_F(HttpFilterTest, LocalResponseStarted) {
 }
 
 } // namespace
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

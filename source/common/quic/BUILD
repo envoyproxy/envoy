@@ -128,6 +128,7 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
         ":envoy_quic_proof_verifier_lib",
+        ":envoy_quic_server_session_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
         "//envoy/event:dispatcher_interface",
@@ -151,6 +152,7 @@ envoy_cc_library(
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
         "@quiche//:quic_core_crypto_certificate_view_lib",
@@ -307,12 +309,12 @@ envoy_cc_library(
     ]),
     deps = envoy_select_enable_http3([
         ":envoy_quic_connection_debug_visitor_factory_interface",
-        ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_crypto_stream_factory_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
+        ":quic_server_transport_socket_factory_lib",
         ":quic_stat_names_lib",
         ":quic_stats_gatherer",
         "//source/common/buffer:buffer_lib",
@@ -507,6 +509,7 @@ envoy_cc_library(
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_preferred_address_config_factory_interface",
         ":envoy_quic_utils_lib",
+        ":quic_packet_writer_interface",
         "//envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
@@ -639,6 +642,22 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["envoy_quic_packet_writer.h"]),
     deps = envoy_select_enable_http3([
         ":envoy_quic_utils_lib",
+        "//envoy/network:udp_packet_writer_handler_interface",
+        "@quiche//:quic_core_packet_writer_lib",
+        "@quiche//:quic_platform",
+    ]),
+)
+
+envoy_cc_library(
+    name = "quic_packet_writer_interface",
+    hdrs = envoy_select_enable_http3(["quic_packet_writer_interface.h"]),
+    deps = envoy_select_enable_http3([
+        "//envoy/network:io_handle_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:quic_core_packet_writer_lib",
         "@quiche//:quic_platform",
     ]),

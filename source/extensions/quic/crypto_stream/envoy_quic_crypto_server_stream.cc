@@ -3,6 +3,7 @@
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/server_context_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -19,26 +20,39 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
     return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
   }
 
-  // QUIC listeners always use QuicServerTransportSocketFactory. The factory's
-  // ssl_ctx_ is set in the constructor and swapped (never nulled) on SDS updates.
   auto& factory = static_cast<const QuicServerTransportSocketFactory&>(*transport_socket_factory);
 
   const bool ticket_support =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support");
-  if (!ticket_support && !factory.requireClientCertificate()) {
+  const bool keylog_support =
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.quic_keylog_support");
+  if (!ticket_support && !keylog_support && !factory.requireClientCertificate()) {
     return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
   }
 
-  // The Envoy handshaker is needed for session ticket handling and/or client certificate
-  // validation. If it is used only because client certificates are required while the session
-  // ticket runtime flag is off, disable resumption: the ticket key callback was not installed on
-  // the SSL context in that case.
-  auto ticket_config = factory.getSessionTicketConfig();
-  bool disable_resumption = !ticket_support || ticket_config.disable_stateless_resumption ||
-                            !ticket_config.has_keys || ticket_config.handles_session_resumption;
+  Ssl::ServerContextSharedPtr pinned_ssl_ctx = factory.sslCtx();
+  bool disable_resumption = false;
+  if (ticket_support) {
+    const auto ticket_config = factory.getSessionTicketConfig();
+    // Also check the pinned context for keys: the factory is shared across
+    // workers and the config snapshot may reflect an SDS update before
+    // ssl_ctx_ is swapped on the main thread. Checking the same instance the
+    // handshaker pins guards against that window. The factory always creates
+    // ServerContextImpl, so the downcast is safe for non-null contexts.
+    auto* server_ctx =
+        static_cast<Extensions::TransportSockets::Tls::ServerContextImpl*>(pinned_ssl_ctx.get());
+    disable_resumption = !ticket_config.has_keys || ticket_config.disable_stateless_resumption ||
+                         ticket_config.handles_session_resumption || server_ctx == nullptr ||
+                         !server_ctx->hasSessionTicketKeys();
+  } else if (factory.requireClientCertificate()) {
+    // The handshaker exists without Envoy-managed session tickets, so the ticket key callback was
+    // not installed on the SSL context; mTLS connections pin full-handshake behavior, so disable
+    // resumption rather than falling back to QUICHE's native ticket handling.
+    disable_resumption = true;
+  }
 
-  return std::make_unique<EnvoyTlsServerHandshaker>(session, crypto_config, factory.sslCtx(),
-                                                    disable_resumption, dispatcher);
+  return std::make_unique<EnvoyTlsServerHandshaker>(
+      session, crypto_config, std::move(pinned_ssl_ctx), disable_resumption, dispatcher);
 }
 
 REGISTER_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl,
