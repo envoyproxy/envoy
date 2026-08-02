@@ -245,6 +245,7 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
   using ListenerManager::apiListener;
   ApiListenerOptRef apiListener() override;
+  ApiListenerOptRef apiListener(absl::string_view name) override;
   ListenerUpdateCallbacksHandlePtr
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
 
@@ -368,7 +369,7 @@ private:
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,
                                              const ListenerImpl& existing_listener);
 
-  ApiListenerPtr api_listener_;
+  absl::flat_hash_map<std::string, ApiListenerPtr> api_listeners_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
   // Warming listeners are listeners that may need further initialization via the listener's init

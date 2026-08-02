@@ -531,7 +531,8 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
           "error adding listener named '{}': api_listener and internal_listener cannot be both set",
           name));
     }
-    if (!api_listener_ && !added_via_api) {
+
+    if (!added_via_api) {
       auto* api_listener_factory =
           Registry::FactoryRegistry<Server::ApiListenerFactory>::getFactory(
               "envoy.http_api_listener");
@@ -539,13 +540,16 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
         return absl::InvalidArgumentError(fmt::format(
             "error adding listener named '{}': missing the API listener extension", name));
       }
-      auto listener_or_error = api_listener_factory->create(config, server_, config.name());
+      auto listener_or_error = api_listener_factory->create(config, server_, name);
       RETURN_IF_NOT_OK_REF(listener_or_error.status());
-      api_listener_ = std::move(listener_or_error.value());
+
+      api_listeners_[name] = std::move(listener_or_error.value());
       return true;
     } else {
-      ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "
-                      "allowed, and it can only be added via bootstrap configuration");
+      ENVOY_LOG(warn,
+                "listener {} can not be added because currently API listeners "
+                "can only be added via bootstrap configuration",
+                name);
       return false;
     }
   }
@@ -1321,7 +1325,19 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
 }
 
 ApiListenerOptRef ListenerManagerImpl::apiListener() {
-  return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : std::nullopt;
+  if (api_listeners_.empty()) {
+    return std::nullopt;
+  }
+  ASSERT(api_listeners_.size() == 1);
+  return ApiListenerOptRef(std::ref(*api_listeners_.begin()->second));
+}
+
+ApiListenerOptRef ListenerManagerImpl::apiListener(absl::string_view name) {
+  auto it = api_listeners_.find(name);
+  if (it != api_listeners_.end()) {
+    return ApiListenerOptRef(std::ref(*it->second));
+  }
+  return std::nullopt;
 }
 
 ListenerUpdateCallbacksHandlePtr
