@@ -104,7 +104,8 @@ TEST_P(QuicMtlsIntegrationTest, NoClientCertHandshakeFailure) {
 
 // A client certificate not signed by the listener's trusted CA fails the handshake.
 TEST_P(QuicMtlsIntegrationTest, UntrustedClientCertHandshakeFailure) {
-  // The test client's certificate is signed by cacert.pem, not upstreamcacert.pem.
+  // The test client's certificate is signed by cacert.pem, not by the upstream CA that the
+  // listener is configured to trust below.
   setRequireClientCertificate("test/config/integration/certs/upstreamcacert.pem");
   initialize();
 

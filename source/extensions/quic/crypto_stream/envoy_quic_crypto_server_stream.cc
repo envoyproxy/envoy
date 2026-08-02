@@ -47,7 +47,7 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
   } else if (factory.requireClientCertificate()) {
     // The handshaker exists without Envoy-managed session tickets, so the ticket key callback was
     // not installed on the SSL context; mTLS connections pin full-handshake behavior, so disable
-    // resumption rather than falling back to QUICHE's native ticket handling.
+    // resumption rather than falling back to native QUICHE ticket handling.
     disable_resumption = true;
   }
 

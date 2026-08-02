@@ -35,7 +35,7 @@ class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker,
                                  protected Logger::Loggable<Logger::Id::quic> {
 public:
   // Bridges the completion of an asynchronous Envoy cert validation back to the QUICHE
-  // handshake. QUICHE's own async proof-verify completion path assumes a client connection, so
+  // handshake. The QUICHE async proof-verify completion path assumes a client connection, so
   // instead of running the QUICHE callback directly, completion is routed through
   // onAsyncCertValidationDone() which resumes the server handshake with a packet flusher
   // attached (mirroring quic::TlsServerHandshaker::AdvanceHandshakeFromCallback). The handshaker

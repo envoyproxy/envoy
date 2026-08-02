@@ -124,7 +124,7 @@ void EnvoyTlsServerHandshaker::onAsyncCertValidationDone(
     bool succeeded, const std::string& error_details,
     std::unique_ptr<quic::ProofVerifierCallback> quic_callback) {
   pending_validation_callback_ = nullptr;
-  // QUICHE's proof verify completion (ProofVerifierCallbackImpl::Run) resumes the handshake with
+  // The QUICHE proof verify completion (ProofVerifierCallbackImpl::Run) resumes the handshake with
   // a plain AdvanceHandshake(), which asserts on the server side that a packet flusher is
   // attached. Mirror quic::TlsServerHandshaker::AdvanceHandshakeFromCallback by attaching a
   // flusher around the resumption and notifying the delegate afterwards.
