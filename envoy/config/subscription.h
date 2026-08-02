@@ -166,12 +166,6 @@ public:
  */
 struct SubscriptionOptions {
   /**
-   * For legacy VHDS, should an xDS resource name be treated as <namespace>/<resource name>? This is
-   * incompatible with the use of xdstp:// naming.
-   */
-  bool use_namespace_matching_{};
-
-  /**
    * For xdstp:// resource names, should node context parameters be added at the transport layer?
    */
   bool add_xdstp_node_context_params_{};
@@ -214,10 +208,7 @@ public:
    * @param removed_resources names of resources that this fetch instructed to be removed.
    * @param system_version_info aggregate response data "version", for debugging.
    * @throw EnvoyException with reason if the config changes are rejected. Otherwise the changes
-   * @param use_namespace_matching if the resources should me matched on their namespaces, rather
-   * than unique names. This is used when a collection of resources (e.g. virtual hosts in VHDS) is
-   * being updated. Accepted changes have their version_info reflected in subsequent
-   * requests.
+   * are accepted and have their version_info reflected in subsequent requests.
    */
   virtual void
   onConfigUpdate(absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
@@ -260,6 +251,25 @@ public:
    * @param add_these_names resource ids for inclusion in the discovery request.
    */
   virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) PURE;
+
+  /**
+   * Declares the resource-name patterns this subscription ACCEPTS for routing. This affects routing
+   * ONLY and never changes the discovery request sent to the management server.
+   *
+   * By default (accept() never called), the subscription routes exactly the resources it requested;
+   * if that set is empty or contains the wildcard "*", it is a catch-all and routes every resource.
+   * When accept(patterns) is called, the patterns are evaluated first and suppress the default
+   * wildcard (catch-all) semantics: only resources matching 'patterns' (plus explicitly requested
+   * names) are routed. Each pattern must be the wildcard (the "*" string) or a suffix glob (a
+   * prefix followed by a slash and an asterisk), matching every resource under that prefix. To keep
+   * wildcard routing while using accept(), include "*" in the patterns.
+   *
+   * This lets a subscription accept resources it cannot enumerate up front while still subscribing
+   * to the wildcard on the wire (e.g. VHDS virtual hosts under a route configuration). Only
+   * meaningful for gRPC subscriptions; other subscription types treat this as a no-op.
+   * @param patterns wildcard / suffix-glob patterns to accept.
+   */
+  virtual void accept(const absl::flat_hash_set<std::string>& patterns) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

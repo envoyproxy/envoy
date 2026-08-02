@@ -1643,11 +1643,6 @@ TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
   EXPECT_NO_THROW(scoped = null_mux_.pause(params));
 }
 
-TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
-  EXPECT_ENVOY_BUG(null_mux_.requestOnDemandUpdate("type_url", {"for_update"}),
-                   "unexpected request for on demand update");
-}
-
 TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
   NiceMock<MockSubscriptionCallbacks> callbacks;
   OpaqueResourceDecoderSharedPtr resource_decoder(
@@ -1906,12 +1901,6 @@ TEST_P(GrpcMuxImplTest, ShutdownPreventsSending) {
   // We do not expect any messages to be sent here as the mux has been shutdown.
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _)).Times(0);
   auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
-}
-
-TEST_P(GrpcMuxImplTest, RequestOnDemandUpdateDoesNothing) {
-  setup();
-  // Should not throw or crash.
-  grpc_mux_->requestOnDemandUpdate("foo", {"z"});
 }
 
 } // namespace

@@ -824,6 +824,70 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsWildcardUpgradeOnReconnect) {
                                            {"*", "my_route/vhost.first"}, {}, vhds_stream_.get()));
 }
 
+// End-to-end regression guard for on-demand VHDS after the switch to accept()-based routing: two
+// requests to two DIFFERENT unknown virtual hosts each trigger an on-demand VHDS fetch (via
+// requestOnDemandUpdate()/append()), and both must be routed and resolved. VHDS declares
+// accept("my_route/*") for routing, so on-demand virtual-host names under that route configuration
+// are delivered to the subscription and the requests succeed.
+TEST_P(OnDemandVhdsIntegrationTest, VhdsTwoOnDemandVirtualHostsRouteResponses) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // First on-demand virtual host: vhost.first.
+  {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"x-lyft-user-id", "123"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.first")}, {},
+                                             vhds_stream_.get()));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "2", vhds_stream_.get(),
+        {"my_route/vhost.first"});
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+    waitForNextUpstreamRequest(1);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForHeaders();
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+
+  // Second on-demand virtual host: vhost.second, a DIFFERENT name -> a second append() on the same
+  // subscription. Its response must also be routed for the request to succeed.
+  {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.second"},
+                                                   {"x-lyft-user-id", "123"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.second")}, {},
+                                             vhds_stream_.get()));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost,
+        {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+            virtualHostYaml("my_route/vhost_2", "vhost.second"))},
+        {}, "3", vhds_stream_.get(), {"my_route/vhost.second"});
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+    waitForNextUpstreamRequest(1);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForHeaders();
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+}
+
 // Test class for VHDS on-demand updates with request bodies
 class OnDemandVhdsWithBodyIntegrationTest
     : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, VhdsIntegrationTestParam>>,

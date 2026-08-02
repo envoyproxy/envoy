@@ -600,6 +600,86 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
   cleanupUpstreamAndDownstream();
 }
 
+// Regression test for on-demand CDS with two DIFFERENT clusters on the same subscription:
+//  - a request to unknown cluster "new_cluster" triggers on-demand discovery (the initial
+//    subscription, via start()), which is resolved and the request succeeds;
+//  - a request to a different unknown cluster "new_cluster_2" triggers a SECOND on-demand
+//    discovery, which goes through requestOnDemandUpdate()/append() on the already-started
+//    subscription.
+TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoverySecondClusterRoutesResponse) {
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
+                    "integration", {});
+  initialize();
+
+  // A second cluster for the second on-demand request. It points at the same upstream as
+  // "new_cluster" -- the endpoint is irrelevant here; what matters is that the second on-demand
+  // response is routed so the cluster is added.
+  auto second_cluster = ConfigHelper::buildStaticCluster(
+      "new_cluster_2", fake_upstreams_[new_cluster_upstream_idx_]->localAddress()->ip()->port(),
+      Network::Test::getLoopbackAddressString(ipVersion()));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // First request -> first on-demand cluster ("new_cluster"). This is the initial (start()-time)
+  // subscription, which was always routed correctly.
+  Http::TestRequestHeaderMapImpl request_headers_1{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response_1 = codec_client_->makeHeaderOnlyRequest(request_headers_1);
+
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response_1->waitForEndStream());
+  verifyResponse(std::move(response_1), "200", {}, {});
+
+  // Reset the downstream/upstream between the two independent requests (the second request routes
+  // to a different cluster, i.e. a new upstream connection). The ODCDS (xds) stream persists.
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Second request -> a DIFFERENT on-demand cluster ("new_cluster_2"). This is the second on-demand
+  // request on the same subscription, so it flows through requestOnDemandUpdate()/append(). The
+  // response must be routed to the ODCDS callbacks so the cluster is added and the request succeeds
+  // (before the fix this timed out with a 503).
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers_2{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"Pick-This-Cluster", "new_cluster_2"}};
+  IntegrationStreamDecoderPtr response_2 = codec_client_->makeHeaderOnlyRequest(request_headers_2);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster_2"},
+                                           {}, odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {second_cluster}, {}, "2", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response_2->waitForEndStream());
+  verifyResponse(std::move(response_2), "200", {}, {});
+
+  cleanUpXdsConnection();
+  cleanupUpstreamAndDownstream();
+}
+
 // tests a scenario when:
 //  - making a request to an unknown cluster
 //  - odcds initiates a connection with a request for the cluster

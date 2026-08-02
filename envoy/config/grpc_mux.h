@@ -49,6 +49,39 @@ public:
    * @param resources set of resource names to watch for
    */
   virtual void update(const absl::flat_hash_set<std::string>& resources) PURE;
+
+  /**
+   * Adds resources to the set the watch is interested in, without disturbing the resources it
+   * already watches (the additive counterpart to update()). This updates BOTH the watch-level
+   * routing and the subscription sent to the management server, so it is how on-demand requests add
+   * a new resource: the watch will route the resource when it arrives, and the server is told to
+   * send it.
+   * @param resources set of resource names to additionally watch for and subscribe to.
+   */
+  virtual void append(const absl::flat_hash_set<std::string>& resources) PURE;
+
+  /**
+   * Declares the resource-name patterns this watch ACCEPTS for routing. This affects routing ONLY
+   * and never changes the subscription sent to the management server (that is driven solely by
+   * update()/append()).
+   *
+   * By default (accept() never called), the watch is routed exactly the resources it watches via
+   * update()/append(); if that set is empty or contains the wildcard "*", the watch is a catch-all
+   * and is routed every resource.
+   *
+   * When accept(patterns) is called, the patterns are evaluated FIRST and SUPPRESS the default
+   * wildcard (catch-all) semantics: the watch is then routed only resources matching 'patterns',
+   * plus any concrete names it explicitly watches. Each pattern must be the wildcard "*" (accept
+   * every resource) or a suffix glob -- a prefix followed by a slash and an asterisk -- which
+   * accepts every resource named with that prefix. This is how a watch can subscribe to the
+   * wildcard on the wire (update({"*"})) while routing only a subset -- e.g. VHDS, which accepts
+   * only virtual hosts under its route configuration. To keep wildcard routing while using
+   * accept(), include "*" in the patterns.
+   *
+   * Calling accept({}) clears any previously registered patterns and restores the default behavior.
+   * @param patterns set of wildcard / suffix-glob patterns to accept.
+   */
+  virtual void accept(const absl::flat_hash_set<std::string>& patterns) PURE;
 };
 
 using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
@@ -108,9 +141,6 @@ public:
                                    SubscriptionCallbacks& callbacks,
                                    OpaqueResourceDecoderSharedPtr resource_decoder,
                                    const SubscriptionOptions& options) PURE;
-
-  virtual void requestOnDemandUpdate(const std::string& type_url,
-                                     const absl::flat_hash_set<std::string>& for_update) PURE;
 
   /**
    * Returns an EdsResourcesCache for this GrpcMux if there is one.
