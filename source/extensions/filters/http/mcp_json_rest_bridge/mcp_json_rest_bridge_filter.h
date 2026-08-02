@@ -159,6 +159,8 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  bool perRouteOnly() const { return proto_config_.per_route_only(); }
+
 private:
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
