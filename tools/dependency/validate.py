@@ -38,7 +38,7 @@ IGNORE_DEPS = set([
 # docs/root/intro/arch_overview/security/external_deps.rst.
 def test_only_ignore(dep):
     # Rust
-    if dep.startswith('raze__'):
+    if dep.startswith('raze__') or dep.startswith('cu__') or dep == 'cu':
         return True
     # Java
     if dep.startswith('remotejdk'):

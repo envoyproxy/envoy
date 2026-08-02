@@ -13,11 +13,6 @@ lto = true
 opt-level = 3
 panic = "abort"
 
-[package.metadata.raze]
-package_aliases_dir = "."
-workspace_path = "//bazel/external/cargo"
-genmode = "Remote"
-
 [[example]]
 name = "grpc_call_rust"
 path = "../../../test/extensions/filters/http/wasm/test_data/grpc_call_rust.rs"
