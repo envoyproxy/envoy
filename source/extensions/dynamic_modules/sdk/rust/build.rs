@@ -19,6 +19,9 @@ fn main() {
   let bindings = bindgen::Builder::default()
     .header(abi_header.to_str().unwrap())
     .clang_arg("-v")
+    .allowlist_type("envoy_.*")
+    .allowlist_function("envoy_.*")
+    .allowlist_var("envoy_.*")
     .default_enum_style(bindgen::EnumVariation::Rust {
       non_exhaustive: false,
     })

@@ -79,7 +79,15 @@ def envoy_dependency_imports(
     )
     rules_rust_dependencies()
     rust_register_toolchains(
-        versions = ["1.88.0"],
+        versions = ["1.93.0"],
+        extra_exec_rustc_flags = {
+            "x86_64-unknown-linux-gnu": ["-Clink-self-contained=no"],
+            "aarch64-unknown-linux-gnu": ["-Clink-self-contained=no"],
+        },
+        extra_rustc_flags = {
+            "x86_64-unknown-linux-gnu": ["-Clink-self-contained=no"],
+            "aarch64-unknown-linux-gnu": ["-Clink-self-contained=no"],
+        },
         extra_target_triples = [
             "wasm32-unknown-unknown",
             "wasm32-wasip1",

@@ -816,9 +816,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     let mut buffered_body_len: usize = 0;
     let mut body_content = String::new();
 
-    let buffered_body = envoy_filter.get_buffered_request_body();
-    if buffered_body.is_some() {
-      for chunk in buffered_body.unwrap() {
+    if let Some(buffered_body) = envoy_filter.get_buffered_request_body() {
+      for chunk in buffered_body {
         buffered_body_len += chunk.as_slice().len();
         body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
       }
@@ -826,9 +825,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
       assert_eq!(buffered_body_len, buffered_body_len_directly);
     }
 
-    let received_body = envoy_filter.get_received_request_body();
-    if received_body.is_some() {
-      for chunk in received_body.unwrap() {
+    if let Some(received_body) = envoy_filter.get_received_request_body() {
+      for chunk in received_body {
         received_body_len += chunk.as_slice().len();
         body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
       }
@@ -876,9 +874,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     let mut received_body_len: usize = 0;
     let mut body_content = String::new();
 
-    let buffered_body = envoy_filter.get_buffered_response_body();
-    if buffered_body.is_some() {
-      for chunk in buffered_body.unwrap() {
+    if let Some(buffered_body) = envoy_filter.get_buffered_response_body() {
+      for chunk in buffered_body {
         buffered_body_len += chunk.as_slice().len();
         body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
       }
@@ -886,9 +883,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
       assert_eq!(buffered_body_len, buffered_body_len_directly);
     }
 
-    let received_body = envoy_filter.get_received_response_body();
-    if received_body.is_some() {
-      for chunk in received_body.unwrap() {
+    if let Some(received_body) = envoy_filter.get_received_response_body() {
+      for chunk in received_body {
         received_body_len += chunk.as_slice().len();
         body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
       }
