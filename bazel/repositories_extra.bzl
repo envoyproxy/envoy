@@ -30,8 +30,9 @@ def envoy_dependencies_extra(
     java_compatibility_proxy_repo()
     bazel_toolchain_dependencies()
     setup_libcxx_libs()
-    setup_llvm_minimal()
-    llvm_toolchain_alias(name = "llvm_toolchain_llvm")
+    if not use_host_tools:
+        setup_llvm_minimal()
+        llvm_toolchain_alias(name = "llvm_toolchain_llvm")
     setup_sysroots(glibc_version = glibc_version)
     emsdk_deps()
     raze_fetch_remote_crates()
