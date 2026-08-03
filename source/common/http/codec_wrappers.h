@@ -108,10 +108,8 @@ private:
     if (inner_handle_ == nullptr) {
       return inner_;
     }
-    if (inner_handle_) {
-      if (OptRef<ResponseDecoder> inner = inner_handle_->get(); inner.has_value()) {
-        return &inner.value().get();
-      }
+    if (OptRef<ResponseDecoder> inner = inner_handle_->get(); inner.has_value()) {
+      return &inner.value().get();
     }
     return nullptr;
   }

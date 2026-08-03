@@ -48,11 +48,6 @@ public:
     updateCapacity(quiche_capacity_ - 1);
   }
 
-  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
-    updateQuicheCapacity();
-    return MultiplexedActiveClientBase::newStreamEncoder(response_decoder);
-  }
-
   RequestEncoder& newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) override {
     updateQuicheCapacity();
     return MultiplexedActiveClientBase::newStreamEncoder(std::move(response_decoder_handle));
