@@ -89,6 +89,8 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   } else if (callbacks_->upstreamCallbacks()->pausedForWebsocketUpgrade()) {
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  } else if (callbacks_->upstreamCallbacks()->pausedForGenericUpgrade()) {
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -155,6 +157,17 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
       ((Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers))))) {
     filter_.callbacks_->upstreamCallbacks()->setPausedForConnect(false);
     filter_.callbacks_->continueDecoding();
+  }
+
+  if (filter_.callbacks_->upstreamCallbacks()->pausedForGenericUpgrade()) {
+    const uint64_t status = Http::Utility::getResponseStatus(*headers);
+    const auto protocol = filter_.callbacks_->upstreamCallbacks()->upstreamStreamInfo().protocol();
+    if (status == static_cast<uint64_t>(Http::Code::SwitchingProtocols) ||
+        (protocol.has_value() && protocol.value() != Envoy::Http::Protocol::Http11 &&
+         Http::CodeUtility::is2xx(status))) {
+      filter_.callbacks_->upstreamCallbacks()->setPausedForGenericUpgrade(false);
+      filter_.callbacks_->continueDecoding();
+    }
   }
 
   if (filter_.callbacks_->upstreamCallbacks()->pausedForWebsocketUpgrade()) {
