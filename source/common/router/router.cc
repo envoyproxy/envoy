@@ -108,7 +108,9 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     // TODO(wbpcode): To validate the terminal filter is upstream codec filter by the proto.
     Server::Configuration::ServerFactoryContext& server_factory_ctx =
         context.serverFactoryContext();
-    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+    // Retained as a member: the manager is an unpinned singleton, and the ECDS subscriptions
+    // created below hold a raw reference to it that they dereference on destruction.
+    upstream_filter_config_provider_manager_ =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
     std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
@@ -116,7 +118,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, server_factory_ctx,
+        helper(*upstream_filter_config_provider_manager_, server_factory_ctx,
                context.serverFactoryContext().clusterManager(), *upstream_ctx_, prefix);
     SET_AND_RETURN_IF_NOT_OK(helper.processFilters(config.upstream_http_filters(),
                                                    "router upstream http", "router upstream http",
