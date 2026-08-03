@@ -5916,6 +5916,109 @@ TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
   EXPECT_EQ("/#fragment", default_request_headers_.getPathValue());
 }
 
+// Tests for x-envoy-internal-redirect-on per-request header.
+// The route has no internal_redirect_policy; redirect is driven solely by the header.
+
+TEST_F(RouterTest, InternalRedirectOnHeaderAccepted302) {
+  // Route redirect policy disabled; header enables it for 302.
+  ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, enabled())
+      .WillByDefault(Return(false));
+  ON_CALL(callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+
+  default_request_headers_.setCopy(Http::LowerCaseString("x-envoy-internal-redirect-on"), "302");
+  sendRequest();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(302)));
+
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+  router_->onDestroy();
+}
+
+TEST_F(RouterTest, InternalRedirectOnHeaderAccepted3xxShorthand) {
+  // "3xx" shorthand enables redirect for any 3xx code.
+  ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, enabled())
+      .WillByDefault(Return(false));
+  ON_CALL(callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+
+  default_request_headers_.setCopy(Http::LowerCaseString("x-envoy-internal-redirect-on"), "3xx");
+  sendRequest();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(302)));
+
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+  router_->onDestroy();
+}
+
+TEST_F(RouterTest, InternalRedirectOnHeaderRejectedForUnlistedCode) {
+  // Header only lists 301; upstream responds with 302 — should NOT redirect.
+  ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, enabled())
+      .WillByDefault(Return(false));
+  ON_CALL(callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+
+  default_request_headers_.setCopy(Http::LowerCaseString("x-envoy-internal-redirect-on"), "301");
+  sendRequest();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(302)));
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  Buffer::OwnedImpl data("1234567890");
+  response_decoder_->decodeData(data, true);
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+}
+
+TEST_F(RouterTest, InternalRedirectOnHeaderStrippedOnRedirect) {
+  // After redirect the header must not be present on the re-issued request.
+  ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, enabled())
+      .WillByDefault(Return(false));
+  ON_CALL(callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+
+  default_request_headers_.setCopy(Http::LowerCaseString("x-envoy-internal-redirect-on"), "302");
+  sendRequest();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(302)));
+
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  // Header must have been removed from the downstream headers before the second pass.
+  EXPECT_EQ(nullptr, default_request_headers_.get(
+                         Http::LowerCaseString("x-envoy-internal-redirect-on"))[0]);
+  router_->onDestroy();
+}
+
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects(3);
