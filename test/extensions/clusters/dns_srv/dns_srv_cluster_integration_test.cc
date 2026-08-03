@@ -43,11 +43,11 @@ public:
 
           envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig dns_srv_cluster{};
           dns_srv_cluster.set_srv_name("_local_service._tcp.service.consul.");
-          cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(dns_srv_cluster);
+          ASSERT_TRUE(cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(dns_srv_cluster));
 
           cluster.mutable_typed_dns_resolver_config()->set_name("envoy.network.dns_resolver.cares");
-          cluster.mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-              envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig());
+          ASSERT_TRUE(cluster.mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+              envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()));
         });
   }
 

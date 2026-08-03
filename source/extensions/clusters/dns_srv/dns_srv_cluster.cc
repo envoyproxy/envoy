@@ -182,7 +182,7 @@ void DnsSrvCluster::allTargetsResolved() {
       priority_state_manager.updateClusterPrioritySet(
           current_priority,
           std::move(priority_state_manager.priorityState()[current_priority].first), hosts_added,
-          hosts_removed, absl::nullopt, weighted_priority_health_, overprovisioning_factor_);
+          hosts_removed, std::nullopt, weighted_priority_health_, overprovisioning_factor_);
     } else {
       info_->configUpdateStats().update_no_rebuild_.inc();
     }
