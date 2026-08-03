@@ -62,6 +62,29 @@ bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
 
+// Parses the value of the x-envoy-internal-redirect-on header into a set of HTTP redirect codes.
+// Accepts individual codes ("301", "302", "303", "307", "308") or the shorthand "3xx" to enable
+// all of them. Returns an empty set if the header value is empty or unrecognized.
+absl::flat_hash_set<Http::Code> parseInternalRedirectOn(absl::string_view header_value) {
+  static const absl::flat_hash_set<uint32_t> kValidCodes = {301, 302, 303, 307, 308};
+  absl::flat_hash_set<Http::Code> result;
+  for (absl::string_view token :
+       StringUtil::splitToken(header_value, ",", /*keep_empty=*/false, /*trim=*/true)) {
+    const auto& values = Http::Headers::get().EnvoyInternalRedirectOnValues;
+    if (token == values.All) {
+      for (uint32_t code : kValidCodes) {
+        result.insert(static_cast<Http::Code>(code));
+      }
+      return result;
+    }
+    uint32_t code = 0;
+    if (absl::SimpleAtoi(token, &code) && kValidCodes.contains(code)) {
+      result.insert(static_cast<Http::Code>(code));
+    }
+  }
+  return result;
+}
+
 } // namespace
 
 absl::StatusOr<std::unique_ptr<FilterConfig>>
@@ -1954,10 +1977,23 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     }
   }
 
-  if (route_entry_->internalRedirectPolicy().enabled() &&
-      route_entry_->internalRedirectPolicy().shouldRedirectForResponseCode(
-          static_cast<Http::Code>(response_code)) &&
-      setupRedirect(*headers)) {
+  // Check for the per-request x-envoy-internal-redirect-on header. When present it activates
+  // internal redirect even if the route has no internal_redirect_policy configured. The header
+  // value is a comma-separated list of redirect codes ("301", "302", ...) or the shorthand "3xx".
+  const bool route_redirect_enabled = route_entry_->internalRedirectPolicy().enabled();
+  absl::flat_hash_set<Http::Code> header_redirect_codes;
+  if (downstream_headers_ && downstream_headers_->EnvoyInternalRedirectOn()) {
+    header_redirect_codes =
+        parseInternalRedirectOn(downstream_headers_->getEnvoyInternalRedirectOnValue());
+  }
+  const Http::Code response_code_enum = static_cast<Http::Code>(response_code);
+  const bool should_redirect =
+      (route_redirect_enabled &&
+       route_entry_->internalRedirectPolicy().shouldRedirectForResponseCode(response_code_enum)) ||
+      (!route_redirect_enabled && !header_redirect_codes.empty() &&
+       header_redirect_codes.contains(response_code_enum));
+
+  if (should_redirect && setupRedirect(*headers)) {
     return;
     // If the redirect could not be handled, fail open and let it pass to the
     // next downstream.
@@ -2342,6 +2378,8 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 
   num_internal_redirect->increment();
   restore_original_headers.cancel();
+  // Consume the header so it is not forwarded to the upstream on the redirected request.
+  downstream_headers.removeEnvoyInternalRedirectOn();
   // Preserve the original request URL for the second pass.
   downstream_headers.setEnvoyOriginalUrl(
       absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
