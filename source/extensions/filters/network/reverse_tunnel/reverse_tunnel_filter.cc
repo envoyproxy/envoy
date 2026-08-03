@@ -126,8 +126,8 @@ absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>> ReverseTunnelFilterCo
   // Build the JWT handshake validator if it is configured. This runs here rather than in the
   // constructor so that a bad configuration fails at config load time.
   JwtHandshakeValidatorPtr jwt_validator;
-  if (proto_config.has_jwt_validation()) {
-    auto validator_or_error = JwtHandshakeValidator::create(proto_config.jwt_validation(), context,
+  if (proto_config.has_jwt_validator()) {
+    auto validator_or_error = JwtHandshakeValidator::create(proto_config.jwt_validator(), context,
                                                             std::move(create_fetcher_fn));
     if (!validator_or_error.ok()) {
       return validator_or_error.status();

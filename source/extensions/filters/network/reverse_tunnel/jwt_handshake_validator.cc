@@ -40,7 +40,7 @@ JwtHandshakeValidator::create(const JwtHandshakeValidatorProto& jwt,
                               JwksFetcherFactory create_fetcher_fn) {
   // An issuer is required. Without one, a validly signed token from any issuer would be accepted.
   if (jwt.issuer().empty()) {
-    return absl::InvalidArgumentError("reverse_tunnel jwt_validation: `issuer` is required");
+    return absl::InvalidArgumentError("reverse_tunnel jwt_validator: `issuer` is required");
   }
 
   CommonJwks::JwksProviderSharedPtr provider;
@@ -50,7 +50,7 @@ JwtHandshakeValidator::create(const JwtHandshakeValidatorProto& jwt,
         jwt.local_jwks(), context.serverFactoryContext().api());
     if (!provider_or_error.ok()) {
       return absl::InvalidArgumentError(
-          fmt::format("reverse_tunnel jwt_validation: {}", provider_or_error.status().message()));
+          fmt::format("reverse_tunnel jwt_validator: {}", provider_or_error.status().message()));
     }
     provider = std::move(provider_or_error.value());
     break;
@@ -65,14 +65,14 @@ JwtHandshakeValidator::create(const JwtHandshakeValidatorProto& jwt,
         stats.jwt_jwks_fetch_failed_);
     if (!provider_or_error.ok()) {
       return absl::InvalidArgumentError(
-          fmt::format("reverse_tunnel jwt_validation: {}", provider_or_error.status().message()));
+          fmt::format("reverse_tunnel jwt_validator: {}", provider_or_error.status().message()));
     }
     provider = std::move(provider_or_error.value());
     break;
   }
   case JwtHandshakeValidatorProto::JWKS_SOURCE_SPECIFIER_NOT_SET:
     return absl::InvalidArgumentError(
-        "reverse_tunnel jwt_validation: a JWKS source (local_jwks or remote_jwks) is required");
+        "reverse_tunnel jwt_validator: a JWKS source (local_jwks or remote_jwks) is required");
   }
 
   return std::unique_ptr<JwtHandshakeValidator>(

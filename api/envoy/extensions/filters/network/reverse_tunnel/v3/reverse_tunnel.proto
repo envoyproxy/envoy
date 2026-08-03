@@ -171,7 +171,7 @@ message ReverseTunnel {
   //
   // See :ref:`JwtHandshakeValidator
   // <envoy_v3_api_msg_extensions.filters.common.jwks.v3.JwtHandshakeValidator>`.
-  common.jwks.v3.JwtHandshakeValidator jwt_validation = 10;
+  common.jwks.v3.JwtHandshakeValidator jwt_validator = 10;
 
   // Enforces the per-node concurrent connection cap (``max_connections_per_node``, configured on
   // the ``UpstreamReverseConnectionSocketInterface`` bootstrap extension) for tunnels accepted by

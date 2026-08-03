@@ -139,7 +139,7 @@ private:
   // socket interface bootstrap extension) before completing a reverse tunnel handshake.
   const bool enable_connection_limit_{false};
 
-  // JWT handshake authentication (experimental). nullptr when `jwt_validation` is not set.
+  // JWT handshake authentication (experimental). nullptr when `jwt_validator` is not set.
   const JwtHandshakeValidatorPtr jwt_validator_;
 };
 

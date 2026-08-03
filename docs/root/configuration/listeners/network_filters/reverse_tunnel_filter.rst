@@ -19,7 +19,7 @@ Configuration notes:
   ``<tenant>:<cluster>`` so that the same node or cluster identifier can be reused across tenants.
   To avoid ambiguity, handshake requests that contain the ``:`` delimiter in any of the reverse
   tunnel headers are rejected. This option is disabled by default for backwards compatibility.
-- **Remote JWKS**: with ``jwt_validation.remote_jwks``, each configured filter fetches and refreshes
+- **Remote JWKS**: with ``jwt_validator.remote_jwks``, each configured filter fetches and refreshes
   the JWKS on its own background timer. Several reverse tunnel listeners that share one issuer each
   run a separate fetch loop rather than sharing a single one.
 

@@ -1750,7 +1750,7 @@ cluster_type:
   client_b1->close();
 }
 
-// Inline JWT handshake authentication (jwt_validation), end to end.
+// Inline JWT handshake authentication (jwt_validator), end to end.
 
 std::string makeJwtHandshakeRequest(absl::string_view authorization) {
   std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
@@ -1768,7 +1768,7 @@ std::string makeJwtHandshakeRequest(absl::string_view authorization) {
 // A valid token verified against an inline JWKS completes the handshake (200).
 TEST_P(ReverseTunnelFilterIntegrationTest, JwtLocalJwksValidTokenAccepted) {
   const std::string jwt_config = fmt::format(R"(
-          jwt_validation:
+          jwt_validator:
             issuer: "{}"
             local_jwks:
               inline_string: '{}')",
@@ -1789,7 +1789,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, JwtLocalJwksValidTokenAccepted) {
 // A missing token is rejected with 401 before the socket is registered.
 TEST_P(ReverseTunnelFilterIntegrationTest, JwtLocalJwksMissingTokenRejected) {
   const std::string jwt_config = fmt::format(R"(
-          jwt_validation:
+          jwt_validator:
             issuer: "{}"
             local_jwks:
               inline_string: '{}')",
@@ -1829,7 +1829,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, JwtRemoteJwksUnavailableRejectsValidT
     addr->set_port_value(1);
   });
   const std::string jwt_config = fmt::format(R"(
-          jwt_validation:
+          jwt_validator:
             issuer: "{}"
             remote_jwks:
               http_uri:
@@ -1899,7 +1899,7 @@ TEST_P(ReverseTunnelJwtRemoteIntegrationTest, ValidTokenAcceptedAfterFetch) {
     jwks_cluster->set_name("jwks_cluster");
   });
   const std::string jwt_config = fmt::format(R"(
-          jwt_validation:
+          jwt_validator:
             issuer: "{}"
             remote_jwks:
               http_uri:
@@ -1936,7 +1936,7 @@ TEST_P(ReverseTunnelJwtRemoteIntegrationTest, InitTargetBlocksUntilFetched) {
     jwks_cluster->set_name("jwks_cluster");
   });
   const std::string jwt_config = fmt::format(R"(
-          jwt_validation:
+          jwt_validator:
             issuer: "{}"
             remote_jwks:
               http_uri:
