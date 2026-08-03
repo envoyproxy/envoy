@@ -162,7 +162,7 @@ message ParserConfig {
 
 // Per-route override configuration for MCP filter
 message McpOverride {
-  // Optional per-route traffic mode override
+  // Overrides the global traffic mode for this route.
   Mcp.TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Optional per-route max request body size override.
@@ -170,19 +170,15 @@ message McpOverride {
   // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
   google.protobuf.UInt32Value max_request_body_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
 
-  // Optional per-route clear route cache override.
-  // When set, this overrides the global clear_route_cache setting for this route.
-  google.protobuf.BoolValue clear_route_cache = 3;
+  // Overrides the global clear_route_cache setting for this route.
+  bool clear_route_cache = 3;
 
-  // Optional per-route parser configuration override.
-  // When set, this overrides the global parser_config for this route.
+  // Overrides the global parser config for this route.
   ParserConfig parser_config = 4;
 
-  // Optional per-route request storage mode override.
-  // When set, this overrides the global request_storage_mode for this route.
+  // Overrides the global request storage mode for this route.
   Mcp.RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
-  // Optional per-route reject duplicate keys override.
-  // When set, this overrides the global reject_duplicate_keys setting for this route.
-  google.protobuf.BoolValue reject_duplicate_keys = 6;
+  // Overrides the global reject_duplicate_keys setting for this route.
+  bool reject_duplicate_keys = 6;
 }

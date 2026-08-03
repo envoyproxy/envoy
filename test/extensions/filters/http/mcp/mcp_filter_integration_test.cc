@@ -481,7 +481,7 @@ TEST_P(McpFilterIntegrationTest, PerRouteRejectDuplicateKeysOverride) {
         route->mutable_match()->set_path("/api/mcp");
 
         envoy::extensions::filters::http::mcp::v3::McpOverride mcp_override;
-        mcp_override.mutable_reject_duplicate_keys()->set_value(true);
+        mcp_override.set_reject_duplicate_keys(true);
         std::ignore =
             (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
                 mcp_override);
@@ -888,7 +888,6 @@ TEST_P(McpFilterIntegrationTest, PerRouteOverrideToNoop) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
-
 
 } // namespace
 } // namespace Mcp

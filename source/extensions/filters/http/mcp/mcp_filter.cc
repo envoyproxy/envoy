@@ -227,8 +227,8 @@ uint32_t McpFilter::getMaxRequestBodySize() const {
 bool McpFilter::clearRouteCache() const {
   const auto* override_config = routeOverride();
 
-  if (override_config && override_config->clearRouteCache().has_value()) {
-    return override_config->clearRouteCache().value();
+  if (override_config) {
+    return override_config->clearRouteCache();
   }
 
   return config_->clearRouteCache();
@@ -237,8 +237,8 @@ bool McpFilter::clearRouteCache() const {
 const ParserConfig& McpFilter::parserConfig() const {
   const auto* override_config = routeOverride();
 
-  if (override_config && override_config->parserConfig().has_value()) {
-    return override_config->parserConfig().value();
+  if (override_config) {
+    return override_config->parserConfig();
   }
 
   return config_->parserConfig();
@@ -247,8 +247,8 @@ const ParserConfig& McpFilter::parserConfig() const {
 bool McpFilter::shouldStoreToDynamicMetadata() const {
   const auto* override_config = routeOverride();
 
-  if (override_config && override_config->requestStorageMode().has_value()) {
-    const auto mode = override_config->requestStorageMode().value();
+  if (override_config) {
+    const auto mode = override_config->requestStorageMode();
     return mode == envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED ||
            mode == envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA ||
            mode ==
@@ -261,8 +261,8 @@ bool McpFilter::shouldStoreToDynamicMetadata() const {
 bool McpFilter::shouldStoreToFilterState() const {
   const auto* override_config = routeOverride();
 
-  if (override_config && override_config->requestStorageMode().has_value()) {
-    const auto mode = override_config->requestStorageMode().value();
+  if (override_config) {
+    const auto mode = override_config->requestStorageMode();
     return mode == envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE ||
            mode ==
                envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE;
@@ -274,19 +274,18 @@ bool McpFilter::shouldStoreToFilterState() const {
 bool McpFilter::rejectDuplicateKeys() const {
   const auto* override_config = routeOverride();
 
-  if (override_config && override_config->rejectDuplicateKeys().has_value()) {
-    return override_config->rejectDuplicateKeys().value();
+  if (override_config) {
+    return override_config->rejectDuplicateKeys();
   }
 
   return config_->rejectDuplicateKeys();
 }
 
 const McpOverrideConfig* McpFilter::routeOverride() const {
-  if (!route_override_.has_value()) {
-    route_override_ =
-        Http::Utility::resolveMostSpecificPerFilterConfig<McpOverrideConfig>(decoder_callbacks_);
-  }
-  return *route_override_;
+  // TODO(mkbehr): We can latch the McpOverrideConfig in order to do fewer route lookups. The
+  // McpOverrideConfig has lifetime equal to the route, so we'll need to take care not to keep a
+  // stale pointer if another filter clears the route cache.
+  return Http::Utility::resolveMostSpecificPerFilterConfig<McpOverrideConfig>(decoder_callbacks_);
 }
 
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -329,9 +328,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   }
 
   ENVOY_LOG(debug, "after the post check");
-  const auto* override_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<McpOverrideConfig>(decoder_callbacks_);
-  if (!is_mcp_request_ && shouldRejectRequest(override_config)) {
+  if (!is_mcp_request_ && shouldRejectRequest()) {
     config_->stats().requests_rejected_.inc();
     sendErrorReply("Only MCP traffic is allowed", Filters::Common::Mcp::Status::NoMcp);
     return Http::FilterHeadersStatus::StopIteration;
@@ -401,7 +398,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     }
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      if (truncated_by_limit && !shouldRejectRequest(routeOverride())) {
+      if (truncated_by_limit && !shouldRejectRequest()) {
         // PASS_THROUGH mode: size limit caused truncation, allow through.
         ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
         return completeParsing();
@@ -460,7 +457,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  if (!is_mcp_request_ && shouldRejectRequest(routeOverride())) {
+  if (!is_mcp_request_ && shouldRejectRequest()) {
     sendErrorReply("request must be a valid JSON-RPC 2.0 message for MCP",
                    Filters::Common::Mcp::Status::NotJsonRpc);
     return Http::FilterDataStatus::StopIterationNoBuffer;

@@ -1544,7 +1544,7 @@ TEST_F(McpFilterTest, PerRouteClearRouteCache) {
 
   // Per-route config overrides clear route cache = true
   envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
-  override_config.mutable_clear_route_cache()->set_value(true);
+  override_config.set_clear_route_cache(true);
   auto route_config = std::make_shared<McpOverrideConfig>(override_config);
 
   EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
@@ -1580,7 +1580,7 @@ TEST_F(McpFilterTest, PerRouteRejectDuplicateKeys) {
 
   // Per-route config overrides reject duplicate keys = true
   envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
-  override_config.mutable_reject_duplicate_keys()->set_value(true);
+  override_config.set_reject_duplicate_keys(true);
   auto route_config = std::make_shared<McpOverrideConfig>(override_config);
 
   EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
