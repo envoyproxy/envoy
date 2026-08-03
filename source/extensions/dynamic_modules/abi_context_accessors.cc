@@ -411,6 +411,18 @@ bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_ResponseFlags: {
+    // Unlike the response code, the flags are always available as a bitmask (0 when none are set),
+    // matching the value exposed by the response.flags CEL attribute.
+    *result = stream_info.legacyResponseFlags();
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseSize: {
+    *result = stream_info.bytesSent();
+    ok = true;
+    break;
+  }
   case envoy_dynamic_module_type_attribute_id_ConnectionId: {
     *result = stream_info.downstreamAddressProvider().connectionID().value_or(0);
     ok = true;

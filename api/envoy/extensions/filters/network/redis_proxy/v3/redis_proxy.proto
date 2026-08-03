@@ -28,10 +28,31 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
+
+  // RESP protocol version supported on this listener.
+  enum ProtocolVersion {
+    // Default. The listener speaks RESP2 on both downstream connections and
+    // every routed upstream conn pool: no ``HELLO 3`` is sent upstream and a
+    // downstream ``HELLO 3`` is rejected with ``-NOPROTO``. (RESP3-aware
+    // handling such as the local ``HELLO`` reply, ``CLIENT SETINFO`` /
+    // ``SETNAME`` acceptance, and the RESP3 decoder is always present; this
+    // value only controls the negotiated wire version.)
+    RESP2 = 0;
+
+    // The listener speaks RESP3 on both downstream connections and every
+    // routed upstream conn pool. Upstream conn pools negotiate ``HELLO 3``
+    // (combined with ``AUTH`` when credentials or AWS IAM authentication are
+    // configured) on each new connection; ``upstream_resp3_hello_failure``
+    // tracks negotiation failures. Downstream clients must perform an
+    // explicit ``HELLO 3`` handshake before any data command — bare ``HELLO``
+    // on a fresh connection or any non-HELLO/AUTH/QUIT command before
+    // ``HELLO 3`` is rejected with ``-NOPROTO``.
+    RESP3 = 1;
+  }
 
   // Redis connection pool settings.
   // [#next-free-field: 11]
@@ -389,6 +410,20 @@ message RedisProxy {
   //   The is to support redis's feature wherein new commands can be added using redis' modules api:
   //   https://redis.io/docs/latest/develop/reference/modules/
   repeated string custom_commands = 11;
+
+  // RESP protocol version enforced for both downstream connections and every
+  // routed upstream conn pool for this listener. Mismatched negotiation is
+  // rejected at HELLO (``HELLO N`` where ``N`` does not match returns
+  // ``-NOPROTO``) and, when set to ``RESP3``, at every non-HELLO/AUTH/QUIT
+  // command on a connection that has not yet negotiated RESP3 (so clients
+  // must perform an explicit ``HELLO 3`` handshake before any data command).
+  //
+  // When ``protocol_version`` is ``RESP3``, every routed upstream
+  // Redis-compatible backend must support ``HELLO 3`` / RESP3 (e.g.
+  // Redis 6.0+, where RESP3 was introduced). Misconfigured upstreams will
+  // fail every connection's HELLO 3 negotiation, surfaced as
+  // ``upstream_resp3_hello_failure`` stat increments.
+  ProtocolVersion protocol_version = 12 [(validate.rules).enum = {defined_only: true}];
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in

@@ -1,0 +1,25 @@
+# Backport of upstream toolchains_llvm commit 68822c1 (PR #748, v1.8.0):
+# on macOS, use the SDK's libc++ headers instead of the hermetic toolchain's
+# bundled headers, so that compile-time and link-time libc++ are the same
+# version. Without this, LLVM >= 21 headers reference std::__hash_memory
+# which the older SDK libc++ doesn't provide.
+# Remove this patch when upgrading to toolchains_llvm v1.8.0+.
+diff --git a/toolchain/cc_toolchain_config.bzl b/toolchain/cc_toolchain_config.bzl
+--- a/toolchain/cc_toolchain_config.bzl
++++ b/toolchain/cc_toolchain_config.bzl
+@@ -266,6 +266,15 @@
+         ]
+
+         if is_darwin_exec_and_target:
++            # Use the SDK's libc++ headers instead of the hermetic toolchain's
++            # bundled headers so that compile-time and link-time libc++ are the
++            # same version. Without this, LLVM >= 21 headers reference symbols
++            # (e.g. std::__hash_memory) that the older SDK libc++ doesn't export.
++            cxx_flags.extend([
++                "-nostdinc++",
++                "-cxx-isystem",
++                "{}/usr/include/c++/v1".format(sysroot_path),
++            ])
+             # Several system libraries on macOS dynamically link libc++ and
+             # libc++abi, so static linking them becomes a problem. We need to
+             # ensure that they are dynamic linked from the system sysroot and

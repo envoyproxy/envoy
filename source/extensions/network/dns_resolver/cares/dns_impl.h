@@ -211,6 +211,7 @@ private:
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;
   CaresDnsResolverStats stats_;
+  const uint32_t max_cache_ttl_; // in seconds
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

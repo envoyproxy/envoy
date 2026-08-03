@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"

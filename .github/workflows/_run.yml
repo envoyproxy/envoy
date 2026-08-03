@@ -11,7 +11,6 @@ on:
       dockerhub-token:
       gpg-key:
       gpg-key-password:
-      slack-bot-token:
       ssh-key:
       ssh-key-extra:
     inputs:
@@ -137,10 +136,6 @@ on:
       skip:
         type: boolean
         default: false
-      slack-channel:
-        type: string
-        default: ''
-        description: Slack channel for failure notifications (opt-in, e.g. '#envoy-ci'). Leave empty to disable.
       source:
         type: string
       summary-post:
@@ -321,7 +316,7 @@ jobs:
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
       id: cache-lookup
-      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      uses: actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8  # v6.0.0
       with:
         lookup-only: true
         path: /tmp/cache
@@ -406,7 +401,7 @@ jobs:
       continue-on-error: true
 
     # NOTE: This is where untrusted code can be run!!!
-    #  Only post-failure notification steps (which don't use any repo code) should follow this step.
+    #  It MUST be the last step in the workflow
     - uses: envoyproxy/toolshed/actions/github/run@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       id: ci-run
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
@@ -464,23 +459,8 @@ jobs:
         ENVOY_REPO: ${{ github.repository }}
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
 
-    - name: Notify Slack on failure
-      if: >-
-        steps.ci-run.outputs.exit-code != 0
-        && inputs.slack-channel != ''
-        && github.event.workflow_run.event == 'push'
-        && github.repository == 'envoyproxy/envoy'
-      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
-      env:
-        JOB_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      with:
-        method: chat.postMessage
-        token: ${{ secrets.slack-bot-token }}
-        payload: |
-          channel: "${{ inputs.slack-channel }}"
-          text: "CI job failed: ${{ inputs.target }}"
-          blocks:
-          - type: section
-            text:
-              type: mrkdwn
-              text: ":x: *CI job failed:* `${{ inputs.target }}`\n<${{ env.JOB_URL }}|View workflow run>"
+######################################################################################################################
+##
+## NOTHING GOES HERE - NO EXCEPTIONS
+##
+######################################################################################################################

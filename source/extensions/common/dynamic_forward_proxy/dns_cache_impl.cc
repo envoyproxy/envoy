@@ -62,7 +62,9 @@ DnsCacheImpl::DnsCacheImpl(
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)),
       resolved_address_filter_(std::move(resolved_address_filter)) {
-  tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
+  tls_slot_.set([&](Event::Dispatcher& dispatcher) {
+    return std::make_shared<ThreadLocalHostInfo>(*this, dispatcher);
+  });
 
   loadCacheEntries(config);
 
@@ -172,10 +174,25 @@ DnsCacheImpl::loadDnsCacheEntryWithForceRefresh(absl::string_view raw_host, uint
       [this, host = std::string(host), default_port, is_proxy_lookup, ignore_cached_entries]() {
         startCacheLoad(host, default_port, is_proxy_lookup, ignore_cached_entries);
       });
-  return {LoadDnsCacheEntryStatus::Loading,
-          std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_, host,
-                                                        callbacks),
-          std::nullopt};
+
+  auto handle = std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_,
+                                                              host, callbacks);
+
+  {
+    absl::ReaderMutexLock read_lock{primary_hosts_lock_};
+    auto it = primary_hosts_.find(host);
+    // If the host is in the map and has already completed its first resolution, then we know that
+    // the DNS resolution has finished and we can notify the worker thread.
+    if (!ignore_cached_entries && it != primary_hosts_.end() &&
+        it->second->host_info_->firstResolveComplete()) {
+      ENVOY_LOG(debug, "host '{}' resolved during handle registration, posting deferred notify",
+                host);
+      auto resolved_info = std::make_shared<HostMapUpdateInfo>(host, it->second->host_info_);
+      tls_host_info.dispatcher_.post(
+          [&tls_host_info, resolved_info]() { tls_host_info.onHostMapUpdate(resolved_info); });
+    }
+  }
+  return {LoadDnsCacheEntryStatus::Loading, std::move(handle), std::nullopt};
 }
 
 Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest() {

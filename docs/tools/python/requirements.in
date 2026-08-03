@@ -17,4 +17,5 @@ frozendict>=2.3.7
 jinja2
 packaging
 pyjwt[crypto]==2.13.0
+cryptography==49.0.0
 pyyaml

@@ -1,7 +1,11 @@
 #include <string>
+#include <vector>
 
 #include "envoy/stats/refcount_ptr.h"
 
+#include "test/test_common/thread_factory_for_test.h"
+
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -67,6 +71,35 @@ TEST(RefcountPtr, Operators) {
   shared2.reset();
   EXPECT_EQ(nullptr, shared2);
   EXPECT_EQ(1, shared3.use_count());
+}
+
+// Reads through references from many threads while the last of them to drop
+// its reference deletes the object; every read must happen-before the delete.
+// The copies are made sequentially on the main thread (capture-by-value at
+// thread creation), so only reads, releases, and the deletion race with each
+// other. Meaningful primarily under TSAN, which verifies the release/acquire
+// pairing on RefcountHelper's reference count.
+TEST(RefcountPtr, ThreadedCopyDropChurn) {
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  const uint32_t num_threads = 8;
+  const uint32_t iters = 500;
+  for (uint32_t iter = 0; iter < iters; ++iter) {
+    SharedString shared(new RefcountedString("Hello"));
+    absl::Notification go;
+    std::vector<Thread::ThreadPtr> threads;
+    for (uint32_t i = 0; i < num_threads; ++i) {
+      threads.push_back(thread_factory.createThread([copy = SharedString(shared), &go]() mutable {
+        go.WaitForNotification();
+        EXPECT_EQ(5, copy->size());
+        copy.reset(); // Possibly the final release, which deletes the string.
+      }));
+    }
+    shared.reset(); // Drop the main thread's reference before releasing the readers.
+    go.Notify();
+    for (uint32_t i = 0; i < num_threads; ++i) {
+      threads[i]->join();
+    }
+  }
 }
 
 } // namespace Stats

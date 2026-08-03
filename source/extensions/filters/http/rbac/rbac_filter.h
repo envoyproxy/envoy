@@ -99,8 +99,8 @@ using RoleBasedAccessControlFilterConfigSharedPtr =
 /**
  * A filter that provides role-based access control authorization for HTTP requests.
  */
-class RoleBasedAccessControlFilter final : public Http::StreamDecoderFilter,
-                                           public Logger::Loggable<Logger::Id::rbac> {
+class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter,
+                                     public Logger::Loggable<Logger::Id::rbac> {
 public:
   RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(std::move(config)) {}
@@ -124,12 +124,13 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override {}
 
-private:
+protected:
   // Handles shadow engine evaluation and updates metrics
   bool evaluateShadowEngine(const Http::RequestHeaderMap& headers, Protobuf::Struct& metrics) const;
 
-  // Handles enforced engine evaluation and updates metrics
-  Http::FilterHeadersStatus evaluateEnforcedEngine(Http::RequestHeaderMap& headers,
+  // Handles enforced engine evaluation and updates metrics. Sends a local reply on denial and
+  // returns StopIteration; returns Continue otherwise.
+  Http::FilterHeadersStatus evaluateEnforcedEngine(const Http::RequestHeaderMap& headers,
                                                    Protobuf::Struct& metrics) const;
 
   RoleBasedAccessControlFilterConfigSharedPtr config_;

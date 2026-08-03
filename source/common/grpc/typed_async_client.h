@@ -6,6 +6,7 @@
 #include "envoy/grpc/async_client.h"
 
 #include "source/common/common/empty_string.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -15,8 +16,7 @@ namespace Internal {
  * Forward declarations for helper functions.
  */
 void sendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream);
-ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& message,
-                                              Buffer::InstancePtr&& response);
+bool parseMessageUntyped(Protobuf::Message& message, Buffer::InstancePtr&& response);
 RawAsyncStream* startUntyped(RawAsyncClient* client,
                              const Protobuf::MethodDescriptor& service_method,
                              RawAsyncStreamCallbacks& callbacks,
@@ -65,7 +65,7 @@ private:
   RawAsyncStream* stream_{};
 };
 
-template <typename Response> using ResponsePtr = std::unique_ptr<Response>;
+template <typename Response> using ResponsePtr = ArenaWrappedProto<Response>;
 
 /**
  * Convenience subclasses for AsyncRequestCallbacks.
@@ -77,10 +77,8 @@ public:
 
 private:
   void onSuccessRaw(Buffer::InstancePtr&& response, Tracing::Span& span) override {
-    auto message = ResponsePtr<Response>(Envoy::Protobuf::DynamicCastMessage<Response>(
-        Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
-            .release()));
-    if (!message) {
+    ResponsePtr<Response> message;
+    if (!Internal::parseMessageUntyped(*message, std::move(response))) {
       onFailure(Status::WellKnownGrpcStatus::Internal, "", span);
       return;
     }
@@ -98,10 +96,8 @@ public:
 
 private:
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override {
-    auto message = ResponsePtr<Response>(Envoy::Protobuf::DynamicCastMessage<Response>(
-        Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
-            .release()));
-    if (!message) {
+    ResponsePtr<Response> message;
+    if (!Internal::parseMessageUntyped(*message, std::move(response))) {
       return false;
     }
     onReceiveMessage(std::move(message));

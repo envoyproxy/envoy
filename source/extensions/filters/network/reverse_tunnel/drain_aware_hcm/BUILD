@@ -22,6 +22,8 @@ envoy_cc_extension(
         "//envoy/network:drain_decision_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/http:conn_manager_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/http_connection_manager:config",

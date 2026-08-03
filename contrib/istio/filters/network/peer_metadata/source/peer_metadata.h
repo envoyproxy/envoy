@@ -1,8 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
@@ -15,6 +17,7 @@
 #include "contrib/envoy/extensions/filters/network/peer_metadata/v3/peer_metadata.pb.h"
 #include "contrib/envoy/extensions/filters/network/peer_metadata/v3/peer_metadata.pb.validate.h"
 #include "contrib/istio/filters/common/source/metadata_object.h"
+#include "contrib/istio/filters/common/source/peer_metadata_registry.h"
 
 /**
  * PeerMetadata network and upstream network filters are used in one of ambient
@@ -111,6 +114,9 @@ enum class PeerMetadataState {
   PassThrough,
 };
 
+// Wire header for the legacy data-stream exchange: a magic number followed by
+// the serialized peer metadata size, injected ahead of the real data by the
+// downstream filter and stripped by the upstream filter.
 PACKED_STRUCT(struct PeerMetadataHeader {
   uint32_t magic;
   static const uint32_t magic_number;
@@ -122,12 +128,14 @@ PACKED_STRUCT(struct PeerMetadataHeader {
  * connect_originate or inner_connect_originate filter chains. It will take
  * baggage header information from filter state (we expect TCP Proxy to
  * populate it), collect other details that are missing from the baggage, i.e.
- * the upstream peer principle, encode those details into a sequence of bytes
- * and will inject it dowstream.
+ * the upstream peer identity, and store the discovered peer metadata in a
+ * thread-local registry keyed by the upstream connection ID, allowing the
+ * upstream peer_metadata filter on the cluster side to retrieve it directly.
  */
 class Filter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const Config& config, const LocalInfo::LocalInfo& local_info);
+  Filter(const Config& config, const LocalInfo::LocalInfo& local_info,
+         Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry);
 
   // Network::ReadFilter
   Network::FilterStatus onNewConnection() override;
@@ -142,6 +150,13 @@ private:
   void populateBaggage();
   bool disableDiscovery() const;
   std::optional<Envoy::Protobuf::Any> discoverPeerMetadata();
+  // Store discovered peer metadata in the thread-local registry, keyed by the
+  // downstream connection ID from filter state. Returns false when there is no
+  // connection ID in filter state (registry hand-off unavailable), so the caller
+  // can fall back to the data-stream approach.
+  bool storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata);
+  // Legacy fallback: inject the peer metadata (or an empty marker) as a preamble
+  // into the downstream data stream.
   void propagatePeerMetadata(const Envoy::Protobuf::Any& peer_metadata);
   void propagateNoPeerMetadata();
 
@@ -150,27 +165,19 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   Config config_;
   std::string baggage_;
+  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry_;
 };
 
 /**
  * This is an upstream network filter complementing the filter above. It will
- * be installed in all the service clusters that may use HBONE (or double
- * HBONE) to communicate with the upstream peers and it will parse and remove
- * the data injected by the filter above. The parsed peer metadata details will
- * be saved in the filter state.
- *
- * NOTE: This filter has built-in safety checks that would prevent it from
- * trying to interpret the actual connection data as peer metadata injected
- * by the filter above. However, those checks are rather shallow and rely on a
- * bunch of implicit assumptions (i.e., the magic number does not match
- * accidentally, the upstream host actually sends back some data that we can
- * check, etc). What I'm trying to say is that in correct setup we don't need
- * to rely on those checks for correctness and if it's not the case, then we
- * definitely have a bug.
+ * be installed in all the service clusters that communicate with upstream peers
+ * via internal listeners. It reads peer metadata from the thread-local registry
+ * (stored by the listener-side Filter keyed by this connection's ID) and
+ * populates filter state for use by telemetry filters.
  */
 class UpstreamFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  UpstreamFilter();
+  UpstreamFilter(Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override;
@@ -179,15 +186,27 @@ public:
 
 private:
   bool disableDiscovery() const;
+  // Look up peer metadata stored by the paired downstream filter, keyed by this
+  // connection's ID from filter state. Returns false when there is no connection
+  // ID in filter state or the TLS registry is not allocated.
+  bool tryRegistryLookup();
+  // Legacy fallback: parse and strip the peer metadata preamble from the
+  // upstream data stream.
   bool consumePeerMetadata(Buffer::Instance& buffer, bool end_stream);
 
   static const CelStatePrototype& peerInfoPrototype();
 
+  // Parse serialized peer metadata (a serialized google.protobuf.Any wrapping a
+  // Struct), convert it to a WorkloadMetadataObject and populate filter state.
+  // On any parsing/unpacking failure, populates the no-peer-metadata marker
+  // instead.
+  void populatePeerMetadataFromProto(absl::string_view serialized);
   void populatePeerMetadata(const ::Istio::Common::WorkloadMetadataObject& peer);
   void populateNoPeerMetadata();
 
   PeerMetadataState state_ = PeerMetadataState::WaitingForData;
   Network::ReadFilterCallbacks* callbacks_{};
+  Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry_;
 };
 
 /**
@@ -220,14 +239,11 @@ class UpstreamConfigFactory
 public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
-                               Server::Configuration::UpstreamFactoryContext&) override;
+                               Server::Configuration::UpstreamFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;
   bool isTerminalFilterByProto(const Protobuf::Message&,
                                Server::Configuration::ServerFactoryContext&) override;
-
-private:
-  Network::FilterFactoryCb createFilterFactory(const UpstreamConfig&);
 };
 
 } // namespace PeerMetadata

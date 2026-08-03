@@ -31,7 +31,6 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - uses: envoyproxy/toolshed/actions/bind-mounts@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
-      if: ! github.event.repository.private
       with:
         mounts: |
           - src: /mnt/workspace
@@ -42,7 +41,7 @@ jobs:
             chown: "runner:runner"
 
     - name: Checkout repository
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       with:
         fetch-depth: 2
 
@@ -54,16 +53,14 @@ jobs:
         else
             TO_OTHER=HEAD^1
         fi
-        if git diff --name-only HEAD "${TO_OTHER}" -- source/common/ include/ | grep -q .; then
+        if git diff --name-only HEAD "${TO_OTHER}" -- source/common/ envoy/ | grep -q .; then
             echo "CPP_CHANGED=true" >> "$GITHUB_ENV"
         else
             echo "CPP_CHANGED=false" >> "$GITHUB_ENV"
         fi
 
     - name: Free disk space
-      if: |
-        env.CPP_CHANGED == 'true'
-        && github.event.repository.private
+      if: env.CPP_CHANGED == 'true'
       uses: envoyproxy/toolshed/actions/diskspace@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
       with:
         to_remove: |
@@ -79,7 +76,7 @@ jobs:
                 if [[ -n "$line" ]]; then
                     bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
                 fi
-            done < <(git diff --name-only HEAD "${1}" -- source/common/* include/*)
+            done < <(git diff --name-only HEAD "${1}" -- source/common/* envoy/*)
         }
         if [[ "$GIT_EVENT" == "pull_request" ]]; then
             git fetch "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2> /dev/null
@@ -97,7 +94,7 @@ jobs:
     - name: Set default build target
       if: env.CPP_CHANGED == 'true' && env.BUILD_TARGETS == ''
       run: |
-        echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" > $GITHUB_ENV
+        echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" >> $GITHUB_ENV
 
     - name: Initialize CodeQL
       if: env.CPP_CHANGED == 'true'
@@ -124,10 +121,9 @@ jobs:
        sudo apt-get -qq update --error-on=any
        sudo apt-get -qq install --yes \
            libtool libtinfo5 automake autoconf curl unzip
-       # Note: the llvm/clang version should match the version specifed in:
-       #  - bazel/repository_locations.bzl
+       # Note: the llvm/clang version should match the version specified in:
+       #  - bazel/toolchains.bzl
        #  - .github/workflows/codeql-daily.yml
-       #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
        #
        # IMPORTANT: the clang bundle MUST be unpacked outside $GITHUB_WORKSPACE (we use $RUNNER_TEMP).
        # The CodeQL C++ extractor treats anything under the source root as project code, so headers
@@ -135,10 +131,10 @@ jobs:
        # (e.g. cpp/new-free-mismatch in <vector>, alert #1881). Keeping it under $RUNNER_TEMP makes
        # CodeQL classify those headers as system headers — same as /usr/include/c++/** on a normal
        # build. Do NOT move this back into the checkout tree.
-       mkdir -p "${RUNNER_TEMP}/clang18.1.8"
-       cd "${RUNNER_TEMP}/clang18.1.8"
-       wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-       tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       mkdir -p "${RUNNER_TEMP}/clang22.1.8"
+       cd "${RUNNER_TEMP}/clang22.1.8"
+       wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
+       tar -xf LLVM-22.1.8-Linux-X64.tar.xz --strip-components 1
 
     - name: Build
       if: env.CPP_CHANGED == 'true'
@@ -146,7 +142,7 @@ jobs:
         bazel shutdown
         bazel build \
             -c fastbuild \
-            --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang18.1.8" \
+            --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang22.1.8" \
             --spawn_strategy=local \
             --discard_analysis_cache \
             --nouse_action_cache \

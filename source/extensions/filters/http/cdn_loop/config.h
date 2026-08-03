@@ -23,6 +23,11 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace CdnLoop
