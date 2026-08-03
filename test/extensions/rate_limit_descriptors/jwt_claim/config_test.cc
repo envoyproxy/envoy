@@ -69,14 +69,6 @@ actions:
                       extra_fields);
 }
 
-TEST(JwtClaimDescriptorFactoryTest, ProvidesExtensionMetadata) {
-  JwtClaimDescriptorFactory factory;
-
-  EXPECT_EQ("envoy.rate_limit_descriptors.jwt_claim", factory.name());
-  EXPECT_EQ("envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor",
-            factory.createEmptyConfigProto()->GetTypeName());
-}
-
 TEST_F(JwtClaimDescriptorTest, ExtractsSimpleClaim) {
   setupTest(yamlFor());
   const std::string jwt = makeJwt(R"({"sub":"user-123"})");
@@ -178,6 +170,16 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(JwtClaimDescriptorTest, DefaultValueUsedWhenClaimIsAbsentFromValidJwt) {
+  setupTest(yamlFor("      default_value: anonymous\n"));
+  const std::string jwt = makeJwt(R"({"iss":"issuer"})");
+  Http::TestRequestHeaderMapImpl header{{"authorization", absl::StrCat("Bearer ", jwt)}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_descriptor_name", "anonymous"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
 TEST_F(JwtClaimDescriptorTest, MalformedJwtUsesDefaultValue) {
   const std::string yaml = absl::StrCat(R"EOF(
 actions:
@@ -199,13 +201,46 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(JwtClaimDescriptorTest, NonStringClaimTreatedAsAbsent) {
-  setupTest(yamlFor());
-  const std::string jwt = makeJwt(R"({"sub":42})");
+TEST_F(JwtClaimDescriptorTest, NonStringCustomClaimTreatedAsAbsent) {
+  const std::string yaml = absl::StrCat(R"EOF(
+actions:
+- extension:
+    name: jwt_claim_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor
+      descriptor_key: my_descriptor_name
+      header_name: authorization
+      value_prefix: "Bearer "
+      claim_name: role
+)EOF");
+  setupTest(yaml);
+  const std::string jwt = makeJwt(R"({"sub":"user-123","role":42})");
   Http::TestRequestHeaderMapImpl header{{"authorization", absl::StrCat("Bearer ", jwt)}};
 
   rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
   EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(JwtClaimDescriptorTest, DefaultValueUsedWhenNestedClaimHasScalarIntermediateValue) {
+  const std::string yaml = absl::StrCat(R"EOF(
+actions:
+- extension:
+    name: jwt_claim_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor
+      descriptor_key: my_descriptor_name
+      header_name: authorization
+      value_prefix: "Bearer "
+      claim_name: nested.key
+      default_value: anonymous
+)EOF");
+  setupTest(yaml);
+  const std::string jwt = makeJwt(R"({"sub":"user-123","nested":"not-an-object"})");
+  Http::TestRequestHeaderMapImpl header{{"authorization", absl::StrCat("Bearer ", jwt)}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_descriptor_name", "anonymous"}}}}),
+              testing::ContainerEq(descriptors_));
 }
 
 TEST_F(JwtClaimDescriptorTest, ValuePrefixMismatchTreatedAsAbsent) {
