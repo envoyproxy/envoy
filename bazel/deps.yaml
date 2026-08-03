@@ -597,7 +597,7 @@ cel_cpp:
   project_name: "Common Expression Language (CEL) C++ library"
   project_desc: "Common Expression Language (CEL) C++ library"
   project_url: "https://opensource.google/projects/cel"
-  release_date: "2025-11-17"
+  release_date: "2026-04-24"
   use_category:
   - dataplane_ext
   extensions:
