@@ -246,6 +246,12 @@ public:
   virtual bool pausedForWebsocketUpgrade() const PURE;
   virtual void setPausedForWebsocketUpgrade(bool value) PURE;
 
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a generic (non-WebSocket) HTTP upgrade. These should only be used by the
+  // upstream codec filter.
+  virtual bool pausedForGenericUpgrade() const PURE;
+  virtual void setPausedForGenericUpgrade(bool value) PURE;
+
   // Disable the route timeout after websocket upgrade completes successfully.
   // This should only be used by the upstream codec filter.
   virtual void disableRouteTimeoutForWebsocketUpgrade() PURE;

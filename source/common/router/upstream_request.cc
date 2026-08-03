@@ -91,7 +91,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
       retried_(false), awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      paused_for_websocket_(false), reset_stream_(false),
+      paused_for_websocket_(false), paused_for_generic_upgrade_(false), reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       cleaned_up_(false), had_upstream_(false),
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
@@ -418,6 +418,13 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
       }
       parent_.setupRouteTimeoutForWebsocketUpgrade();
     }
+  } else if (!end_stream &&
+             Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.http_pause_generic_upgrade_request_body") &&
+             Http::Utility::isUpgrade(*headers)) {
+    // Pause proxying the payload of generic (non-WebSocket) upgrades until the upstream
+    // accepts the upgrade.
+    paused_for_generic_upgrade_ = true;
   }
 
   // Kick off creation of the upstream connection immediately upon receiving headers.
@@ -623,10 +630,11 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   if (protocol) {
     stream_info_.protocol(protocol.value());
   } else {
-    // We only pause for CONNECT and WebSocket for HTTP upstreams. If this is a TCP upstream,
-    // unpause.
+    // We only pause for CONNECT and upgrades for HTTP upstreams. If this is a non-HTTP
+    // upstream (e.g. TCP for CONNECT termination or UDP for CONNECT-UDP termination), unpause.
     paused_for_connect_ = false;
     paused_for_websocket_ = false;
+    paused_for_generic_upgrade_ = false;
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
