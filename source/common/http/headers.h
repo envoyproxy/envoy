@@ -165,6 +165,7 @@ public:
       absl::StrCat(prefix(), "-immediate-health-check-fail")};
   const LowerCaseString EnvoyIsTimeoutRetry{absl::StrCat(prefix(), "-is-timeout-retry")};
   const LowerCaseString EnvoyOriginalUrl{absl::StrCat(prefix(), "-original-url")};
+  const LowerCaseString EnvoyInternalRedirectOn{absl::StrCat(prefix(), "-internal-redirect-on")};
   const LowerCaseString EnvoyInternalRequest{absl::StrCat(prefix(), "-internal")};
   // TODO(mattklein123): EnvoyIpTags should be a custom header registered with the IP tagging
   // filter. We need to figure out if we can remove this header from the set of headers that
@@ -296,6 +297,15 @@ public:
   struct {
     const std::string True{"true"};
   } EnvoyRateLimitedValues;
+
+  struct {
+    const std::string All{"3xx"};
+    const std::string _301{"301"};
+    const std::string _302{"302"};
+    const std::string _303{"303"};
+    const std::string _307{"307"};
+    const std::string _308{"308"};
+  } EnvoyInternalRedirectOnValues;
 
   struct {
     const std::string _5xx{"5xx"};
