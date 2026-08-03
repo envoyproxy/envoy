@@ -1,5 +1,6 @@
 #include "source/common/router/vhds.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -16,6 +17,8 @@
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Router {
@@ -37,6 +40,17 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
   if (!is_ads && !is_delta_grpc) {
     return absl::InvalidArgumentError(
         "vhds: only 'DELTA_GRPC' or 'ADS' (which uses Delta xDS) is supported as a config source.");
+  }
+
+  // A wildcard ('*') default resource subscribes to all virtual hosts, so combining it with other
+  // specific default resources is contradictory. Reject such configuration rather than silently
+  // ignoring the other entries.
+  const auto& default_resources =
+      config_update_info->protobufConfigurationCast().vhds().default_resources();
+  if (default_resources.size() > 1 && std::find(default_resources.begin(), default_resources.end(),
+                                                "*") != default_resources.end()) {
+    return absl::InvalidArgumentError(
+        "vhds: default_resources cannot contain '*' together with other resources.");
   }
 
   // If using ADS, verify the parent ADS stream is in Delta mode
@@ -73,8 +87,16 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       init_target_(fmt::format("VhdsConfigSubscription {}",
                                config_update_info_->protobufConfigurationCast().name()),
                    [this]() {
-                     subscription_->start(
-                         {config_update_info_->protobufConfigurationCast().name()});
+                     const auto& config = config_update_info_->protobufConfigurationCast();
+                     // Subscribe to the route configuration itself plus any configured default
+                     // virtual host resources. Each default resource is prefixed with the route
+                     // configuration name before being sent to the management server, matching the
+                     // alias format used for on-demand updates.
+                     absl::flat_hash_set<std::string> initial_resources{config.name()};
+                     for (const auto& default_resource : config.vhds().default_resources()) {
+                       initial_resources.insert(domainNameToAlias(config.name(), default_resource));
+                     }
+                     subscription_->start(initial_resources);
                    }),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name"),
