@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    those claims will be used as rate limit descriptor values. This means
 //    an attacker can trivially evade or manipulate per-claim rate limits
 //    (e.g. impersonate another subject, or rotate a fake claim value on
-//    every request to bypass limiting entirely) unless the JWT's signature
+//    every request to bypass limiting entirely) unless the JWT signature
 //    is verified elsewhere in the request path — for example, by an
 //    upstream mTLS-authenticated service, or by an
 //    :ref:`envoy.filters.http.jwt_authn
