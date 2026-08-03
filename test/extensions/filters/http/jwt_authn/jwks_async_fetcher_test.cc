@@ -289,6 +289,109 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetchWithCustomRefetch) {
   EXPECT_EQ(2U, stats_.jwks_fetch_failed_.value());
 }
 
+// When the owning filter chain starts draining while a fetch is in flight, the fetch completion
+// must not re-arm the refetch timer, so the async fetch loop stops.
+TEST_P(JwksAsyncFetcherTest, TestNoRefetchScheduledOnFailureWhenDraining) {
+  const char config[] = R"(
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+      async_fetch: {}
+)";
+
+  // The initial fetch happens while the filter chain is not draining.
+  setupAsyncFetcher(config);
+  EXPECT_EQ(fetch_receiver_array_.size(), 1);
+
+  // The owning filter chain starts draining, e.g. it was replaced by an in-place filter chain
+  // update. From now on drainClose() returns true.
+  ON_CALL(context_.drain_manager_, drainClose(_)).WillByDefault(testing::Return(true));
+
+  // When the in-flight fetch completes, the refetch timer must NOT be re-armed.
+  EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
+  fetch_receiver_array_[0]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
+  EXPECT_EQ(out_jwks_array_.size(), 0);
+  EXPECT_EQ(1U, stats_.jwks_fetch_failed_.value());
+  // Timer left disabled: no further fetch loop.
+  EXPECT_FALSE(timer_->enabled());
+}
+
+// When the owning filter chain starts draining while a fetch is in flight, a successful fetch still
+// delivers the Jwks but must not re-arm the refetch timer, so the async fetch loop stops.
+TEST_P(JwksAsyncFetcherTest, TestNoRefetchScheduledOnSuccessWhenDraining) {
+  const char config[] = R"(
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+      async_fetch: {}
+)";
+
+  // The initial fetch happens while the filter chain is not draining.
+  setupAsyncFetcher(config);
+  EXPECT_EQ(fetch_receiver_array_.size(), 1);
+
+  // The owning filter chain starts draining.
+  ON_CALL(context_.drain_manager_, drainClose(_)).WillByDefault(testing::Return(true));
+
+  // When the in-flight fetch succeeds, the Jwks is still delivered but the refetch timer must NOT
+  // be re-armed.
+  EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
+  auto jwks = Envoy::JwtVerify::Jwks::createFrom(PublicKey, Envoy::JwtVerify::Jwks::JWKS);
+  fetch_receiver_array_[0]->onJwksSuccess(std::move(jwks));
+  EXPECT_EQ(out_jwks_array_.size(), 1);
+  EXPECT_EQ(1U, stats_.jwks_fetch_success_.value());
+  // Timer left disabled: no further fetch loop.
+  EXPECT_FALSE(timer_->enabled());
+}
+
+// A refetch timer that was armed before the filter chain started draining must be a no-op when it
+// fires: fetch() bails out without starting a new fetch or re-arming the timer.
+TEST_P(JwksAsyncFetcherTest, TestArmedTimerNoOpWhenDraining) {
+  const char config[] = R"(
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+      async_fetch: {}
+)";
+
+  setupAsyncFetcher(config);
+  EXPECT_EQ(fetch_receiver_array_.size(), 1);
+
+  // Complete the initial fetch while not draining: the refetch timer is armed.
+  fetch_receiver_array_[0]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
+  EXPECT_TRUE(timer_->enabled());
+
+  // Now the owning filter chain starts draining.
+  ON_CALL(context_.drain_manager_, drainClose(_)).WillByDefault(testing::Return(true));
+
+  // The armed timer fires: fetch() must bail out - no new fetch is started and the timer is not
+  // re-armed.
+  EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
+  timer_->invokeCallback();
+  EXPECT_EQ(fetch_receiver_array_.size(), 1);
+}
+
+// A fetcher constructed while its filter chain is already draining must bail out of the initial
+// fetch(): no fetch is started and no timer is armed.
+TEST_P(JwksAsyncFetcherTest, TestNoInitialFetchWhenConstructedWhileDraining) {
+  const char config[] = R"(
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+      async_fetch: {}
+)";
+
+  // The filter chain is already draining before the fetcher is constructed. The initial fetch
+  // triggered from the constructor (fast_listener) or the init target must bail out.
+  ON_CALL(context_.drain_manager_, drainClose(_)).WillByDefault(testing::Return(true));
+  setupAsyncFetcher(config);
+
+  EXPECT_EQ(fetch_receiver_array_.size(), 0);
+  EXPECT_FALSE(timer_->enabled());
+  EXPECT_EQ(0U, stats_.jwks_fetch_success_.value());
+  EXPECT_EQ(0U, stats_.jwks_fetch_failed_.value());
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
