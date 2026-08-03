@@ -136,8 +136,8 @@ private:
   const Network::DnsLookupFamily dns_lookup_family_;
   ResolveListPtr active_resolve_list_;
 
-  // Host map (hosts_by_address_) for current resolve target. When we have multiple resolve targets, multiple targets
-  // may contain two different hosts with the same address. This has two effects:
+  // Host map (hosts_by_address_) for current resolve target. When we have multiple resolve targets,
+  // multiple targets may contain two different hosts with the same address. This has two effects:
   // 1) This host map cannot be replaced by the cross-priority global host map in the priority
   // set.
   // 2) Cross-priority global host map may not be able to search for the expected host based on
