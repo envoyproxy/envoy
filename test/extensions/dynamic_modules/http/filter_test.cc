@@ -1,5 +1,6 @@
 #include <cstring>
 
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/http/message_impl.h"
@@ -14,6 +15,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -117,6 +119,81 @@ TEST_P(DynamicModuleHttpLanguageTests, ConfigInitializationFailure) {
       *stats_store.createScope(""), context);
   EXPECT_THAT(filter_config_or_status,
               HasStatusMessage(testing::HasSubstr("Failed to initialize dynamic module")));
+}
+
+// Creating an SDS subscription reaches for the dispatcher's time source, so the simulated time
+// system has to be established before the mocks that expect one (``MockStreamInfo``, reached via
+// the filter callbacks below).
+class DynamicModuleHttpFilterSecretsTest : public Event::TestUsingSimulatedTime,
+                                           public testing::Test {};
+
+// This drives the Rust module only; the integration test covers the Go and C++ SDK bindings against
+// a real server, so this is not parameterized over the languages like the tests around it.
+TEST_F(DynamicModuleHttpFilterSecretsTest, GenericSecretCallbacks) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  ASSERT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  // The module subscribes to this one by name with no config source.
+  envoy::extensions::transport_sockets::tls::v3::Secret static_secret;
+  TestUtility::loadFromYaml(R"EOF(
+name: "static_secret"
+generic_secret:
+  secret:
+    inline_string: "static_value"
+)EOF",
+                            static_secret);
+  ASSERT_TRUE(context.secret_manager_->addStaticSecret(static_secret).ok());
+
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "generic_secret_callbacks", "", DefaultMetricsNamespace, false,
+      std::move(dynamic_module.value()), *stats_store.createScope(""), context);
+  ASSERT_TRUE(filter_config_or_status.ok());
+
+  // The module also subscribed to a secret over SDS, whose value only arrives once the SDS server
+  // delivers it.
+  envoy::extensions::transport_sockets::tls::v3::Secret dynamic_secret;
+  TestUtility::loadFromYaml(R"EOF(
+name: "dynamic_secret"
+generic_secret:
+  secret:
+    inline_string: "dynamic_value"
+)EOF",
+                            dynamic_secret);
+  const auto decoded_resources = TestUtility::decodeResources({dynamic_secret});
+  ASSERT_TRUE(context.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "")
+                  .ok());
+
+  // Check the values as Envoy sees them first, so that a mismatch below points at the SDK binding
+  // rather than at the subscriptions themselves. The module subscribed the static secret first, so
+  // it holds ID 1.
+  envoy_dynamic_module_type_envoy_buffer buffer{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+      filter_config_or_status.value().get(), 1, &buffer));
+  EXPECT_EQ(std::string(buffer.ptr, buffer.length), "static_value");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+      filter_config_or_status.value().get(), 2, &buffer));
+  EXPECT_EQ(std::string(buffer.ptr, buffer.length), "dynamic_value");
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  filter->initializeInModuleFilter();
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // The module copies both secret values onto the request headers. The header ABI reads the map
+  // back through the decoder callbacks, so those have to hand out the map under test.
+  Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_CALL(decoder_callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<Http::RequestHeaderMap>(request_headers)));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  EXPECT_EQ(request_headers.get_("x-static-secret"), "static_value");
+  EXPECT_EQ(request_headers.get_("x-dynamic-secret"), "dynamic_value");
 }
 
 TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
