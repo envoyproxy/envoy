@@ -16,13 +16,6 @@ On macOS, run the following command:
 brew install bazelisk
 ```
 
-On Windows, run the following commands:
-```cmd
-mkdir %USERPROFILE%\bazel
-powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe -OutFile %USERPROFILE%\bazel\bazel.exe
-set PATH=%USERPROFILE%\bazel;%PATH%
-```
-
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
@@ -174,110 +167,6 @@ for how to update or override dependencies.
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
     consider uninstalling binutils.
 
-    ### Windows
-
-    > Note: These instructions apply to **Windows 10 SDK, version 1803 (10.0.17134.12)**. Earlier versions will not compile because the `afunix.h` header is not available. **The recommended Windows version is equal or later than Windows 10 SDK, version 1903 (10.0.18362.1)**
-
-    Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
-
-    When building Envoy, Bazel creates very long path names. One way to work around these excessive path
-    lengths is to change the output base directory for bazel to a very short root path. An example Bazel configuration
-    to help with this is to use `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
-    the following bazelrc configuration line in a system `%ProgramData%\bazel.bazelrc` file or the individual
-    user's `%USERPROFILE%\.bazelrc` file (rather than including it on every bazel command line):
-
-    ```
-    startup --output_base=C:/_eb
-    ```
-
-    Another option to shorten the output root for Bazel is to set the `USERNAME` environment variable in your shell
-    session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
-    is set.
-
-    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
-    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#symlink).
-    For other common issues, see the
-    [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
-
-    > The paths in this document are given as
-    examples, make sure to verify you are using the correct paths for your environment. Also note
-    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
-    to do the equivalent if using a different shell.
-
-    [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
-    by python.org. The POSIX flavor available via MSYS2, the Windows Store flavor and other distributions
-    will not work. Add a symlink for `python3.exe` pointing to the installed `python.exe` for Envoy scripts
-    and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
-    package.
-    ```cmd
-    mklink %USERPROFILE%\Python3\python3.exe %USERPROFILE%\Python3\python.exe
-    set PATH=%USERPROFILE%\Python3;%PATH%
-    set PATH=%USERPROFILE%\Python3\Scripts;%PATH%
-    pip install wheel
-    ```
-
-    [Build Tools for Visual Studio 2022](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022):
-    For building with MSVC, you must install at least the VC++ workload.
-    You may alternately install the entire Visual Studio 2022 and use the Build Tools installed in that
-    package. Earlier versions of VC++ Build Tools/Visual Studio are not recommended or supported.
-    If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC` environment variable
-    to the path of the VC++ package to allow Bazel to find your installation of VC++. NOTE: ensure that
-    the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2,
-    which is determined by their relative ordering in your PATH.
-    ```cmd
-    set BAZEL_VC=%USERPROFILE%\VSBT2022\VC
-    set PATH=%USERPROFILE%\VSBT2022\VC\Tools\MSVC\<version>\bin\Hostx64\x64;%PATH%
-    ```
-
-    The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
-
-    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
-
-    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
-    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
-    of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
-    ```cmd
-    set PATH=%USERPROFILE%\msys64\usr\bin;%PATH%
-    set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
-    set MSYS2_ARG_CONV_EXCL=*
-    set MSYS2_PATH_TYPE=inherit
-    ```
-
-    Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
-    `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
-    path `/c/Windows/TEMP` is equivalent to the Windows path `C:/Windows/TEMP`:
-    ```cmd
-    set TMPDIR=C:/Windows/TEMP
-    mklink /d C:\c C:\
-    ```
-
-    The TMPDIR path and MSYS2 `mktemp` command are used frequently by the `rules_foreign_cc`
-    component of Bazel as well as Envoy's test scripts, causing problems if not set to a path
-    accessible to both Windows and msys commands. [Note the `ci/windows_ci_steps.sh` script
-    which builds envoy and run tests in CI creates this symlink automatically.]
-
-    In the MSYS2 shell, install additional packages via pacman:
-    ```
-    pacman -S diffutils patch unzip zip
-    ```
-
-    [Git](https://git-scm.com/downloads): This version from the Git project, or the version
-    distributed using pacman under MSYS2 will both work, ensure one is on the PATH:.
-    ```cmd
-    set PATH=%USERPROFILE%\Git\bin;%PATH%
-    ```
-
-    Lastly, persist environment variable changes.
-    ``` cmd
-    setx PATH "%PATH%"
-    setx BAZEL_SH "%BAZEL_SH%"
-    setx MSYS2_ARG_CONV_EXCL "%MSYS2_ARG_CONV_EXCL%"
-    setx BAZEL_VC "%BAZEL_VC%"
-    setx TMPDIR "%TMPDIR%"
-    setx MSYS2_PATH_TYPE "%MSYS2_PATH_TYPE%"
-    ```
-    > On Windows the supported/recommended shell to interact with bazel is MSYS2. This means that all the bazel commands (i.e. build, test) should be executed from MSYS2.
-
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
    Make sure you have go version 1.24 or later.
@@ -297,15 +186,6 @@ On Linux, run:
 
 ```
 ./ci/run_envoy_docker.sh './ci/do_ci.sh dev'
-```
-
-From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
-MSYS2 or Git bash), run:
-
-**Note: the command below executes the whole Windows CI and unlike Linux you are not able to set specific build targets. You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc. as well as set environment variables to adjust your container build environment.**
-
-```
-./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/main/ci) for developer use of the
