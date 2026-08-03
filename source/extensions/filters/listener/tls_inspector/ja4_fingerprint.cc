@@ -324,7 +324,7 @@ std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello) {
       "_",
 
       // Extension and signature algorithm hash
-      getJA4ExtensionHash(ssl_client_hello)); 
+      getJA4ExtensionHash(ssl_client_hello));
 }
 
 } // namespace TlsInspector
