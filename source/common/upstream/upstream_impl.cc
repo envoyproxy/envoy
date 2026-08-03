@@ -145,9 +145,9 @@ parseExtensionProtocolOptions(
 // Recovers the per-cluster upstream (client) codec factory from the parsed protocol options. Any
 // options object may expose one via ProtocolOptionsConfig::upstreamHttpClientCodecFactory(); at
 // most one is allowed across all configured options.
-absl::StatusOr<std::shared_ptr<const Http::ClientCodecFactory>> findUpstreamHttpClientCodecFactory(
+absl::StatusOr<const Http::ClientCodecFactory*> findUpstreamHttpClientCodecFactory(
     const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>& options) {
-  std::shared_ptr<const Http::ClientCodecFactory> found;
+  const Http::ClientCodecFactory* found = nullptr;
   for (const auto& [name, option] : options) {
     OptRef<const Http::ClientCodecFactory> factory = option->upstreamHttpClientCodecFactory();
     if (!factory.has_value()) {
@@ -158,9 +158,7 @@ absl::StatusOr<std::shared_ptr<const Http::ClientCodecFactory>> findUpstreamHttp
           "multiple upstream HTTP client codec factories configured on a single cluster via "
           "typed_extension_protocol_options; at most one is allowed");
     }
-    // Aliasing shared_ptr: shares ownership with the options object (the factory and the options
-    // object are the same instance) while exposing it as a ClientCodecFactory.
-    found = std::shared_ptr<const Http::ClientCodecFactory>(option, &factory.ref());
+    found = &factory.ref();
   }
   return found;
 }
@@ -986,7 +984,8 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
     uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
-    std::optional<uint32_t> overprovisioning_factor) {
+    std::optional<uint32_t> overprovisioning_factor,
+    HostMapConstSharedPtr cross_priority_host_map) {
   // We assume that each call updates a different priority.
   ASSERT(priorities_.find(priority) == priorities_.end());
   priorities_.insert(priority);
@@ -1000,7 +999,8 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
   }
 
   parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
-                      hosts_removed, weighted_priority_health, overprovisioning_factor);
+                      hosts_removed, weighted_priority_health, overprovisioning_factor,
+                      std::move(cross_priority_host_map));
 }
 
 void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
@@ -1224,7 +1224,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           parseExtensionProtocolOptions(config, factory_context), ProtocolOptionsHashMap)),
       upstream_client_codec_factory_(
           THROW_OR_RETURN_VALUE(findUpstreamHttpClientCodecFactory(extension_protocol_options_),
-                                std::shared_ptr<const Http::ClientCodecFactory>)),
+                                const Http::ClientCodecFactory*)),
       http_protocol_options_(THROW_OR_RETURN_VALUE(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
