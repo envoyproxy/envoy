@@ -47,21 +47,20 @@ jobs:
       actions: read
       contents: read
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Incoming data
       id: needs
       with:
         input: |
-          check_name: ${{ fromJSON(inputs.needs).load.outputs.check-name }}
-          repo: ${{ github.repository }}
-          run_id: ${{ github.run_id }}
-          branch: ${{ github.event.workflow_run.head_branch }}
-          outcomes: ${{ toJSON(fromJSON(inputs.needs)) }}
-          allowed_to_fail: ${{ toJSON(inputs.allowed-to-fail) }}
-          load: ${{ toJSON(fromJSON(inputs.needs).load.outputs) }}
-          slack_channel: ${{ toJSON(inputs.slack-channel) }}
-          slack_channel_allowed_failure: ${{ toJSON(inputs.slack-channel-allowed-failure) }}
-        input-format: yaml
+          {"check_name": ${{ toJSON(fromJSON(inputs.needs).load.outputs.check-name) }},
+           "repo": ${{ toJSON(github.repository) }},
+           "run_id": ${{ toJSON(github.run_id) }},
+           "branch": ${{ toJSON(github.event.workflow_run.head_branch) }},
+           "outcomes": ${{ toJSON(fromJSON(inputs.needs)) }},
+           "allowed_to_fail": ${{ toJSON(inputs.allowed-to-fail) }},
+           "load": ${{ toJSON(fromJSON(inputs.needs).load.outputs) }},
+           "slack_channel": ${{ toJSON(inputs.slack-channel) }},
+           "slack_channel_allowed_failure": ${{ toJSON(inputs.slack-channel-allowed-failure) }}}
         print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
         filter: |
           .repo as $repo
@@ -129,7 +128,7 @@ jobs:
                    summary: "Check has finished",
                    text: ($text + $allowed_failure_text)}}}}
 
-    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Print summary
       with:
         input: ${{ toJSON(steps.needs.outputs.value).summary-title }}
@@ -137,13 +136,13 @@ jobs:
           "## \(.)"
         options: -Rr
         output-path: GITHUB_STEP_SUMMARY
-    - uses: envoyproxy/toolshed/actions/appauth@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/appauth@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/github/checks@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Update check
       with:
         action: update
