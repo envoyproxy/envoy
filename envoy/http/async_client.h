@@ -459,7 +459,7 @@ public:
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
 
-    // The amount of tiem to wait for server to half-close its stream after client
+    // The amount of time to wait for server to half-close its stream after client
     // has half-closed its stream.
     // Defaults to 1 second.
     std::chrono::milliseconds remote_close_timeout{1000};

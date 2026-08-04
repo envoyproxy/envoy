@@ -648,12 +648,17 @@ public:
      * @param hosts_removed supplies the hosts removed since the last update.
      * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
      * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
+     * @param cross_priority_host_map read only cross-priority host map which is created in the main
+     * thread and shared by all the worker threads. This is used when a coalesced batch host update
+     * is applied to a worker thread's priority set, where the shared map is delivered once for the
+     * whole batch.
      */
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
                              std::optional<bool> weighted_priority_health,
-                             std::optional<uint32_t> overprovisioning_factor) PURE;
+                             std::optional<uint32_t> overprovisioning_factor,
+                             HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
   };
 
   /**
@@ -678,6 +683,13 @@ public:
    * @param callback callback to use to add hosts.
    */
   virtual void batchHostUpdate(BatchUpdateCb& callback) PURE;
+
+  /**
+   * @return true if a batch host update (see batchHostUpdate()) is currently in progress. This
+   * remains true while the batch's end-of-batch MemberUpdateCb callbacks are running, allowing
+   * update callbacks to distinguish a coalesced batch update from an individual update.
+   */
+  virtual bool batchUpdateActive() const PURE;
 };
 
 /**
@@ -1362,6 +1374,7 @@ protected:
 
 using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
+class AdminEndpointProvider;
 class HealthChecker;
 
 /**
@@ -1437,6 +1450,12 @@ public:
    * Set up the drop_category value for the thread local cluster.
    */
   virtual void setDropCategory(absl::string_view drop_category) PURE;
+
+  /**
+   * @return the cluster's admin endpoint provider, used to render synthetic, display-only entries
+   *         on the admin /clusters page, or nullptr if the cluster has none. Defaults to nullptr.
+   */
+  virtual const AdminEndpointProvider* adminEndpointProvider() const { return nullptr; }
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
@@ -1460,3 +1479,22 @@ template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_vie
 };
 
 } // namespace fmt
+
+namespace std {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) const -> decltype(ctx.out()) {
+    absl::string_view out = !host.hostname().empty() ? host.hostname()
+                            : host.address()         ? host.address()->asStringView()
+                                                     : "<empty>";
+    return std::formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace std

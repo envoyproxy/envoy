@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

@@ -240,7 +240,9 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:logger_lib",
         "//source/common/filesystem:filesystem_lib",
+        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -389,6 +391,7 @@ envoy_cc_library(
     hdrs = ["server.h"],
     rbe_pool = "6gig",
     deps = [
+        ":cgroup_cpu_util_lib",
         ":configuration_lib",
         ":listener_hooks_lib",
         ":listener_manager_factory_lib",

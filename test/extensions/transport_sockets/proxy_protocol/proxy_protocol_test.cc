@@ -1057,9 +1057,9 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
         const auto length = buffer.length();
 
         // Compare as hex encoded to make errors easier to read.
-        EXPECT_EQ(
-            Hex::encode(reinterpret_cast<uint8_t*>(buffer.linearize(length)), buffer.length()),
-            Hex::encode(expected));
+        EXPECT_EQ(Hex::encode(absl::Span<const uint8_t>(
+                      reinterpret_cast<const uint8_t*>(buffer.linearize(length)), buffer.length())),
+                  Hex::encode(expected));
 
         buffer.drain(length);
         return {length, Api::IoError::none()};

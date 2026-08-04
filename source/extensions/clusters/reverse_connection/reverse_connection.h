@@ -12,6 +12,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.h"
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.validate.h"
+#include "envoy/upstream/admin_endpoint_provider.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -132,7 +133,7 @@ private:
  * to retrieve reverse connection sockets to stream data to upstream endpoints.
  * Also, the RevConCluster cleans these hosts if no connection pool is using them.
  */
-class RevConCluster : public Upstream::ClusterImplBase {
+class RevConCluster : public Upstream::ClusterImplBase, public Upstream::AdminEndpointProvider {
   friend class ReverseConnectionClusterTest;
 
 public:
@@ -146,6 +147,13 @@ public:
 
   // Upstream::Cluster.
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+  // Upstream::Cluster. This cluster provides its own admin endpoints.
+  const Upstream::AdminEndpointProvider* adminEndpointProvider() const override { return this; }
+
+  // Upstream::AdminEndpointProvider. Surfaces currently-reachable reverse-tunnel nodes on /clusters
+  // without creating load-balanced hosts.
+  std::vector<Upstream::AdminEndpointProvider::AdminEndpoint> adminEndpoints() const override;
 
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
@@ -212,13 +220,19 @@ private:
   // Get the upstream socket manager from the thread-local registry.
   BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;
 
+  // Get the process-wide acceptor extension (for cross-worker stats). Returns nullptr if the
+  // bootstrap extension is not configured. Safe to call from the main/admin thread (does not
+  // require thread-local state).
+  BootstrapReverseConnection::ReverseTunnelAcceptorExtension* getAcceptorExtension() const;
+
   // No pre-initialize work needs to be completed by REVERSE CONNECTION cluster.
   void startPreInit() override { onPreInitComplete(); }
 
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds cleanup_interval_;
   Event::TimerPtr cleanup_timer_;
-  absl::Mutex host_map_lock_;
+  // Mutable so the const adminEndpoints() accessor can read host_map_ under the lock.
+  mutable absl::Mutex host_map_lock_;
   absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
   // Formatter for computing host identifier from request context.
   Envoy::Formatter::FormatterPtr host_id_formatter_;

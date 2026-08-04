@@ -3,12 +3,14 @@ use crate::buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use crate::utility::HeaderPairSlice;
 use crate::{
   abi, bytes_to_module_buffer, str_to_module_buffer, strs_to_module_buffers, ClusterHostCount,
-  EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId,
-  EnvoyHistogramVecId, NewHttpFilterConfigFunction, NewHttpFilterPerRouteConfigFunction,
-  NEW_HTTP_FILTER_CONFIG_FUNCTION, NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+  EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyGenericSecretId,
+  EnvoyHistogramId, EnvoyHistogramVecId, NewHttpFilterConfigFunction,
+  NewHttpFilterPerRouteConfigFunction, NEW_HTTP_FILTER_CONFIG_FUNCTION,
+  NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
 };
 use mockall::*;
 use std::any::Any;
+use std::ffi::c_void;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// The trait that represents the configuration for an Envoy Http filter configuration.
@@ -389,6 +391,35 @@ pub trait EnvoyHttpFilterConfig {
     labels: &[&str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
 
+  /// Subscribe to a generic secret so that its value can later be read via
+  /// [`EnvoyHttpFilterConfig::get_generic_secret`] or [`EnvoyHttpFilter::get_generic_secret`].
+  ///
+  /// `name` is the name of the secret: for a static secret the name in the bootstrap
+  /// configuration, and for a dynamic secret the resource name requested from the SDS server.
+  ///
+  /// `sds_config_source` is the JSON serialized `envoy.config.core.v3.ConfigSource` describing where
+  /// to fetch the secret from, so that the value is updated whenever the SDS server pushes a new
+  /// version. Pass `None` to look the name up among the statically configured secrets instead.
+  ///
+  /// This can only be called while the filter config is being created, i.e. from
+  /// [`HttpFilterConfig`]'s constructor. Returns `None` if the secret cannot be subscribed to, for
+  /// example when the static secret does not exist or `sds_config_source` is not a valid
+  /// `ConfigSource`.
+  fn subscribe_generic_secret(
+    &mut self,
+    name: &str,
+    sds_config_source: Option<&str>,
+  ) -> Option<EnvoyGenericSecretId>;
+
+  /// Get the current value of a previously subscribed generic secret from the config context.
+  ///
+  /// Unlike [`EnvoyHttpFilter::get_generic_secret`], this does not require a per-stream filter and
+  /// can be called outside of the request lifecycle, for example from a scheduled background task.
+  ///
+  /// Returns `None` if the id does not correspond to a subscribed secret. The value is empty when
+  /// the secret has been subscribed to but not yet delivered by the SDS server.
+  fn get_generic_secret(&self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'_>>;
+
   /// Increment the counter with the given id from the config context.
   ///
   /// Unlike [`EnvoyHttpFilter::increment_counter`], this does not require a per-stream filter and
@@ -638,6 +669,48 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
       )
     })?;
     Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn subscribe_generic_secret(
+    &mut self,
+    name: &str,
+    sds_config_source: Option<&str>,
+  ) -> Option<EnvoyGenericSecretId> {
+    let id = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+        // An empty buffer tells Envoy to resolve the name as a static secret.
+        sds_config_source.map_or_else(|| bytes_to_module_buffer(&[]), str_to_module_buffer),
+      )
+    };
+    // 0 is reserved to signal that the subscription could not be created.
+    if id == 0 {
+      None
+    } else {
+      Some(EnvoyGenericSecretId(id))
+    }
+  }
+
+  fn get_generic_secret(&self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'_>> {
+    let EnvoyGenericSecretId(id) = id;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+        self.raw_ptr,
+        id,
+        &mut result as *mut _,
+      )
+    };
+    if !success {
+      return None;
+    }
+    // Safety: Envoy owns the buffer and keeps it alive until the module returns from the current
+    // event hook, which outlives the borrow of `self`.
+    Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
   }
 
   fn increment_counter(
@@ -1186,6 +1259,16 @@ pub trait EnvoyHttpFilter {
     entries: &'a [(&'a str, &'a str)],
   );
 
+  /// Set an entire dynamic metadata namespace from a serialized `google.protobuf.Struct`.
+  /// The struct is merged into the namespace and existing entries with the same key are
+  /// overwritten. A buffer that does not parse as a `google.protobuf.Struct` is a no-op.
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]);
+
+  /// Set an entire typed dynamic metadata namespace from a serialized `google.protobuf.Any`.
+  /// The Any is merged into the namespace's `typed_filter_metadata` entry. A buffer that does not
+  /// parse as a `google.protobuf.Any` is a no-op.
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]);
+
   /// Get the bool-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
@@ -1308,6 +1391,42 @@ pub trait EnvoyHttpFilter {
   /// Returns None if the key does not exist, the object does not support serialization, or the
   /// filter state is not accessible.
   fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Store an opaque, module-owned object in the filter state under `key`. Envoy never interprets
+  /// the object; it calls `destructor` exactly once when the entry is destroyed. Objects stored at
+  /// `Request` or `Connection` lifespan survive `recreate_stream`; `FilterChain` objects do not.
+  ///
+  /// Typical use: `Box::into_raw(Box::new(state)) as *mut c_void`, with a destructor that calls
+  /// `drop(Box::from_raw(ptr as *mut State))`. The module must only recover the object via
+  /// [`EnvoyHttpFilter::get_filter_state_object`] and never free it itself.
+  ///
+  /// Ownership transfers to Envoy on every path: the destructor runs exactly once, either when the
+  /// entry is destroyed or before this returns `false`, so a failed store never leaks the object.
+  ///
+  /// Returns true if stored. Returns false, after running the destructor, if the filter state is
+  /// not accessible or the key already holds an entry at a different `life_span`.
+  ///
+  /// # Safety
+  ///
+  /// `object` must be a valid pointer that `destructor` can free, and `destructor` must free it
+  /// without unwinding: it runs on the teardown path, and a panic crossing the FFI boundary is
+  /// undefined behavior. Use an `extern "C"` destructor, which aborts rather than unwinds.
+  unsafe fn set_filter_state_object(
+    &mut self,
+    key: &[u8],
+    object: *mut c_void,
+    destructor: extern "C" fn(*mut c_void),
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  ) -> bool;
+
+  /// Borrow the opaque object previously stored under `key`, or `None` if absent. Ownership stays
+  /// with Envoy; the module must not free the returned pointer.
+  ///
+  /// The pointer is valid only on the worker thread owning the stream, and only until the entry is
+  /// destroyed or overwritten. It is shared: the rebuilt filter after a `recreate_stream`, or
+  /// another filter on the same stream, can hold it too, so the module must synchronize any
+  /// interior mutability through it.
+  fn get_filter_state_object(&self, key: &[u8]) -> Option<*mut c_void>;
 
   /// Get the received request body (the request body pieces received in the latest event).
   /// This should only be used in the [`HttpFilter::on_request_body`] callback.
@@ -1713,6 +1832,17 @@ pub trait EnvoyHttpFilter {
   /// ```
   fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static;
 
+  /// Get the current value of a generic secret subscribed to by the filter config via
+  /// [`EnvoyHttpFilterConfig::subscribe_generic_secret`].
+  ///
+  /// Returns `None` if the id does not correspond to a subscribed secret. The value is empty when
+  /// the secret has been subscribed to but not yet delivered by the SDS server.
+  ///
+  /// The returned buffer must not be retained across events: a secret rotation replaces the value
+  /// in between events on this worker thread. Copy the value if it needs to outlive the current
+  /// event hook.
+  fn get_generic_secret<'a>(&'a self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'a>>;
+
   /// Increment the counter with the given id.
   fn increment_counter(
     &self,
@@ -1914,6 +2044,9 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns `true` if the override was set successfully, `false` if the host address is invalid.
   fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool;
+
+  /// Get the upstream connection ID, or 0 if not available.
+  fn get_upstream_connection_id(&self) -> u64;
 
   // ------------------- Stream Control methods -------------------------
 
@@ -2675,6 +2808,26 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_any),
+      )
+    }
+  }
+
   fn get_metadata_bool(
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
@@ -2960,6 +3113,39 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
+    }
+  }
+
+  unsafe fn set_filter_state_object(
+    &mut self,
+    key: &[u8],
+    object: *mut c_void,
+    destructor: extern "C" fn(*mut c_void),
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  ) -> bool {
+    let destructor: unsafe extern "C" fn(*mut c_void) = destructor;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_object(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        object,
+        Some(destructor),
+        life_span,
+      )
+    }
+  }
+
+  fn get_filter_state_object(&self, key: &[u8]) -> Option<*mut c_void> {
+    let object = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_filter_state_object(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+      )
+    };
+    if object.is_null() {
+      None
+    } else {
+      Some(object)
     }
   }
 
@@ -3455,6 +3641,27 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn get_generic_secret(&self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'_>> {
+    let EnvoyGenericSecretId(id) = id;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_generic_secret(
+        self.raw_ptr,
+        id,
+        &mut result as *mut _,
+      )
+    };
+    if !success {
+      return None;
+    }
+    // Safety: Envoy owns the buffer and keeps it alive until the module returns from the current
+    // event hook, which outlives the borrow of `self`.
+    Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+  }
+
   fn increment_counter(
     &self,
     id: EnvoyCounterId,
@@ -3872,6 +4079,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         strict,
       )
     }
+  }
+
+  fn get_upstream_connection_id(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_upstream_connection_id(self.raw_ptr) }
   }
 
   fn reset_stream(

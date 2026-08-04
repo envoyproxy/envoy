@@ -13,6 +13,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/stat_sink:__pkg__",
     "//test/extensions/dynamic_modules/udp:__pkg__",
     "//test/extensions/formatter/dynamic_modules:__pkg__",
+    "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
@@ -249,3 +250,17 @@ test_program(name = "stat_sink_missing_histogram_complete")
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "dns_resolver_config_new_fail")
+
+test_program(name = "health_checker_no_op")
+
+test_program(name = "health_checker_missing_config_new")
+
+test_program(name = "health_checker_missing_config_destroy")
+
+test_program(name = "health_checker_missing_session_new")
+
+test_program(name = "health_checker_missing_session_on_interval")
+
+test_program(name = "health_checker_missing_session_destroy")
+
+test_program(name = "health_checker_session_new_null")

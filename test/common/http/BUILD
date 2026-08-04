@@ -34,6 +34,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -165,6 +166,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:codec_wrappers_lib",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
@@ -351,6 +353,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -434,6 +437,7 @@ envoy_cc_test(
         "//source/common/http:header_utility_lib",
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -448,6 +452,7 @@ envoy_cc_test(
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:http_service_headers_lib",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -528,6 +533,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/http:status_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -666,6 +672,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/http:dependency_manager",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

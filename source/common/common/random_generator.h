@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/common/random_generator.h"
 
 namespace Envoy {

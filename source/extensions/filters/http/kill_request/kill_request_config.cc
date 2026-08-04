@@ -11,7 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace KillRequest {
 
-Http::FilterFactoryCb KillRequestFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> KillRequestFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   return [proto_config, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {

@@ -24,3 +24,4 @@ Wasm runtime emits the following statistics:
 
   wasm.<runtime>.created, Counter, Total number of execution instances created
   wasm.<runtime>.active, Gauge, Number of active execution instances
+  wasm.wasm_vm_count, Gauge, "Process-wide number of active Wasm VMs, across every runtime"

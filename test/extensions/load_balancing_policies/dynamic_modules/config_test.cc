@@ -15,6 +15,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -26,7 +27,11 @@ namespace LoadBalancingPolicies {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::NiceMock;
+using ::testing::Not;
 using ::testing::Return;
 using ::testing::ReturnRef;
 
@@ -59,8 +64,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok());
-  EXPECT_NE(lb_config_or_error.value(), nullptr);
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(::testing::NotNull()));
 
   // The happy path emits no load-failure counters.
   EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
@@ -77,8 +81,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccessWithLocalFile) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok()) << lb_config_or_error.status().message();
-  EXPECT_NE(lb_config_or_error.value(), nullptr);
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(::testing::NotNull()));
 }
 
 // Remote module sources are not supported for load balancing policies (no init manager is wired
@@ -95,7 +98,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigRemoteSourceRejected) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_FALSE(lb_config_or_error.ok());
+  EXPECT_THAT(lb_config_or_error, Not(IsOk()));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
@@ -106,9 +109,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_FALSE(lb_config_or_error.ok());
-  EXPECT_THAT(lb_config_or_error.status().message(),
-              testing::HasSubstr("Failed to load dynamic module"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
   EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
 }
 
@@ -120,9 +122,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleConfigNewFails) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_FALSE(lb_config_or_error.ok());
-  EXPECT_THAT(lb_config_or_error.status().message(),
-              testing::HasSubstr("failed to create load balancer config"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("failed to create load balancer config")));
 
   // The module loads fine but its config creation fails, so this is counted as config_init_error.
   EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
@@ -142,7 +143,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigMalformedLbPolicyConfig) 
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_FALSE(lb_config_or_error.ok());
+  EXPECT_THAT(lb_config_or_error, Not(IsOk()));
 
   EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
   EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
@@ -157,9 +158,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleMissingSymbol) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_FALSE(lb_config_or_error.ok());
-  EXPECT_THAT(lb_config_or_error.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_lb_choose_host"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("envoy_dynamic_module_on_lb_choose_host")));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStringValueConfig) {
@@ -175,7 +175,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStringValueConfig) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok());
+  EXPECT_OK(lb_config_or_error);
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithBytesValueConfig) {
@@ -191,7 +191,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithBytesValueConfig) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok());
+  EXPECT_OK(lb_config_or_error);
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStructConfig) {
@@ -207,7 +207,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStructConfig) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok());
+  EXPECT_OK(lb_config_or_error);
 }
 
 // =============================================================================
@@ -222,7 +222,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, CreateThreadAwareLoadBalancer) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
@@ -230,7 +230,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, CreateThreadAwareLoadBalancer) {
   EXPECT_NE(thread_aware_lb, nullptr);
 
   // Initialize and get the factory.
-  EXPECT_TRUE(thread_aware_lb->initialize().ok());
+  EXPECT_OK(thread_aware_lb->initialize());
   auto lb_factory = thread_aware_lb->factory();
   EXPECT_NE(lb_factory, nullptr);
 }
@@ -311,13 +311,13 @@ TEST_F(DynamicModulesLoadBalancerTest, RoundRobinHostSelection) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   // Create a worker LB.
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
@@ -343,13 +343,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostWithContext) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -378,13 +378,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostNoHealthyHosts) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -407,13 +407,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostEmptyHostSets) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -432,13 +432,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LbNewFails) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -458,13 +458,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidIndex) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -485,13 +485,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidPriority) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -511,13 +511,13 @@ TEST_F(DynamicModulesLoadBalancerTest, PeekAnotherHost) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -535,13 +535,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LifetimeCallbacks) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -559,13 +559,13 @@ TEST_F(DynamicModulesLoadBalancerTest, SelectExistingConnection) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -640,13 +640,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -686,13 +686,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -727,13 +727,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -828,13 +828,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -914,13 +914,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -958,13 +958,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressNullInputs) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1000,13 +1000,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1145,13 +1145,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostAccepted) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1176,13 +1176,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostRejected) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1207,13 +1207,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostInvalidPriority) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1316,13 +1316,13 @@ TEST_F(DynamicModulesLoadBalancerTest, PerHostDataSetAndGet) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1383,13 +1383,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMetadataTypedAccessSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1444,13 +1444,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMetadataNotFound) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1524,13 +1524,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1569,13 +1569,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksEdgeCases) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1641,13 +1641,13 @@ TEST_F(DynamicModulesLoadBalancerTest, CallbacksTestModuleExercisesNewCallbacks)
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1675,13 +1675,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMembershipUpdateNotifiesModule) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1710,13 +1710,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMembershipUpdateEmptyVectors) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1740,13 +1740,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMembershipUpdateCallbackAddress) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1779,13 +1779,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LbNewFailDoesNotRegisterCallback) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1813,7 +1813,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterDefineAndIncrement) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -1856,7 +1856,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsGaugeDefineAndManipulate) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -1901,7 +1901,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramDefineAndRecord) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -1931,7 +1931,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsInvalidId) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -1985,7 +1985,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsMultipleCounters) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -2028,7 +2028,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterVecWithLabels) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -2075,7 +2075,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsGaugeVecWithLabels) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -2118,7 +2118,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramVecWithLabels) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -2162,7 +2162,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecScalarIdConflictErrors) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -2223,7 +2223,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecWrongLabelCount) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -2261,7 +2261,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecNotFoundWithLabels) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -2288,7 +2288,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsFrozenAfterInit) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
@@ -2330,7 +2330,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsConcurrentIncrementCounterVecNoRac
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());

@@ -19,6 +19,7 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "absl/types/span.h"
 #include "openssl/evp.h"
 #include "openssl/sha.h"
 
@@ -203,7 +204,7 @@ absl::Status verifyFileSha256(const std::filesystem::path& path,
   if (EVP_DigestFinal(ctx.get(), digest.data(), nullptr) != 1) {
     return absl::InternalError("Failed to finalize SHA256 digest");
   }
-  std::string actual_hex = Hex::encode(digest.data(), digest.size());
+  std::string actual_hex = Hex::encode(absl::Span<const uint8_t>(digest.data(), digest.size()));
   // The expected hash is operator-supplied (proto config, not user input) and the actual digest
   // is computed from a file the attacker may control; the only information leaked by an
   // early-exit comparison is "wrong remote module", which carries no secret. A constant-time

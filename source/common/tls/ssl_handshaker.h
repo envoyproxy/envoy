@@ -156,6 +156,13 @@ public:
   X509* validatedPeerIssuer() const override {
     return validated_chain_.size() >= 2 ? validated_chain_[1].get() : nullptr;
   }
+  // Returns the validated peer certificate chain (leaf first).
+  OptRef<const std::vector<bssl::UniquePtr<X509>>> validatedPeerCertChain() const override {
+    if (validated_chain_.empty()) {
+      return std::nullopt;
+    }
+    return validated_chain_;
+  }
 
   bssl::UniquePtr<SSL> ssl_;
 

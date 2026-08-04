@@ -16,7 +16,7 @@ namespace Common {
 namespace DynamicForwardProxy {
 
 absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
-    Server::Configuration::GenericFactoryContext& context,
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
   const uint32_t max_hosts = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024);
   if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts) {
@@ -25,8 +25,7 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
         config.name(), config.preresolve_hostnames().size(), max_hosts));
   }
   auto resolver_or_error =
-      selectDnsResolver(config, context.serverFactoryContext().mainThreadDispatcher(),
-                        context.serverFactoryContext());
+      selectDnsResolver(config, server_context.mainThreadDispatcher(), server_context);
   RETURN_IF_NOT_OK_REF(resolver_or_error.status());
 
   Envoy::Matcher::AddressMatcherPtr resolved_address_filter;
@@ -38,31 +37,33 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
   }
 
   return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(
-      context, config, std::move(*resolver_or_error), std::move(resolved_address_filter)));
+      server_context, config, std::move(*resolver_or_error), std::move(resolved_address_filter)));
 }
 
 DnsCacheImpl::DnsCacheImpl(
-    Server::Configuration::GenericFactoryContext& context,
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Network::DnsResolverSharedPtr&& resolver,
     Envoy::Matcher::AddressMatcherPtr resolved_address_filter)
-    : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
-      config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
+    : main_thread_dispatcher_(server_context.mainThreadDispatcher()), config_(config),
+      random_generator_(server_context.api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(std::move(resolver)), tls_slot_(context.serverFactoryContext().threadLocal()),
-      scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
+      resolver_(std::move(resolver)), tls_slot_(server_context.threadLocal()),
+      scope_(server_context.serverScope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
-      resource_manager_(*scope_, context.serverFactoryContext().runtime(), config.name(),
+      resource_manager_(*scope_, server_context.runtime(), config.name(),
                         config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       min_refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_min_refresh_rate, 5000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
-      file_system_(context.serverFactoryContext().api().fileSystem()),
-      validation_visitor_(context.messageValidationVisitor()),
+      file_system_(server_context.api().fileSystem()),
+      validation_visitor_(server_context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)),
       resolved_address_filter_(std::move(resolved_address_filter)) {
-  tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
+  tls_slot_.set([&](Event::Dispatcher& dispatcher) {
+    return std::make_shared<ThreadLocalHostInfo>(*this, dispatcher);
+  });
 
   loadCacheEntries(config);
 
@@ -78,8 +79,8 @@ DnsCacheImpl::DnsCacheImpl(
     ENVOY_LOG(debug, "DNS pre-resolve starting for host {}", host);
     startCacheLoad(host, hostname.port_value(), false, false);
   }
-  enable_dfp_dns_trace_ = context.serverFactoryContext().runtime().snapshot().getBoolean(
-      "envoy.enable_dfp_dns_trace", false);
+  enable_dfp_dns_trace_ =
+      server_context.runtime().snapshot().getBoolean("envoy.enable_dfp_dns_trace", false);
 }
 
 DnsCacheImpl::~DnsCacheImpl() {
@@ -172,10 +173,25 @@ DnsCacheImpl::loadDnsCacheEntryWithForceRefresh(absl::string_view raw_host, uint
       [this, host = std::string(host), default_port, is_proxy_lookup, ignore_cached_entries]() {
         startCacheLoad(host, default_port, is_proxy_lookup, ignore_cached_entries);
       });
-  return {LoadDnsCacheEntryStatus::Loading,
-          std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_, host,
-                                                        callbacks),
-          std::nullopt};
+
+  auto handle = std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_,
+                                                              host, callbacks);
+
+  {
+    absl::ReaderMutexLock read_lock{primary_hosts_lock_};
+    auto it = primary_hosts_.find(host);
+    // If the host is in the map and has already completed its first resolution, then we know that
+    // the DNS resolution has finished and we can notify the worker thread.
+    if (!ignore_cached_entries && it != primary_hosts_.end() &&
+        it->second->host_info_->firstResolveComplete()) {
+      ENVOY_LOG(debug, "host '{}' resolved during handle registration, posting deferred notify",
+                host);
+      auto resolved_info = std::make_shared<HostMapUpdateInfo>(host, it->second->host_info_);
+      tls_host_info.dispatcher_.post(
+          [&tls_host_info, resolved_info]() { tls_host_info.onHostMapUpdate(resolved_info); });
+    }
+  }
+  return {LoadDnsCacheEntryStatus::Loading, std::move(handle), std::nullopt};
 }
 
 Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest() {

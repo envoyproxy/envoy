@@ -2,6 +2,7 @@ load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
 load("@com_google_protobuf//bazel/private/oss:proto_bazel_features.bzl", "proto_bazel_features")
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@envoy_toolshed//compile:libcxx_libs.bzl", "setup_libcxx_libs")
+load("@envoy_toolshed//compile:llvm_minimal.bzl", "llvm_toolchain_alias", "setup_llvm_minimal")
 load("@envoy_toolshed//sysroot:sysroot.bzl", "setup_sysroots")
 load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
@@ -23,11 +24,15 @@ PYTHON_MINOR_VERSION = _python_minor_version(PYTHON_VERSION)
 def envoy_dependencies_extra(
         glibc_version = GLIBC_VERSION,
         python_version = PYTHON_VERSION,
-        ignore_root_user_error = False):
+        ignore_root_user_error = False,
+        use_host_tools = False):
     compatibility_proxy_repo()
     java_compatibility_proxy_repo()
     bazel_toolchain_dependencies()
     setup_libcxx_libs()
+    if not use_host_tools:
+        setup_llvm_minimal()
+        llvm_toolchain_alias(name = "llvm_toolchain_llvm")
     setup_sysroots(glibc_version = glibc_version)
     emsdk_deps()
     raze_fetch_remote_crates()
@@ -35,11 +40,18 @@ def envoy_dependencies_extra(
     py_repositories()
 
     # Registers underscored Python minor version - eg `python3_10`
+    # When use_host_tools is True, skip registering the hermetic Python toolchain
+    # and use the host Python instead. This is unsupported by the Envoy project
+    # and intended only for downstream builds in controlled environments.
     python_register_toolchains(
         name = "python%s" % _python_minor_version(python_version),
         python_version = python_version,
         ignore_root_user_error = ignore_root_user_error,
+        register_toolchains = not use_host_tools,
     )
+
+    if use_host_tools:
+        native.register_toolchains("@rules_python//python:autodetecting_toolchain")
 
     aspect_bazel_lib_dependencies()
 
