@@ -173,6 +173,35 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_EQ(10U, response->body().size());
 }
 
+TEST_P(DynamicModulesIntegrationTest, GenericSecretCallbacks) {
+  // The module subscribes by name with no config source, so the name resolves against the
+  // statically configured secrets.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("test_secret");
+    secret->mutable_generic_secret()->mutable_secret()->set_inline_string("super_secret_value");
+  });
+
+  initializeFilter("generic_secret_callbacks", "test_secret");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  // The value the module read while handling the request.
+  EXPECT_EQ(
+      "super_secret_value",
+      response->headers().get(Http::LowerCaseString("x-secret-value"))[0]->value().getStringView());
+  // The value the module read from the config context while the configuration was being loaded.
+  EXPECT_EQ("super_secret_value", response->headers()
+                                      .get(Http::LowerCaseString("x-secret-value-at-config"))[0]
+                                      ->value()
+                                      .getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionId) {
   if (GetParam() != "rust" && GetParam() != "rust_static") {
     GTEST_SKIP() << "the upstream_connection_id filter is only in the rust test module";

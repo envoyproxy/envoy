@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/assert.h"
@@ -182,6 +183,62 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
   // TextReadout exposes only an owning value() accessor, so copy from the temporary into the
   // module buffer. Names stay allocation-free above.
   copyToModuleBuffer(readout.value(), value_buffer, value_buffer_capacity, value_size);
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr) {
+  return toFlushContext(snapshot_envoy_ptr)->snapshot_.histograms().size();
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* sample_count_out,
+    double* sample_sum_out) {
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  const auto& histograms = context->snapshot_.histograms();
+  if (index >= histograms.size()) {
+    return false;
+  }
+  const Envoy::Stats::ParentHistogram& histogram = histograms[index].get();
+  *name_size = histogram.constSymbolTable().serializeToBuffer(histogram.statName(), name_buffer,
+                                                              name_buffer_capacity);
+  const Envoy::Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
+  *sample_count_out = stats.sampleCount();
+  *sample_sum_out = stats.sampleSum();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr,
+    size_t histogram_index) {
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  const auto& histograms = context->snapshot_.histograms();
+  if (histogram_index >= histograms.size()) {
+    return 0;
+  }
+  return histograms[histogram_index].get().cumulativeStatistics().supportedBuckets().size();
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr,
+    size_t histogram_index, size_t bucket_index, double* upper_bound_out,
+    uint64_t* cumulative_count_out) {
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  const auto& histograms = context->snapshot_.histograms();
+  if (histogram_index >= histograms.size()) {
+    return false;
+  }
+  const Envoy::Stats::HistogramStatistics& stats =
+      histograms[histogram_index].get().cumulativeStatistics();
+  // supportedBuckets() (upper bounds) and computedBuckets() (cumulative counts) are the same
+  // length, so one bound checks both.
+  const auto& upper_bounds = stats.supportedBuckets();
+  if (bucket_index >= upper_bounds.size()) {
+    return false;
+  }
+  *upper_bound_out = upper_bounds[bucket_index];
+  *cumulative_count_out = stats.computedBuckets()[bucket_index];
   return true;
 }
 

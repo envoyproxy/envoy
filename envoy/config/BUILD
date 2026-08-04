@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "config_provider_interface",
     hdrs = ["config_provider.h"],
     deps = [
+        "//envoy/common:pure_lib",
         "//envoy/common:time_interface",
-        "//source/common/common:assert_lib",
         "//source/common/protobuf",
     ],
 )

@@ -860,6 +860,21 @@ func (mr *MockHttpFilterHandleMockRecorder) GetFilterStateTyped(key any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilterStateTyped", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetFilterStateTyped), key)
 }
 
+// GetGenericSecret mocks base method.
+func (m *MockHttpFilterHandle) GetGenericSecret(id shared.GenericSecretID) (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetGenericSecret", id)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetGenericSecret indicates an expected call of GetGenericSecret.
+func (mr *MockHttpFilterHandleMockRecorder) GetGenericSecret(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGenericSecret", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetGenericSecret), id)
+}
+
 // GetLogLevel mocks base method.
 func (m *MockHttpFilterHandle) GetLogLevel() shared.LogLevel {
 	m.ctrl.T.Helper()
@@ -1685,6 +1700,21 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) DefineHistogram(name any, tagK
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).DefineHistogram), varargs...)
 }
 
+// GetGenericSecret mocks base method.
+func (m *MockHttpFilterConfigHandle) GetGenericSecret(id shared.GenericSecretID) (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetGenericSecret", id)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetGenericSecret indicates an expected call of GetGenericSecret.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetGenericSecret(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGenericSecret", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetGenericSecret), id)
+}
+
 // GetScheduler mocks base method.
 func (m *MockHttpFilterConfigHandle) GetScheduler() shared.Scheduler {
 	m.ctrl.T.Helper()
@@ -1860,4 +1890,18 @@ func (m *MockHttpFilterConfigHandle) StartHttpStream(cluster string, headers [][
 func (mr *MockHttpFilterConfigHandleMockRecorder) StartHttpStream(cluster, headers, body, endOfStream, timeoutMs, cb any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartHttpStream", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).StartHttpStream), cluster, headers, body, endOfStream, timeoutMs, cb)
+}
+
+// SubscribeGenericSecret mocks base method.
+func (m *MockHttpFilterConfigHandle) SubscribeGenericSecret(name, sdsConfigSource string) shared.GenericSecretID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubscribeGenericSecret", name, sdsConfigSource)
+	ret0, _ := ret[0].(shared.GenericSecretID)
+	return ret0
+}
+
+// SubscribeGenericSecret indicates an expected call of SubscribeGenericSecret.
+func (mr *MockHttpFilterConfigHandleMockRecorder) SubscribeGenericSecret(name, sdsConfigSource any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeGenericSecret", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).SubscribeGenericSecret), name, sdsConfigSource)
 }

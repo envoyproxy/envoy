@@ -624,7 +624,9 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//envoy/thread_local:thread_local_interface",
         "//test/test_common:test_time_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -1051,7 +1053,9 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "@quiche//:quic_core_crypto_encryption_lib",
+    ]),
 )
 
 envoy_cc_test(
@@ -1095,6 +1099,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_upstream_client_cert_integration_test",
+    size = "large",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["quic_upstream_client_cert_integration_test.cc"],
+    }),
+    data = ["//test/config/integration/certs"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = envoy_select_enable_http3([
+        ":http_protocol_integration_lib",
+        "//source/common/quic:envoy_quic_proof_source_lib",
+        "//source/common/tls:connection_info_impl_base_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ]),
+)
+
+envoy_cc_test(
     name = "multiplexed_upstream_integration_test",
     size = "large",
     srcs = [
@@ -1116,7 +1141,10 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:envoy_quic_server_crypto_stream_factory_lib",
+        "@quiche//:quic_server_session_lib",
+    ]),
 )
 
 envoy_cc_test_library(
@@ -1200,6 +1228,7 @@ envoy_cc_test_library(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/http/http2:http2_frame",
         "//test/common/upstream:utility_lib",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
@@ -1348,6 +1377,7 @@ envoy_cc_test_library(
         "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
+        "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:codec_stats_lib",
@@ -1362,6 +1392,7 @@ envoy_cc_test_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks/http:header_validator_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
@@ -1427,8 +1458,11 @@ envoy_cc_test_library(
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:resources_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -2139,6 +2173,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_random_generator_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -2146,6 +2181,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/tcp/v3:pkg_cc_proto",
     ],
 )
 
@@ -2817,6 +2853,7 @@ envoy_cc_test_library(
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/integration/filters:test_listener_filter_lib",
         "//test/integration/filters:test_network_filter_lib",
+        "//test/mocks/server:factory_context_mocks",
         "@quiche//:quic_test_tools_session_peer_lib",
         "@quiche//:quic_test_tools_test_utils_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
