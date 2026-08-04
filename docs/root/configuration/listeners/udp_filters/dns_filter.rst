@@ -119,6 +119,18 @@ numerical value is specified, Envoy will attempt to resolve the number to a name
 protocols are used as they appear. An underscore is prepended to both the service and protocol to
 adhere to the convention outlined in the RFC.
 
+Case-insensitive matching
+--------------------------
+
+By default the filter matches query names against the configured virtual domains using a
+byte-exact comparison, so a query for ``GOOGLE.COM`` does not match a configured ``google.com``.
+Setting :ref:`case_insensitive
+<envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.case_insensitive>` to
+``true`` makes matching case-insensitive. The response still echoes the client's original
+query-name case. Note that when enabled, SRV target names in the answer are lowercased, and two
+virtual domains that differ only by case collapse to a single entry (the first entry wins and
+address lists are merged).
+
 The filter can also consume its domain configuration from an external DNS table. The same entities
 appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
 using the :ref:`external_dns_table DataSource <envoy_v3_api_msg_config.core.v3.datasource>` directive:

@@ -768,6 +768,8 @@ public:
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
+  bool batchUpdateActive() const override { return batch_update_; }
+
   HostMapConstSharedPtr crossPriorityHostMap() const override {
     return const_cross_priority_host_map_;
   }
@@ -821,7 +823,8 @@ private:
     void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                      const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
-                     std::optional<uint32_t> overprovisioning_factor) override;
+                     std::optional<uint32_t> overprovisioning_factor,
+                     HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
     absl::node_hash_set<HostSharedPtr> all_hosts_removed_;

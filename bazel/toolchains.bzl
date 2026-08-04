@@ -84,5 +84,9 @@ def envoy_toolchains():
             "linux-x86_64": "@sysroot_linux_amd64//:sysroot",
             "linux-aarch64": "@sysroot_linux_arm64//:sysroot",
         },
-        toolchain_roots = {"": LLVM_PATH} if LLVM_PATH else {},
+        toolchain_roots = {"": LLVM_PATH} if LLVM_PATH else {
+            "linux-x86_64": "@llvm_minimal_linux_x64//",
+            "linux-aarch64": "@llvm_minimal_linux_arm64//",
+            "darwin-aarch64": "@llvm_minimal_macos_arm64//",
+        },
     )
