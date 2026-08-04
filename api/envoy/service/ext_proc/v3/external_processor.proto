@@ -6,6 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
@@ -159,7 +160,7 @@ message ProcessingRequest {
 //   the server must send back exactly one ``ProcessingResponse`` message.
 // * If it is set to ``FULL_DUPLEX_STREAMED``, the server must follow the API defined
 //   for this mode to send the ``ProcessingResponse`` messages.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ProcessingResponse {
   // The response type that is sent by the server.
   oneof response {
@@ -219,6 +220,14 @@ message ProcessingResponse {
   // following filters. This metadata will be placed in the namespace(s) specified by the top-level
   // field name(s) of the struct.
   google.protobuf.Struct dynamic_metadata = 8;
+
+  // Optional typed metadata that will be emitted as dynamic metadata to be consumed by
+  // following filters. This metadata will be placed in the namespace(s) specified by the
+  // keys of the map.
+  //
+  // Typed dynamic metadata should be preferred over untyped dynamic metadata (``dynamic_metadata``)
+  // because it is more efficient and more type-safe.
+  map<string, google.protobuf.Any> typed_dynamic_metadata = 13;
 
   // Override how parts of the HTTP request and response are processed for the duration of this
   // particular request/response only. Servers may use this to intelligently control how requests
