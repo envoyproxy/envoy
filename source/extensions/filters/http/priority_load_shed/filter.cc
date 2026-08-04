@@ -38,8 +38,7 @@ PriorityLoadShedFilterConfig::create(const ProtoConfig& config,
                       bucket_config.load_shed_point()));
     }
 
-    buckets.push_back(
-        Bucket{range.start(), range.end(), bucket_config.load_shed_point(), load_shed_point});
+    buckets.push_back(Bucket{range.start(), range.end(), load_shed_point});
   }
 
   std::sort(buckets.begin(), buckets.end(),
@@ -53,30 +52,27 @@ PriorityLoadShedFilterConfig::create(const ProtoConfig& config,
     }
   }
 
-  std::string default_load_shed_point_name;
   Server::LoadShedPoint* default_load_shed_point = nullptr;
   if (!config.default_load_shed_point().empty()) {
-    default_load_shed_point_name = config.default_load_shed_point();
     default_load_shed_point =
-        load_shed_point_provider.getLoadShedPoint(default_load_shed_point_name);
+        load_shed_point_provider.getLoadShedPoint(config.default_load_shed_point());
     if (default_load_shed_point == nullptr) {
       return absl::InvalidArgumentError(
           fmt::format("default load shed point '{}' is not configured in the overload manager",
-                      default_load_shed_point_name));
+                      config.default_load_shed_point()));
     }
   }
 
   return std::shared_ptr<PriorityLoadShedFilterConfig>(new PriorityLoadShedFilterConfig(
-      Http::LowerCaseString(config.header_name()), std::move(buckets),
-      std::move(default_load_shed_point_name), default_load_shed_point, stats_prefix, scope));
+      Http::LowerCaseString(config.header_name()), std::move(buckets), default_load_shed_point,
+      stats_prefix, scope));
 }
 
 PriorityLoadShedFilterConfig::PriorityLoadShedFilterConfig(
     Http::LowerCaseString header_name, std::vector<Bucket> buckets,
-    std::string default_load_shed_point_name, Server::LoadShedPoint* default_load_shed_point,
-    const std::string& stats_prefix, Stats::Scope& scope)
+    Server::LoadShedPoint* default_load_shed_point, const std::string& stats_prefix,
+    Stats::Scope& scope)
     : header_name_(std::move(header_name)), buckets_(std::move(buckets)),
-      default_load_shed_point_name_(std::move(default_load_shed_point_name)),
       default_load_shed_point_(default_load_shed_point),
       stats_(generateStats(stats_prefix, scope)) {}
 

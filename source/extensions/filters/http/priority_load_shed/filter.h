@@ -38,7 +38,6 @@ public:
   struct Bucket {
     int32_t start;
     int32_t end;
-    std::string load_shed_point_name;
     Server::LoadShedPoint* load_shed_point;
   };
 
@@ -48,13 +47,12 @@ public:
 
   const Http::LowerCaseString& headerName() const { return header_name_; }
   const Bucket* findBucket(int32_t value) const;
-  bool hasDefaultLoadShedPoint() const { return !default_load_shed_point_name_.empty(); }
+  bool hasDefaultLoadShedPoint() const { return default_load_shed_point_ != nullptr; }
   Server::LoadShedPoint* defaultLoadShedPoint() const { return default_load_shed_point_; }
   PriorityLoadShedStats& stats() { return stats_; }
 
 private:
   PriorityLoadShedFilterConfig(Http::LowerCaseString header_name, std::vector<Bucket> buckets,
-                               std::string default_load_shed_point_name,
                                Server::LoadShedPoint* default_load_shed_point,
                                const std::string& stats_prefix, Stats::Scope& scope);
 
@@ -62,7 +60,6 @@ private:
 
   const Http::LowerCaseString header_name_;
   std::vector<Bucket> buckets_;
-  std::string default_load_shed_point_name_;
   Server::LoadShedPoint* default_load_shed_point_{nullptr};
   PriorityLoadShedStats stats_;
 };
