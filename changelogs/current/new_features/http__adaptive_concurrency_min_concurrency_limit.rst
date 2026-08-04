@@ -1,0 +1,1 @@
+Added ``min_concurrency_limit`` to the adaptive concurrency gradient controller to allow the minimum calculated concurrency limit to be configured separately from the concurrency used during minRTT recalculation.
