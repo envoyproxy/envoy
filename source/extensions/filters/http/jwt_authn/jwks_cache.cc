@@ -126,7 +126,8 @@ public:
 
       // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
       async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-          jwt_provider_.remote_jwks(), retry_policy_, context, fetcher_cb, stats,
+          jwt_provider_.remote_jwks(), retry_policy_, context, fetcher_cb,
+          stats.jwks_fetch_success_, stats.jwks_fetch_failed_,
           [this](Envoy::JwtVerify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
     }
   }

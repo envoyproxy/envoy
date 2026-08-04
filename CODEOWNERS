@@ -139,6 +139,7 @@
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @kbaichoo
 /*/extensions/filters/common/fault @rshriram @kbaichoo
+/*/extensions/filters/common/jwks @wbpcode @kanurag94 @taoxuy @tyxia @yanavlasov
 /*/extensions/filters/http/grpc_json_reverse_transcoder @numanelahi @yanavlasov
 /*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @nezdolik
 /*/extensions/filters/http/router @yanavlasov @mattklein123
