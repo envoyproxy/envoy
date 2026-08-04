@@ -1187,6 +1187,16 @@ pub trait EnvoyHttpFilter {
     entries: &'a [(&'a str, &'a str)],
   );
 
+  /// Set an entire dynamic metadata namespace from a serialized `google.protobuf.Struct`.
+  /// The struct is merged into the namespace and existing entries with the same key are
+  /// overwritten. A buffer that does not parse as a `google.protobuf.Struct` is a no-op.
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]);
+
+  /// Set an entire typed dynamic metadata namespace from a serialized `google.protobuf.Any`.
+  /// The Any is merged into the namespace's `typed_filter_metadata` entry. A buffer that does not
+  /// parse as a `google.protobuf.Any` is a no-op.
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]);
+
   /// Get the bool-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
@@ -2711,6 +2721,26 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         str_to_module_buffer(namespace),
         pairs.as_ptr(),
         pairs.len(),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_any),
       )
     }
   }
