@@ -92,7 +92,7 @@ void CompositeClusterLoadBalancer::onClusterAddOrUpdate(
   }
 }
 
-void CompositeClusterLoadBalancer::onClusterRemoval(const std::string& cluster_name) {
+void CompositeClusterLoadBalancer::onClusterRemoval(absl::string_view cluster_name) {
   if (std::find(clusters_->begin(), clusters_->end(), cluster_name) != clusters_->end()) {
     ENVOY_LOG(debug, "cluster '{}' removed from composite cluster '{}'", cluster_name,
               parent_info_->name());

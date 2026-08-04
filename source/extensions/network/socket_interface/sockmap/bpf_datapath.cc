@@ -38,6 +38,9 @@ bool buildSockKey(const Address::Instance& local, const Address::Instance& peer,
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <array>
+#include <cstdint>
+
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 
@@ -48,6 +51,11 @@ namespace {
 constexpr char SockhashName[] = "envoy_sockhash";
 constexpr char SockOpsName[] = "envoy_sockops";
 constexpr char SkMsgName[] = "envoy_sk_msg";
+constexpr char AccelPortsName[] = "envoy_accel_ports";
+constexpr char AccelFilterName[] = "envoy_accel_filter";
+// Number of 64-bit words in the `envoy_accel_ports` bitmap, one bit per TCP port (0-65535). Must
+// stay in sync with `ENVOY_PORT_BITMAP_WORDS` in `bpf/sockmap_kern.c`.
+constexpr uint32_t AccelBitmapWords = 1024;
 
 // Loads the `sock_ops` and `sk_msg` programs through libbpf, attaches the `sk_msg` verdict to the
 // sockhash and, when configured, the `sock_ops` program to a cgroup. Every registration is best
@@ -131,6 +139,54 @@ BpfDatapathSharedPtr LibbpfDatapath::create(const BpfDatapathConfig& config) {
     ENVOY_LOG_MISC(warn, "sockmap could not load eBPF programs: {}", errorDetails(errno));
     bpf_object__close(obj);
     return nullptr;
+  }
+
+  // Populate the optional proxy-port allowlist so the `sock_ops` program only registers connections
+  // whose local or peer port is in one of the configured ranges and leaves every other same-host
+  // connection in the cgroup on the standard datapath. An empty list keeps the default of
+  // registering every connection.
+  if (!config.accelerated_ports.empty()) {
+    struct bpf_map* ports_map = bpf_object__find_map_by_name(obj, AccelPortsName);
+    struct bpf_map* filter_map = bpf_object__find_map_by_name(obj, AccelFilterName);
+    if (ports_map == nullptr || filter_map == nullptr) {
+      ENVOY_LOG_MISC(warn, "sockmap accelerated_ports set but the allowlist maps are missing, "
+                           "registering all same-host hops in the cgroup");
+    } else {
+      // Set one bit per port covered by the ranges. The map is zero-initialized on load, so only
+      // the non-zero words are pushed.
+      std::array<uint64_t, AccelBitmapWords> bitmap{};
+      for (const PortRange& range : config.accelerated_ports) {
+        for (uint32_t port = range.start; port < range.end; ++port) {
+          bitmap[port >> 6] |= uint64_t{1} << (port & 63);
+        }
+      }
+      const int ports_fd = bpf_map__fd(ports_map);
+      bool populated = true;
+      for (uint32_t word = 0; word < AccelBitmapWords; ++word) {
+        if (bitmap[word] == 0) {
+          continue;
+        }
+        if (bpf_map_update_elem(ports_fd, &word, &bitmap[word], BPF_ANY) != 0) {
+          populated = false;
+          break;
+        }
+      }
+      // Enable the filter only after the whole bitmap is written. A partial bitmap would silently
+      // drop application hops, so on failure the filter stays off and every same-host connection is
+      // registered.
+      const uint32_t zero = 0;
+      const uint32_t enabled = 1;
+      const int filter_fd = bpf_map__fd(filter_map);
+      if (populated && bpf_map_update_elem(filter_fd, &zero, &enabled, BPF_ANY) == 0) {
+        ENVOY_LOG_MISC(info, "sockmap acceleration scoped to {} proxy port range(s)",
+                       config.accelerated_ports.size());
+      } else {
+        ENVOY_LOG_MISC(warn,
+                       "sockmap could not populate the accelerated_ports allowlist, "
+                       "registering all same-host hops in the cgroup: {}",
+                       errorDetails(errno));
+      }
+    }
   }
 
   const int sockhash_fd = bpf_map__fd(map);

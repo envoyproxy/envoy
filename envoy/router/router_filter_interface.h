@@ -28,7 +28,7 @@ public:
   /**
    * This will be called when upstream 1xx headers are ready to be processed by downstream code.
    * @param headers contains the 1xx headers
-   * @param upstream_request inicates which UpstreamRequest the 1xx headers are from.
+   * @param upstream_request indicates which UpstreamRequest the 1xx headers are from.
    *
    */
   virtual void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
@@ -36,7 +36,7 @@ public:
   /**
    * This will be called when upstream non-1xx headers are ready to be processed by downstream code.
    * @param headers contains the headers
-   * @param upstream_request inicates which UpstreamRequest the headers are from.
+   * @param upstream_request indicates which UpstreamRequest the headers are from.
    * @param end_stream indicates if the response is complete.
    *
    */
@@ -45,7 +45,7 @@ public:
   /**
    * This will be called when upstream data is ready to be processed by downstream code.
    * @param data contains the data to process
-   * @param upstream_request inicates which UpstreamRequest the data is from.
+   * @param upstream_request indicates which UpstreamRequest the data is from.
    * @param end_stream indicates if the response is complete.
    *
    */
@@ -54,7 +54,7 @@ public:
   /**
    * This will be called when upstream trailers are ready to be processed by downstream code.
    * @param trailers contains the trailers to process
-   * @param upstream_request inicates which UpstreamRequest the trailers are from.
+   * @param upstream_request indicates which UpstreamRequest the trailers are from.
    *
    */
   virtual void onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
@@ -62,7 +62,7 @@ public:
   /**
    * This will be called when upstream metadata is ready to be processed by downstream code.
    * @param metadata contains the metadata to process
-   * @param upstream_request inicates which UpstreamRequest the metadata is from.
+   * @param upstream_request indicates which UpstreamRequest the metadata is from.
    *
    */
   virtual void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) PURE;
@@ -71,7 +71,7 @@ public:
    * This will be called when an upstream reset is ready to be processed by downstream code.
    * @param reset_reason indicates the reason for the reset.
    * @param transport_failure optionally indicates any transport failure.
-   * @param upstream_request inicates which UpstreamRequest the reset is from.
+   * @param upstream_request indicates which UpstreamRequest the reset is from.
    *
    */
   virtual void onUpstreamReset(Http::StreamResetReason reset_reason,
@@ -80,7 +80,7 @@ public:
 
   /**
    * This will be called when an upstream host is selected. This is called both
-   * if the host can accomodate the stream and if the host is selected but unusable.
+   * if the host can accommodate the stream and if the host is selected but unusable.
    * @param host the host selected for the request
    * @param pool_success indicates if the host can be used for the request.
    */
@@ -88,19 +88,19 @@ public:
                                       bool pool_success) PURE;
   /*
    * This will be called if a per-try timeout fails.
-   * @param upstream_request inicates which UpstreamRequest which timed out
+   * @param upstream_request indicates which UpstreamRequest which timed out
    */
   virtual void onPerTryTimeout(UpstreamRequest& upstream_request) PURE;
 
   /*
    * This will be called if a per-try idle timeout fails.
-   * @param upstream_request inicates which UpstreamRequest which timed out
+   * @param upstream_request indicates which UpstreamRequest which timed out
    */
   virtual void onPerTryIdleTimeout(UpstreamRequest& upstream_request) PURE;
 
   /*
    * This will be called if the max stream duration was reached.
-   * @param upstream_request inicates which UpstreamRequest which timed out
+   * @param upstream_request indicates which UpstreamRequest which timed out
    */
   virtual void onStreamMaxDurationReached(UpstreamRequest& upstream_request) PURE;
 
@@ -136,7 +136,7 @@ public:
   virtual TimeoutData timeout() PURE;
 
   /*
-   * @returns the dynamic max stream duraration for this stream, if set.
+   * @returns the dynamic max stream duration for this stream, if set.
    */
   virtual std::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const PURE;
 

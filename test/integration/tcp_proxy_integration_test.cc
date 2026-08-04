@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.h"
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/socket_option_impl.h"
@@ -24,6 +25,7 @@
 #include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_random_generator.h"
 
 #include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
@@ -231,6 +233,34 @@ TEST_P(TcpProxyIntegrationTest, NoUpstream) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->waitForDisconnect();
 }
+
+#if defined(__linux__)
+// Regression test: when the upstream connection cannot be created because binding to the
+// configured network namespace fails at connection time (the namespace file cannot be opened),
+// the TCP proxy closes the downstream connection gracefully instead of crashing on a null
+// connection.
+TEST_P(TcpProxyIntegrationTest, UpstreamConnectionCreationFailure) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
+    source_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    source_address->set_port_value(0);
+    // The namespace file does not exist, so entering it at connection time fails and the
+    // dispatcher returns a null connection. validate_network_namespaces is intentionally not set,
+    // so the configuration is accepted and the failure happens at connection time.
+    source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  // The upstream connection cannot be created, so the pool surfaces a graceful connection failure
+  // (rather than crashing) and the TCP proxy exhausts its connect attempts. Assert on the cluster
+  // counter, which is only incremented when the failure is handled cleanly.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
+  tcp_client->close();
+}
+#endif
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   config_helper_.setBufferLimits(1024, 1024);

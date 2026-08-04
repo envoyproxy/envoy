@@ -60,8 +60,10 @@ envoy_cc_extension(
     deps = [
         ":bpf_datapath_lib",
         ":io_handle_lib",
+        "//envoy/common:exception_lib",
         "//envoy/registry",
         "//envoy/server:bootstrap_extension_config_interface",
+        "//source/common/common:fmt_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:socket_interface_lib",
         "//source/common/protobuf:utility_lib",

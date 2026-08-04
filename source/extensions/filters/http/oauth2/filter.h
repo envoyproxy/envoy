@@ -26,6 +26,7 @@
 #include "source/extensions/filters/http/oauth2/oauth.h"
 #include "source/extensions/filters/http/oauth2/oauth_client.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
@@ -154,7 +155,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Server::Configuration::CommonFactoryContext& context,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
-               const std::string& stats_prefix);
+               const std::string& stats_prefix, absl::Status& creation_status);
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
@@ -180,14 +181,20 @@ public:
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
+  const Formatter::Formatter* postLogoutRedirectUri() const {
+    return post_logout_redirect_uri_formatter_.get();
+  }
+  bool disablePostLogoutRedirectUri() const { return disable_post_logout_redirect_uri_; }
   const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
   }
-  const std::string& redirectUri() const { return redirect_uri_; }
+  const Formatter::Formatter& redirectUri() const { return *redirect_uri_formatter_; }
   const std::vector<std::string>& allowedRedirectDomains() const {
     return allowed_redirect_domains_;
   }
-  const std::string& originalRequestUri() const { return original_request_uri_; }
+  const Formatter::Formatter* originalRequestUri() const {
+    return original_request_uri_formatter_.get();
+  }
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
@@ -249,6 +256,9 @@ public:
     return code_verifier_cookie_settings_;
   }
   bool disableTokenEncryption() const { return disable_token_encryption_; }
+  const std::string& jwtSigningAlgorithm() const { return jwt_signing_algorithm_; }
+  std::chrono::seconds jwtAssertionLifetime() const { return jwt_assertion_lifetime_; }
+  const std::string& tokenEndpointUrl() const { return oauth_token_endpoint_.uri(); }
 
 private:
   static FilterStats generateStats(const std::string& prefix,
@@ -259,11 +269,13 @@ private:
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
   const std::string end_session_endpoint_;
+  Formatter::FormatterPtr post_logout_redirect_uri_formatter_;
+  const bool disable_post_logout_redirect_uri_ : 1;
   const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
-  const std::string redirect_uri_;
+  Formatter::FormatterPtr redirect_uri_formatter_;
+  Formatter::FormatterPtr original_request_uri_formatter_;
   const std::vector<std::string> allowed_redirect_domains_;
-  const std::string original_request_uri_;
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
@@ -280,6 +292,9 @@ private:
   const std::chrono::seconds default_refresh_token_expires_in_;
   const std::chrono::seconds csrf_token_expires_in_;
   const std::chrono::seconds code_verifier_token_expires_in_;
+  // Always initialized even for non-JWT auth types; minimal overhead (a string + 8 bytes).
+  const std::string jwt_signing_algorithm_;
+  const std::chrono::seconds jwt_assertion_lifetime_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
@@ -471,6 +486,7 @@ private:
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
+  absl::StatusOr<std::string> getClientCredential();
   void removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
   bool shouldAllowFailed(const Http::RequestHeaderMap& headers) const;
   bool shouldDenyRedirect(const Http::RequestHeaderMap& headers) const;

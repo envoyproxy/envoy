@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "runtime_interface",
     hdrs = ["runtime.h"],
     deps = [
-        "//envoy/stats:stats_interface",
+        "//envoy/stats:scope_interface",
         "//envoy/thread_local:thread_local_object",
         "//source/common/common:assert_lib",
         "//source/common/singleton:threadsafe_singleton",

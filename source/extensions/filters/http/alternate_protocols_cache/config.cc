@@ -11,7 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AlternateProtocolsCache {
 
-Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+AlternateProtocolsCacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
@@ -28,8 +29,8 @@ Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryF
   };
 }
 
-Http::FilterFactoryCb
-AlternateProtocolsCacheFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+AlternateProtocolsCacheFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
         proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {

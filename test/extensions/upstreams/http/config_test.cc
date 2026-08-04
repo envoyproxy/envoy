@@ -10,6 +10,7 @@
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -21,9 +22,11 @@ namespace Extensions {
 namespace Upstreams {
 namespace Http {
 
+using ::Envoy::StatusHelpers::IsOk;
 using ::testing::ContainsRegex;
 using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
+using ::testing::Not;
 using ::testing::StrictMock;
 
 class ConfigTest : public ::testing::Test {
@@ -208,9 +211,9 @@ TEST_F(ConfigTest, HeaderValidatorConfig) {
                          ::Envoy::Http::Protocol::Http2, stats));
 #else
   // If UHV is disabled, providing config should result in rejection
-  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).status(),
+      Not(IsOk()));
 #endif
 }
 
@@ -235,9 +238,9 @@ TEST_F(ConfigTest, HeaderValidatorConfigWithRuntimeDisabled) {
   EXPECT_EQ(nullptr, config->header_validator_factory_);
 #else
   // If UHV is disabled, providing config should result in rejection
-  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).status(),
+      Not(IsOk()));
 #endif
 }
 
@@ -260,9 +263,9 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithRuntimeEnabled) {
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).status(),
+      Not(IsOk()));
 #endif
 }
 
@@ -305,9 +308,9 @@ TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).status(),
+      Not(IsOk()));
 #endif
 }
 
@@ -337,9 +340,9 @@ TEST_F(ConfigTest, TranslateAutoLegacyConfigToDefaultHeaderValidatorConfig) {
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).status(),
+      Not(IsOk()));
 #endif
 }
 
@@ -369,9 +372,9 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).status(),
+      Not(IsOk()));
 #endif
 }
 
@@ -401,9 +404,9 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                   .status()
-                   .ok());
+  EXPECT_THAT(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).status(),
+      Not(IsOk()));
 #endif
 }
 

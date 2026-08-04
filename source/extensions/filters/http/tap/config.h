@@ -14,14 +14,26 @@ namespace TapFilter {
  * Config registration for the tap filter.
  */
 class TapFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::tap::v3::Tap> {
+    : public Common::ExceptionFreeFactoryBase<envoy::extensions::filters::http::tap::v3::Tap> {
 public:
-  TapFilterFactory() : FactoryBase("envoy.filters.http.tap") {}
+  TapFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.tap") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
+  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
+  // (ServerFactoryContext) paths. The FilterConfig stats are scoped to the given scope.
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
+                      const std::string& stats_prefix,
+                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+                      ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 } // namespace TapFilter

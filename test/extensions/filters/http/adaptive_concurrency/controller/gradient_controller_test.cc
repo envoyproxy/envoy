@@ -15,11 +15,13 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
 using testing::Return;
 
@@ -34,7 +36,10 @@ GradientControllerConfig makeConfig(const std::string& yaml_config,
                                     NiceMock<Runtime::MockLoader>& runtime) {
   envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig proto;
   TestUtility::loadFromYamlAndValidate(yaml_config, proto);
-  return GradientControllerConfig{proto, runtime};
+  absl::Status creation_status = absl::OkStatus();
+  GradientControllerConfig config{proto, runtime, creation_status};
+  EXPECT_OK(creation_status);
+  return config;
 }
 
 class GradientControllerConfigTest : public testing::Test {
@@ -158,9 +163,14 @@ TEST_F(GradientControllerConfigTest, MissingMinRTTValues) {
     min_concurrency: 8
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      makeConfig(yaml, runtime_), EnvoyException,
-      "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set");
+  envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig proto;
+  TestUtility::loadFromYamlAndValidate(yaml, proto);
+  absl::Status creation_status = absl::OkStatus();
+  GradientControllerConfig config{proto, runtime_, creation_status};
+  EXPECT_THAT(
+      creation_status,
+      HasStatusMessage(
+          "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set"));
 }
 
 TEST_F(GradientControllerConfigTest, Clamping) {

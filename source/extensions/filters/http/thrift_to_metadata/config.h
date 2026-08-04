@@ -13,17 +13,17 @@ namespace HttpFilters {
 namespace ThriftToMetadata {
 
 class ThriftToMetadataConfig
-    : public Extensions::HttpFilters::Common::FactoryBase<
+    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata> {
 public:
   ThriftToMetadataConfig();
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata&,
       const std::string&, Server::Configuration::FactoryContext&) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata&,
       const std::string&, Server::Configuration::ServerFactoryContext&) override;
 };

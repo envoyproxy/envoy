@@ -41,7 +41,7 @@ datapath.
 Compiling the eBPF object
 -------------------------
 
-Envoy does not ship a compiled eBPF object: the ``sock_ops`` and ``sk_msg`` programs and the user
+Envoy does not ship a compiled eBPF object. The ``sock_ops`` and ``sk_msg`` programs and the user
 space registration must share the same map name and key layout. The program source is part of this
 extension at
 :repo:`sockmap_kern.c <source/extensions/network/socket_interface/sockmap/bpf/sockmap_kern.c>`, and
@@ -89,23 +89,26 @@ When :ref:`cgroup_path
 Envoy attaches the ``sock_ops`` program to that cgroup v2 directory. Every socket that reaches the
 established state inside the cgroup is added to the ``sockhash``, which accelerates hops between
 applications and Envoy that run in the same cgroup. Prefer a narrowly scoped cgroup over a broad
-one such as the root. If ``cgroup_path`` is not set, the ``sock_ops`` program is not attached and
-application sockets are not tracked.
+one such as the root. When the cgroup must be broad, set :ref:`accelerated_ports
+<envoy_v3_api_field_extensions.network.socket_interface.sockmap.v3.Sockmap.accelerated_ports>` to the
+proxy listener port ranges so only connections to or from those ports are registered, leaving
+unrelated same-host connections in the cgroup on the standard datapath. If ``cgroup_path`` is not
+set, the ``sock_ops`` program is not attached and application sockets are not tracked.
 
 Proxy-to-proxy hops
 ~~~~~~~~~~~~~~~~~~~
 
 When :ref:`register_user_space_sockets
 <envoy_v3_api_field_extensions.network.socket_interface.sockmap.v3.Sockmap.register_user_space_sockets>`
-is true, which is the default, Envoy registers its accepted, connected, and duplicated sockets into
-the ``sockhash`` from user space. This is independent of ``cgroup_path`` and accelerates
+is ``true``, which is the default, Envoy registers its accepted, connected, and duplicated sockets
+into the ``sockhash`` from user space. This is independent of ``cgroup_path`` and accelerates
 proxy-to-proxy hops on the same host without attaching the ``sock_ops`` program. The matching entry
 is removed when the socket closes, so a later connection that reuses the tuple is never redirected
 into a stale entry.
 
 For either path, the ``sk_msg`` verdict program looks up the peer of each send in the ``sockhash``
 and, when the peer is present, redirects the payload straight to its ingress queue with
-``bpf_msg_redirect_hash``. Only IPv4 stream sockets are accelerated; other sockets, including IPv6
+``bpf_msg_redirect_hash``. Only IPv4 stream sockets are accelerated. Other sockets, including IPv6
 and Unix domain sockets, use the standard datapath unchanged. The ``sockhash`` holds one entry per
 accelerated socket, up to :ref:`sockhash_max_entries
 <envoy_v3_api_field_extensions.network.socket_interface.sockmap.v3.Sockmap.sockhash_max_entries>`.

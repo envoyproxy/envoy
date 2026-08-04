@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_cc_test_library",
@@ -277,6 +279,7 @@ envoy_cc_test(
     srcs =
         ["xds_failover_integration_test.cc"],
     rbe_pool = "6gig",
+    shard_count = 2,
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
@@ -289,4 +292,19 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "eds_resources_cache_impl_benchmark",
+    srcs = ["eds_resources_cache_impl_benchmark.cc"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:eds_resources_cache_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "eds_resources_cache_impl_benchmark_test",
+    benchmark_binary = "eds_resources_cache_impl_benchmark",
 )

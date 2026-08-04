@@ -14,6 +14,7 @@ envoy_cc_extension(
     hdrs = ["reverse_connection.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/upstream:admin_endpoint_provider_interface",
         "//envoy/upstream:cluster_factory_interface",
         "//source/common/formatter:builtin_command_parser_factory_helper_lib",
         "//source/common/formatter:formatter_extension_lib",

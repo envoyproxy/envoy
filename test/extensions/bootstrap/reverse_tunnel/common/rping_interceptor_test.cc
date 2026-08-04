@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -30,6 +31,22 @@ class RpingInterceptorTest : public testing::Test {
 protected:
   std::unique_ptr<TestRpingInterceptor> makeInterceptor(int fd) {
     return std::make_unique<TestRpingInterceptor>(fd);
+  }
+
+  // The readv() drain loop re-reads after consuming a keepalive, so the read end must be
+  // non-blocking (as production sockets are) for the loop to terminate on EAGAIN.
+  void setNonBlocking(int fd) {
+    const int flags = fcntl(fd, F_GETFL, 0);
+    ASSERT_EQ(fcntl(fd, F_SETFL, flags | O_NONBLOCK), 0);
+  }
+
+  // Reads through the interceptor's readv() into a caller buffer, mirroring the TLS BIO's
+  // single-slice call.
+  Api::IoCallUint64Result readvInto(TestRpingInterceptor& interceptor, char* buf, uint64_t cap) {
+    Buffer::RawSlice slice;
+    slice.mem_ = buf;
+    slice.len_ = cap;
+    return interceptor.readv(cap, &slice, 1);
   }
 };
 
@@ -153,6 +170,173 @@ TEST_F(RpingInterceptorTest, NonRpingFirstDisablesPingModeThenRpingPassesThrough
   EXPECT_EQ(second.return_value_, rping.size());
   EXPECT_EQ(second_read_buffer.toString(), rping);
   EXPECT_EQ(interceptor->pingMessages(), 0);
+
+  close(fds[1]);
+}
+
+// A full RPING read via readv() is consumed and echoed; the caller sees would-block.
+TEST_F(RpingInterceptorTest, FullRpingConsumedViaReadv) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  setNonBlocking(fds[0]);
+
+  auto interceptor = makeInterceptor(fds[0]);
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
+
+  char buf[64];
+  const auto result = readvInto(*interceptor, buf, sizeof(buf));
+
+  EXPECT_TRUE(result.wouldBlock());
+  EXPECT_EQ(interceptor->pingMessages(), 1);
+
+  close(fds[1]);
+}
+
+// A RPING split across two readv() calls completes and is echoed once.
+TEST_F(RpingInterceptorTest, ChoppedRpingViaReadv) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  setNonBlocking(fds[0]);
+
+  auto interceptor = makeInterceptor(fds[0]);
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  const std::string prefix = rping.substr(0, 3);
+  const std::string suffix = rping.substr(3);
+
+  char buf[64];
+  ASSERT_EQ(write(fds[1], prefix.data(), prefix.size()), static_cast<ssize_t>(prefix.size()));
+  const auto first = readvInto(*interceptor, buf, sizeof(buf));
+  EXPECT_TRUE(first.wouldBlock());
+  EXPECT_EQ(interceptor->pingMessages(), 0);
+
+  ASSERT_EQ(write(fds[1], suffix.data(), suffix.size()), static_cast<ssize_t>(suffix.size()));
+  const auto second = readvInto(*interceptor, buf, sizeof(buf));
+  EXPECT_TRUE(second.wouldBlock());
+  EXPECT_EQ(interceptor->pingMessages(), 1);
+
+  close(fds[1]);
+}
+
+// RPING immediately followed by application data: the RPING is stripped, the data passes through.
+TEST_F(RpingInterceptorTest, PingPlusDataViaReadv) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  setNonBlocking(fds[0]);
+
+  auto interceptor = makeInterceptor(fds[0]);
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  const std::string payload = " value";
+  const std::string combined = rping + payload;
+  ASSERT_EQ(write(fds[1], combined.data(), combined.size()), static_cast<ssize_t>(combined.size()));
+
+  char buf[64];
+  const auto result = readvInto(*interceptor, buf, sizeof(buf));
+
+  EXPECT_EQ(result.err_, nullptr);
+  EXPECT_EQ(result.return_value_, payload.size());
+  EXPECT_EQ(absl::string_view(buf, result.return_value_), payload);
+  EXPECT_EQ(interceptor->pingMessages(), 1);
+
+  close(fds[1]);
+}
+
+// Application data after a consumed RPING passes through unchanged.
+TEST_F(RpingInterceptorTest, DataAfterPingViaReadv) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  setNonBlocking(fds[0]);
+
+  auto interceptor = makeInterceptor(fds[0]);
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  const std::string data = "GET /";
+
+  char buf[64];
+  ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
+  const auto first = readvInto(*interceptor, buf, sizeof(buf));
+  EXPECT_TRUE(first.wouldBlock());
+  EXPECT_EQ(interceptor->pingMessages(), 1);
+
+  ASSERT_EQ(write(fds[1], data.data(), data.size()), static_cast<ssize_t>(data.size()));
+  const auto second = readvInto(*interceptor, buf, sizeof(buf));
+  EXPECT_EQ(second.err_, nullptr);
+  EXPECT_EQ(second.return_value_, data.size());
+  EXPECT_EQ(absl::string_view(buf, second.return_value_), data);
+  EXPECT_EQ(interceptor->pingMessages(), 1);
+
+  close(fds[1]);
+}
+
+// A non-RPING first read latches echo off; a later RPING then passes through verbatim.
+TEST_F(RpingInterceptorTest, NonRpingFirstThenPassthroughViaReadv) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  setNonBlocking(fds[0]);
+
+  auto interceptor = makeInterceptor(fds[0]);
+  const std::string first_data = "HELLO";
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+
+  char buf[64];
+  ASSERT_EQ(write(fds[1], first_data.data(), first_data.size()),
+            static_cast<ssize_t>(first_data.size()));
+  const auto first = readvInto(*interceptor, buf, sizeof(buf));
+  EXPECT_EQ(first.err_, nullptr);
+  EXPECT_EQ(first.return_value_, first_data.size());
+  EXPECT_EQ(absl::string_view(buf, first.return_value_), first_data);
+  EXPECT_EQ(interceptor->pingMessages(), 0);
+
+  ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
+  const auto second = readvInto(*interceptor, buf, sizeof(buf));
+  EXPECT_EQ(second.err_, nullptr);
+  EXPECT_EQ(second.return_value_, rping.size());
+  EXPECT_EQ(absl::string_view(buf, second.return_value_), rping);
+  EXPECT_EQ(interceptor->pingMessages(), 0);
+
+  close(fds[1]);
+}
+
+// The processing_read_ guard keeps read() from double-processing via the inner readv() dispatch.
+TEST_F(RpingInterceptorTest, NoDoubleProcessing) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  auto interceptor = makeInterceptor(fds[0]);
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
+
+  Buffer::OwnedImpl buffer;
+  const auto result = interceptor->read(buffer, std::nullopt);
+
+  EXPECT_EQ(result.err_, nullptr);
+  EXPECT_EQ(result.return_value_, rping.size());
+  EXPECT_EQ(buffer.length(), 0);
+  EXPECT_EQ(interceptor->pingMessages(), 1);
+
+  close(fds[1]);
+}
+
+// A RPING coalesced with trailing data in one segment must not strand the data behind a
+// would-block; the drain loop reads past the consumed RPING and delivers the data.
+TEST_F(RpingInterceptorTest, CoalescedRpingPlusDataDrainsViaReadv) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+  setNonBlocking(fds[0]);
+
+  auto interceptor = makeInterceptor(fds[0]);
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  const std::string data = "HELLO";
+  const std::string combined = rping + data;
+  ASSERT_EQ(write(fds[1], combined.data(), combined.size()), static_cast<ssize_t>(combined.size()));
+
+  // Mirror the TLS BIO reading one record-header's worth at a time.
+  char buf[5];
+  const auto result = readvInto(*interceptor, buf, sizeof(buf));
+
+  EXPECT_EQ(result.err_, nullptr);
+  EXPECT_EQ(result.return_value_, data.size());
+  EXPECT_EQ(absl::string_view(buf, result.return_value_), data);
+  EXPECT_EQ(interceptor->pingMessages(), 1);
 
   close(fds[1]);
 }

@@ -32,7 +32,7 @@
 #endif
 
 namespace Envoy {
-#if !defined OPENSSL_IS_BORINGSSL && !defined OPENSSL_IS_AWSLC
+#ifndef OPENSSL_IS_BORINGSSL
 #error Envoy requires BoringSSL
 #endif
 
@@ -118,6 +118,13 @@ public:
 
   static void keylogCallback(const SSL* ssl, const char* line);
 
+  // Apply the configured local/remote IP-list filters and, if they match,
+  // write a single NSS Key Log line. Shared by the TCP TLS key log callback
+  // and by the QUIC TLS key log callback in EnvoyTlsServerHandshaker. The
+  // call is a no-op when no key log file has been opened.
+  void maybeWriteKeyLog(const char* line, const Network::Address::Instance* local_addr,
+                        const Network::Address::Instance* remote_addr) const;
+
 protected:
   friend class ContextImplPeer;
 
@@ -149,6 +156,8 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl);
 
   void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
+
+  absl::Status setCompliancePolicy(enum ssl_compliance_policy_t policy);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
