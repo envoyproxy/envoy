@@ -1468,17 +1468,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "librdkafka",
         license_url = "https://github.com/confluentinc/librdkafka/blob/v{version}/LICENSE",
     ),
-    kafka_server_binary = dict(
-        project_name = "Kafka (server binary)",
-        project_desc = "Open-source distributed event streaming platform",
-        project_url = "https://kafka.apache.org",
-        version = "3.9.2",
-        sha256 = "d5d951c22484f9a0908b05563bc80a042de9779df1e06a89f77d27ceb5f68323",
-        strip_prefix = "kafka_2.13-{version}",
-        urls = ["https://downloads.apache.org/kafka/{version}/kafka_2.13-{version}.tgz"],
-        release_date = "2026-02-22",
-        use_category = ["test_only"],
-    ),
     proxy_wasm_cpp_sdk = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
         project_desc = "WebAssembly for Proxies (C++ SDK)",
