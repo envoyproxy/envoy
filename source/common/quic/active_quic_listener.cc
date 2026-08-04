@@ -404,6 +404,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
 absl::Status ActiveQuicListenerFactory::initializeWorkerRouting(
     absl::Span<const Network::ListenSocketFactoryPtr> socket_factories) {
+  // Already initialized in the constructor, options were applied via socketOptions().
   ASSERT(Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init"));
 
   RETURN_IF_NOT_OK(initializeCidGeneratorAndWorkerRouting());

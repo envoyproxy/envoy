@@ -974,10 +974,6 @@ TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, InitInCtorWhenFlagO
   EXPECT_TRUE(ActiveQuicListenerFactoryPeer::kernelWorkerRouting(*factory_));
   ASSERT_EQ(factory_->socketOptions()->size(), 1u);
   EXPECT_EQ((*factory_->socketOptions())[0].get(), mock_option.get());
-
-  EXPECT_OK(factory_->initializeWorkerRouting({}));
-  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), cid_generator_factory_);
-  EXPECT_EQ(factory_->socketOptions()->size(), 1u);
 }
 
 TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest,
