@@ -30,3 +30,15 @@ local_path_override(
     module_name = "envoy_mobile",
     path = "mobile",
 )
+
+# Dependencies not available via bazel_dep (non-BCR/non-registry).
+# The full use_repo list will be populated as deps are migrated to bzlmod.
+envoy_deps = use_extension("//bazel:extensions.bzl", "non_module_deps")
+
+# Envoy repository metadata (version, compiler config, container images).
+envoy_repo = use_extension("//bazel:extensions.bzl", "envoy_repo_ext")
+use_repo(envoy_repo, "envoy_repo")
+
+# LLVM/Clang and GCC RBE toolchain setup.
+envoy_toolchains = use_extension("//bazel:toolchain_extensions.bzl", "envoy_toolchains_ext")
+use_repo(envoy_toolchains, "llvm_toolchain")
