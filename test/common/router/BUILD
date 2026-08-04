@@ -232,7 +232,11 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/router:scoped_config_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//test/mocks/router:router_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

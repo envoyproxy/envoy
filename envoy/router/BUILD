@@ -108,8 +108,10 @@ envoy_cc_library(
     hdrs = ["scopes.h"],
     deps = [
         ":router_interface",
+        "//envoy/common:optref_lib",
         "//envoy/config:config_provider_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
     ],
 )
 

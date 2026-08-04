@@ -1392,7 +1392,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
   setupFilterChain(1, 0); // Recreate the chain for second stream.
 
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
-              computeScopeKey(_))
+              computeScopeKey(_, _))
       .Times(2);
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
@@ -1427,7 +1427,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
   setup(SetupOpts().setUseSrds(true));
 
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
-              computeScopeKey(_))
+              computeScopeKey(_, _))
       .Times(3);
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
@@ -1503,9 +1503,10 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
   EXPECT_CALL(*route_config2, route(_, _, _, _))
       .WillRepeatedly(Return(Router::VirtualHostRoute{route2->virtual_host_, route2}));
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
-              computeScopeKey(_))
+              computeScopeKey(_, _))
       .Times(3)
-      .WillRepeatedly(Invoke([&](const HeaderMap& headers) -> Router::ScopeKeyPtr {
+      .WillRepeatedly(Invoke([&](const HeaderMap& headers,
+                                 OptRef<const StreamInfo::StreamInfo>) -> Router::ScopeKeyPtr {
         auto& test_headers = dynamic_cast<const TestRequestHeaderMapImpl&>(headers);
         if (test_headers.get_("scope_key") == "foo") {
           Router::ScopeKey key;
@@ -1586,7 +1587,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(fake_cluster1.get()));
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
-              computeScopeKey(_))
+              computeScopeKey(_, _))
       .Times(2);
   EXPECT_CALL(*scopedRouteConfigProvider()->config<Router::MockScopedConfig>(), getRouteConfig(_))
       // 1. decodeHeaders() snapping route config.
