@@ -85,6 +85,27 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
+    "generic_secret_callbacks" => {
+      let secret_name = String::from_utf8(config.to_owned()).unwrap();
+      // A secret that is not configured anywhere cannot be subscribed to.
+      assert!(envoy_filter_config
+        .subscribe_generic_secret("not_configured", None)
+        .is_none());
+      let secret = envoy_filter_config
+        .subscribe_generic_secret(&secret_name, None)
+        .expect("failed to subscribe to the secret");
+      // The value is readable right away from the config context, since a static secret is
+      // available before any request is served.
+      let value_at_config = envoy_filter_config
+        .get_generic_secret(secret)
+        .expect("failed to read the secret")
+        .as_slice()
+        .to_vec();
+      Some(Box::new(GenericSecretCallbacksFilterConfig {
+        secret,
+        value_at_config,
+      }))
+    },
     "streaming_terminal_filter" => Some(Box::new(StreamingTerminalFilterConfig {})),
     "streaming_response_reentry" => Some(Box::new(StreamingResponseReentryFilterConfig {})),
     "reentrant_stream_complete" => Some(Box::new(ReentrantStreamCompleteFilterConfig {
@@ -155,6 +176,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
     "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
+    "log_level" => Some(Box::new(LogLevelFilterConfig {})),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -434,6 +456,32 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
     assert!(envoy_filter.get_upstream_connection_id() > 0);
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+struct LogLevelFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LogLevelFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LogLevelFilter {})
+  }
+}
+
+struct LogLevelFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let level = (get_log_level() as u32).to_string();
+    envoy_filter.set_response_header("x-log-level", level.as_bytes());
+    let info_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Info).to_string();
+    envoy_filter.set_response_header("x-log-info-enabled", info_enabled.as_bytes());
+    let error_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Error).to_string();
+    envoy_filter.set_response_header("x-log-error-enabled", error_enabled.as_bytes());
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
@@ -2193,6 +2241,50 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
       let header_name = format!("x-list-bool-{i}");
       envoy_filter.set_response_header(&header_name, val.to_string().as_bytes());
     }
+
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+/// Subscribes to a generic secret at config load and exposes the value on the response, both as
+/// read per-stream and as read from the config context during initialization.
+struct GenericSecretCallbacksFilterConfig {
+  secret: EnvoyGenericSecretId,
+  value_at_config: Vec<u8>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for GenericSecretCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(GenericSecretCallbacksFilter {
+      secret: self.secret,
+      value_at_config: self.value_at_config.clone(),
+    })
+  }
+}
+
+struct GenericSecretCallbacksFilter {
+  secret: EnvoyGenericSecretId,
+  value_at_config: Vec<u8>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for GenericSecretCallbacksFilter {
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let value = envoy_filter
+      .get_generic_secret(self.secret)
+      .expect("failed to read the secret")
+      .as_slice()
+      .to_vec();
+    envoy_filter.set_response_header("x-secret-value", &value);
+    envoy_filter.set_response_header("x-secret-value-at-config", &self.value_at_config);
+
+    // An ID that was never returned by a subscription is not readable.
+    assert!(envoy_filter
+      .get_generic_secret(EnvoyGenericSecretId(12345))
+      .is_none());
 
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }

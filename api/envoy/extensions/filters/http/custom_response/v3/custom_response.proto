@@ -27,7 +27,11 @@ message CustomResponse {
   // Matcher to match against the original response to select a
   // :ref:`Custom Response Policy <extension_category_envoy.http.custom_response>`
   // that will override the original response. The matching is done by matching
-  // against :ref:`response header values<extension_category_envoy.matching.http.input>`
+  // against the response status code, response header values, and/or
+  // :ref:`request header values<extension_category_envoy.matching.http.input>`.
+  // Request inputs (for example ``HttpRequestHeaderMatchInput``) match against
+  // the original downstream request, which allows selecting a custom response
+  // based on, e.g., the ``Accept`` request header.
   // Example:
   //
   // .. validated-code-block:: yaml
@@ -96,6 +100,35 @@ message CustomResponse {
   //             - header:
   //                 key: "foo2"
   //                 value: "x-bar2"
+  //       # Apply a JSON custom response to 5xx responses when the request asks for JSON.
+  //     - predicate:
+  //         and_matcher:
+  //           predicate:
+  //           - single_predicate:
+  //               input:
+  //                 name: 5xx_response
+  //                 typed_config:
+  //                   "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeClassMatchInput
+  //               value_match:
+  //                 exact: "5xx"
+  //           - single_predicate:
+  //               input:
+  //                 name: accept_request_header
+  //                 typed_config:
+  //                   "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //                   header_name: accept
+  //               value_match:
+  //                 exact: "application/json"
+  //       on_match:
+  //         action:
+  //           name: action
+  //           typed_config:
+  //             "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+  //             status_code: 500
+  //             body_format:
+  //               json_format:
+  //                 status: "%RESPONSE_CODE%"
+  //                 message: "%LOCAL_REPLY_BODY%"
   //
   // -- attention::
   //  The first matched policy wins. Once the response is matched, matcher

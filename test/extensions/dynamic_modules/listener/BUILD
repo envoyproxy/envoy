@@ -26,6 +26,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -57,6 +58,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/registry",
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/network:io_socket_error_lib",
@@ -70,6 +72,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -84,10 +87,14 @@ envoy_cc_test(
     env = {"GODEBUG": "cgocheck=0"},
     rbe_pool = "6gig",
     deps = [
+        "//envoy/registry",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/listener/dynamic_modules:config",
+        "//source/extensions/filters/network/direct_response:config",
         "//source/extensions/filters/network/echo:config",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/dynamic_modules/v3:pkg_cc_proto",

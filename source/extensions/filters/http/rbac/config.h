@@ -14,13 +14,15 @@ namespace RBACFilter {
  * Config registration for the RBAC filter. @see NamedHttpFilterConfigFactory.
  */
 class RoleBasedAccessControlFilterConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::rbac::v3::RBAC,
-                                 envoy::extensions::filters::http::rbac::v3::RBACPerRoute> {
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::http::rbac::v3::RBAC,
+          envoy::extensions::filters::http::rbac::v3::RBACPerRoute> {
 public:
-  RoleBasedAccessControlFilterConfigFactory() : FactoryBase("envoy.filters.http.rbac") {}
+  RoleBasedAccessControlFilterConfigFactory()
+      : ExceptionFreeFactoryBase("envoy.filters.http.rbac") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 

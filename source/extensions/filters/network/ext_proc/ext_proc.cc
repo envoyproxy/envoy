@@ -342,7 +342,7 @@ void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, 
   data.drain(data.length());
 }
 
-void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& res) {
+void NetworkExtProcFilter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& res) {
   if (processing_complete_) {
     ENVOY_CONN_LOG(debug, "Ignoring response message: processing already completed",
                    read_callbacks_->connection());

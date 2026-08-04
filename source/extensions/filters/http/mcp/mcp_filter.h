@@ -12,6 +12,8 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/mcp/constants.h"
+#include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
@@ -144,20 +146,26 @@ private:
   bool isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const;
-  bool shouldRejectRequest() const;
+  bool shouldRejectRequest();
+  envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode();
   uint32_t getMaxRequestBodySize() const;
 
-  void handleParseError(absl::string_view error_msg);
+  void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   Http::FilterDataStatus completeParsing();
+  void setDynamicMetadataStatus(Protobuf::Struct metadata);
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  // Traffic mode after applying any per-route override. Latched on first access in decodeHeaders;
+  // we assume the route does not change during the request, so it is resolved only once.
+  std::optional<envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode> traffic_mode_;
   uint32_t bytes_parsed_{0};
   bool parsing_complete_{false};
   bool is_exceeding_limit_{false};
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
+  Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
 };
 
 } // namespace Mcp

@@ -11,7 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
-Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+RoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 

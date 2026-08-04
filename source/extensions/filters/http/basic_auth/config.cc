@@ -13,7 +13,7 @@ using envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute;
 
 namespace {
 
-UserMap readHtpasswd(const std::string& htpasswd) {
+absl::StatusOr<UserMap> readHtpasswd(const std::string& htpasswd) {
   UserMap users;
 
   std::istringstream htpsswd_ss(htpasswd);
@@ -29,28 +29,31 @@ UserMap readHtpasswd(const std::string& htpasswd) {
 
     const size_t colon_pos = line.find(':');
     if (colon_pos == std::string::npos) {
-      throw EnvoyException("basic auth: invalid htpasswd format, username:password is expected");
+      return absl::InvalidArgumentError(
+          "basic auth: invalid htpasswd format, username:password is expected");
     }
 
     std::string name = line.substr(0, colon_pos);
     std::string hash = line.substr(colon_pos + 1);
 
     if (name.empty() || hash.empty()) {
-      throw EnvoyException("basic auth: empty user name or password");
+      return absl::InvalidArgumentError("basic auth: empty user name or password");
     }
 
     if (users.contains(name)) {
-      throw EnvoyException("basic auth: duplicate users");
+      return absl::InvalidArgumentError("basic auth: duplicate users");
     }
 
     if (!absl::StartsWith(hash, "{SHA}")) {
-      throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
+      return absl::InvalidArgumentError(
+          "basic auth: unsupported htpasswd format: please use {SHA}");
     }
 
     hash = hash.substr(5);
     // The base64 encoded SHA1 hash is 28 bytes long
     if (hash.length() != 28) {
-      throw EnvoyException("basic auth: invalid htpasswd format, invalid SHA hash length");
+      return absl::InvalidArgumentError(
+          "basic auth: invalid htpasswd format, invalid SHA hash length");
     }
 
     users.insert({name, {name, hash}});
@@ -61,14 +64,16 @@ UserMap readHtpasswd(const std::string& htpasswd) {
 
 } // namespace
 
-Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
     const BasicAuth& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
-      Config::DataSource::read(proto_config.users(), false, context.serverFactoryContext().api()),
-      std::string));
+  auto htpasswd_or =
+      Config::DataSource::read(proto_config.users(), false, context.serverFactoryContext().api());
+  RETURN_IF_NOT_OK_REF(htpasswd_or.status());
+  auto users_or = readHtpasswd(htpasswd_or.value());
+  RETURN_IF_NOT_OK_REF(users_or.status());
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
-      std::move(users), proto_config.forward_username_header(),
+      std::move(users_or.value()), proto_config.forward_username_header(),
       proto_config.authentication_header(), proto_config.allow_missing(),
       proto_config.emit_dynamic_metadata(), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -79,10 +84,12 @@ Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
 absl::StatusOr<Http::FilterFactoryCb> BasicAuthFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const BasicAuth& proto_config, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& context) {
-  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
-      Config::DataSource::read(proto_config.users(), false, context.api()), std::string));
+  auto htpasswd_or = Config::DataSource::read(proto_config.users(), false, context.api());
+  RETURN_IF_NOT_OK_REF(htpasswd_or.status());
+  auto users_or = readHtpasswd(htpasswd_or.value());
+  RETURN_IF_NOT_OK_REF(users_or.status());
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
-      std::move(users), proto_config.forward_username_header(),
+      std::move(users_or.value()), proto_config.forward_username_header(),
       proto_config.authentication_header(), proto_config.allow_missing(),
       proto_config.emit_dynamic_metadata(), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -94,9 +101,11 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 BasicAuthFilterFactory::createRouteSpecificFilterConfigTyped(
     const BasicAuthPerRoute& proto_config, Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor&) {
-  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
-      Config::DataSource::read(proto_config.users(), true, context.api()), std::string));
-  return std::make_unique<FilterConfigPerRoute>(std::move(users));
+  auto htpasswd_or = Config::DataSource::read(proto_config.users(), true, context.api());
+  RETURN_IF_NOT_OK_REF(htpasswd_or.status());
+  auto users_or = readHtpasswd(htpasswd_or.value());
+  RETURN_IF_NOT_OK_REF(users_or.status());
+  return std::make_unique<FilterConfigPerRoute>(std::move(users_or.value()));
 }
 
 REGISTER_FACTORY(BasicAuthFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);

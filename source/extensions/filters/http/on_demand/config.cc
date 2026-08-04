@@ -9,12 +9,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
-Http::FilterFactoryCb OnDemandFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> OnDemandFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
+  absl::Status creation_status = absl::OkStatus();
   OnDemandFilterConfigSharedPtr config = std::make_shared<OnDemandFilterConfig>(
       proto_config, context.serverFactoryContext().clusterManager(),
-      context.messageValidationVisitor());
+      context.messageValidationVisitor(), creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<OnDemandRouteUpdate>(config));
   };
@@ -23,8 +25,10 @@ Http::FilterFactoryCb OnDemandFilterFactory::createFilterFactoryFromProtoTyped(
 absl::StatusOr<Http::FilterFactoryCb> OnDemandFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {
+  absl::Status creation_status = absl::OkStatus();
   OnDemandFilterConfigSharedPtr config = std::make_shared<OnDemandFilterConfig>(
-      proto_config, context.clusterManager(), context.messageValidationVisitor());
+      proto_config, context.clusterManager(), context.messageValidationVisitor(), creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<OnDemandRouteUpdate>(config));
   };
@@ -35,8 +39,11 @@ OnDemandFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return std::make_shared<const OnDemandFilterConfig>(proto_config, context.clusterManager(),
-                                                      validation_visitor);
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<const OnDemandFilterConfig>(proto_config, context.clusterManager(),
+                                                             validation_visitor, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return config;
 }
 
 /**

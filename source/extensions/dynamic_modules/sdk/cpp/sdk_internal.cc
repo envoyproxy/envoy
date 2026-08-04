@@ -887,6 +887,20 @@ public:
             reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(tags_values.data())),
         tags_values.size(), value));
   }
+  std::optional<std::string_view> getGenericSecret(GenericSecretID id) override {
+    BufferView value{nullptr, 0};
+    const bool ret = envoy_dynamic_module_callback_http_filter_get_generic_secret(
+        host_plugin_ptr_, id, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    if (!ret) {
+      return {};
+    }
+    // Unlike the other getters, an empty value is meaningful here: it means the secret has not been
+    // delivered yet, so it stays distinct from std::nullopt.
+    if (value.data() == nullptr) {
+      return std::string_view{};
+    }
+    return value.toStringView();
+  }
   bool logEnabled(LogLevel level) override {
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
@@ -1012,6 +1026,35 @@ public:
                 reinterpret_cast<const envoy_dynamic_module_type_module_buffer*>(
                     tags_values.data())),
             tags_values.size(), value));
+  }
+
+  std::optional<GenericSecretID>
+  subscribeGenericSecret(std::string_view name, std::string_view sds_config_source) override {
+    const size_t id = envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+        host_config_ptr_, envoy_dynamic_module_type_module_buffer{name.data(), name.size()},
+        // An empty buffer tells Envoy to resolve the name as a static secret.
+        envoy_dynamic_module_type_module_buffer{sds_config_source.data(),
+                                                sds_config_source.size()});
+    // 0 is reserved to signal that the subscription could not be created.
+    if (id == 0) {
+      return {};
+    }
+    return id;
+  }
+
+  std::optional<std::string_view> getGenericSecret(GenericSecretID id) override {
+    BufferView value{nullptr, 0};
+    const bool ret = envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+        host_config_ptr_, id, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    if (!ret) {
+      return {};
+    }
+    // Unlike the other getters, an empty value is meaningful here: it means the secret has not been
+    // delivered yet, so it stays distinct from std::nullopt.
+    if (value.data() == nullptr) {
+      return std::string_view{};
+    }
+    return value.toStringView();
   }
 
   bool logEnabled(LogLevel level) override {

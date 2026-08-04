@@ -29,9 +29,7 @@ absl::StatusOr<Http::FilterFactoryCb>
 AdmissionControlFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
-  auto cb = createFilterFactory(proto_config, stats_prefix, context, context.scope());
-  THROW_IF_NOT_OK_REF(cb.status());
-  return cb.value();
+  return createFilterFactory(proto_config, stats_prefix, context, context.scope());
 }
 
 absl::StatusOr<Http::FilterFactoryCb> AdmissionControlFilterFactory::createFilterFactory(

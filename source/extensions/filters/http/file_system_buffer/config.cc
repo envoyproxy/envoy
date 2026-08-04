@@ -16,9 +16,10 @@ using Extensions::Common::AsyncFiles::AsyncFileManager;
 using Extensions::Common::AsyncFiles::AsyncFileManagerFactory;
 
 FileSystemBufferFilterFactory::FileSystemBufferFilterFactory()
-    : FactoryBase(FileSystemBufferFilter::filterName()) {}
+    : ExceptionFreeFactoryBase(FileSystemBufferFilter::filterName()) {}
 
-Http::FilterFactoryCb FileSystemBufferFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+FileSystemBufferFilterFactory::createFilterFactoryFromProtoTyped(
     const ProtoFileSystemBufferFilterConfig& config,
     const std::string& stats_prefix ABSL_ATTRIBUTE_UNUSED,
     Server::Configuration::FactoryContext& context) {
@@ -26,8 +27,10 @@ Http::FilterFactoryCb FileSystemBufferFilterFactory::createFilterFactoryFromProt
       AsyncFileManagerFactory::singleton(&context.serverFactoryContext().singletonManager());
   auto manager = config.has_manager_config() ? factory->getAsyncFileManager(config.manager_config())
                                              : std::shared_ptr<AsyncFileManager>();
-  auto filter_config = std::make_shared<FileSystemBufferFilterConfig>(std::move(factory),
-                                                                      std::move(manager), config);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<FileSystemBufferFilterConfig>(
+      std::move(factory), std::move(manager), config, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
   return [filter_config =
               std::move(filter_config)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FileSystemBufferFilter>(filter_config));
@@ -42,8 +45,10 @@ FileSystemBufferFilterFactory::createHttpFilterFactoryFromProtoTyped(
   auto factory = AsyncFileManagerFactory::singleton(&context.singletonManager());
   auto manager = config.has_manager_config() ? factory->getAsyncFileManager(config.manager_config())
                                              : std::shared_ptr<AsyncFileManager>();
-  auto filter_config = std::make_shared<FileSystemBufferFilterConfig>(std::move(factory),
-                                                                      std::move(manager), config);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<FileSystemBufferFilterConfig>(
+      std::move(factory), std::move(manager), config, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
   return [filter_config =
               std::move(filter_config)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FileSystemBufferFilter>(filter_config));
@@ -57,8 +62,11 @@ FileSystemBufferFilterFactory::createRouteSpecificFilterConfigTyped(
   auto factory = AsyncFileManagerFactory::singleton(&context.singletonManager());
   auto manager = config.has_manager_config() ? factory->getAsyncFileManager(config.manager_config())
                                              : std::shared_ptr<AsyncFileManager>();
-  return std::make_shared<FileSystemBufferFilterConfig>(std::move(factory), std::move(manager),
-                                                        config);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<FileSystemBufferFilterConfig>(
+      std::move(factory), std::move(manager), config, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return filter_config;
 }
 
 REGISTER_FACTORY(FileSystemBufferFilterFactory,

@@ -60,12 +60,8 @@ CredentialInjectorFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
-  auto result = createFilterFactoryFromProtoHelper(proto_config, stats_prefix, context,
-                                                   context.scope(), context.initManager());
-  if (!result.ok()) {
-    ExceptionUtil::throwEnvoyException(std::string(result.status().message()));
-  }
-  return std::move(result.value());
+  return createFilterFactoryFromProtoHelper(proto_config, stats_prefix, context, context.scope(),
+                                            context.initManager());
 }
 
 REGISTER_FACTORY(CredentialInjectorFilterFactory,

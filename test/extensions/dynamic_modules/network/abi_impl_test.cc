@@ -19,6 +19,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 
@@ -88,12 +89,12 @@ class DynamicModuleNetworkFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     filter_config_->stat_creation_frozen_ = false;
@@ -1671,12 +1672,12 @@ class DynamicModuleNetworkFilterHttpCalloutTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     filter_config_->stat_creation_frozen_ = false;
@@ -2731,6 +2732,51 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ConfigStatsOperate) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
                 config, invalid_id, 1));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeInt) {
+  const uint64_t response_flags = (1ULL << 1) | (1ULL << 26);
+  EXPECT_CALL(connection_.stream_info_, legacyResponseFlags())
+      .WillRepeatedly(testing::Return(response_flags));
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_int(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseFlags, &result));
+  EXPECT_EQ(response_flags, result);
+
+  EXPECT_CALL(connection_.stream_info_, bytesSent()).WillRepeatedly(testing::Return(4096));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_int(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseSize, &result));
+  EXPECT_EQ(4096, result);
+
+  // A request attribute that is not backed by stream info returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_attribute_int(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeBool) {
+  EXPECT_CALL(connection_.stream_info_, healthCheck()).WillRepeatedly(testing::Return(true));
+  bool result = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_TRUE(result);
+
+  // An unsupported bool attribute returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetAttributeString) {
+  const std::optional<std::string> details = "via_upstream";
+  EXPECT_CALL(connection_.stream_info_, responseCodeDetails())
+      .WillRepeatedly(testing::ReturnRef(details));
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseCodeDetails, &result));
+  EXPECT_EQ("via_upstream", std::string(result.ptr, result.length));
+
+  // An int attribute requested as string returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseFlags, &result));
 }
 
 } // namespace NetworkFilters

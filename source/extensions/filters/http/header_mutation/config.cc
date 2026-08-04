@@ -28,9 +28,7 @@ HeaderMutationFactoryConfig::createHttpFilterFactoryFromProtoTyped(
     Server::Configuration::ServerFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<HeaderMutationConfig>(config, context, creation_status);
-  if (!creation_status.ok()) {
-    ExceptionUtil::throwEnvoyException(std::string(creation_status.message()));
-  }
+  RETURN_IF_NOT_OK_REF(creation_status);
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));

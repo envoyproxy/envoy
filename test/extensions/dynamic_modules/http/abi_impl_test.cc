@@ -6,6 +6,7 @@
 #include <set>
 #include <thread>
 
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/router/string_accessor_impl.h"
@@ -25,6 +26,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1506,6 +1508,12 @@ TEST(ABIImpl, attribute_bool) {
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionMtls, &result));
   EXPECT_FALSE(result);
 
+  // HealthCheck is not handled locally and is served by delegating to the shared ContextAccessor.
+  EXPECT_CALL(stream_info, healthCheck()).WillRepeatedly(testing::Return(true));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
+      &filter, envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_TRUE(result);
+
   // Unsupported attribute.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
       &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result));
@@ -2530,6 +2538,17 @@ TEST(ABIImpl, GetAttributes) {
       &filter, envoy_dynamic_module_type_attribute_id_ResponseCode, &result_number));
   EXPECT_EQ(result_number, 200);
 
+  // envoy_dynamic_module_type_attribute_id_ResponseFlags
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ResponseFlags,
+      &result_number));
+  // NoHealthyUpstream (bit 1) and DnsResolutionFailed (bit 26).
+  const uint64_t response_flags = (1ULL << 1) | (1ULL << 26);
+  EXPECT_CALL(stream_info, legacyResponseFlags()).WillRepeatedly(testing::Return(response_flags));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_ResponseFlags, &result_number));
+  EXPECT_EQ(result_number, response_flags);
+
   // envoy_dynamic_module_type_attribute_id_UpstreamPort
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_UpstreamPort, &result_number));
@@ -2550,6 +2569,12 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionId, &result_number));
   EXPECT_EQ(result_number, 8386);
+
+  // envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(testing::Return(3));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount, &result_number));
+  EXPECT_EQ(result_number, 3);
 }
 
 // When the request header map is present but a typed header is absent, the attribute must be
@@ -2625,6 +2650,194 @@ TEST(ABIImpl, Log) {
                                     {msg.data(), msg.size()});
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off,
                                     {msg.data(), msg.size()});
+}
+
+// Builds an ``envoy_dynamic_module_type_module_buffer`` for a string owned by the caller, the way a
+// module passes strings to Envoy.
+envoy_dynamic_module_type_module_buffer moduleBuffer(const std::string& str) {
+  return {const_cast<char*>(str.data()), str.size()};
+}
+
+class ABIImplGenericSecretTest : public testing::Test {
+protected:
+  void addStaticSecret(const std::string& name, const std::string& value) {
+    const std::string yaml = fmt::format(R"EOF(
+name: "{}"
+generic_secret:
+  secret:
+    inline_string: "{}"
+)EOF",
+                                         name, value);
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    TestUtility::loadFromYaml(yaml, secret);
+    ASSERT_TRUE(context_.secret_manager_->addStaticSecret(secret).ok());
+  }
+
+  // Pushes an SDS update for the given dynamic secret, as the SDS server would.
+  void pushSdsUpdate(const std::string& name, const std::string& value) {
+    const std::string yaml = fmt::format(R"EOF(
+name: "{}"
+generic_secret:
+  secret:
+    inline_string: "{}"
+)EOF",
+                                         name, value);
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    TestUtility::loadFromYaml(yaml, secret);
+    const auto decoded_resources = TestUtility::decodeResources({secret});
+    EXPECT_TRUE(context_.cluster_manager_.subscription_factory_.callbacks_
+                    ->onConfigUpdate(decoded_resources.refvec_, "")
+                    .ok());
+  }
+
+  // Reads the secret through both the config level and the filter level callback, which must always
+  // agree, and returns the value.
+  std::optional<std::string> getSecret(size_t id) {
+    envoy_dynamic_module_type_envoy_buffer config_result{};
+    const bool config_ok = envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+        filter_config_.get(), id, &config_result);
+    envoy_dynamic_module_type_envoy_buffer filter_result{};
+    const bool filter_ok = envoy_dynamic_module_callback_http_filter_get_generic_secret(
+        filter_.get(), id, &filter_result);
+    EXPECT_EQ(config_ok, filter_ok);
+    if (!config_ok) {
+      return std::nullopt;
+    }
+    EXPECT_EQ(std::string(config_result.ptr, config_result.length),
+              std::string(filter_result.ptr, filter_result.length));
+    return std::string(config_result.ptr, config_result.length);
+  }
+
+  void createFilterConfig(OptRef<Init::Manager> init_manager = std::nullopt) {
+    filter_config_ = std::make_shared<DynamicModuleHttpFilterConfig>(
+        "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope_, context_,
+        init_manager);
+    filter_ =
+        std::make_unique<DynamicModuleHttpFilter>(filter_config_, stats_scope_.symbolTable(), 0);
+  }
+
+  Stats::TestUtil::TestStore stats_store_;
+  Stats::TestUtil::TestScope stats_scope_{"", stats_store_};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  DynamicModuleHttpFilterConfigSharedPtr filter_config_;
+  std::unique_ptr<DynamicModuleHttpFilter> filter_;
+};
+
+// A name with no config source resolves against the statically configured secrets.
+TEST_F(ABIImplGenericSecretTest, StaticSecret) {
+  addStaticSecret("static_secret", "static_value");
+  createFilterConfig();
+
+  const std::string name = "static_secret";
+  const size_t id = envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+      filter_config_.get(), moduleBuffer(name), {nullptr, 0});
+  EXPECT_EQ(id, 1); // IDs are 1-based so that 0 can signal failure.
+  EXPECT_EQ(getSecret(id), "static_value");
+
+  // A second subscription gets its own ID.
+  addStaticSecret("other_secret", "other_value");
+  const std::string other_name = "other_secret";
+  const size_t other_id = envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+      filter_config_.get(), moduleBuffer(other_name), {nullptr, 0});
+  EXPECT_EQ(other_id, 2);
+  EXPECT_EQ(getSecret(other_id), "other_value");
+  EXPECT_EQ(getSecret(id), "static_value");
+}
+
+// A config source creates an SDS subscription, and the module observes rotations through it.
+TEST_F(ABIImplGenericSecretTest, DynamicSecret) {
+  createFilterConfig(context_.init_manager_);
+
+  const std::string name = "dynamic_secret";
+  const std::string sds_config_source =
+      R"({"api_config_source":{"api_type":"GRPC","transport_api_version":"V3",)"
+      R"("grpc_services":[{"envoy_grpc":{"cluster_name":"sds_cluster"}}]}})";
+  const size_t id = envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+      filter_config_.get(), moduleBuffer(name), moduleBuffer(sds_config_source));
+  ASSERT_EQ(id, 1);
+
+  // Nothing has been delivered yet, so the value is empty rather than unavailable.
+  EXPECT_EQ(getSecret(id), "");
+
+  pushSdsUpdate(name, "delivered_value");
+  EXPECT_EQ(getSecret(id), "delivered_value");
+
+  // A rotation is visible to the module without re-subscribing.
+  pushSdsUpdate(name, "rotated_value");
+  EXPECT_EQ(getSecret(id), "rotated_value");
+}
+
+TEST_F(ABIImplGenericSecretTest, SubscribeFailures) {
+  addStaticSecret("static_secret", "static_value");
+  createFilterConfig();
+
+  // An empty name.
+  const std::string empty_name;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+                filter_config_.get(), moduleBuffer(empty_name), {nullptr, 0}),
+            0);
+
+  // A static secret that does not exist.
+  const std::string unknown_name = "not_configured";
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+                filter_config_.get(), moduleBuffer(unknown_name), {nullptr, 0}),
+            0);
+
+  // A config source that is not valid JSON.
+  const std::string name = "static_secret";
+  const std::string not_json = "{not json";
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+                filter_config_.get(), moduleBuffer(name), moduleBuffer(not_json)),
+            0);
+
+  // A config source that is valid JSON but not a ConfigSource.
+  const std::string wrong_message = R"({"not_a_config_source_field":true})";
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+                filter_config_.get(), moduleBuffer(name), moduleBuffer(wrong_message)),
+            0);
+
+  // A config source whose subscription cannot be created.
+  const std::string bad_config_source = R"({"api_config_source":{"api_type":"GRPC"}})";
+  EXPECT_CALL(context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(testing::_, testing::_, testing::_, testing::_,
+                                           testing::_, testing::_))
+      .WillOnce(testing::Return(absl::InvalidArgumentError("no gRPC services configured")));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+                filter_config_.get(), moduleBuffer(name), moduleBuffer(bad_config_source)),
+            0);
+
+  // None of the failures consumed an ID, so the next successful subscription still gets 1.
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+                filter_config_.get(), moduleBuffer(name), {nullptr, 0}),
+            1);
+}
+
+// Secrets can only be subscribed to while the module's config_new hook is running.
+TEST_F(ABIImplGenericSecretTest, SubscribeAfterConfigLoaded) {
+  addStaticSecret("static_secret", "static_value");
+  createFilterConfig();
+  filter_config_->secret_subscription_frozen_.store(true, std::memory_order_release);
+
+  const std::string name = "static_secret";
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+                filter_config_.get(), moduleBuffer(name), {nullptr, 0}),
+            0);
+}
+
+TEST_F(ABIImplGenericSecretTest, ReadUnknownId) {
+  addStaticSecret("static_secret", "static_value");
+  createFilterConfig();
+
+  // Nothing subscribed yet, so even the first ID is unknown.
+  EXPECT_EQ(getSecret(1), std::nullopt);
+
+  const std::string name = "static_secret";
+  const size_t id = envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+      filter_config_.get(), moduleBuffer(name), {nullptr, 0});
+  ASSERT_EQ(id, 1);
+  // 0 is never a valid ID, and IDs past the end are unknown.
+  EXPECT_EQ(getSecret(0), std::nullopt);
+  EXPECT_EQ(getSecret(id + 1), std::nullopt);
 }
 
 TEST(ABIImpl, Stats) {
@@ -3507,12 +3720,12 @@ public:
 
     // Create a real dynamic module and filter config.
     auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
         *stats_scope_, context_);
-    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    ASSERT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
 
     filter_ = std::make_unique<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
@@ -3682,11 +3895,11 @@ class DynamicModuleHttpFilterLifecycleTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
     auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
         *stats_scope_, context_);
-    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    ASSERT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
   }
 
@@ -4187,12 +4400,12 @@ public:
 
     auto dynamic_module = Envoy::Extensions::DynamicModules::newDynamicModule(
         testSharedObjectPath("no_op", "c"), false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
         *stats_store_.rootScope(), context_);
-    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    ASSERT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
 
     filter_ = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);

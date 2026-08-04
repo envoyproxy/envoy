@@ -12,18 +12,23 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 absl::flat_hash_map<std::string, ExpressionManager::CelExpression>
-ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers) {
+ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers,
+                                   absl::Status& creation_status) {
   absl::flat_hash_map<std::string, ExpressionManager::CelExpression> expressions;
 #if defined(USE_CEL_PARSER)
   for (const auto& matcher : matchers) {
+    if (!creation_status.ok()) {
+      return expressions;
+    }
     if (expressions.contains(matcher)) {
       continue;
     }
     const absl::StatusOr<cel::expr::ParsedExpr> parse_status =
         google::api::expr::parser::Parse(matcher);
     if (!parse_status.ok()) {
-      throw EnvoyException("Unable to parse descriptor expression: " +
-                           parse_status.status().ToString());
+      creation_status = absl::InvalidArgumentError("Unable to parse descriptor expression: " +
+                                                   parse_status.status().ToString());
+      return expressions;
     }
 
     const auto& parsed_expr = parse_status.value();
@@ -31,8 +36,9 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
     auto compiled_expression =
         Extensions::Filters::Common::Expr::CompiledExpression::Create(builder_, cel_expr);
     if (!compiled_expression.ok()) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           absl::StrCat("failed to create an expression: ", compiled_expression.status().message()));
+      return expressions;
     }
     expressions.emplace(matcher, std::move(compiled_expression.value()));
   }

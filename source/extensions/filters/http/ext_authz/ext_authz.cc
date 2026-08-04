@@ -85,7 +85,8 @@ Http::Code zeroHttpCode() {
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            Stats::Scope& scope, const std::string& stats_prefix,
                            Server::Configuration::ServerFactoryContext& factory_context,
-                           AuthCachePtr cache)
+                           AuthCachePtr cache,
+                           absl::Status& creation_status)
     : allow_partial_message_(config.with_request_body().allow_partial_message()),
       failure_mode_allow_(config.failure_mode_allow()),
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
@@ -161,7 +162,9 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
 
   if (config.has_allowed_headers() &&
       config.http_service().authorization_request().has_allowed_headers()) {
-    throw EnvoyException("Invalid duplicate configuration for allowed_headers.");
+    creation_status =
+        absl::InvalidArgumentError("Invalid duplicate configuration for allowed_headers.");
+    return;
   }
 
   // An unset request_headers_matchers_ means that all client request headers are allowed through

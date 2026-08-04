@@ -473,7 +473,7 @@ public:
   virtual absl::string_view responseDetails() { return ""; }
 
   /**
-   * @return const Network::ConnectionInfoProvider& the adderess provider  of the connection
+   * @return const Network::ConnectionInfoProvider& the address provider of the connection
    * associated with the stream.
    */
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() PURE;
@@ -611,7 +611,7 @@ struct Http1Settings {
   // and https:// URLs should be rejected over unencrypted connections.
   bool validate_scheme_{false};
 
-  // If true, Envoy will send a fully qualified URL in the firstline of the request.
+  // If true, Envoy will send a fully qualified URL in the first line of the request.
   bool send_fully_qualified_url_{false};
 
   // If true, any non-empty method composed of valid characters is accepted.
@@ -691,6 +691,39 @@ public:
    * when both the stream and the connection go under the low watermark limit, and the callee must
    * ensure that the flow of data does not resume until all callers which were above their high
    * watermarks have gone below.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
+};
+
+/**
+ * Callbacks for upstream request watermark limits, as observed on the request (decode) path.
+ *
+ * These are the mirror image of DownstreamWatermarkCallbacks: where the downstream callbacks fire
+ * when the downstream connection/stream backs up (a slow client reading the response), these fire
+ * when the upstream backs up while accepting the request body. The connection manager already
+ * receives this signal via
+ * StreamDecoderFilterCallbacks::onDecoderFilterAboveWriteBufferHighWatermark (raised by the
+ * router's UpstreamRequest) and read-disables the downstream codec to slow the original source;
+ * subscribing here additionally lets a filter that produces request data on its own (e.g. by
+ * replaying a buffered body via injectDecodedDataToFilterChain) pause and resume in step with the
+ * upstream.
+ */
+class UpstreamWatermarkCallbacks {
+public:
+  virtual ~UpstreamWatermarkCallbacks() = default;
+
+  /**
+   * Called when the upstream request path goes over its high watermark. As with
+   * DownstreamWatermarkCallbacks, this may be called more than once (e.g. for the stream and the
+   * connection independently), and the implementation is responsible for unwinding multiple high
+   * and low watermark calls.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the upstream request path goes from over its high watermark to under its low
+   * watermark. The implementation must not resume the flow of data until a matching number of low
+   * watermark callbacks have been received for the outstanding high watermark callbacks.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
 };

@@ -75,6 +75,8 @@ test_program(name = "cluster_integration_test")
 
 test_program(name = "cluster_filter_state_test")
 
+test_program(name = "cluster_dynamic_metadata_test")
+
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "transport_socket_integration_test")

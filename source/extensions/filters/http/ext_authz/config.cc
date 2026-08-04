@@ -38,8 +38,11 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
                            ? cache_factory->createAuthCache(*cache_config, server_context)
                            : nullptr;
 
+  absl::Status creation_status = absl::OkStatus();
   const auto filter_config = std::make_shared<FilterConfig>(
-      proto_config, server_context.scope(), stats_prefix, server_context, std::move(cache));
+      proto_config, server_context.scope(), stats_prefix, server_context, std::move(cache),
+      creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
 
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
@@ -67,7 +70,7 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
         timeout_ms == 0
             ? std::nullopt
             : std::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
-    THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
+    RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
     callback = [&server_context, filter_config = std::move(filter_config), timeout,
@@ -76,7 +79,7 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
                                  .grpcAsyncClientManager()
                                  .getOrCreateRawAsyncClientWithHashKey(
                                      config_with_hash_key, server_context.scope(), true);
-      THROW_IF_NOT_OK_REF(client_or_error.status());
+      RELEASE_ASSERT(client_or_error.ok(), "failed to create ext_authz gRPC client");
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           client_or_error.value(), timeout);
       callbacks.addStreamFilter(
@@ -90,7 +93,10 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfigPerRoute>(proto_config);
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<FilterConfigPerRoute>(proto_config, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return config;
 }
 
 /**

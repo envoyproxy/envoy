@@ -79,6 +79,7 @@ envoy_extension_cc_test(
     deps = [
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
+        "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/extensions/filters/network/common/redis:redis_mocks",

@@ -88,10 +88,13 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
+  absl::Status config_creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
       dual_info.scope, stats_prefix, dual_info.is_upstream,
-      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context);
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context,
+      config_creation_status);
+  RETURN_IF_NOT_OK_REF(config_creation_status);
   if (proto_config.has_grpc_service()) {
     return [filter_config = std::move(filter_config), &context,
             dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
@@ -131,19 +134,19 @@ ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   // Verify configuration before creating FilterConfig
-  absl::Status result = verifyFilterConfig(proto_config);
-  if (!result.ok()) {
-    throw EnvoyException(std::string(result.message()));
-  }
+  RETURN_IF_NOT_OK(verifyFilterConfig(proto_config));
 
   const uint32_t message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
+  absl::Status config_creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
       server_context.scope(), stats_prefix, false,
-      Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context);
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context,
+      config_creation_status);
+  RETURN_IF_NOT_OK_REF(config_creation_status);
 
   if (proto_config.has_grpc_service()) {
     return [filter_config = std::move(filter_config),

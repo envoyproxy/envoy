@@ -13,6 +13,7 @@
 #include "source/common/tracing/null_span_impl.h"
 #include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -45,6 +46,26 @@ static Stats::StatNameTagVector buildTagsForModuleMetric(
     tags.push_back(Stats::StatNameTag(label_names[i], label_value));
   }
   return tags;
+}
+
+// Converts a module owned buffer to a string view, tolerating the null buffer that a module passes
+// to mean "absent" rather than constructing a string view from a null pointer.
+absl::string_view moduleBufferToStringView(envoy_dynamic_module_type_module_buffer buffer) {
+  if (buffer.ptr == nullptr || buffer.length == 0) {
+    return {};
+  }
+  return absl::string_view(buffer.ptr, buffer.length);
+}
+
+// Hands a subscribed secret's current value to the module, or reports that the ID is unknown.
+bool secretToModuleBuffer(const std::string* secret,
+                          envoy_dynamic_module_type_envoy_buffer* result) {
+  if (secret == nullptr) {
+    return false;
+  }
+  result->ptr = secret->data();
+  result->length = secret->size();
+  return true;
 }
 
 using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
@@ -897,6 +918,29 @@ envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
                                        label_values_length);
   hist->recordValue(*filter_config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+size_t envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer sds_config_source) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  return filter_config->subscribeGenericSecret(moduleBufferToStringView(name),
+                                               moduleBufferToStringView(sds_config_source));
+}
+
+bool envoy_dynamic_module_callback_http_filter_get_generic_secret(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return secretToModuleBuffer(filter->getFilterConfig().getGenericSecretById(id), result);
+}
+
+bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  return secretToModuleBuffer(filter_config->getGenericSecretById(id), result);
 }
 
 bool envoy_dynamic_module_callback_http_get_header(
@@ -1910,11 +1954,14 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           return ssl->uriSanPeerCertificate().front();
         },
         result);
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Unsupported attribute ID {} as string",
-                        static_cast<int64_t>(attribute_id));
+  default: {
+    // Fall back to the shared context accessor for stream-info-based attributes that are not
+    // served from the live request state above.
+    if (const auto stream_info = filter->streamInfo(); stream_info != nullptr) {
+      ok = ContextAccessor::getAttributeString(*stream_info, attribute_id, result);
+    }
     break;
+  }
   }
   return ok;
 }
@@ -1980,9 +2027,14 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     }
     break;
   }
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
+  default: {
+    // Fall back to the shared context accessor for stream-info-based attributes that are not
+    // served from the live request state above.
+    if (const auto stream_info = filter->streamInfo(); stream_info != nullptr) {
+      ok = ContextAccessor::getAttributeInt(*stream_info, attribute_id, result);
+    }
+    break;
+  }
   }
   return ok;
 }
@@ -2001,9 +2053,14 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
     }
     break;
   }
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Unsupported attribute ID {} as bool", static_cast<int64_t>(attribute_id));
+  default: {
+    // Fall back to the shared context accessor for stream-info-based attributes that are not
+    // served from the live request state above.
+    if (const auto stream_info = filter->streamInfo(); stream_info != nullptr) {
+      ok = ContextAccessor::getAttributeBool(*stream_info, attribute_id, result);
+    }
+    break;
+  }
   }
   return ok;
 }
