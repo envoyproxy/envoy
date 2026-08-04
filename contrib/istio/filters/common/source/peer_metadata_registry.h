@@ -23,16 +23,17 @@ namespace PeerMetadataShared {
 // its own map and reads/writes are lock-free. This only works as a hand-off
 // when the writing and reading filters run on the *same* worker thread (which
 // is the case for internal listener connections), and when both sides agree on
-// the key (the originating upstream connection ID).
+// the key (the address of the PassthroughState shared by the internal
+// user-space socket's two peers).
 class PeerMetadataRegistry {
 public:
   virtual ~PeerMetadataRegistry() = default;
 
-  virtual void setValue(absl::string_view key, const std::string& value) PURE;
+  virtual void setValue(uint64_t key, const std::string& value) PURE;
 
-  virtual std::optional<std::string> getValue(absl::string_view key) const PURE;
+  virtual std::optional<std::string> getValue(uint64_t key) const PURE;
 
-  virtual void removeValue(absl::string_view key) PURE;
+  virtual void removeValue(uint64_t key) PURE;
 };
 
 using PeerMetadataRegistrySharedPtr = std::shared_ptr<PeerMetadataRegistry>;

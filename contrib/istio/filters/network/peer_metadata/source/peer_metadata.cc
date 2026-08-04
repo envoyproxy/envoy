@@ -1,5 +1,6 @@
 #include "contrib/istio/filters/network/peer_metadata/source/peer_metadata.h"
 
+#include <cstdint>
 #include <optional>
 
 #include "envoy/runtime/runtime.h"
@@ -10,6 +11,7 @@
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/extensions/io_socket/user_space/io_handle.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,13 +52,27 @@ bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
   return value.bool_value();
 }
 
-std::optional<std::string> getRegistryKey(const StreamInfo::FilterState& filter_state) {
-  const auto* connection_id = filter_state.getDataReadOnly<Router::StringAccessor>(
-      Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
-  if (connection_id == nullptr) {
+std::optional<uint64_t> getRegistryKey(Network::Connection& connection) {
+  const auto& socket = connection.getSocket();
+  if (socket == nullptr) {
     return std::nullopt;
   }
-  return std::string(connection_id->asString());
+  auto* handle = dynamic_cast<IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
+  if (handle == nullptr) {
+    return std::nullopt;
+  }
+  return reinterpret_cast<uint64_t>(handle->passthroughState().get());
+}
+
+// Layered-runtime boolean key that disables the PassthroughState-pointer registry
+// hand-off and falls back to the legacy in-byte-stream peer metadata exchange.
+constexpr char DisablePassthroughStateKeyRuntimeKey[] =
+    "envoy.contrib.peer_metadata.disable_passthrough_state_key";
+
+// Whether to hand off peer metadata via the shared-PassthroughState-pointer
+// registry (default) rather than the legacy in-byte-stream exchange.
+bool usePassthroughStateKey(Server::Configuration::ServerFactoryContext& context) {
+  return !context.runtime().snapshot().getBoolean(DisablePassthroughStateKeyRuntimeKey, false);
 }
 
 // Layered-runtime boolean key that, when true, disables the thread-local registry hand-off. The
@@ -83,8 +99,10 @@ maybeGetRegistry(Server::Configuration::ServerFactoryContext& context) {
 const uint32_t PeerMetadataHeader::magic_number = 0xabcd1234;
 
 Filter::Filter(const Config& config, const LocalInfo::LocalInfo& local_info,
-               Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry)
-    : config_(config), baggage_(baggageValue(local_info)), registry_(std::move(registry)) {}
+               Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry,
+               bool use_passthrough_state_key)
+    : config_(config), baggage_(baggageValue(local_info)), registry_(std::move(registry)),
+      use_passthrough_state_key_(use_passthrough_state_key) {}
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
   return Network::FilterStatus::Continue;
@@ -209,9 +227,13 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
 
 bool Filter::storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata) {
   ASSERT(read_callbacks_);
-  std::optional<std::string> key =
-      getRegistryKey(*read_callbacks_->connection().streamInfo().filterState());
+  if (!use_passthrough_state_key_) {
+    // Pointer key disabled: fall back to the legacy in-byte-stream exchange.
+    return false;
+  }
+  const std::optional<uint64_t> key = getRegistryKey(read_callbacks_->connection());
   if (!key) {
+    ENVOY_LOG(warn, "No key available for peer metadata hand-off");
     return false;
   }
   if (registry_ == nullptr) {
@@ -256,8 +278,9 @@ void Filter::propagateNoPeerMetadata() {
 }
 
 UpstreamFilter::UpstreamFilter(
-    Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry)
-    : registry_(std::move(registry)) {}
+    Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry,
+    bool use_passthrough_state_key)
+    : registry_(std::move(registry)), use_passthrough_state_key_(use_passthrough_state_key) {}
 
 Network::FilterStatus UpstreamFilter::onData(Buffer::Instance& buffer, bool end_stream) {
   switch (state_) {
@@ -340,9 +363,13 @@ bool UpstreamFilter::disableDiscovery() const {
 
 bool UpstreamFilter::tryRegistryLookup() {
   ASSERT(callbacks_);
-  std::optional<std::string> key =
-      getRegistryKey(*callbacks_->connection().streamInfo().filterState());
+  if (!use_passthrough_state_key_) {
+    // Pointer key disabled: fall back to the legacy in-byte-stream exchange.
+    return false;
+  }
+  const std::optional<uint64_t> key = getRegistryKey(callbacks_->connection());
   if (!key) {
+    ENVOY_LOG(debug, "No registry key available for peer metadata lookup");
     return false;
   }
   if (registry_ == nullptr) {
@@ -351,9 +378,8 @@ bool UpstreamFilter::tryRegistryLookup() {
   }
   auto value = registry_->getValue(*key);
   if (!value.has_value()) {
-    ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", *key);
-    populateNoPeerMetadata();
-    return true;
+    ENVOY_LOG(debug, "No peer metadata in registry for key {}", *key);
+    return false;
   }
 
   registry_->removeValue(*key);
@@ -488,10 +514,12 @@ ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
                                                  Server::Configuration::FactoryContext& context) {
   Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry =
       maybeGetRegistry(context.serverFactoryContext());
-  return [config, &context,
-          registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
+  const bool use_passthrough_state_key = usePassthroughStateKey(context.serverFactoryContext());
+  return [config, &context, registry = std::move(registry),
+          use_passthrough_state_key](Network::FilterManager& filter_manager) -> void {
     const auto& local_info = context.serverFactoryContext().localInfo();
-    filter_manager.addFilter(std::make_shared<Filter>(config, local_info, registry));
+    filter_manager.addFilter(
+        std::make_shared<Filter>(config, local_info, registry, use_passthrough_state_key));
   };
 }
 
@@ -499,8 +527,11 @@ Network::FilterFactoryCb UpstreamConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message&, Server::Configuration::UpstreamFactoryContext& context) {
   Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry =
       maybeGetRegistry(context.serverFactoryContext());
-  return [registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<UpstreamFilter>(registry));
+  const bool use_passthrough_state_key = usePassthroughStateKey(context.serverFactoryContext());
+  return [registry = std::move(registry),
+          use_passthrough_state_key](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(
+        std::make_shared<UpstreamFilter>(registry, use_passthrough_state_key));
   };
 }
 
