@@ -191,8 +191,8 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                Stats::Scope& scope, const std::string& stats_prefix,
-               Server::Configuration::ServerFactoryContext& factory_context,
-               absl::Status& creation_status, AuthCachePtr cache = nullptr);
+               Server::Configuration::ServerFactoryContext& factory_context, AuthCachePtr cache,
+               absl::Status& creation_status);
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -604,17 +604,13 @@ private:
   bool initiating_cache_lookup_{};
   bool buffer_data_{};
   bool skip_check_{false};
-<<<<<<< HEAD
-  envoy::service::auth::v3::CheckRequest check_request_;
+  ArenaWrappedProto<envoy::service::auth::v3::CheckRequest> check_request_;
   // Cached request attributes collected during initiateCall(), used as authorization context
   // inputs for cache lookups and CheckRequest construction.
   std::optional<RequestAttributes> request_attributes_;
   // Cached consolidated per-route configuration merged across route specific filter configs,
   // used to override default authorization services and provide context extensions.
   std::optional<FilterConfigPerRoute> merged_per_route_config_;
-=======
-  ArenaWrappedProto<envoy::service::auth::v3::CheckRequest> check_request_;
->>>>>>> upstream/main
 };
 
 } // namespace ExtAuthz

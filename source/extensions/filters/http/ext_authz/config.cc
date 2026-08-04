@@ -39,9 +39,9 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
                            : nullptr;
 
   absl::Status creation_status = absl::OkStatus();
-  const auto filter_config = std::make_shared<FilterConfig>(
-      proto_config, server_context.scope(), stats_prefix, server_context, std::move(cache),
-      creation_status);
+  const auto filter_config =
+      std::make_shared<FilterConfig>(proto_config, server_context.scope(), stats_prefix,
+                                     server_context, std::move(cache), creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
 
   // The callback is created in main thread and executed in worker thread, variables except factory
@@ -59,7 +59,8 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
                 &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
           server_context.clusterManager(), client_config);
-      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
+      callbacks.addStreamFilter(
+          std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };
   } else {
     // gRPC client.

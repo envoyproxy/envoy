@@ -1364,7 +1364,7 @@ TEST_P(HttpFilterTestParam, DEPRECATED_FEATURE_TEST(DuplicateAllowedHeadersConfi
                             proto_config);
   absl::Status creation_status = absl::OkStatus();
   FilterConfig filter_config(proto_config, *stats_store_.rootScope(), "ext_authz_prefix",
-                             factory_context_, creation_status);
+                             factory_context_, nullptr, creation_status);
   EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
                                          "Invalid duplicate configuration for allowed_headers."));
 }
@@ -3940,8 +3940,9 @@ class HttpFilterCacheTest : public HttpFilterTestBase<testing::Test> {
 public:
   HttpFilterCacheTest() { mock_cache_ = new NiceMock<MockAuthCacheSession>(); }
 
-  void initializeFilter(bool failure_mode_allow = false) {
+  void initializeFilter(bool failure_mode_allow = false, bool validate_mutations = false) {
     auto proto_config = getFilterConfig(failure_mode_allow, false); // grpc config
+    proto_config.set_validate_mutations(validate_mutations);
     auto shared_cache = std::make_unique<NiceMock<MockAuthCache>>();
     ON_CALL(*shared_cache, createSession()).WillByDefault(Invoke([this]() {
       return AuthCacheSessionPtr{mock_cache_};
@@ -3983,8 +3984,9 @@ TEST_F(HttpFilterCacheTest, CacheHitOk) {
 
   lookup_cb(std::move(cached_response));
 
-  EXPECT_EQ("yes",
-            request_headers_.get(LowerCaseString("x-cached-header"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "yes",
+      request_headers_.get(Http::LowerCaseString("x-cached-header"))[0]->value().getStringView());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
@@ -4011,8 +4013,9 @@ TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
-  EXPECT_EQ("yes",
-            request_headers_.get(LowerCaseString("x-cached-header"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "yes",
+      request_headers_.get(Http::LowerCaseString("x-cached-header"))[0]->value().getStringView());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitDenied) {
@@ -4246,6 +4249,84 @@ TEST_F(HttpFilterCacheTest, CacheMiss) {
   authz_cb->onComplete(std::move(authz_response));
 }
 
+TEST_F(HttpFilterCacheTest, CacheMissError) {
+  initializeFilter();
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  AuthCacheSession::LookupCallback lookup_cb;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
+                     AuthCacheSession::LookupCallback&& cb) -> AuthCacheSession::LookupRequest* {
+            lookup_cb = std::move(cb);
+            return nullptr;
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Filters::Common::ExtAuthz::RequestCallbacks* authz_cb = nullptr;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& cb,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) { authz_cb = &cb; }));
+
+  lookup_cb(nullptr);
+
+  auto authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  authz_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  authz_response->status_code = Http::Code::Forbidden;
+
+  EXPECT_CALL(*mock_cache_, insert(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+
+  authz_cb->onComplete(std::move(authz_response));
+}
+
+TEST_F(HttpFilterCacheTest, CacheMissRejected) {
+  initializeFilter(false /* failure_mode_allow */, true /* validate_mutations */);
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  AuthCacheSession::LookupCallback lookup_cb;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
+                     AuthCacheSession::LookupCallback&& cb) -> AuthCacheSession::LookupRequest* {
+            lookup_cb = std::move(cb);
+            return nullptr;
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Filters::Common::ExtAuthz::RequestCallbacks* authz_cb = nullptr;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& cb,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) { authz_cb = &cb; }));
+
+  lookup_cb(nullptr);
+
+  auto authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  authz_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  authz_response->headers_to_add.push_back({"invalid header name", "val"});
+
+  EXPECT_CALL(*mock_cache_, insert(_)).Times(0);
+
+  authz_cb->onComplete(std::move(authz_response));
+  EXPECT_EQ(1U, config_->stats().invalid_.value());
+}
+
 TEST_F(HttpFilterCacheTest, DestroyDuringLookup) {
   initializeFilter();
 
@@ -4280,7 +4361,8 @@ TEST_F(HttpFilterTest, CreatePerRouteGrpcClientWithServerContext) {
   auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
   grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute per_route_filter_config(per_route_config, creation_status);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 
@@ -4319,7 +4401,8 @@ TEST_F(HttpFilterTest, CreatePerRouteHttpClientWithServerContext) {
   http_service->mutable_server_uri()->set_uri("https://per-route.example.com");
   http_service->mutable_server_uri()->set_cluster("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute per_route_filter_config(per_route_config, creation_status);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 
@@ -4419,7 +4502,8 @@ TEST_F(HttpFilterTest, PerRouteGrpcClientCreationFailure) {
   auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
   grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute per_route_filter_config(per_route_config, creation_status);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 

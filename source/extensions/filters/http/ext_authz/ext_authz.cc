@@ -85,8 +85,7 @@ Http::Code zeroHttpCode() {
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            Stats::Scope& scope, const std::string& stats_prefix,
                            Server::Configuration::ServerFactoryContext& factory_context,
-                           AuthCachePtr cache,
-                           absl::Status& creation_status)
+                           AuthCachePtr cache, absl::Status& creation_status)
     : allow_partial_message_(config.with_request_body().allow_partial_message()),
       failure_mode_allow_(config.failure_mode_allow()),
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
@@ -722,10 +721,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   updateLoggingInfo(response->grpc_status);
   active_client_ = nullptr;
 
-  if (!from_cache && cache_session_ != nullptr) {
-    cache_session_->insert(*response);
-  }
-
   if (response->saw_invalid_append_actions) {
     if (config_->validateMutations()) {
       ENVOY_STREAM_LOG(trace, "Rejecting response with invalid header append action.",
@@ -1201,6 +1196,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     break;
   }
+  }
+
+  if (!from_cache && cache_session_ != nullptr && response->status != CheckStatus::Error) {
+    cache_session_->insert(*response);
   }
 }
 
