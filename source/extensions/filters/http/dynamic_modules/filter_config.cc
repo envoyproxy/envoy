@@ -42,12 +42,12 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
   // Acquire-load pairs with the release-store in ``newDynamicModuleHttpFilterConfig``. See
   // filter_config.h for the memory-order contract.
   if (secret_subscription_frozen_.load(std::memory_order_acquire)) {
-    ENVOY_LOG_MISC(error, "{} '{}': secrets can only be subscribed during config initialization",
-                   failure_prefix, name);
+    ENVOY_LOG(error, "{} '{}': secrets can only be subscribed during config initialization",
+              failure_prefix, name);
     return 0;
   }
   if (name.empty()) {
-    ENVOY_LOG_MISC(error, "{}: the name is empty", failure_prefix);
+    ENVOY_LOG(error, "{}: the name is empty", failure_prefix);
     return 0;
   }
 
@@ -57,7 +57,7 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
     // ``SdsSecretConfig`` without ``sds_config`` is resolved.
     provider = server_context_.secretManager().findStaticGenericSecretProvider(std::string(name));
     if (provider == nullptr) {
-      ENVOY_LOG_MISC(error, "{} '{}': no such static secret", failure_prefix, name);
+      ENVOY_LOG(error, "{} '{}': no such static secret", failure_prefix, name);
       return 0;
     }
   } else {
@@ -67,31 +67,33 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
     if (absl::Status status =
             MessageUtil::loadFromJsonNoThrow(sds_config_source, sds_config, has_unknown_field);
         !status.ok()) {
-      ENVOY_LOG_MISC(error, "{} '{}': the config source is not a valid ConfigSource JSON: {}",
-                     failure_prefix, name, status.message());
+      ENVOY_LOG(error, "{} '{}': the config source is not a valid ConfigSource JSON: {}",
+                failure_prefix, name, status.message());
       return 0;
     }
     // Creating the subscription validates the config source and can throw, e.g. when the config
     // source refers to a cluster that does not exist. This is called from the module via the C ABI,
     // so the exception must not escape this frame.
+    // TODO(wbpcode): remove the exception from the findOrCreateGenericSecretProvider
+    // and make it return a StatusOr instead, so that the exception handling can be removed here.
     TRY_ASSERT_MAIN_THREAD {
       provider = server_context_.secretManager().findOrCreateGenericSecretProvider(
           sds_config, std::string(name), server_context_, init_manager_);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
-      ENVOY_LOG_MISC(error, "{} '{}': {}", failure_prefix, name, e.what());
+      ENVOY_LOG(error, "{} '{}': {}", failure_prefix, name, e.what());
       return 0;
     });
     if (provider == nullptr) {
-      ENVOY_LOG_MISC(error, "{} '{}': failed to create the SDS subscription", failure_prefix, name);
+      ENVOY_LOG(error, "{} '{}': failed to create the SDS subscription", failure_prefix, name);
       return 0;
     }
 #else
-    ENVOY_LOG_MISC(error,
-                   "{} '{}': JSON support is not compiled in, so a config source cannot be "
-                   "parsed. Use a static secret instead.",
-                   failure_prefix, name);
+    ENVOY_LOG(error,
+              "{} '{}': JSON support is not compiled in, so a config source cannot be "
+              "parsed. Use a static secret instead.",
+              failure_prefix, name);
     return 0;
 #endif
   }
@@ -99,8 +101,7 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
   auto thread_local_provider = Secret::ThreadLocalGenericSecretProvider::create(
       std::move(provider), server_context_.threadLocal(), server_context_.api());
   if (!thread_local_provider.ok()) {
-    ENVOY_LOG_MISC(error, "{} '{}': {}", failure_prefix, name,
-                   thread_local_provider.status().message());
+    ENVOY_LOG(error, "{} '{}': {}", failure_prefix, name, thread_local_provider.status().message());
     return 0;
   }
   generic_secrets_.push_back(std::move(thread_local_provider.value()));

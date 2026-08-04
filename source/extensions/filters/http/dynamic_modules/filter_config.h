@@ -77,7 +77,8 @@ using OnHttpFilterConfigHttpStreamResetType =
  * Each filter instance and the factory callback holds a shared pointer to this config.
  */
 class DynamicModuleHttpFilterConfig
-    : public std::enable_shared_from_this<DynamicModuleHttpFilterConfig> {
+    : public std::enable_shared_from_this<DynamicModuleHttpFilterConfig>,
+      public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
    * Constructor for the config.
