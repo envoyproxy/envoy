@@ -161,6 +161,7 @@ message ParserConfig {
 }
 
 // Per-route override configuration for MCP filter
+// [#next-free-field: 7]
 message McpOverride {
   // Overrides the global traffic mode for this route.
   Mcp.TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
