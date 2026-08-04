@@ -261,6 +261,12 @@ private:
   // (longest observed ~25B, e.g. "input_audio_transcription") while bounding
   // per-key allocation and guarding against DoS via unbounded key lengths.
   static constexpr size_t kMaxKeyBytes = 256;
+  // kMaxPendingBytes is a hard limit against the byte-at-a-time DoS when a NUMBER token is split
+  // across chunk boundaries, NUMBER tokens that arrive complete with their terminator in one chunk
+  // bypass this path entirely — those are bounded by the max_body_bytes limit instead. A legitimate
+  // number is at most ~25 chars (64-bit int ≤ 20 digits; float with sign/decimal/exponent ≤ ~25).
+  // 64 bytes gives generous headroom.
+  static constexpr size_t kMaxPendingBytes = 64;
   int depth_{0};
   bool is_dict_[kMaxTrackedDepth]{};
   bool expecting_key_[kMaxTrackedDepth]{};

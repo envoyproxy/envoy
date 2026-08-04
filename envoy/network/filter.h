@@ -534,7 +534,7 @@ public:
 
   /**
    * Called before connection creation.
-   * @return false if the given preferred address is incomplatible with this filter and the listener
+   * @return false if the given preferred address is incompatible with this filter and the listener
    * shouldn't advertise the given preferred address. I.e. onAccept() would have behaved differently
    * if the connection socket's destination address were the preferred address.
    */

@@ -8,6 +8,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/socket.h"
+#include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
 
 #include "source/common/stats/custom_stat_namespaces_impl.h"

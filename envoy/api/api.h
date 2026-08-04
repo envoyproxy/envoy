@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -11,7 +13,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/process_context.h"
 #include "envoy/stats/custom_stat_namespaces.h"
-#include "envoy/stats/store.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {

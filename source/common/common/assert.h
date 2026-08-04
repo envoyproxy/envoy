@@ -31,12 +31,28 @@ public:
     stack_depth_ = absl::GetStackTrace(stack_trace_, kMaxStackDepth, /* skip_count = */ 1);
   }
 
+  static void setSingleLine(bool single_line) { single_line_ = single_line; }
+  static bool singleLine() { return single_line_; }
+
   /*
    * Logs each row of the captured stack into the envoy_bug log.
    */
   void logStackTrace() {
-    ENVOY_LOG(error, "stacktrace for envoy bug");
     char out[1024];
+    if (single_line_) {
+      std::string buf("stacktrace for envoy bug");
+      for (int i = 0; i < stack_depth_; ++i) {
+        const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
+        if (success) {
+          fmt::format_to(std::back_inserter(buf), "\n#{} {} [{}]", i, out, stack_trace_[i]);
+        } else {
+          fmt::format_to(std::back_inserter(buf), "\n#{} UNKNOWN [{}]", i, stack_trace_[i]);
+        }
+      }
+      ENVOY_LOG(error, "{}", buf);
+      return;
+    }
+    ENVOY_LOG(error, "stacktrace for envoy bug");
     for (int i = 0; i < stack_depth_; ++i) {
       const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
       if (success) {
@@ -48,6 +64,7 @@ public:
   }
 
 private:
+  static inline bool single_line_ = false;
   static const int kMaxStackDepth = 16;
   void* stack_trace_[kMaxStackDepth];
   int stack_depth_{0};

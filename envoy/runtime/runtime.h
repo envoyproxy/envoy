@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/stats/store.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/type/v3/percent.pb.h"
 

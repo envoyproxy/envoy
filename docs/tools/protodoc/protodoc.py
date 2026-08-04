@@ -533,6 +533,7 @@ class RstFormatVisitor(visitor.Visitor):
         return dict(
             anchor=field_cross_ref_label(normalize_type_context_name(ctx.name)),
             field=field,
+            is_map=type_name_from_fqn(field.type_name) in ctx.map_typenames,
             field_name=field.name,
             comment=self._field_type(ctx.map_typenames, field.type, field.type_name),
             field_annotations=",".join(field_annotations),

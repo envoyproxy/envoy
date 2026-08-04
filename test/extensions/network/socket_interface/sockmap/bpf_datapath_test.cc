@@ -79,10 +79,11 @@ TEST(SockKey, LayoutMatchesKernelContract) {
 }
 
 // Without `ENVOY_ENABLE_SOCKMAP` the datapath is a no-op, so every configuration falls back to the
-// standard datapath by returning a null datapath.
+// standard datapath by returning a null datapath, including when accelerated_ports is set.
 TEST(CreateBpfDatapath, ReturnsNullWhenNotCompiledIn) {
   BpfDatapathConfig config;
   config.sockhash_max_entries = 1024;
+  config.accelerated_ports = {{9211, 9212}, {6000, 6010}};
 
   EXPECT_EQ(createBpfDatapath(config), nullptr);
 

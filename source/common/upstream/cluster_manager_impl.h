@@ -241,7 +241,7 @@ public:
 
   // Upstream::ClusterManager
   absl::StatusOr<bool> addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                          const std::string& version_info,
+                                          absl::string_view version_info,
                                           const bool avoid_cds_removal = false) override;
 
   void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
@@ -280,7 +280,7 @@ public:
     }
   }
 
-  OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
+  OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
       return *it->second->cluster_;
@@ -288,7 +288,7 @@ public:
     return std::nullopt;
   }
 
-  OptRef<const Cluster> getActiveOrWarmingCluster(const std::string& cluster_name) const override {
+  OptRef<const Cluster> getActiveOrWarmingCluster(absl::string_view cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
       return *it->second->cluster_;
@@ -299,7 +299,7 @@ public:
     return std::nullopt;
   }
 
-  bool hasCluster(const std::string& cluster_name) const override {
+  bool hasCluster(absl::string_view cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);
   }
@@ -312,7 +312,7 @@ public:
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
-  bool removeCluster(const std::string& cluster, const bool remove_ignored = false) override;
+  bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) override;
   void shutdown() override {
     shutdown_ = true;
     if (resume_cds_ != nullptr) {
@@ -379,7 +379,7 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
-  void drainConnections(const std::string& cluster,
+  void drainConnections(absl::string_view cluster,
                         DrainConnectionsHostPredicate predicate) override;
 
   void drainConnections(DrainConnectionsHostPredicate predicate,
@@ -388,7 +388,7 @@ public:
   void drainOrCloseConnPools(DrainConnectionsPoolPredicate predicate,
                              ConnectionPool::DrainBehavior drain_behavior) override;
 
-  absl::Status checkActiveStaticCluster(const std::string& cluster) override;
+  absl::Status checkActiveStaticCluster(absl::string_view cluster) override;
 
   // Upstream::MissingClusterNotifier
   void notifyMissingCluster(absl::string_view name) override;
@@ -630,6 +630,17 @@ private:
                        std::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
+      // Applies a set of per-priority host updates to the priority set as a single batch (see
+      // PrioritySetImpl::batchHostUpdate()). Unlike calling updateHosts() once per priority, the
+      // priority set's end-of-batch MemberUpdateCb fires only once for the whole update, so the
+      // worker-local load balancer coalesces its rebuild across all the updated priorities. Used by
+      // the cluster manager when batch-aware updates are enabled. `updates` must not contain
+      // duplicate priorities; an empty `updates` is a no-op.
+      void updateHosts(
+          const std::vector<
+              std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
+          HostMapConstSharedPtr cross_priority_host_map);
+
       // Drains any connection pools associated with the removed hosts. All connections will be
       // closed gracefully and no new connections will be created.
       void drainConnPools(const HostVector& hosts_removed);
@@ -647,6 +658,37 @@ private:
       }
 
     private:
+      // Applies a batch of per-priority host updates to the cluster entry's priority set via
+      // PrioritySet::batchHostUpdate(). See ClusterEntry::updateHosts().
+      class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
+      public:
+        BatchUpdateHelper(
+            const std::vector<
+                std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
+            HostMapConstSharedPtr cross_priority_host_map)
+            : updates_(updates), cross_priority_host_map_(std::move(cross_priority_host_map)) {}
+
+        // PrioritySet::BatchUpdateCb
+        void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+          for (const auto& update : updates_) {
+            const auto& per_priority = update.get();
+            // Copy the update params as they are shared across all worker threads and cannot be
+            // moved from.
+            host_update_cb.updateHosts(
+                per_priority.priority_,
+                PrioritySet::UpdateHostsParams(per_priority.update_hosts_params_),
+                per_priority.locality_weights_, per_priority.hosts_added_,
+                per_priority.hosts_removed_, per_priority.weighted_priority_health_,
+                per_priority.overprovisioning_factor_, cross_priority_host_map_);
+          }
+        }
+
+      private:
+        const std::vector<
+            std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates_;
+        const HostMapConstSharedPtr cross_priority_host_map_;
+      };
+
       Http::ConnectionPool::Instance*
       httpConnPoolImpl(HostConstSharedPtr host, ResourcePriority priority,
                        std::optional<Http::Protocol> downstream_protocol,
@@ -818,6 +860,9 @@ private:
     SystemTime last_updated_;
     Common::CallbackHandlePtr member_update_cb_;
     Common::CallbackHandlePtr priority_update_cb_;
+    // Accumulates per-priority host updates on the main thread (see the priority update callback in
+    // onClusterInit()).
+    ThreadLocalClusterUpdateParams pending_update_params_;
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
     const bool avoid_cds_removal_ : 1;

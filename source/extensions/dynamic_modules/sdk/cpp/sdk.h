@@ -404,6 +404,12 @@ public:
 using MetricID = uint64_t;
 enum class MetricsResult : uint32_t { Success, NotFound, InvalidTags, Frozen };
 
+/**
+ * An opaque identifier for a generic secret subscribed to via
+ * HttpFilterConfigHandle::subscribeGenericSecret.
+ */
+using GenericSecretID = uint64_t;
+
 class HttpFilterHandle {
 public:
   virtual ~HttpFilterHandle();
@@ -943,6 +949,22 @@ public:
                                               std::span<const BufferView> tags_values = {}) = 0;
 
   /**
+   * Returns the current value of a generic secret subscribed to by the filter config via
+   * HttpFilterConfigHandle::subscribeGenericSecret. An empty value means the secret has been
+   * subscribed to but not yet delivered by the SDS server, which is distinct from an absent
+   * optional.
+   *
+   * The returned view aliases Envoy memory and must not be retained across events: a secret
+   * rotation replaces the value in between events on this worker thread. Copy it if it needs to
+   * outlive the current callback.
+   *
+   * @param id The secret ID returned by subscribeGenericSecret.
+   * @return The current value, or std::nullopt if the id does not correspond to a subscribed
+   * secret.
+   */
+  virtual std::optional<std::string_view> getGenericSecret(GenericSecretID id) = 0;
+
+  /**
    * Checks if logging is enabled for the given log level.
    * @param level The log level to check.
    * @return True if logging is enabled, false otherwise.
@@ -1047,6 +1069,42 @@ public:
    */
   virtual MetricsResult incrementCounterValue(MetricID id, uint64_t value,
                                               std::span<const BufferView> tags_values = {}) = 0;
+
+  /**
+   * Subscribes to a generic secret so that its value can later be read via getGenericSecret, either
+   * here or on HttpFilterHandle.
+   *
+   * This can only be called while the filter config is being created, i.e. from
+   * HttpFilterConfigFactory::onConfigNew.
+   *
+   * @param name The name of the secret: for a static secret the name in the bootstrap
+   * configuration, and for a dynamic secret the resource name requested from the SDS server.
+   * @param sds_config_source The JSON serialized ``envoy.config.core.v3.ConfigSource`` describing
+   * where to fetch the secret from, so that the value is updated whenever the SDS server pushes a
+   * new version. Pass an empty string to look the name up among the statically configured secrets
+   * instead.
+   * @return The secret ID, or std::nullopt if the secret cannot be subscribed to, for example when
+   * the static secret does not exist or sds_config_source is not a valid ConfigSource.
+   */
+  virtual std::optional<GenericSecretID>
+  subscribeGenericSecret(std::string_view name, std::string_view sds_config_source = {}) = 0;
+
+  /**
+   * Returns the current value of a previously subscribed generic secret. An empty value means the
+   * secret has been subscribed to but not yet delivered by the SDS server, which is distinct from
+   * an absent optional.
+   *
+   * Unlike HttpFilterHandle::getGenericSecret, this does not require a per-stream filter and can be
+   * called outside of the request lifecycle, for example from a scheduled background task.
+   *
+   * The returned view aliases Envoy memory and must not be retained across events. Copy it if it
+   * needs to outlive the current callback.
+   *
+   * @param id The secret ID returned by subscribeGenericSecret.
+   * @return The current value, or std::nullopt if the id does not correspond to a subscribed
+   * secret.
+   */
+  virtual std::optional<std::string_view> getGenericSecret(GenericSecretID id) = 0;
 
   /**
    * Checks if logging is enabled for the given log level.

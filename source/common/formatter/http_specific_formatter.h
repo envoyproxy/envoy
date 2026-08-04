@@ -202,7 +202,8 @@ public:
     Decoded,
   };
 
-  static DecodeOption parseDecodeOption(absl::string_view decoding);
+  static absl::StatusOr<FormatterProviderPtr> create(absl::string_view decoding,
+                                                     std::optional<size_t> max_length);
 
   // FormatterProvider
   std::optional<std::string> format(const Context& context,
@@ -255,7 +256,7 @@ public:
 
 private:
   using FormatterProviderCreateFunc =
-      std::function<FormatterProviderPtr(absl::string_view, std::optional<size_t>)>;
+      std::function<absl::StatusOr<FormatterProviderPtr>(absl::string_view, std::optional<size_t>)>;
 
   using FormatterProviderLookupTbl =
       absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,

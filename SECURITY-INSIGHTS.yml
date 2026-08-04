@@ -1,8 +1,8 @@
 header:
   schema-version: '1.0.0'
-  expiration-date: '2025-01-24T01:00:00.000Z'
-  last-updated: '2024-01-24'
-  last-reviewed: '2024-01-24'
+  expiration-date: '2027-07-03T01:00:00.000Z'
+  last-updated: '2026-07-03'
+  last-reviewed: '2026-07-03'
   project-url: https://github.com/envoyproxy/envoy
   changelog: https://www.envoyproxy.io/docs/envoy/latest/version_history/version_history#version-history
   license: https://github.com/envoyproxy/envoy/blob/main/LICENSE
@@ -11,8 +11,12 @@ project-lifecycle:
   bug-fixes-only: false
   core-maintainers:  # from https://github.com/envoyproxy/envoy/blob/main/OWNERS.md
   # Senior maintainers
+  - github:agrawroh
+  - github:botengyao
   - github:ggreenway
+  - github:htuch
   - github:mattklein123
+  - github:nezdolik
   - github:phlax
   - github:RyanTheOptimist
   - github:wbpcode
@@ -20,15 +24,12 @@ project-lifecycle:
   - github:zuercher
   # Maintainers
   - github:adisuissa
-  - github:agrawroh
-  - github:botengyao
   - github:jwendell
   - github:KBaichoo
   - github:keith
   - github:krinkinmu
   - github:kyessenov
   - github:mathetake
-  - github:nezdolik
   - github:paul-r-gall
   - github:ravenblackx
   - github:tonya11en

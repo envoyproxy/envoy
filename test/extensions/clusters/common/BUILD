@@ -36,6 +36,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

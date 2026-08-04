@@ -72,7 +72,7 @@ When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a n
 implemented in any language to connect to the proxy as if it's a single node Redis instance.
 The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the
 cluster according to the `spec <https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/>`_. Advance features such as reading
-from replicas can also be added to the Envoy proxy instead of updating redis clients in each language.
+from replicas can also be added to the Envoy proxy instead of updating Redis clients in each language.
 
 Envoy proxy tracks the topology of the cluster by sending periodic
 `cluster slots <https://redis.io/commands/cluster-slots>`_ commands to a random node in the cluster, and maintains the
@@ -95,6 +95,7 @@ Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.
 
   max_upstream_unknown_connections_reached, Counter, Total number of times that an upstream connection to an unknown host is not created after redirection having reached the connection pool's max_upstream_unknown_connections limit
   upstream_cx_drained, Counter, Total number of upstream connections drained of active requests before being closed
+  upstream_resp3_hello_failure, Counter, "Total number of upstream ``HELLO 3`` negotiations that did not result in a successful RESP3 handshake (error reply, wrong reply shape, connection error, or non-3 ``proto`` field). Incremented only when the listener's ``protocol_version`` is ``RESP3``."
   upstream_commands.upstream_rq_time, Histogram, Histogram of upstream request times for all types of requests
 
 .. _arch_overview_redis_cluster_command_stats:
@@ -116,6 +117,9 @@ Transactions
 Transactions (MULTI) are supported. Their use is no different from regular Redis: you start a transaction with MULTI,
 and you execute it with EXEC. Within the transaction, from the list of commands supported by Envoy (see below), only single-key
 commands (e.g. GET, SET), multi-key commands (e.g. DEL, MSET) and transaction commands (e.g. WATCH, UNWATCH, DISCARD, EXEC) are supported.
+Commands configured via :ref:`custom_commands
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.custom_commands>` are also supported within
+transactions and are treated as single-key commands.
 
 
 When working in Redis Cluster mode, Envoy will relay all the commands in the transaction to the node handling the first
@@ -130,7 +134,8 @@ At the protocol level, pipelines are supported.
 Use pipelining wherever possible for the best performance.
 
 At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING, ECHO and INFO
-are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
+are exceptions, as are HELLO, QUIT, and the CLIENT SETNAME and CLIENT SETINFO subcommands that Envoy handles
+locally. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
 configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
 to an external service and act according to the authentication response. If a downstream password is set together
@@ -143,12 +148,31 @@ original Redis command except possibly in failure scenarios.
 
 RESP Protocol
 ^^^^^^^^^^^^^
-Envoy redis proxy supports only RESP2 protocol for now. Clients should connect to Envoy using RESP2 protocol.
-hello command with only hello 2 argument is supported, hello 3 will result in error response from Envoy.
+Envoy Redis proxy supports RESP2 and RESP3, selected by the listener's
+:ref:`RedisProxy.protocol_version
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.protocol_version>`.
+This single knob governs both downstream connections and every routed upstream conn pool —
+there is no separate per-cluster RESP knob and no implicit floor across clusters.
+
+The listener pins one RESP version end-to-end rather than translating between them, because
+RESP2 and RESP3 diverge structurally: some replies have no transparent mapping (for example
+``ZRANGE WITHSCORES`` is a flat array under RESP2 but a nested array of pairs under RESP3).
+The proxy therefore does not cross-encode upstream responses — a reply is always emitted
+downstream in the RESP version it arrived in. The exception is cluster-scope aggregate commands such as
+``CONFIG GET`` and ``KEYS``, whose per-shard replies are combined into one flat array even when a shard
+answers with a RESP3 Map. Unsolicited RESP3 ``Push`` frames from upstream
+are dropped rather than forwarded downstream (the proxy routes no Push-producing feature on
+ordinary request/response connections, and forwarding one would desynchronize the reply FIFO).
+
+For the full ``HELLO 3`` negotiation, ``-NOPROTO`` gating of pre-handshake data commands,
+downstream ``HELLO N AUTH`` handling, the locally-synthesized ``HELLO`` reply, and the
+``upstream_resp3_hello_failure`` stat, see the :ref:`RESP protocol version
+<config_network_filters_redis_proxy_protocol_version>` section of the Redis proxy filter
+configuration.
 
 INFO command
 ^^^^^^^^^^^^
-INFO command is handled by envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
+INFO command is handled by Envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
 An optional section parameter can be provided to filter the output (e.g., INFO memory).
 INFO.SHARD is an Envoy-specific command introduced for debugging purposes that queries a specific shard by index
 and returns that shard's complete INFO response (e.g., INFO.SHARD 0 memory).
@@ -164,7 +188,9 @@ For details on each command's usage see the official
   :widths: 1, 1
 
   AUTH, Authentication
+  CLIENT, Connection
   ECHO, Connection
+  HELLO, Connection
   PING, Connection
   QUIT, Connection
   DEL, Generic

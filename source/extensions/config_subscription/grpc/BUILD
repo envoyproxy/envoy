@@ -264,5 +264,6 @@ envoy_cc_library(
         "//envoy/config:eds_resources_cache_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
     ],
 )

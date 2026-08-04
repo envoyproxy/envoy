@@ -20,9 +20,12 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
   // expectation is that if a custom response policy recreates the stream, it
   // adds itself to the filter state. In that case do not look for
   // route-specific config, as this is not the original request from downstream.
-  // Note that the original request header map is NOT carried over to the
-  // redirected response. The redirected request header map does NOT participate
-  // in the custom response framework.
+  // Note that matching is only performed for the original downstream request:
+  // its request headers are available to the matcher (via the stream info) so
+  // policies can be selected based on request header values. A redirected
+  // request created by a custom response policy does NOT re-enter the custom
+  // response framework, so its request header map does not participate in
+  // matching.
   auto filter_state =
       encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CustomResponseFilterState>(
           CustomResponseFilterState::kFilterStateName);

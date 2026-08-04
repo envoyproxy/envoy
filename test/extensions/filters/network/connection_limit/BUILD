@@ -35,5 +35,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/connection_limit:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

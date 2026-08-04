@@ -10,9 +10,9 @@
 namespace Envoy {
 namespace {
 
-// Boots Envoy with the sockmap socket interface as the default. The eBPF datapath cannot be loaded
-// in the test environment, so every socket falls back to the standard datapath and proxying is
-// unchanged.
+// Boots Envoy with the sockmap socket interface as the default and accelerated_ports set, so the
+// scoped configuration is validated end to end. The eBPF datapath cannot be loaded in the test
+// environment, so every socket falls back to the standard datapath and proxying is unchanged.
 class SockmapSocketInterfaceIntegrationTest
     : public BaseIntegrationTest,
       public testing::TestWithParam<Network::Address::IpVersion> {
@@ -32,6 +32,9 @@ bootstrap_extensions:
   - name: envoy.extensions.network.socket_interface.sockmap
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network.socket_interface.sockmap.v3.Sockmap
+      accelerated_ports:
+      - start: 9211
+        end: 9212
 default_socket_interface: "envoy.extensions.network.socket_interface.sockmap"
     )EOF");
   }

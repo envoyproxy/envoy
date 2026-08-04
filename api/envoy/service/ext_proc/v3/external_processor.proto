@@ -6,6 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
@@ -220,17 +221,37 @@ message ProcessingResponse {
   // field name(s) of the struct.
   google.protobuf.Struct dynamic_metadata = 8;
 
+  // Optional typed metadata that will be emitted as dynamic metadata to be consumed by
+  // following filters. This metadata will be placed in the namespace(s) specified by the
+  // keys of the map.
+  //
+  // Typed dynamic metadata should be preferred over untyped dynamic metadata (``dynamic_metadata``)
+  // because it is more efficient and more type-safe.
+  map<string, google.protobuf.Any> typed_dynamic_metadata = 13;
+
   // Override how parts of the HTTP request and response are processed for the duration of this
   // particular request/response only. Servers may use this to intelligently control how requests
   // are processed based on the headers and other metadata that they see.
   //
-  // This field is only applicable when servers are responding to the header requests. If it is set
+  // This field is applicable when servers are responding to the header requests. If it is set
   // in the response to the body or trailer requests, it will be ignored by the data plane.
   // It is also ignored by the data plane when the ext_proc filter config
   // :ref:`allow_mode_override <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
   // is set to ``false``, or
   // :ref:`send_body_without_waiting_for_header_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
   // is set to ``true``.
+  //
+  // The external processing server can override the processing mode by returning a standalone ``mode_override``
+  // in the ``ProcessingResponse`` after receiving a ``ProcessingRequest`` for request headers. This standalone
+  // override must be sent before the request headers response is sent.
+  // Subsequent messages will adhere to this new mode.
+  //
+  // Constraints:
+  //
+  // 1. Request Path: A standalone ``mode_override`` only supports transitioning the body processing mode
+  //    from other mode to ``FULL_DUPLEX_STREAMED``, and the trailer mode must be set to ``SEND``.
+  // 2. Response Path: There are no restrictions on processing mode changes in this case.
+  //
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 
   // [#not-implemented-hide:]

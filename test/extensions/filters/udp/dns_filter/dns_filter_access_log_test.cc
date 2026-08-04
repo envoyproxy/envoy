@@ -24,6 +24,7 @@ namespace UdpFilters {
 namespace DnsFilter {
 namespace {
 
+using Envoy::StatusHelpers::HasStatus;
 using Envoy::StatusHelpers::IsOkAndHolds;
 using ResponseValidator = Utils::DnsResponseValidator;
 using testing::_;
@@ -590,8 +591,9 @@ TEST(DnsFilterCommandParserTest, QueryClassFormatter) {
 
 TEST(DnsFilterCommandParserTest, UnknownCommand) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("UNKNOWN_COMMAND", "", std::nullopt).value();
-  EXPECT_EQ(formatter, nullptr);
+  EXPECT_THAT(parser->parse("UNKNOWN_COMMAND", "", std::nullopt),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Invalid format substitution: UNKNOWN_COMMAND"));
 }
 
 TEST(DnsFilterCommandParserTest, EmptyCommandArg) {
@@ -611,9 +613,15 @@ TEST(DnsFilterCommandParserTest, CaseSensitiveCommands) {
 
   // Commands should be case-sensitive
   ASSERT_THAT(parser->parse("QUERY_NAME", "", std::nullopt), IsOkAndHolds(NotNull()));
-  ASSERT_THAT(parser->parse("query_name", "", std::nullopt), IsOkAndHolds(IsNull()));
-  ASSERT_THAT(parser->parse("Query_Name", "", std::nullopt), IsOkAndHolds(IsNull()));
-  ASSERT_THAT(parser->parse("QUERYNAME", "", std::nullopt), IsOkAndHolds(IsNull()));
+  ASSERT_THAT(
+      parser->parse("query_name", "", std::nullopt),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Invalid format substitution: query_name"));
+  ASSERT_THAT(
+      parser->parse("Query_Name", "", std::nullopt),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Invalid format substitution: Query_Name"));
+  ASSERT_THAT(
+      parser->parse("QUERYNAME", "", std::nullopt),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Invalid format substitution: QUERYNAME"));
 }
 
 TEST(DnsFilterCommandParserTest, FormatValueStringType) {

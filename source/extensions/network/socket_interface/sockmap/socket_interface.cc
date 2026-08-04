@@ -1,9 +1,11 @@
 #include "source/extensions/network/socket_interface/sockmap/socket_interface.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/extensions/network/socket_interface/sockmap/v3/sockmap.pb.h"
 #include "envoy/extensions/network/socket_interface/sockmap/v3/sockmap.pb.validate.h"
 
+#include "source/common/common/fmt.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/network/socket_interface/sockmap/io_handle.h"
@@ -36,6 +38,17 @@ Server::BootstrapExtensionPtr SockmapSocketInterface::createBootstrapExtension(
   datapath_config.cgroup_path = message.cgroup_path();
   datapath_config.sockhash_max_entries =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, sockhash_max_entries, 65536);
+  datapath_config.accelerated_ports.reserve(message.accelerated_ports().size());
+  for (const auto& range : message.accelerated_ports()) {
+    if (range.start() < 1 || range.end() > 65536 || range.start() >= range.end()) {
+      throwEnvoyExceptionOrPanic(
+          fmt::format("sockmap accelerated_ports range [{}, {}) is invalid, expected "
+                      "1 <= start < end <= 65536",
+                      range.start(), range.end()));
+    }
+    datapath_config.accelerated_ports.push_back(
+        {static_cast<uint32_t>(range.start()), static_cast<uint32_t>(range.end())});
+  }
   const bool register_user_space_sockets =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, register_user_space_sockets, true);
   BpfDatapathSharedPtr datapath = createDatapath(datapath_config);

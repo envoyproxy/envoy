@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:logging_lib",
         "@envoy_api//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg_cc_proto",
     ],
 )

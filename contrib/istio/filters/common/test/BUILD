@@ -73,6 +73,7 @@ envoy_cc_test(
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/filters/network/set_filter_state:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/internal_upstream:config",
         "//source/extensions/transport_sockets/raw_buffer:config",

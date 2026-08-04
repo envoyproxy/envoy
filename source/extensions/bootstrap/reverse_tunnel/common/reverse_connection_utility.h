@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
@@ -39,6 +40,20 @@ public:
 
   static bool isPingMessage(absl::string_view data);
 
+  // Classification of the front bytes of a read against the RPING keepalive marker.
+  enum class RpingPrefixMatch {
+    // The first PING_MESSAGE.size() bytes are a complete RPING keepalive.
+    Complete,
+    // Fewer than PING_MESSAGE.size() bytes, all matching the RPING prefix so far.
+    PartialPrefix,
+    // Neither a complete RPING nor a viable prefix of one.
+    NotRping,
+  };
+
+  // Classifies `data` against RPING. Only the first PING_MESSAGE.size() bytes are considered;
+  // trailing application bytes are ignored. Empty input is a (trivial) PartialPrefix.
+  static RpingPrefixMatch classifyRpingPrefix(absl::string_view data);
+
   static Buffer::InstancePtr createPingResponse();
 
   static bool sendPingResponse(Network::Connection& connection);
@@ -54,6 +69,13 @@ public:
   static std::string buildTenantScopedIdentifier(absl::string_view tenant,
                                                  absl::string_view identifier);
 
+  // Build the reverse-tunnel host key "[tenant:]cluster:node" from the scoped node and cluster ids.
+  static std::string buildClusterScopedIdentifier(absl::string_view node_id,
+                                                  absl::string_view cluster_id);
+
+  // Inverse of buildClusterScopedIdentifier: the tenant-scoped {node_id, cluster_id}.
+  static std::pair<std::string, std::string> splitClusterScopedIdentifier(absl::string_view value);
+
   static void applySslQuietClose(Network::Connection& conn);
 
   /**
@@ -64,6 +86,8 @@ public:
    */
   static uint64_t addJitter(uint64_t interval_ms, uint64_t jitter_percent,
                             Random::RandomGenerator& random);
+
+  static uint64_t diffMs(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end);
 
 private:
   ReverseConnectionUtility() = delete;
@@ -99,6 +123,23 @@ inline const Http::LowerCaseString& reverseTunnelUpstreamClusterNameHeader() {
 inline const Http::LowerCaseString& reverseTunnelInitiationTimeHeader() {
   static const Http::LowerCaseString kHeader{
       absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-initiation-time")};
+  return kHeader;
+}
+
+// Identifies the initiator worker thread that opened the tunnel (the worker dispatcher name, e.g.
+// "worker_2"). Distinguishes tunnels originating from different workers of the same initiator.
+inline const Http::LowerCaseString& reverseTunnelWorkerIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-worker-id")};
+  return kHeader;
+}
+
+// The initiator's per-connection identifier (Envoy's monotonic connection id) for the outbound
+// handshake connection. Combined with the worker id, distinguishes individual tunnels from the
+// same initiator instance.
+inline const Http::LowerCaseString& reverseTunnelConnectionIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-connection-id")};
   return kHeader;
 }
 

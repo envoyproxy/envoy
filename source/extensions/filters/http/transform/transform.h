@@ -146,9 +146,10 @@ using TransformConfigSharedPtr = std::shared_ptr<TransformConfig>;
 class FilterConfig : public TransformConfig {
 public:
   FilterConfig(const ProtoConfig& config, const std::string& stats_prefix,
-               Server::Configuration::FactoryContext& context, absl::Status& creation_status)
-      : TransformConfig(config, context.serverFactoryContext(), creation_status),
-        stats_(generateStats(stats_prefix, context.scope())) {}
+               Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+               absl::Status& creation_status)
+      : TransformConfig(config, context, creation_status),
+        stats_(generateStats(stats_prefix, scope)) {}
 
   TransformFilterStats& stats() { return stats_; }
 
