@@ -62,12 +62,12 @@ typed_config:
         triggers:
         - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
           threshold:
-            value: 0.70
+            value: 0.90
       - name: "envoy.load_shed_points.priority.low"
         triggers:
         - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
           threshold:
-            value: 0.90
+            value: 0.70
     )EOF"));
 
   auto send_request_with_priority = [this](int priority) {
@@ -84,19 +84,22 @@ typed_config:
     return status;
   };
 
+  // Below both thresholds: nothing is shed.
   updateResource(0.65);
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent", Eq(0));
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.low.scale_percent", Eq(0));
   EXPECT_EQ("200", send_request_with_priority(5));
   EXPECT_EQ("200", send_request_with_priority(20));
 
+  // Above the low priority threshold only: low priority traffic is shed first, high priority
+  // traffic is still served.
   updateResource(0.75);
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
-                             Eq(100));
-  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.low.scale_percent", Eq(0));
-  EXPECT_EQ("503", send_request_with_priority(5));
-  EXPECT_EQ("200", send_request_with_priority(20));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent", Eq(0));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.low.scale_percent", Eq(100));
+  EXPECT_EQ("200", send_request_with_priority(5));
+  EXPECT_EQ("503", send_request_with_priority(20));
 
+  // Above both thresholds: even high priority traffic is shed.
   updateResource(0.95);
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
                              Eq(100));

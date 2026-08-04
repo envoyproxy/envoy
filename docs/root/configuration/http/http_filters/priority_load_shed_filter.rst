@@ -16,6 +16,11 @@ buckets and checks a corresponding overload manager load shed point for that buc
 The filter maps header values to buckets without interpreting their relative importance.
 Each bucket's shedding behavior is independently controlled by its configured load shed point.
 
+Because a load shed point begins shedding once resource pressure reaches its trigger threshold,
+the relative ordering of thresholds determines the shedding order. Give less important buckets
+lower thresholds so they are shed first, and the most critical buckets the highest thresholds so
+they are shed last.
+
 Bucket ranges use half-open interval semantics ``[start, end)``:
 
 * ``start`` is included in the bucket.
@@ -48,11 +53,13 @@ Example configuration
         "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
         max_heap_size_bytes: 4294967296  # 4 GiB
     loadshed_points:
-    - name: envoy.load_shed_points.priority.high
+    # Less important traffic is shed first, so it gets the lower threshold.
+    - name: envoy.load_shed_points.priority.low
       triggers:
       - name: envoy.resource_monitors.fixed_heap
         threshold: { value: 0.70 }
-    - name: envoy.load_shed_points.priority.low
+    # The most critical traffic is shed last, only under severe pressure.
+    - name: envoy.load_shed_points.priority.high
       triggers:
       - name: envoy.resource_monitors.fixed_heap
         threshold: { value: 0.90 }
