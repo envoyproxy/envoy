@@ -327,10 +327,10 @@ envoy_cc_benchmark_binary(
         "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "@benchmark",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@benchmark",
     ],
 )
 
