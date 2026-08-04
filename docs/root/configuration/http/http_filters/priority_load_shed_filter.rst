@@ -40,6 +40,28 @@ All referenced load shed points (both in buckets and ``default_load_shed_point``
 configured in the overload manager. If a referenced point does not exist, the configuration
 is rejected at load time.
 
+Security considerations
+-----------------------
+
+.. attention::
+
+   This filter sheds load based solely on the priority value it reads from the request header, and
+   performs no validation of that value beyond parsing it. A client that can set the header can
+   therefore place its own requests in whichever bucket is configured to shed last, and evade
+   shedding entirely at the expense of better behaved traffic.
+
+   Only enable this filter where the header is populated by a trusted component. At a trust
+   boundary, remove or overwrite any client-supplied value before this filter runs (for example
+   with the :ref:`header mutation filter <config_http_filters_header_mutation>`) and derive the
+   priority from a trusted signal such as the authenticated peer identity, the listener, or the
+   matched route.
+
+   :ref:`default_load_shed_point
+   <envoy_v3_api_field_extensions.filters.http.priority_load_shed.v3.PriorityLoadShed.default_load_shed_point>`
+   controls what happens to requests that arrive without a usable header. When traffic from
+   untrusted sources cannot be classified, point it at a load shed point that sheds early, so that
+   unclassified traffic is shed before classified traffic.
+
 Example configuration
 ---------------------
 
