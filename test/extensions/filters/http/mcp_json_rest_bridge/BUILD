@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
@@ -23,6 +24,7 @@ envoy_cc_test(
     name = "mcp_json_rest_bridge_filter_test",
     srcs = ["mcp_json_rest_bridge_filter_test.cc"],
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -35,6 +37,7 @@ envoy_cc_test(
     name = "endpoint_keyed_filtering_test",
     srcs = ["endpoint_keyed_filtering_test.cc"],
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",

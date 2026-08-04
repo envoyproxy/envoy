@@ -225,16 +225,17 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
 
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-        proto_config, Stats::Scope& scope)
-    : proto_config_(proto_config), scope_(scope),
-      fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        proto_config,
+    Stats::Scope& scope)
+    : proto_config_(proto_config), fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                        proto_config_.server_info(), fallback_protocol_version,
                                        std::string(McpConstants::FALLBACK_PROTOCOL_VERSION))),
       max_request_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_request_body_size,
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)),
-      clear_route_cache_(!proto_config_.disable_clear_route_cache()) {
+      clear_route_cache_(!proto_config_.disable_clear_route_cache()), scope_(scope),
+      stat_names_(scope_.symbolTable()) {
   const auto& tool_config = proto_config_.tool_config();
   std::string host = tool_config.default_server_info().host();
   std::string path = tool_config.default_server_info().path();
@@ -343,6 +344,23 @@ bool McpJsonRestBridgeFilterConfig::hasEndpoint(absl::string_view host,
     }
   }
   return false;
+}
+
+void McpJsonRestBridgeFilterConfig::incRequestCount(absl::string_view method,
+                                                    absl::string_view param,
+                                                    absl::string_view status) {
+  Stats::StatNameDynamicPool dynamic_stat_name_pool(scope_.symbolTable());
+  Stats::StatNameTagVector tags;
+  if (!method.empty()) {
+    tags.emplace_back(stat_names_.mcp_method.statName(), dynamic_stat_name_pool.add(method));
+  }
+  if (!param.empty()) {
+    tags.emplace_back(stat_names_.mcp_param.statName(), dynamic_stat_name_pool.add(param));
+  }
+  if (!status.empty()) {
+    tags.emplace_back(stat_names_.status.statName(), dynamic_stat_name_pool.add(status));
+  }
+  scope_.counterFromStatNameWithTags(stat_names_.request_count.statName(), tags).inc();
 }
 
 McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(

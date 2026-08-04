@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -48,7 +49,8 @@ tool_config:
   }
 
   void makeFilter() {
-    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config_);
+    config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config_, *stats_store_.rootScope());
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -60,6 +62,7 @@ tool_config:
         .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
@@ -1192,7 +1195,8 @@ tool_config:
         body: key
 )yaml",
                             proto_config);
-  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  config_ =
+      std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config, *stats_store_.rootScope());
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -1919,7 +1923,8 @@ tool_config:
       text_content_streaming_enabled: true
 )yaml",
                               proto_config);
-    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+    config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config, *stats_store_.rootScope());
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -1941,6 +1946,7 @@ tool_config:
     ASSERT_EQ(filter_->decodeData(req, /*end_stream=*/true), Http::FilterDataStatus::Continue);
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -2119,7 +2125,8 @@ tool_config:
         body: key
 )yaml",
                               proto_config);
-    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+    config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config, *stats_store_.rootScope());
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -2131,6 +2138,7 @@ tool_config:
         .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -2476,7 +2484,8 @@ public:
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
     proto_config.set_request_storage_mode(envoy::extensions::filters::http::mcp_json_rest_bridge::
                                               v3::McpJsonRestBridge::DYNAMIC_METADATA);
-    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+    config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config, *stats_store_.rootScope());
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -2488,6 +2497,7 @@ public:
         .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
