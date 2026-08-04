@@ -335,6 +335,40 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlVariableMatchingIsExact) {
   EXPECT_THAT(*constructBaseUrl("/v1/{id}/copy/{id}", {"id"}, arguments), StrEq("/v1/7/copy/7"));
 }
 
+TEST(HttpRequestBuilderTest, ConstructQueryParamsNestingDepthLimit) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+get: "/v1"
+)yaml",
+                            http_rule);
+
+  json arguments = json::object();
+  json* current = &arguments;
+  for (int i = 0; i < 150; ++i) {
+    (*current)["a"] = json::object();
+    current = &((*current)["a"]);
+  }
+
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(HttpRequestBuilderTest, ConstructQueryParamsArrayNestingDepthLimit) {
+  HttpRule http_rule;
+  TestUtility::loadFromYaml(R"yaml(
+get: "/v1"
+)yaml",
+                            http_rule);
+
+  json arguments = json::array();
+  json* current = &arguments;
+  for (int i = 0; i < 150; ++i) {
+    current->push_back(json::array());
+    current = &((*current)[0]);
+  }
+
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters
