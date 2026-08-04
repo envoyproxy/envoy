@@ -327,6 +327,24 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     })
     .return_const(())
     .once();
+  // Whole-namespace metadata from a serialized google.protobuf.Struct.
+  envoy_filter
+    .expect_set_dynamic_metadata_struct()
+    .withf(|ns, bytes| {
+      ns == "ns_req_header_struct"
+        && bytes == &[0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76]
+    })
+    .return_const(())
+    .once();
+  // Whole-namespace typed metadata from a serialized google.protobuf.Any.
+  envoy_filter
+    .expect_set_dynamic_typed_metadata()
+    .withf(|ns, bytes| {
+      ns == "ns_req_header_typed"
+        && bytes == &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02]
+    })
+    .return_const(())
+    .once();
   // Route/Cluster/Host metadata.
   envoy_filter
     .expect_get_metadata_string()

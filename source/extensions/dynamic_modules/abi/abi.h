@@ -2157,6 +2157,38 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_struct is called by the module to set an
+ * entire dynamic metadata namespace from a serialized google.protobuf.Struct. The struct is merged
+ * into the namespace and existing entries with the same key are overwritten. If the buffer does not
+ * parse as a google.protobuf.Struct, this is a no-op.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_typed_metadata is called by the module to set an
+ * entire typed dynamic metadata namespace from a serialized google.protobuf.Any. The Any is merged
+ * into the namespace's typed_filter_metadata entry. If the buffer does not parse as a
+ * google.protobuf.Any, this is a no-op.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
  * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
  * the string value of the dynamic metadata with the given namespace and key. If the metadata is not
  * accessible, the namespace does not exist, the key does not exist or the value is not a string,

@@ -1306,6 +1306,47 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
   metadata_namespace->MergeFrom(metadata_value);
 }
 
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  Protobuf::Struct metadata_value;
+  if (!metadata_value.ParseFromArray(serialized_struct.ptr,
+                                     static_cast<int>(serialized_struct.length))) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "envoy_dynamic_module_callback_http_set_dynamic_metadata_struct: failed to "
+                        "parse serialized google.protobuf.Struct");
+    return;
+  }
+  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
+  if (!metadata_namespace) {
+    // If stream info is not available, we cannot guarantee that the namespace is created.
+    return;
+  }
+  metadata_namespace->MergeFrom(metadata_value);
+}
+
+void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  Protobuf::Any typed_value;
+  if (!typed_value.ParseFromArray(serialized_any.ptr, static_cast<int>(serialized_any.length))) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "envoy_dynamic_module_callback_http_set_dynamic_typed_metadata: failed to "
+                        "parse serialized google.protobuf.Any");
+    return;
+  }
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
+    // If stream info is not available, we cannot set the typed metadata.
+    return;
+  }
+  auto& typed_metadata = *stream_info->dynamicMetadata().mutable_typed_filter_metadata();
+  typed_metadata[std::string(ns.ptr, ns.length)].MergeFrom(typed_value);
+}
+
 bool envoy_dynamic_module_callback_http_get_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,

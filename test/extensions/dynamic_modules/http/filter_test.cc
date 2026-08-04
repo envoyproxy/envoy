@@ -473,6 +473,17 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
     auto bytes_key = ns_req_header_bytes->second.fields().find("key");
     ASSERT_NE(bytes_key, ns_req_header_bytes->second.fields().end());
     EXPECT_EQ(bytes_key->second.string_value(), std::string("\xff\x00\xfe", 3));
+    // A whole namespace set from a serialized google.protobuf.Struct via the struct setter.
+    auto ns_req_header_struct = metadata.filter_metadata().find("ns_req_header_struct");
+    ASSERT_NE(ns_req_header_struct, metadata.filter_metadata().end());
+    auto struct_k = ns_req_header_struct->second.fields().find("k");
+    ASSERT_NE(struct_k, ns_req_header_struct->second.fields().end());
+    EXPECT_EQ(struct_k->second.string_value(), "v");
+    // A whole typed namespace set from a serialized google.protobuf.Any via the typed setter.
+    auto ns_req_header_typed = metadata.typed_filter_metadata().find("ns_req_header_typed");
+    ASSERT_NE(ns_req_header_typed, metadata.typed_filter_metadata().end());
+    EXPECT_EQ(ns_req_header_typed->second.type_url(), "t/x");
+    EXPECT_EQ(ns_req_header_typed->second.value(), std::string("\x01\x02", 2));
   }
   auto ns_req_body = metadata.filter_metadata().find("ns_req_body");
   ASSERT_NE(ns_req_body, metadata.filter_metadata().end());
