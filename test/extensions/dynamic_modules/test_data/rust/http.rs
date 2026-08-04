@@ -42,6 +42,42 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         .define_histogram_vec("test_histogram_vec", &["test_label"])
         .expect("failed to define histogram vec"),
     })),
+    "generic_secret_callbacks" => {
+      // A secret that is not configured anywhere cannot be subscribed to.
+      assert!(envoy_filter_config
+        .subscribe_generic_secret("not_configured", None)
+        .is_none());
+      // Neither can one whose config source is not a valid ConfigSource.
+      assert!(envoy_filter_config
+        .subscribe_generic_secret("static_secret", Some("{not json"))
+        .is_none());
+
+      let static_secret = envoy_filter_config
+        .subscribe_generic_secret("static_secret", None)
+        .expect("failed to subscribe to the static secret");
+      // The value is readable from the config context as well as per-stream.
+      assert_eq!(
+        envoy_filter_config
+          .get_generic_secret(static_secret)
+          .expect("failed to read the static secret")
+          .as_slice(),
+        b"static_value"
+      );
+
+      let dynamic_secret = envoy_filter_config
+        .subscribe_generic_secret(
+          "dynamic_secret",
+          Some(
+            r#"{"api_config_source":{"api_type":"GRPC","transport_api_version":"V3",
+              "grpc_services":[{"envoy_grpc":{"cluster_name":"sds_cluster"}}]}}"#,
+          ),
+        )
+        .expect("failed to subscribe to the dynamic secret");
+      Some(Box::new(GenericSecretCallbacksFilterConfig {
+        static_secret,
+        dynamic_secret,
+      }))
+    },
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "local_reply_callbacks" => Some(Box::new(LocalReplyCallbacksFilterConfig {})),
     "reset_stream" => Some(Box::new(ResetStreamFilterConfig {})),
@@ -170,6 +206,57 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
 /// A HTTP filter configuration that implements
 /// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the header/trailer
 /// related callbacks.
+/// An HTTP filter config that subscribes to generic secrets and exposes their values as request
+/// headers so that the test can observe them.
+struct GenericSecretCallbacksFilterConfig {
+  static_secret: EnvoyGenericSecretId,
+  dynamic_secret: EnvoyGenericSecretId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for GenericSecretCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(GenericSecretCallbacksFilter {
+      static_secret: self.static_secret,
+      dynamic_secret: self.dynamic_secret,
+    })
+  }
+}
+
+/// An HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
+struct GenericSecretCallbacksFilter {
+  static_secret: EnvoyGenericSecretId,
+  dynamic_secret: EnvoyGenericSecretId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for GenericSecretCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let static_secret = envoy_filter
+      .get_generic_secret(self.static_secret)
+      .expect("failed to read the static secret")
+      .as_slice()
+      .to_vec();
+    envoy_filter.set_request_header("x-static-secret", &static_secret);
+
+    let dynamic_secret = envoy_filter
+      .get_generic_secret(self.dynamic_secret)
+      .expect("failed to read the dynamic secret")
+      .as_slice()
+      .to_vec();
+    envoy_filter.set_request_header("x-dynamic-secret", &dynamic_secret);
+
+    // An ID that was never returned by a subscription is not readable.
+    assert!(envoy_filter
+      .get_generic_secret(EnvoyGenericSecretId(12345))
+      .is_none());
+
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
 struct HeaderCallbacksFilterConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeaderCallbacksFilterConfig {

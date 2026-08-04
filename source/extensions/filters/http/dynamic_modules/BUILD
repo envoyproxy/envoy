@@ -14,8 +14,15 @@ envoy_cc_library(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        "//envoy/secret:secret_manager_interface",
+        "//envoy/secret:secret_provider_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

@@ -125,3 +125,26 @@ In addition to the counters above, a module may define its own custom metrics. T
 under the configurable :ref:`metrics_namespace
 <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>`
 (``dynamicmodulescustom`` by default), separately from the ``dynamic_modules.`` namespace above.
+
+Secrets
+---------------------------
+
+An HTTP filter module can subscribe to :ref:`generic secrets <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.GenericSecret>`
+rather than carrying credentials in its own configuration, so that secrets stay out of the module
+configuration and are rotated by Envoy.
+
+A subscription is created while the filter configuration is being loaded, and is identified by a
+name plus an optional :ref:`ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`, serialized
+as JSON, that the module passes to Envoy:
+
+* Without a config source, the name refers to a secret in :ref:`static_resources.secrets
+  <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.secrets>`.
+* With a config source, the name is the resource requested over :ref:`SDS <config_secret_discovery_service>`.
+  Identical subscriptions are shared across filters, and the value the module reads is updated
+  whenever the SDS server pushes a new version. On the downstream HTTP filter chain the subscription
+  also participates in initialization, so the listener does not start serving until the secret has
+  been delivered.
+
+Reading a secret returns the value for the current worker thread, so a rotation is transparent to
+the module. The returned bytes are owned by Envoy and are only valid for the duration of the event
+hook, so a module that needs to retain a secret must copy it.

@@ -514,11 +514,21 @@ type HttpFilterHandle interface {
 	// IncrementCounterValue adds the given value to the counter metric. The order and
 	// size of tagsValues must match the tag keys defined when the metric was created.
 	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// GetGenericSecret returns the current value of a generic secret subscribed to by the filter
+	// config via HttpFilterConfigHandle.SubscribeGenericSecret. The second return value is false
+	// if the id does not correspond to a subscribed secret. The value is empty when the secret has
+	// been subscribed to but not yet delivered by the SDS server.
+	//
+	// The buffer aliases Envoy memory and must not be retained across events: a secret rotation
+	// replaces the value in between events on this worker thread. Copy it if it needs to outlive
+	// the current callback.
+	GetGenericSecret(id GenericSecretID) (UnsafeEnvoyBuffer, bool)
 }
 
 // HttpFilterConfigHandle is the per-filter-config handle exposed to HttpFilterConfig
-// implementations. It supports config-scoped logging, metric definition, and async I/O via
-// HttpCallout / StartHttpStream from the main thread.
+// implementations. It supports config-scoped logging, metric definition, generic secret
+// subscription, and async I/O via HttpCallout / StartHttpStream from the main thread.
 type HttpFilterConfigHandle interface {
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
@@ -598,4 +608,31 @@ type HttpFilterConfigHandle interface {
 	// Unlike HttpFilterHandle.IncrementCounterValue, this does not require a per-stream filter and
 	// can be called outside of the request lifecycle, for example from a scheduled background task.
 	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// SubscribeGenericSecret subscribes to a generic secret so that its value can later be read
+	// via GetGenericSecret, either here or on HttpFilterHandle.
+	//
+	// name is the name of the secret: for a static secret the name in the bootstrap configuration,
+	// and for a dynamic secret the resource name requested from the SDS server.
+	//
+	// sdsConfigSource is the JSON serialized envoy.config.core.v3.ConfigSource describing where to
+	// fetch the secret from, so that the value is updated whenever the SDS server pushes a new
+	// version. Pass an empty string to look the name up among the statically configured secrets
+	// instead.
+	//
+	// This can only be called while the filter config is being created, i.e. from
+	// HttpFilterConfigFactory.Create. Returns a zero ID if the secret cannot be subscribed to, for
+	// example when the static secret does not exist or sdsConfigSource is not a valid ConfigSource.
+	SubscribeGenericSecret(name string, sdsConfigSource string) GenericSecretID
+
+	// GetGenericSecret returns the current value of a previously subscribed generic secret. The
+	// second return value is false if the id does not correspond to a subscribed secret. The value
+	// is empty when the secret has been subscribed to but not yet delivered by the SDS server.
+	//
+	// Unlike HttpFilterHandle.GetGenericSecret, this does not require a per-stream filter and can
+	// be called outside of the request lifecycle, for example from a scheduled background task.
+	//
+	// The buffer aliases Envoy memory and must not be retained across events. Copy it if it needs
+	// to outlive the current callback.
+	GetGenericSecret(id GenericSecretID) (UnsafeEnvoyBuffer, bool)
 }
