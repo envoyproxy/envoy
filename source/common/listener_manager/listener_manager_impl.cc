@@ -604,9 +604,8 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
   return add_or_update_status;
 }
 
-absl::Status
-ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
-                                                   const ListenerImpl& existing_listener) {
+absl::Status ListenerManagerImpl::setupSocketFactoryForListener(
+    ListenerImpl& new_listener, const ListenerImpl& existing_listener, bool in_place_update) {
   if (new_listener.reusePort() != existing_listener.reusePort()) {
     return absl::InvalidArgumentError(fmt::format(
         "Listener {}: reuse port cannot be changed during an update", new_listener.name()));
@@ -617,6 +616,9 @@ ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
   }
+
+  RETURN_IF_NOT_OK(initializeWorkerRoutingForUdpListener(new_listener, in_place_update));
+
   return absl::OkStatus();
 }
 
@@ -702,13 +704,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   if (existing_warming_listener != warming_listeners_.end()) {
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_warming_listener));
-    RETURN_IF_NOT_OK(initializeWorkerRoutingForUdpListener(*new_listener, in_place_update));
+    RETURN_IF_NOT_OK(
+        setupSocketFactoryForListener(*new_listener, **existing_warming_listener, in_place_update));
     // In this case we can just replace inline.
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
-    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_active_listener));
-    RETURN_IF_NOT_OK(initializeWorkerRoutingForUdpListener(*new_listener, in_place_update));
+    RETURN_IF_NOT_OK(
+        setupSocketFactoryForListener(*new_listener, **existing_active_listener, in_place_update));
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
     if (workers_started_) {
@@ -722,7 +724,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not.
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(name, *new_listener));
-    RETURN_IF_NOT_OK(initializeWorkerRoutingForUdpListener(*new_listener, in_place_update));
+    // This can never be an in-place update
+    RETURN_IF_NOT_OK(
+        initializeWorkerRoutingForUdpListener(*new_listener, /*in_place_update=*/false));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
