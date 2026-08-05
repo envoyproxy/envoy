@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/init/manager.h"
 #include "envoy/rds/route_config_update_receiver.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -35,13 +36,16 @@ public:
    * @param added_vhosts supplies VirtualHosts that have been added.
    * @param added_resource_ids set of resources IDs (names + aliases) added.
    * @param removed_resources supplies names of VirtualHosts that have been removed.
+   * @param init_manager supplies the init manager that is used to warm up the resources of the
+   * new RouteConfiguration. Every update has its own independent init manager and the caller is
+   * responsible for keeping it alive until the new RouteConfiguration is warmed up and published.
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether RouteConfiguration has been updated.
    */
   virtual bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
                             std::set<std::string>&& added_resource_ids,
                             const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                            const std::string& version_info) PURE;
+                            Init::Manager& init_manager, const std::string& version_info) PURE;
 
   /**
    * @return bool return whether VHDS configuration has been changed in the last RDS update.

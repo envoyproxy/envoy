@@ -12,6 +12,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/init/manager_impl.h"
 #include "source/common/rds/common/route_config_provider_manager_impl.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/common/rds/rds_route_config_subscription.h"
@@ -48,6 +49,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  Init::ManagerImpl init_manager_{"test route config"};
 };
 
 class TestConfig : public Config {
@@ -106,13 +108,13 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   SystemTime time1(std::chrono::milliseconds(1234567891234));
   timeSystem().setSystemTime(time1);
 
-  EXPECT_TRUE(config_update_->onRdsUpdate(response1, "1"));
+  EXPECT_TRUE(config_update_->onRdsUpdate(response1, init_manager_, "1"));
   EXPECT_EQ(nullptr, route("foo"));
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
   EXPECT_EQ(time1, config_update_->lastUpdated());
 
-  EXPECT_FALSE(config_update_->onRdsUpdate(response1, "2"));
+  EXPECT_FALSE(config_update_->onRdsUpdate(response1, init_manager_, "2"));
   EXPECT_EQ(nullptr, route("foo"));
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
 
@@ -139,7 +141,7 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   SystemTime time2(std::chrono::milliseconds(1234567891235));
   timeSystem().setSystemTime(time2);
 
-  EXPECT_TRUE(config_update_->onRdsUpdate(response2, "2"));
+  EXPECT_TRUE(config_update_->onRdsUpdate(response2, init_manager_, "2"));
   EXPECT_EQ("foo", *route("foo"));
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("2", config_update_->configInfo().value().version_);
@@ -167,7 +169,8 @@ name: foo
 virtual_hosts: null
 )EOF",
                               route_config);
-    return manager_.createStaticRouteConfigProvider(route_config, server_factory_context_);
+    return manager_.createStaticRouteConfigProvider(route_config, server_factory_context_,
+                                                    init_manager_);
   }
 
   template <class RouteConfiguration = envoy::config::route::v3::RouteConfiguration>

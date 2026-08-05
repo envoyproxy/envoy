@@ -25,6 +25,7 @@ public:
   Rds::ConfigConstSharedPtr createNullConfig() const override;
   Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
                                          Server::Configuration::ServerFactoryContext& context,
+                                         Init::Manager&,
                                          bool validate_clusters_default) const override;
 
 private:
@@ -45,11 +46,12 @@ public:
   bool updateVhosts(VirtualHostMap& vhosts, const VirtualHostRefVector& added_vhosts);
 
   // Router::RouteConfigUpdateReceiver
-  bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
+  bool onRdsUpdate(const Protobuf::Message& rc, Init::Manager& init_manager,
+                   const std::string& version_info) override;
   bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
                     std::set<std::string>&& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                    const std::string& version_info) override;
+                    Init::Manager& init_manager, const std::string& version_info) override;
   uint64_t configHash() const override { return base_.configHash(); }
   const std::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();

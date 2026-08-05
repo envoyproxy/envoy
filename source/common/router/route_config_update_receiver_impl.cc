@@ -39,10 +39,14 @@ Rds::ConfigConstSharedPtr ConfigTraitsImpl::createNullConfig() const {
   return std::make_shared<NullConfigImpl>();
 }
 
+// TODO(wbpcode): the route configuration doesn't own any resource that needs to be warmed up yet,
+// so the init manager is ignored. Once the resources of a route configuration, such as the
+// route-level filter configurations, can be warmed up, the init manager should be passed down to
+// them.
 Rds::ConfigConstSharedPtr
 ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
                                Server::Configuration::ServerFactoryContext& factory_context,
-                               bool validate_clusters_default) const {
+                               Init::Manager&, bool validate_clusters_default) const {
   ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(&rc));
   return THROW_OR_RETURN_VALUE(
       ConfigImpl::create(static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc),
@@ -51,6 +55,7 @@ ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
 }
 
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
+                                                Init::Manager& init_manager,
                                                 const std::string& version_info) {
   uint64_t new_hash = base_.getHash(rc);
   if (!base_.checkHash(new_hash)) {
@@ -76,7 +81,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
       rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhds_virtual_hosts_, *new_route_config);
     }
   }
-  base_.updateConfig(std::move(new_route_config));
+  base_.updateConfig(std::move(new_route_config), init_manager);
   base_.updateHash(new_hash);
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
@@ -87,7 +92,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
 
 bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, Init::Manager& init_manager,
     const std::string& version_info) {
   std::unique_ptr<VirtualHostMap> vhosts_after_this_update;
   if (vhds_virtual_hosts_ != nullptr) {
@@ -101,19 +106,21 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   const bool removed = removeVhosts(*vhosts_after_this_update, removed_resources);
   const bool updated = updateVhosts(*vhosts_after_this_update, added_vhosts);
 
-  auto route_config_after_this_update =
-      std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-  route_config_after_this_update->CheckTypeAndMergeFrom(base_.protobufConfiguration());
-  rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhosts_after_this_update,
-                                 *route_config_after_this_update);
+  const bool vhosts_changed = removed || updated || !added_resource_ids.empty();
+  if (vhosts_changed) {
+    auto route_config_after_this_update =
+        std::make_unique<envoy::config::route::v3::RouteConfiguration>();
+    route_config_after_this_update->CheckTypeAndMergeFrom(base_.protobufConfiguration());
+    rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhosts_after_this_update,
+                                   *route_config_after_this_update);
+    base_.updateConfig(std::move(route_config_after_this_update), init_manager);
+  }
 
-  base_.updateConfig(std::move(route_config_after_this_update));
-  // No exception, route_config_after_this_update is valid, can update the state.
+  // The new route configuration, if any, was built without throwing, so the state can be updated.
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
   resource_ids_in_last_update_ = std::move(added_resource_ids);
   base_.onUpdateCommon(version_info);
-
-  return removed || updated || !resource_ids_in_last_update_.empty();
+  return vhosts_changed;
 }
 
 bool RouteConfigUpdateReceiverImpl::removeVhosts(

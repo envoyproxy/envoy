@@ -212,6 +212,7 @@ envoy_cc_test(
     srcs = ["static_route_provider_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/init:manager_lib",
         "//source/common/router:route_provider_manager_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/http:http_mocks",
@@ -280,6 +281,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/config:utility_lib",
+        "//source/common/init:manager_lib",
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
         "//source/common/router:vhds_lib",

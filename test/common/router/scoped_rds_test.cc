@@ -402,7 +402,8 @@ scope_key_builder:
     provider_ = config_provider_manager_->createXdsConfigProvider(
         scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
         ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
-                                                scoped_routes_config.rds_config_source()));
+                                                scoped_routes_config.rds_config_source(),
+                                                context_init_manager_));
     srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -2047,7 +2048,8 @@ scope_key_builder:
   provider_ = config_provider_manager_->createXdsConfigProvider(
       scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
       ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
-                                              scoped_routes_config.rds_config_source()));
+                                              scoped_routes_config.rds_config_source(),
+                                              context_init_manager_));
   srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
 
   const std::string config_yaml = R"EOF(

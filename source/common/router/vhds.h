@@ -20,7 +20,9 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/resource_type_helper.h"
+#include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/init/watcher_impl.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
@@ -75,11 +77,37 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
+  // Takes ownership of the init manager that is dedicated to the route configuration of the VHDS
+  // update that is being applied and starts warming it up. If a previous update is still warming up
+  // it is abandoned, as this update supersedes it. Only called once the update is known to be
+  // applied, so that an update that turns out to be a no-op leaves a warming up update alone.
+  void commitUpdateInitManager(std::unique_ptr<Init::ManagerImpl> update_init_manager,
+                               absl::string_view version_info);
+  // Drops the per-update init manager. Called once the route configuration of the update has been
+  // warmed up and published, so that there is no init manager in between updates.
+  void resetUpdateInitManager();
+  // Called when everything that registered to the per-update init manager is warmed up. Publishes
+  // the new route configuration and signals that this subscription is ready.
+  void onUpdateInitManagerReady();
+
   RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopeSharedPtr scope_;
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
+  // Init manager that is used to warm up the resources that are owned by the route configuration
+  // built by the VHDS update that is currently being processed. Every update gets its own
+  // independent init manager, and it is reset once the new route configuration is warmed up and
+  // published, so it's null in between updates.
+  std::unique_ptr<Init::ManagerImpl> update_init_manager_;
+  // Watcher that update_init_manager_ notifies once everything it warms up is ready.
+  std::unique_ptr<Init::WatcherImpl> update_init_watcher_;
+  // Result of the last publishing attempt. Publishing is deferred until the route configuration is
+  // warmed up, so a failure is only reported back to the xDS layer in the common case where there
+  // is nothing to warm up and the publishing therefore happens synchronously. It also gates
+  // whether this subscription signals readiness, so that nothing is told a route configuration is
+  // ready when publishing it failed.
+  absl::Status publish_status_;
   const Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::VirtualHost>
       resource_type_helper_;
 

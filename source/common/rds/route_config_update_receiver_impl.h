@@ -17,11 +17,13 @@ public:
   uint64_t getHash(const Protobuf::Message& rc) const { return MessageUtil::hash(rc); }
   bool checkHash(uint64_t new_hash) const { return (new_hash != last_config_hash_); }
   void updateHash(uint64_t hash) { last_config_hash_ = hash; }
-  void updateConfig(std::unique_ptr<Protobuf::Message>&& route_config_proto);
+  void updateConfig(std::unique_ptr<Protobuf::Message>&& route_config_proto,
+                    Init::Manager& init_manager);
   void onUpdateCommon(const std::string& version_info);
 
   // RouteConfigUpdateReceiver
-  bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
+  bool onRdsUpdate(const Protobuf::Message& rc, Init::Manager& init_manager,
+                   const std::string& version_info) override;
 
   uint64_t configHash() const override { return last_config_hash_; }
   const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const override;

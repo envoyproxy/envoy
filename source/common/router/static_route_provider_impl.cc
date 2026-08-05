@@ -10,13 +10,13 @@ namespace Router {
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::config::route::v3::RouteConfiguration& config, Rds::ConfigTraits& config_traits,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     Rds::RouteConfigProviderManager& route_config_provider_manager)
-    : base_(config, config_traits, factory_context, route_config_provider_manager),
+    : base_(config, config_traits, factory_context, init_manager, route_config_provider_manager),
       route_config_provider_manager_(route_config_provider_manager),
       vhds_context_(config.has_vhds()
-                        ? std::make_unique<VhdsContext>(config, factory_context, *this,
-                                                        route_config_provider_manager)
+                        ? std::make_unique<VhdsContext>(config, factory_context, init_manager,
+                                                        *this, route_config_provider_manager)
                         : nullptr) {}
 
 StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
@@ -74,7 +74,7 @@ void StaticRouteConfigProviderImpl::requestVirtualHostsUpdate(
 
 StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
     const envoy::config::route::v3::RouteConfiguration& config,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     StaticRouteConfigProviderImpl& parent,
     Rds::RouteConfigProviderManager& route_config_provider_manager)
     : config_update_info_mutable_(std::make_unique<RouteConfigUpdateReceiverImpl>(
@@ -82,7 +82,9 @@ StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
       config_update_info_(config_update_info_mutable_.get()), factory_context_(factory_context),
       tls_(factory_context.threadLocal()) {
   // Emulate a config-update information gathering using a dynamic RouteConfigurationReceiver.
-  config_update_info_mutable_->onRdsUpdate(config, "");
+  // This route configuration is provided inline, so it inherits the init manager of its owner
+  // rather than getting a per-update one like the following VHDS updates do.
+  config_update_info_mutable_->onRdsUpdate(config, init_manager, "");
   // TODO(adisuissa): Convert the THROW_OR_RETURN_VALUE to return an
   // absl::StatusOr<> and propagate the result through a StaticRouteConfigProviderImpl
   // create function.

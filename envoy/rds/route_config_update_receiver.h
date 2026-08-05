@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/init/manager.h"
 #include "envoy/rds/route_config_provider.h"
 
 namespace Envoy {
@@ -20,12 +21,16 @@ public:
   /**
    * Called on updates via RDS.
    * @param rc supplies the RouteConfiguration.
+   * @param init_manager supplies the init manager that is used to warm up the resources of the
+   * new RouteConfiguration. Every update has its own independent init manager and the caller is
+   * responsible for keeping it alive until the new RouteConfiguration is warmed up and published.
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether the hash of the new config has been different than
    * the hash of the current one and RouteConfiguration has been updated.
    * @throw EnvoyException if the new config is invalid and can't be applied.
    */
-  virtual bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) PURE;
+  virtual bool onRdsUpdate(const Protobuf::Message& rc, Init::Manager& init_manager,
+                           const std::string& version_info) PURE;
 
   /**
    * @return uint64_t the hash value of RouteConfiguration.

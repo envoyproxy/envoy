@@ -14,8 +14,8 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
       config_(config_traits_.createNullConfig()) {}
 
 void RouteConfigUpdateReceiverImpl::updateConfig(
-    std::unique_ptr<Protobuf::Message>&& route_config_proto) {
-  config_ = config_traits_.createConfig(*route_config_proto, factory_context_,
+    std::unique_ptr<Protobuf::Message>&& route_config_proto, Init::Manager& init_manager) {
+  config_ = config_traits_.createConfig(*route_config_proto, factory_context_, init_manager,
                                         false /* not validate unknown cluster */);
   // If the above create config doesn't raise exception, update the
   // other cached config entries.
@@ -29,12 +29,13 @@ void RouteConfigUpdateReceiverImpl::onUpdateCommon(const std::string& version_in
 
 // Rds::RouteConfigUpdateReceiver
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
+                                                Init::Manager& init_manager,
                                                 const std::string& version_info) {
   uint64_t new_hash = getHash(rc);
   if (!checkHash(new_hash)) {
     return false;
   }
-  updateConfig(cloneProto(proto_traits_, rc));
+  updateConfig(cloneProto(proto_traits_, rc), init_manager);
   updateHash(new_hash);
   onUpdateCommon(version_info);
   return true;

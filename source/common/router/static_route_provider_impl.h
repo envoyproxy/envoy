@@ -38,6 +38,7 @@ public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                 Rds::ConfigTraits& config_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context,
+                                Init::Manager& init_manager,
                                 Rds::RouteConfigProviderManager& route_config_provider_manager);
   ~StaticRouteConfigProviderImpl() override;
 
@@ -60,7 +61,7 @@ private:
   struct VhdsContext {
     VhdsContext(const envoy::config::route::v3::RouteConfiguration& config,
                 Server::Configuration::ServerFactoryContext& factory_context,
-                StaticRouteConfigProviderImpl& parent,
+                Init::Manager& init_manager, StaticRouteConfigProviderImpl& parent,
                 Rds::RouteConfigProviderManager& route_config_provider_manager);
 
     absl::Status onConfigUpdate();

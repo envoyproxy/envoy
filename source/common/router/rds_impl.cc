@@ -54,6 +54,26 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() { config_update_info_.release(); }
 
+// TODO(wbpcode): most of this can go away now that every RDS update gets its own init manager.
+// maybeCreateInitManager() and the noop init manager plus Cleanup only exist to work around
+// local_init_manager_ possibly being Initialized, which makes Init::Manager::add() illegal. A
+// per-update init manager is always freshly created and Uninitialized, so registering the VHDS
+// init target with it is always legal and the initial VHDS fetch warms up together with the rest
+// of the route configuration.
+//
+// This hook can't use update_init_manager_ directly though, it runs after that manager has been
+// initialized and add() would assert. The VHDS subscription has to be created in the build step
+// instead, i.e. in onRdsUpdate(), which already receives the per-update init manager. Better yet,
+// move the VhdsSubscription into Router::RouteConfigUpdateReceiverImpl and manage its whole
+// lifecycle there: that also folds in the duplicate creation site in
+// StaticRouteConfigProviderImpl::VhdsContext, and it fixes vhds_configuration_changed_ being
+// latched in onRdsUpdate() but consumed here, which loses the VHDS subscription entirely if the
+// update that set it is superseded while still warming up.
+//
+// To sort out first: the receiver needs a late-bound Rds::RouteConfigProvider* (same pattern as
+// Rds::RdsRouteConfigSubscription::routeConfigProvider()), onRdsUpdate() needs a StatusOr return
+// to propagate createVhdsSubscription() failures, and vhds_lib's unused dependency on
+// route_config_update_impl_lib has to be dropped to avoid a build cycle.
 absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
     std::unique_ptr<Init::ManagerImpl>& noop_init_manager, std::unique_ptr<Cleanup>& resume_rds) {
   if (config_update_info_->protobufConfigurationCast().has_vhds() &&

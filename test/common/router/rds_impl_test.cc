@@ -104,8 +104,10 @@ public:
     switch (config.route_specifier_case()) {
     case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         RouteSpecifierCase::kRouteConfig:
+      // The inline route configuration inherits the init manager of its owner, i.e. of the HTTP
+      // connection manager.
       return route_config_provider_manager.createStaticRouteConfigProvider(
-          config.route_config(), factory_context, validator);
+          config.route_config(), factory_context, init_manager, validator);
     case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         RouteSpecifierCase::kRds:
       return route_config_provider_manager.createRdsRouteConfigProvider(
@@ -806,7 +808,7 @@ virtual_hosts:
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV3Yaml(config_yaml), server_factory_context_,
-          validation_visitor_);
+          outer_init_manager_, validation_visitor_);
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
       universal_name_matcher);
   const auto& route_config_dump2 =

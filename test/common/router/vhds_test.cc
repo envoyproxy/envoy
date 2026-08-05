@@ -8,6 +8,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/init/manager_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
@@ -83,12 +84,13 @@ vhds:
   makeRouteConfigUpdate(const envoy::config::route::v3::RouteConfiguration& rc) {
     RouteConfigUpdatePtr config_update_info =
         std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits_, factory_context_);
-    config_update_info->onRdsUpdate(rc, "1");
+    config_update_info->onRdsUpdate(rc, init_manager_, "1");
     return config_update_info;
   }
 
   ProtoTraitsImpl proto_traits_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  Init::ManagerImpl init_manager_{"test route config"};
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   const std::string context_ = "vhds_test";
@@ -300,7 +302,7 @@ vhds:
       decoded_resources.refvec_, removed_resources, "1"));
   EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
 
-  config_update_info->onRdsUpdate(updated_route_config, "2");
+  config_update_info->onRdsUpdate(updated_route_config, init_manager_, "2");
 
   EXPECT_EQ(3UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
   auto actual_vhost_0 = config_update_info->protobufConfigurationCast().virtual_hosts(0);
