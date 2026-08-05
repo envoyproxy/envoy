@@ -28,6 +28,22 @@ enum class HealthTransition {
 };
 
 /**
+ * Callbacks for reading/writing health flags on a host. By default, operations go directly to the
+ * host. The multi health checker provides overrides so that sub-checkers operate on local per-host
+ * state instead of real host flags.
+ */
+struct HealthFlagCallbacks {
+  std::function<bool(const Host&, Host::HealthFlag)> get =
+      [](const Host& host, Host::HealthFlag flag) { return host.healthFlagGet(flag); };
+  std::function<void(Host&, Host::HealthFlag)> set = [](Host& host, Host::HealthFlag flag) {
+    host.healthFlagSet(flag);
+  };
+  std::function<void(Host&, Host::HealthFlag)> clear = [](Host& host, Host::HealthFlag flag) {
+    host.healthFlagClear(flag);
+  };
+};
+
+/**
  * Wraps active health checking of an upstream cluster.
  */
 class HealthChecker {

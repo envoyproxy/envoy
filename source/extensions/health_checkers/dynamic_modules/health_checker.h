@@ -79,7 +79,9 @@ public:
                              DynamicModuleHealthCheckerConfigSharedPtr module_config,
                              Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                              Random::RandomGenerator& random,
-                             Upstream::HealthCheckEventLoggerPtr&& event_logger);
+                             Upstream::HealthCheckEventLoggerPtr&& event_logger,
+                             Stats::Scope& stats_scope,
+                             Upstream::HealthFlagCallbacks health_flag_callbacks = {});
 
   // Accessor used by the scheduler, after locking the checker, to reach the main thread dispatcher.
   Event::Dispatcher& dispatcher() { return dispatcher_; }

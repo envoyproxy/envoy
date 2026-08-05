@@ -53,12 +53,15 @@ struct HealthCheckerEqualTo {
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
 public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster,
-                                  Server::Configuration::ServerFactoryContext& server_context)
+                                  Server::Configuration::ServerFactoryContext& server_context,
+                                  Stats::Scope& stats_scope,
+                                  HealthFlagCallbacks health_flag_callbacks = {})
       : cluster_(cluster), runtime_(server_context.runtime()),
         dispatcher_(server_context.mainThreadDispatcher()),
         validation_visitor_(server_context.messageValidationVisitor()),
         log_manager_(server_context.accessLogManager()), api_(server_context.api()),
-        server_context_(server_context) {}
+        server_context_(server_context), stats_scope_(stats_scope),
+        health_flag_callbacks_(std::move(health_flag_callbacks)) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
@@ -77,6 +80,9 @@ public:
     return server_context_;
   };
 
+  Stats::Scope& statsScope() override { return stats_scope_; }
+  HealthFlagCallbacks healthFlagCallbacks() const override { return health_flag_callbacks_; }
+
 private:
   Upstream::Cluster& cluster_;
   Envoy::Runtime::Loader& runtime_;
@@ -86,6 +92,8 @@ private:
   Api::Api& api_;
   HealthCheckEventLoggerPtr event_logger_;
   Server::Configuration::ServerFactoryContext& server_context_;
+  Stats::Scope& stats_scope_;
+  HealthFlagCallbacks health_flag_callbacks_;
 };
 
 /**
@@ -102,11 +110,15 @@ public:
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param server_context reference to the Server context object
+   * @param stats_scope optional scope override for health check stats.
+   * @param health_flag_callbacks optional overrides for health flag operations.
    * @return a health checker.
    */
   static absl::StatusOr<HealthCheckerSharedPtr>
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
-         Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context);
+         Upstream::Cluster& cluster, Server::Configuration::ServerFactoryContext& server_context,
+         OptRef<Stats::Scope> stats_scope = std::nullopt,
+         HealthFlagCallbacks health_flag_callbacks = {});
 };
 
 /**

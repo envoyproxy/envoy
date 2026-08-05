@@ -23,9 +23,10 @@ ThriftHealthChecker::ThriftHealthChecker(
     const envoy::extensions::health_checkers::thrift::v3::Thrift& thrift_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
-    ClientFactory& client_factory)
+    ClientFactory& client_factory, Stats::Scope& stats_scope,
+    Upstream::HealthFlagCallbacks health_flag_callbacks)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
-                            std::move(event_logger)),
+                            std::move(event_logger), stats_scope, std::move(health_flag_callbacks)),
       method_name_(thrift_config.method_name()),
       transport_(ProtoUtils::getTransportType(thrift_config.transport())),
       protocol_(ProtoUtils::getProtocolType(thrift_config.protocol())),

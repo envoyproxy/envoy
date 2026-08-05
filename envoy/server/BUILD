@@ -99,6 +99,7 @@ envoy_cc_library(
         ":factory_context_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/config:typed_config_interface",
+        "//envoy/stats:scope_interface",
         "//envoy/upstream:health_checker_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

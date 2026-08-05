@@ -48,7 +48,8 @@ class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   TcpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                       Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                       Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
+                       Stats::Scope& stats_scope, HealthFlagCallbacks health_flag_callbacks = {});
 
 private:
   struct TcpActiveHealthCheckSession;
