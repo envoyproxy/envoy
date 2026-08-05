@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "source/extensions/filters/http/ext_proc/config.h"
 
 #include "test/mocks/server/factory_context.h"
