@@ -122,7 +122,12 @@ NetworkExtProcFilter::NetworkExtProcFilter(ConfigConstSharedPtr config,
     : config_(config), stats_(config->stats()), client_(std::move(client)),
       config_with_hash_key_(config_->grpcService()), downstream_callbacks_(*this) {}
 
-NetworkExtProcFilter::~NetworkExtProcFilter() { closeStream(); }
+NetworkExtProcFilter::~NetworkExtProcFilter() {
+  if (read_callbacks_ != nullptr) {
+    read_callbacks_->connection().removeConnectionCallbacks(downstream_callbacks_);
+  }
+  closeStream();
+}
 
 void NetworkExtProcFilter::initializeLoggingInfo() {
   if (read_callbacks_ == nullptr) {
@@ -167,7 +172,7 @@ Network::FilterStatus NetworkExtProcFilter::onNewConnection() {
   ENVOY_CONN_LOG(debug, "ext_proc: new connection", read_callbacks_->connection());
 
   if (config_->processingMode().process_new_connection() ==
-      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::NONE) {
     return Network::FilterStatus::Continue;
   }
 

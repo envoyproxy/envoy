@@ -1063,10 +1063,12 @@ TEST_F(NetworkExtProcFilterTest, WriteTimerStopsOnWriteResponse) {
 
   auto* read_timer = new NiceMock<Event::MockTimer>();
   auto* write_timer = new NiceMock<Event::MockTimer>();
+  auto* connection_timer = new NiceMock<Event::MockTimer>();
 
   EXPECT_CALL(connection_.dispatcher_, createTimer_(_))
       .WillOnce(Return(read_timer))
-      .WillOnce(Return(write_timer));
+      .WillOnce(Return(write_timer))
+      .WillOnce(Return(connection_timer));
 
   filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
   filter_->initializeReadFilterCallbacks(read_callbacks_);
@@ -1660,9 +1662,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionSkipByDefault) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionSendMode) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(false);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(false);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 
@@ -1676,14 +1676,12 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionSendMode) {
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
   auto* stream_ptr = stream.get();
 
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678");
-  Network::Address::InstanceConstSharedPtr local_address =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:80");
+  auto remote_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 5678);
+  auto local_address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 80);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(remote_address);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(local_address);
-  connection_.requested_server_name_ = "example.com";
-  connection_.next_protocol_ = "h2";
+  ON_CALL(connection_, requestedServerName()).WillByDefault(Return("example.com"));
+  ON_CALL(connection_, nextProtocol()).WillByDefault(Return("h2"));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
       .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
@@ -1730,9 +1728,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionSendMode) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionReceiveDynamicMetadata) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(false);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(false);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
   config.mutable_metadata_options()->mutable_receiving_namespaces()->add_untyped("custom-ns");
@@ -1767,9 +1763,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionReceiveDynamicMetadata) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionCloseConnection) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(false);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(false);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 
@@ -1804,9 +1798,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionCloseConnection) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionCloseStreamToExtProc) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(false);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(false);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 
@@ -1844,9 +1836,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionCloseStreamToExtProc) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionTimeoutFailClose) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(false);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(false);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 
@@ -1877,9 +1867,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionTimeoutFailClose) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionTimeoutFailOpen) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(true);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(true);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 
@@ -1910,9 +1898,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionTimeoutFailOpen) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionGrpcErrorFailClose) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(false);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(false);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 
@@ -1942,9 +1928,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionGrpcErrorFailClose) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionGrpcErrorFailOpen) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(true);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(true);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 
@@ -1975,9 +1959,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionGrpcErrorFailOpen) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionStreamOpenFailureFailClose) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(false);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(false);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 
@@ -1997,9 +1979,7 @@ TEST_F(NetworkExtProcFilterTest, OnNewConnectionStreamOpenFailureFailClose) {
 }
 
 TEST_F(NetworkExtProcFilterTest, OnNewConnectionStreamOpenFailureFailOpen) {
-  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-  config.set_failure_mode_allow(true);
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  auto config = createConfig(true);
   config.mutable_processing_mode()->set_process_new_connection(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
 

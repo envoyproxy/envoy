@@ -144,7 +144,7 @@ TEST(NetworkExtProcConfigFactoryTest, AllModesSkipped) {
   processing_mode->set_process_write(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
   processing_mode->set_process_new_connection(
-      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::NONE);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   NetworkExtProcConfigFactory factory;

@@ -28,7 +28,7 @@ absl::Status verifyFilterConfig(
       config.processing_mode().process_write() ==
           envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP &&
       config.processing_mode().process_new_connection() ==
-          envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
+          envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::NONE) {
     return absl::InvalidArgumentError(
         "read, write and new_connection paths are all skipped, at least one must be enabled.");
   }

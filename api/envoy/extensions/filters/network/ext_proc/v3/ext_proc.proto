@@ -80,8 +80,8 @@ message ProcessingMode {
 
   // Control how new connection events are handled.
   enum ConnectionSendMode {
-    // Skip sending the new connection event to the external processor.
-    SKIP = 0;
+    // Skip sending the new connection event to the external processor. This is the default.
+    NONE = 0;
 
     // Send the new connection event to the external processor.
     SEND = 1;
@@ -96,7 +96,7 @@ message ProcessingMode {
   DataSendMode process_write = 2;
 
   // Controls whether new connection events are sent to the external processor.
-  // Default: SKIP
+  // Default: NONE
   ConnectionSendMode process_new_connection = 3;
 }
 
