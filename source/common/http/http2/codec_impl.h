@@ -299,6 +299,8 @@ protected:
       Headers, // Signifies additional headers after the initial request/response set.
     };
 
+    friend class Http2CodecImplTestFixture;
+
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
 
     // Http::MultiplexedStreamImplBase
