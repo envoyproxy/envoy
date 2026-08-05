@@ -110,6 +110,8 @@ public:
   const std::string SetMetadata = "envoy.filters.http.set_metadata";
   // Body Size Limit filter
   const std::string BodySizeLimit = "envoy.filters.http.body_size_limit";
+  // MCP JSON REST bridge filter
+  const std::string McpJsonRestBridge = "envoy.filters.http.mcp_json_rest_bridge";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

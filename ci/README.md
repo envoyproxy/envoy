@@ -38,9 +38,9 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 13 and Clang 18 compiler.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 13 and Clang 22 compiler.
 
-The source for theis images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
 
 The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests. This is configured with `--config=clang`. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.

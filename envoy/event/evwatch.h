@@ -32,29 +32,13 @@ public:
    * @param check_time monotonic time at check.
    */
   virtual void onCheck(MonotonicTime check_time) = 0;
-};
-
-using ObserverPtr = std::unique_ptr<Observer>;
-using ObserverWeakPtr = std::weak_ptr<Observer>;
-
-/**
- * Handle returned when registering an Evwatch::Observer with a Dispatcher.
- * When this handle is destructed (on any thread), the associated observer is automatically
- * unregistered and lazily pruned from the dispatcher's event loop.
- */
-class ObserverHandle {
-public:
-  virtual ~ObserverHandle() = default;
 
   /**
-   * Returns a weak reference to the underlying observer. This allows ad-hoc tracking lists
-   * (such as periodic metric readers) to safely reference the observer without interfering
-   * with RAII handle ownership and lifecycle unregistration.
+   * Called on the dispatcher thread when the observer is unregistered from the dispatcher
+   * or when the dispatcher loop is shutting down.
    */
-  virtual ObserverWeakPtr observer() const = 0;
+  virtual void onClose() {}
 };
-
-using ObserverHandlePtr = std::unique_ptr<ObserverHandle>;
 
 } // namespace Evwatch
 } // namespace Event

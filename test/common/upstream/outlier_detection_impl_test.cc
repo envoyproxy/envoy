@@ -24,13 +24,16 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -217,10 +220,10 @@ max_ejection_time: 3s
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
   // Detector should reject the config.
-  ASSERT_FALSE(DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_,
-                                    time_system_, event_logger_, random_)
-                   .status()
-                   .ok());
+  ASSERT_THAT(DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                                   event_logger_, random_)
+                  .status(),
+              Not(IsOk()));
 }
 
 // Test verifies that legacy config without max_ejection_time value

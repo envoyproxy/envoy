@@ -59,7 +59,8 @@ public:
   const std::string& name() override { return name_; }
   void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                         std::chrono::milliseconds min_touch_interval) override;
-  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer) override;
+  void registerEvwatchObserver(Evwatch::Observer& observer) override;
+  void unregisterEvwatchObserver(Evwatch::Observer& observer) override;
   TimeSource& timeSource() override { return time_source_; }
   void initializeStats(Stats::Scope& scope, const std::optional<std::string>& prefix) override;
   void clearDeferredDeleteList() override;

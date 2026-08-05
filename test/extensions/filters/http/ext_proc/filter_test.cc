@@ -149,6 +149,9 @@ protected:
     EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(this, &HttpFilterTest::doSetDynamicMetadata));
+    EXPECT_CALL(stream_info_, setDynamicTypedMetadata(_, _))
+        .Times(AnyNumber())
+        .WillRepeatedly(Invoke(this, &HttpFilterTest::doSetDynamicTypedMetadata));
 
     EXPECT_CALL(decoder_callbacks_, connection())
         .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
@@ -225,6 +228,21 @@ protected:
   )EOF");
   }
 
+  void initializeTestGoogleGrpc() {
+    initialize(R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: "ext_proc_server_uri"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  )EOF");
+  }
+
   void TearDown() override {
     // This will fail if, at the end of the test, we left any timers enabled.
     // (This particular test suite does not actually let timers expire,
@@ -276,6 +294,10 @@ protected:
 
   void doSetDynamicMetadata(const std::string& ns, const Protobuf::Struct& val) {
     (*dynamic_metadata_.mutable_filter_metadata())[ns] = val;
+  };
+
+  void doSetDynamicTypedMetadata(const std::string& ns, const Protobuf::Any& val) {
+    (*dynamic_metadata_.mutable_typed_filter_metadata())[ns] = val;
   };
 
   void doSend(ProcessingRequest&& request, Unused) { last_request_ = std::move(request); }
@@ -4368,6 +4390,146 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   filter_->onDestroy();
 }
 
+// Verify that when returning a response with typed_dynamic_metadata field set, the filter emits
+// typed dynamic metadata.
+TEST_F(HttpFilterTest, EmitTypedDynamicMetadata) {
+  // Configure the filter to only pass response headers to ext server.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    receiving_namespaces:
+      typed:
+      - envoy.filters.http.ext_proc
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    Protobuf::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
+    Protobuf::Any typed_val;
+    EXPECT_TRUE(typed_val.PackFrom(foobar));
+    (*resp.mutable_typed_dynamic_metadata())["envoy.filters.http.ext_proc"] = typed_val;
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  const auto& typed_metadata = dynamic_metadata_.typed_filter_metadata();
+  ASSERT_TRUE(typed_metadata.contains("envoy.filters.http.ext_proc"));
+
+  Protobuf::Struct unpacked_val;
+  ASSERT_TRUE(typed_metadata.at("envoy.filters.http.ext_proc").UnpackTo(&unpacked_val));
+  EXPECT_EQ("bar", unpacked_val.fields().at("foo").string_value());
+
+  filter_->onDestroy();
+}
+
+// Verify that when returning a response with typed_dynamic_metadata field set, but the namespace
+// is not allowed, the filter does not emit it.
+TEST_F(HttpFilterTest, EmitTypedDynamicMetadataNotAllowed) {
+  // Configure the filter to only pass response headers to ext server.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    receiving_namespaces:
+      typed:
+      - some.other.namespace
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    Protobuf::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
+    Protobuf::Any typed_val;
+    EXPECT_TRUE(typed_val.PackFrom(foobar));
+    (*resp.mutable_typed_dynamic_metadata())["envoy.filters.http.ext_proc"] = typed_val;
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  const auto& typed_metadata = dynamic_metadata_.typed_filter_metadata();
+  EXPECT_FALSE(typed_metadata.contains("envoy.filters.http.ext_proc"));
+
+  filter_->onDestroy();
+}
+
+// Verify that when returning a response with typed_dynamic_metadata field set, but
+// receiving_namespaces configuration is left as default (empty/unconfigured), the filter does
+// not emit it.
+TEST_F(HttpFilterTest, EmitTypedDynamicMetadataDefaultReceivingNamespaces) {
+  // Configure the filter to only pass response headers to ext server without specifying
+  // receiving_namespaces.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  Buffer::OwnedImpl empty_chunk;
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    Protobuf::Struct foobar;
+    (*foobar.mutable_fields())["foo"].set_string_value("bar");
+    Protobuf::Any typed_val;
+    EXPECT_TRUE(typed_val.PackFrom(foobar));
+    (*resp.mutable_typed_dynamic_metadata())["envoy.filters.http.ext_proc"] = typed_val;
+  });
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  const auto& typed_metadata = dynamic_metadata_.typed_filter_metadata();
+  EXPECT_FALSE(typed_metadata.contains("envoy.filters.http.ext_proc"));
+
+  filter_->onDestroy();
+}
+
 // Verify that when returning an response with dynamic_metadata field set, the filter emits
 // dynamic metadata to namespaces other than its own.
 TEST_F(HttpFilterTest, EmitDynamicMetadataArbitraryNamespace) {
@@ -6304,6 +6466,32 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatencyReturnContinue) {
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 }
 
+TEST_F(HttpFilterTest, ClusterMissingLoggingInfo) {
+  do_start_option_ = OnGrpcError;
+  initializeTestSendAll();
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->logStreamInfo();
+
+  ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server");
+}
+
+TEST_F(HttpFilterTest, GoogleGrpcMissingLoggingInfo) {
+  do_start_option_ = OnGrpcError;
+  initializeTestGoogleGrpc();
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  filter_->logStreamInfo();
+
+  ASSERT_TRUE(stream_info_.filterState()->hasData<ExtProcLoggingInfo>(filter_config_name));
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server_uri");
+}
+
 TEST_F(HttpFilterTest, ResponseCaseToStringCoverage) {
   EXPECT_EQ("request headers",
             responseCaseToString(ProcessingResponse::ResponseCase::kRequestHeaders));
@@ -6399,6 +6587,50 @@ TEST_F(HttpFilterTest, DeferredCloseAlreadyClosed) {
   // Null out the stream
   wrapper.stream_ = nullptr;
   wrapper.closeStreamOnTimer();
+}
+
+// When the ThreadLocalStreamManager is destroyed (e.g. its ThreadLocal slot is torn down by an
+// ext_proc config update) while it still owns open streams, the destructor must close each of them.
+// Otherwise the underlying gRPC streams are left with dangling callbacks references.
+TEST_F(HttpFilterTest, ThreadLocalStreamManagerClosesOpenStreamOnDestruction) {
+  initialize("");
+
+  // Standalone manager so we can control its destruction directly.
+  auto manager = std::make_unique<ThreadLocalStreamManager>();
+  auto stream = std::make_unique<NiceMock<MockStream>>();
+  auto* raw_stream = stream.get();
+  manager->store(std::move(stream), config_->stats(), std::chrono::milliseconds(100));
+
+  // The stream is still open, so the manager destructor must close it.
+  EXPECT_CALL(*raw_stream, close()).WillOnce(Return(true));
+  manager.reset();
+
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// The observability-mode config-update scenario: onDestroy() defers stream closure with a timer,
+// then a config update tears down the ThreadLocalStreamManager before the timer fires. The manager
+// destructor must close the still-open stream instead of dropping it with the underlying gRPC
+// stream's dangling callbacks reference.
+TEST_F(HttpFilterTest, ThreadLocalStreamManagerClosesDeferredStreamOnDestruction) {
+  initialize("");
+
+  auto manager = std::make_unique<ThreadLocalStreamManager>();
+  auto stream = std::make_unique<NiceMock<MockStream>>();
+  auto* raw_stream = stream.get();
+  manager->store(std::move(stream), config_->stats(), std::chrono::milliseconds(100));
+
+  // Arm the deferred-close timer, mirroring observability-mode onDestroy(). Use a dedicated
+  // MockTimer (not tracked in timers_) since it is destroyed with the manager below.
+  auto* deferred_close_timer = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*deferred_close_timer, enableTimer(std::chrono::milliseconds(100), _));
+  manager->deferredErase(raw_stream, dispatcher_);
+
+  // Config update destroys the manager before the timer fires: the stream must still be closed.
+  EXPECT_CALL(*raw_stream, close()).WillOnce(Return(true));
+  manager.reset();
+
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 TEST_F(HttpFilterTest, BufferedPartialBodyMutationAndLeftover) {
@@ -6517,6 +6749,7 @@ TEST_F(HttpFilterTest, LocalResponseStarted) {
 }
 
 } // namespace
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

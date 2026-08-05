@@ -1791,7 +1791,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
-  Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
+  Ssl::ClientContextSharedPtr ssl_context(new NiceMock<Ssl::MockClientContext>());
   EXPECT_CALL(factory_context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =

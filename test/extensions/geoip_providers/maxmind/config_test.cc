@@ -284,7 +284,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
   EXPECT_THAT(driver, AllOf(HasCityDbPath(city_db_path), HasIspDbPath(isp_db_path),
                             HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
                             HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
@@ -305,7 +305,9 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MaxmindProviderFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context), Envoy::EnvoyException,
+      factory.createGeoipProviderDriver(provider_config, "maxmind",
+                                        context.server_factory_context_),
+      Envoy::EnvoyException,
       "At least one geolocation database path needs to be configured: "
       "city_db_path, isp_db_path, asn_db_path, anon_db_path or country_db_path");
 }
@@ -317,9 +319,10 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {
   MaxmindProviderConfig provider_config;
   TestUtility::loadFromYaml(provider_config_yaml, provider_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context.server_factory_context_, messageValidationVisitor());
   MaxmindProviderFactory factory;
-  EXPECT_THROW_WITH_REGEX(factory.createGeoipProviderDriver(provider_config, "maxmind", context),
+  EXPECT_THROW_WITH_REGEX(factory.createGeoipProviderDriver(provider_config, "maxmind",
+                                                            context.server_factory_context_),
                           ProtoValidationException,
                           "Proto constraint validation failed.*value is required.*");
 }
@@ -334,10 +337,11 @@ TEST_F(MaxmindProviderConfigTest, DbPathFormatValidatedWhenNonEmptyValue) {
   MaxmindProviderConfig provider_config;
   TestUtility::loadFromYaml(provider_config_yaml, provider_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context.server_factory_context_, messageValidationVisitor());
   MaxmindProviderFactory factory;
   EXPECT_THROW_WITH_REGEX(
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context),
+      factory.createGeoipProviderDriver(provider_config, "maxmind",
+                                        context.server_factory_context_),
       ProtoValidationException,
       "Proto constraint validation failed.*value does not match regex pattern.*");
 }
@@ -370,9 +374,9 @@ TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver1 =
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
   Geolocation::DriverSharedPtr driver2 =
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
   EXPECT_EQ(driver1.get(), driver2.get());
 }
 
@@ -416,9 +420,9 @@ TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoCon
   TestUtility::loadFromYaml(processed_provider_config_yaml2, provider_config2);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver1 =
-      factory.createGeoipProviderDriver(provider_config1, "maxmind", context_);
+      factory.createGeoipProviderDriver(provider_config1, "maxmind", server_factory_context_);
   Geolocation::DriverSharedPtr driver2 =
-      factory.createGeoipProviderDriver(provider_config2, "maxmind", context_);
+      factory.createGeoipProviderDriver(provider_config2, "maxmind", server_factory_context_);
   EXPECT_NE(driver1.get(), driver2.get());
 }
 
@@ -435,7 +439,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbPath) {
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
   // City DB is not configured, so isCityDbPathSet() should return false.
   EXPECT_THAT(driver, AllOf(HasCountryDbPath(country_db_path), HasCountryHeader("x-geo-country"),
                             IsCityDbPathSet(false)));
@@ -458,7 +462,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbAndCityDbPaths) {
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
   // Both Country DB and City DB are configured.
   EXPECT_THAT(driver, AllOf(HasCountryDbPath(country_db_path), HasCityDbPath(city_db_path),
                             HasCountryHeader("x-geo-country"), HasCityHeader("x-geo-city"),
@@ -497,7 +501,7 @@ TEST_F(MaxmindProviderConfigTest,
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option",
       Geolocation::DriverSharedPtr driver =
-          factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+          factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
       EXPECT_THAT(driver,
                   AllOf(HasCityDbPath(city_db_path), HasIspDbPath(isp_db_path),
                         HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
@@ -523,8 +527,8 @@ TEST_F(MaxmindProviderConfigTest,
   MaxmindProviderFactory factory;
   // Verify that is_anon field is read and used as anon_header_.
   EXPECT_LOG_CONTAINS("warning", "Using deprecated option",
-                      Geolocation::DriverSharedPtr driver =
-                          factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+                      Geolocation::DriverSharedPtr driver = factory.createGeoipProviderDriver(
+                          provider_config, "maxmind", server_factory_context_);
                       auto provider = std::static_pointer_cast<GeoipProvider>(driver);
                       auto anon_header = GeoipProviderPeer::countryHeader(*provider);
                       // The is_anon fallback should populate the anon header.
@@ -547,7 +551,9 @@ TEST_F(MaxmindProviderConfigTest,
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MaxmindProviderFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context), Envoy::EnvoyException,
+      factory.createGeoipProviderDriver(provider_config, "maxmind",
+                                        context.server_factory_context_),
+      Envoy::EnvoyException,
       "At least one geolocation database path needs to be configured: "
       "city_db_path, isp_db_path, asn_db_path, anon_db_path or country_db_path");
 }
@@ -574,7 +580,7 @@ TEST_F(MaxmindProviderConfigTest, DEPRECATED_FEATURE_TEST(GeoFieldKeysTakesPrece
   // geo_field_keys should take precedence, so we should see the "new" values.
   // The deprecated geo_headers_to_add should be ignored.
   Geolocation::DriverSharedPtr driver =
-      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+      factory.createGeoipProviderDriver(provider_config, "maxmind", server_factory_context_);
   EXPECT_THAT(driver,
               AllOf(HasCountryHeader("x-geo-country-new"), HasCityHeader("x-geo-city-new")));
   // Region should NOT be set because geo_field_keys takes precedence and it doesn't have region.

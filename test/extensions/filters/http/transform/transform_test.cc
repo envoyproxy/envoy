@@ -6,6 +6,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -110,14 +111,14 @@ protected:
     absl::Status status;
     config_ = std::make_shared<FilterConfig>(
         config, "test", factory_context_.serverFactoryContext(), factory_context_.scope(), status);
-    ASSERT_TRUE(status.ok()) << "Filter config creation failed: " << status.message();
+    ASSERT_OK(status) << "Filter config creation failed";
 
     if (!route_yaml_config.empty()) {
       envoy::extensions::filters::http::transform::v3::TransformConfig route_config;
       TestUtility::loadFromYaml(route_yaml_config, route_config);
       route_config_ = std::make_shared<TransformConfig>(
           route_config, factory_context_.server_factory_context_, status);
-      ASSERT_TRUE(status.ok()) << "TransformConfig of route creation failed: " << status.message();
+      ASSERT_OK(status) << "TransformConfig of route creation failed";
 
       ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
           .WillByDefault(Return(route_config_.get()));

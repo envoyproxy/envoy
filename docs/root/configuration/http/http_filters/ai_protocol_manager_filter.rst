@@ -25,6 +25,25 @@ the headers before the payload they depend on is available.
   in-memory store. The filter performs a straight offload-then-replay; streaming
   payload parsing and admission control will be layered on top of this plumbing.
 
+The filter is a dual filter: besides the downstream HTTP filter chain shown
+below, it can also be placed in a cluster's upstream HTTP filter chain via
+:ref:`http_filters <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.http_filters>`,
+where the offload/replay round-trip runs after load balancing and host
+selection (and therefore once per retry or hedged attempt).
+
+.. note::
+
+  Two caveats apply to the upstream placement. The filter holds the request
+  headers until the payload has been fully offloaded, and upstream filter
+  chains have no per-upgrade-type chain selection (the
+  :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
+  escape hatch is downstream-only), so the filter must not front upgrade or
+  CONNECT routes, or other requests whose body does not end promptly: such
+  streams would stall until the request times out. Additionally, local replies
+  raised from an upstream filter chain (such as this filter's external-buffer
+  error reply) are delivered directly to the downstream client without
+  consulting the router's retry or hedging logic.
+
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager>`
 
