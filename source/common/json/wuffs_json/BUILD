@@ -37,7 +37,6 @@ envoy_cc_library(
     hdrs = ["wuffs_json_cursor.h"],
     deps = [
         ":wuffs_impl",
-        "//source/common/common:assert_lib",
         "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",

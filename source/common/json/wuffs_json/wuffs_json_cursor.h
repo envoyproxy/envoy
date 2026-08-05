@@ -53,8 +53,8 @@ namespace Wuffs {
 // Container byte ranges: onContainerOpen/onContainerClose deliver token_start/
 // token_end forming a half-open [token_start, token_end) over raw body bytes.
 //
-// Path tracking: with track_paths=true, call matchesPatternPath(segments, depth)
-// from any callback for structural spec matching.
+// Path tracking: call matchesPatternPath(segments, depth) from a callback,
+// passing that callback's depth (container callbacks: depth-1).
 //
 class WuffsJsonCursor {
 public:
@@ -158,18 +158,21 @@ public:
     // Called after depth has been incremented for a { or [ open. `key` is the
     // parent dict key or "" for array/root. token_start is the offset of { or [.
     //
-    // matchesPatternPath note: use depth-1, not depth — key_stack_[depth] is
-    // not yet populated at this point. Match an N-segment container spec with
-    // matchesPatternPath(segments, depth-1) and compare `key`/is_dict yourself.
+    // matchesPatternPath: use depth-1 — `depth` is this container's contents
+    // level, not yet labeled. Compare `key`/is_dict yourself.
     // TODO(tyxia): add matchesContainerPatternPath convenience wrapper.
     virtual void onContainerOpen(absl::string_view key, bool is_dict, int depth,
                                  size_t token_start) = 0;
 
     // Called with the container's depth before decrement and the offset past } or ].
+    //
+    // matchesPatternPath: this container's level is depth-1; matching at
+    // `depth` describes the last item inside it. No `key` here — record the
+    // match in onContainerOpen and consume it.
     virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
-  explicit WuffsJsonCursor(Handler& handler, bool track_paths = false);
+  explicit WuffsJsonCursor(Handler& handler);
 
   WuffsJsonCursor(const WuffsJsonCursor&) = delete;
   WuffsJsonCursor& operator=(const WuffsJsonCursor&) = delete;
@@ -191,8 +194,10 @@ public:
   // Dict labels are compared atomically (no serialization, so a document key
   // containing '.', '[', ']' cannot masquerade as nested structure).
   // Zero allocations; O(depth) string_view compares with early exit.
-  // Requires track_paths=true at construction; misuse is caught by ASSERT in
-  // debug builds. Must be called from within a Handler callback.
+  //
+  // Call from within a Handler callback (the chain is only valid while feed()
+  // is on the stack), passing that callback's `depth` — container callbacks:
+  // depth-1, see their notes. A wrong `depth` returns false silently.
   bool matchesPatternPath(absl::Span<const PatternSegment> segments, int depth) const;
 
   // Monotonically increasing offset of the next source byte to be consumed.
@@ -207,11 +212,6 @@ public:
 
 private:
   Handler& handler_;
-  // When true, push_key_[d] is updated on every container push so that
-  // matchesPatternPath can compare intermediate dict labels. Only needed by
-  // the spec-based extraction mode (extract_fields); capture_all_scalars and
-  // handlers that route by depth+key alone can leave this false.
-  const bool track_paths_;
 
   wuffs_json__decoder::unique_ptr decoder_;
   static constexpr size_t kTokenBufLen = 256;
@@ -234,12 +234,9 @@ private:
   bool is_dict_[kMaxTrackedDepth]{};
   bool expecting_key_[kMaxTrackedDepth]{};
 
-  // key_stack_[d] — current key at depth d; always maintained; forwarded as
-  //                 the `key` argument to callbacks.
-  // push_key_[d]  — key that opened the container at depth d; maintained only
-  //                 when track_paths_=true (used by matchesPatternPath).
+  // key_stack_[d] — key of the item at depth d; forwarded as the `key` argument
+  // to callbacks, and the sole label source for matchesPatternPath.
   std::string key_stack_[kMaxTrackedDepth]{};
-  std::string push_key_[kMaxTrackedDepth + 1]{};
   // duplicate-key detection.
   absl::flat_hash_set<std::string> seen_keys_[kMaxTrackedDepth]{};
 

@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "source/common/common/assert.h"
-
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -58,8 +56,7 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 
 } // namespace
 
-WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths)
-    : handler_(handler), track_paths_(track_paths) {
+WuffsJsonCursor::WuffsJsonCursor(Handler& handler) : handler_(handler) {
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));
@@ -245,9 +242,6 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
       is_dict_[depth_] = to_dict;
       expecting_key_[depth_] = to_dict;
     }
-    if (track_paths_ && depth_ <= kMaxTrackedDepth) {
-      push_key_[depth_] = (depth_ > 1 && is_dict_[depth_ - 1]) ? key_stack_[depth_ - 1] : "";
-    }
     // key for onContainerOpen is the parent dict key that triggered this container.
     // Empty when the parent is an array or at root (depth 1).
     const absl::string_view parent_key = (depth_ > 1 && is_dict_[depth_ - 1])
@@ -396,10 +390,6 @@ absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
 
 bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments,
                                          int depth) const {
-  // Without track_paths, push_key_ is not maintained: intermediate labels
-  // would compare against "" and dict-intermediate specs would silently
-  // never match. Fail loudly in debug builds instead.
-  ASSERT(track_paths_, "matchesPatternPath requires track_paths=true at construction");
   // Compares: segment count must equal depth, and each level must agree
   // in kind (object vs array) and, for objects, in whole-label equality.
   if (depth <= 0 || depth >= kMaxTrackedDepth || static_cast<int>(segments.size()) != depth) {
@@ -411,8 +401,9 @@ bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segmen
       if (seg.is_array_element) {
         return false;
       }
-      const std::string& label = (d == depth) ? key_stack_[d] : push_key_[d + 1];
-      if (label != seg.key) {
+      // is_dict_[d] means key_stack_[d] names the item at depth d: the leaf key
+      // when d == depth, else the key that opened the container at depth d+1.
+      if (key_stack_[d] != seg.key) {
         return false;
       }
     } else if (!seg.is_array_element) {

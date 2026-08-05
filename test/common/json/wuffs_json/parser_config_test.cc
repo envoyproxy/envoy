@@ -35,8 +35,7 @@ public:
 
 // CaptureAllScalarsHandler is the executable template for capture-all mode:
 // every scalar value is recorded keyed by its leaf dict key ("" for array
-// elements) — no PatternSegment conversion, no matchesPatternPath() calls,
-// and no track_paths cursor mode.
+// elements) — no PatternSegment conversion and no matchesPatternPath() calls.
 class CaptureAllScalarsHandler : public MockHandler {
 public:
   explicit CaptureAllScalarsHandler(const ParserConfig& config = {})
@@ -98,7 +97,7 @@ private:
 // order, without any spec machinery or path tracking.
 TEST(CaptureAllScalarsTest, CapturesEveryScalarWithoutPathTracking) {
   CaptureAllScalarsHandler h;
-  WuffsJsonCursor cursor(h); // track_paths not needed in capture-all mode
+  WuffsJsonCursor cursor(h);
   constexpr absl::string_view json = R"({"model":"m","max_tokens":5,"stream":false,)"
                                      R"("id":null,"params":{"name":"n"}})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
@@ -275,8 +274,8 @@ TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
 
 // SpecMatchingHandler is the executable template for the production routing
 // decision: convert spec.segments to PatternSegments once at config time,
-// then ask the cursor for a structural match at each openStringCapture —
-// zero allocations, and collision-free (see the hostile-key test below).
+// then match at each scalar callback with that callback's depth — zero
+// allocations, and collision-free (see the hostile-key test below).
 
 // Captures exactly the scalar values (strings, numbers, booleans, nulls)
 // whose root-to-here chain structurally matches the spec's segments; each
@@ -343,7 +342,7 @@ TEST(StructuralMatchTest, RoutesArrayElementField) {
   auto spec = parseExtractFieldSpec("messages[].role");
   ASSERT_TRUE(spec.ok());
   SpecMatchingHandler h(*spec);
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   constexpr absl::string_view json =
       R"({"model":"m","messages":[{"role":"user","content":"h"},{"role":"tool","content":"x"}]})";
@@ -357,20 +356,21 @@ TEST(StructuralMatchTest, RoutesDepthOneScalar) {
   auto spec = parseExtractFieldSpec("model");
   ASSERT_TRUE(spec.ok());
   SpecMatchingHandler h(*spec);
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   constexpr absl::string_view json = R"({"model":"m","messages":[{"role":"user"}]})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
   EXPECT_EQ(h.captured(), "m;");
 }
 
-// Dict-only chain: every intermediate label comes from the push-key of the
-// child container, not the current key.
+// Dict-only chain: intermediate labels come from key_stack_ at the ancestor
+// depth. "name" precedes "_meta" at depth 2, so this also covers the slot
+// being overwritten by an earlier sibling key before the match runs.
 TEST(StructuralMatchTest, RoutesNestedDicts) {
   auto spec = parseExtractFieldSpec("params._meta.traceparent");
   ASSERT_TRUE(spec.ok());
   SpecMatchingHandler h(*spec);
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   constexpr absl::string_view json =
       R"({"params":{"name":"n","_meta":{"traceparent":"t","other":"o"}}})";
@@ -379,13 +379,43 @@ TEST(StructuralMatchTest, RoutesNestedDicts) {
   EXPECT_EQ(h.captured(), "t;");
 }
 
+// Sibling subtrees with identical inner shape must not cross-match: only the
+// one under the spec's intermediate label is captured. This pins the ancestor
+// half of the match — an intermediate label that went stale when the first
+// subtree closed would capture the decoy too.
+TEST(StructuralMatchTest, RejectsSiblingSubtreeWithSameInnerShape) {
+  auto spec = parseExtractFieldSpec("a.x.v");
+  ASSERT_TRUE(spec.ok());
+  SpecMatchingHandler h(*spec);
+  WuffsJsonCursor cursor(h);
+  h.setCursor(&cursor);
+  // Both subtrees contain x.v at depth 3; only the one under "a" matches.
+  constexpr absl::string_view json = R"({"a":{"x":{"v":"hit"}},"b":{"x":{"v":"decoy"}}})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "hit;");
+}
+
+// The mirror of the above at the deeper intermediate: the spec's second
+// segment must discriminate even when the first one matches both times.
+TEST(StructuralMatchTest, RejectsSiblingSubtreeAtDeeperIntermediate) {
+  auto spec = parseExtractFieldSpec("a.x.v");
+  ASSERT_TRUE(spec.ok());
+  SpecMatchingHandler h(*spec);
+  WuffsJsonCursor cursor(h);
+  h.setCursor(&cursor);
+  // "y" is a sibling of "x" under the matching "a"; its "v" must be skipped.
+  constexpr absl::string_view json = R"({"a":{"y":{"v":"decoy"},"x":{"v":"hit"}}})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_EQ(h.captured(), "hit;");
+}
+
 // Nested arrays: the '[]' wildcard erases indices, so one spec matches the
 // target field in every element of both array levels.
 TEST(StructuralMatchTest, RoutesNestedArrays) {
   auto spec = parseExtractFieldSpec("messages[].content[].text");
   ASSERT_TRUE(spec.ok());
   SpecMatchingHandler h(*spec);
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   constexpr absl::string_view json = R"({"messages":[)"
                                      R"({"content":[{"text":"a"},{"text":"b"}]},)"
@@ -408,7 +438,7 @@ TEST(StructuralMatchTest, RejectsHostileKeyCollision) {
 
   {
     SpecMatchingHandler h(*spec);
-    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    WuffsJsonCursor cursor(h);
     h.setCursor(&cursor);
     // The shape the spec means: dict "a" containing key "b".
     ASSERT_TRUE(cursor.feed(R"({"a":{"b":"legit"}})", /*closed=*/true).ok());
@@ -416,7 +446,7 @@ TEST(StructuralMatchTest, RejectsHostileKeyCollision) {
   }
   {
     SpecMatchingHandler h(*spec);
-    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    WuffsJsonCursor cursor(h);
     h.setCursor(&cursor);
     // Hostile shape that collides under string equality (same serialized
     // string, same depth): structural matching rejects it at level 1.
@@ -433,7 +463,7 @@ TEST(StructuralMatchTest, RoutesNonStringScalars) {
     auto spec = parseExtractFieldSpec("usage.total_tokens");
     ASSERT_TRUE(spec.ok());
     SpecMatchingHandler h(*spec);
-    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    WuffsJsonCursor cursor(h);
     h.setCursor(&cursor);
     constexpr absl::string_view json =
         R"({"usage":{"total_tokens":42,"cached":true},"total_tokens":7})";
@@ -445,7 +475,7 @@ TEST(StructuralMatchTest, RoutesNonStringScalars) {
     auto spec = parseExtractFieldSpec("stream");
     ASSERT_TRUE(spec.ok());
     SpecMatchingHandler h(*spec);
-    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    WuffsJsonCursor cursor(h);
     h.setCursor(&cursor);
     ASSERT_TRUE(cursor.feed(R"({"stream":true,"id":null})", /*closed=*/true).ok());
     EXPECT_EQ(h.captured(), "true;");
@@ -454,7 +484,7 @@ TEST(StructuralMatchTest, RoutesNonStringScalars) {
     auto spec = parseExtractFieldSpec("id");
     ASSERT_TRUE(spec.ok());
     SpecMatchingHandler h(*spec);
-    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    WuffsJsonCursor cursor(h);
     h.setCursor(&cursor);
     ASSERT_TRUE(cursor.feed(R"({"stream":true,"id":null})", /*closed=*/true).ok());
     EXPECT_EQ(h.captured(), "null;");
@@ -470,7 +500,7 @@ TEST(StructuralMatchTest, KindMismatchRejected) {
     auto spec = parseExtractFieldSpec("messages[].role");
     ASSERT_TRUE(spec.ok());
     SpecMatchingHandler h(*spec);
-    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    WuffsJsonCursor cursor(h);
     h.setCursor(&cursor);
     ASSERT_TRUE(cursor.feed(R"({"messages":{"inner":{"role":"x"}}})", /*closed=*/true).ok());
     EXPECT_EQ(h.captured(), "");
@@ -480,7 +510,7 @@ TEST(StructuralMatchTest, KindMismatchRejected) {
     auto spec = parseExtractFieldSpec("params._meta.traceparent");
     ASSERT_TRUE(spec.ok());
     SpecMatchingHandler h(*spec);
-    WuffsJsonCursor cursor(h, /*track_paths=*/true);
+    WuffsJsonCursor cursor(h);
     h.setCursor(&cursor);
     ASSERT_TRUE(cursor.feed(R"({"params":[{"traceparent":"x"}]})", /*closed=*/true).ok());
     EXPECT_EQ(h.captured(), "");
@@ -514,7 +544,7 @@ public:
 
 TEST(StructuralMatchTest, DegenerateDepthArgumentsReturnFalse) {
   MatchProbeHandler h;
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   ASSERT_TRUE(cursor.feed(R"({"a":"x"})", /*closed=*/true).ok());
   EXPECT_TRUE(h.matched_correct_); // sanity: the well-formed call matches
@@ -523,11 +553,12 @@ TEST(StructuralMatchTest, DegenerateDepthArgumentsReturnFalse) {
   EXPECT_FALSE(h.matched_over_bound_);
 }
 
-// Executable form of the onContainerOpen depth-1 recipe documented on the
-// cursor: when a container opens, the chain at `depth` is not yet populated,
-// so a container spec of N segments is matched with the full pattern at
-// depth-1 (== N). Captures each matching container's [token_start, token_end)
-// byte range — the production shape for messages[] element passthrough.
+// Executable form of the container depth-1 recipe documented on the cursor:
+// when a container opens, the chain at `depth` is not yet populated, so a
+// container spec of N segments is matched with the full pattern at depth-1
+// (== N), and the decision is recorded for close to consume. Captures each
+// matching container's [token_start, token_end) byte range — the production
+// shape for messages[] element passthrough.
 class ContainerRangeHandler : public MockHandler {
 public:
   explicit ContainerRangeHandler(const ExtractFieldSpec& spec, const ParserConfig& config = {})
@@ -572,7 +603,7 @@ TEST(StructuralMatchTest, ContainerSpecCapturesElementByteRanges) {
   auto spec = parseExtractFieldSpec("messages[]");
   ASSERT_TRUE(spec.ok());
   ContainerRangeHandler h(*spec);
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   constexpr absl::string_view json =
       R"({"messages":[{"role":"user"},{"role":"tool"}],"tools":[{"x":1}]})";
@@ -597,7 +628,7 @@ TEST(StructuralMatchTest, ElementBudgetRejectsOversizedElements) {
   cfg.max_element_capture_bytes = 9; // {"r":"x"} == 9 bytes; {"r":"toolong"} == 15 bytes
 
   ContainerRangeHandler h(*spec, cfg);
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   // Three elements: fits (9 B), over budget (15 B), fits (9 B).
   constexpr absl::string_view json = R"({"messages":[{"r":"x"},{"r":"toolong"},{"r":"y"}]})";
@@ -620,7 +651,7 @@ TEST(StructuralMatchTest, ElementBudgetExactLimitIsAccepted) {
   cfg.max_element_capture_bytes = 9; // {"r":"x"} == exactly 9 bytes
 
   ContainerRangeHandler h(*spec, cfg);
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   constexpr absl::string_view json = R"({"messages":[{"r":"x"}]})";
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
@@ -650,7 +681,7 @@ TEST(StructuralMatchTest, SpecAtCursorDepthBoundMatchesEndToEnd) {
   EXPECT_FALSE(parseExtractFieldSpec("x." + path, bound).ok());
 
   SpecMatchingHandler h(*spec);
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   std::string json; // {"a":{"a": ... {"k":"v"} ... }} — value at depth == bound
   for (int i = 0; i < bound - 1; ++i) {

@@ -686,7 +686,7 @@ TEST(WuffsJsonCursorTest, BuildIndexedPathNestedMessages) {
 // buildPatternPath must use [] instead of [n] and be identical for each element.
 TEST(WuffsJsonCursorTest, BuildPatternPathNestedMessages) {
   PatternCapturingHandler h;
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.cursor = &cursor;
   EXPECT_OK(cursor.feed(R"({"messages":[{"role":"user"},{"role":"assistant"}]})",
                         /*closed=*/true));

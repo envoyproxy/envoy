@@ -37,12 +37,12 @@ absl::Status validatePathSyntax(absl::string_view path) {
 }
 
 absl::Status appendSegment(std::vector<Segment>& segments, Segment segment, int max_depth) {
-  segments.push_back(std::move(segment));
-  if (max_depth > 0 && segments.size() > static_cast<size_t>(max_depth)) {
+  if (max_depth > 0 && segments.size() >= static_cast<size_t>(max_depth)) {
     return absl::InvalidArgumentError(absl::StrCat("extract_field_spec: path depth ",
-                                                   segments.size(),
+                                                   segments.size() + 1,
                                                    " exceeds maximum supported depth ", max_depth));
   }
+  segments.push_back(std::move(segment));
   return absl::OkStatus();
 }
 
@@ -52,38 +52,39 @@ public:
       : path_(path), max_depth_(max_depth) {}
 
   absl::StatusOr<std::vector<Segment>> parse() {
+    std::vector<Segment> segments;
     for (size_t i = 0; i < path_.size(); ++i) {
-      if (auto status = consume(i); !status.ok()) {
+      if (auto status = consume(i, segments); !status.ok()) {
         return status;
       }
     }
     if (in_array_) {
       return absl::InvalidArgumentError("extract_field_spec: unterminated '[' in path");
     }
-    if (auto status = flushKey(path_.size()); !status.ok()) {
+    if (auto status = flushKey(path_.size(), segments); !status.ok()) {
       return status;
     }
-    if (segments_.empty()) {
+    if (segments.empty()) {
       return absl::InvalidArgumentError("extract_field_spec: path contains no segments");
     }
-    return std::move(segments_);
+    return segments;
   }
 
 private:
-  absl::Status consume(size_t i) {
+  absl::Status consume(size_t i, std::vector<Segment>& segments) {
     switch (path_[i]) {
     case '[':
-      return openArray(i);
+      return openArray(i, segments);
     case ']':
-      return closeArray();
+      return closeArray(segments);
     case '.':
-      return separator(i);
+      return separator(i, segments);
     default:
       return keyCharacter(i);
     }
   }
 
-  absl::Status openArray(size_t i) {
+  absl::Status openArray(size_t i, std::vector<Segment>& segments) {
     if (in_array_) {
       return absl::InvalidArgumentError("extract_field_spec: nested '[' in path");
     }
@@ -93,25 +94,25 @@ private:
       return absl::InvalidArgumentError(
           "extract_field_spec: '.' before '[' is not valid; use 'key[]' not 'key.[]'");
     }
-    if (auto status = flushKey(i); !status.ok()) {
+    if (auto status = flushKey(i, segments); !status.ok()) {
       return status;
     }
     in_array_ = true;
     return absl::OkStatus();
   }
 
-  absl::Status closeArray() {
+  absl::Status closeArray(std::vector<Segment>& segments) {
     if (!in_array_) {
       return absl::InvalidArgumentError("extract_field_spec: unexpected ']' in path");
     }
-    if (auto status = appendSegment(segments_, std::nullopt, max_depth_); !status.ok()) {
+    if (auto status = appendSegment(segments, std::nullopt, max_depth_); !status.ok()) {
       return status;
     }
     in_array_ = false;
     return absl::OkStatus();
   }
 
-  absl::Status separator(size_t i) {
+  absl::Status separator(size_t i, std::vector<Segment>& segments) {
     if (in_array_) {
       return absl::InvalidArgumentError("extract_field_spec: '.' inside '[]' in path");
     }
@@ -119,11 +120,16 @@ private:
       return absl::InvalidArgumentError(
           absl::StrCat("extract_field_spec: consecutive '.' at position ", i, " in path"));
     }
-    return flushKey(i);
+    return flushKey(i, segments);
   }
 
   absl::Status keyCharacter(size_t i) {
     if (in_array_) {
+      // Index-based addressing (e.g. "[42]") is intentionally unsupported.
+      // Path specs are structural patterns: '[]' means "every element" because
+      // LLM/MCP arrays (messages[], choices[], result.content[]) are homogeneous
+      // lists where every element is processed. 
+      // We can implement index-based addressing if needed in the future.
       return absl::InvalidArgumentError(
           "extract_field_spec: only '[]' wildcard is supported, not '[...]'");
     }
@@ -140,18 +146,17 @@ private:
     return absl::OkStatus();
   }
 
-  absl::Status flushKey(size_t end) {
+  absl::Status flushKey(size_t end, std::vector<Segment>& segments) {
     if (!has_key_) {
       return absl::OkStatus();
     }
     has_key_ = false;
-    return appendSegment(segments_, std::string(path_.substr(segment_start_, end - segment_start_)),
+    return appendSegment(segments, std::string(path_.substr(segment_start_, end - segment_start_)),
                          max_depth_);
   }
 
   absl::string_view path_;
   const int max_depth_;
-  std::vector<Segment> segments_;
   bool in_array_{false};
   bool has_key_{false};
   size_t segment_start_{0};
