@@ -36,6 +36,8 @@ public:
   ::Envoy::Http::LocalErrorStatus
   onLocalReply(const ::Envoy::Http::StreamFilterBase::LocalReplyData& data) override {
     on_local_reply_called_ = true;
+    // LocalReplyData::body_ is valid only during this callback, so retain an owned copy for the
+    // local response policy to use later in encodeHeaders().
     local_reply_body_ = std::string(data.body_);
     return ::Envoy::Http::LocalErrorStatus::Continue;
   }
