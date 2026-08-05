@@ -2918,6 +2918,9 @@ TEST_F(ConnectionManagerUtilityTest, UnescapeSlashesAndChromiumNormalization) {
 
 // maybeNormalizePath() rejects request when chromium normalization fails after unescaping slashes.
 TEST_F(ConnectionManagerUtilityTest, UnescapeSlashesRedirectAndChromiumNormalizationFailure) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_percentzerozero_in_url_path", "false"}});
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   ON_CALL(config_, pathWithEscapedSlashesAction())
       .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::

@@ -4,6 +4,7 @@
 
 #include "source/common/http/path_utility.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -40,6 +41,9 @@ TEST_F(PathUtilityTest, AlreadyNormalPaths) {
 
 // Invalid paths are rejected.
 TEST_F(PathUtilityTest, InvalidPaths) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_percentzerozero_in_url_path", "false"}});
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
                                                "/xyz/AAAAA%%0000/abc"};
   for (const auto& path : invalid_paths) {

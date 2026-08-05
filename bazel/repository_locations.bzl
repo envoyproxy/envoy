@@ -559,8 +559,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "quiche-{version}",
     ),
     googleurl = dict(
-        version = "dd4080fec0b443296c0ed0036e1e776df8813aa7",
-        sha256 = "4ffa45a827646692e7b26e2a8c0dcbc1b1763a26def2fbbd82362970962a2fcf",
+        version = "94ff147fe0b96b4cca5d6d316b9af6210c0b8051",
+        sha256 = "d8a701123250e03b3c0865babdfc78540d66374db78f74aafd09bf08545c00bd",
         urls = ["https://github.com/google/gurl/archive/{version}.tar.gz"],
         strip_prefix = "gurl-{version}",
     ),
