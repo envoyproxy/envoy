@@ -979,6 +979,9 @@ public:
     // True if a reset will occur rather than the local reply (some prior filter
     // has returned ContinueAndResetStream)
     bool reset_imminent_;
+    // The body supplied to sendLocalReply(). This view is valid only for the duration of the
+    // onLocalReply() callback.
+    absl::string_view body_;
   };
 
   /**

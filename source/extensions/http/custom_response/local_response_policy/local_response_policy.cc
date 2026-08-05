@@ -70,7 +70,7 @@ Envoy::Http::FilterHeadersStatus LocalResponsePolicy::encodeHeaders(
                 "envoy.filters.http.custom_response") == nullptr,
             "Filter State should not be set when using the LocalResponse policy.");
   // Handle local body
-  std::string body;
+  std::string body(custom_response_filter.localReplyBody());
   Envoy::Http::Code code = getStatusCodeForLocalReply(headers);
   formatBody(encoder_callbacks->streamInfo().getRequestHeaders() == nullptr
                  ? *Envoy::Http::StaticEmptyHeaders::get().request_headers

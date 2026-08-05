@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
 #include "envoy/http/filter.h"
@@ -32,8 +34,9 @@ public:
   }
 
   ::Envoy::Http::LocalErrorStatus
-  onLocalReply(const ::Envoy::Http::StreamFilterBase::LocalReplyData&) override {
+  onLocalReply(const ::Envoy::Http::StreamFilterBase::LocalReplyData& data) override {
     on_local_reply_called_ = true;
+    local_reply_body_ = std::string(data.body_);
     return ::Envoy::Http::LocalErrorStatus::Continue;
   }
 
@@ -41,6 +44,7 @@ public:
   ::Envoy::Http::StreamEncoderFilterCallbacks* encoderCallbacks() { return encoder_callbacks_; }
   ::Envoy::Http::StreamDecoderFilterCallbacks* decoderCallbacks() { return decoder_callbacks_; }
   bool onLocalReplyCalled() const { return on_local_reply_called_; }
+  absl::string_view localReplyBody() const { return local_reply_body_; }
 
   ~CustomResponseFilter() override = default;
 
@@ -49,6 +53,7 @@ public:
 private:
   const std::shared_ptr<const FilterConfig> config_;
   ::Envoy::Http::RequestHeaderMap* downstream_headers_ = nullptr;
+  std::string local_reply_body_;
   bool on_local_reply_called_ = false;
 };
 

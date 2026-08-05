@@ -79,6 +79,64 @@ TEST_F(CustomResponseFilterTest, LocalData) {
             ::Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
+TEST_F(CustomResponseFilterTest, ExistingLocalReplyBodyWithFormatter) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          body_format:
+            text_format_source:
+              inline_string: "%LOCAL_REPLY_BODY%"
+)EOF");
+  setupFilterAndCallback();
+
+  const ::Envoy::Http::StreamFilterBase::LocalReplyData local_reply_data{
+      ::Envoy::Http::Code::Unauthorized, std::nullopt, "details", false, "original body"};
+  EXPECT_EQ(filter_->onLocalReply(local_reply_data), ::Envoy::Http::LocalErrorStatus::Continue);
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::Unauthorized, "original body", _, _, _));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, ConfiguredBodyTakesPrecedenceOverExistingLocalReplyBody) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          body:
+            inline_string: "configured body"
+          body_format:
+            text_format_source:
+              inline_string: "[%LOCAL_REPLY_BODY%]"
+)EOF");
+  setupFilterAndCallback();
+
+  const ::Envoy::Http::StreamFilterBase::LocalReplyData local_reply_data{
+      ::Envoy::Http::Code::Unauthorized, std::nullopt, "details", false, "original body"};
+  EXPECT_EQ(filter_->onLocalReply(local_reply_data), ::Envoy::Http::LocalErrorStatus::Continue);
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::Unauthorized, "[configured body]", _, _, _));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
 TEST_F(CustomResponseFilterTest, RemoteData) {
   createConfig();
   setupFilterAndCallback();
