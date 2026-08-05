@@ -110,9 +110,9 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
         uint64_t rq_issued = 0;
         LoadMetricStats::StatMap aggregated_host_custom_metrics;
 
-        envoy::config::endpoint::v3::UpstreamLocalityStats locality_stats;
-        locality_stats.mutable_locality()->MergeFrom(hosts[0]->locality());
-        locality_stats.set_priority(host_set->priority());
+        auto* locality_stats = cluster_stats->add_upstream_locality_stats();
+        locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
+        locality_stats->set_priority(host_set->priority());
 
         for (const HostSharedPtr& host : hosts) {
           uint64_t host_rq_success = host->stats().rq_success_.latch();
@@ -143,7 +143,7 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
             envoy::config::endpoint::v3::UpstreamEndpointStats* upstream_endpoint_stats = nullptr;
             // Set the upstream endpoint stats if we are reporting endpoint granularity.
             if (message_ && message_->report_endpoint_granularity()) {
-              upstream_endpoint_stats = locality_stats.add_upstream_endpoint_stats();
+              upstream_endpoint_stats = locality_stats->add_upstream_endpoint_stats();
               Network::Utility::addressToProtobufAddress(
                   *host->address(), *upstream_endpoint_stats->mutable_address());
               upstream_endpoint_stats->set_total_successful_requests(host_rq_success);
@@ -206,18 +206,19 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
         }
 
         if (should_send_locality_stats) {
-          locality_stats.set_total_successful_requests(rq_success);
-          locality_stats.set_total_error_requests(rq_error);
-          locality_stats.set_total_requests_in_progress(rq_active);
-          locality_stats.set_total_issued_requests(rq_issued);
+          locality_stats->set_total_successful_requests(rq_success);
+          locality_stats->set_total_error_requests(rq_error);
+          locality_stats->set_total_requests_in_progress(rq_active);
+          locality_stats->set_total_issued_requests(rq_issued);
           for (const auto& metric : aggregated_host_custom_metrics) {
-            auto* load_metric_stats = locality_stats.add_load_metric_stats();
+            auto* load_metric_stats = locality_stats->add_load_metric_stats();
             load_metric_stats->set_metric_name(metric.first);
             load_metric_stats->set_num_requests_finished_with_metric(
                 metric.second.num_requests_with_metric);
             load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
           }
-          cluster_stats->add_upstream_locality_stats()->MergeFrom(locality_stats);
+        } else {
+          cluster_stats->mutable_upstream_locality_stats()->RemoveLast();
         }
       }
     }
