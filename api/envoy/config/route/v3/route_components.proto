@@ -2006,7 +2006,7 @@ message Decorator {
   google.protobuf.BoolValue propagate = 2;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Tracing {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Tracing";
 
@@ -2070,6 +2070,13 @@ message Tracing {
   // * :ref:`HCM tracing upstream operation
   //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.upstream_operation>`
   string upstream_operation = 6;
+
+  // Formatter command parsers used for this route's tracing custom tags and operation names.
+  // HCM tracing formatter configuration is scoped separately. Built-in command parsers such as
+  // ``%CEL%`` are always available; this field is only needed to add extension parsers or to
+  // override a built-in parser's configuration.
+  // [#extension-category: envoy.formatter]
+  repeated core.v3.TypedExtensionConfig formatters = 7;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against

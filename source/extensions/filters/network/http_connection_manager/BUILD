@@ -62,6 +62,7 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/filter:config_discovery_lib",
+        "//source/common/formatter:substitution_format_string_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
         "//source/common/http:filter_chain_helper_lib",

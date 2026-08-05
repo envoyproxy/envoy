@@ -32,6 +32,32 @@ envoy_cc_test(
     deps = [":config_impl_test_lib"],
 )
 
+# TODO: fold these into config_impl_test if/when CEL builds on Windows. They are a separate
+# target only because config_impl_test runs on Windows, where cel:config isn't built. See #28588.
+envoy_cc_test(
+    name = "route_tracing_formatter_test",
+    srcs = ["route_tracing_formatter_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/router:config_lib",
+        "//source/extensions/formatter/cel:config",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test_library(
     name = "config_impl_test_lib",
     srcs = ["config_impl_test.cc"],
