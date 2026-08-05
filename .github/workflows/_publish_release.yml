@@ -8,6 +8,7 @@ on:
     secrets:
       dockerhub-token:
       dockerhub-write-token:
+      ghcr-write-token:
       ENVOY_CI_SYNC_APP_ID:
       ENVOY_CI_SYNC_APP_KEY:
       ENVOY_CI_PUBLISH_APP_ID:
@@ -18,6 +19,9 @@ on:
         required: true
     inputs:
       dockerhub-username:
+        type: string
+        required: true
+      ghcr-username:
         type: string
         required: true
       request:
@@ -80,6 +84,7 @@ jobs:
   container:
     secrets:
       dockerhub-write-token: ${{ secrets.dockerhub-write-token }}
+      ghcr-write-token: ${{ secrets.ghcr-write-token }}
     permissions:
       actions: read
       contents: read
@@ -89,6 +94,8 @@ jobs:
     with:
       dockerhub-repo: ${{ vars.DOCKERHUB_REPO || 'envoy' }}
       dockerhub-username: ${{ inputs.dockerhub-username }}
+      ghcr-repo: ${{ vars.GHCR_REPO || 'envoy' }}
+      ghcr-username: ${{ inputs.ghcr-username }}
       dev: ${{ fromJSON(inputs.request).request.version.dev }}
       sha: ${{ fromJSON(inputs.request).request.sha }}
       target-branch: ${{ fromJSON(inputs.request).request.target-branch }}

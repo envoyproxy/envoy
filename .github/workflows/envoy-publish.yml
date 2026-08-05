@@ -85,6 +85,7 @@ jobs:
     secrets:
       dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
       dockerhub-write-token: ${{ secrets.DOCKERHUB_WRITE_TOKEN }}
+      ghcr-write-token: ${{ secrets.GHCR_WRITE_TOKEN }}
       ENVOY_CI_SYNC_APP_ID: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -127,6 +128,7 @@ jobs:
     name: Release
     with:
       dockerhub-username: ${{ vars.DOCKERHUB_USERNAME }}
+      ghcr-username: ${{ vars.GHCR_USERNAME }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
