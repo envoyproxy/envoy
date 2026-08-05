@@ -151,7 +151,9 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
   // This doesn't work in coverage build because part of the stacktrace will be overwritten by
   // __llvm_coverage_mapping
   // Stack trace under gcc with optimizations on (-c opt) doesn't include the test name
-  // Stack trace on s390x optimized builds do not preserve the test name
+  // On s390x, backtrace_symbols in Clang optimized builds (-c opt, which sets NDEBUG) omits frame
+  // pointers, so QuicStackTrace() cannot resolve the test name. The test still runs in
+  // debug mode on s390x where frame information is preserved.
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 #endif
 }
