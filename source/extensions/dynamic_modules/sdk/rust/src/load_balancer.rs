@@ -1299,7 +1299,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
     let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
     let lb_config = {
       let raw = config_ptr as *const *const dyn LoadBalancerConfig;
-      &**raw
+      // SAFETY: `config_ptr` is the module pointer returned by
+      // `envoy_dynamic_module_on_lb_config_new`. Envoy keeps that config alive for the lifetime
+      // of every load balancer created from it.
+      unsafe { &**raw }
     };
     let lb = lb_config.new_load_balancer(&envoy_lb);
     wrap_into_c_void_ptr!(lb)
@@ -1326,12 +1329,20 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
     let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
     let lb = {
       let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
-      &mut **raw
+      // SAFETY: `lb_module_ptr` is the module pointer returned by
+      // `envoy_dynamic_module_on_lb_new`. Envoy drives a load balancer from a single worker
+      // thread, so this is the only live reference for the duration of the call.
+      unsafe { &mut **raw }
     };
     match lb.choose_host(&envoy_lb) {
       Some(selection) => {
-        *result_priority = selection.priority;
-        *result_index = selection.index;
+        // SAFETY: the ABI contract guarantees `result_priority` and `result_index` point to
+        // writable `u32`s owned by Envoy for the duration of the call. They are only written on
+        // the `true` path, which is the only path where Envoy reads them.
+        unsafe {
+          *result_priority = selection.priority;
+          *result_index = selection.index;
+        }
         true
       },
       None => false,
@@ -1360,7 +1371,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
     let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
     let lb = {
       let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
-      &mut **raw
+      // SAFETY: `lb_module_ptr` is the module pointer returned by
+      // `envoy_dynamic_module_on_lb_new`. Envoy drives a load balancer from a single worker
+      // thread, so this is the only live reference for the duration of the call.
+      unsafe { &mut **raw }
     };
     lb.on_host_membership_update(&envoy_lb, num_hosts_added, num_hosts_removed);
   }))

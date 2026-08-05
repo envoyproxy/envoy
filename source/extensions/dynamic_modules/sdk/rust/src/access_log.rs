@@ -1435,7 +1435,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_destroy(
   config_ptr: *const c_void,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigHandle));
+    // SAFETY: `config_ptr` is the handle leaked by
+    // `envoy_dynamic_module_on_access_logger_config_new`. Envoy calls this destroy hook exactly
+    // once, so reclaiming the box here cannot double-free.
+    drop(unsafe { Box::from_raw(config_ptr as *mut AccessLoggerConfigHandle) });
   }))
   .map_err(|panic| {
     crate::log_ffi_panic(
@@ -1455,7 +1458,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_new(
   logger_envoy_ptr: *mut c_void,
 ) -> *const c_void {
   catch_unwind(AssertUnwindSafe(|| {
-    let handle = &*(config_ptr as *const AccessLoggerConfigHandle);
+    // SAFETY: `config_ptr` is the handle leaked by
+    // `envoy_dynamic_module_on_access_logger_config_new`, which Envoy keeps alive for the
+    // lifetime of every logger created from it.
+    let handle = unsafe { &*(config_ptr as *const AccessLoggerConfigHandle) };
     let metrics = MetricsContext::new(handle.config_envoy_ptr);
     let logger: Box<dyn AccessLogger> = handle.inner.create_logger(metrics, logger_envoy_ptr);
     crate::wrap_into_c_void_ptr!(logger)
@@ -1477,7 +1483,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
   log_type: abi::envoy_dynamic_module_type_access_log_type,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
+    // SAFETY: `logger_ptr` is the boxed logger returned by
+    // `envoy_dynamic_module_on_access_logger_new`. Envoy drives a logger from a single worker
+    // thread, so this is the only live reference for the duration of the call.
+    let logger = unsafe { &mut *(logger_ptr as *mut Box<dyn AccessLogger>) };
     let access_log_type = AccessLogType::from_abi(log_type);
     let ctx = LogContext::new(envoy_ptr, access_log_type);
     logger.log(&ctx);
@@ -1508,7 +1517,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_pt
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_flush(logger_ptr: *mut c_void) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
+    // SAFETY: `logger_ptr` is the boxed logger returned by
+    // `envoy_dynamic_module_on_access_logger_new`. Envoy drives a logger from a single worker
+    // thread, so this is the only live reference for the duration of the call.
+    let logger = unsafe { &mut *(logger_ptr as *mut Box<dyn AccessLogger>) };
     logger.flush();
   }))
   .map_err(|panic| {

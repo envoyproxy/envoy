@@ -304,6 +304,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
   });
 }
 
+// SAFETY invariant shared by the `envoy_dynamic_module_on_cert_validator_*` entry points below:
+// `config_module_ptr` is the module pointer returned by
+// `envoy_dynamic_module_on_cert_validator_config_new`, which Envoy keeps alive until the
+// matching destroy callback.
 /// # Safety
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
@@ -320,7 +324,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_c
   catch_unwind(AssertUnwindSafe(|| {
     let config = {
       let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
-      &**raw
+      // SAFETY: see the shared invariant above.
+      unsafe { &**raw }
     };
 
     let envoy_cert_validator = EnvoyCertValidator::new(config_envoy_ptr);
@@ -328,15 +333,22 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_c
     // `certs` may be null when `certs_count` is 0 (for example, a TLS handshake with no
     // client certificate). `slice_from_raw_or_empty` returns an empty slice for null without
     // dereferencing.
+    // SAFETY: Envoy guarantees `certs` addresses `certs_count` live buffers for the duration of
+    // the call, and each buffer's `(ptr, length)` describes live certificate bytes.
     let cert_buffers: &[crate::abi::envoy_dynamic_module_type_envoy_buffer] =
-      crate::ffi_helpers::slice_from_raw_or_empty(certs, certs_count);
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(certs, certs_count) };
     let cert_slices: Vec<&[u8]> = cert_buffers
       .iter()
-      .map(|buf| crate::ffi_helpers::slice_from_raw_or_empty(buf.ptr as *const u8, buf.length))
+      .map(|buf| unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(buf.ptr as *const u8, buf.length)
+      })
       .collect();
 
-    let host_name_str =
-      crate::ffi_helpers::str_lossy_from_raw(host_name.ptr as *const u8, host_name.length);
+    // SAFETY: `host_name` is an Envoy-owned buffer valid for the duration of the call. The SNI
+    // value is attacker-influenced and not contractually UTF-8, so the lossy helper is used.
+    let host_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(host_name.ptr as *const u8, host_name.length)
+    };
 
     let result = config.do_verify_cert_chain(
       &envoy_cert_validator,
@@ -352,10 +364,15 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_c
         ptr: error.as_ptr() as *const _,
         length: error.len(),
       };
-      abi::envoy_dynamic_module_callback_cert_validator_set_error_details(
-        config_envoy_ptr,
-        error_buf,
-      );
+      // SAFETY: `config_envoy_ptr` is the Envoy-owned validator handle passed to this callback,
+      // and `error_buf` borrows `error`, which outlives the call. Envoy copies the buffer before
+      // returning.
+      unsafe {
+        abi::envoy_dynamic_module_callback_cert_validator_set_error_details(
+          config_envoy_ptr,
+          error_buf,
+        );
+      }
     }
 
     abi::envoy_dynamic_module_type_cert_validator_validation_result::from(&result)
@@ -384,7 +401,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_m
   catch_unwind(AssertUnwindSafe(|| {
     let config = {
       let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
-      &**raw
+      // SAFETY: see the shared invariant above.
+      unsafe { &**raw }
     };
     config.get_ssl_verify_mode(handshaker_provides_certificates)
   }))
@@ -411,11 +429,17 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let config = {
       let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
-      &**raw
+      // SAFETY: see the shared invariant above.
+      unsafe { &**raw }
     };
     let digest = config.update_digest();
-    (*out_data).ptr = digest.as_ptr() as *const _;
-    (*out_data).length = digest.len();
+    // SAFETY: the ABI contract guarantees `out_data` points to a writable buffer struct owned by
+    // Envoy. `update_digest` returns a slice borrowed from the config, which outlives this call,
+    // so the pointer handed to Envoy stays valid.
+    unsafe {
+      (*out_data).ptr = digest.as_ptr() as *const _;
+      (*out_data).length = digest.len();
+    }
   }))
   .map_err(|panic| {
     crate::log_ffi_panic(
@@ -425,8 +449,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
     // On panic, leave `out_data` as an empty buffer so Envoy contributes nothing to the
     // session context hash and avoids reading uninitialized memory.
     if !out_data.is_null() {
-      (*out_data).ptr = std::ptr::null();
-      (*out_data).length = 0;
+      // SAFETY: `out_data` was just checked non-null and, per the ABI contract, points to a
+      // writable buffer struct owned by Envoy.
+      unsafe {
+        (*out_data).ptr = std::ptr::null();
+        (*out_data).length = 0;
+      }
     }
   });
 }

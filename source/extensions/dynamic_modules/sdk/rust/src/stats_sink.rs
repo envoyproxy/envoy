@@ -781,7 +781,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_flush(
   snapshot_envoy_ptr: *mut c_void,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    let sink = &*(config_ptr as *const Box<dyn StatSink>);
+    // SAFETY: `config_ptr` is the boxed sink returned by
+    // `envoy_dynamic_module_on_stat_sink_config_new`, which Envoy keeps alive until the matching
+    // destroy callback.
+    let sink = unsafe { &*(config_ptr as *const Box<dyn StatSink>) };
     let snapshot = MetricSnapshot::new(snapshot_envoy_ptr);
     sink.on_flush(&snapshot);
   }))
@@ -801,7 +804,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_on_histogram_complete
   value: u64,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    let sink = &*(config_ptr as *const Box<dyn StatSink>);
+    // SAFETY: `config_ptr` is the boxed sink returned by
+    // `envoy_dynamic_module_on_stat_sink_config_new`, which Envoy keeps alive until the matching
+    // destroy callback.
+    let sink = unsafe { &*(config_ptr as *const Box<dyn StatSink>) };
     let name =
       unsafe { EnvoyBuffer::new_from_raw(histogram_name.ptr as *const u8, histogram_name.length) };
     sink.on_histogram_complete(name, value);
@@ -825,7 +831,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_scheduled(
   event_id: u64,
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
-    let sink = &*(config_ptr as *const Box<dyn StatSink>);
+    // SAFETY: `config_ptr` is the boxed sink returned by
+    // `envoy_dynamic_module_on_stat_sink_config_new`, which Envoy keeps alive until the matching
+    // destroy callback.
+    let sink = unsafe { &*(config_ptr as *const Box<dyn StatSink>) };
     let mut envoy_config = EnvoyStatSinkConfig::new(config_envoy_ptr);
     sink.on_config_scheduled(&mut envoy_config, event_id);
   }))

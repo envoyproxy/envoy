@@ -4416,6 +4416,11 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   });
 }
 
+// SAFETY invariant shared by the `envoy_dynamic_module_on_http_filter_*` entry points below:
+// `filter_ptr` is the module pointer returned by `envoy_dynamic_module_on_http_filter_new`, and
+// `config_ptr` the one returned by `envoy_dynamic_module_on_http_filter_config_new`. Envoy keeps
+// each alive until its matching destroy hook, and drives a stream from a single worker thread
+// without re-entering the filter, so a recovered reference is the only live one for the call.
 /// # Safety
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
@@ -4428,7 +4433,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_scheduled(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
-    let config = &**config;
+    // SAFETY: see the shared invariant above; `config_ptr` outlives this call.
+    let config = unsafe { &**config };
     config.on_scheduled(event_id);
   }))
   .map_err(|panic| {
@@ -4485,7 +4491,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_de
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let ptr = config_ptr as *mut std::sync::Arc<dyn Any>;
-    std::mem::drop(Box::from_raw(ptr));
+    // SAFETY: `config_ptr` is the boxed `Arc` leaked by
+    // `envoy_dynamic_module_on_http_filter_per_route_config_new`. Envoy calls this destroy hook
+    // exactly once, so reclaiming the box here cannot double-free.
+    std::mem::drop(unsafe { Box::from_raw(ptr) });
   }))
   .map_err(|panic| {
     crate::log_ffi_panic(
@@ -4524,7 +4533,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
     };
     let filter_config = {
       let raw = filter_config_ptr as *const *const dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
-      &**raw
+      // SAFETY: `filter_config_ptr` is the module pointer returned by
+      // `envoy_dynamic_module_on_http_filter_config_new`. Envoy keeps that config alive for the
+      // lifetime of every filter created from it.
+      unsafe { &**raw }
     };
     envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter, filter_config)
   }))
@@ -4569,7 +4581,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_stream_complete(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
   }))
   .map_err(|panic| {
@@ -4589,7 +4602,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_request_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
   }))
   .unwrap_or_else(|panic| {
@@ -4611,7 +4625,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_request_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
   }))
   .unwrap_or_else(|panic| {
@@ -4632,7 +4647,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_request_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
   }))
   .unwrap_or_else(|panic| {
@@ -4656,7 +4672,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_response_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
   }))
   .unwrap_or_else(|panic| {
@@ -4680,7 +4697,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
   }))
   .unwrap_or_else(|panic| {
@@ -4700,7 +4718,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
   }))
   .unwrap_or_else(|panic| {
@@ -4729,7 +4748,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     let headers = if headers_size > 0 {
       Some(unsafe {
         crate::ffi_helpers::slice_from_raw_or_empty(
@@ -4778,7 +4798,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_scheduled(&mut EnvoyHttpFilterImpl::new(envoy_ptr), event_id);
   }))
   .map_err(|panic| {
@@ -4797,7 +4818,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_above_wr
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter
       .on_downstream_above_write_buffer_high_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
   }))
@@ -4820,7 +4842,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_below_wr
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_downstream_below_write_buffer_low_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
   }))
   .map_err(|panic| {
@@ -4845,8 +4868,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_local_reply(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_local_reply_status {
   catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
-    let details_buffer = EnvoyBuffer::new_from_raw(details.ptr as *const u8, details.length);
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
+    // SAFETY: `details` is an Envoy-owned buffer describing the local-reply detail string; it
+    // stays valid for the duration of the call, which bounds the returned `EnvoyBuffer`.
+    let details_buffer =
+      unsafe { EnvoyBuffer::new_from_raw(details.ptr as *const u8, details.length) };
     filter.on_local_reply(
       &mut EnvoyHttpFilterImpl::new(envoy_ptr),
       response_code,
@@ -4876,7 +4903,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_headers
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     let headers = if headers_size > 0 {
       unsafe {
         crate::ffi_helpers::slice_from_raw_or_empty(
@@ -4917,7 +4945,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_data(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     let data = if data_count > 0 {
       unsafe { crate::ffi_helpers::slice_from_raw_or_empty(data as *const EnvoyBuffer, data_count) }
     } else {
@@ -4952,7 +4981,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_trailer
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     let trailers = if trailers_size > 0 {
       unsafe {
         crate::ffi_helpers::slice_from_raw_or_empty(
@@ -4989,7 +5019,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_complet
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_http_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr), stream_handle);
   }))
   .map_err(|panic| {
@@ -5013,7 +5044,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_reset(
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-    let filter = &mut **filter;
+    // SAFETY: see the shared invariant above; `filter_ptr` is live and exclusively ours here.
+    let filter = unsafe { &mut **filter };
     filter.on_http_stream_reset(
       &mut EnvoyHttpFilterImpl::new(envoy_ptr),
       stream_handle,
@@ -5045,7 +5077,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_callout
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
-    let config = &**config;
+    // SAFETY: see the shared invariant above; `config_ptr` outlives this call.
+    let config = unsafe { &**config };
     let headers = if headers_size > 0 {
       Some(unsafe {
         crate::ffi_helpers::slice_from_raw_or_empty(
@@ -5099,7 +5132,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
-    let config = &**config;
+    // SAFETY: see the shared invariant above; `config_ptr` outlives this call.
+    let config = unsafe { &**config };
     let headers = if headers_size > 0 {
       unsafe {
         crate::ffi_helpers::slice_from_raw_or_empty(
@@ -5142,7 +5176,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
-    let config = &**config;
+    // SAFETY: see the shared invariant above; `config_ptr` outlives this call.
+    let config = unsafe { &**config };
     let data = if data_count > 0 {
       unsafe { crate::ffi_helpers::slice_from_raw_or_empty(data as *const EnvoyBuffer, data_count) }
     } else {
@@ -5179,7 +5214,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
-    let config = &**config;
+    // SAFETY: see the shared invariant above; `config_ptr` outlives this call.
+    let config = unsafe { &**config };
     let trailers = if trailers_size > 0 {
       unsafe {
         crate::ffi_helpers::slice_from_raw_or_empty(
@@ -5218,7 +5254,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
-    let config = &**config;
+    // SAFETY: see the shared invariant above; `config_ptr` outlives this call.
+    let config = unsafe { &**config };
     config.on_http_stream_complete(
       &mut EnvoyHttpFilterConfigImpl {
         raw_ptr: envoy_config_ptr,
@@ -5247,7 +5284,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
 ) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
-    let config = &**config;
+    // SAFETY: see the shared invariant above; `config_ptr` outlives this call.
+    let config = unsafe { &**config };
     config.on_http_stream_reset(
       &mut EnvoyHttpFilterConfigImpl {
         raw_ptr: envoy_config_ptr,
