@@ -2104,6 +2104,9 @@ pub trait EnvoyHttpFilter {
   /// After calling this function successfully, the current filter chain will be destroyed and a new
   /// stream will be created. The filter should return StopIteration from the current event hook.
   ///
+  /// The filter itself stays valid until the hook returns, and the callbacks it makes after the
+  /// teardown are safe and do not affect the recreated stream.
+  ///
   /// * `headers` - Optional list of new headers for the recreated stream. If None, the original
   ///   headers will be reused.
   ///

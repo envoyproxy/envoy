@@ -1,7 +1,7 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::any::Any;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -175,6 +175,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     },
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
     "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
+    "use_self_after_teardown" => Some(Box::new(UseSelfAfterTeardownFilterConfig {
+      dropped_filters: Arc::new(AtomicUsize::new(0)),
+    })),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
     "log_level" => Some(Box::new(LogLevelFilterConfig {})),
     _ => panic!("Unknown filter name: {name}"),
@@ -263,6 +266,74 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateObjectRecreateFilter {
         abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
       },
     }
+  }
+}
+
+const RECREATED_HEADER: &str = "x-recreated";
+
+/// A HTTP filter that keeps using itself after recreate_stream has torn its own filter chain down.
+/// The counter lives in the config so that a filter can report how many filters Envoy had already
+/// destroyed by the time its own hook resumed.
+struct UseSelfAfterTeardownFilterConfig {
+  dropped_filters: Arc<AtomicUsize>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UseSelfAfterTeardownFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(UseSelfAfterTeardownFilter {
+      state: String::from("alive"),
+      dropped_filters: self.dropped_filters.clone(),
+    })
+  }
+}
+
+struct UseSelfAfterTeardownFilter {
+  state: String,
+  dropped_filters: Arc<AtomicUsize>,
+}
+
+impl Drop for UseSelfAfterTeardownFilter {
+  fn drop(&mut self) {
+    self.dropped_filters.fetch_add(1, Ordering::SeqCst);
+  }
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UseSelfAfterTeardownFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // The request headers are carried over to the recreated stream, so this marks the second pass.
+    if envoy_filter
+      .get_request_header_value(RECREATED_HEADER)
+      .is_some()
+    {
+      envoy_filter.send_response(200, &[(RECREATED_HEADER, b"true")], None, None);
+      return abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
+    }
+
+    let header_set = envoy_filter.set_request_header(RECREATED_HEADER, b"true");
+    let recreated = envoy_filter.recreate_stream(None);
+
+    // Everything below runs on a hook whose filter chain Envoy has already destroyed. Writing the
+    // state proves the allocation is intact, and a synchronous destroy would have counted this
+    // filter in the drops. Panics are swallowed at the FFI boundary, so every result the test needs
+    // to check goes to the log rather than to an assert.
+    self.state.push_str("-torn-down");
+    envoy_log_info!(
+      "recreated with state {} after {} drops, header_set={} recreated={} append={} drain={} \
+       route={}",
+      self.state,
+      self.dropped_filters.load(Ordering::SeqCst),
+      header_set,
+      recreated,
+      envoy_filter.append_buffered_request_body(b"ignored"),
+      envoy_filter.drain_buffered_response_body(1),
+      envoy_filter.get_most_specific_route_config().is_some()
+    );
+
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 }
 

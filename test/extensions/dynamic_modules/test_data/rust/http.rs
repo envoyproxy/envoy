@@ -83,6 +83,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "reset_stream" => Some(Box::new(ResetStreamFilterConfig {})),
     "send_go_away_and_close" => Some(Box::new(SendGoAwayAndCloseFilterConfig {})),
     "recreate_stream" => Some(Box::new(RecreateStreamFilterConfig {})),
+    "destroy_logging" => Some(Box::new(DestroyLoggingFilterConfig {})),
     "socket_option_callbacks" => Some(Box::new(SocketOptionCallbacksFilterConfig {})),
     "span_callbacks" => Some(Box::new(SpanCallbacksFilterConfig {})),
     "cluster_callbacks" => Some(Box::new(ClusterCallbacksFilterConfig {})),
@@ -644,6 +645,29 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for RecreateStreamFilter {
       envoy_filter.recreate_stream(Some(&[(":status", b"302"), ("location", b"/recreated"),]))
     );
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to observe when the in-module filter
+/// is destroyed.
+struct DestroyLoggingFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for DestroyLoggingFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(DestroyLoggingFilter {})
+  }
+}
+
+/// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`] and logs on
+/// drop so that the point at which Envoy destroys the in-module filter is observable.
+struct DestroyLoggingFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DestroyLoggingFilter {}
+
+impl Drop for DestroyLoggingFilter {
+  fn drop(&mut self) {
+    envoy_log_info!("destroy_logging filter dropped");
   }
 }
 
