@@ -5,6 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/token_bucket_impl.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
@@ -179,7 +180,10 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     }
   }
 
-  auto ack = sub->second->sub_state_.handleResponse(*message);
+  UpdateAck ack = [&]() {
+    ScopedResume resume_dependent_type_urls = pause(Config::dependentTypeUrls(message->type_url()));
+    return sub->second->sub_state_.handleResponse(*message);
+  }();
 
   // Processing point to record error if there is any failure after the response is processed.
   if (xds_config_tracker_.has_value() &&

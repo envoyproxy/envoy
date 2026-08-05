@@ -409,11 +409,6 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   // server.
   std::unique_ptr<Cleanup> srds_initialization_continuation;
   ASSERT(localInitManager().state() > Init::Manager::State::Uninitialized);
-  const auto type_url = Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
-  // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
-  // In the case that localInitManager is uninitialized, RDS is already paused
-  // either by Server init or LDS init.
-  resume_rds = factory_context_.xdsManager().pause(type_url);
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
     srds_init_mgr =

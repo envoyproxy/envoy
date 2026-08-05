@@ -2436,7 +2436,7 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_EQ(nullptr, route_impl_->virtualHost().corsPolicy());
   EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInRequest());
   EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInResponse());
-  EXPECT_FALSE(route_impl_->virtualHost().routeConfig().usesVhds());
+  EXPECT_FALSE(route_impl_->virtualHost().routeConfig().onDemandVhdsEnabled());
   EXPECT_EQ(nullptr, route_entry.tlsContextMatchCriteria());
 }
 

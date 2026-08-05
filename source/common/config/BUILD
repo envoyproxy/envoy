@@ -77,6 +77,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dependent_type_urls_lib",
+    srcs = ["dependent_type_urls.cc"],
+    hdrs = ["dependent_type_urls.h"],
+    deps = [
+        ":resource_name_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings:string_view",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "ttl_lib",
     srcs = ["ttl.cc"],
     hdrs = ["ttl.h"],
