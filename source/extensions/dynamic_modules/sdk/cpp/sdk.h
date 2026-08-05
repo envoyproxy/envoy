@@ -745,7 +745,11 @@ public:
   virtual void sendGoAwayAndClose(bool graceful) = 0;
 
   /**
-   * Recreates the current stream, optionally with replacement headers.
+   * Recreates the current stream, optionally with replacement headers. Returns false if the
+   * recreation could not be initiated, for example when the request body has not been fully
+   * received. On success the filter chain is destroyed before the current event hook returns and
+   * the filter should stop iteration. The filter itself stays valid until the hook returns, and
+   * the callbacks it makes after the teardown are safe and do not affect the recreated stream.
    */
   virtual bool recreateStream(std::span<const HeaderView> headers = {}) = 0;
 

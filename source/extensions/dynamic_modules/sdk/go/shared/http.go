@@ -365,8 +365,10 @@ type HttpFilterHandle interface {
 	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
 	// headers if headers is nil). Useful for internal redirects or request retries. After a
 	// successful call, the current filter chain is destroyed and the filter SHOULD return Stop
-	// from the current callback. Returns false if recreation could not be initiated (e.g., the
-	// request body has not been fully received yet).
+	// from the current callback. The filter itself stays valid until the callback returns, and the
+	// methods it calls after the teardown are safe and do not affect the recreated stream.
+	// Returns false if recreation could not be initiated (e.g., the request body has not been fully
+	// received yet).
 	RecreateStream(headers [][2]string) bool
 
 	// RequestHeaders retrieves the request headers.
