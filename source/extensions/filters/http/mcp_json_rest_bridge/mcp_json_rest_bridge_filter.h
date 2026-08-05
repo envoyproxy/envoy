@@ -48,7 +48,7 @@ enum class BridgeStatus {
   Ok,
   RequestNotPost,
   RequestTooLarge,
-  RequestParseError,
+  RequestFailedToParseJsonRpc,
   RequestUnsupportedProtocolVersion,
   RequestInitializeNotValid,
   RequestMethodNotSupported,
@@ -64,7 +64,7 @@ enum class BridgeStatus {
   ResponseTooLarge,
   ResponseInvalidUtf8,
   ResponseBackendError,
-  ResponseParseError,
+  ResponseFailedToParseJsonRpc,
 };
 
 absl::string_view bridgeStatusToString(BridgeStatus status);
@@ -74,12 +74,12 @@ inline constexpr absl::string_view STATUS = "status";
 inline constexpr absl::string_view OK = "mcp_json_rest_bridge_ok";
 inline constexpr absl::string_view REQUEST_NOT_POST = "mcp_json_rest_bridge_request_not_post";
 inline constexpr absl::string_view REQUEST_TOO_LARGE = "mcp_json_rest_bridge_request_too_large";
-inline constexpr absl::string_view REQUEST_PARSE_ERROR =
+inline constexpr absl::string_view REQUEST_FAILED_TO_PARSE_JSON_RPC =
     "mcp_json_rest_bridge_request_failed_to_parse_json_rpc";
 inline constexpr absl::string_view REQUEST_UNSUPPORTED_PROTOCOL_VERSION =
     "mcp_json_rest_bridge_request_unsupported_protocol_version";
 inline constexpr absl::string_view REQUEST_INITIALIZE_NOT_VALID =
-    "mcp_json_rest_bridge_request_initialize_request_not_valid";
+    "mcp_json_rest_bridge_request_initialize_not_valid";
 inline constexpr absl::string_view REQUEST_METHOD_NOT_SUPPORTED =
     "mcp_json_rest_bridge_request_method_not_supported";
 inline constexpr absl::string_view REQUEST_METHOD_NOT_FOUND =
@@ -104,7 +104,7 @@ inline constexpr absl::string_view RESPONSE_INVALID_UTF8 =
     "mcp_json_rest_bridge_response_invalid_utf8";
 inline constexpr absl::string_view RESPONSE_BACKEND_ERROR =
     "mcp_json_rest_bridge_response_backend_error";
-inline constexpr absl::string_view RESPONSE_PARSE_ERROR =
+inline constexpr absl::string_view RESPONSE_FAILED_TO_PARSE_JSON_RPC =
     "mcp_json_rest_bridge_response_failed_to_parse_json";
 } // namespace BridgeStatusValues
 
@@ -158,6 +158,8 @@ public:
   const std::string& serverDescription() const { return proto_config_.server_info().description(); }
 
   bool clearRouteCache() const { return clear_route_cache_; }
+
+  bool perRouteOnly() const { return proto_config_.per_route_only(); }
 
 private:
   struct ToolEntry {
@@ -264,6 +266,26 @@ private:
                               const McpJsonRestBridgePerRouteConfig* per_route_config);
 
   // Handles decoding errors: sets dynamic metadata and sends a local reply.
+  // IMPORTANT PROTOCOL RULE:
+  // 1. For JSON-RPC application/protocol errors (-32600, -32601, -32602), MUST use Http::Code::OK
+  //    (200). Many MCP SDK clients inspect HTTP status before JSON-RPC decoding and will fail with
+  //    a transport exception on non-200 responses, discarding the structured JSON-RPC error
+  //    code/message.
+  // 2. Only use non-200 HTTP codes (400, 401, 403, 405, 413) in the following cases:
+  //    - Transport-level or framing syntax failures (generated locally by this filter):
+  //      * 405 Method Not Allowed (non-POST request)
+  //      * 413 Payload Too Large (exceeding maxRequestBodySize)
+  //      * 400 Bad Request for malformed JSON syntax (-32700 parse error)
+  //    - Authorization errors preserved from upstream (401 Unauthorized, 403 Forbidden):
+  //      * 401 and 403 from upstream are preserved as non-200 HTTP responses as required by the MCP
+  //        authorization spec:
+  //        https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+  //      * Note on 400 Bad Request: Although the MCP authorization spec also includes HTTP 400 for
+  //        certain authorization errors, we assume authorization checks (e.g., OAuth token
+  //        validation) occur in filters before MCP transcoding. Therefore, any 400 error from the
+  //        REST backend is assumed to be an API error rather than an authorization error, so the
+  //        MCP transcoder transforms the REST 400 error into a standard JSON-RPC error (with HTTP
+  //        200 OK) and does not preserve it as an authorization error.
   void sendErrorResponse(
       Http::Code response_code, BridgeStatus status, absl::string_view response_body,
       std::function<void(Http::ResponseHeaderMap&)> modify_headers = nullptr,
