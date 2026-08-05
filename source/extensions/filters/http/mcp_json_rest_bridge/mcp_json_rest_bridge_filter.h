@@ -113,9 +113,9 @@ inline constexpr absl::string_view RESPONSE_FAILED_TO_PARSE_JSON_RPC =
  */
 class McpJsonRestBridgeFilterConfig : public Logger::Loggable<Logger::Id::config> {
 public:
-  explicit McpJsonRestBridgeFilterConfig(
-      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-          proto_config);
+  static absl::StatusOr<std::shared_ptr<McpJsonRestBridgeFilterConfig>>
+  create(const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+             proto_config);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
@@ -162,6 +162,12 @@ public:
   bool perRouteOnly() const { return proto_config_.per_route_only(); }
 
 private:
+  explicit McpJsonRestBridgeFilterConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+          proto_config);
+
+  absl::Status initialize();
+
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
@@ -186,7 +192,7 @@ private:
 class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,
                                         public Logger::Loggable<Logger::Id::config> {
 public:
-  explicit McpJsonRestBridgePerRouteConfig(
+  static absl::StatusOr<std::shared_ptr<McpJsonRestBridgePerRouteConfig>> create(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
           proto_config);
 
@@ -209,6 +215,12 @@ public:
                                    absl::string_view path) const;
 
 private:
+  explicit McpJsonRestBridgePerRouteConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config);
+
+  absl::Status initialize();
+
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
@@ -228,6 +240,7 @@ private:
 };
 
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
+using McpJsonRestBridgePerRouteConfigSharedPtr = std::shared_ptr<McpJsonRestBridgePerRouteConfig>;
 
 /**
  * MCP JSON REST Bridge proxy implementation.
