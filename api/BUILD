@@ -160,6 +160,7 @@ proto_library(
         "//envoy/extensions/clusters/common/dns/v3:pkg",
         "//envoy/extensions/clusters/composite/v3:pkg",
         "//envoy/extensions/clusters/dns/v3:pkg",
+        "//envoy/extensions/clusters/dns_srv/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/clusters/dynamic_modules/v3:pkg",
         "//envoy/extensions/clusters/mcp_multicluster/v3:pkg",

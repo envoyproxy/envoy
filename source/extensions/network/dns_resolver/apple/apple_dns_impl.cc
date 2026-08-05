@@ -122,6 +122,12 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
   return pending_resolution_and_success.first.release();
 }
 
+ActiveDnsQuery* AppleDnsResolverImpl::resolveSrv(const std::string& dns_name ABSL_ATTRIBUTE_UNUSED,
+                                                 ResolveCb callback ABSL_ATTRIBUTE_UNUSED) {
+  ENVOY_LOG(error, "Apple DNS resolver does not support SRV records (not implemented)");
+  return nullptr;
+}
+
 void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code) {
   switch (error_code) {
   case kDNSServiceErr_DefunctConnection:
