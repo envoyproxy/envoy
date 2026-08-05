@@ -272,10 +272,9 @@ TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
 // Structural spec matching (matchesPatternPath)
 // ============================================================================
 
-// SpecMatchingHandler is the executable template for the production routing
-// decision: convert spec.segments to PatternSegments once at config time,
-// then match at each scalar callback with that callback's depth — zero
-// allocations, and collision-free (see the hostile-key test below).
+// SpecMatchingHandler is the executable templat to convert spec.segments to PatternSegments once at
+// config time, then match at each scalar callback with that callback's depth — zero allocations,
+// and collision-free (see the hostile-key test below).
 
 // Captures exactly the scalar values (strings, numbers, booleans, nulls)
 // whose root-to-here chain structurally matches the spec's segments; each
@@ -287,10 +286,22 @@ public:
     // keys, so the per-callback match allocates nothing. `spec` must outlive
     // this handler.
     for (const auto& seg : spec.segments) {
-      pattern_.push_back({seg.has_value() ? absl::string_view(*seg) : absl::string_view{},
-                          ExtractFieldSpec::is_array_element(seg)});
+      owned_.push_back({seg.has_value() ? absl::string_view(*seg) : absl::string_view{},
+                        ExtractFieldSpec::is_array_element(seg)});
     }
+    pattern_ = owned_;
   }
+
+  // Caller-owned segments — a fixed path spelled as a static constexpr array of
+  // literals, the form documented on WuffsJsonCursor::PatternSegment. Nothing is
+  // converted or copied, and the literals' static storage satisfies the "key's
+  // bytes must outlive the array" rule with nothing for the caller to manage.
+  explicit SpecMatchingHandler(absl::Span<const WuffsJsonCursor::PatternSegment> pattern)
+      : pattern_(pattern) {}
+
+  // pattern_ may point into owned_, which copying would leave dangling.
+  SpecMatchingHandler(const SpecMatchingHandler&) = delete;
+  SpecMatchingHandler& operator=(const SpecMatchingHandler&) = delete;
 
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
@@ -332,7 +343,10 @@ public:
   const std::string& captured() const { return captured_; }
 
 private:
-  std::vector<WuffsJsonCursor::PatternSegment> pattern_;
+  // Backing storage for the spec constructor only; empty when the caller owns
+  // the segments.
+  std::vector<WuffsJsonCursor::PatternSegment> owned_;
+  absl::Span<const WuffsJsonCursor::PatternSegment> pattern_;
   const WuffsJsonCursor* cursor_{nullptr};
   bool capturing_{false};
   std::string captured_;
@@ -349,6 +363,28 @@ TEST(StructuralMatchTest, RoutesArrayElementField) {
   ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
   // Both role values captured; model and content are skipped despite also
   // being string values.
+  EXPECT_EQ(h.captured(), "user;tool;");
+}
+
+// The compile-time counterpart of the spec-derived path above: the same
+// "messages[].role" written as a static constexpr array, per the example
+// documented on WuffsJsonCursor::PatternSegment.
+TEST(StructuralMatchTest, StaticConstexprPatternRoutesSameAsSpec) {
+  static constexpr WuffsJsonCursor::PatternSegment kMessagesRole[] = {
+      {"messages"},         // dict key
+      {"", /*array=*/true}, // [] wildcard; key unused
+      {"role"},             // dict key
+  };
+  SpecMatchingHandler h(kMessagesRole);
+  WuffsJsonCursor cursor(h);
+  h.setCursor(&cursor);
+  constexpr absl::string_view json =
+      R"({"model":"m","messages":[{"role":"user","content":"h"},{"role":"tool"}],)"
+      R"("metadata":[{"role":"admin"}]})";
+  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  // Same result the ExtractFieldSpec-derived pattern produces for this path.
+  // metadata's "admin" shares the leaf key, the depth and the array-at-level-2
+  // shape, and is still rejected — level 1 is "metadata", not "messages".
   EXPECT_EQ(h.captured(), "user;tool;");
 }
 

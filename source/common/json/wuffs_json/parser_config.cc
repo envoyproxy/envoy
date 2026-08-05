@@ -128,7 +128,7 @@ private:
       // Index-based addressing (e.g. "[42]") is intentionally unsupported.
       // Path specs are structural patterns: '[]' means "every element" because
       // LLM/MCP arrays (messages[], choices[], result.content[]) are homogeneous
-      // lists where every element is processed. 
+      // lists where every element is processed.
       // We can implement index-based addressing if needed in the future.
       return absl::InvalidArgumentError(
           "extract_field_spec: only '[]' wildcard is supported, not '[...]'");
