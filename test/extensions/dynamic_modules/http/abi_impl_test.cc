@@ -3796,6 +3796,48 @@ TEST_F(DynamicModuleHttpFilterLifecycleTest,
   filter->onDestroy();
 }
 
+// A terminal operation (recreate_stream, reset_stream, send_go_away_and_close, continue_decoding)
+// makes Envoy tear the filter chain down, running onDestroy() while the module hook is still on the
+// stack. The module can then still call these; each one dereferenced a cleared callbacks pointer and
+// crashed Envoy. The documented contract is to report that the body is unavailable instead.
+TEST_F(DynamicModuleHttpFilterLifecycleTest, BodyCallbacksAfterOnDestroyReportUnavailable) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+  filter->initializeInModuleFilter();
+
+  filter->onDestroy();
+  ASSERT_EQ(nullptr, filter->decoder_callbacks_);
+  ASSERT_EQ(nullptr, filter->encoder_callbacks_);
+
+  // Non-null so execution reaches the buffered-body branches rather than short-circuiting on the
+  // received-body pointers.
+  Buffer::OwnedImpl body;
+  filter->current_request_body_ = &body;
+  filter->current_response_body_ = &body;
+
+  const std::string data = "foo";
+  for (const auto body_type : {envoy_dynamic_module_type_http_body_type_BufferedRequestBody,
+                               envoy_dynamic_module_type_http_body_type_BufferedResponseBody}) {
+    EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(filter.get(), body_type), 0);
+    EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(filter.get(), body_type), 0);
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_http_get_body_chunks(filter.get(), body_type, nullptr));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_append_body(filter.get(), body_type,
+                                                               {data.data(), data.size()}));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(filter.get(), body_type, 1));
+  }
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_request_body(filter.get()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_response_body(filter.get()));
+
+  // resolveMostSpecificPerFilterConfig() only ASSERTs its argument is non-null, so without the guard
+  // this dereferences null in a release build.
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_get_most_specific_route_config(filter.get()));
+}
+
 // =============================================================================
 // Tests for stream control callbacks.
 // =============================================================================
