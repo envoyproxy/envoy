@@ -885,17 +885,7 @@ void OAuth2Filter::resolveAndSetActiveConfig() {
 }
 
 std::map<std::string, std::string> OAuth2Filter::getLogTags() const {
-  // Attach the request id (matching access-log %STREAM_ID% / x-request-id) so OAuth2 application
-  // logs can be correlated with access logs on a per-request basis.
-  std::map<std::string, std::string> log_tags;
-  const auto provider = decoder_callbacks_->streamInfo().getStreamIdProvider();
-  if (provider.has_value()) {
-    const auto request_id = provider->toStringView();
-    if (request_id.has_value()) {
-      log_tags.emplace("RequestId", std::string(request_id.value()));
-    }
-  }
-  return log_tags;
+  return oauthLogTags(*decoder_callbacks_);
 }
 
 /**

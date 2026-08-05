@@ -459,7 +459,8 @@ private:
   void resolveAndSetActiveConfig();
 
   // Returns the log tags (RequestId, matching access-log %STREAM_ID% / x-request-id) attached to
-  // the filter's application logs so they can be correlated with the access log.
+  // the filter's application logs so they can be correlated with the access log. Shared with
+  // OAuth2ClientImpl via oauthLogTags() so all OAuth2 log lines for a request carry the same tag.
   std::map<std::string, std::string> getLogTags() const;
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
