@@ -185,9 +185,6 @@ public:
 
   // One level of a structural pattern-path match: a dict key or an array wildcard.
   //
-  // Callbacks carry only `key` and `depth`, so a handler cannot tell "role" inside
-  // messages[] from "role" inside metadata. An array of segments names a full path;
-  // matchesPatternPath() answers whether the cursor sits exactly there.
   //
   // Build once — static constexpr, or converted from an ExtractFieldSpec
   // (parser_config.h) at config time — never per callback. `key` is not copied, so

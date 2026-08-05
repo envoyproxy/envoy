@@ -392,7 +392,13 @@ bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segmen
                                          int depth) const {
   // Compares: segment count must equal depth, and each level must agree
   // in kind (object vs array) and, for objects, in whole-label equality.
-  if (depth <= 0 || depth >= kMaxTrackedDepth || static_cast<int>(segments.size()) != depth) {
+  //
+  // depth > depth_ is rejected: per-depth state is not cleared on pop, so levels
+  // above the cursor still hold the labels of an already-closed container. Reading
+  // them would match a path the cursor is not on — at {"a":{"b":1},"c":2}'s "c",
+  // key_stack_[2] is still "b", so ["c","b"] at depth 2 would falsely match.
+  if (depth <= 0 || depth > depth_ || depth >= kMaxTrackedDepth ||
+      static_cast<int>(segments.size()) != depth) {
     return false;
   }
   for (int d = 1; d <= depth; ++d) {
