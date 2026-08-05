@@ -42,6 +42,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/conn_pool/pending_stream.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
@@ -53,6 +54,7 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -80,6 +82,42 @@ defaultHappyEyeballsConfig() {
         default_config.mutable_first_address_family_count()->set_value(1);
         return default_config;
       }());
+}
+
+// Resolves the queue policy for cluster pending requests: looks up the factory, translates the
+// typed config and creates a queue policy instance once so that invalid configurations are
+// rejected at config load time rather than when the first connection pool is created. The
+// resolved factory and config are stored on the cluster info so that connection pool creation
+// does not need to repeat this work.
+absl::StatusOr<std::unique_ptr<const ClusterInfo::PendingRqQueuePolicy>>
+resolvePendingRqQueuePolicy(
+    const envoy::config::core::v3::TypedExtensionConfig& queue_policy_config,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  using PendingStreamQueueFactory =
+      Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
+  PendingStreamQueueFactory* factory =
+      Config::Utility::getFactory<PendingStreamQueueFactory>(queue_policy_config);
+  if (factory == nullptr) {
+    factory =
+        Config::Utility::getFactoryByName<PendingStreamQueueFactory>(queue_policy_config.name());
+  }
+  if (factory == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("Didn't find a registered queue policy implementation for name: '{}'",
+                    queue_policy_config.name()));
+  }
+  ProtobufTypes::MessagePtr factory_config = factory->createEmptyConfigProto();
+  RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(queue_policy_config.typed_config(),
+                                                          server_context.messageValidationVisitor(),
+                                                          *factory_config));
+  auto queue = factory->createQueuePolicy(*factory_config, "cluster." + factory->name(),
+                                          server_context.messageValidationVisitor());
+  RETURN_IF_NOT_OK(queue.status());
+
+  auto policy = std::make_unique<ClusterInfo::PendingRqQueuePolicy>();
+  policy->factory_ = factory;
+  policy->config_ = std::move(factory_config);
+  return policy;
 }
 
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
@@ -1365,6 +1403,13 @@ ClusterInfoImpl::ClusterInfoImpl(
         absl::InvalidArgumentError("Only one of max_requests_per_connection from Cluster or "
                                    "HttpProtocolOptions can be specified");
     return;
+  }
+
+  if (config.queuing_policies().has_pending_rq_policy()) {
+    auto policy_or_error =
+        resolvePendingRqQueuePolicy(config.queuing_policies().pending_rq_policy(), server_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    pending_rq_queue_policy_ = std::move(*policy_or_error);
   }
 
   if (config.has_load_balancing_policy() ||
