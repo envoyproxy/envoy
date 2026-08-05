@@ -37,6 +37,7 @@
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_stream_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
@@ -1434,6 +1435,37 @@ class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessio
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
   EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), std::nullopt);
   EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), std::nullopt);
+}
+
+class EnvoyQuicServerSessionSslResetTest : public EnvoyQuicServerSessionTest {
+public:
+  EnvoyQuicServerSessionSslResetTest() {
+    // Merged before SetUp() initializes the session, so it picks up the flag.
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.quic_enable_reset_ssl_after_handshake", "true"}});
+  }
+
+protected:
+  TestScopedRuntime scoped_runtime_;
+};
+
+// With reset-after-handshake enabled, the peer certificate chain is cached at handshake
+// completion so peer certificate queries keep working after QUICHE releases the SSL object.
+TEST_F(EnvoyQuicServerSessionSslResetTest, PeerCertQueriesAfterSslReset) {
+  installReadFilter();
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  envoy_quic_session_.OnTlsHandshakeComplete();
+
+  // Release the SSL object the way QUICHE does once the handshake completion is acknowledged.
+  static_cast<quic::QuicCryptoServerStreamBase*>(
+      quic::test::QuicSessionPeer::GetMutableCryptoStream(&envoy_quic_session_))
+      ->ResetSsl();
+
+  // No client certificate was presented; the queries are served from the cache instead of the
+  // released SSL object.
+  EXPECT_FALSE(envoy_quic_session_.ssl()->peerCertificatePresented());
+  EXPECT_TRUE(envoy_quic_session_.ssl()->subjectPeerCertificate().empty());
 }
 
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, ResetSslAfterHandshakeEnabledViaRuntime) {
