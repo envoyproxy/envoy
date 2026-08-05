@@ -121,7 +121,7 @@ public:
   // ClientFactory
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
+         const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr& config,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
          Stats::Scope&, const std::string&, const std::string&, bool,
          std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
@@ -130,6 +130,9 @@ public:
          Extensions::NetworkFilters::Common::Redis::RespProtocolVersion,
          OptRef<Stats::Counter>) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
+    if (hold_client_configs_) {
+      held_client_configs_.push_back(config);
+    }
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};
   }
@@ -768,6 +771,13 @@ protected:
   Network::MockActiveDnsQuery active_dns_query_;
   Envoy::Common::CallbackHandlePtr priority_update_cb_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  // When set, create() keeps a copy of the session config shared_ptr, mirroring the production
+  // ClientImpl which stores the config and thereby keeps the discovery session alive until the
+  // client's deferred deletion runs. Declared last so the references are dropped first during
+  // fixture teardown.
+  bool hold_client_configs_{false};
+  std::vector<Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr>
+      held_client_configs_;
 };
 
 using RedisDnsConfigTuple = std::tuple<std::string, Network::DnsLookupFamily,
@@ -1583,8 +1593,8 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
 // triggers callback after cluster is destroyed. This reproduces the issue from #38585.
 TEST_F(RedisClusterTest, NoSegfaultOnClusterDestructionWithPendingCallback) {
   // This test verifies that destroying the cluster properly cleans up resources
-  // and doesn't cause a segfault. The key protection is in the destructor that
-  // sets is_destroying_ flag and cleans up the redis_discovery_session_.
+  // and doesn't cause a segfault. The key protection is the destructor shutting
+  // down the discovery session before dropping it.
 
   // Create the cluster with basic configuration
   setupFromV3Yaml(BasicConfig);
@@ -1605,16 +1615,106 @@ TEST_F(RedisClusterTest, NoSegfaultOnClusterDestructionWithPendingCallback) {
   expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
-  // Now destroy the cluster. With the fix in place (destructor setting is_destroying_
-  // and resetting redis_discovery_session_), this should not crash.
+  // Now destroy the cluster. With the fix in place (the destructor shutting down and
+  // resetting redis_discovery_session_), this should not crash.
   // Without the fix, accessing resolve_timer_ after destruction would segfault.
   cluster_.reset();
 
   // If we reach here without crashing, the test passes.
-  // The fix ensures that:
-  // 1. The destructor sets is_destroying_ = true
-  // 2. The destructor resets redis_discovery_session_
-  // 3. Timer callbacks check is_destroying_ before accessing cluster members
+}
+
+// Discovery clients keep the discovery session alive past ~RedisCluster(): the production
+// ClientImpl stores the session as its client Config (a shared_ptr) until the client's
+// deferred deletion runs. Destroying the cluster while a discovery connection is open must
+// close that connection and leave the surviving session inert. Before the explicit shutdown()
+// teardown, the session leaked together with its clients and its still-armed resolve timer
+// dereferenced the destroyed cluster on the next fire (use-after-free).
+TEST_F(RedisClusterTest, DestructionWithHeldSessionClosesClientsAndDisarmsTimer) {
+  hold_client_configs_ = true;
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimary("127.0.0.1", 22120));
+
+  // Destroying the cluster closes the discovery connection (the close() expectation set by
+  // expectRedisResolve) even though the held config reference keeps the session itself alive.
+  cluster_.reset();
+
+  // The surviving session must ignore a late timer fire instead of dereferencing the
+  // destroyed cluster.
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+  resolve_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
+  resolve_timer_->invokeCallback();
+}
+
+// A CLUSTER SLOTS response can contain hostnames instead of IP addresses (e.g. AWS
+// ElastiCache) whose DNS resolution is still in flight when the cluster is destroyed. The
+// resolution must be cancelled at teardown; before the resolve() handles were tracked, the
+// pending callback fired into the destroyed session (use-after-free).
+TEST_F(RedisClusterTest, DestructionCancelsInFlightHostnameResolution) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  // Deliver a CLUSTER SLOTS response whose primary is a hostname and leave its DNS
+  // resolution in flight.
+  EXPECT_CALL(*dns_resolver_, resolve("primary.com", Network::DnsLookupFamily::V4Only, _))
+      .WillOnce(Return(&active_dns_query_));
+  pool_callbacks_->onResponse(singleSlotPrimary("primary.com", 22120));
+
+  // Destroying the cluster must cancel the outstanding query.
+  EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  cluster_.reset();
+}
+
+// Destroying the cluster while zone-discovery INFO requests are in flight must cancel them.
+// Without the cancellation, closing the discovery clients fails the pending requests and
+// re-enters finishZoneDiscovery() against a cluster that is mid-destruction.
+TEST_F(RedisClusterTest, DestructionCancelsInFlightZoneDiscovery) {
+  setupFromV3Yaml(ZoneDiscoveryConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  auto* zone_client = new Extensions::NetworkFilters::Common::Redis::Client::MockClient();
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(zone_client));
+  EXPECT_CALL(*zone_client, addConnectionCallbacks(_));
+  EXPECT_CALL(*zone_client, close());
+  Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest primary_info_request;
+  Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest replica_info_request;
+  EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+      .WillOnce(Return(&primary_info_request));
+  EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+      .WillOnce(Return(&replica_info_request));
+
+  pool_callbacks_->onResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
+
+  // Two INFO requests are outstanding. Destroying the cluster cancels each of them; zone
+  // discovery must not complete (no further slot update, no timer re-arm).
+  EXPECT_CALL(primary_info_request, cancel());
+  EXPECT_CALL(replica_info_request, cancel());
+  cluster_.reset();
 }
 
 // Tests for parseAvailabilityZone static method

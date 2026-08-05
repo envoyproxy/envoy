@@ -267,6 +267,14 @@ private:
 
     ~RedisDiscoverySession() override;
 
+    // Cancels all in-flight discovery work (the CLUSTER SLOTS request, zone-discovery INFO
+    // requests, hostname resolutions), disables the resolve timer, and closes all discovery
+    // clients. ~RedisCluster() calls this before dropping its reference to the session: each
+    // discovery client holds a shared_ptr back to the session (as its client Config), so the
+    // session outlives the cluster until the deferred deletion of its closed clients runs.
+    // After shutdown() the session is inert; no callback can reach it or the destroyed cluster.
+    void shutdown();
+
     void registerDiscoveryAddress(std::list<Network::DnsResponse>&& response, const uint32_t port);
 
     // Start discovery against a random host from existing hosts
@@ -340,6 +348,17 @@ private:
                         Extensions::NetworkFilters::Common::Redis::Client::PoolRequest*>
         zone_requests_;
     HostZoneMap discovered_zones_; // address -> zone mapping from INFO responses
+
+    // In-flight hostname resolutions for CLUSTER SLOTS entries that returned hostnames instead
+    // of IP addresses (e.g. AWS ElastiCache). The resolve() handles are tracked so shutdown()
+    // can cancel them; completed queries unregister themselves by id.
+    absl::node_hash_map<uint64_t, Network::ActiveDnsQuery*> active_dns_queries_;
+    uint64_t next_dns_query_id_{0};
+
+    // Set once by shutdown(). All discovery work runs on the main thread and ~RedisCluster()
+    // calls shutdown() before tearing anything else down, so `!shutdown_` implies `parent_` is
+    // still valid.
+    bool shutdown_{false};
   };
 
   Upstream::ClusterManager& cluster_manager_;
@@ -367,9 +386,6 @@ private:
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
   const bool enable_zone_discovery_;
-
-  // Flag to prevent callbacks during destruction
-  std::atomic<bool> is_destroying_{false};
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
