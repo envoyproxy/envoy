@@ -82,7 +82,7 @@ void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* logMessage,
             config_->maxRequestBytes(), client_address, target_host, path);
 
   decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, replyText, nullptr, std::nullopt,
-                                     logMessage);
+                                     StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
 }
 
 } // namespace BodySizeLimitFilter

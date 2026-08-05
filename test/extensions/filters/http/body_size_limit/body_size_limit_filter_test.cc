@@ -107,6 +107,17 @@ TEST_F(BodySizeLimitFilterTest, DataTooLong) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, small_filter.decodeData(data2, false));
 }
 
+TEST_F(BodySizeLimitFilterTest, Unlimited) {
+  auto zero_config = setupConfig(0);
+  BodySizeLimitFilter zero_filter(zero_config);
+  zero_filter.setDecoderFilterCallbacks(callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{"content-length", "12334455667788"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, zero_filter.decodeHeaders(headers, false));
+  Buffer::OwnedImpl data1("Hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, zero_filter.decodeData(data1, false));
+}
+
 } // namespace BodySizeLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

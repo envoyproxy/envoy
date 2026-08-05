@@ -62,8 +62,8 @@ TEST(BodySizeLimitFilterFactoryTest, BodySizeLimitFilterEmptyProto) {
   BodySizeLimitFilterFactory factory;
   auto empty_proto = factory.createEmptyConfigProto();
   envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit config =
-      *dynamic_cast<envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit*>(
-          empty_proto.get());
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit>(empty_proto.get());
 
   config.mutable_max_request_bytes()->set_value(1028);
 
@@ -78,8 +78,8 @@ TEST(BodySizeLimitFilterFactoryTest, BodySizeLimitFilterNoMaxRequestBytes) {
   BodySizeLimitFilterFactory factory;
   auto empty_proto = factory.createEmptyConfigProto();
   envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit config =
-      *dynamic_cast<envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit*>(
-          empty_proto.get());
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit>(empty_proto.get());
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_NO_THROW(factory.createFilterFactoryFromProto(config, "stats", context).value());
