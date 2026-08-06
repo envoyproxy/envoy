@@ -437,6 +437,19 @@ public:
         envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
   }
 
+  void setMetadataStruct(std::string_view ns, std::string_view serialized_struct) override {
+    envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{serialized_struct.data(),
+                                                serialized_struct.size()});
+  }
+
+  void setTypedMetadata(std::string_view ns, std::string_view serialized_any) override {
+    envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{serialized_any.data(), serialized_any.size()});
+  }
+
   bool addMetadataList(std::string_view ns, std::string_view key, double value) override {
     return envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
