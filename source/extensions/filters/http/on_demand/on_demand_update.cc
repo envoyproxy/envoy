@@ -59,14 +59,20 @@ absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
   if (!odcds_config.has_value()) {
     return DecodeHeadersBehavior::rds();
   }
+  // Idle idle timeout for on-demand-discovered clusters. Unset/zero disables
+  // reclamation. If changing the default, please update the documentation in on_demand.proto too.
+  const auto cluster_idle_timeout = std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(odcds_config.ref(), cluster_idle_timeout, 0));
   Upstream::OdCdsApiHandlePtr odcds = nullptr;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
     // For xDS-TP based configs, both the odcds_config->source and
     // odcds_config->resources_locator must be empty.
     if (!odcds_config->has_source() && odcds_config->resources_locator().empty()) {
-      auto odcds_or = cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
-                                          odcds_config->source(), std::nullopt, validation_visitor);
+      auto odcds_or =
+          cm.allocateOdCdsApi(Upstream::withClusterIdleTimeout(&Upstream::XdstpOdCdsApiImpl::create,
+                                                               cluster_idle_timeout),
+                              odcds_config->source(), std::nullopt, validation_visitor);
       RETURN_IF_NOT_OK_REF(odcds_or.status());
       odcds = std::move(odcds_or.value());
     }
@@ -83,23 +89,26 @@ absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
         if (odcds_config->source().config_source_specifier_case() ==
             envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
           auto odcds_or =
-              cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create, odcds_config->source(),
-                                  std::nullopt, validation_visitor);
+              cm.allocateOdCdsApi(Upstream::withClusterIdleTimeout(
+                                      &Upstream::XdstpOdCdsApiImpl::create, cluster_idle_timeout),
+                                  odcds_config->source(), std::nullopt, validation_visitor);
           RETURN_IF_NOT_OK_REF(odcds_or.status());
           odcds = std::move(odcds_or.value());
         }
       }
       if (odcds == nullptr) {
-        auto odcds_or = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(),
-                                            std::nullopt, validation_visitor);
+        auto odcds_or = cm.allocateOdCdsApi(
+            Upstream::withClusterIdleTimeout(&Upstream::OdCdsApiImpl::create, cluster_idle_timeout),
+            odcds_config->source(), std::nullopt, validation_visitor);
         RETURN_IF_NOT_OK_REF(odcds_or.status());
         odcds = std::move(odcds_or.value());
       }
     } else {
       auto locator_or = Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator());
       RETURN_IF_NOT_OK_REF(locator_or.status());
-      auto odcds_or = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(),
-                                          locator_or.value(), validation_visitor);
+      auto odcds_or = cm.allocateOdCdsApi(
+          Upstream::withClusterIdleTimeout(&Upstream::OdCdsApiImpl::create, cluster_idle_timeout),
+          odcds_config->source(), locator_or.value(), validation_visitor);
       RETURN_IF_NOT_OK_REF(odcds_or.status());
       odcds = std::move(odcds_or.value());
     }

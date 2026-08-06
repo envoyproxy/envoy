@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
@@ -36,7 +38,7 @@ public:
     OptRef<xds::core::v3::ResourceLocator> null_locator;
     odcds_ = *XdstpOdCdsApiImpl::create(odcds_config, null_locator, xds_manager_, cm_, notifier_,
                                         *store_.rootScope(), validation_visitor_,
-                                        server_factory_context_);
+                                        server_factory_context_, std::chrono::milliseconds::zero());
 
     ON_CALL(xds_manager_, subscriptionFactory())
         .WillByDefault(ReturnRef(cm_.subscription_factory_));
