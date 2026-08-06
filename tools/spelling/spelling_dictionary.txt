@@ -1688,6 +1688,9 @@ xid
 xmodem
 xxhash
 xxs
+xxxx
+xxxxxxxx
+xxxxxxxxxxxx
 xyz
 xyzwebservices
 yml

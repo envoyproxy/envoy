@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.36",
-        sha256 = "7e1e9575d9477254e8855c4483b8fb08b088bd49868c3ef9330a4bb196492542",
+        version = "0.4.2",
+        sha256 = "3427dc6eaafa83042249125920b3fb03ebc3779bb1aff02c147faedebb6c0475",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -553,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "0580a14c23b7f7005abd2c18587f108ed6f1e93e",
-        sha256 = "30a8bbb156d5e3739dc19741837df2d8191d18dc0506727f08f2db5f88a72328",
+        version = "89d6d17edc0f0b79f38edf6fac9e5c8bf5f3cfd7",
+        sha256 = "d994da485d3e1821bcf20a0da5f38ee3d28bd8c0f00389a59adb7ce1196dbce7",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -683,8 +683,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
     toolchains_llvm = dict(
-        version = "1.7.0",
-        sha256 = "85c341e957ba58482892a8088e4a34391d15bd98917f0993ecb62f008d6986d6",
+        version = "1.8.0",
+        sha256 = "3b05826f256040f91c24dcaad673eb1c91e4cc93f4043d0205f2512327640205",
         strip_prefix = "toolchains_llvm-v{version}",
         urls = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
     ),

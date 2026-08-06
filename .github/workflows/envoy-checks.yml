@@ -48,7 +48,6 @@ jobs:
   build:
     secrets:
       dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-      slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -57,6 +56,26 @@ jobs:
     name: Check (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
     uses: ./.github/workflows/_check_build.yml
     if: ${{ fromJSON(needs.load.outputs.request).run.check-build }}
+    needs:
+    - load
+    with:
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
+  # These jobs are invoked separately as they are allowed to fail. If that is not the case they should be moved to the build matrix.
+  build-openssl:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    name: Check (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
+    uses: ./.github/workflows/_check_build_openssl.yml
+    if: >-
+      fromJSON(needs.load.outputs.request).run.check-build-openssl
+      || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
     needs:
     - load
     with:
@@ -119,6 +138,7 @@ jobs:
     secrets:
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
       app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -129,14 +149,21 @@ jobs:
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
       && (fromJSON(needs.load.outputs.request).run.check-build
+          || fromJSON(needs.load.outputs.request).run.check-build-openssl
+          || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
           || fromJSON(needs.load.outputs.request).run.check-coverage
           || fromJSON(needs.load.outputs.request).run.check-san)
     needs:
     - load
     - build
+    - build-openssl
     - coverage
     - runtime
     - san
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}
+      allowed-to-fail: |
+        build-openssl
+      slack-channel: '#envoy-ci'
+      slack-channel-allowed-failure: '#envoy-openssl'

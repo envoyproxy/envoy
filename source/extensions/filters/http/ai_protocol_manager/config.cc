@@ -10,9 +10,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-Http::FilterFactoryCb AiProtocolManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+AiProtocolManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager&,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    const std::string&, DualInfo, Server::Configuration::ServerFactoryContext&) {
   // One factory is shared by every stream on the chain. The in-memory
   // implementation is stateless, so a single shared instance is safe.
   auto buffer_factory = std::make_shared<InMemoryExternalBufferFactory>();
@@ -22,10 +23,13 @@ Http::FilterFactoryCb AiProtocolManagerFilterConfigFactory::createFilterFactoryF
 }
 
 /**
- * Static registration for the AI Protocol Manager filter. @see RegisterFactory.
+ * Static registration for the AI Protocol Manager filter as a downstream and an
+ * upstream HTTP filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(AiProtocolManagerFilterConfigFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAiProtocolManagerFilterConfigFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters
