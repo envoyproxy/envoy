@@ -5024,6 +5024,27 @@ TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithEmptyBody) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideIgnoredIfBuffered) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = "hello world";
+  auto response = sendDownstreamRequestWithBody(body_str, std::nullopt);
+
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_request_headers());
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_EQ(1, test_server_->counter("http.config_test.ext_proc.spurious_msgs_received")->value());
+}
+
 TEST_P(ExtProcIntegrationTest, BufferedModeOverSizeRequestLocalReply) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
