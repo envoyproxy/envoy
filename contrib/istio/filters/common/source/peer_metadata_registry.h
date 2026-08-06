@@ -29,11 +29,11 @@ class PeerMetadataRegistry {
 public:
   virtual ~PeerMetadataRegistry() = default;
 
-  virtual void setValue(uint64_t key, const std::string& value) PURE;
+  virtual void setValue(void* key, const std::string& value) PURE;
 
-  virtual std::optional<std::string> getValue(uint64_t key) const PURE;
+  virtual std::optional<std::string> getValue(void* key) const PURE;
 
-  virtual void removeValue(uint64_t key) PURE;
+  virtual void removeValue(void* key) PURE;
 };
 
 using PeerMetadataRegistrySharedPtr = std::shared_ptr<PeerMetadataRegistry>;

@@ -61,9 +61,9 @@ using ::testing::ReturnRef;
 // upstream (cluster-side) filter.
 class TestPeerMetadataRegistry : public Filters::Common::PeerMetadataShared::PeerMetadataRegistry {
 public:
-  void setValue(uint64_t key, const std::string& value) override { store_[key] = value; }
+  void setValue(void* key, const std::string& value) override { store_[key] = value; }
 
-  std::optional<std::string> getValue(uint64_t key) const override {
+  std::optional<std::string> getValue(void* key) const override {
     const auto it = store_.find(key);
     if (it == store_.end()) {
       return std::nullopt;
@@ -71,10 +71,10 @@ public:
     return it->second;
   }
 
-  void removeValue(uint64_t key) override { store_.erase(key); }
+  void removeValue(void* key) override { store_.erase(key); }
 
 private:
-  std::map<uint64_t, std::string> store_;
+  std::map<void*, std::string> store_;
 };
 
 // Serializes peer metadata the same way the listener-side filter stores it in
@@ -112,9 +112,9 @@ decodePeerMetadata(const std::string& serialized) {
 // PassthroughState. The IoHandle and its owning socket are stored in `io_handle`
 // and `socket` (which must outlive the connection), and the key the filter will
 // compute is returned.
-std::uint64_t wireUserSpaceSocket(NiceMock<Network::MockConnection>& connection,
-                                  Extensions::IoSocket::UserSpace::IoHandleImplPtr& io_handle,
-                                  Network::ConnectionSocketPtr& socket) {
+void* wireUserSpaceSocket(NiceMock<Network::MockConnection>& connection,
+                          Extensions::IoSocket::UserSpace::IoHandleImplPtr& io_handle,
+                          Network::ConnectionSocketPtr& socket) {
   auto pair = Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
   io_handle = std::move(pair.first);
   auto owned_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
@@ -122,7 +122,7 @@ std::uint64_t wireUserSpaceSocket(NiceMock<Network::MockConnection>& connection,
   ON_CALL(Const(*owned_socket), ioHandle()).WillByDefault(ReturnRef(*io_handle));
   socket = std::move(owned_socket);
   ON_CALL(connection, getSocket()).WillByDefault(ReturnRef(socket));
-  return reinterpret_cast<std::uint64_t>(io_handle->passthroughState().get());
+  return io_handle->passthroughState().get();
 }
 
 // Which hand-off path the parameterized fixtures exercise. The path is selected
@@ -245,7 +245,7 @@ public:
   Buffer::OwnedImpl injected_write_data_;
   Extensions::IoSocket::UserSpace::IoHandleImplPtr io_handle_;
   Network::ConnectionSocketPtr connection_socket_;
-  std::uint64_t registry_key_{0};
+  void* registry_key_{nullptr};
   std::unique_ptr<Filter> filter_;
 };
 
@@ -441,7 +441,7 @@ public:
       std::make_shared<TestPeerMetadataRegistry>();
   Extensions::IoSocket::UserSpace::IoHandleImplPtr io_handle_;
   Network::ConnectionSocketPtr connection_socket_;
-  std::uint64_t registry_key_{0};
+  void* registry_key_{nullptr};
   std::unique_ptr<UpstreamFilter> filter_;
 };
 
@@ -451,8 +451,7 @@ class PeerMetadataUpstreamFilterTest : public PeerMetadataUpstreamFilterTestBase
                                        public ::testing::WithParamInterface<ExchangePath> {
 public:
   void initialize() {
-    PeerMetadataUpstreamFilterTestBase::initialize(GetParam() ==
-                                                   ExchangePath::ThreadLocalRegistry);
+    PeerMetadataUpstreamFilterTestBase::initialize(GetParam() == ExchangePath::ThreadLocalRegistry);
   }
 
   void deliverPeerMetadata(Buffer::Instance& data, absl::string_view baggage,

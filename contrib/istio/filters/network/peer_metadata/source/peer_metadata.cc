@@ -52,27 +52,28 @@ bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
   return value.bool_value();
 }
 
-std::optional<uint64_t> getRegistryKey(Network::Connection& connection) {
+std::optional<void*> getRegistryKey(Network::Connection& connection) {
   const auto& socket = connection.getSocket();
   if (socket == nullptr) {
     return std::nullopt;
   }
   auto* handle = dynamic_cast<IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
-  if (handle == nullptr) {
+  if (handle == nullptr || handle->passthroughState() == nullptr) {
     return std::nullopt;
   }
-  return reinterpret_cast<uint64_t>(handle->passthroughState().get());
+  return handle->passthroughState().get();
 }
 
-// Layered-runtime boolean key that disables the PassthroughState-pointer registry
-// hand-off and falls back to the legacy in-byte-stream peer metadata exchange.
-constexpr char DisablePassthroughStateKeyRuntimeKey[] =
-    "envoy.contrib.peer_metadata.disable_passthrough_state_key";
+// Layered-runtime boolean key that enables the PassthroughState-pointer registry
+// hand-off. When disabled, the filters fall back to the legacy in-byte-stream
+// peer metadata exchange. Enabled by default.
+constexpr char EnablePassthroughStateKeyRuntimeKey[] =
+    "envoy.contrib.peer_metadata.enable_passthrough_state_key";
 
 // Whether to hand off peer metadata via the shared-PassthroughState-pointer
 // registry (default) rather than the legacy in-byte-stream exchange.
 bool usePassthroughStateKey(Server::Configuration::ServerFactoryContext& context) {
-  return !context.runtime().snapshot().getBoolean(DisablePassthroughStateKeyRuntimeKey, false);
+  return context.runtime().snapshot().getBoolean(EnablePassthroughStateKeyRuntimeKey, true);
 }
 
 // Layered-runtime boolean key that, when true, disables the thread-local registry hand-off. The
@@ -231,7 +232,7 @@ bool Filter::storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_met
     // Pointer key disabled: fall back to the legacy in-byte-stream exchange.
     return false;
   }
-  const std::optional<uint64_t> key = getRegistryKey(read_callbacks_->connection());
+  const std::optional<void*> key = getRegistryKey(read_callbacks_->connection());
   if (!key) {
     ENVOY_LOG(warn, "No key available for peer metadata hand-off");
     return false;
@@ -367,7 +368,7 @@ bool UpstreamFilter::tryRegistryLookup() {
     // Pointer key disabled: fall back to the legacy in-byte-stream exchange.
     return false;
   }
-  const std::optional<uint64_t> key = getRegistryKey(callbacks_->connection());
+  const std::optional<void*> key = getRegistryKey(callbacks_->connection());
   if (!key) {
     ENVOY_LOG(debug, "No registry key available for peer metadata lookup");
     return false;
