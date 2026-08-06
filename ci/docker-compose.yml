@@ -119,3 +119,11 @@ services:
     - /var/run/docker.sock:/var/run/docker.sock
     - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
     - ${ENVOY_ENTRYPOINT_EXTRA:-./docker-entrypoint-extra.sh}:/entrypoint-extra.sh
+
+# NOTE: local-dev-only addition. Allows ENVOY_DOCKER_BUILD_DIR to reference a native Docker
+# named volume (e.g. `ENVOY_DOCKER_BUILD_DIR=envoy-build-cache`) instead of a macOS bind-mount,
+# to avoid virtiofs directory-deletion inconsistencies with Bazel's external repo extraction.
+# Safe to revert; only takes effect when a service actually references this volume name.
+volumes:
+  envoy-build-cache:
+    external: true

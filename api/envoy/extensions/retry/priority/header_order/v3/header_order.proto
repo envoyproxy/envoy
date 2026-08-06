@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package envoy.extensions.retry.priority.header_order.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.retry.priority.header_order.v3";
+option java_outer_classname = "HeaderOrderConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/retry/priority/header_order/v3;header_orderv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Header order retry priority]
+
+// A retry priority that forces each attempt (the initial attempt and every retry) to target a
+// specific Envoy priority level, chosen per-request by an upstream HTTP filter (e.g. an
+// ext_proc filter) rather than by the cluster's static Priority-based load balancing.
+//
+// The desired attempt order is communicated via dynamic metadata: a ``ListValue`` of numbers
+// under the configured namespace/key, e.g. a value of ``[3, 0, 2]`` means: attempt 1 (initial)
+// -> priority 3, attempt 2 (1st retry) -> priority 0, attempt 3 (2nd retry) -> priority 2.
+//
+// If the metadata is absent, empty, or malformed, or a listed priority has no healthy hosts,
+// this plugin searches forward in the list for the next healthy priority; if none remain, it
+// falls back to the cluster's original, unmodified priority load.
+//
+// [#extension: envoy.retry_priorities.header_order]
+message HeaderOrderConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.retry.header_order.HeaderOrderConfig";
+
+  // The dynamic metadata namespace (typically the setting filter's name, e.g. a custom
+  // ext_proc filter) to read the ordered list of priority indices from.
+  string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The key within metadata_namespace whose value is expected to be a ``ListValue`` of numbers
+  // representing the ordered list of priority indices, e.g. ``[3, 0, 2]``.
+  string metadata_key = 2 [(validate.rules).string = {min_len: 1}];
+}
