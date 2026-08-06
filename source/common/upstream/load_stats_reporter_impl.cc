@@ -1,10 +1,22 @@
 #include "source/common/upstream/load_stats_reporter_impl.h"
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "envoy/common/optref.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -20,6 +32,19 @@ MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
   return request;
 }
 
+void latchLoadReportStats(const Cluster& cluster) {
+  cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
+  cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
+  cluster.info()->loadReportStats().upstream_rq_total_.latch();
+  for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+    for (const auto& host : host_set->hosts()) {
+      host->stats().rq_success_.latch();
+      host->stats().rq_error_.latch();
+      host->stats().rq_total_.latch();
+    }
+  }
+}
+
 } // namespace
 
 LoadStatsReporterImpl::LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_info,
@@ -31,7 +56,9 @@ LoadStatsReporterImpl::LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_i
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
-      request_template_(MakeRequestTemplate(local_info)), time_source_(dispatcher.timeSource()) {
+      request_template_(MakeRequestTemplate(local_info)), time_source_(dispatcher.timeSource()),
+      optimized_lrs_enabled_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.optimized_lrs_enabled")) {
   retry_timer_ = dispatcher.createTimer([this]() -> void {
     stats_.retries_.inc();
     establishNewStream();
@@ -100,135 +127,152 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
     if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
       cluster_stats->set_cluster_service_name(name);
     }
-    for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-      ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
-      for (const HostVector& hosts : host_set->hostsPerLocality().get()) {
-        ASSERT(!hosts.empty());
-        uint64_t rq_success = 0;
-        uint64_t rq_error = 0;
-        uint64_t rq_active = 0;
-        uint64_t rq_issued = 0;
-        LoadMetricStats::StatMap aggregated_host_custom_metrics;
+    const uint64_t cluster_rq_dropped_val =
+        cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
+    const uint64_t cluster_rq_drop_overload_val =
+        cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
+    const uint64_t cluster_rq_total_val =
+        cluster.info()->loadReportStats().upstream_rq_total_.latch();
+    bool cluster_received_zero_traffic = false;
+    if (optimized_lrs_enabled_) {
+      const uint64_t cluster_rq_active_val =
+          cluster.info()->loadReportStats().upstream_rq_active_.value();
 
-        envoy::config::endpoint::v3::UpstreamLocalityStats locality_stats;
-        locality_stats.mutable_locality()->MergeFrom(hosts[0]->locality());
-        locality_stats.set_priority(host_set->priority());
+      if (cluster_rq_total_val == 0 && cluster_rq_active_val == 0 && cluster_rq_dropped_val == 0 &&
+          cluster_rq_drop_overload_val == 0) {
+        cluster_received_zero_traffic = true;
+      }
+    }
 
-        for (const HostSharedPtr& host : hosts) {
-          uint64_t host_rq_success = host->stats().rq_success_.latch();
-          uint64_t host_rq_error = host->stats().rq_error_.latch();
-          uint64_t host_rq_active = host->stats().rq_active_.value();
-          uint64_t host_rq_issued = host->stats().rq_total_.latch();
+    if (!cluster_received_zero_traffic) {
+      for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+        ENVOY_LOG(trace, "Load report locality count {}",
+                  host_set->hostsPerLocality().get().size());
+        for (const HostVector& hosts : host_set->hostsPerLocality().get()) {
+          ASSERT(!hosts.empty());
+          uint64_t rq_success = 0;
+          uint64_t rq_error = 0;
+          uint64_t rq_active = 0;
+          uint64_t rq_issued = 0;
+          LoadMetricStats::StatMap aggregated_host_custom_metrics;
 
-          // Check if the host has any load stats updates. If the host has no load stats updates, we
-          // skip it.
-          bool endpoint_has_updates =
-              (host_rq_success + host_rq_error + host_rq_active + host_rq_issued) != 0;
+          envoy::config::endpoint::v3::UpstreamLocalityStats locality_stats;
+          locality_stats.mutable_locality()->MergeFrom(hosts[0]->locality());
+          locality_stats.set_priority(host_set->priority());
 
-          std::unique_ptr<LoadMetricStats::StatMap> host_custom_metrics;
-          if (Runtime::runtimeFeatureEnabled(
-                  "envoy.reloadable_features.report_load_for_non_zero_stats")) {
-            host_custom_metrics = host->loadMetricStats().latch();
-            if (host_custom_metrics != nullptr) {
-              endpoint_has_updates = true;
-            }
-          }
+          for (const HostSharedPtr& host : hosts) {
+            uint64_t host_rq_success = host->stats().rq_success_.latch();
+            uint64_t host_rq_error = host->stats().rq_error_.latch();
+            uint64_t host_rq_active = host->stats().rq_active_.value();
+            uint64_t host_rq_issued = host->stats().rq_total_.latch();
 
-          if (endpoint_has_updates) {
-            rq_success += host_rq_success;
-            rq_error += host_rq_error;
-            rq_active += host_rq_active;
-            rq_issued += host_rq_issued;
+            // Check if the host has any load stats updates. If the host has no load stats updates,
+            // we skip it.
+            bool endpoint_has_updates =
+                (host_rq_success + host_rq_error + host_rq_active + host_rq_issued) != 0;
 
-            envoy::config::endpoint::v3::UpstreamEndpointStats* upstream_endpoint_stats = nullptr;
-            // Set the upstream endpoint stats if we are reporting endpoint granularity.
-            if (message_ && message_->report_endpoint_granularity()) {
-              upstream_endpoint_stats = locality_stats.add_upstream_endpoint_stats();
-              Network::Utility::addressToProtobufAddress(
-                  *host->address(), *upstream_endpoint_stats->mutable_address());
-              upstream_endpoint_stats->set_total_successful_requests(host_rq_success);
-              upstream_endpoint_stats->set_total_error_requests(host_rq_error);
-              upstream_endpoint_stats->set_total_requests_in_progress(host_rq_active);
-              upstream_endpoint_stats->set_total_issued_requests(host_rq_issued);
-            }
-
-            // TODO(fcfort): Remove this latch() call when cleaning up
-            // `report_load_for_non_zero_stats`.
-            if (host_custom_metrics == nullptr) {
+            std::unique_ptr<LoadMetricStats::StatMap> host_custom_metrics;
+            if (Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.report_load_for_non_zero_stats")) {
               host_custom_metrics = host->loadMetricStats().latch();
+              if (host_custom_metrics != nullptr) {
+                endpoint_has_updates = true;
+              }
             }
-            if (host_custom_metrics != nullptr) {
-              for (const auto& metric : *host_custom_metrics) {
-                const auto& metric_name = metric.first;
-                const auto& metric_value = metric.second;
 
-                // Add the metric to the load metrics map.
-                LoadMetricStats::Stat& stat = aggregated_host_custom_metrics[metric_name];
-                stat.num_requests_with_metric += metric_value.num_requests_with_metric;
-                stat.total_metric_value += metric_value.total_metric_value;
+            if (endpoint_has_updates) {
+              rq_success += host_rq_success;
+              rq_error += host_rq_error;
+              rq_active += host_rq_active;
+              rq_issued += host_rq_issued;
 
-                // If we are reporting endpoint granularity, add the metric to the upstream endpoint
-                // stats.
-                if (upstream_endpoint_stats != nullptr) {
-                  auto* endpoint_load_metric = upstream_endpoint_stats->add_load_metric_stats();
-                  endpoint_load_metric->set_metric_name(metric_name);
-                  endpoint_load_metric->set_num_requests_finished_with_metric(
-                      metric_value.num_requests_with_metric);
-                  endpoint_load_metric->set_total_metric_value(metric_value.total_metric_value);
+              envoy::config::endpoint::v3::UpstreamEndpointStats* upstream_endpoint_stats = nullptr;
+              // Set the upstream endpoint stats if we are reporting endpoint granularity.
+              if (message_ && message_->report_endpoint_granularity()) {
+                upstream_endpoint_stats = locality_stats.add_upstream_endpoint_stats();
+                Network::Utility::addressToProtobufAddress(
+                    *host->address(), *upstream_endpoint_stats->mutable_address());
+                upstream_endpoint_stats->set_total_successful_requests(host_rq_success);
+                upstream_endpoint_stats->set_total_error_requests(host_rq_error);
+                upstream_endpoint_stats->set_total_requests_in_progress(host_rq_active);
+                upstream_endpoint_stats->set_total_issued_requests(host_rq_issued);
+              }
+
+              // TODO(fcfort): Remove this latch() call when cleaning up
+              // `report_load_for_non_zero_stats`.
+              if (host_custom_metrics == nullptr) {
+                host_custom_metrics = host->loadMetricStats().latch();
+              }
+              if (host_custom_metrics != nullptr) {
+                for (const auto& metric : *host_custom_metrics) {
+                  const auto& metric_name = metric.first;
+                  const auto& metric_value = metric.second;
+
+                  // Add the metric to the load metrics map.
+                  LoadMetricStats::Stat& stat = aggregated_host_custom_metrics[metric_name];
+                  stat.num_requests_with_metric += metric_value.num_requests_with_metric;
+                  stat.total_metric_value += metric_value.total_metric_value;
+
+                  // If we are reporting endpoint granularity, add the metric to the upstream
+                  // endpoint stats.
+                  if (upstream_endpoint_stats != nullptr) {
+                    auto* endpoint_load_metric = upstream_endpoint_stats->add_load_metric_stats();
+                    endpoint_load_metric->set_metric_name(metric_name);
+                    endpoint_load_metric->set_num_requests_finished_with_metric(
+                        metric_value.num_requests_with_metric);
+                    endpoint_load_metric->set_total_metric_value(metric_value.total_metric_value);
+                  }
                 }
               }
             }
           }
-        }
 
-        // Upstream locality stats
+          // Upstream locality stats
 
-        bool should_send_locality_stats = rq_issued != 0;
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.report_load_for_non_zero_stats")) {
-          bool has_host_custom_metrics = false;
-          for (const auto& metric : aggregated_host_custom_metrics) {
-            if (metric.second.num_requests_with_metric != 0 ||
-                metric.second.total_metric_value != 0) {
-              has_host_custom_metrics = true;
-              break;
+          bool should_send_locality_stats = rq_issued != 0;
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.report_load_for_non_zero_stats")) {
+            bool has_host_custom_metrics = false;
+            for (const auto& metric : aggregated_host_custom_metrics) {
+              if (metric.second.num_requests_with_metric != 0 ||
+                  metric.second.total_metric_value != 0) {
+                has_host_custom_metrics = true;
+                break;
+              }
             }
+            should_send_locality_stats = rq_success != 0 || rq_error != 0 || rq_active != 0 ||
+                                         rq_issued != 0 || has_host_custom_metrics;
+          } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
+                                                    "report_load_when_rq_active_is_non_zero")) {
+            // If rq_active is non-zero, we should send the locality stats even if
+            // rq_issued is zero (no new requests have been issued in this poll
+            // window). This is needed to report long-lived connections/requests (e.g., when
+            // web-sockets are used).
+            should_send_locality_stats = (rq_issued != 0) || (rq_active != 0);
           }
-          should_send_locality_stats = rq_success != 0 || rq_error != 0 || rq_active != 0 ||
-                                       rq_issued != 0 || has_host_custom_metrics;
-        } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
-                                                  "report_load_when_rq_active_is_non_zero")) {
-          // If rq_active is non-zero, we should send the locality stats even if
-          // rq_issued is zero (no new requests have been issued in this poll
-          // window). This is needed to report long-lived connections/requests (e.g., when
-          // web-sockets are used).
-          should_send_locality_stats = (rq_issued != 0) || (rq_active != 0);
-        }
 
-        if (should_send_locality_stats) {
-          locality_stats.set_total_successful_requests(rq_success);
-          locality_stats.set_total_error_requests(rq_error);
-          locality_stats.set_total_requests_in_progress(rq_active);
-          locality_stats.set_total_issued_requests(rq_issued);
-          for (const auto& metric : aggregated_host_custom_metrics) {
-            auto* load_metric_stats = locality_stats.add_load_metric_stats();
-            load_metric_stats->set_metric_name(metric.first);
-            load_metric_stats->set_num_requests_finished_with_metric(
-                metric.second.num_requests_with_metric);
-            load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+          if (should_send_locality_stats) {
+            locality_stats.set_total_successful_requests(rq_success);
+            locality_stats.set_total_error_requests(rq_error);
+            locality_stats.set_total_requests_in_progress(rq_active);
+            locality_stats.set_total_issued_requests(rq_issued);
+            for (const auto& metric : aggregated_host_custom_metrics) {
+              auto* load_metric_stats = locality_stats.add_load_metric_stats();
+              load_metric_stats->set_metric_name(metric.first);
+              load_metric_stats->set_num_requests_finished_with_metric(
+                  metric.second.num_requests_with_metric);
+              load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+            }
+            cluster_stats->add_upstream_locality_stats()->MergeFrom(locality_stats);
           }
-          cluster_stats->add_upstream_locality_stats()->MergeFrom(locality_stats);
         }
       }
     }
-    cluster_stats->set_total_dropped_requests(
-        cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
-    const uint64_t drop_overload_count =
-        cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
-    if (drop_overload_count > 0) {
+    cluster_stats->set_total_dropped_requests(cluster_rq_dropped_val);
+    if (cluster_rq_drop_overload_val > 0) {
       auto* dropped_request = cluster_stats->add_dropped_requests();
       dropped_request->set_category(cluster.dropCategory());
-      dropped_request->set_dropped_count(drop_overload_count);
+      dropped_request->set_dropped_count(cluster_rq_drop_overload_val);
     }
 
     const auto now = time_source_.monotonicTime().time_since_epoch();
@@ -270,7 +314,7 @@ void LoadStatsReporterImpl::onReceiveMessage(
   stats_.requests_.inc();
 }
 
-void LoadStatsReporterImpl::startLoadReportPeriod() {
+void LoadStatsReporterImpl::startLoadReportPeriodOld() {
   // Once a cluster is tracked, we don't want to reset its stats between reports
   // to avoid racing between request/response.
   // TODO(htuch): They key here could be absl::string_view, but this causes
@@ -321,6 +365,8 @@ void LoadStatsReporterImpl::startLoadReportPeriod() {
     }
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
     cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
+    // Latch stats for newly tracked clusters to reset the deltas.
+    cluster.info()->loadReportStats().upstream_rq_total_.latch();
   };
   if (message_->send_all_clusters()) {
     for (const auto& p : all_clusters.active_clusters_) {
@@ -332,6 +378,54 @@ void LoadStatsReporterImpl::startLoadReportPeriod() {
       handle_cluster_func(cluster_name);
     }
   }
+  response_timer_->enableTimer(std::chrono::milliseconds(
+      DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));
+}
+
+void LoadStatsReporterImpl::startLoadReportPeriod() {
+  if (!optimized_lrs_enabled_) {
+    startLoadReportPeriodOld();
+    return;
+  }
+  // New optimized code path that uses forEachActiveCluster to iterate over the
+  // active clusters in Cluster Manager, getActiveCluster() on the Cluster
+  // Manager to verify the existence of a cluster, instead of creating a new
+  // ClusterInfoMap every time, which is less efficient.
+  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> new_clusters;
+  const auto now = time_source_.monotonicTime().time_since_epoch();
+
+  if (message_->send_all_clusters()) {
+    cm_.forEachActiveCluster([this, &new_clusters, now](const Cluster& cluster) {
+      const std::string& name = cluster.info()->name();
+      auto it = clusters_.find(name);
+      if (it != clusters_.end()) {
+        new_clusters.emplace(name, it->second);
+      } else {
+        new_clusters.emplace(name, now);
+        // Latch stats for newly tracked clusters to reset the deltas.
+        latchLoadReportStats(cluster);
+      }
+    });
+  } else {
+    for (const std::string& cluster_name : message_->clusters()) {
+      auto it = clusters_.find(cluster_name);
+      const bool exists = (it != clusters_.end());
+
+      new_clusters.emplace(cluster_name, exists ? it->second : now);
+
+      OptRef<const Cluster> active_cluster = cm_.getActiveCluster(cluster_name);
+      if (!active_cluster.has_value()) {
+        continue;
+      }
+
+      if (!exists) {
+        // Latch stats for newly tracked clusters to reset the deltas.
+        latchLoadReportStats(*active_cluster);
+      }
+    }
+  }
+
+  clusters_ = std::move(new_clusters);
   response_timer_->enableTimer(std::chrono::milliseconds(
       DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));
 }

@@ -277,12 +277,17 @@ envoy_cc_library(
     srcs = ["load_stats_reporter_impl.cc"],
     hdrs = ["load_stats_reporter_impl.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:load_stats_reporter_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "@abseil-cpp//absl/container:node_hash_map",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
     ],
 )

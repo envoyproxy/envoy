@@ -63,12 +63,17 @@ public:
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
 
+protected:
+  void sendLoadStatsRequest();
+
 private:
   void setRetryTimer();
   void establishNewStream();
-  void sendLoadStatsRequest();
   void handleFailure();
   void startLoadReportPeriod();
+  // Legacy, less efficient implementation which is exercised when the runtime
+  // feature `envoy.reloadable_features.optimized_lrs_enabled` is disabled.
+  void startLoadReportPeriodOld();
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
@@ -84,6 +89,7 @@ private:
   // Map from cluster name to start of measurement interval.
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;
+  const bool optimized_lrs_enabled_;
 };
 
 } // namespace Upstream
