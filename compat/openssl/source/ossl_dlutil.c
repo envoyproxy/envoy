@@ -3,15 +3,36 @@
 #include <limits.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 #include "log.h"
 #include "ossl_dlutil.h"
 
 
 static void *libcrypto;
 static void *libssl;
+
+
+static void *ossl_malloc(size_t num, const char *file, int line) {
+  (void)file;
+  (void)line;
+  return malloc(num);
+}
+
+static void *ossl_realloc(void *addr, size_t num, const char *file, int line) {
+  (void)file;
+  (void)line;
+  return realloc(addr, num);
+}
+
+static void ossl_free(void *addr, const char *file, int line) {
+  (void)file;
+  (void)line;
+  free(addr);
+}
 
 
 void ossl_dlopen(int expected_major, int expected_minor) {
@@ -98,6 +119,28 @@ void ossl_dlopen(int expected_major, int expected_minor) {
   if ((loaded_major != expected_major) || (loaded_minor < expected_minor)) {
     bssl_compat_error("Expecting to load OpenSSL version at least %d.%d.x but got %d.%d.%d\n",
                       expected_major, expected_minor, loaded_major, loaded_minor, loaded_patch);
+    exit(ELIBACC);
+  }
+
+  // Tell OpenSSL to use the tcmalloc malloc/realloc/free functions from the
+  // main executable. Without this, RTLD_DEEPBIND causes OpenSSL's allocations
+  // to resolve to glibc's malloc/realloc/free instead, resulting in OpenSSL
+  // using a completely separate heap. This defeats tcmalloc's performance
+  // benefits on the TLS hot path, and also makes all OpenSSL allocations
+  // invisible to tcmalloc's heap dumps.
+  typedef int (*CRYPTO_set_mem_functions_fn)(
+      void *(*malloc_fn)(size_t, const char *, int),
+      void *(*realloc_fn)(void *, size_t, const char *, int),
+      void (*free_fn)(void *, const char *, int));
+
+  CRYPTO_set_mem_functions_fn set_mem_fn = dlsym(libcrypto, "CRYPTO_set_mem_functions");
+  if (set_mem_fn == NULL) {
+    bssl_compat_error("dlsym(libcrypto, \"CRYPTO_set_mem_functions\") : %s\n", dlerror());
+    exit(ELIBACC);
+  }
+
+  if (!set_mem_fn(ossl_malloc, ossl_realloc, ossl_free)) {
+    bssl_compat_error("CRYPTO_set_mem_functions() failed\n");
     exit(ELIBACC);
   }
 }
