@@ -72,7 +72,6 @@ message Data {
 // ProcessingRequest contains data sent from Envoy to the external processing server.
 // Each request contains either read data (from client) or write data (to client)
 // along with optional metadata and attributes.
-// [#next-free-field: 5]
 message ProcessingRequest {
   // ReadData contains the network data intercepted in the request path (client to server).
   // This is sent to the external processor when data arrives from the downstream client.
