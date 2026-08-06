@@ -15,8 +15,10 @@ The following lists the filter state object keys used by the Envoy extensions to
   Accepts a comma-separated list of protocols as a constructor, e.g. "h2,http/1.1".
 
 ``envoy.network.upstream_subject_alt_names``
-  Enables additional verification of the upstream peer certificate SAN names. Accepts a comma-separated list of SAN
-  names as a constructor.
+  Enables additional verification of the upstream peer certificate SAN names. Both the
+  :ref:`default certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
+  and the :ref:`SPIFFE certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`
+  support this. Accepts a comma-separated list of SAN names as a constructor.
 
 ``envoy.tcp_proxy.cluster``
   :ref:`TCP proxy <config_network_filters_tcp_proxy>` dynamic cluster name selection on a per-connection basis. Accepts
