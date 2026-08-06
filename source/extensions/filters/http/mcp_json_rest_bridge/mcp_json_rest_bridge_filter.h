@@ -35,14 +35,15 @@ inline constexpr char FilterName[] = "envoy.filters.http.mcp_json_rest_bridge";
 
 struct McpJsonRestBridgeStatNames {
   explicit McpJsonRestBridgeStatNames(Stats::SymbolTable& symbol_table)
-      : mcp_method("mcp_method", symbol_table), mcp_param("mcp_param", symbol_table),
-        status("status", symbol_table),
-        request_count("http.mcp_json_rest_bridge.request_count", symbol_table) {}
+      : pool_(symbol_table), mcp_method_(pool_.add("mcp_method")),
+        tool_name_(pool_.add("tool_name")), status_(pool_.add("status")),
+        request_count_(pool_.add("mcp_json_rest_bridge.request_count")) {}
 
-  Stats::StatNameManagedStorage mcp_method;
-  Stats::StatNameManagedStorage mcp_param;
-  Stats::StatNameManagedStorage status;
-  Stats::StatNameManagedStorage request_count;
+  Stats::StatNamePool pool_;
+  const Stats::StatName mcp_method_;
+  const Stats::StatName tool_name_;
+  const Stats::StatName status_;
+  const Stats::StatName request_count_;
 };
 
 struct EndpointKey {
@@ -174,7 +175,31 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
-  void incRequestCount(absl::string_view method, absl::string_view param, absl::string_view status);
+  /**
+   * Increments the `http.mcp_json_rest_bridge.request_count` counter stat with
+   * `mcp_method`, `tool_name`, and `status` tags.
+   *
+   * Implementation and lifetime note:
+   * This method belongs on McpJsonRestBridgeFilterConfig because FilterConfig is a
+   * long-lived singleton per listener/route configuration that owns the Stats::Scope
+   * and StatNamePool shared across all worker threads and request streams. Placing this
+   * method here allows ephemeral per-stream McpJsonRestBridgeFilter instances to
+   * increment the shared stat counters across multiple requests.
+   *
+   * Cardinality considerations:
+   * - `tool_name` is populated ONLY after tool validation against the static
+   *   configured tool registry succeeds. Requests for unknown or malformed tools leave
+   *   `tool_name` empty to prevent tag cardinality explosion from unauthenticated
+   *   or client-controlled input.
+   * - Overall metric cardinality is bounded to O(N) where N is the number of
+   *   statically configured tools (~5 series per configured tool).
+   *
+   * @param method The MCP method (e.g., "initialize", "tools/call", "tools/list").
+   * @param tool_name The tool name (empty if non-tool call or unknown tool).
+   * @param status The bridge status string indicating request outcome or error reason.
+   */
+  void incrementRequestCount(absl::string_view method, absl::string_view tool_name,
+                             absl::string_view status);
 
   bool perRouteOnly() const { return proto_config_.per_route_only(); }
 

@@ -127,7 +127,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalRespo
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
 
-  expectCounter("http.mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_"
+  expectCounter("mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_"
                 "rest_bridge_ok",
                 1, {{"mcp_method", "initialize"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
@@ -195,7 +195,7 @@ TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAccepte
             Http::FilterHeadersStatus::Continue);
 
   expectCounter(
-      "http.mcp_json_rest_bridge.request_count.mcp_method.notifications/"
+      "mcp_json_rest_bridge.request_count.mcp_method.notifications/"
       "initialized.status.mcp_json_rest_bridge_ok",
       1, {{"mcp_method", "notifications/initialized"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
@@ -300,7 +300,7 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
       nlohmann::json::parse(
           R"json({"error":{"code":-32600,"message":"Missing method field"},"id":0,"jsonrpc":"2.0"})json"));
 
-  expectCounter("http.mcp_json_rest_bridge.request_count.status.mcp_json_rest_bridge_request_"
+  expectCounter("mcp_json_rest_bridge.request_count.status.mcp_json_rest_bridge_request_"
                 "method_not_found",
                 1, {{"status", "mcp_json_rest_bridge_request_method_not_found"}});
 }
@@ -681,11 +681,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackendResponseR
       nlohmann::json::parse(
           R"json({"jsonrpc":"2.0","id":123,"result":{"content":[{"text":"{\"displayName\":\"display-key\",\"createTime\":\"1970-01-01T00:00:22Z\"}","type":"text"}],"isError":false}})json"));
 
-  expectCounter("http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
-                "call.mcp_param.create_api_key.status.mcp_json_rest_bridge_ok",
+  expectCounter("mcp_json_rest_bridge.request_count.mcp_method.tools/"
+                "call.tool_name.create_api_key.status.mcp_json_rest_bridge_ok",
                 1,
                 {{"mcp_method", "tools/call"},
-                 {"mcp_param", "create_api_key"},
+                 {"tool_name", "create_api_key"},
                  {"status", "mcp_json_rest_bridge_ok"}});
 }
 
@@ -875,7 +875,7 @@ TEST_F(McpJsonRestBridgeFilterTest, UnknownToolReturnsError) {
           R"json({"error":{"code":-32602,"message":"Unknown tool"},"id":123,"jsonrpc":"2.0"})json"));
 
   expectCounter(
-      "http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
+      "mcp_json_rest_bridge.request_count.mcp_method.tools/"
       "call.status.mcp_json_rest_bridge_request_unknown_tool",
       1, {{"mcp_method", "tools/call"}, {"status", "mcp_json_rest_bridge_request_unknown_tool"}});
 }
@@ -975,11 +975,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
           R"json({"error":{"code":-32602,"message":"Invalid tool arguments"},"id":123,"jsonrpc":"2.0"})json"));
 
   expectCounter(
-      "http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
-      "call.mcp_param.create_api_key.status.mcp_json_rest_bridge_request_tool_transcoding_failure",
+      "mcp_json_rest_bridge.request_count.mcp_method.tools/"
+      "call.tool_name.create_api_key.status.mcp_json_rest_bridge_request_tool_transcoding_failure",
       1,
       {{"mcp_method", "tools/call"},
-       {"mcp_param", "create_api_key"},
+       {"tool_name", "create_api_key"},
        {"status", "mcp_json_rest_bridge_request_tool_transcoding_failure"}});
 }
 
@@ -1034,11 +1034,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
           R"json({"error":{"code":-32602,"message":"Tool arguments must be an object"},"id":123,"jsonrpc":"2.0"})json"));
 
   expectCounter(
-      "http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
-      "call.mcp_param.create_api_key.status.mcp_json_rest_bridge_request_tool_arguments_invalid",
+      "mcp_json_rest_bridge.request_count.mcp_method.tools/"
+      "call.tool_name.create_api_key.status.mcp_json_rest_bridge_request_tool_arguments_invalid",
       1,
       {{"mcp_method", "tools/call"},
-       {"mcp_param", "create_api_key"},
+       {"tool_name", "create_api_key"},
        {"status", "mcp_json_rest_bridge_request_tool_arguments_invalid"}});
 }
 
@@ -3155,6 +3155,40 @@ TEST_F(McpJsonRestBridgeFilterTest, DisabledClearRouteCacheDoesNotClearForToolsL
 
   EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, MultipleFilterStreamsAccumulateStats) {
+  makeFilter();
+
+  // Stream 1: initialize request processed by filter_
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl body1(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body1, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Stream 2: a second distinct stream filter instance sharing the same config_
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks2;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks2;
+  auto filter2 = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter2->setDecoderFilterCallbacks(decoder_callbacks2);
+  filter2->setEncoderFilterCallbacks(encoder_callbacks2);
+
+  Http::TestRequestHeaderMapImpl request_headers2{
+      {":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter2->decodeHeaders(request_headers2, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl body2(
+      R"json({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter2->decodeData(body2, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Verifies the counter accumulated to 2 across the two distinct filter stream lifecycles.
+  expectCounter("mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_"
+                "rest_bridge_ok",
+                2, {{"mcp_method", "initialize"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
 
 } // namespace
