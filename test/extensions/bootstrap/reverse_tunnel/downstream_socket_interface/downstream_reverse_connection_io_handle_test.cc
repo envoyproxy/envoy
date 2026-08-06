@@ -192,14 +192,16 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, Setup) {
 }
 
 // When the parent ReverseConnectionIOHandle is destroyed first, it detaches its still-live children
-// so a surviving tunnel's parent() returns nullptr instead of a dangling pointer.
+// so surviving drain/close notifications are no-ops instead of using a dangling parent pointer.
 TEST_F(DownstreamReverseConnectionIOHandleTest, ParentTeardownDetachesChild) {
   auto child = createHandle(io_handle_.get(), "detach_key");
-  EXPECT_EQ(child->parent(), io_handle_.get());
 
   // Destroying the parent runs cleanup(), which detaches its registered children.
   io_handle_.reset();
-  EXPECT_EQ(child->parent(), nullptr);
+
+  // Drain and close must not crash after detach (parent back-pointer is null).
+  child->markTunnelDrainingAndDialReplacement();
+  EXPECT_EQ(child->close().err_, nullptr);
 }
 
 // Test close() method and all edge cases.

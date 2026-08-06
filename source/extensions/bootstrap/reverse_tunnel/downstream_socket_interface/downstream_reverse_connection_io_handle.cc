@@ -95,6 +95,12 @@ Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
   return Api::SysCallIntResult{0, 0};
 }
 
+void DownstreamReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement() {
+  if (parent_) {
+    parent_->markTunnelDrainingAndDialReplacement(connection_key_, connection_id_);
+  }
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
