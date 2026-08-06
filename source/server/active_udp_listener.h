@@ -98,13 +98,19 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
-  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
+  void shutdownListener(const Network::ExtraShutdownListenerOptions& options) override {
+    if (options.non_dispatched_udp_packet_handler_) {
+      non_dispatched_udp_packet_handler_ = options.non_dispatched_udp_packet_handler_;
+      return;
+    }
     // The read filter should be deleted before the UDP listener is deleted.
     // The read filter refers to the UDP listener to send packets to downstream.
     // If the UDP listener is deleted before the read filter, the read filter may try to use it
     // after deletion.
     read_filters_.clear();
     udp_listener_.reset();
+    flow_last_activity_.clear();
+    flow_sweep_timer_.reset();
   }
   // These two are unreachable because a config will be rejected if it configures both this listener
   // and any L4 filter chain.
@@ -117,7 +123,7 @@ public:
   void onFilterChainDrainStart(const std::list<const Network::FilterChain*>&) override {
     IS_ENVOY_BUG("unexpected call to onFilterChainDrainStart");
   }
-  void onListenerDrainStart() override { IS_ENVOY_BUG("unexpected call to onListenerDrainStart"); }
+  void onListenerDrainStart() override {}
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;
@@ -126,8 +132,16 @@ public:
   Network::UdpListener& udpListener() override;
 
 private:
+  // Erases flows idle for longer than flow_idle_timeout_ and rearms itself while any flows remain.
+  // An entry therefore lives between one and two timeouts past its last packet.
+  void sweepIdleFlows();
+
   std::list<Network::UdpListenerReadFilterPtr> read_filters_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
+  absl::flat_hash_map<Network::UdpRecvData::LocalPeerAddresses, MonotonicTime> flow_last_activity_;
+  Event::TimerPtr flow_sweep_timer_;
+  OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
+  const std::chrono::milliseconds flow_idle_timeout_;
 };
 
 } // namespace Server

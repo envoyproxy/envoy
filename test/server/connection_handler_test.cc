@@ -305,6 +305,8 @@ public:
     Event::MockDispatcher dispatcher_;
   };
 
+  // Note: for Datagram sockets `listener` cannot be injected and is deleted immediately since
+  // #29692. The created ActiveRawUdpListener builds a real UdpListenerImpl internally.
   TestListener* addListener(
       uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,
       const std::string& name, Network::Listener* listener,
@@ -2258,6 +2260,8 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilter) {
 
   // Make sure these calls don't crash.
   Network::UdpRecvData data;
+  data.addresses_.local_ = local_address_;
+  data.addresses_.peer_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 20000);
   callbacks->onData(std::move(data));
   callbacks->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
 }
@@ -2743,6 +2747,55 @@ TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
 
   handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
   handler_->stopListeners();
+}
+
+// Shutdown with a hot restart packet forwarding handler keeps the udp listener alive and
+// forwards packets of unknown flows instead of delivering them locally.
+TEST_F(ConnectionHandlerTest, HotRestartShutdownUdpListenerKeepsListening) {
+  Network::MockUdpReadFilterCallbacks dummy_callbacks;
+  auto listener = new NiceMock<MockUpstreamUdpListener>(*this);
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, nullptr, nullptr, nullptr, nullptr,
+                  Network::Socket::Type::Datagram, std::chrono::milliseconds(), false, nullptr);
+  auto filter = std::make_unique<NiceMock<MockUpstreamUdpFilter>>(*this, dummy_callbacks);
+  auto* filter_ptr = filter.get();
+
+  EXPECT_CALL(factory_, createUdpListenerFilterChain(_, _))
+      .WillOnce(Invoke([&](Network::UdpListenerFilterManager& udp_listener,
+                           Network::UdpReadFilterCallbacks&) -> bool {
+        udp_listener.addReadFilter(std::move(filter));
+        return true;
+      }));
+  EXPECT_CALL(test_listener->socketFactory(), localAddress())
+      .WillRepeatedly(ReturnRef(local_address_));
+  EXPECT_CALL(dummy_callbacks.udp_listener_, onDestroy());
+
+  Network::UdpListenerCallbacks* callbacks = nullptr;
+  auto udp_listener_worker_router = static_cast<Network::MockUdpListenerWorkerRouter*>(
+      test_listener->udp_listener_config_->listener_worker_router_map_
+          .find(local_address_->asString())
+          ->second.get());
+  EXPECT_CALL(*udp_listener_worker_router, registerWorkerForListener(_))
+      .WillOnce(Invoke([&](Network::UdpListenerCallbacks& cb) {
+        EXPECT_CALL(*udp_listener_worker_router, unregisterWorkerForListener(_));
+        callbacks = &cb;
+      }));
+
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  Network::MockNonDispatchedUdpPacketHandler packet_handler;
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = packet_handler;
+  handler_->stopListeners(1, options);
+
+  // A packet of an unknown flow is forwarded instead of being dropped by a shut down listener or
+  // delivered locally.
+  EXPECT_CALL(packet_handler, handle(0, _));
+  EXPECT_CALL(*filter_ptr, onData(_)).Times(0);
+  Network::UdpRecvData data;
+  data.addresses_.local_ = local_address_;
+  data.addresses_.peer_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 20000);
+  callbacks->onData(std::move(data));
 }
 
 } // namespace
