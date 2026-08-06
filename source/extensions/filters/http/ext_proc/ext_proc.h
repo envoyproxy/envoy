@@ -219,6 +219,20 @@ public:
     it->second->deferredClose(dispatcher);
   }
 
+  ~ThreadLocalStreamManager() override {
+    // Clean up all the streams in the map that are not closed yet.
+    // This is to avoid dangling reference at the underlying gRPC stream.
+    while (!stream_manager_.empty()) {
+      // Pop the element out first so we always make progress, even if stream_ state changes.
+      auto it = stream_manager_.begin();
+      DeferredDeletableStreamPtr stream = std::move(it->second);
+      stream_manager_.erase(it);
+
+      // Close the underlying stream now.
+      stream->closeStreamOnTimer();
+    }
+  }
+
 private:
   // Map of DeferredDeletableStreamPtrs with ExternalProcessorStream pointer as key.
   absl::flat_hash_map<ExternalProcessorStream*, DeferredDeletableStreamPtr> stream_manager_;
