@@ -246,6 +246,20 @@ public:
     it->second->deferredClose(dispatcher);
   }
 
+  ~ThreadLocalStreamManager() override {
+    // Clean up all the streams in the map that are not closed yet.
+    // This is to avoid dangling reference at the underlying gRPC stream.
+    while (!stream_manager_.empty()) {
+      // Pop the element out first so we always make progress, even if stream_ state changes.
+      auto it = stream_manager_.begin();
+      DeferredDeletableStreamPtr stream = std::move(it->second);
+      stream_manager_.erase(it);
+
+      // Close the underlying stream now.
+      stream->closeStreamOnTimer();
+    }
+  }
+
 private:
   // Map of DeferredDeletableStreamPtrs with ExternalProcessorStream pointer as key.
   absl::flat_hash_map<ExternalProcessorStream*, DeferredDeletableStreamPtr> stream_manager_;
@@ -312,6 +326,10 @@ public:
 
   const std::vector<std::string>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
+  }
+
+  const std::vector<std::string>& typedReceivingMetadataNamespaces() const {
+    return typed_receiving_namespaces_;
   }
 
   const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
@@ -381,6 +399,7 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
+  const std::vector<std::string> typed_receiving_namespaces_;
   const std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
   const std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
   // Empty allowed_header_ means allow all.
@@ -461,6 +480,9 @@ public:
   const std::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
+  const std::optional<const std::vector<std::string>>& typedReceivingMetadataNamespaces() const {
+    return typed_receiving_namespaces_;
+  }
   const std::optional<const std::vector<std::string>>&
   untypedClusterMetadataForwardingNamespaces() const {
     return untyped_cluster_metadata_forwarding_namespaces_;
@@ -492,6 +514,7 @@ private:
   const std::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
   const std::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
   const std::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
+  const std::optional<const std::vector<std::string>> typed_receiving_namespaces_;
   const std::optional<const std::vector<std::string>>
       untyped_cluster_metadata_forwarding_namespaces_;
   const std::optional<const std::vector<std::string>> typed_cluster_metadata_forwarding_namespaces_;
@@ -527,12 +550,14 @@ public:
             *this, config->processingMode(), config->untypedForwardingMetadataNamespaces(),
             config->typedForwardingMetadataNamespaces(),
             config->untypedReceivingMetadataNamespaces(),
+            config->typedReceivingMetadataNamespaces(),
             config->untypedClusterMetadataForwardingNamespaces(),
             config->typedClusterMetadataForwardingNamespaces(), config->keepContentLength()),
         encoding_state_(
             *this, config->processingMode(), config->untypedForwardingMetadataNamespaces(),
             config->typedForwardingMetadataNamespaces(),
             config->untypedReceivingMetadataNamespaces(),
+            config->typedReceivingMetadataNamespaces(),
             config->untypedClusterMetadataForwardingNamespaces(),
             config->typedClusterMetadataForwardingNamespaces(), config->keepContentLength()),
         processing_request_modifier_(config->createProcessingRequestModifier()),
@@ -642,6 +667,10 @@ private:
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
   void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                           const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setUntypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                                 const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setTypedDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                               const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void setEncoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void setDecoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void addDynamicMetadata(const ProcessorState& state,
@@ -699,6 +728,7 @@ private:
   std::vector<std::string> untyped_forwarding_namespaces_;
   std::vector<std::string> typed_forwarding_namespaces_;
   std::vector<std::string> untyped_receiving_namespaces_;
+  std::vector<std::string> typed_receiving_namespaces_;
   std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
   std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
   Http::StreamFilterCallbacks* filter_callbacks_;

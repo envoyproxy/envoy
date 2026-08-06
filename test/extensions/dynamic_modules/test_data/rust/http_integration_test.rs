@@ -1,8 +1,7 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::any::Any;
-use std::cell::{Cell, RefCell};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -86,6 +85,27 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
+    "generic_secret_callbacks" => {
+      let secret_name = String::from_utf8(config.to_owned()).unwrap();
+      // A secret that is not configured anywhere cannot be subscribed to.
+      assert!(envoy_filter_config
+        .subscribe_generic_secret("not_configured", None)
+        .is_none());
+      let secret = envoy_filter_config
+        .subscribe_generic_secret(&secret_name, None)
+        .expect("failed to subscribe to the secret");
+      // The value is readable right away from the config context, since a static secret is
+      // available before any request is served.
+      let value_at_config = envoy_filter_config
+        .get_generic_secret(secret)
+        .expect("failed to read the secret")
+        .as_slice()
+        .to_vec();
+      Some(Box::new(GenericSecretCallbacksFilterConfig {
+        secret,
+        value_at_config,
+      }))
+    },
     "streaming_terminal_filter" => Some(Box::new(StreamingTerminalFilterConfig {})),
     "streaming_response_reentry" => Some(Box::new(StreamingResponseReentryFilterConfig {})),
     "reentrant_stream_complete" => Some(Box::new(ReentrantStreamCompleteFilterConfig {
@@ -155,6 +175,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     },
     "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
     "filter_state_object_recreate" => Some(Box::new(FilterStateObjectRecreateFilterConfig {})),
+    "use_self_after_teardown" => Some(Box::new(UseSelfAfterTeardownFilterConfig {
+      dropped_filters: Arc::new(AtomicUsize::new(0)),
+    })),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
     "log_level" => Some(Box::new(LogLevelFilterConfig {})),
     _ => panic!("Unknown filter name: {name}"),
@@ -243,6 +266,74 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateObjectRecreateFilter {
         abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
       },
     }
+  }
+}
+
+const RECREATED_HEADER: &str = "x-recreated";
+
+/// A HTTP filter that keeps using itself after recreate_stream has torn its own filter chain down.
+/// The counter lives in the config so that a filter can report how many filters Envoy had already
+/// destroyed by the time its own hook resumed.
+struct UseSelfAfterTeardownFilterConfig {
+  dropped_filters: Arc<AtomicUsize>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UseSelfAfterTeardownFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(UseSelfAfterTeardownFilter {
+      state: String::from("alive"),
+      dropped_filters: self.dropped_filters.clone(),
+    })
+  }
+}
+
+struct UseSelfAfterTeardownFilter {
+  state: String,
+  dropped_filters: Arc<AtomicUsize>,
+}
+
+impl Drop for UseSelfAfterTeardownFilter {
+  fn drop(&mut self) {
+    self.dropped_filters.fetch_add(1, Ordering::SeqCst);
+  }
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UseSelfAfterTeardownFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // The request headers are carried over to the recreated stream, so this marks the second pass.
+    if envoy_filter
+      .get_request_header_value(RECREATED_HEADER)
+      .is_some()
+    {
+      envoy_filter.send_response(200, &[(RECREATED_HEADER, b"true")], None, None);
+      return abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
+    }
+
+    let header_set = envoy_filter.set_request_header(RECREATED_HEADER, b"true");
+    let recreated = envoy_filter.recreate_stream(None);
+
+    // Everything below runs on a hook whose filter chain Envoy has already destroyed. Writing the
+    // state proves the allocation is intact, and a synchronous destroy would have counted this
+    // filter in the drops. Panics are swallowed at the FFI boundary, so every result the test needs
+    // to check goes to the log rather than to an assert.
+    self.state.push_str("-torn-down");
+    envoy_log_info!(
+      "recreated with state {} after {} drops, header_set={} recreated={} append={} drain={} \
+       route={}",
+      self.state,
+      self.dropped_filters.load(Ordering::SeqCst),
+      header_set,
+      recreated,
+      envoy_filter.append_buffered_request_body(b"ignored"),
+      envoy_filter.drain_buffered_response_body(1),
+      envoy_filter.get_most_specific_route_config().is_some()
+    );
+
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 }
 
@@ -2223,6 +2314,50 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
       let header_name = format!("x-list-bool-{i}");
       envoy_filter.set_response_header(&header_name, val.to_string().as_bytes());
     }
+
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+/// Subscribes to a generic secret at config load and exposes the value on the response, both as
+/// read per-stream and as read from the config context during initialization.
+struct GenericSecretCallbacksFilterConfig {
+  secret: EnvoyGenericSecretId,
+  value_at_config: Vec<u8>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for GenericSecretCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(GenericSecretCallbacksFilter {
+      secret: self.secret,
+      value_at_config: self.value_at_config.clone(),
+    })
+  }
+}
+
+struct GenericSecretCallbacksFilter {
+  secret: EnvoyGenericSecretId,
+  value_at_config: Vec<u8>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for GenericSecretCallbacksFilter {
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let value = envoy_filter
+      .get_generic_secret(self.secret)
+      .expect("failed to read the secret")
+      .as_slice()
+      .to_vec();
+    envoy_filter.set_response_header("x-secret-value", &value);
+    envoy_filter.set_response_header("x-secret-value-at-config", &self.value_at_config);
+
+    // An ID that was never returned by a subscription is not readable.
+    assert!(envoy_filter
+      .get_generic_secret(EnvoyGenericSecretId(12345))
+      .is_none());
 
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }

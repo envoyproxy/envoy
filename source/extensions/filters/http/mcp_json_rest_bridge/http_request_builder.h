@@ -15,6 +15,10 @@ namespace McpJsonRestBridge {
 // https://cloud.google.com/service-infrastructure/docs/service-management/reference/rpc/google.api#path-template-syntax
 inline constexpr absl::string_view ReservedChars = R"( !"#$%&'()*+,:;<=>?@[\]^`{|}~)";
 
+// Same as `ReservedChars` but also percent-encodes '/', to confine a "simple" path-template
+// variable (`{id}`, no `=pattern`) to a single path segment. See #45931.
+inline constexpr absl::string_view ReservedCharsWithSlash = R"( !"#$%&'()*+,/:;<=>?@[\]^`{|}~)";
+
 struct HttpRequest {
   std::string url;
   std::string method;

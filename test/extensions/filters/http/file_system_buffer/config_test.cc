@@ -75,13 +75,50 @@ public:
   }
 };
 
+// First layer: the proto ``(validate.required)`` rule rejects an unset behavior during config
+// ingestion, before the FileSystemBufferFilterConfig constructor runs.
+TEST_F(FileSystemBufferFilterConfigTest, ProtoValidationRejectsUnsetBufferBehavior) {
+  auto proto_config = configFromYaml(R"(
+    request:
+      behavior: {}
+  )");
+  EXPECT_THROW_WITH_REGEX(captureConfigFromProto(proto_config), ProtoValidationException,
+                          "is required");
+}
+
+// Second layer: the constructor independently rejects an unset request behavior as a config load
+// time error, in case a config reaches it without proto validation.
+TEST_F(FileSystemBufferFilterConfigTest, ConstructorRejectsUnsetRequestBufferBehavior) {
+  auto proto_config = configFromYaml(R"(
+    request:
+      behavior: {}
+  )");
+  absl::Status creation_status;
+  FileSystemBufferFilterConfig config(nullptr, nullptr, proto_config, creation_status);
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         HasSubstr("request buffer behavior is set but empty")));
+}
+
+// As above, but for the response direction.
+TEST_F(FileSystemBufferFilterConfigTest, ConstructorRejectsUnsetResponseBufferBehavior) {
+  auto proto_config = configFromYaml(R"(
+    response:
+      behavior: {}
+  )");
+  absl::Status creation_status;
+  FileSystemBufferFilterConfig config(nullptr, nullptr, proto_config, creation_status);
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         HasSubstr("response buffer behavior is set but empty")));
+}
+
 // Declared here because it's only visible for the sake of this test.
 const BufferBehavior& selectBufferBehavior(const ProtoBufferBehavior& behavior);
-TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionOnUnsetBufferBehavior) {
+// Because config validation guarantees the behavior is set, reaching ``selectBufferBehavior`` with
+// an unset behavior is a programming error rather than a recoverable runtime condition.
+TEST_F(FileSystemBufferFilterConfigTest, PanicsOnUnsetBufferBehavior) {
   BufferBehavior just_to_add_coverage_for_destructor;
   ProtoBufferBehavior unset_behavior;
-  EXPECT_THROW_WITH_REGEX(selectBufferBehavior(unset_behavior), EnvoyException,
-                          "invalid BufferBehavior");
+  EXPECT_DEATH(selectBufferBehavior(unset_behavior), "unset oneof");
 }
 
 TEST_F(FileSystemBufferFilterConfigTest, FailsWithConfiguredInvalidPath) {

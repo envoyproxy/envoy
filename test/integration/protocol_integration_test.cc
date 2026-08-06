@@ -49,6 +49,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+
+#include "quiche/quic/core/crypto/crypto_protocol.h"
 #endif
 
 using testing::Eq;

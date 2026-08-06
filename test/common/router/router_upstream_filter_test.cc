@@ -165,6 +165,45 @@ TEST_F(RouterUpstreamFilterTest, UpstreamFilter) {
   auto headers = run();
   EXPECT_FALSE(headers.get(Http::LowerCaseString("x-header-to-add")).empty());
 }
+
+// Regression test for a use-after-free at teardown. A dynamic (ECDS) upstream HTTP filter causes
+// FilterConfig to create a Filter::FilterConfigSubscription, which holds a raw reference to the
+// filter config provider manager and dereferences it from its destructor. That manager is an
+// *unpinned* singleton, so it survives only as long as something holds a strong reference to it:
+// FilterConfig must be that holder for the providers it owns.
+TEST_F(RouterUpstreamFilterTest, DynamicFilterKeepsConfigProviderManagerAlive) {
+  HttpFilter dynamic_filter;
+  dynamic_filter.set_name("dynamic-filter");
+  auto* config_discovery = dynamic_filter.mutable_config_discovery();
+  config_discovery->mutable_config_source()->mutable_ads();
+  config_discovery->add_type_urls(
+      "type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig");
+
+  HttpFilter codec_filter;
+  codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+  init({dynamic_filter, codec_filter});
+  ASSERT_NE(nullptr, config_);
+
+  // Looking the singleton up again returns the live instance if one exists and creates a fresh one
+  // otherwise. Binding it to a weak_ptr and letting the returned strong reference expire at the end
+  // of the statement therefore reports whether `config_` is keeping the manager alive: without that
+  // reference, the manager created during init() is already gone and every subscription it owns is
+  // left holding a dangling reference.
+  std::weak_ptr<Http::UpstreamFilterConfigProviderManager> manager =
+      Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+          context_.server_factory_context_);
+  EXPECT_FALSE(manager.expired());
+
+  // Destroying the router config destroys the providers and their subscription, which writes
+  // through that reference. The manager must still be alive at that point (this is where ASAN
+  // reports the use-after-free without the fix) and may be released only afterwards.
+  router_.reset();
+  config_.reset();
+  EXPECT_TRUE(manager.expired());
+}
 } // namespace
 } // namespace Router
 } // namespace Envoy

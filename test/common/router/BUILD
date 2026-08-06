@@ -485,6 +485,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:filter_chain_helper_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
