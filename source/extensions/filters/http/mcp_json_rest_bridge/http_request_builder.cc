@@ -20,6 +20,8 @@ namespace {
 
 using ::nlohmann::json;
 
+constexpr uint32_t MaxNestingDepth = 100;
+
 absl::StatusOr<json> getJsonValue(const json& data, absl::string_view path) {
   std::vector<absl::string_view> parts = absl::StrSplit(path, '.');
   json current = data;
@@ -49,7 +51,7 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
                                   absl::string_view body_rule, const json& arguments,
                                   const absl::flat_hash_set<std::string>& templates,
                                   const std::string& path, uint32_t depth = 0) {
-  if (depth > 100) {
+  if (depth > MaxNestingDepth) {
     return absl::InvalidArgumentError("JSON payload exceeds maximum nesting depth limit");
   }
   // Skip if it's a URL path template
