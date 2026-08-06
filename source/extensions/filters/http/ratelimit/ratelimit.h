@@ -166,7 +166,7 @@ private:
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
   const bool enable_x_ratelimit_headers_;
-  const bool enable_retry_after_header_;
+  const bool enable_retry_after_header_ = false;
   const bool disable_x_envoy_ratelimited_header_;
   const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
