@@ -67,7 +67,7 @@ message NetworkExternalProcessor {
 }
 
 // Options for controlling processing behavior.
-// Filter will reject the config if both read and write are SKIP mode.
+// Filter will reject the config if read, write, and new_connection are all SKIP mode.
 message ProcessingMode {
   // Defines how traffic should be handled by the external processor.
   enum DataSendMode {
@@ -78,6 +78,15 @@ message ProcessingMode {
     SKIP = 1;
   }
 
+  // Control how new connection events are handled.
+  enum ConnectionSendMode {
+    // Skip sending the new connection event to the external processor. This is the default.
+    NONE = 0;
+
+    // Send the new connection event to the external processor.
+    SEND = 1;
+  }
+
   // Controls whether inbound (read) data from the client is sent to the external processor.
   // Default: STREAMED
   DataSendMode process_read = 1;
@@ -85,6 +94,10 @@ message ProcessingMode {
   // Controls whether outbound (write) data to the client is sent to the external processor.
   // Default: STREAMED
   DataSendMode process_write = 2;
+
+  // Controls whether new connection events are sent to the external processor.
+  // Default: NONE
+  ConnectionSendMode process_new_connection = 3;
 }
 
 // The MetadataOptions structure defines options for sending dynamic metadata. Specifically,

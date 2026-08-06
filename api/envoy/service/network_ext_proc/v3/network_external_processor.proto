@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.network_ext_proc.v3;
 
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/struct.proto";
@@ -58,6 +59,21 @@ service NetworkExternalProcessor {
   }
 }
 
+// Information about a new connection event sent when a connection is first established.
+message NewConnection {
+  // The downstream remote (client) address.
+  config.core.v3.Address downstream_remote_address = 1;
+
+  // The downstream local (listener/server) address.
+  config.core.v3.Address downstream_local_address = 2;
+
+  // Optional: Server Name Indication (SNI) or requested server name, if available.
+  string requested_server_name = 3;
+
+  // Optional: Negotiated application protocol (ALPN), if available.
+  string negotiated_protocol = 4;
+}
+
 // The payload data from network layer
 message Data {
   // The raw payload data
@@ -70,17 +86,17 @@ message Data {
 }
 
 // ProcessingRequest contains data sent from Envoy to the external processing server.
-// Each request contains either read data (from client) or write data (to client)
-// along with optional metadata.
+// Each request contains either read data (from client), write data (to client),
+// or a new connection event along with optional metadata.
 message ProcessingRequest {
   // ReadData contains the network data intercepted in the request path (client to server).
   // This is sent to the external processor when data arrives from the downstream client.
-  // If this is set, write_data should not be set.
+  // If this is set, write_data and new_connection should not be set.
   Data read_data = 1;
 
   // WriteData contains the network data intercepted in the response path (server to client).
   // This is sent to the external processor when data arrives from the upstream server.
-  // If this is set, read_data should not be set.
+  // If this is set, read_data and new_connection should not be set.
   Data write_data = 2;
 
   // Optional metadata associated with the request.
@@ -90,6 +106,11 @@ message ProcessingRequest {
   // The metadata is not automatically propagated from request to response.
   // The external processor must include any needed metadata in its response.
   config.core.v3.Metadata metadata = 3;
+
+  // NewConnection contains the connection event intercepted when a new connection is established.
+  // This is sent to the external processor when onNewConnection is called on the downstream connection.
+  // If this is set, read_data and write_data should not be set.
+  NewConnection new_connection = 4;
 }
 
 // ProcessingResponse contains the response from the external processing server to Envoy.

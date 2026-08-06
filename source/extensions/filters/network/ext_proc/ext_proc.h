@@ -28,6 +28,7 @@ namespace ExtProc {
   COUNTER(stream_msgs_received)                                                                    \
   COUNTER(read_data_sent)                                                                          \
   COUNTER(write_data_sent)                                                                         \
+  COUNTER(new_connection_sent)                                                                     \
   COUNTER(read_data_injected)                                                                      \
   COUNTER(write_data_injected)                                                                     \
   COUNTER(empty_response_received)                                                                 \
@@ -163,8 +164,7 @@ using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingRespo
 class NetworkExtProcFilter;
 
 /**
- * Manages timeouts for read and write operations independently.
- * Each direction (read/write) can have its own active timer.
+ * Manages timeouts for read, write, and new_connection operations independently.
  */
 class MessageTimeoutManager : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
@@ -177,17 +177,26 @@ public:
   // Stop timeout for a specific direction
   void stopTimer(bool is_read);
 
+  // Start timeout for new connection
+  void startConnectionTimer();
+
+  // Stop timeout for new connection
+  void stopConnectionTimer();
+
   // Stop all active timers
   void stopAllTimers();
 
 private:
   void onTimeout(bool is_read);
+  void onConnectionTimeout();
 
   NetworkExtProcFilter& filter_;
   Event::TimerPtr read_timer_;
   Event::TimerPtr write_timer_;
+  Event::TimerPtr connection_timer_;
   bool read_timer_active_{false};
   bool write_timer_active_{false};
+  bool connection_timer_active_{false};
 };
 
 class NetworkExtProcFilter : public Envoy::Network::Filter,
@@ -233,6 +242,7 @@ public:
 
   // Called by MessageTimeoutManager
   void handleMessageTimeout(bool is_read);
+  void handleConnectionMessageTimeout();
   const std::chrono::milliseconds& getMessageTimeout();
 
 private:
@@ -253,6 +263,7 @@ private:
   StreamOpenState openStream();
   void closeStream();
 
+  void sendNewConnectionRequest();
   void sendRequest(Envoy::Buffer::Instance& data, bool end_stream, bool is_read);
   void addDynamicMetadata(ProcessingRequest& req);
 
@@ -278,10 +289,12 @@ private:
 
   std::optional<MonotonicTime> read_call_start_time_;
   std::optional<MonotonicTime> write_call_start_time_;
+  std::optional<MonotonicTime> new_connection_call_start_time_;
   NetworkExtProcLoggingInfo* logging_info_{nullptr};
 
   bool processing_complete_{false};
 
+  bool new_connection_pending_{false};
   bool read_pending_{false};
   bool write_pending_{false};
 
