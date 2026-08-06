@@ -333,6 +333,76 @@ TEST_F(ExtProcStreamTest, OnReceiveMessageAfterFilterDestroy) {
   stream->close();
 }
 
+// When the ProcessorStreamImpl is destroyed while its stream is still open, the destructor must
+// close the underlying gRPC stream. This is the backstop for the case where the
+// ThreadLocalStreamManager is torn down by an ext_proc config update (observability mode) before
+// the deferred-close timer fires: without it, the gRPC stream would be left with a dangling
+// callbacks reference.
+TEST_F(ExtProcStreamTest, DestructorClosesOpenStream) {
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+  ASSERT_NE(stream, nullptr);
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_side_stream_flow_control")) {
+    EXPECT_CALL(stream_, removeWatermarkCallbacks());
+  }
+  EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
+  // Destroying the stream without an explicit close() must close the underlying gRPC stream.
+  stream.reset();
+}
+
+// The destructor must not double-close a stream that was already closed via close().
+TEST_F(ExtProcStreamTest, DestructorDoesNotCloseAlreadyClosedStream) {
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+  ASSERT_NE(stream, nullptr);
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_side_stream_flow_control")) {
+    EXPECT_CALL(stream_, removeWatermarkCallbacks());
+  }
+  // These are expected exactly once, from the explicit close() below. A second invocation from the
+  // destructor would fail the expectation.
+  EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
+  EXPECT_TRUE(stream->close());
+
+  // Destroying the stream after an explicit close() must not double-close the underlying gRPC
+  // stream.
+  EXPECT_CALL(stream_, closeStream()).Times(0);
+  EXPECT_CALL(stream_, resetStream()).Times(0);
+  stream.reset();
+}
+
+// After a graceful half-close (ext_proc_graceful_grpc_close), the underlying gRPC stream is
+// intentionally kept alive to await the server's close, so the destructor must NOT reset it.
+TEST_F(ExtProcStreamTest, DestructorAfterHalfCloseDoesNotResetStream) {
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+  ASSERT_NE(stream, nullptr);
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_side_stream_flow_control")) {
+    EXPECT_CALL(stream_, removeWatermarkCallbacks());
+  }
+  EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, waitForRemoteCloseAndDelete());
+  // The stream is deleted later on remote close; the destructor must not reset it here.
+  EXPECT_CALL(stream_, resetStream()).Times(0);
+  EXPECT_TRUE(stream->halfCloseAndDeleteOnRemoteClose());
+
+  // Destroying the stream after a half-close must not reset the underlying gRPC stream, since it is
+  // still alive awaiting the server's close.
+  EXPECT_CALL(stream_, closeStream()).Times(0);
+  EXPECT_CALL(stream_, resetStream()).Times(0);
+  stream.reset();
+}
+
 TEST_F(ExtProcStreamTest, ClientStartError) {
   Http::AsyncClient::ParentContext parent_context;
   parent_context.stream_info = &stream_info_;
