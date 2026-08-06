@@ -1227,6 +1227,109 @@ TEST(BufferHelperTest, AddFragmentsOptimization) {
     EXPECT_EQ(4 + 10000, buffer.length());
   }
 }
+TEST(OwnedImplTest, SliceRecycling) {
+  Buffer::OwnedImpl buffer;
+  std::vector<void*> original_slices;
+
+  // Reserve 8 slices (128KB) to empty the freelist and record their addresses.
+  {
+    Buffer::Reservation reservation = buffer.reserveForRead();
+    EXPECT_EQ(8, reservation.numSlices());
+    for (size_t i = 0; i < reservation.numSlices(); i++) {
+      original_slices.push_back(reservation.slices()[i].mem_);
+    }
+    reservation.commit(128 * 1024);
+  }
+
+  EXPECT_EQ(128 * 1024, buffer.length());
+
+  // Drain the buffer to trigger recycling of all 8 slices.
+  buffer.drain(128 * 1024);
+  EXPECT_EQ(0, buffer.length());
+
+  // Allocate spoiler memory to consume any heap-freed blocks.
+  // If the slices were not recycled, they were freed to the heap,
+  // and these allocations will likely consume those addresses.
+  std::vector<std::unique_ptr<uint8_t[]>> spoilers;
+  for (size_t i = 0; i < 8; ++i) {
+    spoilers.push_back(std::make_unique<uint8_t[]>(16 * 1024));
+  }
+
+  // Reserve again. It should reuse the recycled slices.
+  {
+    Buffer::Reservation reservation = buffer.reserveForRead();
+    EXPECT_EQ(8, reservation.numSlices());
+    std::vector<void*> new_slices;
+    for (size_t i = 0; i < reservation.numSlices(); i++) {
+      new_slices.push_back(reservation.slices()[i].mem_);
+    }
+
+    std::sort(original_slices.begin(), original_slices.end());
+    std::sort(new_slices.begin(), new_slices.end());
+    EXPECT_EQ(original_slices, new_slices);
+
+    reservation.commit(0);
+  }
+}
+
+TEST(OwnedImplTest, SliceRecyclingNonDefaultSize) {
+  Buffer::OwnedImpl buffer1;
+  Buffer::OwnedImpl buffer2;
+  std::vector<void*> original_slices;
+
+  // 1. Warm up: Reserve 8 default slices (16KB) in buffer1 and record them.
+  {
+    Buffer::Reservation reservation = buffer1.reserveForRead();
+    EXPECT_EQ(8, reservation.numSlices());
+    for (size_t i = 0; i < reservation.numSlices(); i++) {
+      original_slices.push_back(reservation.slices()[i].mem_);
+    }
+    reservation.commit(128 * 1024);
+  }
+
+  // 2. Reserve a 32KB (non-default) slice in buffer2.
+  void* non_default_slice_mem = nullptr;
+  {
+    Buffer::ReservationSingleSlice reservation = buffer2.reserveSingleSlice(32768, true);
+    non_default_slice_mem = reservation.slice().mem_;
+    EXPECT_NE(nullptr, non_default_slice_mem);
+    EXPECT_EQ(32768, reservation.slice().len_);
+    reservation.commit(32768);
+  }
+
+  // 3. Drain buffer2 (32KB). If it were recycled, it would go to freelist.
+  buffer2.drain(32768);
+
+  // 4. Drain buffer1 (128KB). These 8 slices should be recycled.
+  buffer1.drain(128 * 1024);
+
+  // Allocate spoiler memory to consume any heap-freed blocks.
+  std::vector<std::unique_ptr<uint8_t[]>> spoilers;
+  for (size_t i = 0; i < 8; ++i) {
+    spoilers.push_back(std::make_unique<uint8_t[]>(16 * 1024));
+  }
+
+  // 5. Reserve 8 slices in buffer1 again.
+  {
+    Buffer::Reservation reservation = buffer1.reserveForRead();
+    EXPECT_EQ(8, reservation.numSlices());
+    std::vector<void*> new_slices;
+    for (size_t i = 0; i < reservation.numSlices(); i++) {
+      new_slices.push_back(reservation.slices()[i].mem_);
+    }
+
+    std::sort(original_slices.begin(), original_slices.end());
+    std::sort(new_slices.begin(), new_slices.end());
+    EXPECT_EQ(original_slices, new_slices);
+
+    for (void* mem : new_slices) {
+      EXPECT_NE(non_default_slice_mem, mem);
+    }
+
+    reservation.commit(0);
+  }
+}
+
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

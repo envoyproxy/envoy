@@ -111,38 +111,9 @@ public:
     rhs.reservable_ = 0;
   }
 
-  Slice& operator=(Slice&& rhs) noexcept {
-    if (this != &rhs) {
-      callAndClearDrainTrackersAndCharges();
+  Slice& operator=(Slice&& rhs) noexcept;
 
-      capacity_ = rhs.capacity_;
-      storage_ = std::move(rhs.storage_);
-      base_ = rhs.base_;
-      data_ = rhs.data_;
-      reservable_ = rhs.reservable_;
-      drain_trackers_ = std::move(rhs.drain_trackers_);
-      account_ = std::move(rhs.account_);
-      if (releasor_) {
-        releasor_();
-      }
-      releasor_ = rhs.releasor_;
-      rhs.releasor_ = nullptr;
-
-      rhs.capacity_ = 0;
-      rhs.base_ = nullptr;
-      rhs.data_ = 0;
-      rhs.reservable_ = 0;
-    }
-
-    return *this;
-  }
-
-  ~Slice() {
-    callAndClearDrainTrackersAndCharges();
-    if (releasor_) {
-      releasor_();
-    }
-  }
+  ~Slice();
 
   /**
    * @return true if the data in the slice is mutable
@@ -642,6 +613,7 @@ private:
  */
 class OwnedImpl : public LibEventInstance {
 public:
+  friend class Slice;
   OwnedImpl();
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
@@ -763,7 +735,7 @@ private:
 
   struct OwnedImplReservationSlicesOwnerMultiple : public OwnedImplReservationSlicesOwner {
   public:
-    static constexpr uint32_t free_list_max_ = Buffer::Reservation::MAX_SLICES_;
+    static constexpr uint32_t free_list_max_ = 4 * Buffer::Reservation::MAX_SLICES_;
 
     OwnedImplReservationSlicesOwnerMultiple() : free_list_ref_(free_list_) {}
     ~OwnedImplReservationSlicesOwnerMultiple() override {
@@ -774,6 +746,16 @@ private:
             free_list_ref_.push_back(std::move(r->mem_));
           }
         }
+      }
+    }
+
+    /**
+     * Recycles a storage block back to the thread-local freelist if it matches the default size
+     * and the freelist has capacity. Otherwise, frees `storage`.
+     */
+    static void recycle(Slice::StoragePtr storage, size_t size) {
+      if (size == Slice::default_slice_size_ && free_list_.size() < free_list_max_) {
+        free_list_.push_back(std::move(storage));
       }
     }
 
@@ -857,6 +839,46 @@ private:
 };
 
 using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
+
+inline Slice& Slice::operator=(Slice&& rhs) noexcept {
+  if (this != &rhs) {
+    callAndClearDrainTrackersAndCharges();
+    if (storage_) {
+      OwnedImpl::OwnedImplReservationSlicesOwnerMultiple::recycle(std::move(storage_), capacity_);
+    }
+    if (releasor_) {
+      releasor_();
+    }
+
+    capacity_ = rhs.capacity_;
+    storage_ = std::move(rhs.storage_);
+    base_ = rhs.base_;
+    data_ = rhs.data_;
+    reservable_ = rhs.reservable_;
+    drain_trackers_ = std::move(rhs.drain_trackers_);
+    account_ = std::move(rhs.account_);
+    releasor_ = rhs.releasor_;
+    rhs.releasor_ = nullptr;
+
+    rhs.capacity_ = 0;
+    rhs.base_ = nullptr;
+    rhs.data_ = 0;
+    rhs.reservable_ = 0;
+  }
+
+  return *this;
+}
+
+// Define Slice destructor after OwnedImpl is fully defined
+inline Slice::~Slice() {
+  callAndClearDrainTrackersAndCharges();
+  if (releasor_) {
+    releasor_();
+  }
+  if (storage_) {
+    OwnedImpl::OwnedImplReservationSlicesOwnerMultiple::recycle(std::move(storage_), capacity_);
+  }
+}
 
 } // namespace Buffer
 } // namespace Envoy
