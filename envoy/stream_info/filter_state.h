@@ -46,6 +46,28 @@ enum class StreamSharingMayImpactPooling {
   SharedWithUpstreamConnectionOnce,
 };
 
+enum class FilterStateIndex : uint32_t {
+  LocalReplyOwner,
+  UpstreamServerName,
+  TransportSocketOptions,
+  ConnectionExecutionContext,
+  OriginalConnectPort,
+  CacheFilterLoggingInfo,
+  ExtAuthzLoggingInfo,
+  OverrideHost,
+  NetworkNamespace,
+  UpstreamSubjectAltNames,
+  TransportSocketOriginalDstAddress,
+  TunnelResponseHeadersOrTrailers,
+  TcpProxyCluster,
+  TcpProxyPerConnectionIdleTimeoutMs,
+  UpstreamDynamicHost,
+  UpstreamDynamicPort,
+  HttpGrpcStats,
+  NetworkGeoip,
+  MaxIndex
+};
+
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
  * or a connection by various filters in Envoy. FilterState can be write-once or write-many.
@@ -231,6 +253,30 @@ public:
    * @return filter objects that are shared with the upstream connection.
    **/
   virtual ObjectsPtr objectsSharedWithUpstreamConnection() const PURE;
+
+  static absl::string_view indexToName(FilterStateIndex index);
+  static std::optional<FilterStateIndex> nameToIndex(absl::string_view name);
+
+  virtual void setIndexedData(
+      FilterStateIndex index, absl::string_view data_name, std::shared_ptr<Object> data,
+      LifeSpan life_span = LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
+
+  template <typename T> const T* getIndexedDataReadOnly(FilterStateIndex index) const {
+    return dynamic_cast<const T*>(getIndexedDataReadOnlyGeneric(index));
+  }
+
+  virtual const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const PURE;
+
+  template <typename T> T* getIndexedDataMutable(FilterStateIndex index) {
+    return dynamic_cast<T*>(getIndexedDataMutableGeneric(index));
+  }
+
+  virtual Object* getIndexedDataMutableGeneric(FilterStateIndex index) PURE;
+
+  virtual std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) PURE;
+
+  virtual bool hasIndexedData(FilterStateIndex index) const PURE;
 };
 
 } // namespace StreamInfo

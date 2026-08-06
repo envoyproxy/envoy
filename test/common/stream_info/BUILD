@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -17,6 +19,21 @@ envoy_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "filter_state_benchmark",
+    srcs = ["filter_state_benchmark.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/stream_info:filter_state_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "filter_state_benchmark_test",
+    benchmark_binary = "filter_state_benchmark",
 )
 
 envoy_cc_test(
