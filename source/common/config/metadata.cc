@@ -12,14 +12,28 @@ SINGLETON_MANAGER_REGISTRATION(const_metadata_shared_pool);
 
 MetadataKey::MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key)
     : key_(metadata_key.key()) {
-  for (const auto& seg : metadata_key.path()) {
-    path_.push_back(seg.key());
+  path_.reserve(metadata_key.path().size());
+  for (const auto& segment : metadata_key.path()) {
+    PathSegment path_segment;
+    if (segment.has_key()) {
+      path_segment.key_ = segment.key();
+    } else {
+      path_segment.index_ = segment.index();
+    }
+    path_.push_back(std::move(path_segment));
   }
 }
 
 const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata* metadata,
                                                const MetadataKey& metadata_key) {
-  return metadataValue(metadata, metadata_key.key_, metadata_key.path_);
+  if (!metadata) {
+    return Protobuf::Value::default_instance();
+  }
+  const auto filter_it = metadata->filter_metadata().find(metadata_key.key_);
+  if (filter_it == metadata->filter_metadata().end()) {
+    return Protobuf::Value::default_instance();
+  }
+  return structValue(filter_it->second, metadata_key.path_);
 }
 
 const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata* metadata,
@@ -37,24 +51,54 @@ const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Me
 
 const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_value,
                                              const std::vector<std::string>& path) {
+  std::vector<PathSegment> segments;
+  segments.reserve(path.size());
+  for (const auto& key : path) {
+    PathSegment segment;
+    segment.key_ = key;
+    segments.push_back(std::move(segment));
+  }
+  return structValue(struct_value, segments);
+}
+
+const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_value,
+                                             const std::vector<PathSegment>& path) {
   const Protobuf::Struct* data_struct = &struct_value;
   const Protobuf::Value* val = nullptr;
-  // go through path to select sub entries
-  for (const auto& p : path) {
-    if (nullptr == data_struct) { // sub entry not found
-      return Protobuf::Value::default_instance();
-    }
-    const auto entry_it = data_struct->fields().find(p);
-    if (entry_it == data_struct->fields().end()) {
-      return Protobuf::Value::default_instance();
-    }
-    val = &(entry_it->second);
-    if (val->has_struct_value()) {
-      data_struct = &(val->struct_value());
+
+  for (const auto& segment : path) {
+    if (!segment.key_.empty()) {
+      // Handle struct field access
+      if (nullptr == data_struct) {
+        ENVOY_LOG_MISC(debug, "MetadataKey path segment expects Struct but found null");
+        return Protobuf::Value::default_instance();
+      }
+      const auto entry_it = data_struct->fields().find(segment.key_);
+      if (entry_it == data_struct->fields().end()) {
+        ENVOY_LOG_MISC(debug, "MetadataKey key '{}' not found in Struct", segment.key_);
+        return Protobuf::Value::default_instance();
+      }
+      val = &(entry_it->second);
+      data_struct = val->has_struct_value() ? &(val->struct_value()) : nullptr;
+
     } else {
-      data_struct = nullptr;
+      // Handle list element access
+      if (val == nullptr || val->kind_case() != Protobuf::Value::kListValue) {
+        ENVOY_LOG_MISC(debug, "MetadataKey path segment expects ListValue but found {}",
+                       static_cast<int>(val ? val->kind_case() : Protobuf::Value::KIND_NOT_SET));
+        return Protobuf::Value::default_instance();
+      }
+      const auto& list = val->list_value();
+      if (segment.index_ >= static_cast<uint32_t>(list.values_size())) {
+        ENVOY_LOG_MISC(debug, "MetadataKey index {} out of bounds for list of size {}",
+                       segment.index_, list.values_size());
+        return Protobuf::Value::default_instance();
+      }
+      val = &(list.values(segment.index_));
+      data_struct = val->has_struct_value() ? &(val->struct_value()) : nullptr;
     }
   }
+
   if (nullptr == val) {
     return Protobuf::Value::default_instance();
   }
