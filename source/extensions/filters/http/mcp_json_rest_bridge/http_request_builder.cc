@@ -20,6 +20,10 @@ namespace {
 
 using ::nlohmann::json;
 
+// Maximum nesting depth limit for parsing JSON arguments into query parameters in
+// `constructQueryParams`. Legitimate REST API query parameter schemas rarely exceed 5–10
+// nesting levels, and 100 aligns with standard Protocol Buffers / gRPC-JSON transcoding
+// recursion limits (e.g. `CodedInputStream::default_recursion_limit_`).
 constexpr uint32_t MaxNestingDepth = 100;
 
 absl::StatusOr<json> getJsonValue(const json& data, absl::string_view path) {
