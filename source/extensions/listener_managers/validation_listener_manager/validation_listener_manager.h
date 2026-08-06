@@ -52,6 +52,13 @@ public:
     // convoluted than it needs to be. Fix this to return a mock in a follow up.
     return nullptr;
   }
+  absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>
+  createUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
+                           uint32_t concurrency, Quic::QuicStatNames& quic_stat_names,
+                           Configuration::ListenerFactoryContext& context) override {
+    return ProdListenerComponentFactory::createUdpListenerFactoryImpl(config, concurrency,
+                                                                      quic_stat_names, context);
+  }
   DrainManagerPtr createDrainManager(envoy::config::listener::v3::Listener::DrainType) override {
     return nullptr;
   }

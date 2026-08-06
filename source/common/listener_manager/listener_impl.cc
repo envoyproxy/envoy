@@ -493,12 +493,16 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildProxyProtocolListenerFilter(config);
     SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
   }
-  if (!workers_started_) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
     // listener constructor so that this listener's children entities could register their targets
     // with their parent's initManager.
-    parent_.server_.initManager().add(listener_init_target_);
+    //
+    // QUIC listeners register targets in initializeWorkerRouting(), which runs after the
+    // constructor, so with the runtime flag enabled registration is deferred to
+    // ListenerManagerImpl::addOrUpdateListenerInternal instead.
+    registerInitTargetIfWorkersNotStarted();
   }
 }
 
@@ -715,17 +719,14 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
     udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
         config.udp_listener_config().udp_packet_packet_writer_config(), *listener_factory_context_);
   }
+  absl::StatusOr<Network::ActiveUdpListenerFactoryPtr> udp_listener_factory =
+      parent_.factory_->createUdpListenerFactory(config, concurrency, quic_stat_names_,
+                                                 *listener_factory_context_);
+  RETURN_IF_NOT_OK_REF(udp_listener_factory.status());
+  udp_listener_config_->listener_factory_ = std::move(*udp_listener_factory);
+
   if (config.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
-    if (config.has_connection_balance_config()) {
-      return absl::InvalidArgumentError(
-          "connection_balance_config is configured for QUIC listener which "
-          "doesn't work with connection balancer.");
-    }
-    udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_, *listener_factory_context_);
-
     if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
       auto* quic_packet_writer_factory_factory =
           Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
@@ -748,12 +749,7 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
       udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
     }
 #endif
-#else
-    return absl::InvalidArgumentError("QUIC is configured but not enabled in the build.");
 #endif
-  } else {
-    udp_listener_config_->listener_factory_ =
-        std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
   }
   if (udp_listener_config_->writer_factory_ == nullptr) {
     udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
@@ -1326,6 +1322,12 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
     }
   }
   return false;
+}
+
+void ListenerImpl::registerInitTargetIfWorkersNotStarted() {
+  if (!workers_started_) {
+    parent_.server_.initManager().add(listener_init_target_);
+  }
 }
 
 absl::Status ListenerImpl::cloneSocketFactoryFrom(const ListenerImpl& other) {

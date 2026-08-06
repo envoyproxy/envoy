@@ -5,7 +5,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "quiche/quic/core/connection_id_generator.h"
-#include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
 namespace Envoy {
 namespace Quic {
@@ -33,10 +32,11 @@ public:
 
   /**
    * Create a socket option with BPF program to consistently route QUIC packets to the right listen
-   * socket. Linux only.
+   * socket. Linux only, absl::UnimplementedError on other platforms.
    * @param concurrency the total number of worker threads.
+   * @returns the non null socket option or an error status.
    */
-  virtual Network::Socket::OptionConstSharedPtr
+  virtual absl::StatusOr<Network::Socket::OptionConstSharedPtr>
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) PURE;
 
   /**

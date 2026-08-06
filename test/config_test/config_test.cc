@@ -155,6 +155,8 @@ public:
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   filters, context);
             }));
+    ON_CALL(component_factory_, createUdpListenerFactory)
+        .WillByDefault(Invoke(Server::ProdListenerComponentFactory::createUdpListenerFactoryImpl));
 
     try {
       THROW_IF_NOT_OK(main_config.initialize(bootstrap, server_, *cluster_manager_factory_));

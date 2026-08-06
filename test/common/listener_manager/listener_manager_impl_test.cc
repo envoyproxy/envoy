@@ -197,6 +197,54 @@ public:
   }
 };
 
+class ListenerManagerImplUdpWorkerRoutingTest : public ListenerManagerImplTest {
+public:
+  static constexpr absl::string_view extra_config_ = R"EOF(udp_listener_config:
+  downstream_socket_config:
+    max_rx_datagram_size: 1500
+)EOF";
+
+  static constexpr absl::string_view init_failure_msg_ = "worker routing init failure";
+
+  envoy::config::listener::v3::Listener udpListener(absl::string_view extra_config = "") {
+    const std::string yaml = R"EOF(
+name: udp_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    protocol: UDP
+    port_value: 1234
+)EOF";
+    return parseListenerFromV3Yaml(absl::StrCat(yaml, extra_config));
+  }
+
+  void startWorkers() {
+    EXPECT_CALL(*worker_, start);
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  }
+
+  void expectUdpListenerFactory(absl::Status worker_routing_status,
+                                Init::Target* init_target = nullptr) {
+    auto factory = std::make_unique<NiceMock<MockUdpListenerFactory>>();
+    EXPECT_CALL(*factory, initializeWorkerRouting(_)).WillOnce(Return(worker_routing_status));
+    EXPECT_CALL(listener_factory_, createUdpListenerFactory)
+        .WillOnce([factory = std::move(factory), init_target](
+                      const envoy::config::listener::v3::Listener&, uint32_t, Quic::QuicStatNames&,
+                      Configuration::ListenerFactoryContext& context) mutable
+                      -> absl::StatusOr<Network::ActiveUdpListenerFactoryPtr> {
+          if (init_target != nullptr) {
+            context.initManager().add(*init_target);
+          }
+          return std::move(factory);
+        });
+  }
+
+  void expectCreateUdpListenSocket() {
+    EXPECT_CALL(listener_factory_,
+                createListenSocket(_, _, _, ListenerComponentFactory::BindType::ReusePort, _, 0));
+  }
+};
+
 class MockLdsApi : public LdsApi {
 public:
   MOCK_METHOD(std::string, versionInfo, (), (const));
@@ -1646,8 +1694,16 @@ filter_chains: {}
   Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
   { // Add and remove a listener before starting workers.
     ListenerHandle* listener_foo = expectListenerCreate(true, true);
-    EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    // With "envoy.restart_features.defer_worker_routing_init" the init target is registered with
+    // the server init manager after socket creation, otherwise at the end of the ListenerImpl
+    // constructor.
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+      EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+    } else {
+      EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    }
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1"));
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
@@ -9665,13 +9721,65 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));
+TEST_P(ListenerManagerImplUdpWorkerRoutingTest, ListenerRejectedOnInitFailure) {
+  expectUdpListenerFactory(absl::InternalError(init_failure_msg_));
+  expectCreateUdpListenSocket();
+
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(udpListener()), EnvoyException, init_failure_msg_);
+  EXPECT_EQ(0UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  EXPECT_EQ(0UL, manager_->listeners(ListenerManager::WARMING).size());
+  checkStats(__LINE__, 0, 0, 0, 0, 0, 0, 0);
+}
+
+TEST_P(ListenerManagerImplUdpWorkerRoutingTest, UpdateRejectedOnInitFailure) {
+  expectUdpListenerFactory(absl::OkStatus());
+  expectCreateUdpListenSocket();
+  EXPECT_TRUE(addOrUpdateListener(udpListener(), "version1"));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  expectUdpListenerFactory(absl::InternalError(init_failure_msg_));
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(udpListener(extra_config_), "version2"),
+                          EnvoyException, init_failure_msg_);
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  // The original listener is intact, adding the original config is a no-op
+  EXPECT_FALSE(addOrUpdateListener(udpListener(), "version1"));
+}
+
+TEST_P(ListenerManagerImplUdpWorkerRoutingTest, WarmingListenerUpdateRejectedOnInitFailure) {
+  startWorkers();
+
+  // The listener factory registers an init target to keep the listener warming
+  Init::ExpectableTargetImpl init_target("udp-listener-factory-target");
+  expectUdpListenerFactory(absl::OkStatus(), &init_target);
+  expectCreateUdpListenSocket();
+  init_target.expectInitialize();
+  EXPECT_TRUE(addOrUpdateListener(udpListener(), "version1"));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+
+  expectUdpListenerFactory(absl::InternalError(init_failure_msg_));
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(udpListener(extra_config_), "version2"),
+                          EnvoyException, init_failure_msg_);
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+
+  // The original warming listener finishes warming
+  EXPECT_CALL(*worker_, addListener);
+  init_target.ready();
+  worker_->callAddCompletion();
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest,
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersTest,
-                         ::testing::Values(false, true));
+                         ::testing::Combine(::testing::Bool(), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplForInPlaceFilterChainUpdateTest,
-                         ::testing::Values(false));
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithDispatcherStatsTest,
-                         ::testing::Values(false));
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplUdpWorkerRoutingTest,
+                         ::testing::Values(std::make_tuple(false, true)));
 
 } // namespace
 } // namespace Server

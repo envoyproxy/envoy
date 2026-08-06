@@ -84,6 +84,14 @@ public:
   static Network::ListenerFilterMatcherSharedPtr
   createListenerFilterMatcher(const envoy::config::listener::v3::ListenerFilter& listener_filter);
 
+  /**
+   * Static worker for createUdpListenerFactory() that can be used directly in tests.
+   */
+  static absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>
+  createUdpListenerFactoryImpl(const envoy::config::listener::v3::Listener& config,
+                               uint32_t concurrency, Quic::QuicStatNames& quic_stat_names,
+                               Configuration::ListenerFactoryContext& context);
+
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                          const xds::core::v3::ResourceLocator* lds_resources_locator) override {
@@ -109,6 +117,12 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return createUdpListenerFilterFactoryListImpl(filters, context);
+  }
+  absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>
+  createUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
+                           uint32_t concurrency, Quic::QuicStatNames& quic_stat_names,
+                           Configuration::ListenerFactoryContext& context) override {
+    return createUdpListenerFactoryImpl(config, concurrency, quic_stat_names, context);
   }
   absl::StatusOr<Filter::QuicListenerFilterFactoriesList> createQuicListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
@@ -366,7 +380,11 @@ private:
 
   void maybeCloseSocketsForListener(ListenerImpl& listener);
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,
-                                             const ListenerImpl& existing_listener);
+                                             const ListenerImpl& existing_listener,
+                                             bool in_place_update);
+
+  absl::Status initializeWorkerRoutingForUdpListener(ListenerImpl& new_listener,
+                                                     bool in_place_update);
 
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.

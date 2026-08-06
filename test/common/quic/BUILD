@@ -241,6 +241,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":fake_quic_packet_writer_lib",
         ":test_proof_source_lib",
+        ":mock_quic_connection_id_generator_factory_lib",
         ":test_utils_lib",
         "//source/common/http:utility_lib",
         "//source/common/listener_manager:connection_handler_lib",
@@ -255,8 +256,11 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@quiche//:quic_test_tools_crypto_server_config_peer_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -308,6 +312,16 @@ envoy_cc_test_library(
     deps = [
         "//source/common/quic:envoy_quic_proof_verifier_base_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "mock_quic_connection_id_generator_factory_lib",
+    hdrs = envoy_select_enable_http3(["mock_quic_connection_id_generator_factory.h"]),
+    deps = envoy_select_enable_http3([
+        "//source/common/protobuf:utility_lib",
+        "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
+        "//test/common/config:dummy_config_proto_cc_proto",
+    ]),
 )
 
 envoy_cc_test_library(

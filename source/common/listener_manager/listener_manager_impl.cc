@@ -33,9 +33,11 @@
 #include "absl/types/span.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
+#include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
+#include "source/common/listener_manager/active_raw_udp_listener_config.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
@@ -281,6 +283,33 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
   }
   return {Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(
       listener_filter.filter_disabled())};
+}
+
+absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>
+ProdListenerComponentFactory::createUdpListenerFactoryImpl(
+    const envoy::config::listener::v3::Listener& config, uint32_t concurrency,
+    Quic::QuicStatNames& quic_stat_names, Configuration::ListenerFactoryContext& context) {
+  if (config.udp_listener_config().has_quic_options()) {
+#ifdef ENVOY_ENABLE_QUIC
+    if (config.has_connection_balance_config()) {
+      return absl::InvalidArgumentError(
+          "connection_balance_config is configured for QUIC listener which "
+          "doesn't work with connection balancer.");
+    }
+    absl::Status creation_status = absl::OkStatus();
+    Network::ActiveUdpListenerFactoryPtr listener_factory =
+        std::make_unique<Quic::ActiveQuicListenerFactory>(
+            config.udp_listener_config().quic_options(), concurrency, quic_stat_names,
+            context.messageValidationVisitor(), context, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    return listener_factory;
+#else
+    UNREFERENCED_PARAMETER(quic_stat_names);
+    UNREFERENCED_PARAMETER(context);
+    return absl::InvalidArgumentError("QUIC is configured but not enabled in the build.");
+#endif
+  }
+  return std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
 }
 
 absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocket(
@@ -575,9 +604,8 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
   return add_or_update_status;
 }
 
-absl::Status
-ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
-                                                   const ListenerImpl& existing_listener) {
+absl::Status ListenerManagerImpl::setupSocketFactoryForListener(
+    ListenerImpl& new_listener, const ListenerImpl& existing_listener, bool in_place_update) {
   if (new_listener.reusePort() != existing_listener.reusePort()) {
     return absl::InvalidArgumentError(fmt::format(
         "Listener {}: reuse port cannot be changed during an update", new_listener.name()));
@@ -588,6 +616,24 @@ ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
   }
+
+  RETURN_IF_NOT_OK(initializeWorkerRoutingForUdpListener(new_listener, in_place_update));
+
+  return absl::OkStatus();
+}
+
+absl::Status ListenerManagerImpl::initializeWorkerRoutingForUdpListener(ListenerImpl& new_listener,
+                                                                        bool in_place_update) {
+  if (in_place_update ||
+      !Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    return absl::OkStatus();
+  }
+
+  if (auto udp_listener_config = new_listener.udpListenerConfig()) {
+    RETURN_IF_NOT_OK(udp_listener_config->listenerFactory().initializeWorkerRouting(
+        new_listener.listenSocketFactories()));
+  }
+
   return absl::OkStatus();
 }
 
@@ -631,10 +677,12 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   ListenerImplPtr new_listener = nullptr;
+  bool in_place_update = false;
 
   // In place filter chain update depends on the active listener at worker.
   if (existing_active_listener != active_listeners_.end() &&
       (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_)) {
+    in_place_update = true;
     ENVOY_LOG(debug, "use in place update filter chain update path for listener name={} hash={}",
               name, hash);
     auto listener_or_error =
@@ -656,11 +704,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   if (existing_warming_listener != warming_listeners_.end()) {
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_warming_listener));
+    RETURN_IF_NOT_OK(
+        setupSocketFactoryForListener(*new_listener, **existing_warming_listener, in_place_update));
     // In this case we can just replace inline.
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
-    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_active_listener));
+    RETURN_IF_NOT_OK(
+        setupSocketFactoryForListener(*new_listener, **existing_active_listener, in_place_update));
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
     if (workers_started_) {
@@ -674,6 +724,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not.
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(name, *new_listener));
+    // This can never be an in-place update
+    RETURN_IF_NOT_OK(
+        initializeWorkerRoutingForUdpListener(*new_listener, /*in_place_update=*/false));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -683,6 +736,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     }
 
     added = true;
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    // The listener init target must be registered with the server init manager after all of the
+    // listener's children have registered their targets with the listener's init manager. QUIC
+    // listeners also register targets in initializeWorkerRoutingForUdpListener().
+    new_listener_ref.registerInitTargetIfWorkersNotStarted();
   }
 
   updateWarmingActiveGauges();

@@ -312,7 +312,7 @@ void ActiveQuicListener::onCloseIdleHttpConnections(bool is_saturated) {
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Server::Configuration::ListenerFactoryContext& context)
+    Server::Configuration::ListenerFactoryContext& context, absl::Status& creation_status)
     : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
@@ -372,24 +372,16 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     connection_debug_visitor_factory_ = factory.createFactory(*message, context_);
   }
 
-  // Initialize connection ID generator factory.
-  envoy::config::core::v3::TypedExtensionConfig cid_generator_config;
+  // Initialize connection ID generator factory config for `initializeCidGeneratorAndWorkerRouting`.
   if (!config.has_connection_id_generator_config()) {
-    cid_generator_config.set_name("envoy.quic.deterministic_connection_id_generator");
+    cid_generator_config_.set_name("envoy.quic.deterministic_connection_id_generator");
     envoy::extensions::quic::connection_id_generator::v3::DeterministicConnectionIdGeneratorConfig
         empty_connection_id_generator_config;
-    std::ignore =
-        cid_generator_config.mutable_typed_config()->PackFrom(empty_connection_id_generator_config);
+    std::ignore = cid_generator_config_.mutable_typed_config()->PackFrom(
+        empty_connection_id_generator_config);
   } else {
-    cid_generator_config = config.connection_id_generator_config();
+    cid_generator_config_ = config.connection_id_generator_config();
   }
-  auto& cid_generator_config_factory =
-      Config::Utility::getAndCheckFactory<EnvoyQuicConnectionIdGeneratorConfigFactory>(
-          cid_generator_config);
-  quic_cid_generator_factory_ = cid_generator_config_factory.createQuicConnectionIdGeneratorFactory(
-      *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
-                                                 cid_generator_config_factory),
-      validation_visitor, context_);
 
   if (config.has_server_preferred_address_config()) {
     const envoy::config::core::v3::TypedExtensionConfig& server_preferred_address_config =
@@ -405,26 +397,31 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
             validation_visitor, context_.serverFactoryContext());
   }
 
-  worker_selector_ =
-      quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
-  if (!disable_kernel_bpf_packet_routing_for_test_) {
-    if (concurrency_ > 1) {
-      Network::Socket::OptionConstSharedPtr opt =
-          quic_cid_generator_factory_->createCompatibleLinuxBpfSocketOption(concurrency_);
-      if (opt != nullptr) {
-        options_->push_back(opt);
-        kernel_worker_routing_ = true;
-      } else {
-        ENVOY_LOG(warn,
-                  "Efficient routing of QUIC packets to the correct worker is not supported or "
-                  "not implemented by Envoy on this platform or by the configured "
-                  "connection_id_generator. QUIC performance may be degraded.");
+  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    creation_status = initializeCidGeneratorAndWorkerRouting();
+  }
+}
+
+absl::Status ActiveQuicListenerFactory::initializeWorkerRouting(
+    absl::Span<const Network::ListenSocketFactoryPtr> socket_factories) {
+  // Already initialized in the constructor, options were applied via socketOptions().
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init"));
+
+  RETURN_IF_NOT_OK(initializeCidGeneratorAndWorkerRouting());
+
+  for (const auto& factory : socket_factories) {
+    for (uint32_t i = 0; i < concurrency_; i++) {
+      auto socket = factory->getListenSocket(i);
+      if (!Network::Socket::applyOptions(options_, *socket,
+                                         envoy::config::core::v3::SocketOption::STATE_BOUND)) {
+        return absl::InvalidArgumentError(
+            fmt::format("cannot apply listener factory socket options on socket: {}",
+                        socket->connectionInfoProvider().localAddress()->asString()));
       }
-    } else {
-      ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
-      kernel_worker_routing_ = true;
     }
-  };
+  }
+
+  return absl::OkStatus();
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
@@ -432,6 +429,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
     Network::SocketSharedPtr&& listen_socket_ptr, Event::Dispatcher& dispatcher,
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
+  ASSERT(quic_cid_generator_factory_ != nullptr);
   if (server_preferred_address_config_ != nullptr) {
     const EnvoyQuicServerPreferredAddressConfig::Addresses addresses =
         server_preferred_address_config_->getServerPreferredAddresses(
@@ -474,6 +472,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
       proof_source_factory_.value(),
       quic_cid_generator_factory_->createQuicConnectionIdGenerator(worker_index));
 }
+
 Network::ConnectionHandler::ActiveUdpListenerPtr
 ActiveQuicListenerFactory::createActiveQuicListener(
     Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
@@ -500,6 +499,46 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       std::move(cid_generator), worker_selector_,
       makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_,
       enable_session_idle_list);
+}
+
+absl::Status ActiveQuicListenerFactory::initializeCidGeneratorAndWorkerRouting() {
+  ASSERT(quic_cid_generator_factory_ == nullptr);
+
+  auto& cid_generator_config_factory =
+      Config::Utility::getAndCheckFactory<EnvoyQuicConnectionIdGeneratorConfigFactory>(
+          cid_generator_config_);
+
+  quic_cid_generator_factory_ = cid_generator_config_factory.createQuicConnectionIdGeneratorFactory(
+      *Config::Utility::translateToFactoryConfig(
+          cid_generator_config_, context_.messageValidationVisitor(), cid_generator_config_factory),
+      context_.messageValidationVisitor(), context_);
+
+  worker_selector_ =
+      quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
+
+  if (!disable_kernel_bpf_packet_routing_for_test_) {
+    if (concurrency_ > 1) {
+      absl::StatusOr<Network::Socket::OptionConstSharedPtr> option =
+          quic_cid_generator_factory_->createCompatibleLinuxBpfSocketOption(concurrency_);
+      if (option.ok()) {
+        kernel_worker_routing_ = true;
+        ASSERT(option.value() != nullptr);
+        options_->push_back(std::move(option.value()));
+      } else if (absl::IsUnimplemented(option.status())) {
+        ENVOY_LOG(warn,
+                  "Efficient routing of QUIC packets to the correct worker is not supported or "
+                  "not implemented by Envoy on this platform or by the configured "
+                  "connection_id_generator. QUIC performance may be degraded.");
+      } else {
+        return option.status();
+      }
+    } else {
+      ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
+      kernel_worker_routing_ = true;
+    }
+  }
+
+  return absl::OkStatus();
 }
 
 } // namespace Quic
