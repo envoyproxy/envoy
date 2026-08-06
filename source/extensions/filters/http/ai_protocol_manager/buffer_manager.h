@@ -111,6 +111,13 @@ public:
   // holds the filter chain (returns StopIteration*) while the body is buffered.
   void onData(Buffer::Instance& data);
 
+  // Returns the external buffer, creating it on first call. onData() creates it
+  // implicitly; a caller needs this only to obtain the buffer *before* any data
+  // arrives, as a payload parser does. Creation is lazy rather than done in the
+  // constructor because a backing store may allocate a real resource per buffer,
+  // and a stream with no body must not pay for one.
+  ExternalBuffer& ensureBuffer();
+
   // Signals that the full body has been offloaded, flushing any batched backlog to
   // the buffer so all of it becomes durable, and is ready to replay.
   void endStream();

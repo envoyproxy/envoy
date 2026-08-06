@@ -1,0 +1,333 @@
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
+
+#include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
+
+#include "absl/strings/str_cat.h"
+#include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace AiProtocolManager {
+namespace {
+
+using ::Envoy::StatusHelpers::HasStatusCode;
+
+using ExternalRef = JsonWithExtBuf::ExternalRef;
+
+// The parser only needs a buffer to exist to enable offloading; it records
+// offsets and never reads. ReadsBackFromTheBuffer uses a real one.
+class FakeExternalBuffer : public ExternalBuffer {
+public:
+  void write(Buffer::InstancePtr, WriteCallback cb) override { cb(ExternalBufferStatus::Ok); }
+  void read(uint64_t, uint64_t, ReadCallback cb) override {
+    cb(ExternalBufferStatus::Error, nullptr);
+  }
+  uint64_t length() const override { return 0; }
+};
+
+class JsonWithExtBufParserTest : public testing::Test {
+public:
+  // Small so test bodies stay readable.
+  static constexpr std::uint32_t kThreshold = 8;
+
+  JsonWithExtBufParserTest() { config_.inline_string_threshold_bytes = kThreshold; }
+
+  // Parses `body` in one shot into a document backed by `buffer_`.
+  absl::Status parse(absl::string_view body) {
+    doc_ = std::make_unique<JsonWithExtBuf>(&buffer_);
+    JsonWithExtBufParser parser(*doc_, config_);
+    return parser.feed(body, /*end_stream=*/true);
+  }
+
+  // Feeds `body` `chunk_size` bytes at a time, splitting tokens across feeds.
+  absl::Status parseChunked(absl::string_view body, size_t chunk_size) {
+    doc_ = std::make_unique<JsonWithExtBuf>(&buffer_);
+    JsonWithExtBufParser parser(*doc_, config_);
+    for (size_t i = 0; i < body.size(); i += chunk_size) {
+      const size_t len = std::min(chunk_size, body.size() - i);
+      const bool last = (i + len == body.size());
+      if (auto status = parser.feed(body.substr(i, len), last); !status.ok()) {
+        return status;
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  const nlohmann::json& json() { return doc_->json(); }
+
+  // Decodes the reference at `node`, failing the test if it is not one.
+  ExternalRef refAt(const nlohmann::json& node) {
+    const absl::StatusOr<ExternalRef> ref = JsonWithExtBuf::externalRef(node);
+    EXPECT_TRUE(ref.ok()) << ref.status();
+    return ref.ok() ? *ref : ExternalRef{};
+  }
+
+  JsonWithExtBufParser::Config config_;
+  FakeExternalBuffer buffer_;
+  std::unique_ptr<JsonWithExtBuf> doc_;
+};
+
+// Everything small enough stays in the DOM, with types preserved.
+TEST_F(JsonWithExtBufParserTest, InlinesSmallValues) {
+  ASSERT_OK(parse(R"({"model":"gpt-4","n":2,"temp":0.5,"stream":true,"stop":null})"));
+
+  EXPECT_EQ(json()["model"], "gpt-4");
+  EXPECT_TRUE(json()["n"].is_number_integer());
+  EXPECT_EQ(json()["n"], 2);
+  EXPECT_TRUE(json()["temp"].is_number_float());
+  EXPECT_DOUBLE_EQ(json()["temp"].get<double>(), 0.5);
+  EXPECT_EQ(json()["stream"], true);
+  EXPECT_TRUE(json()["stop"].is_null());
+}
+
+TEST_F(JsonWithExtBufParserTest, BuildsNestedContainers) {
+  ASSERT_OK(parse(R"({"messages":[{"role":"user"},{"role":"tool","ids":[1,2,3]}],"tools":[]})"));
+
+  ASSERT_TRUE(json()["messages"].is_array());
+  EXPECT_EQ(json()["messages"].size(), 2);
+  EXPECT_EQ(json()["messages"][0]["role"], "user");
+  EXPECT_EQ(json()["messages"][1]["ids"], nlohmann::json::array({1, 2, 3}));
+  EXPECT_TRUE(json()["tools"].is_array());
+  EXPECT_TRUE(json()["tools"].empty());
+}
+
+// An oversized string is not in the DOM; the reference left in its place
+// locates its bytes in the body.
+TEST_F(JsonWithExtBufParserTest, OffloadsOversizedString) {
+  const std::string prompt(4096, 'x');
+  const std::string body = absl::StrCat(R"({"model":"gpt-4","prompt":")", prompt, R"("})");
+
+  ASSERT_OK(parse(body));
+
+  EXPECT_EQ(json()["model"], "gpt-4");
+  ASSERT_TRUE(JsonWithExtBuf::isExternalRef(json()["prompt"]));
+
+  const ExternalRef ref = refAt(json()["prompt"]);
+  EXPECT_EQ(ref.length, prompt.size());
+  // The recorded range is the content between the quotes -- not including them.
+  EXPECT_EQ(body.substr(ref.offset, ref.length), prompt);
+  EXPECT_EQ(body[ref.offset - 1], '"');
+  EXPECT_EQ(body[ref.offset + ref.length], '"');
+}
+
+// A string at exactly the threshold is inline; one byte more is offloaded.
+TEST_F(JsonWithExtBufParserTest, ThresholdBoundary) {
+  const std::string at_limit(kThreshold, 'a');
+  ASSERT_OK(parse(absl::StrCat(R"({"p":")", at_limit, R"("})")));
+  EXPECT_EQ(json()["p"], at_limit);
+
+  const std::string over_limit(kThreshold + 1, 'a');
+  ASSERT_OK(parse(absl::StrCat(R"({"p":")", over_limit, R"("})")));
+  EXPECT_TRUE(JsonWithExtBuf::isExternalRef(json()["p"]));
+}
+
+// Keys are never offloaded, however long the value they introduce is.
+TEST_F(JsonWithExtBufParserTest, KeysAreAlwaysInline) {
+  const std::string long_key(64, 'k');
+  ASSERT_OK(parse(absl::StrCat(R"({")", long_key, R"(":"short"})")));
+  EXPECT_EQ(json()[long_key], "short");
+}
+
+// The range covers the raw, still-escaped bytes, so its length is the
+// on-the-wire length rather than the decoded one.
+TEST_F(JsonWithExtBufParserTest, OffloadedRangeIsRawEscapedBytes) {
+  // 16 plain bytes + a 2-char \n escape + a 6-char é escape + 1: 25 on the wire,
+  // 20 decoded.
+  const std::string raw_content = absl::StrCat(std::string(16, 'a'), R"(\n\u00e9)", "b");
+  ASSERT_EQ(raw_content.size(), 25);
+  const std::string body = absl::StrCat(R"({"p":")", raw_content, R"("})");
+
+  ASSERT_OK(parse(body));
+
+  const ExternalRef ref = refAt(json()["p"]);
+  EXPECT_EQ(ref.length, raw_content.size());
+  EXPECT_EQ(body.substr(ref.offset, ref.length), raw_content);
+}
+
+// Offsets are absolute over the body, so a value split across feeds still lands
+// on the right bytes.
+TEST_F(JsonWithExtBufParserTest, ChunkedFeedMatchesSingleShot) {
+  const std::string prompt(300, 'p');
+  const std::string body =
+      absl::StrCat(R"({"messages":[{"role":"user","content":")", prompt,
+                   R"("}],"max_tokens":1024,"temp":-0.25,"nested":{"deep":[null,true,"tiny"]}})");
+
+  ASSERT_OK(parse(body));
+  const nlohmann::json single_shot = json();
+
+  for (const size_t chunk_size : std::vector<size_t>{1, 7, 64, 4096}) {
+    ASSERT_OK(parseChunked(body, chunk_size)) << "chunk size " << chunk_size;
+    EXPECT_EQ(json(), single_shot) << "chunk size " << chunk_size;
+  }
+
+  const ExternalRef ref = refAt(single_shot["messages"][0]["content"]);
+  EXPECT_EQ(body.substr(ref.offset, ref.length), prompt);
+}
+
+// End to end: the recorded reference is enough to fetch exactly that value's
+// bytes back out of a real ExternalBuffer.
+TEST_F(JsonWithExtBufParserTest, ReadsBackFromTheBuffer) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test");
+  InMemoryExternalBuffer buffer(*dispatcher);
+
+  const std::string prompt(2048, 'z');
+  const std::string body =
+      absl::StrCat(R"({"model":"gpt-4","messages":[{"content":")", prompt, R"("}]})");
+
+  // Offload as the BufferManager does -- verbatim from offset 0 -- which is what
+  // makes token offsets valid buffer offsets.
+  buffer.write(std::make_unique<Buffer::OwnedImpl>(body),
+               [](ExternalBufferStatus status) { EXPECT_EQ(status, ExternalBufferStatus::Ok); });
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_EQ(buffer.length(), body.size());
+
+  JsonWithExtBuf doc(&buffer);
+  JsonWithExtBufParser parser(doc, config_);
+  ASSERT_OK(parser.feed(body, /*end_stream=*/true));
+
+  const absl::StatusOr<ExternalRef> ref =
+      JsonWithExtBuf::externalRef(doc.json()["messages"][0]["content"]);
+  ASSERT_OK(ref);
+
+  std::string fetched;
+  doc.externalBuffer()->read(ref->offset, ref->length,
+                             [&fetched](ExternalBufferStatus status, Buffer::InstancePtr data) {
+                               ASSERT_EQ(status, ExternalBufferStatus::Ok);
+                               fetched = data->toString();
+                             });
+  EXPECT_EQ(fetched, prompt);
+}
+
+// With nowhere to point a reference, everything is inlined rather than dropped.
+TEST_F(JsonWithExtBufParserTest, WithoutABufferEverythingIsInlined) {
+  const std::string prompt(4096, 'x');
+  const std::string body = absl::StrCat(R"({"prompt":")", prompt, R"("})");
+
+  JsonWithExtBuf doc;
+  ASSERT_EQ(doc.externalBuffer(), nullptr);
+  JsonWithExtBufParser parser(doc, config_);
+  ASSERT_OK(parser.feed(body, /*end_stream=*/true));
+
+  EXPECT_EQ(doc.json()["prompt"], prompt);
+}
+
+TEST_F(JsonWithExtBufParserTest, RootScalarAndRootArray) {
+  ASSERT_OK(parse(R"("hello")"));
+  EXPECT_EQ(json(), "hello");
+
+  ASSERT_OK(parse("[1,2,3]"));
+  EXPECT_EQ(json(), nlohmann::json::array({1, 2, 3}));
+
+  ASSERT_OK(parse("42"));
+  EXPECT_EQ(json(), 42);
+}
+
+TEST_F(JsonWithExtBufParserTest, NumberTypes) {
+  ASSERT_OK(parse(R"({"i":-17,"big":18446744073709551615,"f":1.5e3})"));
+
+  EXPECT_TRUE(json()["i"].is_number_integer());
+  EXPECT_EQ(json()["i"], -17);
+  EXPECT_TRUE(json()["big"].is_number_unsigned());
+  EXPECT_EQ(json()["big"].get<std::uint64_t>(), 18446744073709551615ULL);
+  EXPECT_DOUBLE_EQ(json()["f"].get<double>(), 1500.0);
+}
+
+// A literal no double can hold would serialize back as null; reject instead.
+TEST_F(JsonWithExtBufParserTest, UnrepresentableNumberIsRejected) {
+  EXPECT_THAT(parse(R"({"n":1e400})"), HasStatusCode(absl::StatusCode::kInvalidArgument));
+}
+
+// A body that simply stops has no malformed token; the completeness check
+// catches it.
+TEST_F(JsonWithExtBufParserTest, TruncatedDocumentIsRejected) {
+  EXPECT_THAT(parse(R"({"model":"gpt-4")"), HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parse(R"({"messages":[{"role":)"), HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parse(""), HasStatusCode(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(JsonWithExtBufParserTest, MalformedDocumentIsRejected) {
+  EXPECT_THAT(parse(R"({"model" "gpt-4"})"), HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parse(R"({"a":1}trailing)"), HasStatusCode(absl::StatusCode::kInvalidArgument));
+}
+
+// Pinned because the point of parsing in the proxy is that Envoy and the backend
+// must not be able to read the same body differently.
+TEST_F(JsonWithExtBufParserTest, DuplicateKeyIsRejected) {
+  EXPECT_THAT(parse(R"({"model":"a","model":"b"})"),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(JsonWithExtBufParserTest, FeedAfterCompletionIsRejected) {
+  JsonWithExtBuf doc(&buffer_);
+  JsonWithExtBufParser parser(doc, config_);
+  ASSERT_OK(parser.feed(R"({"a":1})", /*end_stream=*/true));
+
+  EXPECT_THAT(parser.feed(R"({"b":2})", /*end_stream=*/true),
+              HasStatusCode(absl::StatusCode::kFailedPrecondition));
+}
+
+// Errors are sticky: the same failure comes back rather than half a document.
+TEST_F(JsonWithExtBufParserTest, ErrorsAreTerminal) {
+  JsonWithExtBuf doc(&buffer_);
+  JsonWithExtBufParser parser(doc, config_);
+  EXPECT_THAT(parser.feed(R"({"a" 1})", /*end_stream=*/false),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parser.feed(R"(})", /*end_stream=*/true),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
+
+  // Nothing was published into the document.
+  EXPECT_TRUE(doc.json().is_null());
+}
+
+// Published only once complete, so a caller cannot act on a partial DOM.
+TEST_F(JsonWithExtBufParserTest, DocumentIsPublishedOnlyOnCompletion) {
+  JsonWithExtBuf doc(&buffer_);
+  JsonWithExtBufParser parser(doc, config_);
+
+  ASSERT_OK(parser.feed(R"({"model":"gpt-4",)", /*end_stream=*/false));
+  EXPECT_TRUE(doc.json().is_null());
+
+  ASSERT_OK(parser.feed(R"("n":1})", /*end_stream=*/true));
+  EXPECT_EQ(doc.json()["model"], "gpt-4");
+  EXPECT_EQ(doc.json()["n"], 1);
+}
+
+// A realistic shape: oversized message content each getting its own reference,
+// with small metadata left inline.
+TEST_F(JsonWithExtBufParserTest, MixedInlineAndOffloadedValues) {
+  const std::string system(600, 's');
+  const std::string user(900, 'u');
+  const std::string body =
+      absl::StrCat(R"({"model":"gpt-4","messages":[{"role":"system","content":")", system,
+                   R"("},{"role":"user","content":")", user, R"("}],"max_tokens":256})");
+
+  ASSERT_OK(parse(body));
+
+  EXPECT_EQ(json()["model"], "gpt-4");
+  EXPECT_EQ(json()["max_tokens"], 256);
+  EXPECT_EQ(json()["messages"][0]["role"], "system");
+  EXPECT_EQ(json()["messages"][1]["role"], "user");
+
+  const ExternalRef system_ref = refAt(json()["messages"][0]["content"]);
+  const ExternalRef user_ref = refAt(json()["messages"][1]["content"]);
+  EXPECT_EQ(body.substr(system_ref.offset, system_ref.length), system);
+  EXPECT_EQ(body.substr(user_ref.offset, user_ref.length), user);
+  EXPECT_LT(system_ref.offset, user_ref.offset);
+}
+
+} // namespace
+} // namespace AiProtocolManager
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

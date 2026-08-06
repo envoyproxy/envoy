@@ -35,7 +35,7 @@ void BufferManager::onDestroy() {
   buffer_.reset();
 }
 
-void BufferManager::onData(Buffer::Instance& data) {
+ExternalBuffer& BufferManager::ensureBuffer() {
   if (buffer_ == nullptr) {
     buffer_ = buffer_factory_.createBuffer(bridge_->dispatcher());
     // Bound the not-yet-durable payload to the configured buffer limit so the
@@ -44,6 +44,11 @@ void BufferManager::onData(Buffer::Instance& data) {
     high_watermark_ = bridge_->bufferLimit();
     low_watermark_ = high_watermark_ / 2;
   }
+  return *buffer_;
+}
+
+void BufferManager::onData(Buffer::Instance& data) {
+  ensureBuffer();
 
   ENVOY_LOG(trace, "ai_protocol_manager: offloading {} bytes", data.length());
   // Queue the bytes, taking ownership now so the filter chain's buffer reference

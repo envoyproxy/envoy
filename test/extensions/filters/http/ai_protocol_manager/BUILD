@@ -24,6 +24,31 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "json_with_ext_buf_test",
+    srcs = ["json_with_ext_buf_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "json_with_ext_buf_parser_test",
+    srcs = ["json_with_ext_buf_parser_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_parser_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "buffer_manager_test",
     srcs = ["buffer_manager_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
@@ -43,11 +68,14 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/http:codes_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
+        "@nlohmann_json//:json",
     ],
 )
 
