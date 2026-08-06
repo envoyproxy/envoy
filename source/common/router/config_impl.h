@@ -1313,7 +1313,6 @@ private:
                                                  SubstringFunction substring_function) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
-  Stats::ScopeSharedPtr vhost_scope_;
   absl::flat_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
