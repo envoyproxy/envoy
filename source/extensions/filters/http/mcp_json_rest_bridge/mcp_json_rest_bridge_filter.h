@@ -341,6 +341,7 @@ private:
 
   BridgeStatus status_{BridgeStatus::Ok};
   std::string mcp_method_;
+  std::string tool_name_;
   Protobuf::Struct mcp_params_;
   bool has_params_ = false;
   std::optional<uint64_t> backend_response_code_;

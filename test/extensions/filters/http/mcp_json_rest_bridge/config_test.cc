@@ -85,7 +85,7 @@ TEST(McpJsonRestBridgeFilterConfigTest, IncRequestCountWithToolParam) {
 
   config.incRequestCount("tools/call", "create_api_key", "mcp_json_rest_bridge_ok");
 
-  auto counter = TestUtility::findCounter(
+  Stats::CounterSharedPtr counter = TestUtility::findCounter(
       stats_store, "http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
                    "call.mcp_param.create_api_key.status.mcp_json_rest_bridge_ok");
   ASSERT_NE(counter, nullptr);
@@ -103,7 +103,7 @@ TEST(McpJsonRestBridgeFilterConfigTest, IncRequestCountWithoutToolParam) {
 
   config.incRequestCount("initialize", "", "mcp_json_rest_bridge_ok");
 
-  auto counter = TestUtility::findCounter(
+  Stats::CounterSharedPtr counter = TestUtility::findCounter(
       stats_store,
       "http.mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_rest_bridge_"
       "ok");
@@ -122,7 +122,7 @@ TEST(McpJsonRestBridgeFilterConfigTest, IncRequestCountAccumulates) {
   config.incRequestCount("tools/call", "list_api_keys", "mcp_json_rest_bridge_ok");
   config.incRequestCount("tools/call", "list_api_keys", "mcp_json_rest_bridge_ok");
 
-  auto counter = TestUtility::findCounter(
+  Stats::CounterSharedPtr counter = TestUtility::findCounter(
       stats_store, "http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
                    "call.mcp_param.list_api_keys.status.mcp_json_rest_bridge_ok");
   ASSERT_NE(counter, nullptr);

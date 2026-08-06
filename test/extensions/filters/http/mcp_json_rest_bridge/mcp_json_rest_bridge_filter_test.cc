@@ -62,6 +62,15 @@ tool_config:
         .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
   }
 
+  void expectCounter(absl::string_view stat_name, uint64_t expected_value,
+                     const std::vector<Stats::Tag>& expected_tags) {
+    Stats::CounterSharedPtr counter =
+        TestUtility::findCounter(stats_store_, std::string(stat_name));
+    ASSERT_NE(counter, nullptr);
+    EXPECT_EQ(counter->value(), expected_value);
+    EXPECT_THAT(counter->tags(), testing::ElementsAreArray(expected_tags));
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
@@ -116,6 +125,10 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalRespo
   Buffer::OwnedImpl response_body("initialize response");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
+
+  expectCounter("http.mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_"
+                "rest_bridge_ok",
+                1, {{"mcp_method", "initialize"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, NotMcpRequestResponsePassThrough) {
@@ -179,6 +192,11 @@ TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAccepte
   // Simulates how the router filter handles the local response.
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
             Http::FilterHeadersStatus::Continue);
+
+  expectCounter(
+      "http.mcp_json_rest_bridge.request_count.mcp_method.notifications/"
+      "initialized.status.mcp_json_rest_bridge_ok",
+      1, {{"mcp_method", "notifications/initialized"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
@@ -221,6 +239,10 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"error":{"code":-32601,"message":"Missing method field"},"id":0,"jsonrpc":"2.0"})json"));
+
+  expectCounter("http.mcp_json_rest_bridge.request_count.status.mcp_json_rest_bridge_request_"
+                "method_not_found",
+                1, {{"status", "mcp_json_rest_bridge_request_method_not_found"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
@@ -598,6 +620,13 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackendResponseR
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"jsonrpc":"2.0","id":123,"result":{"content":[{"text":"{\"displayName\":\"display-key\",\"createTime\":\"1970-01-01T00:00:22Z\"}","type":"text"}],"isError":false}})json"));
+
+  expectCounter("http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
+                "call.mcp_param.create_api_key.status.mcp_json_rest_bridge_ok",
+                1,
+                {{"mcp_method", "tools/call"},
+                 {"mcp_param", "create_api_key"},
+                 {"status", "mcp_json_rest_bridge_ok"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithoutHttpRuleBody) {
@@ -784,6 +813,11 @@ TEST_F(McpJsonRestBridgeFilterTest, UnknownToolReturnsError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"error":{"code":-32602,"message":"Unknown tool"},"id":123,"jsonrpc":"2.0"})json"));
+
+  expectCounter(
+      "http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
+      "call.status.mcp_json_rest_bridge_request_unknown_tool",
+      1, {{"mcp_method", "tools/call"}, {"status", "mcp_json_rest_bridge_request_unknown_tool"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolParamsNotFoundReturnsError) {
@@ -881,6 +915,14 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"error":{"code":-32602,"message":"Failed to build HTTP request"},"id":123,"jsonrpc":"2.0"})json"));
+
+  expectCounter(
+      "http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
+      "call.mcp_param.create_api_key.status.mcp_json_rest_bridge_request_tool_transcoding_failure",
+      1,
+      {{"mcp_method", "tools/call"},
+       {"mcp_param", "create_api_key"},
+       {"status", "mcp_json_rest_bridge_request_tool_transcoding_failure"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
@@ -932,6 +974,14 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"error":{"code":-32602,"message":"Tool arguments must be an object"},"id":123,"jsonrpc":"2.0"})json"));
+
+  expectCounter(
+      "http.mcp_json_rest_bridge.request_count.mcp_method.tools/"
+      "call.mcp_param.create_api_key.status.mcp_json_rest_bridge_request_tool_arguments_invalid",
+      1,
+      {{"mcp_method", "tools/call"},
+       {"mcp_param", "create_api_key"},
+       {"status", "mcp_json_rest_bridge_request_tool_arguments_invalid"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, OptionalToolArguments) {
