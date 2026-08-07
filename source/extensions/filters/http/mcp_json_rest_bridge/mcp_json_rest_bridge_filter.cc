@@ -263,7 +263,8 @@ absl::Status McpJsonRestBridgeFilterConfig::initialize() {
              .try_emplace(tool.name(),
                           ToolEntry{tool.http_rule(), tool.text_content_streaming_enabled(), &tool})
              .second) {
-      return absl::InvalidArgumentError(fmt::format("Duplicate tool name: {}", tool.name()));
+      return absl::InvalidArgumentError(
+          fmt::format("Duplicate tool name: {} (host/path: {}, {})", tool.name(), host, path));
     }
     endpoint_config.tools.push_back(&tool);
   }
@@ -405,7 +406,8 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
                  .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
                                                      tool.text_content_streaming_enabled(), &tool})
                  .second) {
-          return absl::InvalidArgumentError(fmt::format("Duplicate tool name: {}", tool.name()));
+          return absl::InvalidArgumentError(
+              fmt::format("Duplicate tool name: {} (host/path: {}, {})", tool.name(), host, path));
         }
         endpoint_config.tools.push_back(&tool);
       }
