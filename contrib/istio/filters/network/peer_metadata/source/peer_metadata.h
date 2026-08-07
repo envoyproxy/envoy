@@ -105,6 +105,7 @@ using Headers = ConstSingleton<HeaderValues>;
 struct FilterNameValues {
   const std::string Name = "istio.peer_metadata";
   const std::string DisableDiscoveryField = "disable_baggage_discovery";
+  const std::string EnableTLSFilterExchange = "enable_tls_filter_exchange";
 };
 
 using FilterNames = ConstSingleton<FilterNameValues>;
@@ -136,8 +137,7 @@ PACKED_STRUCT(struct PeerMetadataHeader {
 class Filter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const Config& config, const LocalInfo::LocalInfo& local_info,
-         Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry,
-         bool use_passthrough_state_key);
+         Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry);
 
   // Network::ReadFilter
   Network::FilterStatus onNewConnection() override;
@@ -154,8 +154,8 @@ private:
   std::optional<Envoy::Protobuf::Any> discoverPeerMetadata();
   // Store discovered peer metadata in the thread-local registry, keyed by the
   // shared PassthroughState pointer of the internal user-space socket. Returns
-  // false when the pointer key is disabled or unavailable, so the caller can
-  // fall back to the legacy in-byte-stream preamble exchange.
+  // false when no registry is allocated or the pointer key is unavailable, so
+  // the caller can fall back to the legacy in-byte-stream preamble exchange.
   bool storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata);
   // Legacy fallback: inject the peer metadata (or an empty marker) as a preamble
   // into the downstream data stream.
@@ -168,7 +168,6 @@ private:
   Config config_;
   std::string baggage_;
   Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry_;
-  const bool use_passthrough_state_key_;
 };
 
 /**
@@ -181,8 +180,7 @@ private:
  */
 class UpstreamFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  UpstreamFilter(Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry,
-                 bool use_passthrough_state_key);
+  UpstreamFilter(Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override;
@@ -193,9 +191,8 @@ private:
   bool disableDiscovery() const;
   // Look up peer metadata stored by the paired downstream filter, keyed by the
   // shared PassthroughState pointer of the internal user-space socket. Returns
-  // false when the pointer key is disabled or unavailable, or the TLS registry
-  // is not allocated, so the caller can fall back to the legacy in-byte-stream
-  // preamble exchange.
+  // false when no registry is allocated or the pointer key is unavailable, so
+  // the caller can fall back to the legacy in-byte-stream preamble exchange.
   bool tryRegistryLookup();
   // Legacy fallback: parse and strip the peer metadata preamble from the
   // upstream data stream.
@@ -214,7 +211,6 @@ private:
   PeerMetadataState state_ = PeerMetadataState::WaitingForData;
   Network::ReadFilterCallbacks* callbacks_{};
   Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry_;
-  const bool use_passthrough_state_key_;
 };
 
 /**
