@@ -71,6 +71,9 @@ common --incompatible_allow_tags_propagation
 common --@rules_python//python/config_settings:bootstrap_impl=script
 build --incompatible_default_to_explicit_init_py
 
+# Protobuf
+common --@com_google_protobuf//bazel/flags:prefer_prebuilt_protoc=true
+
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
 
