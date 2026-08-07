@@ -281,27 +281,15 @@ TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
 // completed capture is terminated with ';'.
 class SpecMatchingHandler : public MockHandler {
 public:
-  explicit SpecMatchingHandler(const ExtractFieldSpec& spec) {
-    // Config-time conversion: string_views into the spec's stable segment
-    // keys, so the per-callback match allocates nothing. `spec` must outlive
-    // this handler.
-    for (const auto& seg : spec.segments) {
-      owned_.push_back({seg.has_value() ? absl::string_view(*seg) : absl::string_view{},
-                        ExtractFieldSpec::is_array_element(seg)});
-    }
-    pattern_ = owned_;
-  }
+  // The spec's segments are already the matcher input, so there is nothing to
+  // convert: the per-callback match allocates nothing. `spec` must outlive this
+  // handler.
+  explicit SpecMatchingHandler(const ExtractFieldSpec& spec) : pattern_(spec.segments) {}
 
-  // Caller-owned segments — a fixed path spelled as a static constexpr array of
-  // literals, the form documented on WuffsJsonCursor::PatternSegment. Nothing is
-  // converted or copied, and the literals' static storage satisfies the "key's
-  // bytes must outlive the array" rule with nothing for the caller to manage.
+  // Caller-owned segments — a fixed path written out in place rather than parsed
+  // from a path string, the form documented on WuffsJsonCursor::PatternSegment.
   explicit SpecMatchingHandler(absl::Span<const WuffsJsonCursor::PatternSegment> pattern)
       : pattern_(pattern) {}
-
-  // pattern_ may point into owned_, which copying would leave dangling.
-  SpecMatchingHandler(const SpecMatchingHandler&) = delete;
-  SpecMatchingHandler& operator=(const SpecMatchingHandler&) = delete;
 
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
@@ -343,9 +331,7 @@ public:
   const std::string& captured() const { return captured_; }
 
 private:
-  // Backing storage for the spec constructor only; empty when the caller owns
-  // the segments.
-  std::vector<WuffsJsonCursor::PatternSegment> owned_;
+  // Non-owning: refers to the spec or caller array passed at construction.
   absl::Span<const WuffsJsonCursor::PatternSegment> pattern_;
   const WuffsJsonCursor* cursor_{nullptr};
   bool capturing_{false};
@@ -366,16 +352,16 @@ TEST(StructuralMatchTest, RoutesArrayElementField) {
   EXPECT_EQ(h.captured(), "user;tool;");
 }
 
-// The compile-time counterpart of the spec-derived path above: the same
-// "messages[].role" written as a static constexpr array, per the example
-// documented on WuffsJsonCursor::PatternSegment.
-TEST(StructuralMatchTest, StaticConstexprPatternRoutesSameAsSpec) {
-  static constexpr WuffsJsonCursor::PatternSegment kMessagesRole[] = {
+// The hand-written counterpart of the spec-derived path above: the same
+// "messages[].role" built in place instead of parsed from a path string, per the
+// example documented on WuffsJsonCursor::PatternSegment.
+TEST(StructuralMatchTest, HandWrittenPatternRoutesSameAsSpec) {
+  const std::vector<WuffsJsonCursor::PatternSegment> messages_role = {
       {"messages"},         // dict key
       {"", /*array=*/true}, // [] wildcard; key unused
       {"role"},             // dict key
   };
-  SpecMatchingHandler h(kMessagesRole);
+  SpecMatchingHandler h(messages_role);
   WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   constexpr absl::string_view json =
@@ -598,12 +584,7 @@ TEST(StructuralMatchTest, DegenerateDepthArgumentsReturnFalse) {
 class ContainerRangeHandler : public MockHandler {
 public:
   explicit ContainerRangeHandler(const ExtractFieldSpec& spec, const ParserConfig& config = {})
-      : max_element_capture_bytes_(config.max_element_capture_bytes) {
-    for (const auto& seg : spec.segments) {
-      pattern_.push_back({seg.has_value() ? absl::string_view(*seg) : absl::string_view{},
-                          ExtractFieldSpec::is_array_element(seg)});
-    }
-  }
+      : max_element_capture_bytes_(config.max_element_capture_bytes), pattern_(spec.segments) {}
 
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
@@ -787,45 +768,45 @@ TEST(ParseExtractFieldSpecTest, DepthOneScalar) {
   auto result = parseExtractFieldSpec("model");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 1u);
-  EXPECT_EQ(result->segments[0].value(), "model");
-  EXPECT_FALSE(ExtractFieldSpec::is_array_element(result->segments[0]));
+  EXPECT_EQ(result->segments[0].key, "model");
+  EXPECT_FALSE(result->segments[0].is_array_element);
 }
 
 TEST(ParseExtractFieldSpecTest, DepthOneArray) {
   auto result = parseExtractFieldSpec("messages[]");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 2u);
-  EXPECT_EQ(result->segments[0].value(), "messages");
-  EXPECT_FALSE(ExtractFieldSpec::is_array_element(result->segments[0]));
-  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[1]));
+  EXPECT_EQ(result->segments[0].key, "messages");
+  EXPECT_FALSE(result->segments[0].is_array_element);
+  EXPECT_TRUE(result->segments[1].is_array_element);
 }
 
 TEST(ParseExtractFieldSpecTest, DepthTwoScalarInArray) {
   auto result = parseExtractFieldSpec("messages[].role");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 3u);
-  EXPECT_EQ(result->segments[0].value(), "messages");
-  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[1]));
-  EXPECT_EQ(result->segments[2].value(), "role");
+  EXPECT_EQ(result->segments[0].key, "messages");
+  EXPECT_TRUE(result->segments[1].is_array_element);
+  EXPECT_EQ(result->segments[2].key, "role");
 }
 
 TEST(ParseExtractFieldSpecTest, DepthThreeNestedDicts) {
   auto result = parseExtractFieldSpec("params._meta.traceparent");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 3u);
-  EXPECT_EQ(result->segments[0].value(), "params");
-  EXPECT_EQ(result->segments[1].value(), "_meta");
-  EXPECT_EQ(result->segments[2].value(), "traceparent");
+  EXPECT_EQ(result->segments[0].key, "params");
+  EXPECT_EQ(result->segments[1].key, "_meta");
+  EXPECT_EQ(result->segments[2].key, "traceparent");
 }
 
 TEST(ParseExtractFieldSpecTest, NestedArrays) {
   auto result = parseExtractFieldSpec("messages[].content[]");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 4u);
-  EXPECT_EQ(result->segments[0].value(), "messages");
-  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[1]));
-  EXPECT_EQ(result->segments[2].value(), "content");
-  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[3]));
+  EXPECT_EQ(result->segments[0].key, "messages");
+  EXPECT_TRUE(result->segments[1].is_array_element);
+  EXPECT_EQ(result->segments[2].key, "content");
+  EXPECT_TRUE(result->segments[3].is_array_element);
 }
 
 TEST(ParseExtractFieldSpecTest, RootArray) {
@@ -833,15 +814,15 @@ TEST(ParseExtractFieldSpecTest, RootArray) {
   auto result = parseExtractFieldSpec("[].role");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 2u);
-  EXPECT_TRUE(ExtractFieldSpec::is_array_element(result->segments[0]));
-  EXPECT_EQ(result->segments[1].value(), "role");
+  EXPECT_TRUE(result->segments[0].is_array_element);
+  EXPECT_EQ(result->segments[1].key, "role");
 }
 
 TEST(ParseExtractFieldSpecTest, UnderscorePrefixedKey) {
   auto result = parseExtractFieldSpec("_meta");
   ASSERT_TRUE(result.ok());
   ASSERT_EQ(result->segments.size(), 1u);
-  EXPECT_EQ(result->segments[0].value(), "_meta");
+  EXPECT_EQ(result->segments[0].key, "_meta");
 }
 
 // ============================================================================
@@ -915,9 +896,9 @@ TEST(ParseExtractFieldSpecTest, DottedDocumentKeyIsNotAddressable) {
   ASSERT_TRUE(result.ok());
   // Parsed as 5 nested dict keys, NOT as {params, _meta, "vendor.example.com/token"}.
   ASSERT_EQ(result->segments.size(), 5u);
-  EXPECT_EQ(result->segments[2].value(), "vendor");
-  EXPECT_EQ(result->segments[3].value(), "example");
-  EXPECT_EQ(result->segments[4].value(), "com/token");
+  EXPECT_EQ(result->segments[2].key, "vendor");
+  EXPECT_EQ(result->segments[3].key, "example");
+  EXPECT_EQ(result->segments[4].key, "com/token");
 }
 
 TEST(ParseExtractFieldSpecTest, BracketAfterBracketAccepted) {

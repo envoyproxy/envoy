@@ -185,27 +185,22 @@ public:
 
   // One level of a structural pattern-path match: a dict key or an array wildcard.
   //
+  // For example, for "messages[].role":
   //
-  // Build once — static constexpr, or converted from an ExtractFieldSpec
-  // (parser_config.h) at config time — never per callback. `key` is not copied, so
-  // its bytes must outlive the array: literals are always safe, spec-derived views
-  // require the spec to outlive the handler. For "messages[].role":
-  //
-  //   static constexpr WuffsJsonCursor::PatternSegment kMessagesRole[] = {
+  //   std::vector<WuffsJsonCursor::PatternSegment> messages_role = {
   //       {"messages"},         // dict key
   //       {"", /*array=*/true}, // [] wildcard; key unused
   //       {"role"},             // dict key
   //   };
   struct PatternSegment {
-    // Unused when is_array_element is true.
-    absl::string_view key;
+    // Empty and unused when is_array_element is true.
+    std::string key;
     bool is_array_element{false};
   };
 
   // True iff the root-to-here chain at `depth` matches `segments` exactly.
   // Labels compare whole and are never serialized, so a document key holding
   // '.', '[' or ']' cannot masquerade as nested structure.
-  // Zero allocations; O(depth) string_view compares with early exit.
   //
   // For `depth`, pass the value the calling Handler callback received (the
   // container callbacks anchor one level up, at depth-1).

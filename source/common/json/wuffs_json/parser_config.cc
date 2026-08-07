@@ -1,6 +1,5 @@
 #include "source/common/json/wuffs_json/parser_config.h"
 
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,7 +13,7 @@ namespace Json {
 namespace Wuffs {
 namespace {
 
-using Segment = std::optional<std::string>;
+using Segment = WuffsJsonCursor::PatternSegment;
 
 // Rejects structural problems detectable before character-by-character parsing.
 absl::Status validatePathSyntax(absl::string_view path) {
@@ -105,7 +104,8 @@ private:
     if (!in_array_) {
       return absl::InvalidArgumentError("extract_field_spec: unexpected ']' in path");
     }
-    if (auto status = appendSegment(segments, std::nullopt, max_depth_); !status.ok()) {
+    if (auto status = appendSegment(segments, Segment{"", /*is_array_element=*/true}, max_depth_);
+        !status.ok()) {
       return status;
     }
     in_array_ = false;
@@ -151,7 +151,9 @@ private:
       return absl::OkStatus();
     }
     has_key_ = false;
-    return appendSegment(segments, std::string(path_.substr(segment_start_, end - segment_start_)),
+    return appendSegment(segments,
+                         Segment{std::string(path_.substr(segment_start_, end - segment_start_)),
+                                 /*is_array_element=*/false},
                          max_depth_);
   }
 

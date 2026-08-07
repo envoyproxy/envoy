@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cstddef>
-#include <optional>
-#include <string>
 #include <vector>
+
+#include "source/common/json/wuffs_json/wuffs_json_cursor.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -15,10 +15,11 @@ namespace Wuffs {
 
 // Parsed representation of the JSON field path used for customized target extraction.
 struct ExtractFieldSpec {
-  // Each segment is either a dict key (present) or an [] wildcard (absent).
-  std::vector<std::optional<std::string>> segments;
-
-  static bool is_array_element(const std::optional<std::string>& seg) { return !seg.has_value(); }
+  // Ready to pass straight to WuffsJsonCursor::matchesPatternPath — the parse is
+  // the conversion, so no handler re-derives a pattern from this. Each segment is
+  // either a dict key or an [] wildcard; segments own their keys, so a spec is an
+  // ordinary copyable value.
+  std::vector<WuffsJsonCursor::PatternSegment> segments;
 };
 
 // Parse and convert the path string into a valid and structured ExtractFieldSpec.
@@ -37,10 +38,10 @@ struct ExtractFieldSpec {
 //   - A field name after '[]' must be preceded by '.'.
 //   - '\' is reserved for a future escape syntax and is rejected.
 //
-// Example:
+// Example (segments below are shown by key; a wildcard is {"", is_array=true}):
 //   parseExtractFieldSpec("messages[].role")
 //     → segments = {"messages",  // dict key
-//                   nullopt,     // [] wildcard
+//                   [],          // [] wildcard
 //                   "role"},     // dict key
 //                                // depth 3
 //
@@ -61,7 +62,7 @@ struct ExtractFieldSpec {
 //
 //   parseExtractFieldSpec("tools[].function.name")   // scalar in a dict inside
 //     → segments = {"tools",     // each array element
-//                   nullopt,
+//                   [],
 //                   "function",
 //                   "name"}      // depth 4
 //
@@ -101,8 +102,11 @@ struct ParserConfig {
   // cutoff; (3) qualified naming for nested scalars.
   bool capture_all_scalars{false};
 
-  // Spec-based extraction: routes scalar callbacks via matchesPatternPath.
-  // Mutually exclusive with capture_all_scalars.
+  // Operator-declared JSON fields to extract from the body. Mutually exclusive
+  // with capture_all_scalars.
+  //
+  // The handler pass a spec's segments straight to cursor.matchesPatternPath(segments, depth) at
+  // each scalar callback.
   std::vector<ExtractFieldSpec> extract_fields;
 
   // Returns InvalidArgumentError if capture_all_scalars and extract_fields are
