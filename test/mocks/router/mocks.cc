@@ -45,6 +45,11 @@ void MockRetryState::expectHedgedPerTryTimeoutRetry() {
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(RetryStatus::Yes)));
 }
 
+void MockRetryState::expectNoHealthyUpstreamRetry() {
+  EXPECT_CALL(*this, shouldRetryNoHealthyUpstream(_))
+      .WillOnce(DoAll(SaveArg<0>(&callback_), Return(RetryStatus::Yes)));
+}
+
 void MockRetryState::expectResetRetry() {
   EXPECT_CALL(*this, shouldRetryReset(_, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used,

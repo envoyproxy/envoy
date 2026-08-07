@@ -1700,6 +1700,10 @@ message RetryPolicy {
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
   // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
+  //
+  // When using :ref:`composite clusters <arch_overview_composite_cluster>` for per-request
+  // failover, include ``no-healthy-upstream`` to retry when a sub-cluster has no healthy
+  // endpoints available.
   string retry_on = 1;
 
   // Specifies the allowed number of retries. This parameter is optional and

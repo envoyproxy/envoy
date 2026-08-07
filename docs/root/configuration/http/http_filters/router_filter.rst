@@ -135,6 +135,14 @@ retriable-headers
 http3-post-connect-failure:
   Envoy will attempt a retry if a request is sent over HTTP/3 to the upstream server and failed after getting connected.
 
+no-healthy-upstream
+  Envoy will attempt a retry if the selected cluster has no healthy upstream hosts available (i.e.,
+  the load balancer could not select a host). This is particularly useful with
+  :ref:`composite clusters <arch_overview_composite_cluster>` where a sub-cluster may have zero
+  endpoints due to DNS resolution failure or complete outlier ejection. Without this condition,
+  requests that encounter an empty sub-cluster fail immediately with a 503 rather than retrying
+  to the next sub-cluster.
+
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route
 configuration <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or via the

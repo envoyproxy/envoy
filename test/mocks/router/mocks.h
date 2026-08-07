@@ -222,6 +222,7 @@ public:
 
   void expectHeadersRetry();
   void expectHedgedPerTryTimeoutRetry();
+  void expectNoHealthyUpstreamRetry();
   void expectResetRetry();
 
   MOCK_METHOD(bool, enabled, ());
@@ -237,6 +238,7 @@ public:
               (const Http::StreamResetReason reset_reason, Http3Used alternate_protocol_used,
                DoRetryResetCallback callback, bool upstream_request_started));
   MOCK_METHOD(RetryStatus, shouldHedgeRetryPerTryTimeout, (DoRetryCallback callback));
+  MOCK_METHOD(RetryStatus, shouldRetryNoHealthyUpstream, (DoRetryCallback callback));
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
   MOCK_METHOD(const Upstream::HealthyAndDegradedLoad&, priorityLoadForRetry,

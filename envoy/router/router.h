@@ -243,6 +243,7 @@ public:
   static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED                 = 0x2000;
   static constexpr uint32_t RETRY_ON_HTTP3_POST_CONNECT_FAILURE         = 0x4000;
   static constexpr uint32_t RETRY_ON_RESET_BEFORE_REQUEST               = 0x8000;
+  static constexpr uint32_t RETRY_ON_NO_HEALTHY_UPSTREAM                = 0x10000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -509,6 +510,8 @@ public:
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) PURE;
+
+  virtual RetryStatus shouldRetryNoHealthyUpstream(DoRetryCallback callback) PURE;
 
   /**
    * Called when a host was attempted but the request failed and is eligible for another retry.
