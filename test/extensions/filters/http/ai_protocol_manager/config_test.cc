@@ -104,11 +104,10 @@ TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
                           .createRouteSpecificFilterConfig(
                               proto_config, context, ProtobufMessage::getNullValidationVisitor())
                           .value();
-  EXPECT_THAT(
-      route_config.get(),
-      testing::WhenDynamicCastTo<const RouteConfig*>(testing::AllOf(
-          testing::Property(&RouteConfig::schema, PerRouteProto::OPENAI_CHAT_COMPLETIONS),
-          testing::Property(&RouteConfig::normalize, true))));
+  EXPECT_THAT(route_config.get(),
+              testing::WhenDynamicCastTo<const RouteConfig*>(testing::AllOf(
+                  testing::Property(&RouteConfig::schema, PerRouteProto::OPENAI_CHAT_COMPLETIONS),
+                  testing::Property(&RouteConfig::normalize, true))));
 }
 
 // normalize defaults off: a route that only declares a schema is a pass-through
@@ -124,9 +123,8 @@ TEST(AiProtocolManagerConfigTest, RouteConfigDefaultsToNoNormalization) {
                               proto_config, context, ProtobufMessage::getNullValidationVisitor())
                           .value();
 
-  EXPECT_THAT(route_config.get(),
-              testing::WhenDynamicCastTo<const RouteConfig*>(
-                  testing::Property(&RouteConfig::normalize, false)));
+  EXPECT_THAT(route_config.get(), testing::WhenDynamicCastTo<const RouteConfig*>(
+                                      testing::Property(&RouteConfig::normalize, false)));
 }
 
 // The route config proto the factory hands the config subsystem is the per-route
