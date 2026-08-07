@@ -1,6 +1,10 @@
 #pragma once
 
 #include <memory>
+#include <string>
+
+#include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
+#include "envoy/router/router.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
@@ -15,6 +19,38 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
+
+// Filter-level configuration, shared by every stream on the chain.
+class FilterConfig {
+public:
+  explicit FilterConfig(
+      const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto)
+      : best_effort_parsing_(proto.best_effort_parsing()) {}
+
+  bool bestEffortParsing() const { return best_effort_parsing_; }
+
+private:
+  const bool best_effort_parsing_;
+};
+using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
+
+// Per-route configuration. Its presence declares the route an AI endpoint: the
+// payload is parsed strictly and, once schemas land, validated against schema()
+// and transcoded to the canonical schema when normalize() is set.
+class RouteConfig : public Router::RouteSpecificFilterConfig {
+public:
+  explicit RouteConfig(
+      const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute&
+          proto)
+      : schema_(proto.schema()), normalize_(proto.normalize()) {}
+
+  const std::string& schema() const { return schema_; }
+  bool normalize() const { return normalize_; }
+
+private:
+  const std::string schema_;
+  const bool normalize_;
+};
 
 // AI Protocol Manager HTTP filter (alpha).
 //
@@ -44,15 +80,23 @@ namespace AiProtocolManager {
 // not after the whole upload. Only a JSON content type is parsed; anything else
 // is offloaded and replayed untouched.
 //
-// The document (requestJson()) is not yet consumed -- an AI-specific extension
-// chain to inspect and rewrite the payload comes later. What it already buys is
-// validation: malformed JSON, duplicate keys, and unrepresentable numbers are
-// rejected here rather than forwarded for the backend to read differently.
+// Whether a payload is parsed at all, and whether a parse failure is fatal, is
+// decided per route. A route carrying a RouteConfig is a declared AI endpoint:
+// its payload is parsed strictly and a malformed one is rejected with a 400,
+// which is what keeps Envoy and the backend from reading the same body
+// differently. A route without one is parsed on a best-effort basis if the
+// filter is configured for it -- the document is offered to later filters when
+// it parses and the request is forwarded untouched when it does not -- and is
+// otherwise not parsed.
+//
+// The document (requestJson()) is not yet consumed, and neither is the route's
+// schema: validation against it, and transcoding to the canonical schema when
+// the route asks to normalize, come later.
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit AiProtocolManagerFilter(ExternalBufferFactory& buffer_factory)
-      : buffer_factory_(buffer_factory) {}
+  AiProtocolManagerFilter(ExternalBufferFactory& buffer_factory, FilterConfigSharedPtr config)
+      : buffer_factory_(buffer_factory), config_(std::move(config)) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -70,16 +114,29 @@ public:
   // this filter's lifetime.
   const JsonWithExtBuf* requestJson() const { return request_json_.get(); }
 
+  // The route's configuration, or nullptr when the route did not declare itself
+  // an AI endpoint. Resolved in decodeHeaders().
+  const RouteConfig* routeConfig() const { return route_config_; }
+
 private:
-  // Feeds one body frame to the parser in place. Returns false if the payload
-  // was rejected, in which case the caller must not offload or replay it.
+  // Feeds one body frame to the parser in place. Returns false only if the
+  // payload was rejected, in which case the caller must not offload or replay
+  // it; a best-effort parse that fails abandons parsing and returns true.
   bool feedParser(const Buffer::Instance& data, bool end_stream);
 
   // Terminates the stream with a 400 for a payload that failed to parse.
   void rejectInvalidPayload(const absl::Status& status);
 
   ExternalBufferFactory& buffer_factory_;
+  FilterConfigSharedPtr config_;
   BufferManagerPtr decode_manager_;
+
+  // Not owned; the route configuration outlives the stream.
+  const RouteConfig* route_config_{nullptr};
+
+  // Whether a parse failure fails the request. Set for a declared AI endpoint,
+  // clear for a best-effort parse.
+  bool reject_on_parse_failure_{false};
 
   // The parser is cleared once a payload is rejected; request_json_ outlives it.
   std::unique_ptr<JsonWithExtBuf> request_json_;

@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.ai_protocol_manager.v3;
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ai_protocol_manager.v3";
 option java_outer_classname = "AiProtocolManagerProto";
@@ -20,4 +21,51 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // Configuration for the AI Protocol Manager filter.
 message AiProtocolManager {
+  // Whether to parse a JSON payload on a route that carries no :ref:`per-route
+  // configuration
+  // <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`.
+  //
+  // Such a route is not a declared AI endpoint, so there is no target schema to
+  // hold its payload to. When this is set the filter still parses a JSON body,
+  // making the parsed document available to later filters, but a payload that
+  // fails to parse is forwarded unchanged instead of being rejected. When unset
+  // (the default) the payload is forwarded without being parsed at all.
+  //
+  // A payload on a route that *does* carry per-route configuration is always
+  // parsed strictly, and a malformed one is rejected with a 400 regardless of
+  // this setting.
+  bool best_effort_parsing = 1;
+}
+
+// Per-route configuration for the AI Protocol Manager filter. Declares that the
+// route is an AI endpoint and what its payload looks like.
+//
+// This is normally attached to a route matching the provider's REST path, for
+// example ``/chat/completions``.
+message AiProtocolManagerPerRoute {
+  // Name of the schema the request payload on this route is expected to conform
+  // to, for example the OpenAI Chat Completions request shape.
+  //
+  // Setting this makes the payload parsed strictly: a body that is not
+  // well-formed JSON is rejected with a 400 rather than forwarded.
+  //
+  // The schema definitions themselves are not part of this API yet; a later
+  // change adds them along with validation and transcoding against them. Until
+  // then the name is recorded and carried, but the payload is not checked
+  // against it.
+  string schema = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Whether to normalize the payload from :ref:`schema
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
+  // into the canonical schema.
+  //
+  // When unset the route is a pass-through endpoint: the payload is parsed (and,
+  // later, validated) in its own schema and forwarded upstream in that same
+  // schema. When set, the payload is additionally transcoded into the canonical
+  // schema, which is what lets one set of filters operate on payloads from
+  // different providers.
+  //
+  // Transcoding is not implemented yet; a later change adds it. Until then this
+  // field is accepted and has no effect.
+  bool normalize = 2;
 }

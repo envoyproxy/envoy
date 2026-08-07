@@ -75,6 +75,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
     ],
 )
@@ -100,6 +101,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
     ],
 )

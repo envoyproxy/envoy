@@ -19,11 +19,19 @@ While a body is being offloaded, the request headers are held at this filter and
 released to the subsequent filters only once replay begins, so they never act on
 the headers before the payload they depend on is available.
 
+As the body is offloaded it is also parsed, so that a payload which is not
+well-formed JSON is rejected here rather than forwarded for the upstream to
+interpret differently. Parsing is incremental and shares the offload's byte
+stream, so an invalid payload fails as soon as the offending byte arrives rather
+than after the whole upload. Oversized string values are left in the external
+buffer and referenced by offset, so a large prompt does not reappear in
+per-stream memory.
+
 .. note::
 
   Only the request (decode) path is wired today, and the body is offloaded to an
-  in-memory store. The filter performs a straight offload-then-replay; streaming
-  payload parsing and admission control will be layered on top of this plumbing.
+  in-memory store. Schema validation and transcoding are not implemented yet;
+  the parsed payload is not consumed by anything downstream so far.
 
 The filter is a dual filter: besides the downstream HTTP filter chain shown
 below, it can also be placed in a cluster's upstream HTTP filter chain via
@@ -50,7 +58,39 @@ selection (and therefore once per retry or hedged attempt).
 Configuration
 -------------
 
-The filter takes no configuration. Example:
+Which routes are AI endpoints is declared per route, with
+:ref:`AiProtocolManagerPerRoute
+<envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`.
+A route that carries one names the :ref:`schema
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
+its payload is expected to conform to, and its payload is parsed strictly: a
+malformed body is rejected with a 400. This is normally attached to a route
+matching the provider's REST path, such as ``/chat/completions``:
+
+.. code-block:: yaml
+
+  routes:
+  - match:
+      path: "/chat/completions"
+    route:
+      cluster: openai
+    typed_per_filter_config:
+      envoy.filters.http.ai_protocol_manager:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
+        schema: openai.chat_completions
+
+Such a route is a pass-through endpoint: the payload is forwarded upstream in
+its own schema. Setting :ref:`normalize
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.normalize>`
+additionally transcodes it into the canonical schema, which is what lets one set
+of filters operate on payloads from different providers.
+
+The filter-level configuration decides what happens on every other route. By
+default their payloads are forwarded without being parsed; setting
+:ref:`best_effort_parsing
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.best_effort_parsing>`
+parses them too, but never fails a request over it -- a payload that does not
+parse is forwarded unchanged.
 
 .. code-block:: yaml
 
@@ -58,3 +98,7 @@ The filter takes no configuration. Example:
   - name: envoy.filters.http.ai_protocol_manager
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      best_effort_parsing: true
+
+In every case only a payload whose content type is ``application/json`` is
+parsed; anything else is offloaded and replayed untouched.

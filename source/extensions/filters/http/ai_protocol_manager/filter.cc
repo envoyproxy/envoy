@@ -6,6 +6,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 
 #include "absl/strings/match.h"
@@ -66,14 +67,24 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (isJsonContentType(headers)) {
+  route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(decoder_callbacks_);
+  if (route_config_ != nullptr) {
+    ENVOY_LOG(debug, "ai_protocol_manager: route declares schema \"{}\"{}", route_config_->schema(),
+              route_config_->normalize() ? ", normalizing" : "");
+  }
+
+  // A declared AI endpoint is parsed strictly. Any other route is parsed only if
+  // the filter opted into best-effort parsing, and never fails the request.
+  const bool parse =
+      isJsonContentType(headers) && (route_config_ != nullptr || config_->bestEffortParsing());
+  if (parse) {
+    reject_on_parse_failure_ = route_config_ != nullptr;
     // Bind to the buffer before any byte arrives: the parser records offsets
     // into it, so it must know which buffer it is describing up front.
     request_json_ = std::make_unique<JsonWithExtBuf>(&decode_manager_->ensureBuffer());
     request_parser_ =
         std::make_unique<JsonWithExtBufParser>(*request_json_, JsonWithExtBufParser::Config{});
-  } else {
-    ENVOY_LOG(debug, "ai_protocol_manager: content type is not JSON, forwarding payload unparsed");
   }
 
   // A body follows: pin the headers at this filter so the subsequent routing and
@@ -109,8 +120,15 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   }
 
   if (!status.ok()) {
-    rejectInvalidPayload(status);
-    return false;
+    if (reject_on_parse_failure_) {
+      rejectInvalidPayload(status);
+      return false;
+    }
+    // Best effort: the payload is forwarded as it stands, just without a
+    // document for later filters to work from.
+    ENVOY_LOG(debug, "ai_protocol_manager: forwarding unparsed payload: {}", status.message());
+    request_parser_.reset();
+    request_json_.reset();
   }
   return true;
 }
@@ -169,8 +187,8 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::Request
   // No data frame carried end_stream, so the document is still open. Closing it
   // here is what catches a truncated payload.
   if (request_parser_ != nullptr) {
-    if (absl::Status status = request_parser_->feed("", /*end_stream=*/true); !status.ok()) {
-      rejectInvalidPayload(status);
+    Buffer::OwnedImpl empty;
+    if (!feedParser(empty, /*end_stream=*/true)) {
       return Http::FilterTrailersStatus::StopIteration;
     }
   }
