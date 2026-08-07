@@ -49,6 +49,13 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
   // A declared AI endpoint is parsed strictly. Any other route is parsed only if
   // the filter opted into best-effort parsing, and never fails the request.
+  // TODO(penguingao): best-effort parsing takes the buffering path below for every bodied request
+  // on every route, which deadlocks full-duplex requests (e.g. gRPC client/bidi streaming):
+  // headers are held until the request's end_stream, which the client may not send until it
+  // sees a response the upstream cannot produce. Gate the best-effort path on content-type
+  // (only application/json and *+json; never gRPC or upgrades), and on a best-effort parse
+  // failure release the held headers and buffered body immediately and pass the remainder
+  // through unbuffered, rather than buffering to end-of-stream.
   if (!isAiEndpoint() && !config_->bestEffortParsing()) {
     // Nothing will look at this payload, so stay out of the way: offloading it
     // would cost a store round-trip and withhold the headers meanwhile, for

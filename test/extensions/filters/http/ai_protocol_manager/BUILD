@@ -72,11 +72,9 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
-        "@nlohmann_json//:json",
     ],
 )
 

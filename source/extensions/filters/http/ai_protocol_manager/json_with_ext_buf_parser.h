@@ -10,6 +10,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
 
@@ -77,11 +78,14 @@ public:
   void onContainerClose(int depth, size_t token_end) override;
 
 private:
-  // Attaches a completed value to the container being built (or makes it the
-  // root), consuming any pending key.
+  // Attaches `value` to the container being built (or makes it the root),
+  // consuming any pending key, and returns the attached node's slot.
+  absl::StatusOr<nlohmann::json*> attach(nlohmann::json&& value);
+
+  // attach() for a completed value, discarding the slot.
   absl::Status addValue(nlohmann::json&& value);
 
-  // Same, for a new empty container, which becomes the current one.
+  // attach() for a new empty container, which becomes the current one.
   absl::Status pushContainer(bool is_dict);
 
   // Records the first error from a callback that cannot return a status. Later

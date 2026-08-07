@@ -57,7 +57,6 @@ public:
   static constexpr std::size_t kExternalRefBytes = sizeof(ExternalRef);
 
   JsonWithExtBuf() = default;
-  virtual ~JsonWithExtBuf() = default;
 
   // Move-only: silently copying a large DOM would defeat the point.
   JsonWithExtBuf(JsonWithExtBuf&&) = default;

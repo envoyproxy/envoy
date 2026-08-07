@@ -58,7 +58,7 @@ void JsonWithExtBufParser::setError(absl::Status status) {
   }
 }
 
-absl::Status JsonWithExtBufParser::addValue(nlohmann::json&& value) {
+absl::StatusOr<nlohmann::json*> JsonWithExtBufParser::attach(nlohmann::json&& value) {
   if (stack_.empty()) {
     if (root_set_) {
       // Defense in depth: the cursor already rejects trailing bytes.
@@ -66,7 +66,7 @@ absl::Status JsonWithExtBufParser::addValue(nlohmann::json&& value) {
     }
     root_ = std::move(value);
     root_set_ = true;
-    return absl::OkStatus();
+    return &root_;
   }
 
   nlohmann::json& parent = *stack_.back();
@@ -74,44 +74,30 @@ absl::Status JsonWithExtBufParser::addValue(nlohmann::json&& value) {
     // Duplicate keys are rejected by the cursor, so this never overwrites.
     // nlohmann's object is a std::map, so key order is not preserved -- a future
     // re-serializer has to account for that.
-    parent[pending_key_] = std::move(value);
+    nlohmann::json& slot = parent[pending_key_];
     pending_key_.clear();
-    return absl::OkStatus();
+    slot = std::move(value);
+    return &slot;
   }
   if (parent.is_array()) {
     parent.push_back(std::move(value));
-    return absl::OkStatus();
+    return &parent.back();
   }
   return absl::InternalError("ai json: value attached to a non-container");
 }
 
+absl::Status JsonWithExtBufParser::addValue(nlohmann::json&& value) {
+  return attach(std::move(value)).status();
+}
+
 absl::Status JsonWithExtBufParser::pushContainer(bool is_dict) {
-  nlohmann::json container = is_dict ? nlohmann::json::object() : nlohmann::json::array();
-
-  if (stack_.empty()) {
-    if (root_set_) {
-      return absl::InvalidArgumentError("ai json: more than one root value");
-    }
-    root_ = std::move(container);
-    root_set_ = true;
-    stack_.push_back(&root_);
-    return absl::OkStatus();
+  absl::StatusOr<nlohmann::json*> slot =
+      attach(is_dict ? nlohmann::json::object() : nlohmann::json::array());
+  if (!slot.ok()) {
+    return slot.status();
   }
-
-  nlohmann::json& parent = *stack_.back();
-  if (parent.is_object()) {
-    nlohmann::json& slot = parent[pending_key_];
-    pending_key_.clear();
-    slot = std::move(container);
-    stack_.push_back(&slot);
-    return absl::OkStatus();
-  }
-  if (parent.is_array()) {
-    parent.push_back(std::move(container));
-    stack_.push_back(&parent.back());
-    return absl::OkStatus();
-  }
-  return absl::InternalError("ai json: container attached to a non-container");
+  stack_.push_back(*slot);
+  return absl::OkStatus();
 }
 
 bool JsonWithExtBufParser::openStringCapture(absl::string_view, int, size_t token_start) {

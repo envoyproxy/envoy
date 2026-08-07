@@ -9,7 +9,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
-#include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -17,7 +16,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "nlohmann/json.hpp"
 
 using testing::Invoke;
 using testing::NiceMock;
