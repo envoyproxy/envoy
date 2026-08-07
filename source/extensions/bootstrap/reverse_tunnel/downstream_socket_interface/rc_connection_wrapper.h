@@ -216,6 +216,8 @@ public:
    */
   Network::ClientConnection* getConnection() { return connection_.get(); }
 
+  const std::string& connectionKey() const { return connection_key_; }
+
   /**
    * Get the host description.
    * @return shared pointer to the host description
