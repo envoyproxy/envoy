@@ -88,20 +88,17 @@ public:
   }
 
   // Attaches a per-route config, declaring the route an AI endpoint.
-  void setRouteConfig(absl::string_view schema, bool normalize = false) {
-    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto;
-    proto.set_schema(std::string(schema));
+  void setRouteConfig(bool normalize = false) {
+    PerRouteProto proto;
+    proto.set_schema(PerRouteProto::OPENAI_CHAT_COMPLETIONS);
     proto.set_normalize(normalize);
     route_config_ = std::make_unique<RouteConfig>(proto);
     ON_CALL(callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
   }
 
-  // Headers that opt the request into JSON parsing.
-  static Http::TestRequestHeaderMapImpl
-  jsonHeaders(absl::string_view content_type = "application/json") {
-    return Http::TestRequestHeaderMapImpl{
-        {":method", "POST"}, {":path", "/v1/chat"}, {"content-type", std::string(content_type)}};
+  static Http::TestRequestHeaderMapImpl requestHeaders() {
+    return Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/chat/completions"}};
   }
 
   // The manager the filter owns requires onDestroy() before destruction (see
@@ -363,10 +360,11 @@ TEST_F(AiProtocolManagerFilterTest, TrailersWithoutBody) {
   EXPECT_EQ(continue_calls_, 0);
 }
 
-// Parsing observes the payload: the body is still replayed byte for byte.
-TEST_F(AiProtocolManagerFilterTest, ParsesJsonBodyAndReplaysItVerbatim) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+// A declared endpoint's payload is parsed as it is offloaded and still replayed
+// downstream byte for byte: parsing observes the payload, it does not rewrite it.
+TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVerbatim) {
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   const std::string payload = R"({"model":"gpt-4","stream":true,"max_tokens":256})";
@@ -377,45 +375,12 @@ TEST_F(AiProtocolManagerFilterTest, ParsesJsonBodyAndReplaysItVerbatim) {
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), payload);
   EXPECT_TRUE(injected_end_stream_);
-
-  ASSERT_NE(filter_->requestJson(), nullptr);
-  const nlohmann::json& json = filter_->requestJson()->json();
-  EXPECT_EQ(json["model"], "gpt-4");
-  EXPECT_EQ(json["stream"], true);
-  EXPECT_EQ(json["max_tokens"], 256);
-}
-
-// A value too large for the DOM is left in the buffer, and its reference
-// resolves to exactly that value's bytes.
-TEST_F(AiProtocolManagerFilterTest, LargeValueBecomesAnExternalReference) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
-
-  const std::string prompt(4096, 'p');
-  const std::string payload = R"({"model":"gpt-4","prompt":")" + prompt + R"("})";
-  Buffer::OwnedImpl body(payload);
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  EXPECT_EQ(injected_.toString(), payload);
-  ASSERT_NE(filter_->requestJson(), nullptr);
-  const nlohmann::json& json = filter_->requestJson()->json();
-  // Small values stayed inline; the oversized one did not.
-  EXPECT_EQ(json["model"], "gpt-4");
-  ASSERT_TRUE(JsonWithExtBuf::isExternalRef(json["prompt"]));
-
-  const absl::StatusOr<JsonWithExtBuf::ExternalRef> ref =
-      JsonWithExtBuf::externalRef(json["prompt"]);
-  ASSERT_TRUE(ref.ok());
-  // Offsets are positions in the body stream, which is what the buffer holds.
-  EXPECT_EQ(payload.substr(ref->offset, ref->length), prompt);
 }
 
 // Malformed JSON is answered with a 400 and never reaches the upstream.
 TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model" "gpt-4"})");
@@ -430,8 +395,8 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
 
 // Where Envoy and the backend could otherwise read the same body differently.
 TEST_F(AiProtocolManagerFilterTest, RejectsDuplicateKeys) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"a","model":"b"})");
@@ -445,8 +410,8 @@ TEST_F(AiProtocolManagerFilterTest, RejectsDuplicateKeys) {
 
 // Incomplete rather than malformed; caught when the terminal frame closes.
 TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJson) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4")");
@@ -458,11 +423,49 @@ TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJson) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
+// A stream whose framing promised a body but delivered none -- a chunked request
+// with only the terminating chunk, or an empty terminal DATA frame -- carries no
+// payload to validate, so it passes through just like a request that ended on
+// its headers. A GET reaches the filter this way.
+TEST_F(AiProtocolManagerFilterTest, EmptyBodyOnDeclaredEndpointIsPassedThrough) {
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
+  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(filter_->decodeData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(injected_.length(), 0);
+}
+
+// Only a stream with no body at all is exempt. Once bytes have arrived they are
+// a payload, and an empty terminal frame closes it rather than excusing it.
+TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonEndedByEmptyTerminalFrame) {
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
+  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4")");
+  EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl terminal;
+  EXPECT_EQ(filter_->decodeData(terminal, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(inject_calls_, 0);
+}
+
 // Parsing before offloading means a bad byte early in a large upload fails the
 // request immediately, and the rest of the client's data is dropped.
 TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl bad_chunk(R"({"model" "gpt-4",)");
@@ -479,73 +482,11 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// Non-JSON traffic on the chain is replayed untouched, not failed as bad JSON.
-TEST_F(AiProtocolManagerFilterTest, NonJsonContentTypeIsNotParsed) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders("text/plain");
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
-
-  Buffer::OwnedImpl body("this is not json {{{");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(filter_->requestJson(), nullptr);
-  EXPECT_EQ(injected_.toString(), "this is not json {{{");
-  EXPECT_TRUE(injected_end_stream_);
-}
-
-// A charset parameter does not change the media type.
-TEST_F(AiProtocolManagerFilterTest, JsonContentTypeWithParametersIsParsed) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders("application/json; charset=utf-8");
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
-
-  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  EXPECT_EQ(local_reply_calls_, 0);
-  ASSERT_NE(filter_->requestJson(), nullptr);
-  EXPECT_EQ(filter_->requestJson()->json()["model"], "gpt-4");
-}
-
-// A different media type that merely shares the prefix is not JSON.
-TEST_F(AiProtocolManagerFilterTest, PrefixMatchingContentTypeIsNotParsed) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders("application/json-seq");
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
-
-  Buffer::OwnedImpl body("not json");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(filter_->requestJson(), nullptr);
-}
-
-// No body at all is passed through, matching the headers-only path, rather than
-// failed as an empty document.
-TEST_F(AiProtocolManagerFilterTest, EmptyBodyWithJsonContentTypeIsPassedThrough) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
-
-  Buffer::OwnedImpl empty;
-  EXPECT_EQ(filter_->decodeData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  ASSERT_TRUE(replay_cb_->enabled());
-  replay_cb_->invokeCallback();
-  drain();
-
-  EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_TRUE(injected_end_stream_);
-  EXPECT_EQ(injected_.length(), 0);
-}
-
-// A body ending on an empty terminal frame still gets its document closed.
+// A body ending on an empty terminal frame still gets its document closed, so a
+// complete payload split that way is not mistaken for a truncated one.
 TEST_F(AiProtocolManagerFilterTest, ChunkedBodyWithEmptyTerminalFrame) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl chunk1(R"({"model":"gpt)");
@@ -557,15 +498,13 @@ TEST_F(AiProtocolManagerFilterTest, ChunkedBodyWithEmptyTerminalFrame) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  ASSERT_NE(filter_->requestJson(), nullptr);
-  EXPECT_EQ(filter_->requestJson()->json()["model"], "gpt-4");
   EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
 }
 
 // With trailers, no data frame carries end_stream, so the trailers close it.
 TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedJsonIsParsed) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
@@ -575,15 +514,14 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedJsonIsParsed) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  ASSERT_NE(filter_->requestJson(), nullptr);
-  EXPECT_EQ(filter_->requestJson()->json()["model"], "gpt-4");
+  EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
   EXPECT_EQ(continue_calls_, 1);
 }
 
 // The same path catches a truncated body that would otherwise be forwarded.
 TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonTerminatedByTrailers) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4")");
@@ -601,15 +539,13 @@ TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonTerminatedByTrailers) {
 // Without a per-route config the route is not a declared AI endpoint, so by
 // default the payload is forwarded without being parsed at all.
 TEST_F(AiProtocolManagerFilterTest, WithoutRouteConfigPayloadIsNotParsed) {
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
-  EXPECT_EQ(filter_->routeConfig(), nullptr);
-  EXPECT_EQ(filter_->requestJson(), nullptr);
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
 }
@@ -617,7 +553,7 @@ TEST_F(AiProtocolManagerFilterTest, WithoutRouteConfigPayloadIsNotParsed) {
 // Nor is a malformed one failed: with no schema to hold it to, the payload is
 // none of the filter's business.
 TEST_F(AiProtocolManagerFilterTest, WithoutRouteConfigMalformedPayloadIsForwarded) {
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model" "gpt-4"})");
@@ -629,26 +565,26 @@ TEST_F(AiProtocolManagerFilterTest, WithoutRouteConfigMalformedPayloadIsForwarde
   EXPECT_TRUE(injected_end_stream_);
 }
 
-// Best-effort parsing makes the document available on an undeclared route.
-TEST_F(AiProtocolManagerFilterTest, BestEffortParsingProducesADocument) {
+// Best-effort parsing runs on an undeclared route and leaves a valid payload
+// untouched.
+TEST_F(AiProtocolManagerFilterTest, BestEffortParsingAcceptsValidPayload) {
   createFilter(/*best_effort_parsing=*/true);
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
-  ASSERT_NE(filter_->requestJson(), nullptr);
-  EXPECT_EQ(filter_->requestJson()->json()["model"], "gpt-4");
   EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
 }
 
 // Best effort means exactly that: a payload that does not parse is forwarded
-// unchanged rather than rejected, and no document is offered for it.
+// unchanged rather than rejected.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
   createFilter(/*best_effort_parsing=*/true);
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model" "gpt-4"})");
@@ -656,7 +592,6 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(filter_->requestJson(), nullptr);
   EXPECT_EQ(injected_.toString(), R"({"model" "gpt-4"})");
   EXPECT_TRUE(injected_end_stream_);
 }
@@ -664,7 +599,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
 // A payload abandoned mid-upload is still offloaded and replayed in full.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsRestOfAbandonedPayload) {
   createFilter(/*best_effort_parsing=*/true);
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl chunk1(R"({"model" "gpt-4",)");
@@ -677,12 +612,29 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsRestOfAbandonedPayl
   EXPECT_EQ(injected_.toString(), R"({"model" "gpt-4","stream":true})");
 }
 
+// Best effort also tolerates an empty body, where a declared endpoint rejects it.
+TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsEmptyBody) {
+  createFilter(/*best_effort_parsing=*/true);
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
+  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(filter_->decodeData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(injected_.length(), 0);
+}
+
 // A declared endpoint is strict regardless of the filter-level best-effort
 // setting: the schema is what says this payload has to be well formed.
 TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigured) {
   createFilter(/*best_effort_parsing=*/true);
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model" "gpt-4"})");
@@ -694,33 +646,18 @@ TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigu
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// The route's schema and normalization choice are carried for the later
-// validation and transcoding steps to act on.
-TEST_F(AiProtocolManagerFilterTest, RouteConfigIsExposed) {
-  setRouteConfig("openai.chat_completions", /*normalize=*/true);
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
-
-  ASSERT_NE(filter_->routeConfig(), nullptr);
-  EXPECT_EQ(filter_->routeConfig()->schema(), "openai.chat_completions");
-  EXPECT_TRUE(filter_->routeConfig()->normalize());
-}
-
-// A pass-through endpoint declares a schema but no normalization; the payload is
-// still parsed and still forwarded in its own schema.
-TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointParsesWithoutNormalizing) {
-  setRouteConfig("openai.chat_completions");
-  Http::TestRequestHeaderMapImpl headers = jsonHeaders();
+// A pass-through endpoint (no normalization) is parsed and forwarded just the
+// same; normalization only governs the transcoding a later change adds.
+TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
+  setRouteConfig(/*normalize=*/false);
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
   EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
-  ASSERT_NE(filter_->routeConfig(), nullptr);
-  EXPECT_FALSE(filter_->routeConfig()->normalize());
-  ASSERT_NE(filter_->requestJson(), nullptr);
-  EXPECT_EQ(filter_->requestJson()->json()["model"], "gpt-4");
+  EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
 }
 

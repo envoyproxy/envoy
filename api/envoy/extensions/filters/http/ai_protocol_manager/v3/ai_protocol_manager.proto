@@ -43,17 +43,24 @@ message AiProtocolManager {
 // This is normally attached to a route matching the provider's REST path, for
 // example ``/chat/completions``.
 message AiProtocolManagerPerRoute {
-  // Name of the schema the request payload on this route is expected to conform
-  // to, for example the OpenAI Chat Completions request shape.
+  // The schema a request payload can be declared to follow.
+  enum Schema {
+    // Not a valid choice; a route must name the schema its payload follows.
+    UNSPECIFIED = 0;
+
+    // The OpenAI Chat Completions request shape, served at ``/chat/completions``.
+    OPENAI_CHAT_COMPLETIONS = 1;
+  }
+
+  // The schema the request payload on this route follows.
   //
   // Setting this makes the payload parsed strictly: a body that is not
   // well-formed JSON is rejected with a 400 rather than forwarded.
   //
-  // The schema definitions themselves are not part of this API yet; a later
-  // change adds them along with validation and transcoding against them. Until
-  // then the name is recorded and carried, but the payload is not checked
-  // against it.
-  string schema = 1 [(validate.rules).string = {min_len: 1}];
+  // The schemas themselves are not part of this API yet; a later change adds
+  // them along with validation and transcoding against them. Until then the
+  // choice is recorded and carried, but the payload is not checked against it.
+  Schema schema = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
 
   // Whether to normalize the payload from :ref:`schema
   // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "source/common/json/wuffs_json/wuffs_json_cursor.h"
@@ -20,27 +21,24 @@ namespace AiProtocolManager {
 // Builds a JsonWithExtBuf from a JSON body streamed in as byte chunks, driving
 // the Wuffs cursor (source/common/json/wuffs_json) and turning its SAX callbacks
 // into a DOM. A string whose decoded content exceeds
-// Config::inline_string_threshold_bytes is recorded as an external-buffer
-// reference and its bytes are never accumulated, so a multi-megabyte prompt
-// costs one 16-byte DOM node.
+// Config::inline_string_threshold_bytes is recorded as an external reference and
+// its bytes are never accumulated, so a multi-megabyte prompt costs one 16-byte
+// DOM node.
 //
 // OFFSET INVARIANT: the cursor reports absolute offsets into the stream fed to
-// it, and the BufferManager offloads the body verbatim from offset 0 -- so token
-// offsets are directly usable as buffer offsets, with no mapping table. Feeding
-// a modified, reordered, or partial stream silently produces references that
-// point at the wrong bytes.
+// it, and the BufferManager offloads the body verbatim from offset 0 -- so the
+// recorded offsets are directly usable against that buffer, with no mapping
+// table. Feeding a modified, reordered, or partial stream silently produces
+// references that point at the wrong bytes.
 //
-// With no ExternalBuffer available, offloading is disabled and every string is
-// inlined: there is nowhere for a reference to point.
-//
-//   JsonWithExtBuf doc(&buffer);
-//   JsonWithExtBufParser parser(doc, {});
+//   JsonWithExtBufParser parser({});
 //   for (chunk : body) {
 //     RETURN_IF_ERROR(parser.feed(chunk, /*end_stream=*/is_last));
 //   }
+//   JsonWithExtBuf doc = parser.takeDocument();
 //
-// The document is moved into `out` only on successful completion. Errors are
-// terminal and sticky: a later feed() returns the same error. A feed() after a
+// The document is only populated on successful completion. Errors are terminal
+// and sticky: a later feed() returns the same error. A feed() after a
 // *successful* completion is API misuse and returns FailedPrecondition.
 class JsonWithExtBufParser : public Json::Wuffs::WuffsJsonCursor::Handler {
 public:
@@ -50,16 +48,20 @@ public:
 
   struct Config {
     // A string whose decoded content exceeds this is recorded as a reference
-    // instead of being materialized. Ignored when no ExternalBuffer is available.
+    // instead of being materialized.
     std::uint32_t inline_string_threshold_bytes{kDefaultInlineStringThresholdBytes};
   };
 
-  JsonWithExtBufParser(JsonWithExtBuf& out, Config config);
+  explicit JsonWithExtBufParser(Config config);
 
   // Feeds one body chunk, in order; chunks may split at any byte boundary.
   // `end_stream` must be true for the final chunk and only then: that call
-  // validates completeness and publishes the document.
+  // validates completeness and populates the document.
   absl::Status feed(absl::string_view chunk, bool end_stream);
+
+  // Moves the parsed document out. Only meaningful once feed() has returned OK
+  // for the final chunk; before that the document is empty.
+  JsonWithExtBuf takeDocument() { return std::move(document_); }
 
   // Json::Wuffs::WuffsJsonCursor::Handler
   bool openStringCapture(absl::string_view key, int depth, size_t token_start) override;
@@ -86,11 +88,9 @@ private:
   // callbacks no-op once set, and feed() surfaces it.
   void setError(absl::Status status);
 
-  JsonWithExtBuf& out_;
   const Config config_;
-  const bool offload_enabled_;
-
   Json::Wuffs::WuffsJsonCursor cursor_;
+  JsonWithExtBuf document_;
 
   nlohmann::json root_;
   bool root_set_{false};

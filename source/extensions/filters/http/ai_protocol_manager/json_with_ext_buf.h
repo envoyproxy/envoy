@@ -2,9 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 #include <utility>
-
-#include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 
 #include "absl/status/statusor.h"
 #include "nlohmann/json.hpp"
@@ -14,23 +13,24 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// A JSON document whose oversized string values are left in an ExternalBuffer
-// instead of being materialized in the DOM: the parser keeps small values inline
-// and, above a threshold, records where the bytes are rather than the bytes.
+// A JSON document whose oversized string values are not materialized in the DOM:
+// the parser keeps small values inline and, above a threshold, records where the
+// bytes are rather than the bytes themselves.
 //
 // A reference rides in the DOM as an nlohmann binary node tagged with
 // kExternalRefSubtype -- binary is the one nlohmann type carrying an
 // application-defined tag, so no sentinel-string convention can collide with
 // user data.
 //
-// Base of the typed request/response wrappers, which add field accessors on top.
-// Holds the DOM by composition rather than deriving from nlohmann::json, whose
-// non-virtual destructor and throwing dump() do not belong in the surface
-// extensions program against.
+// A reference locates its bytes by offset into the request body. The body is
+// what the BufferManager offloads into an ExternalBuffer, verbatim and from
+// offset 0, so those offsets are equally valid against that buffer. Resolving
+// them against it is a later change; nothing here holds a buffer.
 //
-// The referenced bytes live in an ExternalBuffer this class does not own (today
-// the BufferManager owns it for the stream), so a document must not outlive it.
-// externalBuffer() may be null, in which case the document holds no references.
+// Typed request/response wrappers adopt a parsed document by move and add field
+// accessors on top. The DOM is held by composition rather than by deriving from
+// nlohmann::json, whose non-virtual destructor and throwing dump() do not belong
+// in the surface extensions program against.
 class JsonWithExtBuf {
 public:
   // Binary subtype marking a node as an external-buffer reference; spells "AIBX"
@@ -38,9 +38,12 @@ public:
   // two binary nodes apart.
   static constexpr std::uint64_t kExternalRefSubtype = 0x41494258;
 
-  // Locates a value's bytes in the ExternalBuffer. The range is the raw JSON
+  // Locates a value's bytes in the offloaded body. The range is the raw JSON
   // content between the quotes -- still escaped, quotes excluded -- because that
-  // is what the buffer holds; a reader wanting the logical value must unescape.
+  // is what was offloaded; a reader wanting the logical value must unescape.
+  //
+  // Copied byte for byte into the DOM node, so it must stay trivially copyable.
+  // The encoding never leaves the process, so host byte order is not a concern.
   struct ExternalRef {
     std::uint64_t offset{0};
     std::uint64_t length{0};
@@ -49,12 +52,11 @@ public:
       return offset == other.offset && length == other.length;
     }
   };
+  static_assert(std::is_trivially_copyable_v<ExternalRef>);
 
-  // Wire size: two little-endian uint64s, encoded field-by-field so the layout
-  // does not depend on host padding or byte order.
-  static constexpr std::size_t kExternalRefBytes = 16;
+  static constexpr std::size_t kExternalRefBytes = sizeof(ExternalRef);
 
-  explicit JsonWithExtBuf(ExternalBuffer* buffer = nullptr) : buffer_(buffer) {}
+  JsonWithExtBuf() = default;
   virtual ~JsonWithExtBuf() = default;
 
   // Move-only: silently copying a large DOM would defeat the point.
@@ -77,11 +79,7 @@ public:
   nlohmann::json& json() { return json_; }
   void setJson(nlohmann::json json) { json_ = std::move(json); }
 
-  // The buffer every ExternalRef points into. Not owned.
-  ExternalBuffer* externalBuffer() const { return buffer_; }
-
 private:
-  ExternalBuffer* buffer_{nullptr};
   nlohmann::json json_;
 };
 

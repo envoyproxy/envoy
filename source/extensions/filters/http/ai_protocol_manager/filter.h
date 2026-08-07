@@ -20,6 +20,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
+using PerRouteProto =
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute;
+// The schema a route declares its payload follows. UNSPECIFIED means the route
+// declared nothing, i.e. it is not an AI endpoint.
+using Schema = PerRouteProto::Schema;
+
 // Filter-level configuration, shared by every stream on the chain.
 class FilterConfig {
 public:
@@ -39,16 +45,14 @@ using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 // and transcoded to the canonical schema when normalize() is set.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
-  explicit RouteConfig(
-      const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute&
-          proto)
+  explicit RouteConfig(const PerRouteProto& proto)
       : schema_(proto.schema()), normalize_(proto.normalize()) {}
 
-  const std::string& schema() const { return schema_; }
+  Schema schema() const { return schema_; }
   bool normalize() const { return normalize_; }
 
 private:
-  const std::string schema_;
+  const Schema schema_;
   const bool normalize_;
 };
 
@@ -77,8 +81,7 @@ private:
 // identical byte stream from the first body byte -- which is what makes the
 // parser's recorded offsets valid buffer offsets (json_with_ext_buf_parser.h).
 // Feeding first also fails a malformed payload the moment the bad byte arrives,
-// not after the whole upload. Only a JSON content type is parsed; anything else
-// is offloaded and replayed untouched.
+// not after the whole upload.
 //
 // Whether a payload is parsed at all, and whether a parse failure is fatal, is
 // decided per route. A route carrying a RouteConfig is a declared AI endpoint:
@@ -89,9 +92,9 @@ private:
 // it parses and the request is forwarded untouched when it does not -- and is
 // otherwise not parsed.
 //
-// The document (requestJson()) is not yet consumed, and neither is the route's
-// schema: validation against it, and transcoding to the canonical schema when
-// the route asks to normalize, come later.
+// Neither the document nor the route's schema is consumed yet: validation
+// against the schema, transcoding to the canonical schema when the route asks to
+// normalize, and exposing the document to the rest of the chain all come later.
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -108,16 +111,6 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
-  // The parsed payload, or nullptr when there was none to parse (no body, or a
-  // non-JSON content type). Only complete once the full body has arrived. Its
-  // ExternalRefs point into the BufferManager's buffer, so it is valid only for
-  // this filter's lifetime.
-  const JsonWithExtBuf* requestJson() const { return request_json_.get(); }
-
-  // The route's configuration, or nullptr when the route did not declare itself
-  // an AI endpoint. Resolved in decodeHeaders().
-  const RouteConfig* routeConfig() const { return route_config_; }
-
 private:
   // Feeds one body frame to the parser in place. Returns false only if the
   // payload was rejected, in which case the caller must not offload or replay
@@ -127,25 +120,26 @@ private:
   // Terminates the stream with a 400 for a payload that failed to parse.
   void rejectInvalidPayload(const absl::Status& status);
 
+  // Whether the route declared itself an AI endpoint, which is also what makes a
+  // parse failure fatal.
+  bool isAiEndpoint() const { return schema_ != PerRouteProto::UNSPECIFIED; }
+
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
   BufferManagerPtr decode_manager_;
 
-  // Not owned; the route configuration outlives the stream.
-  const RouteConfig* route_config_{nullptr};
+  // Copied out of the route configuration rather than held by pointer: the route
+  // can be re-resolved mid-stream, which would leave a cached pointer dangling,
+  // and these are two scalars.
+  Schema schema_{PerRouteProto::UNSPECIFIED};
+  bool normalize_{false};
 
-  // Whether a parse failure fails the request. Set for a declared AI endpoint,
-  // clear for a best-effort parse.
-  bool reject_on_parse_failure_{false};
-
-  // The parser is cleared once a payload is rejected; request_json_ outlives it.
-  std::unique_ptr<JsonWithExtBuf> request_json_;
+  // The parsed payload. Populated once the body has been fully received and
+  // parsed; nothing consumes it yet.
+  JsonWithExtBuf request_json_;
+  // Cleared once parsing is done with, whether it completed, was abandoned, or
+  // failed the request.
   std::unique_ptr<JsonWithExtBufParser> request_parser_;
-
-  // Whether any body byte reached the parser. Distinguishes "no body at all",
-  // passed through unvalidated like a headers-only request, from a body that
-  // ended on an empty terminal frame, which still has to close the document.
-  bool parser_fed_{false};
 
   // Once set, later frames on the dying stream are dropped, not offloaded.
   bool payload_rejected_{false};

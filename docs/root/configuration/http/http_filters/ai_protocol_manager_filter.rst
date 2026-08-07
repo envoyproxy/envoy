@@ -19,9 +19,9 @@ While a body is being offloaded, the request headers are held at this filter and
 released to the subsequent filters only once replay begins, so they never act on
 the headers before the payload they depend on is available.
 
-As the body is offloaded it is also parsed, so that a payload which is not
-well-formed JSON is rejected here rather than forwarded for the upstream to
-interpret differently. Parsing is incremental and shares the offload's byte
+On a route declared to be an AI endpoint, the body is parsed as it is offloaded,
+so that a payload which is not well-formed JSON is rejected here rather than
+forwarded for the upstream to interpret differently. Parsing is incremental and shares the offload's byte
 stream, so an invalid payload fails as soon as the offending byte arrives rather
 than after the whole upload. Oversized string values are left in the external
 buffer and referenced by offset, so a large prompt does not reappear in
@@ -63,9 +63,9 @@ Which routes are AI endpoints is declared per route, with
 <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`.
 A route that carries one names the :ref:`schema
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
-its payload is expected to conform to, and its payload is parsed strictly: a
-malformed body is rejected with a 400. This is normally attached to a route
-matching the provider's REST path, such as ``/chat/completions``:
+its payload follows, and its payload is parsed strictly: a malformed body is
+rejected with a 400. This is normally attached to a route matching the
+provider's REST path, such as ``/chat/completions``:
 
 .. code-block:: yaml
 
@@ -77,7 +77,7 @@ matching the provider's REST path, such as ``/chat/completions``:
     typed_per_filter_config:
       envoy.filters.http.ai_protocol_manager:
         "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
-        schema: openai.chat_completions
+        schema: OPENAI_CHAT_COMPLETIONS
 
 Such a route is a pass-through endpoint: the payload is forwarded upstream in
 its own schema. Setting :ref:`normalize
@@ -100,5 +100,3 @@ parse is forwarded unchanged.
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
       best_effort_parsing: true
 
-In every case only a payload whose content type is ``application/json`` is
-parsed; anything else is offloaded and replayed untouched.

@@ -95,7 +95,7 @@ TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromUpstreamContext) {
 // declared schema.
 TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
-  proto_config.set_schema("openai.chat_completions");
+  proto_config.set_schema(PerRouteProto::OPENAI_CHAT_COMPLETIONS);
   proto_config.set_normalize(true);
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -108,7 +108,7 @@ TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
 
   const auto* typed = dynamic_cast<const RouteConfig*>(route_config.get());
   ASSERT_NE(typed, nullptr);
-  EXPECT_EQ(typed->schema(), "openai.chat_completions");
+  EXPECT_EQ(typed->schema(), PerRouteProto::OPENAI_CHAT_COMPLETIONS);
   EXPECT_TRUE(typed->normalize());
 }
 
@@ -116,7 +116,7 @@ TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
 // endpoint.
 TEST(AiProtocolManagerConfigTest, RouteConfigDefaultsToNoNormalization) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
-  proto_config.set_schema("openai.chat_completions");
+  proto_config.set_schema(PerRouteProto::OPENAI_CHAT_COMPLETIONS);
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   AiProtocolManagerFilterConfigFactory factory;
@@ -143,8 +143,8 @@ TEST(AiProtocolManagerConfigTest, EmptyRouteConfigProtoIsPerRouteMessage) {
       nullptr);
 }
 
-// A schema is what declares the route an AI endpoint, so an empty one is not a
-// valid per-route config.
+// A schema is what declares the route an AI endpoint, so leaving it unspecified
+// is not a valid per-route config.
 TEST(AiProtocolManagerConfigTest, RouteConfigRequiresASchema) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
   EXPECT_THROW(TestUtility::validate(proto_config), ProtoValidationException);

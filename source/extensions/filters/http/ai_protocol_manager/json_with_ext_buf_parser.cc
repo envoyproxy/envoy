@@ -12,9 +12,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-JsonWithExtBufParser::JsonWithExtBufParser(JsonWithExtBuf& out, Config config)
-    : out_(out), config_(config), offload_enabled_(out.externalBuffer() != nullptr),
-      cursor_(*this, /*track_paths=*/false) {}
+JsonWithExtBufParser::JsonWithExtBufParser(Config config)
+    : config_(config), cursor_(*this, /*track_paths=*/false) {}
 
 absl::Status JsonWithExtBufParser::feed(absl::string_view chunk, bool end_stream) {
   // Order matters: a parser that already failed reports that failure again, so a
@@ -49,7 +48,7 @@ absl::Status JsonWithExtBufParser::feed(absl::string_view chunk, bool end_stream
     status_ = absl::InvalidArgumentError("ai json: incomplete JSON document");
     return status_;
   }
-  out_.setJson(std::move(root_));
+  document_.setJson(std::move(root_));
   return absl::OkStatus();
 }
 
@@ -132,8 +131,7 @@ bool JsonWithExtBufParser::onStringChunk(absl::string_view, int, absl::string_vi
   if (!status_.ok()) {
     return false;
   }
-  if (offload_enabled_ &&
-      pending_string_.size() + chunk.size() > config_.inline_string_threshold_bytes) {
+  if (pending_string_.size() + chunk.size() > config_.inline_string_threshold_bytes) {
     string_offloaded_ = true;
     // Drop what was accumulated -- it will be referenced by offset instead.
     // shrink_to_fit() so the capacity is not pinned for the rest of the document.

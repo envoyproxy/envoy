@@ -36,7 +36,7 @@ envoy_cc_library(
     srcs = ["json_with_ext_buf.cc"],
     hdrs = ["json_with_ext_buf.h"],
     deps = [
-        ":external_buffer_interface",
+        "//source/common/common:safe_memcpy_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
@@ -97,11 +97,9 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/router:router_interface",
         "//source/common/common:logger_lib",
-        "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
     ],
 )

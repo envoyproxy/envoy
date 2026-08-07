@@ -78,15 +78,9 @@ TEST(JsonWithExtBufTest, TruncatedPayloadIsRejected) {
               HasStatusCode(absl::StatusCode::kInvalidArgument));
 }
 
-TEST(JsonWithExtBufTest, HoldsTheBufferItsReferencesPointInto) {
-  JsonWithExtBuf without_buffer;
-  EXPECT_EQ(without_buffer.externalBuffer(), nullptr);
-  EXPECT_TRUE(without_buffer.json().is_null());
-
-  // The concrete buffer is irrelevant here; only the association is under test.
-  ExternalBuffer* const marker = reinterpret_cast<ExternalBuffer*>(0x1);
-  JsonWithExtBuf doc(marker);
-  EXPECT_EQ(doc.externalBuffer(), marker);
+TEST(JsonWithExtBufTest, HoldsADocument) {
+  JsonWithExtBuf doc;
+  EXPECT_TRUE(doc.json().is_null());
 
   doc.setJson(nlohmann::json::parse(R"({"model":"gpt-4"})"));
   EXPECT_EQ(doc.json()["model"], "gpt-4");
