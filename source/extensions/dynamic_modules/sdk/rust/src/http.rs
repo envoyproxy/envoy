@@ -4650,10 +4650,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
     filter_ptr,
     |filter| filter.on_request_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
   )
-  .unwrap_or_else(|()| {
-    // Fail-closed: stop iteration so the request never reaches upstream after a panic.
-    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
-  })
+  // Fail-closed: stop iteration so the request never reaches upstream after a panic.
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration)
 }
 
 /// # Safety
@@ -4671,10 +4669,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
     filter_ptr,
     |filter| filter.on_request_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
   )
-  .unwrap_or_else(|()| {
-    // Fail-closed: stop iteration without buffering further data.
-    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationNoBuffer
-  })
+  // Fail-closed: stop iteration without buffering further data.
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationNoBuffer)
 }
 
 /// # Safety
@@ -4691,9 +4687,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
     filter_ptr,
     |filter| filter.on_request_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr)),
   )
-  .unwrap_or_else(|()| {
-    abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::StopIteration
-  })
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::StopIteration)
 }
 
 /// # Safety
@@ -4711,9 +4705,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
     filter_ptr,
     |filter| filter.on_response_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
   )
-  .unwrap_or_else(|()| {
-    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
-  })
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration)
 }
 
 /// # Safety
@@ -4731,9 +4723,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
     filter_ptr,
     |filter| filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
   )
-  .unwrap_or_else(|()| {
-    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationNoBuffer
-  })
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationNoBuffer)
 }
 
 /// # Safety
@@ -4750,9 +4740,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
     filter_ptr,
     |filter| filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr)),
   )
-  .unwrap_or_else(|()| {
-    abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::StopIteration
-  })
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::StopIteration)
 }
 
 /// # Safety
@@ -4887,10 +4875,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_local_reply(
       )
     },
   )
-  .unwrap_or_else(|()| {
-    // Continue with the planned local reply; do not escalate to a stream reset on panic.
-    abi::envoy_dynamic_module_type_on_http_filter_local_reply_status::Continue
-  })
+  // Continue with the planned local reply; do not escalate to a stream reset on panic.
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_local_reply_status::Continue)
 }
 
 /// # Safety
