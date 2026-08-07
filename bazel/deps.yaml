@@ -268,6 +268,7 @@ flatbuffers:
   - envoy.rbac.matchers.upstream_ip_port
   - envoy.matching.inputs.cel_data_input
   - envoy.matching.matchers.cel_matcher
+  - envoy.filters.network.ext_proc
   - envoy.tracers.opentelemetry
   - envoy.tracers.opentelemetry.samplers.cel
   cpe: "cpe:2.3:a:google:flatbuffers:*"
