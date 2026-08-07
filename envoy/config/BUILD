@@ -103,6 +103,7 @@ envoy_cc_library(
         "//envoy/common:optref_lib",
         "//envoy/stats:stats_macros",
         "//source/common/protobuf",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
