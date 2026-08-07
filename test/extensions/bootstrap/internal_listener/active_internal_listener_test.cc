@@ -173,6 +173,14 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
+  // newActiveConnection inspects the connection socket's ioHandle to decide whether to
+  // register the reverse-propagation pre-close hook; provide a non-UserSpace handle so that
+  // path is a no-op in this test.
+  auto* connection_socket = new NiceMock<Network::MockConnectionSocket>();
+  Network::ConnectionSocketPtr connection_socket_ptr{connection_socket};
+  NiceMock<Network::MockIoHandle> connection_io_handle;
+  ON_CALL(*connection_socket, ioHandle()).WillByDefault(ReturnRef(connection_io_handle));
+  ON_CALL(*connection, getSocket()).WillByDefault(ReturnRef(connection_socket_ptr));
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
@@ -222,6 +230,14 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
+  // newActiveConnection inspects the connection socket's ioHandle to decide whether to
+  // register the reverse-propagation pre-close hook; provide a non-UserSpace handle so that
+  // path is a no-op in this test.
+  auto* connection_socket = new NiceMock<Network::MockConnectionSocket>();
+  Network::ConnectionSocketPtr connection_socket_ptr{connection_socket};
+  NiceMock<Network::MockIoHandle> connection_io_handle;
+  ON_CALL(*connection_socket, ioHandle()).WillByDefault(ReturnRef(connection_io_handle));
+  ON_CALL(*connection, getSocket()).WillByDefault(ReturnRef(connection_socket_ptr));
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());

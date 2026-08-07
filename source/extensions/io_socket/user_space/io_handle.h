@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
@@ -29,6 +31,21 @@ public:
    */
   virtual void mergeInto(envoy::config::core::v3::Metadata& metadata,
                          StreamInfo::FilterState& filter_state) PURE;
+
+  /**
+   * Capture filter state objects marked SharedWithDownstreamConnectionOnClose
+   * from the upstream-side (inner) connection's filter state at upstream close.
+   * Stores captured objects internally for later delivery via `mergeReverse`.
+   * Called at most once.
+   */
+  virtual void captureReverse(const StreamInfo::FilterState& filter_state) PURE;
+
+  /**
+   * Merge previously-captured reverse-propagation objects into the
+   * downstream-side (outer) connection's filter state. Called at most once
+   * after `captureReverse`. Safe to call without a prior capture (no-op).
+   */
+  virtual void mergeReverse(StreamInfo::FilterState& filter_state) PURE;
 };
 
 using PassthroughStateSharedPtr = std::shared_ptr<PassthroughState>;
@@ -93,6 +110,14 @@ public:
    * @return shared state between peering user space IO handles.
    */
   virtual PassthroughStateSharedPtr passthroughState() PURE;
+
+  /**
+   * Register a callback to be invoked exactly once, when this handle is about
+   * to close. Used to capture filter state from the owning connection's
+   * stream info before the connection is torn down (reverse passthrough
+   * propagation across the internal listener boundary).
+   */
+  virtual void addOnPreCloseCallback(std::function<void()> callback) PURE;
 };
 } // namespace UserSpace
 } // namespace IoSocket

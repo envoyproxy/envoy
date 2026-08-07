@@ -1048,9 +1048,10 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
   if (!propagate_response_headers_) {
     return;
   }
-  filter_state->setData(TunnelResponseHeaders::key(),
-                        std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-                        StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
+      StreamInfo::FilterState::LifeSpan::Connection,
+      StreamInfo::StreamSharingMayImpactPooling::SharedWithDownstreamConnectionOnClose);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseTrailers(
@@ -1059,9 +1060,10 @@ void TunnelingConfigHelperImpl::propagateResponseTrailers(
   if (!propagate_response_trailers_) {
     return;
   }
-  filter_state->setData(TunnelResponseTrailers::key(),
-                        std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
-                        StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      TunnelResponseTrailers::key(), std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
+      StreamInfo::FilterState::LifeSpan::Connection,
+      StreamInfo::StreamSharingMayImpactPooling::SharedWithDownstreamConnectionOnClose);
 }
 
 void Filter::onConnectTimeout() {

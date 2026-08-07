@@ -43,6 +43,7 @@ public:
   std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) override;
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
   FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
+  FilterState::ObjectsPtr objectsSharedWithDownstreamConnectionOnClose() const override;
 
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   FilterStateSharedPtr parent() const override { return parent_; }
