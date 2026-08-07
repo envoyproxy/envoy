@@ -46,6 +46,28 @@ enum class StreamSharingMayImpactPooling {
   SharedWithUpstreamConnectionOnce,
 };
 
+enum class FilterStateIndex : uint32_t {
+  LocalReplyOwner,
+  UpstreamServerName,
+  TransportSocketOptions,
+  ConnectionExecutionContext,
+  OriginalConnectPort,
+  CacheFilterLoggingInfo,
+  ExtAuthzLoggingInfo,
+  OverrideHost,
+  NetworkNamespace,
+  UpstreamSubjectAltNames,
+  TransportSocketOriginalDstAddress,
+  TunnelResponseHeadersOrTrailers,
+  TcpProxyCluster,
+  TcpProxyPerConnectionIdleTimeoutMs,
+  UpstreamDynamicHost,
+  UpstreamDynamicPort,
+  HttpGrpcStats,
+  NetworkGeoip,
+  MaxIndex
+};
+
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
  * or a connection by various filters in Envoy. FilterState can be write-once or write-many.
@@ -231,6 +253,128 @@ public:
    * @return filter objects that are shared with the upstream connection.
    **/
   virtual ObjectsPtr objectsSharedWithUpstreamConnection() const PURE;
+
+  static absl::string_view indexToName(FilterStateIndex index) {
+    switch (index) {
+    case FilterStateIndex::LocalReplyOwner:
+      return "envoy.filters.network.http_connection_manager.local_reply_owner";
+    case FilterStateIndex::UpstreamServerName:
+      return "envoy.network.upstream_server_name";
+    case FilterStateIndex::TransportSocketOptions:
+      return "envoy.network.transport_socket_options";
+    case FilterStateIndex::ConnectionExecutionContext:
+      return "envoy.network.connection_execution_context";
+    case FilterStateIndex::OriginalConnectPort:
+      return "envoy.router.original_connect_port";
+    case FilterStateIndex::CacheFilterLoggingInfo:
+      return "io.envoyproxy.extensions.filters.http.cache.CacheFilterLoggingInfo";
+    case FilterStateIndex::ExtAuthzLoggingInfo:
+      return "envoy.filters.http.ext_authz";
+    case FilterStateIndex::OverrideHost:
+      return "envoy.extensions.load_balancing_policies.override_host.filter_state";
+    case FilterStateIndex::NetworkNamespace:
+      return "envoy.network.network_namespace";
+    case FilterStateIndex::UpstreamSubjectAltNames:
+      return "envoy.network.upstream_subject_alt_names";
+    case FilterStateIndex::TransportSocketOriginalDstAddress:
+      return "envoy.network.transport_socket.original_dst_address";
+    case FilterStateIndex::TunnelResponseHeadersOrTrailers:
+      return "envoy.http.tunnel_response_headers_or_trailers";
+    case FilterStateIndex::TcpProxyCluster:
+      return "envoy.tcp_proxy.cluster";
+    case FilterStateIndex::TcpProxyPerConnectionIdleTimeoutMs:
+      return "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+    case FilterStateIndex::UpstreamDynamicHost:
+      return "envoy.upstream.dynamic_host";
+    case FilterStateIndex::UpstreamDynamicPort:
+      return "envoy.upstream.dynamic_port";
+    case FilterStateIndex::HttpGrpcStats:
+      return "envoy.filters.http.grpc_stats";
+    case FilterStateIndex::NetworkGeoip:
+      return "envoy.filters.network.geoip";
+    default:
+      return "";
+    }
+  }
+
+  static std::optional<FilterStateIndex> nameToIndex(absl::string_view name) {
+    if (name == "envoy.filters.network.http_connection_manager.local_reply_owner") {
+      return FilterStateIndex::LocalReplyOwner;
+    }
+    if (name == "envoy.network.upstream_server_name") {
+      return FilterStateIndex::UpstreamServerName;
+    }
+    if (name == "envoy.network.transport_socket_options") {
+      return FilterStateIndex::TransportSocketOptions;
+    }
+    if (name == "envoy.network.connection_execution_context") {
+      return FilterStateIndex::ConnectionExecutionContext;
+    }
+    if (name == "envoy.router.original_connect_port") {
+      return FilterStateIndex::OriginalConnectPort;
+    }
+    if (name == "io.envoyproxy.extensions.filters.http.cache.CacheFilterLoggingInfo") {
+      return FilterStateIndex::CacheFilterLoggingInfo;
+    }
+    if (name == "envoy.filters.http.ext_authz") {
+      return FilterStateIndex::ExtAuthzLoggingInfo;
+    }
+    if (name == "envoy.extensions.load_balancing_policies.override_host.filter_state") {
+      return FilterStateIndex::OverrideHost;
+    }
+    if (name == "envoy.network.network_namespace") {
+      return FilterStateIndex::NetworkNamespace;
+    }
+    if (name == "envoy.network.upstream_subject_alt_names") {
+      return FilterStateIndex::UpstreamSubjectAltNames;
+    }
+    if (name == "envoy.network.transport_socket.original_dst_address") {
+      return FilterStateIndex::TransportSocketOriginalDstAddress;
+    }
+    if (name == "envoy.http.tunnel_response_headers_or_trailers") {
+      return FilterStateIndex::TunnelResponseHeadersOrTrailers;
+    }
+    if (name == "envoy.tcp_proxy.cluster") {
+      return FilterStateIndex::TcpProxyCluster;
+    }
+    if (name == "envoy.tcp_proxy.per_connection_idle_timeout_ms") {
+      return FilterStateIndex::TcpProxyPerConnectionIdleTimeoutMs;
+    }
+    if (name == "envoy.upstream.dynamic_host") {
+      return FilterStateIndex::UpstreamDynamicHost;
+    }
+    if (name == "envoy.upstream.dynamic_port") {
+      return FilterStateIndex::UpstreamDynamicPort;
+    }
+    if (name == "envoy.filters.http.grpc_stats") {
+      return FilterStateIndex::HttpGrpcStats;
+    }
+    if (name == "envoy.filters.network.geoip") {
+      return FilterStateIndex::NetworkGeoip;
+    }
+    return std::nullopt;
+  }
+
+  virtual void setIndexedData(
+      FilterStateIndex index, absl::string_view data_name, std::shared_ptr<Object> data,
+      LifeSpan life_span = LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
+
+  template <typename T> const T* getIndexedDataReadOnly(FilterStateIndex index) const {
+    return dynamic_cast<const T*>(getIndexedDataReadOnlyGeneric(index));
+  }
+
+  virtual const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const PURE;
+
+  template <typename T> T* getIndexedDataMutable(FilterStateIndex index) {
+    return dynamic_cast<T*>(getIndexedDataMutableGeneric(index));
+  }
+
+  virtual Object* getIndexedDataMutableGeneric(FilterStateIndex index) PURE;
+
+  virtual std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) PURE;
+
+  virtual bool hasIndexedData(FilterStateIndex index) const PURE;
 };
 
 } // namespace StreamInfo
