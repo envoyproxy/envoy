@@ -1858,6 +1858,8 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
       // If the response case is not set, this response message is for overriding the
       // processing mode only.
       if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
+        // If this function call returns false, it's a spurious response, and is handled
+        // by the default case of the switch statement below.
         if (decoding_state_.handleStandaloneModeOverride(old_decoding_body_mode)) {
           return;
         }
