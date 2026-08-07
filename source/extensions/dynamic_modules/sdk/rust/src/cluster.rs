@@ -370,6 +370,19 @@ pub trait EnvoyCluster: Send + Sync {
     weights: &[u32],
   ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>>;
 
+  /// Add multiple hosts with logical hostnames in a single batch operation.
+  ///
+  /// Each non-empty hostname is stored separately from its corresponding `ip:port` address and is
+  /// available to upstream features such as automatic SNI and SAN validation. An empty hostname
+  /// uses Envoy's legacy synthesized hostname. `hostnames` must have the same length as
+  /// `addresses`.
+  fn add_hosts_with_hostnames(
+    &self,
+    addresses: &[String],
+    hostnames: &[String],
+    weights: &[u32],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>>;
+
   /// Remove multiple hosts from the cluster in a single batch operation.
   ///
   /// The host pointers must have been returned by a previous [`EnvoyCluster::add_hosts`] call.
@@ -437,6 +450,23 @@ pub trait EnvoyCluster: Send + Sync {
     &self,
     priority: u32,
     addresses: &[String],
+    weights: &[u32],
+    localities: &[(String, String, String)],
+    metadata: &[Vec<(String, String, String)>],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>>;
+
+  /// Add multiple hosts with logical hostnames at the specified priority level, including
+  /// per-host locality and metadata.
+  ///
+  /// Each non-empty hostname is stored separately from its corresponding `ip:port` address and is
+  /// available to upstream features such as automatic SNI and SAN validation. An empty hostname
+  /// uses Envoy's legacy synthesized hostname. `hostnames` must have the same length as
+  /// `addresses`.
+  fn add_hosts_with_hostnames_and_locality_to_priority(
+    &self,
+    priority: u32,
+    addresses: &[String],
+    hostnames: &[String],
     weights: &[u32],
     localities: &[(String, String, String)],
     metadata: &[Vec<(String, String, String)>],
@@ -966,53 +996,27 @@ impl EnvoyClusterImpl {
   }
 }
 
-impl EnvoyCluster for EnvoyClusterImpl {
-  fn add_hosts(
-    &self,
-    addresses: &[String],
-    weights: &[u32],
-  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
-    let empty_localities: Vec<(String, String, String)> = addresses
-      .iter()
-      .map(|_| (String::new(), String::new(), String::new()))
-      .collect();
-    self.add_hosts_with_locality_to_priority(0, addresses, weights, &empty_localities, &[])
-  }
-
-  fn add_hosts_with_locality(
-    &self,
-    addresses: &[String],
-    weights: &[u32],
-    localities: &[(String, String, String)],
-    metadata: &[Vec<(String, String, String)>],
-  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
-    self.add_hosts_with_locality_to_priority(0, addresses, weights, localities, metadata)
-  }
-
-  fn add_hosts_to_priority(
+impl EnvoyClusterImpl {
+  fn add_hosts_to_priority_impl(
     &self,
     priority: u32,
     addresses: &[String],
-    weights: &[u32],
-  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
-    let empty_localities: Vec<(String, String, String)> = addresses
-      .iter()
-      .map(|_| (String::new(), String::new(), String::new()))
-      .collect();
-    self.add_hosts_with_locality_to_priority(priority, addresses, weights, &empty_localities, &[])
-  }
-
-  fn add_hosts_with_locality_to_priority(
-    &self,
-    priority: u32,
-    addresses: &[String],
+    hostnames: Option<&[String]>,
     weights: &[u32],
     localities: &[(String, String, String)],
     metadata: &[Vec<(String, String, String)>],
   ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
     let count = addresses.len();
+    if hostnames.is_some_and(|hostnames| hostnames.len() != count) {
+      return None;
+    }
     let address_buffers: Vec<abi::envoy_dynamic_module_type_module_buffer> =
       addresses.iter().map(|a| str_to_module_buffer(a)).collect();
+    let hostname_buffers: Vec<abi::envoy_dynamic_module_type_module_buffer> = hostnames
+      .unwrap_or_default()
+      .iter()
+      .map(|hostname| str_to_module_buffer(hostname))
+      .collect();
     let region_buffers: Vec<abi::envoy_dynamic_module_type_module_buffer> = localities
       .iter()
       .map(|(r, ..)| str_to_module_buffer(r))
@@ -1050,25 +1054,128 @@ impl EnvoyCluster for EnvoyClusterImpl {
     let mut result_ptrs: Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> =
       vec![std::ptr::null_mut(); count];
     let success = unsafe {
-      abi::envoy_dynamic_module_callback_cluster_add_hosts(
-        self.raw,
-        priority,
-        address_buffers.as_ptr(),
-        weights.as_ptr(),
-        region_buffers.as_ptr(),
-        zone_buffers.as_ptr(),
-        sub_zone_buffers.as_ptr(),
-        metadata_ptr,
-        metadata_pairs_per_host,
-        count,
-        result_ptrs.as_mut_ptr(),
-      )
+      match hostnames {
+        Some(_) => abi::envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+          self.raw,
+          priority,
+          address_buffers.as_ptr(),
+          hostname_buffers.as_ptr(),
+          weights.as_ptr(),
+          region_buffers.as_ptr(),
+          zone_buffers.as_ptr(),
+          sub_zone_buffers.as_ptr(),
+          metadata_ptr,
+          metadata_pairs_per_host,
+          count,
+          result_ptrs.as_mut_ptr(),
+        ),
+        None => abi::envoy_dynamic_module_callback_cluster_add_hosts(
+          self.raw,
+          priority,
+          address_buffers.as_ptr(),
+          weights.as_ptr(),
+          region_buffers.as_ptr(),
+          zone_buffers.as_ptr(),
+          sub_zone_buffers.as_ptr(),
+          metadata_ptr,
+          metadata_pairs_per_host,
+          count,
+          result_ptrs.as_mut_ptr(),
+        ),
+      }
     };
     if success {
       Some(result_ptrs)
     } else {
       None
     }
+  }
+}
+
+impl EnvoyCluster for EnvoyClusterImpl {
+  fn add_hosts(
+    &self,
+    addresses: &[String],
+    weights: &[u32],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
+    let empty_localities: Vec<(String, String, String)> = addresses
+      .iter()
+      .map(|_| (String::new(), String::new(), String::new()))
+      .collect();
+    self.add_hosts_with_locality_to_priority(0, addresses, weights, &empty_localities, &[])
+  }
+
+  fn add_hosts_with_hostnames(
+    &self,
+    addresses: &[String],
+    hostnames: &[String],
+    weights: &[u32],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
+    let empty_localities: Vec<(String, String, String)> = addresses
+      .iter()
+      .map(|_| (String::new(), String::new(), String::new()))
+      .collect();
+    self.add_hosts_with_hostnames_and_locality_to_priority(
+      0,
+      addresses,
+      hostnames,
+      weights,
+      &empty_localities,
+      &[],
+    )
+  }
+
+  fn add_hosts_with_locality(
+    &self,
+    addresses: &[String],
+    weights: &[u32],
+    localities: &[(String, String, String)],
+    metadata: &[Vec<(String, String, String)>],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
+    self.add_hosts_with_locality_to_priority(0, addresses, weights, localities, metadata)
+  }
+
+  fn add_hosts_to_priority(
+    &self,
+    priority: u32,
+    addresses: &[String],
+    weights: &[u32],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
+    let empty_localities: Vec<(String, String, String)> = addresses
+      .iter()
+      .map(|_| (String::new(), String::new(), String::new()))
+      .collect();
+    self.add_hosts_with_locality_to_priority(priority, addresses, weights, &empty_localities, &[])
+  }
+
+  fn add_hosts_with_locality_to_priority(
+    &self,
+    priority: u32,
+    addresses: &[String],
+    weights: &[u32],
+    localities: &[(String, String, String)],
+    metadata: &[Vec<(String, String, String)>],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
+    self.add_hosts_to_priority_impl(priority, addresses, None, weights, localities, metadata)
+  }
+
+  fn add_hosts_with_hostnames_and_locality_to_priority(
+    &self,
+    priority: u32,
+    addresses: &[String],
+    hostnames: &[String],
+    weights: &[u32],
+    localities: &[(String, String, String)],
+    metadata: &[Vec<(String, String, String)>],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
+    self.add_hosts_to_priority_impl(
+      priority,
+      addresses,
+      Some(hostnames),
+      weights,
+      localities,
+      metadata,
+    )
   }
 
   fn update_host_health(
@@ -2806,6 +2913,78 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn add_hosts_with_hostnames_dispatches_and_validates_lengths() {
+    use std::sync::atomic::Ordering;
+
+    crate::mod_test::MOCK_CLUSTER_LEGACY_ADD_HOSTS_CALLS.store(0, Ordering::SeqCst);
+    crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS
+      .lock()
+      .unwrap()
+      .clear();
+
+    let cluster = EnvoyClusterImpl::new(std::ptr::null_mut());
+    let addresses = vec!["192.0.2.10:443".to_owned(), "192.0.2.11:443".to_owned()];
+    let hostnames = vec!["service-a.test".to_owned(), "service-b.test".to_owned()];
+    let weights = vec![1, 2];
+
+    assert!(cluster
+      .add_hosts_with_hostnames(&addresses, &hostnames[..1], &weights)
+      .is_none());
+    assert!(crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS
+      .lock()
+      .unwrap()
+      .is_empty());
+
+    let hosts = cluster
+      .add_hosts_with_hostnames(&addresses, &hostnames, &weights)
+      .expect("matching slices must call the hostname-aware ABI");
+    assert_eq!(hosts.len(), 2);
+    assert!(hosts.iter().all(|host| !host.is_null()));
+
+    let locality = vec![(
+      "region".to_owned(),
+      "zone".to_owned(),
+      "sub-zone".to_owned(),
+    )];
+    let metadata = vec![vec![(
+      "envoy.lb".to_owned(),
+      "service".to_owned(),
+      "service-c".to_owned(),
+    )]];
+    cluster
+      .add_hosts_with_hostnames_and_locality_to_priority(
+        2,
+        &["192.0.2.12:443".to_owned()],
+        &["service-c.test".to_owned()],
+        &[3],
+        &locality,
+        &metadata,
+      )
+      .expect("the full hostname-aware method must call the same ABI");
+
+    assert_eq!(
+      *crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS
+        .lock()
+        .unwrap(),
+      vec![
+        (
+          0,
+          vec![b"service-a.test".to_vec(), b"service-b.test".to_vec()]
+        ),
+        (2, vec![b"service-c.test".to_vec()])
+      ]
+    );
+
+    cluster
+      .add_hosts(&addresses, &weights)
+      .expect("the existing method must retain the legacy ABI");
+    assert_eq!(
+      crate::mod_test::MOCK_CLUSTER_LEGACY_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
+      1
+    );
+  }
 
   // The per-request accessor callbacks are satisfied by the link-time stubs in lib_test.rs.
   #[test]
