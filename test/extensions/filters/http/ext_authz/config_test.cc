@@ -2,11 +2,13 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
+#include "source/extensions/filters/http/ext_authz/auth_cache.h"
 #include "source/extensions/filters/http/ext_authz/config.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
@@ -222,13 +224,53 @@ TEST_F(ExtAuthzFilterHttpTest, FilterWithServerContext) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(ext_authz_config_yaml, *proto_config);
 
+  const std::string per_route_config_yaml = R"EOF(
+  check_settings:
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "per_route_http_cluster"
+        timeout: 0.25s
+  )EOF";
+  ProtobufTypes::MessagePtr per_route_proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *per_route_proto_config);
+
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
       factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  Http::StreamFilterSharedPtr filter;
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
   cb(filter_callback);
+  ASSERT_NE(filter, nullptr);
+
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute per_route_config(
+      dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute&>(
+          *per_route_proto_config),
+      creation_status);
+  ASSERT_OK(creation_status);
+
+  NiceMock<Envoy::Network::MockConnection> connection;
+  auto addr = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+  connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr);
+  Http::TestRequestHeaderMapImpl request_headers;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(decoder_callbacks, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection}));
+  ON_CALL(decoder_callbacks, perFilterConfigs())
+      .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_config}));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  EXPECT_CALL(context.cluster_manager_,
+              getThreadLocalCluster(absl::string_view("per_route_http_cluster")));
+  EXPECT_CALL(context.cluster_manager_, getThreadLocalCluster(absl::string_view("ext_authz")))
+      .Times(0);
+
+  filter->decodeHeaders(request_headers, true);
+  filter->onDestroy();
 }
 
 TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfiguration) {
@@ -647,26 +689,42 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationDisabled) {
 
 class ExtAuthzFilterGrpcTest : public ExtAuthzFilterTest {
 public:
-  void testFilterFactoryAndFilterWithGrpcClient(const std::string& ext_authz_config_yaml) {
+  void testFilterFactoryAndFilterWithGrpcClient(const std::string& ext_authz_config_yaml,
+                                                const std::string& per_route_config_yaml = "") {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
     Http::FilterFactoryCb filter_factory;
     runOnMainBlocking([&]() {
       TestUtility::loadFromYaml(ext_authz_config_yaml, ext_authz_config);
+      if (!per_route_config_yaml.empty()) {
+        TestUtility::loadFromYaml(per_route_config_yaml, per_route_config);
+      }
       filter_factory = createFilterFactory(ext_authz_config);
     });
 
     int request_sent_per_thread = 5;
-    // Initialize address instance to prepare for grpc traffic.
     initAddress();
-    // Create filter from filter factory per thread and send grpc request.
     for (int i = 0; i < request_sent_per_thread; i++) {
       runOnAllWorkersBlocking([&, filter_factory]() {
         Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
-        testExtAuthzFilter(filter);
+        if (!per_route_config_yaml.empty()) {
+          absl::Status creation_status = absl::OkStatus();
+          FilterConfigPerRoute per_route_filter_config(per_route_config, creation_status);
+          ASSERT_OK(creation_status);
+          testExtAuthzFilter(filter, &per_route_filter_config);
+        } else {
+          testExtAuthzFilter(filter);
+        }
       });
     }
-    runOnAllWorkersBlocking(
-        [&]() { expectGrpcClientSentRequest(ext_authz_config, request_sent_per_thread); });
+    runOnAllWorkersBlocking([&]() {
+      if (!per_route_config_yaml.empty()) {
+        expectGrpcClientSentRequestForService(per_route_config.check_settings().grpc_service(),
+                                              request_sent_per_thread);
+      } else {
+        expectGrpcClientSentRequest(ext_authz_config, request_sent_per_thread);
+      }
+    });
   }
 
 private:
@@ -676,12 +734,17 @@ private:
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
 
-  void testExtAuthzFilter(Http::StreamFilterSharedPtr filter) {
+  void testExtAuthzFilter(Http::StreamFilterSharedPtr filter,
+                          const FilterConfigPerRoute* per_route_config = nullptr) {
     EXPECT_NE(filter, nullptr);
     Http::TestRequestHeaderMapImpl request_headers;
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     ON_CALL(decoder_callbacks, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+    if (per_route_config != nullptr) {
+      ON_CALL(decoder_callbacks, perFilterConfigs())
+          .WillByDefault(Return(Router::RouteSpecificFilterConfigs{per_route_config}));
+    }
     filter->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter->decodeHeaders(request_headers, false));
@@ -689,11 +752,11 @@ private:
     decoder_filter->onDestroy();
   }
 
-  void expectGrpcClientSentRequest(
-      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config,
-      int requests_sent_per_thread) {
+  void
+  expectGrpcClientSentRequestForService(const envoy::config::core::v3::GrpcService& grpc_service,
+                                        int requests_sent_per_thread) {
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-        Envoy::Grpc::GrpcServiceConfigWithHashKey(ext_authz_config.grpc_service());
+        Envoy::Grpc::GrpcServiceConfigWithHashKey(grpc_service);
     Grpc::RawAsyncClientSharedPtr async_client =
         async_client_manager_
             ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context_.scope(), false)
@@ -704,6 +767,13 @@ private:
     // All the request in this thread should be sent through the same async client because the async
     // client is cached.
     EXPECT_EQ(mock_async_client->send_count_, requests_sent_per_thread);
+  }
+
+  void expectGrpcClientSentRequest(
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config,
+      int requests_sent_per_thread) {
+    expectGrpcClientSentRequestForService(ext_authz_config.grpc_service(),
+                                          requests_sent_per_thread);
   }
 
   Network::Address::InstanceConstSharedPtr addr_;
@@ -729,6 +799,86 @@ TEST_F(ExtAuthzFilterGrpcTest, GoogleGrpc) {
   failure_mode_allow: false
   )EOF";
   testFilterFactoryAndFilterWithGrpcClient(ext_authz_config_yaml);
+}
+
+TEST_F(ExtAuthzFilterGrpcTest, PerRouteGrpcService) {
+  const std::string ext_authz_config_yaml = R"EOF(
+   grpc_service:
+     envoy_grpc:
+       cluster_name: test_cluster
+   failure_mode_allow: false
+   )EOF";
+  const std::string per_route_config_yaml = R"EOF(
+   check_settings:
+     grpc_service:
+       envoy_grpc:
+         cluster_name: per_route_cluster
+   )EOF";
+  testFilterFactoryAndFilterWithGrpcClient(ext_authz_config_yaml, per_route_config_yaml);
+}
+
+class MockAuthCacheSession : public AuthCacheSession {
+public:
+  MockAuthCacheSession() = default;
+  ~MockAuthCacheSession() override = default;
+
+  MOCK_METHOD(LookupRequest*, lookup,
+              (Http::StreamDecoderFilterCallbacks&, const RequestAttributes&, LookupCallback&&));
+  MOCK_METHOD(void, insert, (const Filters::Common::ExtAuthz::Response&));
+};
+
+class MockAuthCache : public AuthCache {
+public:
+  MockAuthCache() = default;
+  ~MockAuthCache() override = default;
+
+  MOCK_METHOD(AuthCacheSessionPtr, createSession, ());
+};
+
+class MockAuthCacheFactory : public AuthCacheFactory {
+public:
+  MockAuthCacheFactory() = default;
+  ~MockAuthCacheFactory() override = default;
+
+  // TypedFactory
+  std::string name() const override { return "envoy.filters.http.ext_authz.cache.mock"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute>();
+  }
+
+  // AuthCacheFactory
+  AuthCachePtr createAuthCache(const Protobuf::Message&,
+                               Server::Configuration::ServerFactoryContext&) override {
+    auto cache = std::make_unique<NiceMock<MockAuthCache>>();
+    ON_CALL(*cache, createSession()).WillByDefault(Invoke([]() {
+      return std::make_unique<NiceMock<MockAuthCacheSession>>();
+    }));
+    return cache;
+  }
+};
+
+static Registry::RegisterFactory<MockAuthCacheFactory, AuthCacheFactory>
+    register_mock_cache_factory_;
+
+TEST_F(ExtAuthzFilterTest, ConfigWithCache) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  cache:
+    name: envoy.filters.http.ext_authz.cache.mock
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+  )EOF";
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  Http::FilterFactoryCb cb = createFilterFactory(proto_config);
+  Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(cb);
+  EXPECT_NE(filter, nullptr);
 }
 
 } // namespace ExtAuthz

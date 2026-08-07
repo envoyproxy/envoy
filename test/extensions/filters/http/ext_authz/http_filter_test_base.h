@@ -72,8 +72,26 @@ public:
 
   void initialize(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
     absl::Status creation_status = absl::OkStatus();
-    config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                             "ext_authz_prefix", factory_context_, creation_status);
+    config_ =
+        std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(), "ext_authz_prefix",
+                                       factory_context_, nullptr, creation_status);
+    ASSERT_OK(creation_status);
+    client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
+                                       factory_context_);
+    ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
+    filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  }
+
+  void
+  initializeWithCache(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
+                      AuthCachePtr&& cache) {
+    absl::Status creation_status = absl::OkStatus();
+    config_ =
+        std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(), "ext_authz_prefix",
+                                       factory_context_, std::move(cache), creation_status);
     ASSERT_OK(creation_status);
     client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},

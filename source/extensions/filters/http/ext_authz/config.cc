@@ -13,6 +13,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/http/ext_authz/auth_cache.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 namespace Envoy {
@@ -23,10 +24,26 @@ namespace ExtAuthz {
 absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+  AuthCacheFactory* const cache_factory =
+      proto_config.has_cache()
+          ? &Config::Utility::getAndCheckFactory<AuthCacheFactory>(proto_config.cache())
+          : nullptr;
+  ProtobufTypes::MessagePtr cache_config =
+      cache_factory != nullptr
+          ? Config::Utility::translateAnyToFactoryConfig(proto_config.cache().typed_config(),
+                                                         server_context.messageValidationVisitor(),
+                                                         *cache_factory)
+          : nullptr;
+  AuthCachePtr cache = cache_factory != nullptr
+                           ? cache_factory->createAuthCache(*cache_config, server_context)
+                           : nullptr;
+
   absl::Status creation_status = absl::OkStatus();
-  const auto filter_config = std::make_shared<FilterConfig>(
-      proto_config, server_context.scope(), stats_prefix, server_context, creation_status);
+  const auto filter_config =
+      std::make_shared<FilterConfig>(proto_config, server_context.scope(), stats_prefix,
+                                     server_context, std::move(cache), creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
+
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
