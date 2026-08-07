@@ -9,6 +9,7 @@
 #include "envoy/ssl/tls_certificate_config.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/secret/sds_api.h"
 
 #include "absl/container/node_hash_map.h"
@@ -85,8 +86,22 @@ private:
                  const std::string& config_name,
                  Server::Configuration::ServerFactoryContext& server_context,
                  OptRef<Init::Manager> init_manager, bool warm) {
-      const std::string map_key =
-          absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
+      std::string map_key;
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.normalize_sds_config")) {
+        // Normalize the config source before calculating the hash. initial_fetch_timeout does not
+        // affect selection of the secret provider. It is cleared and restored after
+        // calculating the hash.
+        // Since sds_config_source is passed as const, the constness must be casted away before
+        // modifying it.
+        auto* orig_initial_timeout =
+            const_cast<envoy::config::core::v3::ConfigSource&>(sds_config_source)
+                .release_initial_fetch_timeout();
+        map_key = absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
+        const_cast<envoy::config::core::v3::ConfigSource&>(sds_config_source)
+            .set_allocated_initial_fetch_timeout(orig_initial_timeout);
+      } else {
+        map_key = absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
+      }
 
       std::shared_ptr<SecretType> secret_provider = dynamic_secret_providers_[map_key].lock();
       if (!secret_provider) {

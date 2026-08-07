@@ -23,6 +23,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":private_key_provider_proto_cc_proto",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
