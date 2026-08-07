@@ -33,10 +33,10 @@ namespace AiProtocolManager {
 // in the surface extensions program against.
 class JsonWithExtBuf {
 public:
-  // Binary subtype marking a node as an external-buffer reference; spells "AIBX"
-  // in ASCII. Register any future subtype here -- it is the only thing telling
-  // two binary nodes apart.
-  static constexpr std::uint64_t kExternalRefSubtype = 0x41494258;
+  // Binary subtype marking a node as an external-buffer reference; leetspeak for
+  // "Envoy A1 External Buffer". Register any future subtype here -- it is the
+  // only thing telling two binary nodes apart.
+  static constexpr std::uint64_t kExternalRefSubtype = 0xea1eb;
 
   // Locates a value's bytes in the offloaded body. The range is the raw JSON
   // content between the quotes -- still escaped, quotes excluded -- because that
