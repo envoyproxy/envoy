@@ -39,46 +39,32 @@ with a matching
 
 For example, the filter can copy a session header into the gRPC request:
 
-.. code-block:: yaml
-
-  grpc_service:
-    envoy_grpc:
-      cluster_name: ext_proc_cluster
-    initial_metadata:
-    - key: x-session-id
-      value: "%REQ(x-session-id)%"
+.. literalinclude:: /_configs/repo/ext-proc-session-affinity-header.yaml
+   :language: yaml
+   :start-after: session-affinity-header-filter-start
+   :end-before: session-affinity-header-filter-end
+   :caption: :download:`ext-proc-session-affinity-header.yaml </_configs/repo/ext-proc-session-affinity-header.yaml>`
 
 The external processor cluster can then hash the copied header:
 
-.. code-block:: yaml
-
-  name: ext_proc_cluster
-  lb_policy: RING_HASH
-  typed_extension_protocol_options:
-    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-      explicit_http_config:
-        http2_protocol_options: {}
-      hash_policy:
-      - header:
-          header_name: x-session-id
+.. literalinclude:: /_configs/repo/ext-proc-session-affinity-header.yaml
+   :language: yaml
+   :start-after: session-affinity-header-cluster-start
+   :end-before: session-affinity-header-cluster-end
 
 Passive cookie affinity can be configured in the same way by copying the downstream ``cookie``
 header into the gRPC initial metadata and selecting the cookie by name in the cluster hash policy:
 
-.. code-block:: yaml
+.. literalinclude:: /_configs/repo/ext-proc-session-affinity-cookie.yaml
+   :language: yaml
+   :start-after: session-affinity-cookie-filter-start
+   :end-before: session-affinity-cookie-filter-end
+   :caption: :download:`ext-proc-session-affinity-cookie.yaml </_configs/repo/ext-proc-session-affinity-cookie.yaml>`
 
-  grpc_service:
-    envoy_grpc:
-      cluster_name: ext_proc_cluster
-    initial_metadata:
-    - key: cookie
-      value: "%REQ(cookie)%"
-
-  # In the ext_proc_cluster HttpProtocolOptions:
-  hash_policy:
-  - cookie:
-      name: session_id
+.. literalinclude:: /_configs/repo/ext-proc-session-affinity-cookie.yaml
+   :language: yaml
+   :start-after: session-affinity-cookie-cluster-start
+   :end-before: session-affinity-cookie-cluster-end
 
 The cluster must use a hash-based load balancer such as ``RING_HASH`` or ``MAGLEV``. Cookie
 affinity must be passive: generated cookies cannot be propagated from the external processor
