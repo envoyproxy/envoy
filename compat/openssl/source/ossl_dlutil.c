@@ -3,11 +3,9 @@
 #include <limits.h>
 #include <dlfcn.h>
 #include <errno.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <pthread.h>
 #include "log.h"
 #include "ossl_dlutil.h"
 
@@ -92,12 +90,6 @@ void ossl_dlopen(int expected_major, int expected_minor) {
     exit(ELIBACC);
   }
 
-  // Load libssl.so second, so that its dependency on libcrypto.so is resolved.
-  if ((libssl = dlopen(libssl_path, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND)) == NULL) {
-    bssl_compat_error("dlopen(%s) : %s\n", libssl_path, dlerror());
-    exit(ELIBACC);
-  }
-
   // Now check the OpenSSL version of the loaded libraries to ensure they match
   // what we expect to load i.e. the version we were built against. We do this
   // by looking up and then invoking the OpenSSL_version_num() function from the
@@ -141,6 +133,13 @@ void ossl_dlopen(int expected_major, int expected_minor) {
 
   if (!set_mem_fn(ossl_malloc, ossl_realloc, ossl_free)) {
     bssl_compat_error("CRYPTO_set_mem_functions() failed\n");
+    exit(ELIBACC);
+  }
+
+  // Load libssl.so *after* calling CRYPTO_set_mem_functions() just in case
+  // libssl.so has any library constructors that call OPENSSL_malloc().
+  if ((libssl = dlopen(libssl_path, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND)) == NULL) {
+    bssl_compat_error("dlopen(%s) : %s\n", libssl_path, dlerror());
     exit(ELIBACC);
   }
 }
