@@ -284,7 +284,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 // no certificate compression.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
 
-// DnsFilter created resolver on the workerthread which could need to race when sharing resolvers
+// DnsFilter created resolver on the workerthread which could lead to race when sharing resolvers
 // Do not turn this on if DnsFilter is used or until the race is fixed
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 
