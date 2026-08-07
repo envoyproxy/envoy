@@ -421,6 +421,32 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
 }
 
+// Verifies the session signing key is read from an inline DataSource.
+TEST_F(McpRouterConfigTest, SessionSigningKeyInline) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+  proto_config.mutable_session_signing_key()->set_inline_string("test-key");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+  EXPECT_EQ(config.sessionSigningKey(), "test-key");
+}
+
+// Verifies the signing key is empty when not configured, preserving the legacy unsigned session
+// behavior.
+TEST_F(McpRouterConfigTest, SessionSigningKeyEmptyByDefault) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+  EXPECT_TRUE(config.sessionSigningKey().empty());
+}
+
 // Test fixture for McpRouterFilter runtime behavior tests.
 class McpRouterFilterTest : public testing::Test {
 protected:
