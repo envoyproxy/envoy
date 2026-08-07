@@ -73,4 +73,4 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 50052
-  # session-affinity-cookie-cluster-end
+# session-affinity-cookie-cluster-end
