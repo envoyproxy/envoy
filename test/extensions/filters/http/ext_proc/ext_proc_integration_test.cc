@@ -113,26 +113,29 @@ protected:
 
     autonomous_upstream_ = true;
     HttpIntegrationTest::initialize();
-    processor_connections_.resize(grpc_upstreams_.size());
+    codec_client_ = makeHttpConnection(lookupPort("http"));
   }
 
   void waitForProcessorMessage(uint64_t& upstream_index, FakeStreamPtr& processor_stream,
                                ProcessingRequest& request) {
+    ASSERT_EQ(grpc_upstreams_.size(), 2);
     Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
     while (bound.withinBound()) {
       for (uint64_t i = 0; i < grpc_upstreams_.size(); ++i) {
-        if (processor_connections_[i] == nullptr) {
+        FakeHttpConnectionPtr& processor_connection =
+            i == 0 ? processor_connection_ : processor_connection_1_;
+        if (processor_connection == nullptr) {
           FakeHttpConnectionPtr connection;
           if (grpc_upstreams_[i]->waitForHttpConnection(*dispatcher_, connection, 5ms)) {
-            processor_connections_[i] = std::move(connection);
+            processor_connection = std::move(connection);
           }
         }
-        if (processor_connections_[i] == nullptr) {
+        if (processor_connection == nullptr) {
           continue;
         }
 
         FakeStreamPtr stream;
-        if (processor_connections_[i]->waitForNewStream(*dispatcher_, stream, 5ms)) {
+        if (processor_connection->waitForNewStream(*dispatcher_, stream, 5ms)) {
           ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
           upstream_index = i;
           processor_stream = std::move(stream);
@@ -147,7 +150,12 @@ protected:
       std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
       absl::string_view metadata_key, std::optional<absl::string_view> expected_metadata_value,
       uint64_t& upstream_index) {
-    auto response = sendDownstreamRequest(std::move(modify_headers));
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    if (modify_headers) {
+      (*modify_headers)(headers);
+    }
+    auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
     ProcessingRequest request;
     FakeStreamPtr processor_stream;
@@ -165,10 +173,8 @@ protected:
     processor_response.mutable_request_headers();
     processor_stream->sendGrpcMessage(processor_response);
     verifyDownstreamResponse(*response, 200);
+    ASSERT_TRUE(processor_stream->waitForReset(*dispatcher_));
   }
-
-private:
-  std::vector<FakeHttpConnectionPtr> processor_connections_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
