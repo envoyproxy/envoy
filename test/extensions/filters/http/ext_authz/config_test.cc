@@ -223,9 +223,10 @@ TEST_F(ExtAuthzFilterHttpTest, FilterWithServerContext) {
   TestUtility::loadFromYaml(ext_authz_config_yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
+  // Built before the expectation below so that only the factory's own calls are counted.
   Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
                                                            "stats"};
+  EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
       factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;

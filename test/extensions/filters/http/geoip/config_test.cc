@@ -130,10 +130,11 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto2) {
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context.server_factory_context_, messageValidationVisitor()).Times(2);
   GeoipFilterFactory factory;
+  // Built before the expectation below so that only the factory's own calls are counted.
   Server::Configuration::ExtraFactoryContext extra_context{
       context.server_factory_context_.messageValidationVisitor(), "geoip"};
+  EXPECT_CALL(context.server_factory_context_, messageValidationVisitor()).Times(2);
   Http::FilterFactoryCb cb = factory
                                  .createHttpFilterFactoryFromProto(
                                      filter_config, context.server_factory_context_, extra_context)
