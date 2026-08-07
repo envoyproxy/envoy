@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
 
+#include <cstdint>
+
 #include "source/common/http/utility.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -17,6 +19,12 @@ namespace McpJsonRestBridge {
 namespace {
 
 using ::nlohmann::json;
+
+// Maximum nesting depth limit for parsing JSON arguments into query parameters in
+// `constructQueryParams`. Legitimate REST API query parameter schemas rarely exceed 5–10
+// nesting levels, and 100 aligns with standard Protocol Buffers / gRPC-JSON transcoding
+// recursion limits (e.g. `CodedInputStream::default_recursion_limit_`).
+constexpr uint32_t MaxNestingDepth = 100;
 
 absl::StatusOr<json> getJsonValue(const json& data, absl::string_view path) {
   std::vector<absl::string_view> parts = absl::StrSplit(path, '.');
@@ -46,7 +54,10 @@ struct QueryParam {
 absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
                                   absl::string_view body_rule, const json& arguments,
                                   const absl::flat_hash_set<std::string>& templates,
-                                  const std::string& path) {
+                                  const std::string& path, uint32_t depth = 0) {
+  if (depth > MaxNestingDepth) {
+    return absl::InvalidArgumentError("JSON payload exceeds maximum nesting depth limit");
+  }
   // Skip if it's a URL path template
   if (templates.contains(path)) {
     return absl::OkStatus();
@@ -61,8 +72,9 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
 
   if (arguments.is_object()) {
     for (auto it = arguments.begin(); it != arguments.end(); ++it) {
-      absl::Status status = constructQueryParams(query_params, body_rule, it.value(), templates,
-                                                 path.empty() ? it.key() : path + "." + it.key());
+      absl::Status status =
+          constructQueryParams(query_params, body_rule, it.value(), templates,
+                               path.empty() ? it.key() : path + "." + it.key(), depth + 1);
       if (!status.ok()) {
         return status;
       }
@@ -72,7 +84,7 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
   if (arguments.is_array()) {
     for (auto& array_item : arguments) {
       absl::Status status =
-          constructQueryParams(query_params, body_rule, array_item, templates, path);
+          constructQueryParams(query_params, body_rule, array_item, templates, path, depth + 1);
       if (!status.ok()) {
         return status;
       }
