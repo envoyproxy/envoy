@@ -110,7 +110,7 @@ def api_proto_plugin_aspect(
         extra_inputs = []):
     _attrs = {
         "_protoc": attr.label(
-            default = Label("@envoy//bazel:protoc"),
+            default = Label("@com_google_protobuf//:protoc"),
             executable = True,
             cfg = "exec",
         ),

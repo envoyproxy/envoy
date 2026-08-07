@@ -315,7 +315,7 @@ cc_proto_descriptor_library_aspect = aspect(
         "_protoc": attr.label(
             executable = True,
             cfg = "exec",
-            default = "@envoy//bazel:protoc",
+            default = "@com_google_protobuf//:protoc",
         ),
         "_cc_toolchain": attr.label(
             default = "@bazel_tools//tools/cpp:current_cc_toolchain",

@@ -737,7 +737,10 @@ def _com_google_protobuf():
 
     external_http_archive(
         "com_google_protobuf",
-        patches = ["@envoy//bazel:protobuf.patch"],
+        patches = [
+            "@envoy//bazel:protobuf.patch",
+            "@envoy//bazel:protobuf_prebuilt_tool_integrity.patch",
+        ],
         patch_args = ["-p1"],
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )

@@ -1,5 +1,7 @@
 # This should match the schema defined in external_deps.bzl.
 
+PROTOBUF_VERSION = "35.1"
+
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         version = "40864791135333e1446a04553b63cbe744d358d0",
