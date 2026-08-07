@@ -16,6 +16,7 @@ envoy_cc_test(
         "//contrib/istio/filters/network/peer_metadata/source:config",
         "//envoy/router:string_accessor_interface",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",

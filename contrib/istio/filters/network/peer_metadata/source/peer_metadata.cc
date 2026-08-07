@@ -1,5 +1,6 @@
 #include "contrib/istio/filters/network/peer_metadata/source/peer_metadata.h"
 
+#include <cstdint>
 #include <optional>
 
 #include "envoy/runtime/runtime.h"
@@ -10,6 +11,7 @@
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/extensions/io_socket/user_space/io_handle.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,13 +52,34 @@ bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
   return value.bool_value();
 }
 
-std::optional<std::string> getRegistryKey(const StreamInfo::FilterState& filter_state) {
-  const auto* connection_id = filter_state.getDataReadOnly<Router::StringAccessor>(
-      Filters::Common::PeerMetadataShared::ConnectionIdFilterStateKey);
-  if (connection_id == nullptr) {
+bool tlsFilterExchangeDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
+  const auto& value = ::Envoy::Config::Metadata::metadataValue(
+      &metadata, FilterNames::get().Name, FilterNames::get().EnableTLSFilterExchange);
+  return !value.bool_value();
+}
+
+bool tlsFilterExchangeDisabled(const StreamInfo::StreamInfo& stream_info) {
+  const auto upstream = stream_info.upstreamInfo();
+  if (!upstream) {
+    return false;
+  }
+  const auto host = upstream->upstreamHost();
+  if (!host) {
+    return false;
+  }
+  return tlsFilterExchangeDisabled(host->cluster().metadata());
+}
+
+std::optional<void*> getRegistryKey(Network::Connection& connection) {
+  const auto& socket = connection.getSocket();
+  if (socket == nullptr) {
     return std::nullopt;
   }
-  return std::string(connection_id->asString());
+  auto* handle = dynamic_cast<IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
+  if (handle == nullptr || handle->passthroughState() == nullptr) {
+    return std::nullopt;
+  }
+  return handle->passthroughState().get();
 }
 
 // Layered-runtime boolean key that, when true, disables the thread-local registry hand-off. The
@@ -209,13 +232,14 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
 
 bool Filter::storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata) {
   ASSERT(read_callbacks_);
-  std::optional<std::string> key =
-      getRegistryKey(*read_callbacks_->connection().streamInfo().filterState());
-  if (!key) {
+  if (registry_ == nullptr ||
+      tlsFilterExchangeDisabled(read_callbacks_->connection().streamInfo())) {
+    ENVOY_LOG(debug, "Thread local storage for filter exchange is disabled");
     return false;
   }
-  if (registry_ == nullptr) {
-    ENVOY_LOG(debug, "No instance for registry");
+  const std::optional<void*> key = getRegistryKey(read_callbacks_->connection());
+  if (!key) {
+    ENVOY_LOG(warn, "No key available for peer metadata hand-off");
     return false;
   }
   if (peer_metadata) {
@@ -340,20 +364,19 @@ bool UpstreamFilter::disableDiscovery() const {
 
 bool UpstreamFilter::tryRegistryLookup() {
   ASSERT(callbacks_);
-  std::optional<std::string> key =
-      getRegistryKey(*callbacks_->connection().streamInfo().filterState());
-  if (!key) {
+  if (registry_ == nullptr || tlsFilterExchangeDisabled(callbacks_->connection().streamInfo())) {
+    ENVOY_LOG(debug, "Thread local storage for filter exchange is disabled");
     return false;
   }
-  if (registry_ == nullptr) {
-    ENVOY_LOG(debug, "No instance for registry");
+  const std::optional<void*> key = getRegistryKey(callbacks_->connection());
+  if (!key) {
+    ENVOY_LOG(debug, "No registry key available for peer metadata lookup");
     return false;
   }
   auto value = registry_->getValue(*key);
   if (!value.has_value()) {
-    ENVOY_LOG(debug, "No peer metadata in registry for connection ID {}", *key);
-    populateNoPeerMetadata();
-    return true;
+    ENVOY_LOG(debug, "No peer metadata in registry for key {}", *key);
+    return false;
   }
 
   registry_->removeValue(*key);
