@@ -1838,7 +1838,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BufferLimitFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Get the initial buffer limit.
-    self.initial_buffer_limit.set(envoy_filter.get_buffer_limit());
+    self
+      .initial_buffer_limit
+      .set(envoy_filter.get_buffer_limit());
 
     // Increase the buffer limit if it's below our desired value.
     let desired_limit: u64 = 65536;

@@ -4723,7 +4723,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
     filter_ptr,
     |filter| filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
   )
-  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationNoBuffer)
+  .unwrap_or(
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationNoBuffer,
+  )
 }
 
 /// # Safety

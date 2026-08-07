@@ -97,11 +97,7 @@ impl<F> CatchUnwind<F> {
   }
 
   /// `&self` counterpart to [`catch_or_skip`](Self::catch_or_skip), used by the HTTP filter hooks.
-  fn catch_or_skip_ref<R>(
-    &self,
-    name: &str,
-    f: impl FnOnce(&F) -> R,
-  ) -> Result<R, CatchError> {
+  fn catch_or_skip_ref<R>(&self, name: &str, f: impl FnOnce(&F) -> R) -> Result<R, CatchError> {
     if self.poisoned.get() {
       return Err(CatchError::Poisoned);
     }

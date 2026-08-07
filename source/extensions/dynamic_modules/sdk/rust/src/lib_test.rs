@@ -7694,7 +7694,7 @@ fn test_envoy_dynamic_module_on_stat_sink_flush_reads_snapshot() {
     fn on_flush(&self, snapshot: &stats_sink::MetricSnapshot<'_>) {
       let mut seen = SEEN_COUNTERS.lock().unwrap();
       let mut name = Vec::new();
-      for index in 0 .. snapshot.counter_count() {
+      for index in 0..snapshot.counter_count() {
         if let Some(counter) = snapshot.counter(index, &mut name) {
           seen.push((
             String::from_utf8_lossy(&name).into_owned(),
@@ -8327,7 +8327,7 @@ fn test_mock_envoy_transport_socket_do_read() {
       let mut buffer = [0u8; 8];
       let (status, n) = envoy.io_read(&mut buffer);
       assert_eq!(status, IoStatus::Success);
-      envoy.read_buffer_add(&buffer[.. n]);
+      envoy.read_buffer_add(&buffer[..n]);
       IoResult::keep_open(n, false)
     }
     fn on_do_write(
@@ -8366,7 +8366,7 @@ fn test_mock_envoy_transport_socket_do_read() {
 
   let mut mock = transport_socket::MockEnvoyTransportSocket::new();
   mock.expect_io_read().times(1).returning(|buffer| {
-    buffer[.. 5].copy_from_slice(b"hello");
+    buffer[..5].copy_from_slice(b"hello");
     (IoStatus::Success, 5)
   });
   mock
