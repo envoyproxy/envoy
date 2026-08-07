@@ -1,3 +1,5 @@
+load("@com_google_protobuf//bazel/private/oss/toolchains/prebuilt:protoc_toolchain.bzl", "prebuilt_protoc_repo")
+load("@com_google_protobuf//toolchain:platforms.bzl", "PROTOBUF_PLATFORMS")
 load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP", "USE_LOCAL_SYSROOT")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
@@ -90,3 +92,13 @@ def envoy_toolchains():
             "darwin-aarch64": "@llvm_minimal_macos_arm64//",
         },
     )
+
+    for platform in PROTOBUF_PLATFORMS:
+        name = "prebuilt_protoc.%s" % platform.replace("-", "_")
+        if not native.existing_rule(name):
+            prebuilt_protoc_repo(
+                name = name,
+                platform = platform,
+            )
+
+    native.register_toolchains("@com_google_protobuf//bazel/private/oss/toolchains/prebuilt:all")
