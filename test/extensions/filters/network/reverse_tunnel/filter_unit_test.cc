@@ -2771,6 +2771,60 @@ TEST_F(ReverseTunnelJwtTest, ValidationReqCommandMatchesRequestHeader) {
   EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
 }
 
+// Fail-closed regression: when the configured formatter renders EMPTY (here a %REQ(...)% header
+// that is present with an empty value), the binding could not be evaluated and the handshake must
+// be rejected. Previously the empty render silently skipped the check and the handshake was
+// accepted with any node id.
+TEST_F(ReverseTunnelJwtTest, ValidationEmptyRenderFailsClosed) {
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += makeRtHeaders("node-b", "c", "t");
+  req += "x-expected-node-id:\r\n";
+  req += "Content-Length: 0\r\n\r\n";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.mutable_validation()->set_node_id_format("%REQ(x-expected-node-id)%");
+
+  EXPECT_THAT(runHandshake(cfg, req), testing::HasSubstr("403 Forbidden"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+}
+
+// Fail-closed regression for the formatter's absent-value placeholder: with the referenced header
+// missing, %REQ(...)% renders "-", which must reject the handshake even if the claimed node id is
+// itself "-".
+TEST_F(ReverseTunnelJwtTest, ValidationPlaceholderRenderFailsClosed) {
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += makeRtHeaders("-", "c", "t");
+  req += "Content-Length: 0\r\n\r\n";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.mutable_validation()->set_node_id_format("%REQ(x-expected-node-id)%");
+
+  EXPECT_THAT(runHandshake(cfg, req), testing::HasSubstr("403 Forbidden"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+}
+
+// A present-but-empty tenant-id header is rejected like a missing one: an empty tenant silently
+// disables tenant scoping when the socket is registered, while empty node and cluster ids are
+// already rejected at registration by addConnectionSocket.
+TEST_F(ReverseTunnelJwtTest, EmptyTenantIdRejected) {
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += "x-envoy-reverse-tunnel-node-id: n\r\n";
+  req += "x-envoy-reverse-tunnel-cluster-id: c\r\n";
+  req += "x-envoy-reverse-tunnel-tenant-id:\r\n";
+  req += "Content-Length: 0\r\n\r\n";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+
+  EXPECT_THAT(runHandshake(cfg, req), testing::HasSubstr("400 Bad Request"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.parse_error"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+}
+
 TEST_F(ReverseTunnelJwtTest, BareTokenWithoutBearerPrefixAccepted) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   setJwt(cfg, kIssuer);
