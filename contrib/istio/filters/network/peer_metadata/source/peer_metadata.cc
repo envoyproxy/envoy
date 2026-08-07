@@ -232,7 +232,8 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
 
 bool Filter::storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata) {
   ASSERT(read_callbacks_);
-  if (registry_ == nullptr || tlsFilterExchangeDisabled(read_callbacks_->connection().streamInfo())) {
+  if (registry_ == nullptr ||
+      tlsFilterExchangeDisabled(read_callbacks_->connection().streamInfo())) {
     ENVOY_LOG(debug, "Thread local storage for filter exchange is disabled");
     return false;
   }
@@ -510,8 +511,8 @@ ConfigFactory::createFilterFactoryFromProtoTyped(const Config& config,
                                                  Server::Configuration::FactoryContext& context) {
   Filters::Common::PeerMetadataShared::PeerMetadataRegistrySharedPtr registry =
       maybeGetRegistry(context.serverFactoryContext());
-  return [config, &context, registry = std::move(registry)](
-             Network::FilterManager& filter_manager) -> void {
+  return [config, &context,
+          registry = std::move(registry)](Network::FilterManager& filter_manager) -> void {
     const auto& local_info = context.serverFactoryContext().localInfo();
     filter_manager.addFilter(std::make_shared<Filter>(config, local_info, registry));
   };
