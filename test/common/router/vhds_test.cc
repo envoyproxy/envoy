@@ -316,6 +316,279 @@ vhds:
               "vhost_vhds1" == actual_vhost_2.name());
 }
 
+// verify that a VHDS update that neither adds nor removes a virtual host leaves the currently
+// published route configuration in place instead of rebuilding it
+TEST_F(VhdsTest, VhdsUpdateWithoutChangesKeepsTheRouteConfig) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+  const auto config_before_update = config_update_info->parsedConfiguration();
+
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, buildRemovedResources({"never_added_vhost"}), "2"));
+
+  // No new route configuration was built.
+  EXPECT_EQ(config_before_update, config_update_info->parsedConfiguration());
+}
+
+class MockRouteConfigUpdateReceiver : public RouteConfigUpdateReceiver {
+public:
+  // Rds::RouteConfigUpdateReceiver
+  MOCK_METHOD(bool, onRdsUpdate,
+              (const Protobuf::Message& rc, Init::Manager& init_manager,
+               const std::string& version_info));
+  MOCK_METHOD(uint64_t, configHash, (), (const));
+  MOCK_METHOD(const std::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (), (const));
+  MOCK_METHOD(const Protobuf::Message&, protobufConfiguration, (), (const));
+  MOCK_METHOD(Rds::ConfigConstSharedPtr, parsedConfiguration, (), (const));
+  MOCK_METHOD(SystemTime, lastUpdated, (), (const));
+
+  // Router::RouteConfigUpdateReceiver
+  MOCK_METHOD(const envoy::config::route::v3::RouteConfiguration&, protobufConfigurationCast, (),
+              (const));
+  MOCK_METHOD(bool, onVhdsUpdate,
+              (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               Init::Manager& init_manager, const std::string& version_info));
+  MOCK_METHOD(bool, vhdsConfigurationChanged, (), (const));
+  MOCK_METHOD(const std::set<std::string>&, resourceIdsInLastVhdsUpdate, (), (const));
+};
+
+// A resource that is owned by the route configuration built by a VHDS update and that needs to be
+// warmed up before that route configuration can be published.
+class WarmingResource {
+public:
+  WarmingResource(absl::string_view name, Init::Manager& init_manager)
+      : target_(name, [this]() { initializing_ = true; }) {
+    init_manager.add(target_);
+  }
+
+  // Simulates this resource becoming ready.
+  void ready() { target_.ready(); }
+
+  // Whether the init manager that this resource was registered with has started warming it up.
+  bool initializing_{false};
+
+private:
+  Init::TargetImpl target_;
+};
+
+// A route config provider that records how often a route configuration was published through it
+// and that can be told to fail publishing.
+class TestRouteConfigProvider : public Rds::RouteConfigProvider {
+public:
+  Rds::ConfigConstSharedPtr config() const override { return nullptr; }
+  const std::optional<ConfigInfo>& configInfo() const override { return config_info_; }
+  SystemTime lastUpdated() const override { return {}; }
+  absl::Status onConfigUpdate() override {
+    ++config_updates_;
+    return publish_status_;
+  }
+
+  uint64_t config_updates_{0};
+  absl::Status publish_status_;
+
+private:
+  const std::optional<ConfigInfo> config_info_;
+};
+
+class VhdsWarmingTest : public VhdsTest {
+public:
+  // What the mocked receiver does with the next VHDS update.
+  enum class NextUpdate {
+    // Builds a route configuration that owns a resource that needs to be warmed up.
+    Warming,
+    // Builds a route configuration that has nothing to warm up.
+    NothingToWarmUp,
+    // Leaves the currently published route configuration in place.
+    Noop,
+  };
+
+  void createSubscription() {
+    route_config_ =
+        TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+    auto config_update_info = std::make_unique<NiceMock<MockRouteConfigUpdateReceiver>>();
+    config_update_info_ = config_update_info.get();
+    ON_CALL(*config_update_info_, protobufConfigurationCast())
+        .WillByDefault(testing::ReturnRef(route_config_));
+    ON_CALL(*config_update_info_,
+            onVhdsUpdate(testing::_, testing::_, testing::_, testing::_, testing::_))
+        .WillByDefault(testing::Invoke(
+            [this](const RouteConfigUpdateReceiver::VirtualHostRefVector&, std::set<std::string>&&,
+                   const Protobuf::RepeatedPtrField<std::string>&, Init::Manager& init_manager,
+                   const std::string& version_info) {
+              if (next_update_ == NextUpdate::Noop) {
+                return false;
+              }
+              if (next_update_ == NextUpdate::Warming) {
+                warming_resources_.push_back(std::make_unique<WarmingResource>(
+                    fmt::format("vhds warming resource {}", version_info), init_manager));
+              }
+              return true;
+            }));
+    receiver_ = std::move(config_update_info);
+
+    subscription_ = VhdsSubscription::createVhdsSubscription(receiver_, factory_context_, context_,
+                                                             &route_config_provider_)
+                        .value();
+    subscription_->registerInitTargetWithInitManager(init_manager_);
+    // Starts the subscription.
+    init_manager_.initialize(init_watcher_);
+  }
+
+  absl::Status pushUpdate(const std::vector<std::string>& added,
+                          const std::vector<std::string>& removed,
+                          const std::string& version_info) {
+    std::vector<envoy::config::route::v3::VirtualHost> vhosts;
+    vhosts.reserve(added.size());
+    for (const auto& name : added) {
+      vhosts.push_back(buildVirtualHost(name, name + ".domain"));
+    }
+    const auto added_resources = buildAddedResources(vhosts);
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+    return factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+        decoded_resources.refvec_, buildRemovedResources(removed), version_info);
+  }
+
+  uint64_t configReloads() {
+    return factory_context_.store_.counter(context_ + "vhds.my_route.config_reload").value();
+  }
+
+  NextUpdate next_update_{NextUpdate::Warming};
+  std::vector<std::unique_ptr<WarmingResource>> warming_resources_;
+  envoy::config::route::v3::RouteConfiguration route_config_;
+  TestRouteConfigProvider route_config_provider_;
+  NiceMock<MockRouteConfigUpdateReceiver>* config_update_info_{nullptr};
+  RouteConfigUpdatePtr receiver_;
+  VhdsSubscriptionPtr subscription_;
+};
+
+// A route configuration that is still warming up isn't published, and the subscription doesn't
+// signal readiness until it is.
+TEST_F(VhdsWarmingTest, UpdateIsPublishedOnlyAfterItIsWarmedUp) {
+  init_watcher_.expectReady().Times(0);
+  createSubscription();
+
+  EXPECT_OK(pushUpdate({"vhost1"}, {}, "1"));
+  ASSERT_EQ(1UL, warming_resources_.size());
+  EXPECT_TRUE(warming_resources_[0]->initializing_);
+  // Not published yet.
+  EXPECT_EQ(0UL, route_config_provider_.config_updates_);
+  EXPECT_EQ(0UL, configReloads());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  init_watcher_.expectReady();
+  warming_resources_[0]->ready();
+  EXPECT_EQ(1UL, route_config_provider_.config_updates_);
+  EXPECT_EQ(1UL, configReloads());
+}
+
+// A route configuration that has nothing to warm up is published synchronously, i.e. from within
+// onConfigUpdate().
+TEST_F(VhdsWarmingTest, UpdateWithNothingToWarmUpIsPublishedSynchronously) {
+  next_update_ = NextUpdate::NothingToWarmUp;
+  init_watcher_.expectReady();
+  createSubscription();
+
+  EXPECT_OK(pushUpdate({"vhost1"}, {}, "1"));
+  EXPECT_EQ(1UL, route_config_provider_.config_updates_);
+  EXPECT_EQ(1UL, configReloads());
+  EXPECT_TRUE(warming_resources_.empty());
+}
+
+// A VHDS update that arrives while a previous update is still warming up supersedes it. The
+// superseded update is never published, even if it finishes warming up.
+TEST_F(VhdsWarmingTest, UpdateWhileWarmingSupersedesThePreviousUpdate) {
+  init_watcher_.expectReady().Times(0);
+  createSubscription();
+
+  EXPECT_OK(pushUpdate({"vhost1"}, {}, "1"));
+  EXPECT_OK(pushUpdate({"vhost2"}, {}, "2"));
+  ASSERT_EQ(2UL, warming_resources_.size());
+
+  // The abandoned update publishes nothing and doesn't signal readiness.
+  warming_resources_[0]->ready();
+  EXPECT_EQ(0UL, route_config_provider_.config_updates_);
+  EXPECT_EQ(0UL, configReloads());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  init_watcher_.expectReady();
+  warming_resources_[1]->ready();
+  EXPECT_EQ(1UL, route_config_provider_.config_updates_);
+  EXPECT_EQ(1UL, configReloads());
+}
+
+// A VHDS update that turns out to be a no-op leaves an update that is still warming up alone, and
+// doesn't signal readiness on its behalf.
+TEST_F(VhdsWarmingTest, NoopUpdateWhileWarmingLeavesTheWarmingUpdateAlone) {
+  init_watcher_.expectReady().Times(0);
+  createSubscription();
+
+  EXPECT_OK(pushUpdate({"vhost1"}, {}, "1"));
+  next_update_ = NextUpdate::Noop;
+  EXPECT_OK(pushUpdate({}, {}, "2"));
+  ASSERT_EQ(1UL, warming_resources_.size());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  init_watcher_.expectReady();
+  warming_resources_[0]->ready();
+  EXPECT_EQ(1UL, route_config_provider_.config_updates_);
+}
+
+// A VHDS update that turns out to be a no-op while nothing is warming up signals readiness right
+// away without publishing anything.
+TEST_F(VhdsWarmingTest, NoopUpdateSignalsReadinessWithoutPublishing) {
+  next_update_ = NextUpdate::Noop;
+  init_watcher_.expectReady();
+  createSubscription();
+
+  EXPECT_OK(pushUpdate({}, {}, "1"));
+  EXPECT_EQ(0UL, route_config_provider_.config_updates_);
+  EXPECT_EQ(0UL, configReloads());
+}
+
+// A failure to publish a route configuration that was warmed up asynchronously can't be reported to
+// the xDS layer anymore, and the subscription stays unready.
+TEST_F(VhdsWarmingTest, FailureToPublishAWarmedUpUpdate) {
+  init_watcher_.expectReady().Times(0);
+  createSubscription();
+
+  EXPECT_OK(pushUpdate({"vhost1"}, {}, "1"));
+  ASSERT_EQ(1UL, warming_resources_.size());
+
+  route_config_provider_.publish_status_ = absl::InvalidArgumentError("publishing failed");
+  warming_resources_[0]->ready();
+  EXPECT_EQ(1UL, route_config_provider_.config_updates_);
+
+  // The subscription only signals readiness when it is destroyed.
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+  init_watcher_.expectReady();
+}
+
+// A failure to publish a route configuration that had nothing to warm up is reported back to the
+// xDS layer as a rejection of the update.
+TEST_F(VhdsWarmingTest, FailureToPublishAnUpdateWithNothingToWarmUp) {
+  next_update_ = NextUpdate::NothingToWarmUp;
+  init_watcher_.expectReady().Times(0);
+  createSubscription();
+
+  route_config_provider_.publish_status_ = absl::InvalidArgumentError("publishing failed");
+  EXPECT_EQ("publishing failed", pushUpdate({"vhost1"}, {}, "1").message());
+
+  // The subscription only signals readiness when it is destroyed. In production the xDS layer
+  // rejects the update and calls onConfigUpdateFailed(), which signals readiness.
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+  init_watcher_.expectReady();
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
