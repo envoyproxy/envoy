@@ -119,7 +119,7 @@ genrule(
         ":arm64-packages",
         ":x64-packages",
     ],
-    outs = ["multiarch-debs.tar.gz"],
+    outs = ["multiarch-debs.tar"],
     # To ensure the debs tarball is not extracted and kept as a tarball, it is
     # placed into a 2nd archive.
     cmd = """
@@ -140,7 +140,7 @@ genrule(
     rm "$${tmpdir}/signing.key"
     mv "$${tmpdir}/deb/"* "$${tmpdir}"
     rm -rf "$${tmpdir}/deb/"
-    tar cf $$tmpdir2/debs.tar.gz -C "$${tmpdir}" .
+    tar czf $$tmpdir2/debs.tar.gz -C "$${tmpdir}" .
     tar cf $@ -C "$${tmpdir2}" .
     """,
     tags = [

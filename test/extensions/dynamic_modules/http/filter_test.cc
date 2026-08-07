@@ -453,9 +453,8 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   key = ns_res_header->second.fields().find("key");
   ASSERT_NE(key, ns_res_header->second.fields().end());
   EXPECT_EQ(key->second.number_value(), 123);
-  // Multiple string entries set in one namespace via the batch setter. The batch SDK wrapper is
-  // Rust-only, so scope these assertions to the rust parameterization like the other language
-  // guards in the dynamic_modules integration tests.
+  // The batch and raw-bytes SDK wrappers are Rust-only, so scope these assertions to the rust
+  // parameterization like the other language guards in the dynamic_modules integration tests.
   if (GetParam() == "rust") {
     auto ns_req_header_batch = metadata.filter_metadata().find("ns_req_header_batch");
     ASSERT_NE(ns_req_header_batch, metadata.filter_metadata().end());
@@ -474,18 +473,18 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
     auto bytes_key = ns_req_header_bytes->second.fields().find("key");
     ASSERT_NE(bytes_key, ns_req_header_bytes->second.fields().end());
     EXPECT_EQ(bytes_key->second.string_value(), std::string("\xff\x00\xfe", 3));
-    // A whole namespace set from a serialized google.protobuf.Struct via the struct setter.
-    auto ns_req_header_struct = metadata.filter_metadata().find("ns_req_header_struct");
-    ASSERT_NE(ns_req_header_struct, metadata.filter_metadata().end());
-    auto struct_k = ns_req_header_struct->second.fields().find("k");
-    ASSERT_NE(struct_k, ns_req_header_struct->second.fields().end());
-    EXPECT_EQ(struct_k->second.string_value(), "v");
-    // A whole typed namespace set from a serialized google.protobuf.Any via the typed setter.
-    auto ns_req_header_typed = metadata.typed_filter_metadata().find("ns_req_header_typed");
-    ASSERT_NE(ns_req_header_typed, metadata.typed_filter_metadata().end());
-    EXPECT_EQ(ns_req_header_typed->second.type_url(), "t/x");
-    EXPECT_EQ(ns_req_header_typed->second.value(), std::string("\x01\x02", 2));
   }
+  // A whole namespace set from a serialized google.protobuf.Struct via the struct setter.
+  auto ns_req_header_struct = metadata.filter_metadata().find("ns_req_header_struct");
+  ASSERT_NE(ns_req_header_struct, metadata.filter_metadata().end());
+  auto struct_k = ns_req_header_struct->second.fields().find("k");
+  ASSERT_NE(struct_k, ns_req_header_struct->second.fields().end());
+  EXPECT_EQ(struct_k->second.string_value(), "v");
+  // A whole typed namespace set from a serialized google.protobuf.Any via the typed setter.
+  auto ns_req_header_typed = metadata.typed_filter_metadata().find("ns_req_header_typed");
+  ASSERT_NE(ns_req_header_typed, metadata.typed_filter_metadata().end());
+  EXPECT_EQ(ns_req_header_typed->second.type_url(), "t/x");
+  EXPECT_EQ(ns_req_header_typed->second.value(), std::string("\x01\x02", 2));
   auto ns_req_body = metadata.filter_metadata().find("ns_req_body");
   ASSERT_NE(ns_req_body, metadata.filter_metadata().end());
   key = ns_req_body->second.fields().find("key");
