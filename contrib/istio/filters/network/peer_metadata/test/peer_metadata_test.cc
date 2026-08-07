@@ -126,9 +126,9 @@ void* wireUserSpaceSocket(NiceMock<Network::MockConnection>& connection,
 }
 
 // Which hand-off path the parameterized fixtures exercise. The path is selected
-// by the use_passthrough_state_key feature flag: when enabled (default) the
-// shared PassthroughState pointer keys the thread-local registry; when disabled
-// the filters fall back to the legacy data-stream preamble exchange.
+// by whether a registry is present: with a registry the shared PassthroughState
+// pointer keys the thread-local registry; without one the filters fall back to
+// the legacy data-stream preamble exchange.
 enum class ExchangePath { DataStreamPreamble, ThreadLocalRegistry };
 
 // Readable parameter names for the path-parameterized fixtures below.
@@ -140,7 +140,7 @@ std::string modeName(const ::testing::TestParamInfo<ExchangePath>& info) {
 class PeerMetadataFilterTest : public ::testing::TestWithParam<ExchangePath> {
 public:
   // Builds a downstream Filter config. The exchange path is not selected by
-  // config; it is driven by the use_passthrough_state_key feature flag.
+  // config; it is driven by whether the filter is given a registry.
   Config makeConfig(absl::string_view baggage_key) {
     Config config;
     config.set_baggage_key(baggage_key);
@@ -186,7 +186,7 @@ public:
   }
 
   void initialize(const Config& config) {
-    const bool use_passthrough_state_key = GetParam() == ExchangePath::ThreadLocalRegistry;
+    const bool use_registry = GetParam() == ExchangePath::ThreadLocalRegistry;
 
     ON_CALL(local_info_, node()).WillByDefault(ReturnRef(node_metadata_));
 
@@ -201,12 +201,19 @@ public:
     ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, _))
         .WillByDefault([this](Buffer::Instance& data, bool) { injected_write_data_.add(data); });
 
-    if (use_passthrough_state_key) {
+    if (use_registry) {
       registry_key_ =
           wireUserSpaceSocket(read_filter_callbacks_.connection_, io_handle_, connection_socket_);
+      // Enable the TLS filter exchange on the upstream host so storeInRegistry uses the registry.
+      upstream_host_ = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+      Protobuf::Struct md;
+      (*md.mutable_fields())[FilterNames::get().EnableTLSFilterExchange].set_bool_value(true);
+      (*upstream_host_->cluster_.metadata_.mutable_filter_metadata())[FilterNames::get().Name]
+          .MergeFrom(md);
+      stream_info_.upstreamInfo()->setUpstreamHost(upstream_host_);
     }
 
-    filter_ = std::make_unique<Filter>(config, local_info_, registry_, use_passthrough_state_key);
+    filter_ = std::make_unique<Filter>(config, local_info_, use_registry ? registry_ : nullptr);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_filter_callbacks_);
   }
@@ -246,6 +253,7 @@ public:
   Extensions::IoSocket::UserSpace::IoHandleImplPtr io_handle_;
   Network::ConnectionSocketPtr connection_socket_;
   void* registry_key_{nullptr};
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_;
   std::unique_ptr<Filter> filter_;
 };
 
@@ -380,17 +388,18 @@ std::shared_ptr<NiceMock<Upstream::MockHostDescription>> makeIpv4Host(absl::stri
 
 class PeerMetadataUpstreamFilterTestBase : public ::testing::Test {
 public:
-  void initialize(bool use_passthrough_state_key = false) {
+  void initialize(bool use_registry = false) {
+    use_registry_ = use_registry;
     ON_CALL(callbacks_.connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
     ON_CALL(Const(callbacks_.connection_), streamInfo()).WillByDefault(ReturnRef(stream_info_));
 
     host_metadata_ = std::make_shared<::envoy::config::core::v3::Metadata>();
 
-    if (use_passthrough_state_key) {
+    if (use_registry) {
       registry_key_ = wireUserSpaceSocket(callbacks_.connection_, io_handle_, connection_socket_);
     }
 
-    filter_ = std::make_unique<UpstreamFilter>(registry_, use_passthrough_state_key);
+    filter_ = std::make_unique<UpstreamFilter>(use_registry ? registry_ : nullptr);
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
@@ -430,6 +439,12 @@ public:
   void setUpstreamHost(const std::shared_ptr<NiceMock<Upstream::MockHostDescription>>& host) {
     upstream_host_ = host;
     ON_CALL(Const(*upstream_host_), metadata()).WillByDefault(Return(host_metadata_));
+    if (use_registry_) {
+      Protobuf::Struct md;
+      (*md.mutable_fields())[FilterNames::get().EnableTLSFilterExchange].set_bool_value(true);
+      (*upstream_host_->cluster_.metadata_.mutable_filter_metadata())[FilterNames::get().Name]
+          .MergeFrom(md);
+    }
     stream_info_.upstreamInfo()->setUpstreamHost(upstream_host_);
   }
 
@@ -442,6 +457,7 @@ public:
   Extensions::IoSocket::UserSpace::IoHandleImplPtr io_handle_;
   Network::ConnectionSocketPtr connection_socket_;
   void* registry_key_{nullptr};
+  bool use_registry_{false};
   std::unique_ptr<UpstreamFilter> filter_;
 };
 
@@ -579,7 +595,7 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
 // stored under that key. The upstream filter must fall back to marking the peer
 // as unknown by populating NoPeer.
 TEST_F(PeerMetadataUpstreamFilterTestBase, TestNoPeerPopulatedWhenRegistryEmpty) {
-  initialize(/*use_passthrough_state_key=*/true);
+  initialize(/*use_registry=*/true);
   setUpstreamHost(makeInternalListenerHost("connect_originate"));
 
   EXPECT_EQ(filter_->onNewConnection(), Network::FilterStatus::Continue);
