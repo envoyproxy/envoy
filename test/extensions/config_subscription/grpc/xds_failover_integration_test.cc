@@ -11,6 +11,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
@@ -354,8 +356,37 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryNotResponding) {
 
   // Expect another connection attempt to the primary. Reject the stream (gRPC failure) immediately.
   // As this is a 2nd consecutive failure, it will trigger failover.
-  primaryConnectionFailure();
-  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  //
+  // For GoogleGrpc: after a TCP close, the gRPC channel can enter TRANSIENT_FAILURE state.
+  // When Envoy's simulated-time retry timer fires, the gRPC library may immediately reject
+  // the stream attempt (without establishing a new TCP connection) because the channel's
+  // real-time backoff has not yet expired. This also counts as a 2nd consecutive failure
+  // and triggers failover. Detect this case by polling (without advancing simulated time)
+  // before attempting to accept a second connection.
+  bool second_failure_via_transient_failure = false;
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Poll for up to 200*TIMEOUT_FACTOR ms (real time, no simulated clock advancement).
+    // The gRPC completion queue typically propagates the UNAVAILABLE failure to Envoy's
+    // main thread within a few milliseconds; 200ms (×TIMEOUT_FACTOR for slow builds)
+    // provides ample margin while still being much shorter than the 30s default timeout
+    // that would otherwise trigger the "don't use DefaultTimeout" test guard.
+    const auto deadline = absl::Now() + absl::Milliseconds(200 * TIMEOUT_FACTOR);
+    // 5ms between polls: short enough to detect the failure promptly without busy-looping.
+    constexpr absl::Duration kPollInterval = absl::Milliseconds(5);
+    while (absl::Now() < deadline) {
+      const auto counter =
+          TestUtility::findCounter(test_server_->statStore(), "cluster_manager.cds.update_failure");
+      if (counter != nullptr && counter->value() >= 2) {
+        second_failure_via_transient_failure = true;
+        break;
+      }
+      absl::SleepFor(kPollInterval);
+    }
+  }
+  if (!second_failure_via_transient_failure) {
+    primaryConnectionFailure();
+    ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  }
 
   // The CDS request fails when the primary disconnects.
   test_server_->waitForCounter("cluster_manager.cds.update_failure", Ge(2));
