@@ -276,8 +276,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
         response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
       }
       populateRetryAfterHeader(*descriptor_statuses, *response_headers_to_add_,
-                               config_->rateLimitedStatus() == Http::Code::TooManyRequests &&
-                                   config_->enableRetryAfterHeader());
+                               config_->enableRetryAfterHeader());
     }
     state_ = State::Responded;
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);

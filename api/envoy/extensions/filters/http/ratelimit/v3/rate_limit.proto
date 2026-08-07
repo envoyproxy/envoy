@@ -192,9 +192,10 @@ message RateLimit {
   string metadata_namespace = 18;
 
   // Specifies whether the filter emits a ``Retry-After`` header when it enforces an HTTP 429
-  // response. The value is the largest ``duration_until_reset`` among the over-limit descriptor
-  // statuses returned by the rate limit service, expressed in seconds and clamped to at least 1.
-  // The header is not emitted when no over-limit descriptor status is present.
+  // response. This option has no effect on responses with any other status code. The value is the
+  // largest ``duration_until_reset`` among the over-limit descriptor statuses returned by the rate
+  // limit service, expressed in seconds and clamped to at least 1. The header is not emitted when no
+  // over-limit descriptor status is present.
   // If the rate limit service returns a ``Retry-After`` header, the filter does not overwrite it.
   //
   // Disabled by default.

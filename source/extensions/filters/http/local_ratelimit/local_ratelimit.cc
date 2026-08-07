@@ -65,7 +65,8 @@ FilterConfig::FilterConfig(
       has_descriptors_(!config.descriptors().empty()),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
-      enable_retry_after_header_(config.enable_retry_after_header()),
+      enable_retry_after_header_(config.enable_retry_after_header() &&
+                                 status_ == Http::Code::TooManyRequests),
       vh_rate_limits_(config.vh_rate_limits()),
       rate_limited_grpc_status_(
           config.rate_limited_as_resource_exhausted()
@@ -202,9 +203,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       [this](Http::HeaderMap& headers) {
         used_config_->responseHeadersParser().evaluateHeaders(headers,
                                                               decoder_callbacks_->streamInfo());
-        if (used_config_->enableRetryAfterHeader() &&
-            used_config_->status() == Http::Code::TooManyRequests &&
-            token_bucket_context_ != nullptr &&
+        if (used_config_->enableRetryAfterHeader() && token_bucket_context_ != nullptr &&
             headers.get(HttpFilters::Common::RateLimit::RetryAfterHeaders::get().RetryAfter)
                 .empty()) {
           // Clamp to at least one second to avoid telling clients to retry immediately, which could

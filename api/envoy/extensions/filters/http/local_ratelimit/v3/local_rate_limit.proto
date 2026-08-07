@@ -192,8 +192,9 @@ message LocalRateLimit {
   google.protobuf.UInt32Value max_dynamic_descriptors = 18 [(validate.rules).uint32 = {gte: 1}];
 
   // Specifies whether the filter emits a ``Retry-After`` header when it enforces an HTTP 429
-  // response. The value is the number of seconds until the next token is available in the bucket
-  // that rejected the request, clamped to at least 1.
+  // response. This option has no effect on responses with any other status code. The value is the
+  // number of seconds until the next token is available in the bucket that rejected the request,
+  // clamped to at least 1.
   // If ``response_headers_to_add`` sets a ``Retry-After`` header, the filter does not overwrite it.
   //
   // Disabled by default.
