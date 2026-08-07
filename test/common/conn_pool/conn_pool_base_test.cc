@@ -93,7 +93,8 @@ public:
 
   bool empty() const override { return items_.empty(); }
 
-  ConnectionPool::Cancellable* add(ItemPtrType&& item) override {
+  ConnectionPool::Cancellable* add(ItemPtrType&& item,
+                                   Extensions::QueuePolicy::QueueItemMetadata) override {
     LinkedList::moveIntoListBack(std::move(item), items_);
     return items_.back().get();
   }
@@ -101,10 +102,10 @@ public:
   ItemPtrType remove(PendingStream& item) override { return item.removeFromList(items_); }
 
   // Use LIFO ordering so connection-pool tests exercise policy-defined ordering.
-  const ItemPtrType& next() const override { return items_.back(); }
+  PendingStream& next() const override { return *items_.back(); }
   bool isOverloaded() const override { return items_.size() > 1; }
 
-  void forEach(const std::function<bool(PendingStream&)>& cb) override {
+  void forEach(absl::FunctionRef<bool(PendingStream&)> cb) override {
     for (auto it = items_.begin(); it != items_.end();) {
       PendingStream& item = **it;
       ++it;
@@ -126,23 +127,31 @@ public:
   }
 
   absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<PendingStream>>
-  createQueuePolicy(const Protobuf::Message&, const std::string&,
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
                     ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
     return std::make_unique<TestPendingStreamQueue>();
   }
 
   std::string name() const override { return "envoy.queue_policy.fifo"; }
+  std::string stat_prefix_;
 };
 
 // Creates a resolved queue policy bundle for the test factory, mirroring what
 // ClusterInfoImpl produces at cluster configuration load time.
-std::unique_ptr<Upstream::ClusterInfo::PendingRqQueuePolicy> makeTestQueuePolicyBundle() {
-  static TestPendingStreamQueueFactory factory;
+std::unique_ptr<Upstream::ClusterInfo::PendingRqQueuePolicy>
+makeTestQueuePolicyBundle(TestPendingStreamQueueFactory& factory) {
   auto policy = std::make_unique<Upstream::ClusterInfo::PendingRqQueuePolicy>();
   policy->factory_ = &factory;
   policy->config_ =
       std::make_unique<envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig>();
+  policy->stat_prefix_ = "cluster.test_cluster.envoy.queue_policy.fifo";
   return policy;
+}
+
+std::unique_ptr<Upstream::ClusterInfo::PendingRqQueuePolicy> makeTestQueuePolicyBundle() {
+  static TestPendingStreamQueueFactory factory;
+  return makeTestQueuePolicyBundle(factory);
 }
 
 std::shared_ptr<Upstream::MockClusterInfo> makeClusterWithTestQueuePolicy() {
@@ -229,8 +238,9 @@ public:
 };
 
 TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueuePolicy) {
+  TestPendingStreamQueueFactory factory;
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  cluster->pending_rq_queue_policy_ = makeTestQueuePolicyBundle();
+  cluster->pending_rq_queue_policy_ = makeTestQueuePolicyBundle(factory);
   cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
 
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -241,6 +251,7 @@ TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueuePolicy) {
 
   TestConnPoolImplBase pool(host, Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
                             state, overload_manager);
+  EXPECT_EQ("cluster.test_cluster.envoy.queue_policy.fifo", factory.stat_prefix_);
 }
 
 TEST_F(ConnPoolImplBaseQueuePolicyTest, QueueOverloadedGaugeTracksTransitions) {

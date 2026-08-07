@@ -6897,12 +6897,14 @@ public:
   }
 
   absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
-  createQueuePolicy(const Protobuf::Message&, const std::string&,
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
                     ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
     return absl::InvalidArgumentError("queue policy creation failed");
   }
 
   std::string name() const override { return "envoy.queue_policy.rejecting"; }
+  std::string stat_prefix_;
 };
 
 TEST_F(ClusterInfoImplTest, InvalidQueuePolicyConfig) {
@@ -6938,6 +6940,7 @@ TEST_F(ClusterInfoImplTest, QueuePolicyCreationFailure) {
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException, "queue policy creation failed");
+  EXPECT_EQ("cluster.cluster1.envoy.queue_policy.rejecting", factory.stat_prefix_);
 }
 
 TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {

@@ -1,20 +1,24 @@
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <type_traits>
 
 #include "envoy/common/conn_pool.h"
+#include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "source/common/common/linked_object.h"
-
+#include "absl/functional/function_ref.h"
 #include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace QueuePolicy {
+
+// Metadata associated with an item when it is added to a queue.
+struct QueueItemMetadata {
+  MonotonicTime enqueue_time_;
+};
 
 // Base class that handles queuing for objects. Implementations are free to choose any internal
 // container; the interface is intentionally container-agnostic.
@@ -22,8 +26,6 @@ template <class ItemType> class QueueBase {
 
   static_assert(std::is_base_of_v<ConnectionPool::Cancellable, ItemType>,
                 "Queue item type must inherit from ConnectionPool::Cancellable");
-  static_assert(std::is_base_of_v<LinkedObject<ItemType>, ItemType>,
-                "Queue item type must inherit from LinkedObject");
 
 public:
   using ItemPtrType = std::unique_ptr<ItemType>;
@@ -34,19 +36,20 @@ public:
 
   virtual bool empty() const PURE;
 
-  virtual ConnectionPool::Cancellable* add(ItemPtrType&& item) PURE;
+  virtual ConnectionPool::Cancellable* add(ItemPtrType&& item, QueueItemMetadata metadata) PURE;
 
   virtual ItemPtrType remove(ItemType& item) PURE;
 
-  // Returns the next item to be dequeued. It is illegal to call this on an empty queue.
-  virtual const ItemPtrType& next() const PURE;
+  // Returns the next item to be dequeued. It is illegal to call this on an empty queue. The
+  // returned reference is valid until the item is removed and destroyed.
+  virtual ItemType& next() const PURE;
 
   virtual bool isOverloaded() const PURE;
 
   // Iterates over the queued items in dequeue order, invoking cb for each item. Iteration stops
   // early if cb returns false. The callback is allowed to remove the visited item from the queue
   // (via remove()); implementations must make this safe.
-  virtual void forEach(const std::function<bool(ItemType&)>& cb) PURE;
+  virtual void forEach(absl::FunctionRef<bool(ItemType&)> cb) PURE;
 };
 
 template <class ItemType> using QueuePolicyUniquePtr = std::unique_ptr<QueueBase<ItemType>>;

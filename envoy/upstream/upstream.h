@@ -1296,6 +1296,8 @@ public:
     Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>* factory_{};
     // Translated queue policy configuration.
     std::unique_ptr<const Protobuf::Message> config_;
+    // Cluster-specific prefix supplied to the queue policy factory.
+    std::string stat_prefix_;
   };
 
   /**

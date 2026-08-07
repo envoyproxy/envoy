@@ -31,7 +31,7 @@ PendingStreamQueuePtr createPendingStreamQueue(
   // The factory and translated config were resolved and validated once at cluster configuration
   // load time, so no factory lookup or proto translation is needed here.
   auto& factory = *queue_policy->factory_;
-  auto queue = factory.createQueuePolicy(*queue_policy->config_, "cluster." + factory.name(),
+  auto queue = factory.createQueuePolicy(*queue_policy->config_, queue_policy->stat_prefix_,
                                          ProtobufMessage::getStrictValidationVisitor());
   RELEASE_ASSERT(queue.ok(), queue.status().ToString());
   return std::move(*queue);
@@ -447,19 +447,19 @@ void ConnPoolImplBase::scheduleOnUpstreamReady() {
 
 void ConnPoolImplBase::onUpstreamReady() {
   while (!pending_streams_->empty() && !ready_clients_.empty()) {
-    auto& stream = pending_streams_->next();
+    PendingStream& stream = pending_streams_->next();
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
     // FIFO pending streams are pulled from the front, where the oldest stream is stored.
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
-      PendingStreamPtr pending_stream = pending_streams_->remove(*stream);
+      PendingStreamPtr pending_stream = pending_streams_->remove(stream);
       cluster_connectivity_state_.decrPendingStreams(1);
       updateQueueOverloadedGauge();
       attachStreamToClient(*client, pending_stream->context());
     } else {
-      attachStreamToClient(*client, stream->context());
+      attachStreamToClient(*client, stream.context());
       cluster_connectivity_state_.decrPendingStreams(1);
-      pending_streams_->remove(*stream);
+      pending_streams_->remove(stream);
       updateQueueOverloadedGauge();
     }
   }
@@ -765,7 +765,7 @@ void ConnPoolImplBase::purgePendingStreams(
   cluster_connectivity_state_.decrPendingStreams(pending_streams_->size());
   clearQueueOverloadedGauge();
   while (!pending_streams_->empty()) {
-    LinkedList::moveIntoListBack(pending_streams_->remove(*pending_streams_->next()),
+    LinkedList::moveIntoListBack(pending_streams_->remove(pending_streams_->next()),
                                  pending_streams_to_purge_);
   }
   while (!pending_streams_to_purge_.empty()) {

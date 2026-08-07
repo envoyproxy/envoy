@@ -340,7 +340,8 @@ protected:
 
   ConnectionPool::Cancellable*
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
-    const auto stream_added = pending_streams_->add(std::move(pending_stream));
+    const auto stream_added = pending_streams_->add(std::move(pending_stream),
+                                                    {dispatcher_.timeSource().monotonicTime()});
     cluster_connectivity_state_.incrPendingStreams(1);
     updateQueueOverloadedGauge();
     return stream_added;

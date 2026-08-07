@@ -29,11 +29,11 @@ using FifoQueuePolicyConfig = envoy::extensions::queue_policy::fifo::v3::FifoQue
 TEST(FifoQueueTest, TestQueueFunctions) {
   FifoQueue<FifoQueueItemType> queue;
   EXPECT_TRUE(queue.empty());
-  queue.add(std::make_unique<FifoQueueItemType>(11));
-  queue.add(std::make_unique<FifoQueueItemType>(42));
+  queue.add(std::make_unique<FifoQueueItemType>(11), {MonotonicTime{}});
+  queue.add(std::make_unique<FifoQueueItemType>(42), {MonotonicTime{}});
   EXPECT_FALSE(queue.isOverloaded());
   EXPECT_EQ(queue.size(), 2);
-  EXPECT_EQ(queue.next()->value(), 11);
+  EXPECT_EQ(queue.next().value(), 11);
 
   // forEach visits items in dequeue (FIFO) order.
   std::vector<int> visited;
@@ -59,7 +59,7 @@ TEST(FifoQueueTest, TestQueueFunctions) {
     return true;
   });
   EXPECT_EQ(queue.size(), 1);
-  EXPECT_EQ(queue.next()->value(), 42);
+  EXPECT_EQ(queue.next().value(), 42);
 }
 
 class FifoQueueFactoryTest : public ::testing::Test {

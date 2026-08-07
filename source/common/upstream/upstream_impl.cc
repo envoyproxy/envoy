@@ -92,7 +92,7 @@ defaultHappyEyeballsConfig() {
 absl::StatusOr<std::unique_ptr<const ClusterInfo::PendingRqQueuePolicy>>
 resolvePendingRqQueuePolicy(
     const envoy::config::core::v3::TypedExtensionConfig& queue_policy_config,
-    Server::Configuration::ServerFactoryContext& server_context) {
+    Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& server_context) {
   using PendingStreamQueueFactory =
       Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
   PendingStreamQueueFactory* factory =
@@ -106,17 +106,20 @@ resolvePendingRqQueuePolicy(
         fmt::format("Didn't find a registered queue policy implementation for name: '{}'",
                     queue_policy_config.name()));
   }
+  const std::string stat_prefix =
+      absl::StrCat(stats_scope.symbolTable().toString(stats_scope.prefix()), ".", factory->name());
   ProtobufTypes::MessagePtr factory_config = factory->createEmptyConfigProto();
   RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(queue_policy_config.typed_config(),
                                                           server_context.messageValidationVisitor(),
                                                           *factory_config));
-  auto queue = factory->createQueuePolicy(*factory_config, "cluster." + factory->name(),
+  auto queue = factory->createQueuePolicy(*factory_config, stat_prefix,
                                           server_context.messageValidationVisitor());
   RETURN_IF_NOT_OK(queue.status());
 
   auto policy = std::make_unique<ClusterInfo::PendingRqQueuePolicy>();
   policy->factory_ = factory;
   policy->config_ = std::move(factory_config);
+  policy->stat_prefix_ = stat_prefix;
   return policy;
 }
 
@@ -1406,8 +1409,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   if (config.queuing_policies().has_pending_rq_policy()) {
-    auto policy_or_error =
-        resolvePendingRqQueuePolicy(config.queuing_policies().pending_rq_policy(), server_context);
+    auto policy_or_error = resolvePendingRqQueuePolicy(
+        config.queuing_policies().pending_rq_policy(), *stats_scope_, server_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
     pending_rq_queue_policy_ = std::move(*policy_or_error);
   }
