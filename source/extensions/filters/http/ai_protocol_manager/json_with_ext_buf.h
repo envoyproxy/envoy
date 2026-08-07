@@ -33,9 +33,8 @@ namespace AiProtocolManager {
 // in the surface extensions program against.
 class JsonWithExtBuf {
 public:
-  // Binary subtype marking a node as an external-buffer reference; leetspeak for
-  // "Envoy A1 External Buffer". Register any future subtype here -- it is the
-  // only thing telling two binary nodes apart.
+  // Binary subtype marking a node as an external-buffer reference.
+  // 0xEA1EB = "Envoy A1 External Buffer".
   static constexpr std::uint64_t kExternalRefSubtype = 0xea1eb;
 
   // Locates a value's bytes in the offloaded body. The range is the raw JSON
