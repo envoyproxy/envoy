@@ -254,13 +254,18 @@ envoy_cc_library(
     ],
     external_deps = ["ssl"],
     deps = [
+        "//envoy/ssl:tls_certificate_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:fmt_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/ssl:ssl_lib",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 

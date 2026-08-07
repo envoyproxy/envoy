@@ -2514,6 +2514,607 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsaWithFullScanEnabledOnSniMismatch) {
   testUtil(test_options.setExpectedSni("nomatch.example.com"));
 }
 
+// No certificate-level tls_params: context-level tls_params still apply. Context restricts to
+// AES128; client offers both AES128 and AES256 — AES128 is negotiated via context-level params.
+TEST_P(SslSocketTest, ContextLevelTlsParamsInheritedWhenNoCertLevelParams) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES256-GCM-SHA384
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options);
+}
+
+// Certificate-level tls_params applied: cert restricts to AES128 only. Client offering only AES256
+// fails to connect, proving certificate-level tls_params are enforced (not just the context-level
+// defaults).
+TEST_P(SslSocketTest, PerCertTlsParamsApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES256-GCM-SHA384
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+)EOF";
+
+  // Client offers only AES256, cert's tls_params restricts to AES128 — no common cipher.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Per-cert tls_params: cert restricts signature algorithms to a set the client does not support.
+// No common signature algorithm causes the handshake to fail.
+TEST_P(SslSocketTest, PerCertTlsParamsSigAlgsApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        signature_algorithms:
+        - rsa_pss_rsae_sha256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+        signature_algorithms:
+        - rsa_pss_rsae_sha384
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Per-cert tls_params: cert sets compliance_policies. Client cipher incompatible with FIPS policy
+// causes connection failure, covering the compliance policy branch in applyTlsParamsToSsl.
+TEST_P(SslSocketTest, PerCertTlsParamsCompliancePolicyApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-CHACHA20-POLY1305
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-CHACHA20-POLY1305
+        ecdh_curves:
+        - P-256
+        compliance_policies:
+        - FIPS_202205
+)EOF";
+
+  // FIPS policy disallows CHACHA20-POLY1305 — no common cipher, handshake fails.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.connection_error"));
+}
+
+// Per-cert tls_params: cert sets max=TLSv1_2. Client requires TLSv1.3 — version mismatch,
+// handshake fails. Proves max_protocol_version TLSv1_2 on the cert is enforced.
+TEST_P(SslSocketTest, PerCertTlsParamsMaxVersionApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_3
+        tls_maximum_protocol_version: TLSv1_3
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+)EOF";
+
+  // Context allows TLSv1.3 by default, but cert's tls_params cap it at TLSv1.2 — mismatch.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+}
+
+// Per-cert tls_params: cert restricts ecdh_curves to P-384. Client only supports P-256 — no
+// common curve, handshake fails. Exercises the ecdh_curves branch in applyTlsParamsToSsl.
+TEST_P(SslSocketTest, PerCertTlsParamsEcdhCurvesApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-384
+)EOF";
+
+  // Client only supports P-256 but cert's tls_params restricts to P-384 — no common curve.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate-level tls_params with a TLS 1.3 handshake: cert restricts to TLSv1_3 only, client max
+// is 1.3. Confirms that certificate-level tls_params are applied correctly and a TLS 1.3 connection
+// succeeds.
+TEST_P(SslSocketTest, PerCertTlsParamsTls13Succeeds) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* server_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  // Context allows TLSv1_2-TLSv1_3; cert's tls_params restrict to TLSv1_3 only.
+  tls_context.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  tls_context.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_cert->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_cert->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  testUtilV2(test_options.setExpectedProtocolVersion("TLSv1.3")
+                 .setExpectedServerStats("ssl.versions.TLSv1.3")
+                 .setExpectedClientStats("ssl.versions.TLSv1.3")
+                 .setExpectedRequestedServerName("server1.example.com"));
+}
+
+// Certificate-level tls_params: cert sets min=TLSv1_3 while the context allows TLSv1_2 and up. A
+// client that only offers TLSv1_2 cannot negotiate, proving the certificate-level min is enforced.
+TEST_P(SslSocketTest, PerCertTlsParamsMinVersionApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_3
+)EOF";
+
+  // Context floor is TLSv1_2, but cert's tls_params raise it to TLSv1_3 — client offering only
+  // TLSv1_2 cannot negotiate.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "ssl/tls alert protocol version")));
+}
+
+// Certificate-level tls_params under a TLS 1.3 handshake: cert restricts to one signature
+// algorithm; client offers a different one — no common algorithm, handshake fails.
+// Exercises the signature_algorithms branch in applyTlsParamsToSsl at TLS 1.3.
+TEST_P(SslSocketTest, PerCertTlsParamsSigAlgsTls13Fails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* server_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  server_cert->mutable_tls_params()->add_signature_algorithms("rsa_pss_rsae_sha384");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_signature_algorithms(
+      "rsa_pss_rsae_sha256");
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate-level tls_params under a TLS 1.3 handshake: cert restricts ecdh_curves to P-521.
+// Client supports only X25519 and P-256 — no common group, handshake fails.
+// Exercises the ecdh_curves branch in applyTlsParamsToSsl at TLS 1.3 (key_share/supported_groups).
+TEST_P(SslSocketTest, PerCertTlsParamsEcdhCurvesTls13Fails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* server_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  server_cert->mutable_tls_params()->add_ecdh_curves("P-521");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("X25519");
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("P-256");
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate-level tls_params under a TLS 1.3 handshake: cert sets compliance_policies:
+// FIPS_202205. FIPS_202205 at TLS 1.3 restricts permitted groups to P-256/P-384; a client
+// restricted to X25519 only finds no common group, handshake fails. Exercises compliance_policy
+// application in applyTlsParamsToSsl at TLS 1.3.
+TEST_P(SslSocketTest, PerCertTlsParamsCompliancePolicyTls13Fails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* server_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  server_cert->mutable_tls_params()->add_compliance_policies(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::FIPS_202205);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  // X25519 is not permitted under FIPS_202205; no common group, handshake fails.
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("X25519");
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate selection does not consider certificate-level tls_params, which are applied to the
+// per-connection SSL object only after a certificate has been chosen. So a certificate whose params
+// contradict the reason it was selected fails the handshake rather than falling back to another
+// certificate. Here the ECDSA cert is preferred because the client is ECDSA-capable, but its own
+// cipher_suites permit only RSA authentication, so no cipher is usable and the unrestricted RSA
+// cert is never tried.
+TEST_P(SslSocketTest, PerCertCipherOverrideContradictingSelectionFails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* ecdsa_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  ecdsa_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_cert.pem"));
+  ecdsa_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_key.pem"));
+  ecdsa_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+
+  auto* rsa_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  rsa_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  rsa_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_ECDSA_1_CERT_256_HASH);
+  auto* client_params = client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->add_cipher_suites("ECDHE-ECDSA-AES128-GCM-SHA256");
+  client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate-level tls_params are overrides, not additional constraints, so a certificate can
+// lower the context floor. The context permits TLSv1.3 only, the certificate lowers its minimum to
+// TLSv1_2 and leaves the maximum inherited, and a TLSv1.2-only client negotiates successfully. This
+// is the weakening the API documentation warns about.
+TEST_P(SslSocketTest, PerCertTlsParamsLowerMinVersionBelowContextFloor) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_cert->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  testUtilV2(createProtocolTestOptions(listener, client_ctx, version_, "TLSv1.2"));
+}
+
+// A certificate-level maximum above the context ceiling raises it. The context permits TLSv1.2
+// only, the certificate raises its maximum to TLSv1_3 and leaves the minimum inherited, and a
+// TLSv1.3-only client negotiates successfully.
+TEST_P(SslSocketTest, PerCertTlsParamsRaiseMaxVersionAboveContextCeiling) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_cert->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  testUtilV2(createProtocolTestOptions(listener, client_ctx, version_, "TLSv1.3"));
+}
+
+// A certificate-level cipher suite that the context-level list excludes is still usable: the
+// certificate's list replaces the context's rather than intersecting with it. The client offers
+// only the certificate-level suite, which the context alone would have rejected.
+TEST_P(SslSocketTest, PerCertTlsParamsAddCipherExcludedByContext) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  server_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  const std::string stats = "ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384";
+  testUtilV2(test_options.setExpectedCiphersuite("ECDHE-RSA-AES256-GCM-SHA384")
+                 .setExpectedServerStats(stats)
+                 .setExpectedClientStats(stats));
+}
+
+// A certificate that sets only cipher_suites keeps the context-level values for every other field.
+// The context restricts curves to P-384 and pins TLSv1.2, and the certificate narrows the ciphers
+// to AES256 only. The negotiated suite proves the certificate-level field was applied, while the
+// negotiated group and version prove the unset fields were inherited: the client offers X25519
+// first, which the default curve list would have permitted had the context value been dropped.
+TEST_P(SslSocketTest, PerCertTlsParamsPartialOverrideInheritsUnsetFields) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  server_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  server_params->add_ecdh_curves("P-384");
+  server_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  // AES128 is offered first, so the certificate-level list is what forces AES256.
+  client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  client_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  client_params->add_ecdh_curves("X25519");
+  client_params->add_ecdh_curves("P-256");
+  client_params->add_ecdh_curves("P-384");
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  testUtilV2(test_options.setExpectedCiphersuite("ECDHE-RSA-AES256-GCM-SHA384")
+                 .setExpectedTlsGroup("P-384")
+                 .setExpectedProtocolVersion("TLSv1.2"));
+}
+
 // EC cert is selected for a no-EC-capable client.
 TEST_P(SslSocketTest, CertWithNotECCapable) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
@@ -9193,7 +9794,7 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
 // ECONNRESET pushed by io_handle_bio's SO_ERROR probe, drainErrorQueue must surface the
 // TLS protocol error as the root cause and must NOT set detected_io_error_ to
 // ConnectionReset. Otherwise the user-visible failure cause (the cert verify error in
-// transport_failure_reason) gets clobbered by the symptomatic peer RST.
+// transport_failure_reason) gets overwritten by the symptomatic peer RST.
 TEST_P(SslSocketTest, DrainErrorQueuePrefersCertVerifyOverEconnreset) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:

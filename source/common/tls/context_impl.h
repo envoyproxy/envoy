@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -46,6 +47,13 @@ struct TlsContext {
   // safely substituted via SSL_set_SSL_CTX() during the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello.
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+  // Per-certificate TLS params applied to the SSL* after SSL_set_SSL_CTX, which only transfers
+  // certificate material and does not propagate cipher/version/curve settings.
+  std::optional<Ssl::TlsParams> tls_params_;
+  // Mirrors ContextImpl::capabilities_ so applyTlsParamsToSsl can skip fields that a custom
+  // handshaker manages instead of BoringSSL.
+  bool provides_ciphers_and_curves_{false};
+  bool provides_sigalgs_{false};
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;
@@ -157,7 +165,8 @@ protected:
 
   void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
 
-  absl::Status setCompliancePolicy(enum ssl_compliance_policy_t policy);
+  absl::Status setCompliancePolicy(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
