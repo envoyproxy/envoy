@@ -425,8 +425,6 @@ TEST_P(HttpServerPropertiesCacheImplTest, ClearBrokenness) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
-  Runtime::maybeSetRuntimeGuard(
-      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
   std::string host2 = "www.second.example.com";
@@ -447,8 +445,6 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
-  Runtime::maybeSetRuntimeGuard(
-      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
   std::string host1 = "www.example.com";
   std::string host2 = "www.other.com";
@@ -468,8 +464,6 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokenness) {
-  Runtime::maybeSetRuntimeGuard(
-      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
   std::string host2 = "www.second.example.com";
@@ -499,8 +493,6 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokenness) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokennessNoBackPropagation) {
-  Runtime::maybeSetRuntimeGuard(
-      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
   std::string host2 = "www.second.example.com";
