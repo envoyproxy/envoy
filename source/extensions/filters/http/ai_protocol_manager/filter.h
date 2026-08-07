@@ -69,6 +69,11 @@ private:
 // the held headers ahead of it, so subsequent filters see the headers immediately
 // followed by the payload. An invalid payload is rejected rather than forwarded.
 //
+// None of that happens unless the filter has a reason to look at the payload.
+// decodeHeaders() decides once per stream; if not, it returns Continue and the
+// stream never touches the offload path -- no external buffer, no watermark
+// subscription, no held headers.
+//
 // The offload/replay pipeline and its bidirectional flow control live in the
 // path-agnostic BufferManager (buffer_manager.h); the filter is a thin delegator
 // that constructs one BufferManager per direction with the matching
@@ -105,7 +110,6 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -126,6 +130,10 @@ private:
 
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
+
+  // Non-null exactly when decodeHeaders() decided to inspect this stream, so it
+  // doubles as the engaged flag. Outlives request_parser_, which is released as
+  // soon as parsing is done with.
   BufferManagerPtr decode_manager_;
 
   // Copied out of the route configuration rather than held by pointer: the route

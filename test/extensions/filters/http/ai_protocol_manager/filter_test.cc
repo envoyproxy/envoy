@@ -70,8 +70,7 @@ public:
         }));
   }
 
-  // Builds the filter under test. A test wanting a different filter-level config
-  // calls this again before decoding anything.
+  // A test wanting a different filter-level config calls this again first.
   void createFilter(bool best_effort_parsing = false) {
     if (filter_ != nullptr) {
       filter_->onDestroy();
@@ -80,11 +79,24 @@ public:
     proto.set_best_effort_parsing(best_effort_parsing);
     filter_ = std::make_unique<AiProtocolManagerFilter>(
         factory_, std::make_shared<const FilterConfig>(proto));
-    // The manager creates a SchedulableCallback (to resume replay across
-    // event-loop iterations) when setDecoderFilterCallbacks() builds it;
-    // construct the mock first so it claims that call.
-    replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
     filter_->setDecoderFilterCallbacks(callbacks_);
+  }
+
+  // decodeHeaders() for a stream the filter is expected to engage on. Engaging
+  // builds the BufferManager, which claims a SchedulableCallback, so the mock is
+  // created here and only here -- a pass-through stream must not create one, or
+  // its expectation goes unsatisfied.
+  Http::FilterHeadersStatus decodeHeadersEngaging() {
+    replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+    Http::TestRequestHeaderMapImpl headers = requestHeaders();
+    return filter_->decodeHeaders(headers, /*end_stream=*/false);
+  }
+
+  // Engages the filter where the payload is not what the test is about: best
+  // effort offloads and replays whether or not the body parses.
+  void engageIgnoringPayload() {
+    createFilter(/*best_effort_parsing=*/true);
+    ASSERT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
   }
 
   // Attaches a per-route config, declaring the route an AI endpoint.
@@ -136,11 +148,11 @@ public:
   std::string local_reply_details_;
 };
 
-// When a body follows the headers, iteration is paused so the rest of the chain
-// (routing/admission) does not see the headers until the payload is offloaded.
+// With a payload to inspect, iteration pauses so the rest of the chain does not
+// see the headers until it is offloaded.
 TEST_F(AiProtocolManagerFilterTest, HoldsHeadersWhenBodyFollows) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/v1/chat"}};
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 }
 
 // A headers-only request has no payload to inspect, so the headers flow
@@ -153,8 +165,7 @@ TEST_F(AiProtocolManagerFilterTest, PassesHeadersOnlyRequest) {
 // Headers held during decodeHeaders() are released when replay begins: the body
 // is offloaded while iteration is paused, then injected back to the chain.
 TEST_F(AiProtocolManagerFilterTest, ReleasesHeldHeadersOnReplay) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/v1/chat"}};
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  engageIgnoringPayload();
 
   Buffer::OwnedImpl body("{\"messages\":[\"hi\"]}");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -168,6 +179,7 @@ TEST_F(AiProtocolManagerFilterTest, ReleasesHeldHeadersOnReplay) {
 // The body is offloaded chunk-by-chunk and replayed verbatim once end_stream is
 // seen, with end_stream propagated on the final injected frame.
 TEST_F(AiProtocolManagerFilterTest, OffloadsAndReplaysBody) {
+  engageIgnoringPayload();
   Buffer::OwnedImpl chunk1("{\"messages\":");
   EXPECT_EQ(filter_->decodeData(chunk1, false), Http::FilterDataStatus::StopIterationNoBuffer);
   Buffer::OwnedImpl chunk2("[\"hi\"]}");
@@ -185,6 +197,7 @@ TEST_F(AiProtocolManagerFilterTest, OffloadsAndReplaysBody) {
 
 // A body that arrives in a single end_stream frame is still round-tripped.
 TEST_F(AiProtocolManagerFilterTest, SingleFrameBody) {
+  engageIgnoringPayload();
   Buffer::OwnedImpl body("{}");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
@@ -197,6 +210,7 @@ TEST_F(AiProtocolManagerFilterTest, SingleFrameBody) {
 // issues no write, so replay is scheduled (not started reentrantly from
 // decodeData) and runs on the next event-loop iteration.
 TEST_F(AiProtocolManagerFilterTest, EmptyBody) {
+  engageIgnoringPayload();
   Buffer::OwnedImpl empty;
   EXPECT_EQ(filter_->decodeData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
 
@@ -212,6 +226,7 @@ TEST_F(AiProtocolManagerFilterTest, EmptyBody) {
 // A payload larger than the replay chunk size is streamed back in multiple
 // bounded frames and reassembles to the original bytes.
 TEST_F(AiProtocolManagerFilterTest, LargePayloadReplayedInChunks) {
+  engageIgnoringPayload();
   const std::string big(200 * 1024, 'x'); // > ReadChunkSize (64KiB)
   Buffer::OwnedImpl body(big);
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -225,6 +240,7 @@ TEST_F(AiProtocolManagerFilterTest, LargePayloadReplayedInChunks) {
 
 // Destroying the filter mid-flight cancels pending callbacks; no replay occurs.
 TEST_F(AiProtocolManagerFilterTest, DestroyBeforeReplay) {
+  engageIgnoringPayload();
   Buffer::OwnedImpl body("payload");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   filter_->onDestroy();
@@ -236,12 +252,14 @@ TEST_F(AiProtocolManagerFilterTest, DestroyBeforeReplay) {
 // The filter registers for upstream watermark callbacks so it can observe
 // upstream back-pressure during replay.
 TEST_F(AiProtocolManagerFilterTest, RegistersUpstreamWatermarkCallbacks) {
+  engageIgnoringPayload();
   EXPECT_NE(watermark_cb_, nullptr);
 }
 
 // When the downstream chain (toward upstream) is backed up before replay starts,
 // no data is injected until the back-pressure is released.
 TEST_F(AiProtocolManagerFilterTest, ReplayPausesUnderUpstreamBackPressure) {
+  engageIgnoringPayload();
   const std::string big(200 * 1024, 'x'); // > ReadChunkSize, multiple chunks.
   Buffer::OwnedImpl body(big);
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -271,6 +289,7 @@ TEST_F(AiProtocolManagerFilterTest, ReplayPausesUnderUpstreamBackPressure) {
 // Back-pressure arising mid-replay (the upstream fills as we inject) halts the
 // synchronous read loop, and replay resumes when it clears.
 TEST_F(AiProtocolManagerFilterTest, ReplayResumesMidStream) {
+  engageIgnoringPayload();
   const std::string big(200 * 1024, 'x'); // 4 chunks of 64KiB + remainder.
   // Upstream backs up right after the first replayed chunk; the loop must then
   // stop until it is released.
@@ -299,6 +318,7 @@ TEST_F(AiProtocolManagerFilterTest, ReplayResumesMidStream) {
 // High watermark callbacks can nest (stream + connection); replay resumes only
 // after a matching number of low-watermark callbacks.
 TEST_F(AiProtocolManagerFilterTest, NestedWatermarksRequireBalancedRelease) {
+  engageIgnoringPayload();
   const std::string big(200 * 1024, 'x');
   Buffer::OwnedImpl body(big);
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -330,6 +350,7 @@ TEST_F(AiProtocolManagerFilterTest, NestedWatermarksRequireBalancedRelease) {
 // replayed (final frame end_stream=false) and the held trailers are released
 // via continueDecoding() once the body has been injected.
 TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedStream) {
+  engageIgnoringPayload();
   Buffer::OwnedImpl body("{\"messages\":[\"hi\"]}");
   EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
   Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
@@ -349,8 +370,7 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedStream) {
 // A trailer-only request (headers + trailers, no body) has nothing to offload, so
 // the trailers flow immediately (Continue) and nothing is injected or held.
 TEST_F(AiProtocolManagerFilterTest, TrailersWithoutBody) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/v1/chat"}};
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  engageIgnoringPayload();
 
   Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
   EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
@@ -364,8 +384,7 @@ TEST_F(AiProtocolManagerFilterTest, TrailersWithoutBody) {
 // downstream byte for byte: parsing observes the payload, it does not rewrite it.
 TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVerbatim) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   const std::string payload = R"({"model":"gpt-4","stream":true,"max_tokens":256})";
   Buffer::OwnedImpl body(payload);
@@ -380,8 +399,7 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
 // Malformed JSON is answered with a 400 and never reaches the upstream.
 TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model" "gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -396,8 +414,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
 // Where Envoy and the backend could otherwise read the same body differently.
 TEST_F(AiProtocolManagerFilterTest, RejectsDuplicateKeys) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"a","model":"b"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -411,8 +428,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsDuplicateKeys) {
 // Incomplete rather than malformed; caught when the terminal frame closes.
 TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJson) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4")");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -429,8 +445,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJson) {
 // its headers. A GET reaches the filter this way.
 TEST_F(AiProtocolManagerFilterTest, EmptyBodyOnDeclaredEndpointIsPassedThrough) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl empty;
   EXPECT_EQ(filter_->decodeData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -447,8 +462,7 @@ TEST_F(AiProtocolManagerFilterTest, EmptyBodyOnDeclaredEndpointIsPassedThrough) 
 // a payload, and an empty terminal frame closes it rather than excusing it.
 TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonEndedByEmptyTerminalFrame) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4")");
   EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -465,8 +479,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonEndedByEmptyTerminalFram
 // request immediately, and the rest of the client's data is dropped.
 TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl bad_chunk(R"({"model" "gpt-4",)");
   EXPECT_EQ(filter_->decodeData(bad_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -486,8 +499,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
 // complete payload split that way is not mistaken for a truncated one.
 TEST_F(AiProtocolManagerFilterTest, ChunkedBodyWithEmptyTerminalFrame) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl chunk1(R"({"model":"gpt)");
   EXPECT_EQ(filter_->decodeData(chunk1, false), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -504,8 +516,7 @@ TEST_F(AiProtocolManagerFilterTest, ChunkedBodyWithEmptyTerminalFrame) {
 // With trailers, no data frame carries end_stream, so the trailers close it.
 TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedJsonIsParsed) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -521,8 +532,7 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedJsonIsParsed) {
 // The same path catches a truncated body that would otherwise be forwarded.
 TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonTerminatedByTrailers) {
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4")");
   EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -536,41 +546,64 @@ TEST_F(AiProtocolManagerFilterTest, RejectsTruncatedJsonTerminatedByTrailers) {
   EXPECT_EQ(continue_calls_, 0);
 }
 
-// Without a per-route config the route is not a declared AI endpoint, so by
-// default the payload is forwarded without being parsed at all.
-TEST_F(AiProtocolManagerFilterTest, WithoutRouteConfigPayloadIsNotParsed) {
+// An undeclared route gives the filter nothing to look at: headers are not held,
+// the body is not offloaded, nothing is replayed.
+TEST_F(AiProtocolManagerFilterTest, PassesThroughUndeclaredRoute) {
   Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::Continue);
   drain();
 
+  // Left in the chain's own buffer rather than round-tripped.
+  EXPECT_EQ(body.toString(), R"({"model":"gpt-4"})");
+  EXPECT_EQ(inject_calls_, 0);
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
 }
 
-// Nor is a malformed one failed: with no schema to hold it to, the payload is
-// none of the filter's business.
-TEST_F(AiProtocolManagerFilterTest, WithoutRouteConfigMalformedPayloadIsForwarded) {
+// Nor does it subscribe to watermarks or claim any replay machinery.
+TEST_F(AiProtocolManagerFilterTest, PassThroughStreamCostsNothing) {
   Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
+
+  EXPECT_EQ(watermark_cb_, nullptr);
+  EXPECT_EQ(replay_cb_, nullptr);
+}
+
+// Trailers on a pass-through stream flow like everything else.
+TEST_F(AiProtocolManagerFilterTest, PassesThroughTrailersOnUndeclaredRoute) {
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
+  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::Continue);
+  Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
+  drain();
+
+  EXPECT_EQ(inject_calls_, 0);
+  EXPECT_EQ(continue_calls_, 0);
+}
+
+// A malformed payload there is forwarded untouched -- nothing is looking at it.
+TEST_F(AiProtocolManagerFilterTest, PassesThroughMalformedPayloadOnUndeclaredRoute) {
+  Http::TestRequestHeaderMapImpl headers = requestHeaders();
+  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
 
   Buffer::OwnedImpl body(R"({"model" "gpt-4"})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::Continue);
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), R"({"model" "gpt-4"})");
-  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(inject_calls_, 0);
 }
 
 // Best-effort parsing runs on an undeclared route and leaves a valid payload
 // untouched.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingAcceptsValidPayload) {
   createFilter(/*best_effort_parsing=*/true);
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -584,8 +617,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingAcceptsValidPayload) {
 // unchanged rather than rejected.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
   createFilter(/*best_effort_parsing=*/true);
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model" "gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -599,8 +631,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
 // A payload abandoned mid-upload is still offloaded and replayed in full.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsRestOfAbandonedPayload) {
   createFilter(/*best_effort_parsing=*/true);
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl chunk1(R"({"model" "gpt-4",)");
   EXPECT_EQ(filter_->decodeData(chunk1, false), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -615,8 +646,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsRestOfAbandonedPayl
 // Best effort also tolerates an empty body, where a declared endpoint rejects it.
 TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsEmptyBody) {
   createFilter(/*best_effort_parsing=*/true);
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl empty;
   EXPECT_EQ(filter_->decodeData(empty, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -634,8 +664,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsEmptyBody) {
 TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigured) {
   createFilter(/*best_effort_parsing=*/true);
   setRouteConfig();
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model" "gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
@@ -650,8 +679,7 @@ TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigu
 // same; normalization only governs the transcoding a later change adds.
 TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
   setRouteConfig(/*normalize=*/false);
-  Http::TestRequestHeaderMapImpl headers = requestHeaders();
-  EXPECT_EQ(filter_->decodeHeaders(headers, false), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);

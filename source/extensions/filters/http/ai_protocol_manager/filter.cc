@@ -13,17 +13,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-void AiProtocolManagerFilter::setDecoderFilterCallbacks(
-    Http::StreamDecoderFilterCallbacks& callbacks) {
-  PassThroughFilter::setDecoderFilterCallbacks(callbacks);
-  // Construct the decode-path manager. Its constructor subscribes to upstream
-  // watermarks (via the bridge) so replay can be paced against upstream
-  // back-pressure; subscribing may immediately deliver high-watermark callbacks
-  // if the upstream is already backed up.
-  decode_manager_ = std::make_unique<BufferManager>(
-      buffer_factory_, std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_));
-}
-
 void AiProtocolManagerFilter::onDestroy() {
   if (decode_manager_ != nullptr) {
     // Detach the manager (releases the external buffer and unsubscribes from
@@ -60,16 +49,25 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
   // A declared AI endpoint is parsed strictly. Any other route is parsed only if
   // the filter opted into best-effort parsing, and never fails the request.
-  if (isAiEndpoint() || config_->bestEffortParsing()) {
-    request_parser_ = std::make_unique<JsonWithExtBufParser>(JsonWithExtBufParser::Config{});
+  if (!isAiEndpoint() && !config_->bestEffortParsing()) {
+    // Nothing will look at this payload, so stay out of the way: offloading it
+    // would cost a store round-trip and withhold the headers meanwhile, for
+    // nothing. Decided once here; decode_manager_ being null carries it.
+    ENVOY_LOG(trace, "ai_protocol_manager: route has no payload to inspect, passing through");
+    return Http::FilterHeadersStatus::Continue;
   }
 
-  // A body follows: pin the headers at this filter so the subsequent routing and
-  // admission filters do not act on them until the payload has been offloaded.
-  // decodeData() still fires on this filter while iteration is stopped here, so
-  // the BufferManager keeps offloading; the held headers are released when replay
-  // injects the first body frame (or, for an empty/trailer-only body, when the
-  // BufferManager continues iteration).
+  request_parser_ = std::make_unique<JsonWithExtBufParser>(JsonWithExtBufParser::Config{});
+  // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
+  // for none of it: constructing it subscribes to upstream watermarks and claims
+  // a schedulable callback.
+  decode_manager_ = std::make_unique<BufferManager>(
+      buffer_factory_, std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_));
+
+  // Pin the headers so routing and admission filters do not act on them before
+  // the payload is offloaded. decodeData() still fires while iteration is stopped
+  // here; the headers are released when replay injects the first body frame (or,
+  // for an empty/trailer-only body, when the manager continues iteration).
   ENVOY_LOG(trace, "ai_protocol_manager: holding headers until payload is offloaded");
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -122,6 +120,10 @@ void AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
 
 Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& data,
                                                            bool end_stream) {
+  if (decode_manager_ == nullptr) {
+    // decodeHeaders() decided this stream is none of our business.
+    return Http::FilterDataStatus::Continue;
+  }
   if (payload_rejected_) {
     // Already terminated by the local reply; drop whatever is still in flight.
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -158,6 +160,9 @@ Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& dat
 }
 
 Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::RequestTrailerMap&) {
+  if (decode_manager_ == nullptr) {
+    return Http::FilterTrailersStatus::Continue;
+  }
   if (payload_rejected_) {
     return Http::FilterTrailersStatus::StopIteration;
   }

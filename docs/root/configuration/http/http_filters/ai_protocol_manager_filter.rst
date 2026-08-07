@@ -7,7 +7,15 @@ The AI Protocol Manager filter (alpha) buffers the request payload off the
 connection manager's hot path so that routing and admission decisions can be
 made on the fully received body.
 
-As the request body arrives, the filter offloads it into an external buffer
+It does so only for requests it has a reason to inspect. A request on a route
+that is not a declared AI endpoint -- and, unless :ref:`best_effort_parsing
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.best_effort_parsing>`
+is set, every request -- passes straight through: its headers are not held, its
+body is not offloaded, and no external buffer is created for it. A filter chain
+carrying this filter therefore costs ordinary pass-through for the traffic it
+does not serve.
+
+For a request it does inspect, as the body arrives the filter offloads it into an external buffer
 rather than pinning it in the connection manager's in-memory buffers. Once the
 stream ends, it streams the buffered bytes back into the filter chain so that
 the subsequent filters observe the request unchanged. The offload/replay
@@ -15,9 +23,9 @@ round-trip is flow-controlled in both directions: ingest honors the buffer
 limit, and replay is paced against filter-chain back-pressure, so the resident
 footprint stays bounded regardless of payload size.
 
-While a body is being offloaded, the request headers are held at this filter and
-released to the subsequent filters only once replay begins, so they never act on
-the headers before the payload they depend on is available.
+While such a body is being offloaded, the request headers are held at this filter
+and released to the subsequent filters only once replay begins, so they never act
+on the headers before the payload they depend on is available.
 
 On a route declared to be an AI endpoint, the body is parsed as it is offloaded,
 so that a payload which is not well-formed JSON is rejected here rather than
@@ -41,8 +49,9 @@ selection (and therefore once per retry or hedged attempt).
 
 .. note::
 
-  Two caveats apply to the upstream placement. The filter holds the request
-  headers until the payload has been fully offloaded, and upstream filter
+  Two caveats apply to the upstream placement, and only to routes the filter
+  inspects. The filter holds the request headers until the payload has been
+  fully offloaded, and upstream filter
   chains have no per-upgrade-type chain selection (the
   :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`
   escape hatch is downstream-only), so the filter must not front upgrade or
@@ -86,11 +95,12 @@ additionally transcodes it into the canonical schema, which is what lets one set
 of filters operate on payloads from different providers.
 
 The filter-level configuration decides what happens on every other route. By
-default their payloads are forwarded without being parsed; setting
+default those requests are passed through untouched -- not parsed, and not
+offloaded; setting
 :ref:`best_effort_parsing
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.best_effort_parsing>`
-parses them too, but never fails a request over it -- a payload that does not
-parse is forwarded unchanged.
+offloads and parses them too, but never fails a request over it -- a payload that
+does not parse is forwarded unchanged.
 
 .. code-block:: yaml
 
