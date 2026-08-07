@@ -76,8 +76,7 @@ ClientContextImpl::ClientContextImpl(
     return;
   }
 
-  // If a custom TLS certificate selector is used, allow more than
-  // one TLS cert.
+  // If a custom TLS certificate selector is used, allow more than one TLS cert.
   if (!config.tlsCertificateSelectorFactory() && tls_contexts_.size() != 1) {
     creation_status =
         absl::InvalidArgumentError("Client TLS context supports only a single certificate");
