@@ -15,10 +15,8 @@ namespace Wuffs {
 
 // Parsed representation of the JSON field path used for customized target extraction.
 struct ExtractFieldSpec {
-  // Ready to pass straight to WuffsJsonCursor::matchesPatternPath — the parse is
-  // the conversion, so no handler re-derives a pattern from this. Each segment is
-  // either a dict key or an [] wildcard; segments own their keys, so a spec is an
-  // ordinary copyable value.
+  // Each segment is a dict key or an [] wildcard. Pass straight to
+  // WuffsJsonCursor::matchesPatternPath — no conversion needed.
   std::vector<WuffsJsonCursor::PatternSegment> segments;
 };
 
@@ -105,8 +103,8 @@ struct ParserConfig {
   // Operator-declared JSON fields to extract from the body. Mutually exclusive
   // with capture_all_scalars.
   //
-  // The handler pass a spec's segments straight to cursor.matchesPatternPath(segments, depth) at
-  // each scalar callback.
+  // The handler passes a spec's segments straight to
+  // cursor.matchesPatternPath(segments, depth) at each scalar callback.
   std::vector<ExtractFieldSpec> extract_fields;
 
   // Returns InvalidArgumentError if capture_all_scalars and extract_fields are
