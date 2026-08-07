@@ -132,6 +132,11 @@ message ScaleTimersOverloadActionConfig {
       // Sets the minimum duration as a percentage of the maximum value.
       type.v3.Percent min_scale = 3;
     }
+
+    // Optional per-timer triggers. When specified, this timer's scale factor is driven by the
+    // maximum state across these triggers rather than the action-level triggers. Action-level
+    // triggers are still required but have no effect on timers that carry their own triggers.
+    repeated Trigger triggers = 4;
   }
 
   // A set of timer scaling rules to be applied.

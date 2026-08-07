@@ -860,6 +860,178 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
                           ".* constraint validation failed.*");
 }
 
+TEST_F(OverloadManagerImplTest, PerTimerTriggersWithUnknownResource) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+              triggers:
+                - name: "envoy.resource_monitors.fake_resource1"
+                  threshold:
+                    value: 0.9
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unknown trigger resource.*");
+}
+
+TEST_F(OverloadManagerImplTest, PerTimerTriggersDuplicateResource) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+              triggers:
+                - name: "envoy.resource_monitors.fake_resource1"
+                  threshold:
+                    value: 0.9
+                - name: "envoy.resource_monitors.fake_resource1"
+                  threshold:
+                    value: 0.8
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Duplicate trigger resource.*");
+}
+
+constexpr char kPerTimerTriggersConfig[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+    - name: envoy.resource_monitors.fake_resource2
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+  actions:
+    - name: envoy.overload_actions.reduce_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 1s
+            triggers:
+              - name: "envoy.resource_monitors.fake_resource1"
+                scaled:
+                  scaling_threshold: 0.5
+                  saturation_threshold: 1.0
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+            min_scale: { value: 10 }
+            triggers:
+              - name: "envoy.resource_monitors.fake_resource2"
+                scaled:
+                  scaling_threshold: 0.5
+                  saturation_threshold: 1.0
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+)YAML";
+
+TEST_F(OverloadManagerImplTest, PerTimerTriggersCreateStats) {
+  auto manager(createOverloadManager(kPerTimerTriggersConfig));
+
+  // Stats should be created named after the timer type, scoped under the action name.
+  Stats::Gauge& active_gauge = stats_.gauge(
+      "overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE.active",
+      Stats::Gauge::ImportMode::Accumulate);
+  Stats::Gauge& scale_percent_gauge =
+      stats_.gauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_"
+                   "IDLE.scale_percent",
+                   Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(0, active_gauge.value());
+  EXPECT_EQ(0, scale_percent_gauge.value());
+}
+
+TEST_F(OverloadManagerImplTest, PerTimerTriggersAdjustScaleFactorIndependently) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kPerTimerTriggersConfig));
+
+  auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})));
+
+  NiceMock<Event::MockDispatcher> mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  manager->start();
+
+  EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
+
+  // Resource1 at 0.6: per-timer trigger for HTTP_DOWNSTREAM_CONNECTION_IDLE fires.
+  // Scaled trigger range [0.5, 1.0] → state = (0.6-0.5)/(1.0-0.5) = 0.2, scale_factor = 0.8.
+  // The action-level trigger also fires, which calls setScaleFactor on mock_main_manager.
+  EXPECT_CALL(*mock_main_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
+  factory1_.monitor_->setPressure(0.6);
+  timer_cb_();
+
+  // Resource2 at 0.8: per-timer trigger for HTTP_DOWNSTREAM_STREAM_IDLE fires independently.
+  // The action-level state is unchanged, so setScaleFactor is not called on mock_main_manager.
+  factory2_.monitor_->setPressure(0.8);
+  timer_cb_();
+}
+
+TEST_F(OverloadManagerImplTest, PerTimerTriggersCreateTimerRouting) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kPerTimerTriggersConfig));
+
+  auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})));
+
+  NiceMock<Event::MockDispatcher> mock_dispatcher;
+  EXPECT_CALL(mock_dispatcher, createTimer_(_)).WillRepeatedly(Invoke([](Event::TimerCb) {
+    return new NiceMock<Event::MockTimer>();
+  }));
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  manager->start();
+
+  EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
+
+  // createTimer(minimum, cb) always delegates to the main manager regardless of timer type.
+  Event::MockTimer* min_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_main_manager, createTimer_(_, _)).WillOnce(Return(min_timer));
+  auto t1 =
+      scaled_timer_manager->createTimer(Event::AbsoluteMinimum(std::chrono::seconds(1)), []() {});
+  EXPECT_EQ(t1.get(), min_timer);
+
+  // createTimer(timer_type, cb) for a type without per-timer triggers delegates to main manager.
+  Event::MockTimer* action_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_main_manager, createTypedTimer_(_, _)).WillOnce(Return(action_timer));
+  auto t2 = scaled_timer_manager->createTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
+                                              []() {});
+  EXPECT_EQ(t2.get(), action_timer);
+
+  // createTimer(timer_type, cb) for HTTP_DOWNSTREAM_CONNECTION_IDLE routes to its sub-manager,
+  // not the main manager. The call succeeds without touching mock_main_manager.
+  auto t3 = scaled_timer_manager->createTimer(
+      Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout, []() {});
+  EXPECT_NE(t3, nullptr);
+}
+
 // A scaled trigger action's thresholds must conform to scaling < saturation.
 TEST_F(OverloadManagerImplTest, ScaledTriggerSaturationLessThanScalingThreshold) {
   const std::string config = R"EOF(
