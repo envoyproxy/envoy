@@ -132,10 +132,12 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto2) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context.server_factory_context_, messageValidationVisitor()).Times(2);
   GeoipFilterFactory factory;
-  Http::FilterFactoryCb cb =
-      factory
-          .createHttpFilterFactoryFromProto(filter_config, "geoip", context.server_factory_context_)
-          .value();
+  Server::Configuration::ExtraFactoryContext extra_context{
+      context.server_factory_context_.messageValidationVisitor(), "geoip"};
+  Http::FilterFactoryCb cb = factory
+                                 .createHttpFilterFactoryFromProto(
+                                     filter_config, context.server_factory_context_, extra_context)
+                                 .value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback,
               addStreamDecoderFilter(AllOf(HasUseXff(true), HasXffNumTrustedHops(1))));
