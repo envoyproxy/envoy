@@ -58,21 +58,24 @@ private:
 
 // AI Protocol Manager HTTP filter (alpha).
 //
-// AI requests carry a JSON payload the filter must vet before the rest of the
-// chain acts on the request. As the body arrives the filter offloads it into an
-// ExternalBuffer -- keeping a large payload out of the connection manager's
-// buffers -- and parses and validates the JSON in a streaming fashion alongside.
-// The chain is held meanwhile: decodeHeaders() stops iteration when a body
-// follows, and the headers stay pinned here while decodeData() keeps offloading.
-// Only once the payload is validated does the filter replay the buffered body
-// back into the chain; the first injectDecodedDataToFilterChain() call releases
-// the held headers ahead of it, so subsequent filters see the headers immediately
-// followed by the payload. An invalid payload is rejected rather than forwarded.
+// The filter manages AI endpoint traffic: it holds a request payload, validates
+// it against the schema the endpoint serves, and normalizes it to a canonical
+// schema -- which is what lets routing, admission and policy act on a payload
+// the proxy understands rather than on opaque bytes.
 //
-// None of that happens unless the filter has a reason to look at the payload.
-// decodeHeaders() decides once per stream; if not, it returns Continue and the
-// stream never touches the offload path -- no external buffer, no watermark
-// subscription, no held headers.
+// As the body arrives the filter offloads it into an ExternalBuffer -- keeping
+// a large payload out of the connection manager's buffers -- and parses and
+// validates the JSON in a streaming fashion alongside. The chain is held
+// meanwhile: decodeHeaders() stops iteration when a body follows, and the
+// headers stay pinned here while decodeData() keeps offloading. Only once the
+// payload is validated does the filter replay the buffered body back into the
+// chain; the first injectDecodedDataToFilterChain() call releases the held
+// headers ahead of it, so subsequent filters see the headers immediately
+// followed by the payload. An invalid payload is rejected rather than
+// forwarded.
+//
+// None of that happens for a stream the filter has no reason to inspect:
+// decodeHeaders() returns Continue and the offload path is never entered.
 //
 // The offload/replay pipeline and its bidirectional flow control live in the
 // path-agnostic BufferManager (buffer_manager.h); the filter is a thin delegator
@@ -88,18 +91,15 @@ private:
 // Feeding first also fails a malformed payload the moment the bad byte arrives,
 // not after the whole upload.
 //
-// Whether a payload is parsed at all, and whether a parse failure is fatal, is
-// decided per route. A route carrying a RouteConfig is a declared AI endpoint:
-// its payload is parsed strictly and a malformed one is rejected with a 400,
-// which is what keeps Envoy and the backend from reading the same body
-// differently. A route without one is parsed on a best-effort basis if the
-// filter is configured for it -- the document is offered to later filters when
-// it parses and the request is forwarded untouched when it does not -- and is
-// otherwise not parsed.
+// A route carrying a RouteConfig is a declared AI endpoint, and its payload is
+// the filter's to manage: parsed strictly, with a malformed one rejected so
+// Envoy and the backend cannot read the same body differently. A route without
+// one is parsed only if the filter was configured for best effort -- offered for
+// compatibility with chains that want a parsed body on ordinary routes, never a
+// reason to fail a request -- and is otherwise untouched.
 //
-// Neither the document nor the route's schema is consumed yet: validation
-// against the schema, transcoding to the canonical schema when the route asks to
-// normalize, and exposing the document to the rest of the chain all come later.
+// The schema is not acted on yet: validation against it and transcoding to the
+// canonical schema when the route asks to normalize both come later.
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
