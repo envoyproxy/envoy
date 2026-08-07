@@ -143,6 +143,7 @@ RUNTIME_GUARD(envoy_reloadable_features_upstream_bind_config_fix_port_exhaustion
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wasm_filter_uses_root_scope);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_mixed_variable_literals);
+RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 RUNTIME_GUARD(envoy_reloadable_features_use_migration_in_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
@@ -214,8 +215,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_support_web_transport);
 // TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
 // fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
-// TODO(renjietang): Evaluate and make this a config knob or remove.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 // TODO(abeyad): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
 // TODO(abeyad): Evaluate and make this a config knob or remove.
