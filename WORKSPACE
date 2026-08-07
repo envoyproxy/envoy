@@ -12,6 +12,10 @@ load("//bazel:repositories.bzl", "envoy_dependencies")
 
 envoy_dependencies()
 
+load("//bazel:protobuf_toolchains.bzl", "envoy_protobuf_toolchains")
+
+envoy_protobuf_toolchains()
+
 load("//bazel:bazel_deps.bzl", "envoy_bazel_dependencies")
 
 envoy_bazel_dependencies()

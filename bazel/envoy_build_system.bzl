@@ -194,13 +194,13 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     options.extend(["-I" + include_path for include_path in include_paths])
     options.append("--descriptor_set_out=$@")
 
-    cmd = "$(location @com_google_protobuf//:protoc) " + " ".join(options + input_files)
+    cmd = "$(location @envoy//bazel:protoc) " + " ".join(options + input_files)
     native.genrule(
         name = name,
         srcs = srcs,
         outs = [out],
         cmd = cmd,
-        tools = ["@com_google_protobuf//:protoc"],
+        tools = ["@envoy//bazel:protoc"],
     )
 
 # Dependencies on Google grpc should be wrapped with this function.

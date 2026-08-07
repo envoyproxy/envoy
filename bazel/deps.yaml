@@ -670,65 +670,10 @@ com_google_protobuf:
   use_category:
   - dataplane_core
   - controlplane
-  implied_untracked_deps:
-  - com_google_protobuf_protoc_linux_aarch_64
-  - com_google_protobuf_protoc_linux_x86_64
-  - com_google_protobuf_protoc_linux_ppcle_64
-  - com_google_protobuf_protoc_osx_aarch_64
-  - com_google_protobuf_protoc_osx_x86_64
-  - com_google_protobuf_protoc_win64
   - zlib
   cpe: "cpe:2.3:a:google:protobuf:*"
   license: "Protocol Buffers"
   license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
-
-com_google_protobuf_protoc_linux_aarch_64:
-  project_name: "Protocol Buffers (protoc) linux_aarch_64"
-  project_desc: "Protoc compiler for protobuf (linux_aarch_64)"
-  project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2026-06-11"
-  use_category:
-  - build
-
-com_google_protobuf_protoc_linux_ppcle_64:
-  project_name: "Protocol Buffers (protoc) linux_ppcle_64"
-  project_desc: "Protoc compiler for protobuf (linux_ppcle_64)"
-  project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2026-06-11"
-  use_category:
-  - build
-
-com_google_protobuf_protoc_linux_x86_64:
-  project_name: "Protocol Buffers (protoc) linux_x86_64"
-  project_desc: "Protoc compiler for protobuf (linux_x86_64)"
-  project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2026-06-11"
-  use_category:
-  - build
-
-com_google_protobuf_protoc_osx_aarch_64:
-  project_name: "Protocol Buffers (protoc) osx_aarch_64"
-  project_desc: "Protoc compiler for protobuf (osx_aarch_64)"
-  project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2026-06-11"
-  use_category:
-  - build
-
-com_google_protobuf_protoc_osx_x86_64:
-  project_name: "Protocol Buffers (protoc) osx_x86_64"
-  project_desc: "Protoc compiler for protobuf (osx_x86_64)"
-  project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2026-06-11"
-  use_category:
-  - build
-
-com_google_protobuf_protoc_win64:
-  project_name: "Protocol Buffers (protoc) win64"
-  project_desc: "Protoc compiler for protobuf (win64)"
-  project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2026-06-11"
-  use_category:
-  - build
 
 proto_converter:
   project_name: "proto-converter"

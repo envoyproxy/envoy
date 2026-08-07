@@ -933,6 +933,21 @@ alias(
     actual = "@bazel_tools//src/conditions:windows",
 )
 
+alias(
+    name = "protoc",
+    actual = select({
+        ":linux_aarch64": "@prebuilt_protoc.linux_aarch_64//:protoc",
+        ":linux_ppc64le": "@prebuilt_protoc.linux_ppcle_64//:protoc",
+        ":linux_s390x": "@prebuilt_protoc.linux_s390_64//:protoc",
+        ":linux_x86_64": "@prebuilt_protoc.linux_x86_64//:protoc",
+        ":darwin_arm64": "@prebuilt_protoc.osx_aarch_64//:protoc",
+        ":darwin_x86_64": "@prebuilt_protoc.osx_x86_64//:protoc",
+        ":windows_x86_64": "@prebuilt_protoc.win64//:protoc",
+        "//conditions:default": "@com_google_protobuf//:protoc",
+    }),
+    visibility = ["//visibility:public"],
+)
+
 json_data(
     name = "repository_locations_version_info",
     data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),

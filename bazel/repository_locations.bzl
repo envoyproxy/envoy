@@ -1,21 +1,5 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "35.1"
-
-# These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
-# and both must match the names from the protobuf releases (see
-# https://github.com/protocolbuffers/protobuf/releases).
-# The names change in upcoming versions.
-# The shas are calculated from the downloads on the releases page.
-PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "01bf9d08808c7f96678b63f4bd8efa559bb4f83d5a7a270d5edaf507f9d5d9cf",
-    linux_x86_64 = "6930ebf62bd4ea607b98fff052596c6ee564b9835b4ce172c75a3f53ae9d91b7",
-    linux_ppcle_64 = "92da6d454ca3c30b0acf9bd3613dde973a179855742b1ca2859f30a4555cd6e5",
-    osx_aarch_64 = "193289af0470c6a1aada357d4fba0bbf8d78bfaac8b5e42ca30af2ef75583de2",
-    osx_x86_64 = "537d73604a344ded6fc94e98e07e529d4fe3e4a0b09e59905353950fafc2a1f7",
-    win64 = "5d3ff218d7d91eea95f7569bcb5a98f3030f8996d44151279d9772edcff76082",
-)
-
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         version = "40864791135333e1446a04553b63cbe744d358d0",
@@ -741,13 +725,3 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # (declarations) and implementation (when WUFFS_IMPLEMENTATION is defined).
     ),
 )
-
-def _compiled_protoc_deps(locations, versions):
-    for platform, sha in versions.items():
-        locations["com_google_protobuf_protoc_%s" % platform] = dict(
-            version = PROTOBUF_VERSION,
-            sha256 = sha,
-            urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
-        )
-
-_compiled_protoc_deps(REPOSITORY_LOCATIONS_SPEC, PROTOC_VERSIONS)
