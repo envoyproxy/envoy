@@ -386,6 +386,7 @@ EXTENSIONS = {
     #
 
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
+    "envoy.retry_priorities.header_order":              "//source/extensions/retry/priority/header_order:config",
 
     #
     # CacheFilter plugins
@@ -606,6 +607,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
     "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
+    "envoy.load_balancing_policies.header_order":      "//source/extensions/load_balancing_policies/header_order:config",
     "envoy.load_balancing_policies.wrr_locality":      "//source/extensions/load_balancing_policies/wrr_locality:config",
     "envoy.load_balancing_policies.dynamic_modules":   "//source/extensions/load_balancing_policies/dynamic_modules:config",
 

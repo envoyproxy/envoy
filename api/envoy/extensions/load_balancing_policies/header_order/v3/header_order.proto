@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.header_order.v3;
+
+import "envoy/config/cluster/v3/cluster.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.header_order.v3";
+option java_outer_classname = "HeaderOrderProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/header_order/v3;header_orderv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Header order Load Balancing Policy]
+
+// A load balancing policy that reads a per-request, ordered list of Envoy priority indices from
+// dynamic metadata and forces *every* host-selection attempt -- the initial attempt and every
+// subsequent retry alike -- to target the priority at the corresponding position in that list.
+//
+// Unlike a ``RetryPriority`` extension (which Envoy's router only consults on retries), this is
+// a full ``LoadBalancer`` extension, so it is consulted for the very first attempt too. Position
+// 0 of the ordered list is used for the initial attempt, position 1 for the 1st retry, and so
+// on -- indexed by the request's native upstream attempt count
+// (``StreamInfo::attemptCount()``).
+//
+// The desired order is communicated via dynamic metadata: a ``ListValue`` of numbers under the
+// configured namespace/key, e.g. a value of ``[3, 0, 2]`` means: initial attempt -> priority 3,
+// 1st retry -> priority 0, 2nd retry -> priority 2.
+//
+// If the metadata is absent, empty, or malformed, or every remaining listed priority has no
+// healthy hosts, this policy falls back to ``fallback_policy`` for that attempt, unmodified.
+//
+// [#extension: envoy.load_balancing_policies.header_order]
+message HeaderOrder {
+  // The dynamic metadata namespace (typically the setting filter's name, e.g. a custom
+  // ext_proc filter) to read the ordered list of priority indices from.
+  string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The key within metadata_namespace whose value is expected to be a ``ListValue`` of numbers
+  // representing the ordered list of priority indices, e.g. ``[3, 0, 2]``.
+  string metadata_key = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The child LB policy used to select a host *within* the priority chosen by this policy, and
+  // used as a full fallback whenever the metadata is absent, malformed, or every remaining
+  // listed priority has no healthy hosts. This is required so that this policy can wrap
+  // whatever load balancing algorithm (round robin, least request, etc.) the cluster would
+  // otherwise use.
+  config.cluster.v3.LoadBalancingPolicy fallback_policy = 3
+      [(validate.rules).message = {required: true}];
+}
