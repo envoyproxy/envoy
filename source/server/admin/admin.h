@@ -342,7 +342,10 @@ private:
     NullScopeKeyBuilder() = default;
     ~NullScopeKeyBuilder() override = default;
 
-    Router::ScopeKeyPtr computeScopeKey(const Http::HeaderMap&) const override { return nullptr; };
+    Router::ScopeKeyPtr computeScopeKey(const Http::HeaderMap&,
+                                        OptRef<const StreamInfo::StreamInfo>) const override {
+      return nullptr;
+    };
   };
 
   std::vector<const UrlHandler*> sortedHandlers() const;

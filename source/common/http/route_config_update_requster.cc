@@ -14,6 +14,8 @@ void RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     requestVhdsUpdate(host_header, dispatcher, std::move(route_config_updated_cb));
     return;
   } else if (scope_key_builder_.has_value()) {
+    // No stream info here, so stream-sourced fragments (e.g. filter_state) yield a null key and no
+    // on demand update.
     Router::ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(request_headers);
     // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
     if (scope_key != nullptr) {

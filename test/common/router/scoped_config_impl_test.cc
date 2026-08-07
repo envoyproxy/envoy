@@ -5,8 +5,12 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/scoped_config_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -233,6 +237,78 @@ TEST(HeaderValueExtractorImplTest, ElementSeparatorEmpty) {
   EXPECT_EQ(fragment, nullptr);
 }
 
+// Builds a FilterStateExtractorImpl reading the filter state key 'route_policy'.
+FilterStateExtractorImpl makeFilterStateExtractor() {
+  ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config;
+  std::string yaml_plain = R"EOF(
+  filter_state:
+   key: 'route_policy'
+)EOF";
+  TestUtility::loadFromYaml(yaml_plain, config);
+  return FilterStateExtractorImpl(std::move(config));
+}
+
+TEST(FilterStateExtractorImplTest, FilterStateExtraction) {
+  FilterStateExtractorImpl extractor = makeFilterStateExtractor();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState()->setData("route_policy",
+                                     std::make_unique<StringAccessorImpl>("privileged"));
+
+  std::unique_ptr<ScopeKeyFragmentBase> fragment =
+      extractor.computeFragment(TestRequestHeaderMapImpl{}, stream_info);
+  EXPECT_NE(fragment, nullptr);
+  EXPECT_EQ(*fragment, StringKeyFragment{"privileged"});
+}
+
+TEST(FilterStateExtractorImplTest, NoStreamInfo) {
+  FilterStateExtractorImpl extractor = makeFilterStateExtractor();
+
+  // The on demand scoped route update path has no stream info, so no fragment can be produced.
+  EXPECT_EQ(extractor.computeFragment(TestRequestHeaderMapImpl{}), nullptr);
+}
+
+TEST(FilterStateExtractorImplTest, KeyMissing) {
+  FilterStateExtractorImpl extractor = makeFilterStateExtractor();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(extractor.computeFragment(TestRequestHeaderMapImpl{}, stream_info), nullptr);
+
+  // A different key is stored, but not the one configured.
+  stream_info.filterState()->setData("other_key", std::make_unique<StringAccessorImpl>("value"));
+  EXPECT_EQ(extractor.computeFragment(TestRequestHeaderMapImpl{}, stream_info), nullptr);
+}
+
+TEST(FilterStateExtractorImplTest, WrongObjectType) {
+  FilterStateExtractorImpl extractor = makeFilterStateExtractor();
+
+  // An object that is not a string accessor yields no fragment rather than crashing.
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState()->setData("route_policy",
+                                     std::make_unique<StreamInfo::UInt32AccessorImpl>(1));
+  EXPECT_EQ(extractor.computeFragment(TestRequestHeaderMapImpl{}, stream_info), nullptr);
+}
+
+// A value stored at connection life span is read through the filter state ancestor chain.
+TEST(FilterStateExtractorImplTest, ReadsThroughAncestorChain) {
+  FilterStateExtractorImpl extractor = makeFilterStateExtractor();
+
+  auto connection_filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  connection_filter_state->setData("route_policy",
+                                   std::make_unique<StringAccessorImpl>("unprivileged"),
+                                   StreamInfo::FilterState::LifeSpan::Connection);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
+      connection_filter_state, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  std::unique_ptr<ScopeKeyFragmentBase> fragment =
+      extractor.computeFragment(TestRequestHeaderMapImpl{}, stream_info);
+  EXPECT_NE(fragment, nullptr);
+  EXPECT_EQ(*fragment, StringKeyFragment{"unprivileged"});
+}
+
 // Helper function which makes a ScopeKey from a list of strings.
 ScopeKey makeKey(const std::vector<const char*>& parts) {
   ScopeKey key;
@@ -347,6 +423,67 @@ TEST(ScopeKeyBuilderImplTest, Parse) {
       {"foo_header", "a=b,Bar=bar_value,e=f"},
       {"bar_header", "a=b;bar=bar_value;index2"},
   });
+  EXPECT_EQ(key, nullptr);
+}
+
+TEST(ScopeKeyBuilderImplTest, ParseFilterState) {
+  std::string yaml_plain = R"EOF(
+  fragments:
+  - filter_state:
+      key: 'route_policy'
+)EOF";
+
+  ScopedRoutes::ScopeKeyBuilder config;
+  TestUtility::loadFromYaml(yaml_plain, config);
+  ScopeKeyBuilderImpl key_builder(std::move(config));
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState()->setData("route_policy",
+                                     std::make_unique<StringAccessorImpl>("privileged"));
+
+  ScopeKeyPtr key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{}, stream_info);
+  EXPECT_NE(key, nullptr);
+  EXPECT_EQ(*key, makeKey({"privileged"}));
+
+  // No stream info, so the fragment cannot be computed.
+  EXPECT_EQ(key_builder.computeScopeKey(TestRequestHeaderMapImpl{}), nullptr);
+}
+
+TEST(ScopeKeyBuilderImplTest, ParseMixedHeaderAndFilterState) {
+  std::string yaml_plain = R"EOF(
+  fragments:
+  - header_value_extractor:
+      name: 'foo_header'
+      element_separator: ','
+      element:
+        key: 'bar'
+        separator: '='
+  - filter_state:
+      key: 'route_policy'
+)EOF";
+
+  ScopedRoutes::ScopeKeyBuilder config;
+  TestUtility::loadFromYaml(yaml_plain, config);
+  ScopeKeyBuilderImpl key_builder(std::move(config));
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState()->setData("route_policy",
+                                     std::make_unique<StringAccessorImpl>("privileged"));
+
+  // Both fragments resolve.
+  ScopeKeyPtr key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{{"foo_header", "a=b,bar=bar_value,e=f"}}, stream_info);
+  EXPECT_NE(key, nullptr);
+  EXPECT_EQ(*key, makeKey({"bar_value", "privileged"}));
+
+  // Header missing, so the whole key is invalid even though the filter state is present.
+  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{{"other_header", "a=b"}}, stream_info);
+  EXPECT_EQ(key, nullptr);
+
+  // Filter state missing, so the whole key is invalid even though the header is present.
+  NiceMock<StreamInfo::MockStreamInfo> empty_stream_info;
+  key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{{"foo_header", "a=b,bar=bar_value,e=f"}}, empty_stream_info);
   EXPECT_EQ(key, nullptr);
 }
 

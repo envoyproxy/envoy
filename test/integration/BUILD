@@ -2643,6 +2643,8 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/filters/http/header_mutation:config",
+        "//source/extensions/filters/network/set_filter_state:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/test_common:resources_lib",

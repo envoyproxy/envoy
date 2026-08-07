@@ -291,6 +291,8 @@ envoy_cc_library(
         ":config_lib",
         "//envoy/router:rds_interface",
         "//envoy/router:scopes_interface",
+        "//envoy/router:string_accessor_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/protobuf:utility_lib",
         "@abseil-cpp//absl/strings:str_format",
