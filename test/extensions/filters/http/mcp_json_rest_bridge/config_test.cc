@@ -78,39 +78,20 @@ TEST(McpJsonRestBridgeFilterConfigTest, InvalidToolListHttpRuleThrowsException) 
                         HasSubstr("tool_list_http_rule must be a GET request with an empty body")));
 }
 
-TEST(McpJsonRestBridgeFilterConfigTest, IncrementRequestCountWithToolName) {
+TEST(McpJsonRestBridgeFilterConfigTest, IncrementRequestCount) {
   Stats::IsolatedStoreImpl stats_store;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
   McpJsonRestBridgeFilterConfig config(proto_config, *stats_store.rootScope());
 
-  config.incrementRequestCount("tools/call", "create_api_key", "mcp_json_rest_bridge_ok");
+  config.incrementRequestCount("tools/call", "mcp_json_rest_bridge_ok");
 
   Stats::CounterSharedPtr counter = TestUtility::findCounter(
-      stats_store, "mcp_json_rest_bridge.request_count.mcp_method.tools/"
-                   "call.tool_name.create_api_key.status.mcp_json_rest_bridge_ok");
+      stats_store,
+      "mcp_json_rest_bridge.request_count.mcp_method.tools/call.status.mcp_json_rest_bridge_ok");
   ASSERT_NE(counter, nullptr);
   EXPECT_EQ(counter->value(), 1);
   EXPECT_THAT(counter->tags(),
               testing::ElementsAre(Stats::Tag{"mcp_method", "tools/call"},
-                                   Stats::Tag{"tool_name", "create_api_key"},
-                                   Stats::Tag{"status", "mcp_json_rest_bridge_ok"}));
-}
-
-TEST(McpJsonRestBridgeFilterConfigTest, IncrementRequestCountWithoutToolName) {
-  Stats::IsolatedStoreImpl stats_store;
-  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
-  McpJsonRestBridgeFilterConfig config(proto_config, *stats_store.rootScope());
-
-  config.incrementRequestCount("initialize", "", "mcp_json_rest_bridge_ok");
-
-  Stats::CounterSharedPtr counter = TestUtility::findCounter(
-      stats_store,
-      "mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_rest_bridge_"
-      "ok");
-  ASSERT_NE(counter, nullptr);
-  EXPECT_EQ(counter->value(), 1);
-  EXPECT_THAT(counter->tags(),
-              testing::ElementsAre(Stats::Tag{"mcp_method", "initialize"},
                                    Stats::Tag{"status", "mcp_json_rest_bridge_ok"}));
 }
 
@@ -119,12 +100,12 @@ TEST(McpJsonRestBridgeFilterConfigTest, IncrementRequestCountAccumulates) {
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
   McpJsonRestBridgeFilterConfig config(proto_config, *stats_store.rootScope());
 
-  config.incrementRequestCount("tools/call", "list_api_keys", "mcp_json_rest_bridge_ok");
-  config.incrementRequestCount("tools/call", "list_api_keys", "mcp_json_rest_bridge_ok");
+  config.incrementRequestCount("tools/call", "mcp_json_rest_bridge_ok");
+  config.incrementRequestCount("tools/call", "mcp_json_rest_bridge_ok");
 
   Stats::CounterSharedPtr counter = TestUtility::findCounter(
-      stats_store, "mcp_json_rest_bridge.request_count.mcp_method.tools/"
-                   "call.tool_name.list_api_keys.status.mcp_json_rest_bridge_ok");
+      stats_store,
+      "mcp_json_rest_bridge.request_count.mcp_method.tools/call.status.mcp_json_rest_bridge_ok");
   ASSERT_NE(counter, nullptr);
   EXPECT_EQ(counter->value(), 2);
 }

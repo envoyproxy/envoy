@@ -347,15 +347,11 @@ bool McpJsonRestBridgeFilterConfig::hasEndpoint(absl::string_view host,
 }
 
 void McpJsonRestBridgeFilterConfig::incrementRequestCount(absl::string_view method,
-                                                          absl::string_view tool_name,
                                                           absl::string_view status) {
   Stats::StatNameDynamicPool dynamic_stat_name_pool(scope_.symbolTable());
   Stats::StatNameTagVector tags;
   if (!method.empty()) {
     tags.emplace_back(stat_names_.mcp_method_, dynamic_stat_name_pool.add(method));
-  }
-  if (!tool_name.empty()) {
-    tags.emplace_back(stat_names_.tool_name_, dynamic_stat_name_pool.add(tool_name));
   }
   if (!status.empty()) {
     tags.emplace_back(stat_names_.status_, dynamic_stat_name_pool.add(status));
@@ -939,8 +935,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
-        config_->incrementRequestCount(McpConstants::Methods::TOOLS_LIST, "",
-                                       BridgeStatusValues::OK);
+        config_->incrementRequestCount(McpConstants::Methods::TOOLS_LIST, BridgeStatusValues::OK);
         return;
       } else {
         // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
@@ -951,7 +946,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
-        config_->incrementRequestCount(McpConstants::Methods::TOOLS_LIST, "",
+        config_->incrementRequestCount(McpConstants::Methods::TOOLS_LIST,
                                        BridgeStatusValues::REQUEST_PASSTHROUGH);
       }
     }
@@ -963,7 +958,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
       setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                      ? json_rpc[McpConstants::PARAMS_FIELD]
                                      : json::object());
-      config_->incrementRequestCount(McpConstants::Methods::INITIALIZE, "", BridgeStatusValues::OK);
+      config_->incrementRequestCount(McpConstants::Methods::INITIALIZE, BridgeStatusValues::OK);
       decoder_callbacks_->sendLocalReply(
           Http::Code::OK,
           generateInitializeResponse(
@@ -990,7 +985,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
     setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                    ? json_rpc[McpConstants::PARAMS_FIELD]
                                    : json::object());
-    config_->incrementRequestCount(McpConstants::Methods::NOTIFICATION_INITIALIZED, "",
+    config_->incrementRequestCount(McpConstants::Methods::NOTIFICATION_INITIALIZED,
                                    BridgeStatusValues::OK);
     // TODO(guoyilin42): We may need to explicitly set `content-length: 0` to prevent curl from
     // hanging. `modify_headers` fails here as `sendLocalReply` removes it for empty bodies.
@@ -1237,9 +1232,7 @@ void McpJsonRestBridgeFilter::sendErrorResponse(
   mcp_operation_ = McpOperation::OperationFailed;
   setParsingMetadata(method, params);
 
-  absl::string_view tool_name =
-      (mcp_method_ == McpConstants::Methods::TOOLS_CALL) ? absl::string_view(tool_name_) : "";
-  config_->incrementRequestCount(mcp_method_, tool_name, bridgeStatusToString(status));
+  config_->incrementRequestCount(mcp_method_, bridgeStatusToString(status));
 
   decoder_callbacks_->sendLocalReply(response_code, response_body, modify_headers, grpc_status,
                                      bridgeStatusToString(status));
@@ -1296,9 +1289,7 @@ void McpJsonRestBridgeFilter::setResponseMetadata(BridgeStatus status,
   status_ = status;
   backend_response_code_ = response_code;
 
-  absl::string_view tool_name =
-      (mcp_method_ == McpConstants::Methods::TOOLS_CALL) ? absl::string_view(tool_name_) : "";
-  config_->incrementRequestCount(mcp_method_, tool_name, bridgeStatusToString(status));
+  config_->incrementRequestCount(mcp_method_, bridgeStatusToString(status));
 
   if (!config_->shouldStoreToDynamicMetadata()) {
     return;
