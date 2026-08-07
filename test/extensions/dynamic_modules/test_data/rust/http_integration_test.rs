@@ -1,6 +1,7 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::any::Any;
+use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -281,14 +282,14 @@ struct UseSelfAfterTeardownFilterConfig {
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UseSelfAfterTeardownFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(UseSelfAfterTeardownFilter {
-      state: String::from("alive"),
+      state: RefCell::new(String::from("alive")),
       dropped_filters: self.dropped_filters.clone(),
     })
   }
 }
 
 struct UseSelfAfterTeardownFilter {
-  state: String,
+  state: RefCell<String>,
   dropped_filters: Arc<AtomicUsize>,
 }
 
@@ -300,7 +301,7 @@ impl Drop for UseSelfAfterTeardownFilter {
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UseSelfAfterTeardownFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -320,11 +321,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UseSelfAfterTeardownFilter {
     // state proves the allocation is intact, and a synchronous destroy would have counted this
     // filter in the drops. Panics are swallowed at the FFI boundary, so every result the test needs
     // to check goes to the log rather than to an assert.
-    self.state.push_str("-torn-down");
+    self.state.borrow_mut().push_str("-torn-down");
     envoy_log_info!(
       "recreated with state {} after {} drops, header_set={} recreated={} append={} drain={} \
        route={}",
-      self.state,
+      self.state.borrow(),
       self.dropped_filters.load(Ordering::SeqCst),
       header_set,
       recreated,
@@ -2342,7 +2343,7 @@ struct GenericSecretCallbacksFilter {
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for GenericSecretCallbacksFilter {
   fn on_response_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
