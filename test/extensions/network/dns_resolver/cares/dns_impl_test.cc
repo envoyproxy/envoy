@@ -438,7 +438,6 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
-
 };
 
 TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
