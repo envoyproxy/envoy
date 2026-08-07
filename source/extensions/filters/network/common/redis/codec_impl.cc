@@ -1293,8 +1293,8 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     break;
   }
   case RespType::Push: {
-    // RESP3-only frame. On RESP3 emit `>N` natively; on RESP2 down-convert to Array (`*N`)
-    // since the RESP2 pubsub wire form is itself a bulk-string array — emitting `>N` to a
+    // RESP3-only frame routed by the downstream subscriber to its connection. On RESP3
+    // emit `>N` natively; on RESP2 down-convert to Array (`*N`) — emitting `>N` to a
     // RESP2 reader would corrupt the next reply's framing.
     if (protocol_version_ == RespProtocolVersion::Resp3) {
       encodePush(value.asArray(), out);

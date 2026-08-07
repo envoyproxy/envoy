@@ -4,14 +4,26 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+CLUSTERDOWN
+EXECABORT
 FCS
 FLUSHALL
+NOPROTO
 NUMPAT
+PSUBSCRIBE
 PUBSUB
+PUNSUBSCRIBE
 RANDOMKEY
+SETSLOT
 SLOWLOG
+SMESSAGE
+SPUBLISH
+SSUBSCRIBE
+SUNSUBSCRIBE
+UNWATCH
 addend
 addrlen
+arity
 defragmentation
 evictable
 flushdb
@@ -1434,6 +1446,7 @@ setenv
 SETNAME
 setsockopt
 sfixed
+sharded
 sidestream
 sig
 sigaction

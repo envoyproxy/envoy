@@ -30,6 +30,20 @@ following statistics:
   downstream_rq_active, Gauge, Total active requests
   downstream_rq_noproto, Counter, "Data commands rejected ``-NOPROTO`` for arriving before the ``HELLO 3`` handshake on a ``protocol_version: RESP3`` listener"
   downstream_rq_total, Counter, Total requests
+  pubsub_active_subscriptions, Gauge, "Active pub/sub subscriptions, counted per downstream subscriber (two subscribers to the same channel count twice). The authoritative count of live subscriptions."
+  pubsub_push_messages_delivered, Counter, "Pub/sub ``message`` frames delivered downstream. Counts delivered messages only — not subscribe/unsubscribe control acks — so a message parked behind an in-flight command reply is counted when it actually reaches the wire, and one dropped on slow-subscriber eviction or disconnect is not counted."
+  pubsub_slow_subscriber_closed, Counter, "Downstream subscriber connections closed because their buffered pub/sub output exceeded the connection buffer limit (slow-consumer eviction, mirroring Redis ``client-output-buffer-limit`` pubsub)."
+  pubsub_subscribe_ack_error, Counter, "Pub/sub subscribes that failed after the optimistic count: the upstream ``SSUBSCRIBE`` errored or its ack timed out, rolling the subscription back and closing the subscriber."
+  pubsub_subscribe_ack_success, Counter, "Pub/sub subscribes confirmed by the upstream ``SSUBSCRIBE`` ack."
+  pubsub_subscribe_total, Counter, "Total pub/sub channel subscriptions accepted, counted per downstream subscriber."
+  pubsub_unsubscribe_total, Counter, "Total pub/sub channel unsubscriptions, counted per downstream subscriber."
+
+The pub/sub subscription counters relate to the ``pubsub_active_subscriptions`` gauge by
+``pubsub_active_subscriptions = pubsub_subscribe_total - pubsub_unsubscribe_total -
+pubsub_subscribe_ack_error``. A subscription is counted optimistically at ``SUBSCRIBE`` time; if its
+upstream ``SSUBSCRIBE`` later errors or times out, it is rolled back — decrementing the gauge and
+incrementing ``pubsub_subscribe_ack_error`` — but is *not* counted as an unsubscribe. The gauge,
+maintained directly at each subscription-state change, is the source of truth.
 
 
 Splitter statistics
@@ -98,6 +112,10 @@ order of commands it receives.
 Note that faults must have a ``fault_enabled`` field, and are not enabled by default (if no default value
 or runtime key are set).
 
+The pub/sub subscription commands (``SUBSCRIBE`` / ``UNSUBSCRIBE``) bypass fault injection: they are
+handled on the dedicated pub/sub path before the fault-injection layer, so a fault configured for
+all commands (``ALL_KEY``) is not applied to them.
+
 Example configuration:
 
 .. literalinclude:: _include/redis-fault-injection.yaml
@@ -149,9 +167,11 @@ When ``protocol_version`` is ``RESP3``:
   operator-facing error always points to "client failed to handshake" rather than masking
   the missing handshake.
 * Both explicit ``HELLO N`` and bare ``HELLO`` are exact-matched against the listener's
-  ``protocol_version``: bare ``HELLO`` on a fresh ``RESP3`` listener is rejected because the
-  connection's current version (default ``2``) does not match the required ``3``. After a
-  successful ``HELLO 3``, bare ``HELLO`` reaffirms the negotiated version.
+  ``protocol_version``: bare ``HELLO`` on a fresh ``RESP3`` listener is rejected with ``-NOPROTO``
+  because the connection's current version (default ``2``) does not match the required ``3`` — a
+  real Redis server would instead answer a bare ``HELLO`` with its server info map, so a client that
+  depends on that map must send an explicit ``HELLO 3`` here. After a successful ``HELLO 3``, bare
+  ``HELLO`` reaffirms the negotiated version.
 
 Downstream ``HELLO N AUTH <user> <pass>`` is supported with both locally configured
 credentials (``downstream_auth_passwords`` / ``downstream_auth_username``) and an external
