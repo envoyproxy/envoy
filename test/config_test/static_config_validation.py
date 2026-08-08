@@ -3,6 +3,7 @@ import argparse
 import pathlib
 import sys
 
+from yaml.parser import ParserError
 from yaml.scanner import ScannerError
 
 from google.protobuf.json_format import ParseError
@@ -21,9 +22,12 @@ def main():
     protobuf = ProtobufValidator(parsed.descriptor_path)
 
     for example in parsed.paths:
+        is_yaml = example.endswith(".yaml")
+        if not is_yaml:
+            continue
         try:
             protobuf.validate_yaml(pathlib.Path(example).read_text())
-        except (ParseError, KeyError, ScannerError) as e:
+        except (ParseError, KeyError, ParserError, ScannerError) as e:
             errors.append(example)
             print(f"\nERROR (validation failed): {example}\n{e}\n\n")
 

@@ -19,11 +19,35 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+// Resolve the aws-c-auth-testdata testdata directory in runfiles.
+// The external repo dir name is mangled by Bazel's canonical naming and
+// differs across versions/modes (e.g. "aws-c-auth-testdata" under
+// WORKSPACE, "aws-c-auth-testdata~" or "aws-c-auth-testdata+" under
+// bzlmod depending on the Bazel version). Rather than hardcode a
+// separator, glob for whichever variant actually exists.
+std::string awsTestdataDir(const std::string& suite_subpath) {
+  const std::string external =
+      TestEnvironment::runfilesDirectory() + "/external";
+  if (std::filesystem::exists(external)) {
+    for (auto const& entry : std::filesystem::directory_iterator(external)) {
+      const std::string name = entry.path().filename().string();
+      if (name.find("aws-c-auth-testdata") != std::string::npos) {
+        std::string candidate = entry.path().string() + "/" + suite_subpath;
+        if (std::filesystem::exists(candidate)) {
+          return candidate;
+        }
+      }
+    }
+  }
+  // Fall back to the plain (WORKSPACE) name.
+  return TestEnvironment::runfilesDirectory() + "/external/aws-c-auth-testdata/" +
+         suite_subpath;
+}
+
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
-  for (auto const& entry : std::filesystem::directory_iterator(
-           TestEnvironment::runfilesDirectory("aws-c-auth-testdata") +
-           "/tests/aws-signing-test-suite/v4/")) {
+  const std::string path = awsTestdataDir("tests/aws-signing-test-suite/v4");
+  for (auto const& entry : std::filesystem::directory_iterator(path)) {
     directories.push_back(entry.path().string());
   }
   return directories;

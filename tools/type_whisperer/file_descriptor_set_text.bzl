@@ -7,10 +7,25 @@ def _file_descriptor_set_text(ctx):
     proto_repositories = ctx.attr.proto_repositories
     with_external_deps = ctx.attr.with_external_deps
 
+    def _normalize_workspace_name(ws_name):
+        if not ws_name:
+            return ""
+        return ws_name.split("+", 1)[0].split("~", 1)[0]
+
     def _descriptor_set(dep):
         ws_name = dep.owner.workspace_name
+
+        # TODO(phlax): Cleanup once bzlmod migration is complete
+        # In bzlmod mode, the main workspace is named "_main" instead of being empty
+        # In WORKSPACE mode, the main workspace name is empty
+        # In bzlmod mode, workspace names may have canonical suffixes such as
+        # "envoy_api~" or "envoy_api+". Normalize to the base module name.
+        ws_name_normalized = _normalize_workspace_name(ws_name)
         add_dep = (
-            (not ws_name) or ws_name in proto_repositories or with_external_deps
+            (not ws_name) or
+            ws_name == "_main" or
+            ws_name_normalized in proto_repositories or
+            with_external_deps
         )
         if add_dep:
             return dep.path

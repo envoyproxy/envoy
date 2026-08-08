@@ -1,6 +1,6 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@base_pip3//:requirements.bzl", "requirement")
-load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
+load("@grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
@@ -17,6 +17,7 @@ py_binary(
         "//tools/clang-format",
         "//tools/type_whisperer:api_type_db.pb_text",
     ],
+    imports = ["external/googleapis~"],
     visibility = ["//visibility:public"],
     deps = [
         ":utils",
@@ -26,9 +27,9 @@ py_binary(
         requirement("packaging"),
         "//tools/type_whisperer",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
-        "@com_google_googleapis//google/api:annotations_py_proto",
         "@com_google_protobuf//:protobuf_python",
         "@envoy_api//envoy/annotations:pkg_py_proto",
+        "@googleapis//google/api:annotations_py_proto",
         "@xds//udpa/annotations:pkg_py_proto",
         "@xds//xds/annotations/v3:pkg_py_proto",
     ],

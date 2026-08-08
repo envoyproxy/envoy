@@ -191,6 +191,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@googleapis//google/rpc:status_cc_proto",
     ],
 )
 

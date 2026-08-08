@@ -35,6 +35,20 @@ exports_files([
     "exported_symbols_apple.txt",
 ])
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+bool_flag(
+    name = "enable_bzlmod",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bzlmod_mode",
+    flag_values = {
+        ":enable_bzlmod": "True",
+    },
+    visibility = ["//visibility:public"],
+)
+
 sh_library(
     name = "volatile_env",
     srcs = ["volatile_env.sh"],
@@ -559,7 +573,7 @@ config_setting(
 
 config_setting(
     name = "using_boringssl_fips",
-    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+    flag_values = {":ssl": "@boringssl-fips//:ssl"},
 )
 
 config_setting(
@@ -1098,4 +1112,14 @@ config_setting(
     flag_values = {
         ":libstdc++": "True",
     },
+)
+
+# Re-export @llvm_toolchain//:redacted_dates.h so that crate_universe-generated
+# repositories (which cannot resolve bare apparent-name labels like @llvm_toolchain
+# under bzlmod) can reference it via an Envoy-owned label that is visible in
+# the root module's repo-mapping.
+filegroup(
+    name = "redacted_dates_h",
+    srcs = ["@llvm_toolchain//:redacted_dates.h"],
+    visibility = ["//visibility:public"],
 )
