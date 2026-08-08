@@ -314,6 +314,10 @@ public:
       metadata = m;
       return *this;
     }
+    StreamOptions& setMetadata(envoy::config::core::v3::Metadata&& m) {
+      metadata = std::move(m);
+      return *this;
+    }
 
     // Set FilterState on async stream allowing upstream filters to access it.
     StreamOptions& setFilterState(Envoy::StreamInfo::FilterStateSharedPtr fs) {
