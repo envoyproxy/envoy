@@ -134,7 +134,11 @@ OnDemandStats OnDemandConfig::generateStats(Stats::Scope& scope) {
 Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
-    : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
+    : // tcp.(<stat_prefix>.)*
+      stats_scope_(context.scope().createScopeWithTaggedName(
+          "tcp",
+          {Stats::TagStringView{Envoy::Config::TagNames::get().TCP_PREFIX, config.stat_prefix()}},
+          fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)),
       flush_access_log_on_start_(config.access_log_options().flush_access_log_on_start()),
       proxy_protocol_tlv_merge_policy_(config.proxy_protocol_tlv_merge_policy()) {
