@@ -56,6 +56,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/http/http1:balsa_parser_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

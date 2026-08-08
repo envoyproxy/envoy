@@ -1976,6 +1976,13 @@ TEST(Utility, isSafeRequest) {
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("PATCH");
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  // QUERY is safe and idempotent per RFC 10008, but it is deliberately excluded here. Callers of
+  // isSafeRequest() treat it as "safe and without content": it gates sending a request over 0-RTT
+  // early data, and auto-enables retry on 425, which for a request with content would mean
+  // buffering that content for the retry. QUERY always has content, so including it would change
+  // both behaviors and needs to be considered separately.
+  request_headers.setMethod("QUERY");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
 
   request_headers.setMethod("GET");
   EXPECT_TRUE(Utility::isSafeRequest(request_headers));
