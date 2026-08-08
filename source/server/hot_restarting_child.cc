@@ -54,7 +54,7 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
       parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0),
       skip_hot_restart_on_no_parent_(skip_hot_restart_on_no_parent),
-      skip_parent_stats_(skip_parent_stats) {
+      skip_parent_stats_(skip_parent_stats), parent_stop_accepting_requested_(restart_epoch == 0) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
   std::string socket_path_udp = socket_path + "_udp";
   udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
@@ -165,13 +165,16 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 }
 
 void HotRestartingChild::drainParentListeners() {
-  if (parent_terminated_) {
-    return;
+  if (!parent_terminated_) {
+    // No reply expected.
+    HotRestartMessage wrapped_request;
+    wrapped_request.mutable_request()->mutable_drain_listeners();
+    main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
   }
-  // No reply expected.
-  HotRestartMessage wrapped_request;
-  wrapped_request.mutable_request()->mutable_drain_listeners();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+
+  // Whether or not there was a parent to notify, the parent (if any) has now been asked to stop
+  // accepting new connections. Latch the flag so a subsequent query observes it.
+  parent_stop_accepting_requested_.store(true);
 }
 
 void HotRestartingChild::registerUdpForwardingListener(
