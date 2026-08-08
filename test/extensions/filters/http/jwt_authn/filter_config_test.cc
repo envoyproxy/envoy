@@ -459,6 +459,61 @@ providers:
                 HasSubstr("max_interval must be greater than or equal to the base_interval")));
 }
 
+// sanitizePayloadHeaders strips the union of every provider's payload and claim headers, not only
+// those belonging to the matched requirement. That keeps bypass paths and cross-provider requests
+// from forwarding client-supplied identity headers upstream.
+TEST(HttpJwtAuthnFilterConfigTest, SanitizePayloadHeadersCoversAllProviders) {
+  const char config[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    local_jwks:
+      inline_string: jwks
+    forward_payload_header: example-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-sub
+      claim_name: sub
+  other_provider:
+    issuer: other_issuer
+    local_jwks:
+      inline_string: jwks
+    forward_payload_header: other-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-issuer
+      claim_name: iss
+rules:
+- match:
+    prefix: /healthz
+- match:
+    prefix: /
+  requires:
+    provider_name: other_provider
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_conf(proto_config, "", context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"example-auth-userinfo", "spoofed-payload"},
+      {"other-auth-userinfo", "spoofed-other"},
+      {"x-jwt-claim-sub", "spoofed-sub"},
+      {"x-jwt-claim-issuer", "spoofed-iss"},
+      {"unrelated", "keep"},
+  };
+  filter_conf.sanitizePayloadHeaders(headers);
+
+  EXPECT_FALSE(headers.has("example-auth-userinfo"));
+  EXPECT_FALSE(headers.has("other-auth-userinfo"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-issuer"));
+  EXPECT_EQ("keep", headers.get_("unrelated"));
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
