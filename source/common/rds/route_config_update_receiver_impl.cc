@@ -111,5 +111,10 @@ void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
   warming_state_.clear();
 }
 
+const std::optional<RouteConfigProvider::ConfigInfo>&
+RouteConfigUpdateReceiverImpl::configInfo() const {
+  return config_info_;
+}
+
 } // namespace Rds
 } // namespace Envoy
