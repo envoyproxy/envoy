@@ -270,7 +270,8 @@ message CommonTlsContext {
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
-  // Only a single TLS certificate is supported in client contexts. In server contexts,
+  // Only a single TLS certificate is supported in client contexts unless
+  // ``custom_tls_certificate_selector`` is explicitly defined. In server contexts,
   // :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>` can be associated with the
   // same context to allow both RSA and ECDSA certificates and support SNI-based selection.
   //

@@ -32,6 +32,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -350,6 +351,66 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificates) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   EXPECT_EQ(ClientContextConfigImpl::create(tls_context, factory_context_).status().message(),
             "Multiple TLS certificates are not supported for client contexts");
+}
+
+TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSelectorIsUsed) {
+  class TestUpstreamTlsCertificateSelectorFactory
+      : public Ssl::UpstreamTlsCertificateSelectorFactory {
+  public:
+    Ssl::UpstreamTlsCertificateSelectorPtr
+    createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext&) override {
+      return nullptr;
+    }
+
+    absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+  };
+
+  class TestUpstreamTlsCertificateSelectorConfigFactory
+      : public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
+  public:
+    absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+    createUpstreamTlsCertificateSelectorFactory(const Protobuf::Message&,
+                                                Server::Configuration::GenericFactoryContext&,
+                                                const Ssl::ClientContextConfig&) override {
+      return std::make_unique<TestUpstreamTlsCertificateSelectorFactory>();
+    }
+
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Protobuf::StringValue>();
+    }
+
+    std::string name() const override { return "test-tls-context-provider"; }
+  };
+
+  TestUpstreamTlsCertificateSelectorConfigFactory provider_factory;
+  Registry::InjectFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory> registered_factory(
+      provider_factory);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string custom_tls_certificate_selector_yaml = R"EOF(
+  name: test-tls-context-provider
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+  )EOF";
+  TestUtility::loadFromYaml(
+      TestEnvironment::substitute(custom_tls_certificate_selector_yaml),
+      *tls_context.mutable_common_tls_context()->mutable_custom_tls_certificate_selector());
+
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::IsolatedStoreImpl store;
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_OK(context_or);
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate context config does not support handling both static TLS certificate and dynamic TLS
