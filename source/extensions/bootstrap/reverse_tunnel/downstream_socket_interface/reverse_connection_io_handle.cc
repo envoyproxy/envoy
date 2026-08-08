@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <optional>
 
 #include "envoy/event/timer.h"
@@ -56,7 +57,7 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
                                                      ReverseTunnelInitiatorExtension* extension,
                                                      Stats::Scope&)
     : IoSocketHandleImpl(fd), config_(config), cluster_manager_(cluster_manager),
-      extension_(extension), original_socket_fd_(fd) {
+      extension_(extension) {
   ENVOY_LOG_MISC(debug,
                  "Created reverse_tunnel: fd={}, src_node={}, src_cluster: {}, num_clusters={}",
                  fd_, config_.src_node_id, config_.src_cluster_id, config_.remote_clusters.size());
@@ -91,6 +92,7 @@ void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
 
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
+  resetFileEvents();
 
   // Detach any still-live child tunnel IoHandles so their parent() returns nullptr instead of a
   // dangling pointer after this object is destroyed.
@@ -98,33 +100,6 @@ void ReverseConnectionIOHandle::cleanup() {
     child->detachParent();
   }
   child_io_handles_.clear();
-
-  // Reset file events before closing trigger pipe to avoid busy loop from EOF on read FD.
-  ENVOY_LOG_MISC(trace,
-                 "reverse_tunnel: resetting file events before closing trigger pipe; "
-                 "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
-                 trigger_pipe_write_fd_, trigger_pipe_read_fd_);
-  resetFileEvents();
-  SET_SOCKET_INVALID(trigger_pipe_read_fd_);
-
-  // Clean up pipe trigger mechanism first to prevent use-after-free.
-  ENVOY_LOG_MISC(trace,
-                 "reverse_tunnel: cleaning up trigger pipe; "
-                 "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
-                 trigger_pipe_write_fd_, trigger_pipe_read_fd_);
-  if (trigger_pipe_write_fd_ >= 0) {
-    Api::OsSysCallsSingleton::get().close(trigger_pipe_write_fd_);
-    trigger_pipe_write_fd_ = -1;
-  }
-
-  // If initializeFileEvent() ran, fd_ was reassigned to trigger_pipe_read_fd_ and the base class
-  // will close that. We must close original_socket_fd_ explicitly since nothing else owns it.
-  // This guards against cleanup() being called without close() (e.g. destructor-only path).
-  if (original_socket_fd_ != fd_ && original_socket_fd_ >= 0) {
-    ENVOY_LOG(debug, "cleanup: closing original socket FD: {}.", original_socket_fd_);
-    Api::OsSysCallsSingleton::get().close(original_socket_fd_);
-    original_socket_fd_ = -1;
-  }
 
   // Clear cluster to hosts mapping.
   cluster_to_resolved_hosts_map_.clear();
@@ -162,6 +137,18 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
                                                     Event::FileReadyCb cb,
                                                     Event::FileTriggerType trigger,
                                                     uint32_t events) {
+  // Call parent implementation.
+  // After this activateFileEvents is valid. zero it so we don't subscribe to kernel events.
+  IoSocketHandleImpl::initializeFileEvent(
+      dispatcher,
+      [this, cb](uint32_t activated) {
+        auto status = cb(activated);
+        maybePushConn(); // Listener does not guarantee to read all conns in the loop.
+        return status;
+      },
+      trigger, 0);
+  enableFileEvents(events);
+
   // Reverse connections should be initiated when initializeFileEvent() is called on a worker
   // thread.
   ENVOY_LOG(debug,
@@ -180,23 +167,6 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
   // Store worker dispatcher
   worker_dispatcher_ = &dispatcher;
 
-  // Create trigger pipe on worker thread.
-  if (!isTriggerPipeReady()) {
-    createTriggerPipe();
-    if (!isTriggerPipeReady()) {
-      ENVOY_LOG(error, "Failed to create trigger pipe on worker thread");
-      return;
-    }
-  }
-
-  // Replace the monitored FD with pipe read FD
-  // This must happen before any event registration.
-  int trigger_fd = getPipeMonitorFd();
-  if (trigger_fd != -1) {
-    ENVOY_LOG(info, "Replacing monitored FD from {} to pipe read FD {}", fd_, trigger_fd);
-    fd_ = trigger_fd;
-  }
-
   // Initialize reverse connections on worker thread.
   if (!rev_conn_retry_timer_) {
     rev_conn_retry_timer_ = dispatcher.createTimer([this]() {
@@ -208,134 +178,50 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
 
   is_reverse_conn_started_ = true;
   ENVOY_LOG(info, "reverse_tunnel: Reverse connections started on thread '{}'", dispatcher.name());
-
-  // Call parent implementation.
-  IoSocketHandleImpl::initializeFileEvent(dispatcher, cb, trigger, events);
 }
 
 Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* addr,
                                                               socklen_t* addrlen) {
+  RELEASE_ASSERT(addr && addrlen, "addr and addrlen must be valid");
+
+  // Get a connection from the queue.
   ENVOY_LOG(debug, "reverse_tunnel: accept() called");
-  if (isTriggerPipeReady()) {
-    char trigger_byte;
-    ssize_t bytes_read = ::read(trigger_pipe_read_fd_, &trigger_byte, 1);
-    if (bytes_read == 1) {
-      ENVOY_LOG(debug, "reverse_tunnel: received trigger, processing connection.");
-      // When a connection is established, a byte is written to the trigger_pipe_write_fd_ and the
-      // connection is inserted into the established_connections_ queue. The last connection in the
-      // queue is therefore the one that got established last.
-      if (!established_connections_.empty()) {
-        ENVOY_LOG(debug, "reverse_tunnel: getting connection from queue.");
-        auto connection = std::move(established_connections_.front());
-        established_connections_.pop();
-        // Fill in address information for the reverse tunnel "client".
-        // Use actual client address from established connection.
-        if (addr && addrlen) {
-          const auto& remote_addr = connection->connectionInfoProvider().remoteAddress();
-
-          if (remote_addr) {
-            ENVOY_LOG(debug, "reverse_tunnel: using actual client address: {}",
-                      remote_addr->asString());
-            const sockaddr* sock_addr = remote_addr->sockAddr();
-            socklen_t addr_len = remote_addr->sockAddrLen();
-
-            if (*addrlen >= addr_len) {
-              memcpy(addr, sock_addr, addr_len); // NOLINT(safe-memcpy)
-              *addrlen = addr_len;
-              ENVOY_LOG(trace, "reverse_tunnel: copied {} bytes of address data", addr_len);
-            } else {
-              ENVOY_LOG(warn,
-                        "ReverseConnectionIOHandle::accept() - buffer too small for address: "
-                        "need {} bytes, have {}",
-                        addr_len, *addrlen);
-              *addrlen = addr_len; // Still set the required length
-            }
-          } else {
-            ENVOY_LOG(warn, "reverse_tunnel: no remote address available, "
-                            "using synthetic localhost address");
-            // Fallback to synthetic address only when remote address is unavailable.
-            auto synthetic_addr =
-                std::make_shared<Envoy::Network::Address::Ipv4Instance>("127.0.0.1", 0);
-            const sockaddr* sock_addr = synthetic_addr->sockAddr();
-            socklen_t addr_len = synthetic_addr->sockAddrLen();
-            if (*addrlen >= addr_len) {
-              memcpy(addr, sock_addr, addr_len); // NOLINT(safe-memcpy)
-              *addrlen = addr_len;
-            } else {
-              ENVOY_LOG(error, "reverse_tunnel: buffer too small for synthetic address");
-              *addrlen = addr_len;
-            }
-          }
-        }
-
-        const std::string connection_key =
-            connection->connectionInfoProvider().localAddress()->asString();
-        // Capture the connection id now so the tunnel handle can report it on close, after the
-        // originating connection object is gone.
-        const uint64_t connection_id = connection->id();
-        ENVOY_LOG(debug, "reverse_tunnel: got connection key: {}", connection_key);
-
-        // Instead of moving the socket, duplicate the file descriptor.
-        const Network::ConnectionSocketPtr& original_socket = connection->getSocket();
-        if (!original_socket || !original_socket->isOpen()) {
-          ENVOY_LOG(error, "Original socket is not available or not open");
-          return nullptr;
-        }
-
-        // Duplicate the file descriptor.
-        Network::IoHandlePtr duplicated_handle = original_socket->ioHandle().duplicate();
-        if (!duplicated_handle || !duplicated_handle->isOpen()) {
-          ENVOY_LOG(error, "Failed to duplicate file descriptor");
-          return nullptr;
-        }
-
-        os_fd_t original_fd = original_socket->ioHandle().fdDoNotUse();
-        os_fd_t duplicated_fd = duplicated_handle->fdDoNotUse();
-        ENVOY_LOG(debug, "reverse_tunnel: duplicated fd: original_fd={}, duplicated_fd={}",
-                  original_fd, duplicated_fd);
-
-        // Create a new socket with the duplicated handle.
-        Network::ConnectionSocketPtr duplicated_socket =
-            std::make_unique<Network::ConnectionSocketImpl>(
-                std::move(duplicated_handle),
-                original_socket->connectionInfoProvider().localAddress(),
-                original_socket->connectionInfoProvider().remoteAddress());
-
-        // Reset file events on the duplicated socket to clear any inherited events.
-        duplicated_socket->ioHandle().resetFileEvents();
-
-        // Create RAII-based IoHandle with duplicated socket, passing parent pointer, connection
-        // key, and connection id.
-        auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-            std::move(duplicated_socket), this, connection_key, connection_id);
-
-        ENVOY_LOG(info,
-                  "reverse_tunnel: RAII IoHandle created with duplicated socket for node_id: {}"
-                  "and protection enabled.",
-                  config_.src_node_id);
-
-        // Reset file events on the original socket to prevent any pending operations. The socket
-        // fd has been duplicated, so we have an independent fd. Closing the original connection
-        // will only close its fd, not affect our duplicated fd.
-        //
-        // Note: For raw TCP connections, no shutdown() is called during close, only close() on
-        // the fd, which doesn't affect the duplicated fd.
-        original_socket->ioHandle().resetFileEvents();
-
-        // Close the original connection.
-        connection->close(Network::ConnectionCloseType::NoFlush);
-
-        return io_handle;
-      }
-    } else if (bytes_read == 0) {
-      ENVOY_LOG(debug, "reverse_tunnel: trigger pipe closed.");
-      return nullptr;
-    } else if (bytes_read == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-      ENVOY_LOG(error, "reverse_tunnel: error reading from trigger pipe: {}", errorDetails(errno));
-      return nullptr;
-    }
+  if (established_connections_.empty()) {
+    return nullptr;
   }
-  return nullptr;
+  auto conn = std::move(established_connections_.front());
+  RELEASE_ASSERT(conn && conn->getSocket() && conn->getSocket()->isOpen() &&
+                     conn->connectionInfoProvider().localAddress(),
+                 "Connection and socket must be valid for an accepted connection");
+  established_connections_.pop();
+  Cleanup close_conn([&conn]() {
+    conn->close(Network::ConnectionCloseType::NoFlush);
+    conn->dispatcher().deferredDelete(std::move(conn));
+  });
+  auto key = conn->connectionInfoProvider().localAddress()->asString();
+
+  // Get the remote address.
+  auto remote_addr = conn->connectionInfoProvider().remoteAddress();
+  if (!remote_addr) {
+    remote_addr = std::make_shared<Envoy::Network::Address::Ipv4Instance>("127.0.0.1", 0);
+  }
+  if (*addrlen >= remote_addr->sockAddrLen()) {
+    memcpy(addr, remote_addr->sockAddr(), remote_addr->sockAddrLen()); // NOLINT(safe-memcpy)
+  }
+  *addrlen = remote_addr->sockAddrLen();
+
+  // Duplicate the socket handle.
+  auto dup_handle = conn->getSocket()->ioHandle().duplicate();
+  if (!dup_handle || !dup_handle->isOpen()) {
+    ENVOY_CONN_LOG(error, "Failed to duplicate socket handle for key: {}", *conn, key);
+    dropTunnelFromTracking(key);
+    return nullptr;
+  }
+  auto sock = std::make_unique<Network::ConnectionSocketImpl>(
+      std::move(dup_handle), conn->connectionInfoProvider().localAddress(), remote_addr);
+
+  return std::make_unique<DownstreamReverseConnectionIOHandle>(std::move(sock), this, key,
+                                                               conn->id());
 }
 
 Api::IoCallUint64Result ReverseConnectionIOHandle::read(Buffer::Instance& buffer,
@@ -366,23 +252,7 @@ ReverseConnectionIOHandle::connect(Envoy::Network::Address::InstanceConstSharedP
 Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
   ENVOY_LOG(error, "reverse_tunnel: performing graceful shutdown.");
 
-  // If initializeFileEvent() ran, fd_ was reassigned to trigger_pipe_read_fd_ and the base class
-  // will close that. We must close original_socket_fd_ explicitly since nothing else owns it.
-  // If initializeFileEvent() did not run, fd_ == original_socket_fd_ and the base class handles it.
-  if (original_socket_fd_ != fd_ && original_socket_fd_ >= 0) {
-    ENVOY_LOG(error, "Closing original socket FD: {}.", original_socket_fd_);
-    Api::OsSysCallsSingleton::get().close(original_socket_fd_);
-  }
-  SET_SOCKET_INVALID(original_socket_fd_);
-
-  // CRITICAL: If we're using pipe trigger FD, let the IoSocketHandleImpl::close()
-  // close it and cleanup() set the pipe FDs to -1.
-  if (isTriggerPipeReady() && getPipeMonitorFd() == fd_) {
-    ENVOY_LOG(error,
-              "Skipping close of pipe trigger FD {} - will be handled by base close() method.",
-              fd_);
-  }
-
+  listener_want_read_ = false;
   if (rev_conn_retry_timer_) {
     rev_conn_retry_timer_.reset();
   }
@@ -395,8 +265,6 @@ void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
   // For reverse connections, we handle these events through RCConnectionWrapper.
   ENVOY_LOG(trace, "reverse_tunnel: event: {}", static_cast<int>(event));
 }
-
-int ReverseConnectionIOHandle::getPipeMonitorFd() const { return trigger_pipe_read_fd_; }
 
 // Get time source for consistent time operations.
 TimeSource& ReverseConnectionIOHandle::getTimeSource() const {
@@ -1117,35 +985,6 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   return true;
 }
 
-// Trigger pipe used to wake up accept() when a connection is established.
-void ReverseConnectionIOHandle::createTriggerPipe() {
-  ENVOY_LOG(debug, "reverse_tunnel: Creating trigger pipe for single-byte mechanism");
-  int pipe_fds[2];
-  if (pipe(pipe_fds) == -1) {
-    ENVOY_LOG(error, "Failed to create trigger pipe: {}", errorDetails(errno));
-    trigger_pipe_read_fd_ = -1;
-    trigger_pipe_write_fd_ = -1;
-    return;
-  }
-  trigger_pipe_read_fd_ = pipe_fds[0];
-  trigger_pipe_write_fd_ = pipe_fds[1];
-  // Make both ends non-blocking.
-  int flags = fcntl(trigger_pipe_write_fd_, F_GETFL, 0);
-  if (flags != -1) {
-    fcntl(trigger_pipe_write_fd_, F_SETFL, flags | O_NONBLOCK);
-  }
-  flags = fcntl(trigger_pipe_read_fd_, F_GETFL, 0);
-  if (flags != -1) {
-    fcntl(trigger_pipe_read_fd_, F_SETFL, flags | O_NONBLOCK);
-  }
-  ENVOY_LOG(debug, "reverse_tunnel: Created trigger pipe: read_fd={}, write_fd={}",
-            trigger_pipe_read_fd_, trigger_pipe_write_fd_);
-}
-
-bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
-  return trigger_pipe_read_fd_ != -1 && trigger_pipe_write_fd_ != -1;
-}
-
 void ReverseConnectionIOHandle::onConnectionDone(
     const std::string& error, RCConnectionWrapper* wrapper, bool closed,
     std::optional<std::chrono::milliseconds> retry_after) {
@@ -1269,20 +1108,7 @@ void ReverseConnectionIOHandle::onConnectionDone(
 
     // Move connection to established queue for reverse_conn_listener to consume.
     established_connections_.push(std::move(released_conn));
-
-    // Trigger accept mechanism safely.
-    if (isTriggerPipeReady()) {
-      char trigger_byte = 1;
-      ssize_t bytes_written = ::write(trigger_pipe_write_fd_, &trigger_byte, 1);
-      if (bytes_written == 1) {
-        ENVOY_LOG(info,
-                  "reverse_tunnel: Successfully triggered reverse_conn_listener "
-                  "accept() for host {}",
-                  host_address);
-      } else {
-        ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}", errorDetails(errno));
-      }
-    }
+    maybePushConn();
   }
 
   // Safely remove wrapper from tracking.
