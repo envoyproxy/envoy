@@ -1,9 +1,14 @@
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
+#include <algorithm>
+
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/escaping.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -72,8 +77,10 @@ SecretManager::SecretManager(const ConfigProto& config,
     : stats_scope_(factory_context.scope().createScope("on_demand_secret.")),
       stats_(generateCertSelectionStats(*stats_scope_)),
       factory_context_(factory_context.serverFactoryContext()),
-      config_source_(config.config_source()), context_factory_(std::move(context_factory)),
-      cert_contexts_(factory_context_.threadLocal()) {
+      config_source_(config.config_source()),
+      max_secrets_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_secrets, 0)),
+      prefetch_names_(config.prefetch_secret_names().begin(), config.prefetch_secret_names().end()),
+      context_factory_(std::move(context_factory)), cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   for (const auto& name : config.prefetch_secret_names()) {
     addCertificateConfig(name, nullptr, factory_context.initManager());
@@ -83,11 +90,36 @@ SecretManager::SecretManager(const ConfigProto& config,
 void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                                          OptRef<Init::Manager> init_manager) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // When the cache is full, prefer reclaiming a slot from an entry that never produced a
+  // certificate and has no waiting handshakes over rejecting the new secret, so that abandoned
+  // fetches for unknown names cannot permanently occupy the cache.
+  if (max_secrets_ > 0 && cache_.size() >= max_secrets_ && !cache_.contains(secret_name) &&
+      !reclaimUnusedEntry()) {
+    ENVOY_LOG_EVERY_POW_2(warn,
+                          "On-demand secret cache is full at {} secrets, rejecting secret '{}'",
+                          cache_.size(), absl::CEscape(secret_name));
+    stats_->cert_overflow_.inc();
+    if (handle) {
+      handle->notify(nullptr);
+    }
+    return;
+  }
   CacheEntry& entry = cache_[secret_name];
+  entry.prefetched_ = prefetch_names_.contains(secret_name);
   if (handle) {
     if (entry.cert_context_) {
       handle->notify(entry.cert_context_);
     } else {
+      // Compact expired handles at geometric size thresholds, keeping the insertion cost
+      // amortized constant while bounding the list by roughly twice the live pending handshakes
+      // rather than by the history of interrupted ones.
+      if (entry.callbacks_.size() >= entry.next_compact_size_) {
+        entry.callbacks_.erase(
+            std::remove_if(entry.callbacks_.begin(), entry.callbacks_.end(),
+                           [](const std::weak_ptr<Handle>& handle) { return handle.expired(); }),
+            entry.callbacks_.end());
+        entry.next_compact_size_ = std::max<size_t>(16, entry.callbacks_.size() * 2);
+      }
       entry.callbacks_.push_back(handle);
     }
   }
@@ -95,6 +127,7 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   // Should be last to trigger the callback since constructor can fire the update event for an
   // existing SDS subscription.
   if (entry.cert_config_ == nullptr) {
+    entry.generation_ = next_generation_++;
     entry.cert_config_ = std::make_unique<AsyncContextConfig>(
         secret_name, factory_context_, config_source_, init_manager,
         [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
@@ -116,9 +149,12 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   RETURN_IF_NOT_OK(creation_status);
 
   // Update the future lookups and notify pending callbacks.
-  setContext(secret_name, cert_context);
   CacheEntry& entry = cache_[secret_name];
+  setContext(secret_name, cert_context);
   entry.cert_context_ = cert_context;
+  // The update makes any deferred removal captured before it stale: the SDS server published the
+  // certificate after signaling the removal, and the later message wins.
+  entry.generation_ = next_generation_++;
   size_t notify_count = 0;
   for (const auto& fetch_handle : entry.callbacks_) {
     if (auto handle = fetch_handle.lock(); handle) {
@@ -139,8 +175,9 @@ absl::Status SecretManager::updateAll() {
     // Refresh only if there is a certificate present and skip notifying.
     if (cert_config) {
       absl::Status creation_status = absl::OkStatus();
-      entry.cert_context_ =
+      auto cert_context =
           context_factory_(*stats_scope_, factory_context_, *cert_config, creation_status);
+      entry.cert_context_ = cert_context;
       setContext(secret_name, entry.cert_context_);
       RETURN_IF_NOT_OK(creation_status);
     }
@@ -151,21 +188,33 @@ absl::Status SecretManager::updateAll() {
 absl::Status SecretManager::removeCertificateConfig(absl::string_view secret_name) {
   // We cannot remove the subscription caller directly because this is called during a callback
   // which continues later. Instead, we post to the main as a completion.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  const auto it = cache_.find(secret_name);
+  if (it == cache_.end()) {
+    return absl::OkStatus();
+  }
+  // Capture the entry generation so that the deferred removal only applies while the entry state
+  // it observed is still current: it must not erase an entry re-created after a reclaim, nor a
+  // certificate that the SDS server published after signaling this removal.
   factory_context_.mainThreadDispatcher().post(
       [weak_this = std::weak_ptr<SecretManager>(shared_from_this()),
-       name = std::string(secret_name)] {
+       name = std::string(secret_name), generation = it->second.generation_] {
         if (auto that = weak_this.lock(); that) {
-          that->doRemoveCertificateConfig(name);
+          if (that->doRemoveCertificateConfig(name, generation)) {
+            that->removeContexts({name});
+          }
         }
       });
   return absl::OkStatus();
 }
 
-void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
+bool SecretManager::doRemoveCertificateConfig(absl::string_view secret_name,
+                                              std::optional<uint64_t> expected_generation) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   auto it = cache_.find(secret_name);
-  if (it == cache_.end()) {
-    return;
+  if (it == cache_.end() ||
+      (expected_generation.has_value() && it->second.generation_ != *expected_generation)) {
+    return false;
   }
   size_t notify_count = 0;
   for (const auto& fetch_handle : it->second.callbacks_) {
@@ -174,11 +223,43 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
       notify_count++;
     }
   }
+  const bool had_context = it->second.cert_context_ != nullptr;
   cache_.erase(it);
-  setContext(secret_name, nullptr);
   stats_->cert_active_.dec();
   ENVOY_LOG(trace, "Removed certificate subscription for '{}', notified {} pending connections",
             secret_name, notify_count);
+  return had_context;
+}
+
+bool SecretManager::reclaimUnusedEntry() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Note: a fetch that is posted but not yet attached to an entry is not visible here, so its
+  // entry may be reclaimed concurrently. The posted fetch then simply re-admits the entry.
+  for (auto& [secret_name, entry] : cache_) {
+    if (entry.prefetched_ || entry.cert_context_ != nullptr) {
+      continue;
+    }
+    const bool has_live_callbacks =
+        std::any_of(entry.callbacks_.begin(), entry.callbacks_.end(),
+                    [](const std::weak_ptr<Handle>& handle) { return !handle.expired(); });
+    if (has_live_callbacks) {
+      continue;
+    }
+    // The erase in doRemoveCertificateConfig invalidates the map view, so copy the name first.
+    const std::string name(secret_name);
+    ENVOY_LOG(debug, "Reclaiming pending secret '{}' to admit a new secret", absl::CEscape(name));
+    stats_->cert_reclaimed_.inc();
+    // Reclaimable entries have no certificate, so no thread local contexts need to be erased.
+    const bool had_context = doRemoveCertificateConfig(name);
+    ASSERT(!had_context);
+    return true;
+  }
+  return false;
+}
+
+size_t SecretManager::pendingCallbacksForTest(absl::string_view secret_name) const {
+  const auto it = cache_.find(secret_name);
+  return it == cache_.end() ? 0 : it->second.callbacks_.size();
 }
 
 HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
@@ -202,16 +283,19 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
 }
 
 void SecretManager::setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx) {
+  ASSERT(cert_ctx != nullptr);
   cert_contexts_.runOnAllThreads(
-      [name = std::string(secret_name),
-       cert_ctx = std::move(cert_ctx)](OptRef<ThreadLocalCerts> certs) {
-        if (cert_ctx) {
-          certs->ctx_by_name_[name] = cert_ctx;
-        } else {
-          certs->ctx_by_name_.erase(name);
-        }
-      },
+      [name = std::string(secret_name), cert_ctx = std::move(cert_ctx)](
+          OptRef<ThreadLocalCerts> certs) { certs->ctx_by_name_[name] = cert_ctx; },
       [stats_scope = stats_scope_, stats = stats_] { stats->cert_updated_.inc(); });
+}
+
+void SecretManager::removeContexts(std::vector<std::string> secret_names) {
+  cert_contexts_.runOnAllThreads([names = std::move(secret_names)](OptRef<ThreadLocalCerts> certs) {
+    for (const auto& name : names) {
+      certs->ctx_by_name_.erase(name);
+    }
+  });
 }
 
 std::optional<AsyncContextConstSharedPtr>
@@ -287,6 +371,16 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
                                  AsyncContextFactory&& context_factory) {
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
+  if (config.has_max_secrets()) {
+    const absl::flat_hash_set<absl::string_view> prefetch_names(
+        config.prefetch_secret_names().begin(), config.prefetch_secret_names().end());
+    if (prefetch_names.size() > config.max_secrets().value()) {
+      return absl::InvalidArgumentError(
+          fmt::format("The number of prefetched secrets ({}) exceeds the maximum number of "
+                      "cached secrets ({}).",
+                      prefetch_names.size(), config.max_secrets().value()));
+    }
+  }
   MapperFactory& mapper_config =
       Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(

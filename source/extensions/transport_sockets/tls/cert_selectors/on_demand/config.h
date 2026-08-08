@@ -11,6 +11,8 @@
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/server_context_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -21,6 +23,8 @@ namespace OnDemand {
 #define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM)                                        \
   COUNTER(cert_requested)                                                                          \
   COUNTER(cert_updated)                                                                            \
+  COUNTER(cert_overflow)                                                                           \
+  COUNTER(cert_reclaimed)                                                                          \
   GAUGE(cert_active, Accumulate)
 
 struct CertSelectionStats {
@@ -192,10 +196,14 @@ public:
   absl::Status removeCertificateConfig(absl::string_view);
 
   /**
-   * Update the thread local caches with the certificates.
-   * @param cert_ctx the new context or nullptr to remove the secret.
+   * Install a new certificate context in the thread local caches.
    */
   void setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx);
+
+  /**
+   * Erase the certificate contexts from the thread local caches in one batched update.
+   */
+  void removeContexts(std::vector<std::string> secret_names);
 
   /**
    * Retrieve the thread local certificate.
@@ -209,12 +217,26 @@ public:
                                    Ssl::CertificateSelectionCallbackPtr&& cb,
                                    bool client_ocsp_capable);
 
+  /**
+   * @return the number of pending handshake callbacks tracked for the secret. Test use only.
+   */
+  size_t pendingCallbacksForTest(absl::string_view secret_name) const;
+
 private:
-  void doRemoveCertificateConfig(absl::string_view);
+  // Removes the cache entry, failing its pending handshakes. Returns whether a certificate
+  // context was installed for the entry and must also be erased from the thread local caches.
+  bool doRemoveCertificateConfig(absl::string_view,
+                                 std::optional<uint64_t> expected_generation = {});
+  bool reclaimUnusedEntry();
   const Stats::ScopeSharedPtr stats_scope_;
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
+  // The maximum number of cache entries, with 0 meaning unlimited.
+  const uint32_t max_secrets_;
+  // Configured prefetch names remain pinned in the cache even if the secret is removed by the
+  // SDS server and later fetched again on-demand.
+  const absl::flat_hash_set<std::string> prefetch_names_;
   AsyncContextFactory context_factory_;
 
   // Main-thread accessible context config subscriptions and callbacks.
@@ -222,8 +244,20 @@ private:
     AsyncContextConfigConstPtr cert_config_;
     AsyncContextConstSharedPtr cert_context_;
     std::vector<std::weak_ptr<Handle>> callbacks_;
+    // Bumped when the entry is created and on every successful certificate update, so that a
+    // deferred removal only applies while the entry state it observed is still current: it must
+    // not erase an entry that was reclaimed and re-created, nor a certificate that the SDS
+    // server published after signaling the removal.
+    uint64_t generation_{0};
+    // Expired handles are compacted when the callback list reaches this size, which then doubles,
+    // keeping the insertion cost amortized constant and the list bounded by roughly twice the
+    // live pending handshakes.
+    size_t next_compact_size_{16};
+    // Prefetched secrets are pinned in the cache: they are never reclaimed.
+    bool prefetched_{false};
   };
   absl::flat_hash_map<std::string, CacheEntry> cache_;
+  uint64_t next_generation_{0};
 
   // Lock-free map to retrieve ready TLS contexts by name.
   struct ThreadLocalCerts : public ThreadLocal::ThreadLocalObject {
