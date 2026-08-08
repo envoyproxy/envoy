@@ -208,7 +208,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #ifndef ENVOY_ENABLE_UHV
   // These checks are now part of UHV
   if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
-      Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
+      (filterManagerConnection()->shouldValidateUpstreamHeaders() &&
+       Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus()) ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(std::nullopt);

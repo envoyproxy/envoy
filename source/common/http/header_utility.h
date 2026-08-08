@@ -15,6 +15,7 @@
 #include "source/common/common/regex.h"
 #include "source/common/http/status.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -109,7 +110,9 @@ public:
   public:
     HeaderDataBaseImpl(const envoy::config::route::v3::HeaderMatcher& config)
         : name_(config.name()), invert_match_(config.invert_match()),
-          treat_missing_as_empty_(config.treat_missing_header_as_empty()) {}
+          treat_missing_as_empty_(config.treat_missing_header_as_empty()),
+          match_individually_(Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.match_headers_individually")) {}
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& request_headers) const override {
@@ -158,12 +161,20 @@ public:
       return invert_match_;
     }
 
+    bool matches(const HeaderMap& request_headers) const override {
+      return match_individually_ ? matchesHeadersIndividually(request_headers)
+                                 : matchesHeaders(request_headers);
+    }
+
   protected:
     // A matcher specific implementation to match the given header_value.
     virtual bool specificMatchesHeaders(absl::string_view header_value) const PURE;
     const LowerCaseString name_;
     const bool invert_match_;
     const bool treat_missing_as_empty_;
+    // Latched value of the `match_headers_individually` runtime feature, read once at
+    // construction instead of on every match.
+    const bool match_individually_;
   };
 
   // Corresponds to the exact_match from the HeaderMatchSpecifier proto in the RDS API.
@@ -490,6 +501,9 @@ public:
   /* Does a common header check ensuring that header keys and values are valid and do not contain
    * forbidden characters (e.g. valid HTTP header keys/values should never contain embedded NULLs
    * or new lines.)
+   * Callers are expected to gate this check behind the
+   * `envoy.reloadable_features.validate_upstream_headers` runtime feature, latched at codec
+   * connection construction; the check itself runs unconditionally.
    * @return Status containing the result. If failed, message includes details on which header key
    * or value was invalid.
    */

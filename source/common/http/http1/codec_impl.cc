@@ -451,7 +451,9 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+  if (connection_.shouldValidateUpstreamHeaders()) {
+    RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+  }
 #endif
 
   const HeaderEntry* method = headers.Method();
@@ -533,7 +535,13 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                uint32_t max_headers_kb, const uint32_t max_headers_count)
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
+      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count)
+#ifndef ENVOY_ENABLE_UHV
+      ,
+      validate_upstream_headers_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers"))
+#endif
+{
   parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
                                           codec_settings_.allow_custom_methods_);
 }

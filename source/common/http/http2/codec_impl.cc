@@ -392,7 +392,9 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+  if (parent_.validate_upstream_headers_) {
+    RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+  }
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
@@ -999,6 +1001,12 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                     "envoy.reloadable_features.http2_max_cookies_size_in_kb", 0) *
                                     1024
                               : 0),
+      http2_include_cookies_in_limits_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_include_cookies_in_limits")),
+#ifndef ENVOY_ENABLE_UHV
+      validate_upstream_headers_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")),
+#endif
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -1726,7 +1734,7 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
   uint64_t headers_size = stream->headers().byteSize();
   uint64_t headers_count = stream->headers().size();
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
+  if (http2_include_cookies_in_limits_) {
     headers_size += stream->cookies_.size();
     headers_count += stream->cookie_count_;
   }
@@ -2463,6 +2471,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count, runtime),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
+      http2_discard_host_header_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
       should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
@@ -2521,7 +2531,7 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
 }
 
 int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")) {
+  if (http2_discard_host_header_) {
     StreamImpl* stream = getStreamUnchecked(stream_id);
     if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
       // Check if there is already the :authority header

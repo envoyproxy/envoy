@@ -10,7 +10,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
@@ -37,16 +36,8 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
-    for (const HeaderDataPtr& cfg_header_data : config_headers) {
-      if (!cfg_header_data->matchesHeaders(request_headers)) {
-        return false;
-      }
-    }
-    return true;
-  }
   for (const HeaderDataPtr& cfg_header_data : config_headers) {
-    if (!cfg_header_data->matchesHeadersIndividually(request_headers)) {
+    if (!cfg_header_data->matches(request_headers)) {
       return false;
     }
   }
@@ -56,16 +47,8 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
 template <typename PointerType>
 static bool matchAnyHeaderImpl(const HeaderMap& request_headers,
                                const std::vector<PointerType>& config_headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
-    for (const PointerType& cfg_header_data : config_headers) {
-      if (cfg_header_data->matchesHeaders(request_headers)) {
-        return true;
-      }
-    }
-    return false;
-  }
   for (const PointerType& cfg_header_data : config_headers) {
-    if (cfg_header_data->matchesHeadersIndividually(request_headers)) {
+    if (cfg_header_data->matches(request_headers)) {
       return true;
     }
   }
@@ -544,10 +527,6 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
 }
 
 Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMap& headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")) {
-    return Http::okStatus();
-  }
-
   const HeaderEntry* invalid_entry = nullptr;
   bool invalid_key = false;
   headers.iterate([&invalid_entry, &invalid_key](const HeaderEntry& header) -> HeaderMap::Iterate {
