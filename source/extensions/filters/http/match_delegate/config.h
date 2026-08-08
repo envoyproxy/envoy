@@ -155,8 +155,12 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
 // Http::FilterFactoryCb is captured and invoked lazily: the nested filter is only created the first
 // time the match tree resolves to a non-skip result for the stream. This avoids the CPU/RAM cost of
 // building a filter that will be skipped. A single instance is registered as both a stream filter
-// and an access log handler, so the nested filter's access loggers only run when the nested filter
-// was actually created (skipped streams no longer emit its access logs).
+// and an access log handler.
+//
+// Access log behavior: when the skip decision is made from request headers or trailers, the nested
+// filter is never created and its access loggers do not run. When the match tree requires response
+// data to resolve (e.g. response-header matchers), the nested filter is created during the decode
+// phase and its access loggers run at stream end, since the filter participated in decoding.
 class LazyDelegatingStreamFilter : public Logger::Loggable<Logger::Id::http>,
                                    public Envoy::Http::StreamFilter,
                                    public AccessLog::Instance {
@@ -231,8 +235,6 @@ public:
   void setEncoderFilterCallbacks(Envoy::Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // AccessLog::Instance
-  // The nested filter's access loggers only run when the nested filter was actually created (i.e.
-  // the match tree did not resolve to a skip), so skipped filters no longer emit access logs.
   void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override;
 
 private:
@@ -247,12 +249,34 @@ private:
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
     Event::Dispatcher& dispatcher() override;
-    absl::string_view filterConfigName() const override { return {}; }
+    absl::string_view filterConfigName() const override {
+      if (parent_.decoder_callbacks_ != nullptr) {
+        return parent_.decoder_callbacks_->filterConfigName();
+      }
+      return parent_.encoder_callbacks_ != nullptr ? parent_.encoder_callbacks_->filterConfigName()
+                                                   : absl::string_view{};
+    }
+    // setFilterConfigName exists only on FilterChainFactoryCallbacks, not on the
+    // live stream callbacks, so it is a no-op in the lazy-creation context.
     void setFilterConfigName(absl::string_view) override {}
-    OptRef<const Router::Route> route() const override { return std::nullopt; }
+    OptRef<const Router::Route> route() const override {
+      if (parent_.decoder_callbacks_ != nullptr) {
+        return parent_.decoder_callbacks_->route();
+      }
+      return parent_.encoder_callbacks_ != nullptr ? parent_.encoder_callbacks_->route()
+                                                   : OptRef<const Router::Route>{};
+    }
+    // filterDisabled exists only on FilterChainFactoryCallbacks, not on the live
+    // stream callbacks, so report "unknown" during lazy creation.
     std::optional<bool> filterDisabled(absl::string_view) const override { return std::nullopt; }
     const StreamInfo::StreamInfo& streamInfo() const override;
-    Envoy::Http::RequestHeaderMapOptRef requestHeaders() const override { return std::nullopt; }
+    Envoy::Http::RequestHeaderMapOptRef requestHeaders() const override {
+      if (parent_.decoder_callbacks_ != nullptr) {
+        return parent_.decoder_callbacks_->requestHeaders();
+      }
+      return parent_.encoder_callbacks_ != nullptr ? parent_.encoder_callbacks_->requestHeaders()
+                                                   : Envoy::Http::RequestHeaderMapOptRef{};
+    }
 
     LazyDelegatingStreamFilter& parent_;
   };

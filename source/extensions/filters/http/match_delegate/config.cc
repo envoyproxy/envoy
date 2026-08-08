@@ -522,6 +522,7 @@ void LazyDelegatingStreamFilter::setDecoderFilterCallbacks(
 
 Envoy::Http::Filter1xxHeadersStatus
 LazyDelegatingStreamFilter::encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers) {
+  maybeCreateAndDispatch();
   if (match_state_.skipFilter()) {
     return Envoy::Http::Filter1xxHeadersStatus::Continue;
   }
@@ -726,7 +727,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
     // When lazy creation is enabled, register a single delegating filter that captures the nested
     // filter factory and creates the nested filter only after a non-skip match. The delegating
     // filter is also registered as an access log handler so the nested filter's access loggers run
-    // only when the nested filter is actually created.
+    // only when the match tree does not resolve to a skip.
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_delegate_lazy_creation")) {
       auto lazy_delegating_filter =
           std::make_shared<LazyDelegatingStreamFilter>(match_tree, filter_factory);
