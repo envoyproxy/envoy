@@ -80,6 +80,10 @@ private:
   // Init manager that is used to warm up the resources owned by the route configuration of the
   // update that is warming up. Null if no update is warming up.
   std::unique_ptr<Init::ManagerImpl> init_manager_;
+  // The init manager of the update that was warmed up last. It can't be destroyed from inside its
+  // own readiness callback, see onWarmed(), so it is moved aside there and destroyed once the next
+  // update replaces it.
+  std::unique_ptr<Init::ManagerImpl> deferred_delete_init_manager_;
   // Watcher that init_manager_ notifies once everything it warms up is ready.
   std::unique_ptr<Init::WatcherImpl> init_watcher_;
   // Identifies the update that is warming up in logs.
