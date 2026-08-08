@@ -22,6 +22,14 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
+    name = "filter_state_keys_lib",
+    hdrs = ["filter_state_keys.h"],
+    deps = [
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "io_handle_lib",
     hdrs = ["io_handle.h"],
     deps = [
@@ -57,9 +65,11 @@ envoy_cc_library(
     ],
     deps = [
         ":file_event_lib",
+        ":filter_state_keys_lib",
         ":io_handle_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
+        "//source/common/stream_info:uint64_accessor_lib",
     ],
 )

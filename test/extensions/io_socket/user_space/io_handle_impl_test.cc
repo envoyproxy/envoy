@@ -1,9 +1,11 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
+#include "envoy/stream_info/uint64_accessor.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/io_socket/user_space/filter_state_keys.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -1195,7 +1197,8 @@ TEST_F(IoHandleImplTest, PassthroughState) {
       {object, StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection,
        "object_key"});
   ASSERT_NE(nullptr, io_handle_->passthroughState());
-  io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
+  io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state,
+                                             /*connection_id=*/42);
 
   StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   envoy::config::core::v3::Metadata dest_metadata;
@@ -1206,6 +1209,11 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
   ASSERT_NE(nullptr, dest_object);
   ASSERT_EQ(object->value_, dest_object->value_);
+
+  const auto* connection_id =
+      dest_filter_state.getDataReadOnly<StreamInfo::UInt64Accessor>(ConnectionIdFilterStateKey);
+  ASSERT_NE(nullptr, connection_id);
+  EXPECT_EQ(42, connection_id->value());
 }
 
 class IoHandleImplNotImplementedTest : public testing::Test {
