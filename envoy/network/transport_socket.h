@@ -65,6 +65,14 @@ struct IoResult {
    * The underlying I/O error code.
    */
   std::optional<Api::IoError::IoErrorCode> err_code_;
+
+  /**
+   * True if the end-of-stream read corresponds to a full peer close rather than a graceful
+   * write half-close (see IoHandle::wasPeerFullyClosed()). Only meaningful when end_stream_read_
+   * is true. Lets the connection layer translate an EOF into a remote close under half-close
+   * semantics instead of leaving the connection half-open and leaking the upstream stream.
+   */
+  bool remote_close_{false};
 };
 
 /**

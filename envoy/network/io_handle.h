@@ -366,6 +366,17 @@ public:
    * @return the interface name for the socket, if the OS supports it. Otherwise, std::nullopt.
    */
   virtual std::optional<std::string> interfaceName() PURE;
+
+  /**
+   * @return whether the last read that returned end-of-stream corresponds to a full peer close
+   * (peer called close()) rather than a graceful write half-close (peer shutdown(WR)).
+   * Real OS sockets return false: the read side sees a clean EOF in both cases and the kernel
+   * only surfaces the distinction on a subsequent write (RST/EPIPE). User-space io_handle can
+   * tell them apart because the peer handle is destroyed, so it returns true after onPeerDestroy().
+   * Surfaced on the transport read result (IoResult::remote_close_) so the connection layer can
+   * translate an EOF into a remote close under half-close semantics instead of leaking the stream.
+   */
+  virtual bool wasPeerFullyClosed() const { return false; }
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

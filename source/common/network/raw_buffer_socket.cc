@@ -45,7 +45,15 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
     }
   } while (true);
 
-  return {action, bytes_read, end_stream, err};
+  IoResult io_result{action, bytes_read, end_stream, err};
+  // On EOF, record whether the peer fully closed (peer close()) versus a graceful write
+  // half-close (peer shutdown(WR)). Real sockets always report false here; user-space io_handle
+  // (internal listener) can distinguish. The connection layer uses this to avoid leaking the
+  // upstream stream when the downstream fully closes under half-close semantics.
+  if (end_stream) {
+    io_result.remote_close_ = callbacks_->ioHandle().wasPeerFullyClosed();
+  }
+  return io_result;
 }
 
 IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {

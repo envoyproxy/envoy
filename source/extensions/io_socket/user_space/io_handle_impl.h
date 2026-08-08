@@ -94,6 +94,7 @@ public:
   std::optional<std::chrono::milliseconds> lastRoundTripTime() override { return std::nullopt; }
   std::optional<uint64_t> congestionWindowInBytes() const override { return std::nullopt; }
   std::optional<std::string> interfaceName() override { return std::nullopt; }
+  bool wasPeerFullyClosed() const override { return peer_fully_closed_; }
 
   void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }
   void onBelowLowWatermark() {
@@ -124,6 +125,7 @@ public:
   void onPeerDestroy() override {
     peer_handle_ = nullptr;
     sent_eof_ = true;
+    peer_fully_closed_ = true;
   }
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
@@ -186,6 +188,10 @@ private:
 
   // Indicates whether this handle has sent EOF to the peer by calling setEof().
   bool sent_eof_{false};
+
+  // True after peer's close() (not shutdown(WR)). Lets half-close-enabled connections
+  // distinguish a full peer disconnect from a graceful half-close.
+  bool peer_fully_closed_{false};
 
   // Shared state between peer handles.
   PassthroughStateSharedPtr passthrough_state_{nullptr};
