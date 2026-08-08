@@ -84,8 +84,11 @@ absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
     ASSERT(config_update_info_->configInfo().has_value());
     maybeCreateInitManager(routeConfigUpdate()->configInfo().value().version_, noop_init_manager,
                            resume_rds);
+    // The VHDS subscription will use the provided route config provider to update the route
+    // configuration when it receives a VHDS update. But for RDS subscription, it's unnecessary
+    // because the RouteConfigUpdateObserver will be used.
     auto subscription_or_error = VhdsSubscription::createVhdsSubscription(
-        config_update_info_, factory_context_, stat_prefix_, route_config_provider_);
+        config_update_info_, factory_context_, stat_prefix_, nullptr);
     RETURN_IF_NOT_OK_REF(subscription_or_error.status());
     vhds_subscription_ = std::move(subscription_or_error.value());
     vhds_subscription_->registerInitTargetWithInitManager(

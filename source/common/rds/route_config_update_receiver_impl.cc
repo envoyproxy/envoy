@@ -55,12 +55,12 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
     ConfigTraits& config_traits, ProtoTraits& proto_traits,
     Server::Configuration::ServerFactoryContext& factory_context)
     : config_traits_(config_traits), proto_traits_(proto_traits), factory_context_(factory_context),
-      time_source_(factory_context.timeSource()), warmer_([this]() { onConfigWarmed(); }),
-      current_state_{proto_traits_.createEmptyProto(), config_traits_.createNullConfig(),
-                     std::nullopt, 0ull, SystemTime{}} {}
+      time_source_(factory_context.timeSource()),
+      route_config_proto_(proto_traits_.createEmptyProto()),
+      config_(config_traits_.createNullConfig()), warmer_([this]() { onConfigWarmed(); }) {}
 
 void RouteConfigUpdateReceiverImpl::updateConfig(
-    std::unique_ptr<Protobuf::Message> route_config_proto, uint64_t hash,
+    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
     absl::string_view version_info) {
 
   const std::string update_id =
@@ -71,12 +71,12 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
   auto config =
       config_traits_.createConfig(*route_config_proto, factory_context_, *update_init_manager,
                                   false /* not validate unknown cluster */);
+
   warming_state_.route_config_proto_ = std::move(route_config_proto);
   warming_state_.config_ = std::move(config);
   warming_state_.last_config_hash_ = hash;
   warming_state_.last_updated_ = time_source_.systemTime();
-  warming_state_.config_info_.emplace(RouteConfigProvider::ConfigInfo{
-      *warming_state_.route_config_proto_, std::string(version_info)});
+  warming_state_.version_info_.assign(version_info.data(), version_info.size());
 
   // The new route configuration has been built but isn't warmed up or published yet. The caller
   // finishes applying the update and then calls startWarming().
@@ -97,17 +97,18 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
 }
 
 void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
-  current_state_.route_config_proto_ = std::move(warming_state_.route_config_proto_);
-  current_state_.config_ = std::move(warming_state_.config_);
-  current_state_.last_config_hash_ = warming_state_.last_config_hash_;
-  current_state_.last_updated_ = warming_state_.last_updated_;
-  current_state_.config_info_.emplace(std::move(*warming_state_.config_info_));
-
-  warming_state_.route_config_proto_.reset();
-  warming_state_.config_.reset();
-  warming_state_.last_config_hash_ = 0ull;
-  warming_state_.last_updated_ = SystemTime{};
-  warming_state_.config_info_.reset();
+  if (warming_state_.route_config_proto_ != nullptr) {
+    route_config_proto_ = std::move(warming_state_.route_config_proto_);
+    config_ = std::move(warming_state_.config_);
+    // Only update the last config hash if it was set in the warming state.
+    if (warming_state_.last_config_hash_.has_value()) {
+      last_config_hash_ = warming_state_.last_config_hash_.value();
+    }
+    last_updated_ = warming_state_.last_updated_;
+    config_info_.emplace(*route_config_proto_, std::move(warming_state_.version_info_));
+  }
+  // Defensively clear the warming state.
+  warming_state_.clear();
 }
 
 } // namespace Rds

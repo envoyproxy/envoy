@@ -1,5 +1,6 @@
 #include "source/common/router/route_config_update_receiver_impl.h"
 
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -121,12 +122,11 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   // Merge the latest RouteConfiguration with the updated VHDS. That is the one an update that is
   // still warming up built, if any, so that this update supersedes it instead of losing it.
-  route_config_after_this_update->CheckTypeAndMergeFrom(base_.latestProtobufConfiguration());
+  route_config_after_this_update->CheckTypeAndMergeFrom(latestProtobufConfiguration());
   rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhosts_after_this_update,
                                  *route_config_after_this_update);
 
-  const uint64_t new_hash = base_.getHash(*route_config_after_this_update);
-  base_.updateConfig(std::move(route_config_after_this_update), new_hash, version_info);
+  base_.updateConfig(std::move(route_config_after_this_update), std::nullopt, version_info);
   // No exception, the new route configuration is valid, can update the state. This has to happen
   // before the update is published, because publishing runs the on-demand VHDS callbacks against
   // resourceIdsInLastVhdsUpdate().

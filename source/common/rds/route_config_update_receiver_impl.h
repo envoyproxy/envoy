@@ -15,6 +15,9 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+namespace Router {
+class RouteConfigUpdateReceiverImpl;
+}
 namespace Rds {
 
 /**
@@ -92,14 +95,22 @@ private:
 };
 
 // The state of one route configuration: the proto it was built from, the parsed configuration and
-// the bookkeeping that goes with them. A receiver keeps one for the published route configuration
-// and one for the update that is warming up, if any.
-struct RouteConfigState {
+// the bookkeeping that goes with them.
+struct WarmingConfigState {
   ProtobufTypes::MessagePtr route_config_proto_;
   ConfigConstSharedPtr config_;
-  std::optional<RouteConfigProvider::ConfigInfo> config_info_;
-  uint64_t last_config_hash_{0ull};
+  std::string version_info_;
+  // This will be nullopt if the state is generated from VHDS updates.
+  std::optional<uint64_t> last_config_hash_;
   SystemTime last_updated_;
+
+  void clear() {
+    route_config_proto_.reset();
+    config_.reset();
+    version_info_.clear();
+    last_config_hash_.reset();
+    last_updated_ = SystemTime{};
+  }
 };
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
@@ -109,26 +120,14 @@ public:
 
   uint64_t getHash(const Protobuf::Message& rc) const { return MessageUtil::hash(rc); }
   bool checkHash(uint64_t new_hash) const {
-    if (warming_state_.route_config_proto_ != nullptr) {
-      // There is an update that is warming up. Check if the new update is the same as that one, and
-      // if so, ignore it.
-      if (new_hash == warming_state_.last_config_hash_) {
-        return false;
-      }
-    } else {
-      // There is no update that is warming up. Check if the new update is the same as the current
-      // one, and if so, ignore it.
-      if (new_hash == current_state_.last_config_hash_) {
-        return false;
-      }
-    }
-    return true;
+    uint64_t last_config_hash = warming_state_.last_config_hash_.value_or(last_config_hash_);
+    return new_hash != last_config_hash;
   }
   // Builds a new route configuration and installs the init manager that its resources warm up
   // with, but doesn't warm anything up or publish anything yet. The caller finishes applying the
   // update and then calls startWarming(), which eventually publishes it.
-  void updateConfig(std::unique_ptr<Protobuf::Message> route_config_proto, uint64_t hash,
-                    absl::string_view version_info);
+  void updateConfig(std::unique_ptr<Protobuf::Message> route_config_proto,
+                    std::optional<uint64_t> hash, absl::string_view version_info);
   // Warms up the route configuration built by the last updateConfig() call and publishes it once
   // it's ready. Note that this may happen before this method returns, i.e. synchronously, if there
   // is nothing to warm up.
@@ -139,33 +138,28 @@ public:
   void setObserver(RouteConfigUpdateObserver& observer) override { warmer_.setObserver(observer); }
   bool configWarming() const override { return warmer_.warming(); }
 
-  uint64_t configHash() const override { return current_state_.last_config_hash_; }
-  const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const override {
-    return current_state_.config_info_;
-  }
-  const Protobuf::Message& protobufConfiguration() const override {
-    return *current_state_.route_config_proto_;
-  }
-  ConfigConstSharedPtr parsedConfiguration() const override { return current_state_.config_; }
-  SystemTime lastUpdated() const override { return current_state_.last_updated_; }
-
-  ConfigWarmer& warmer() { return warmer_; }
-  const ConfigWarmer& warmer() const { return warmer_; }
-  const Protobuf::Message& latestProtobufConfiguration() const {
-    return warming_state_.route_config_proto_ ? *warming_state_.route_config_proto_
-                                              : *current_state_.route_config_proto_;
-  }
+  uint64_t configHash() const override { return last_config_hash_; }
+  const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const override;
+  const Protobuf::Message& protobufConfiguration() const override { return *route_config_proto_; }
+  ConfigConstSharedPtr parsedConfiguration() const override { return config_; }
+  SystemTime lastUpdated() const override { return last_updated_; }
 
 private:
+  friend class Envoy::Router::RouteConfigUpdateReceiverImpl;
+
   void onConfigWarmed();
 
   ConfigTraits& config_traits_;
   ProtoTraits& proto_traits_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   TimeSource& time_source_;
+  ProtobufTypes::MessagePtr route_config_proto_;
+  uint64_t last_config_hash_{0ull};
+  SystemTime last_updated_;
+  std::optional<RouteConfigProvider::ConfigInfo> config_info_;
+  ConfigConstSharedPtr config_;
   ConfigWarmer warmer_;
-  RouteConfigState current_state_;
-  RouteConfigState warming_state_;
+  WarmingConfigState warming_state_;
 };
 
 } // namespace Rds

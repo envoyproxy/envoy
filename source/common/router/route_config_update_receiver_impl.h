@@ -52,9 +52,9 @@ public:
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
   void setObserver(Rds::RouteConfigUpdateObserver& observer) override {
-    base_.warmer().setObserver(observer);
+    base_.warmer_.setObserver(observer);
   }
-  bool configWarming() const override { return base_.warmer().warming(); }
+  bool configWarming() const override { return base_.warmer_.warming(); }
   uint64_t configHash() const override { return base_.configHash(); }
   const std::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
@@ -79,6 +79,11 @@ public:
   }
 
 private:
+  const Protobuf::Message& latestProtobufConfiguration() const {
+    return base_.warming_state_.route_config_proto_ ? *base_.warming_state_.route_config_proto_
+                                                    : *base_.route_config_proto_;
+  }
+
   ConfigTraitsImpl config_traits_;
 
   Rds::RouteConfigUpdateReceiverImpl base_;
