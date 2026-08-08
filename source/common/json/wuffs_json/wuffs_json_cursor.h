@@ -266,6 +266,11 @@ private:
   // bypass this path entirely — those are bounded by the max_body_bytes limit instead. A legitimate
   // number is at most ~25 chars (64-bit int ≤ 20 digits; float with sign/decimal/exponent ≤ ~25).
   // 64 bytes gives generous headroom.
+  // TODO(penguingao): because the cap only fires on split NUMBER tokens, whether an over-long
+  // number is rejected depends on where the body happened to be chunked, not on the payload.
+  // Enforce the same limit on numbers that arrive complete within one chunk so acceptance is
+  // deterministic, and return a distinct error (resource limit exceeded vs. malformed JSON) so
+  // callers can map it to something clearer than a generic invalid-payload rejection.
   static constexpr size_t kMaxPendingBytes = 64;
   int depth_{0};
   bool is_dict_[kMaxTrackedDepth]{};
