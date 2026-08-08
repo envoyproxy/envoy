@@ -4517,6 +4517,43 @@ fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
 // Cluster Extension FFI stubs for testing.
 // =============================================================================
 
+pub(crate) static MOCK_CLUSTER_LEGACY_ADD_HOSTS_CALLS: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS: std::sync::Mutex<
+  Vec<(u32, Vec<Vec<u8>>)>,
+> = std::sync::Mutex::new(Vec::new());
+
+fn copy_module_buffers(
+  buffers: *const abi::envoy_dynamic_module_type_module_buffer,
+  count: usize,
+) -> Vec<Vec<u8>> {
+  if count == 0 {
+    return Vec::new();
+  }
+  unsafe { std::slice::from_raw_parts(buffers, count) }
+    .iter()
+    .map(|buffer| {
+      if buffer.length == 0 {
+        Vec::new()
+      } else {
+        unsafe { std::slice::from_raw_parts(buffer.ptr as *const u8, buffer.length) }.to_vec()
+      }
+    })
+    .collect()
+}
+
+fn write_mock_cluster_host_ptrs(
+  result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  count: usize,
+) {
+  for index in 0..count {
+    unsafe {
+      result_host_ptrs
+        .add(index)
+        .write((index + 1) as *mut std::ffi::c_void);
+    }
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
@@ -4531,7 +4568,32 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
   _count: usize,
   _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
 ) -> bool {
-  false
+  MOCK_CLUSTER_LEGACY_ADD_HOSTS_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  write_mock_cluster_host_ptrs(_result_host_ptrs, _count);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  priority: u32,
+  _addresses: *const abi::envoy_dynamic_module_type_module_buffer,
+  hostnames: *const abi::envoy_dynamic_module_type_module_buffer,
+  _weights: *const u32,
+  _regions: *const abi::envoy_dynamic_module_type_module_buffer,
+  _zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _sub_zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs_per_host: usize,
+  count: usize,
+  result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+) -> bool {
+  MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS
+    .lock()
+    .unwrap()
+    .push((priority, copy_module_buffers(hostnames, count)));
+  write_mock_cluster_host_ptrs(result_host_ptrs, count);
+  true
 }
 
 #[no_mangle]
