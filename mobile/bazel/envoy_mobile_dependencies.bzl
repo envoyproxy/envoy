@@ -1,18 +1,3 @@
-load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
-load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
-load("@gazelle//:deps.bzl", "go_repository")
-load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
-load("@rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
-load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
-load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
-load("@rules_jvm_external//:defs.bzl", "maven_install")
-load("@rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
-load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
-load("@rules_proto//proto:toolchains.bzl", "rules_proto_toolchains")
-load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
-load("@rules_python//python:pip.bzl", "pip_parse")
-load("@rules_shell//shell:repositories.bzl", "rules_shell_dependencies", "rules_shell_toolchains")
-
 def _default_extra_swift_sources_impl(ctx):
     ctx.file("WORKSPACE", "")
     ctx.file("empty.swift", "")
@@ -29,7 +14,7 @@ objc_library(
     visibility = ["//visibility:public"],
 )""")
 
-_default_extra_swift_sources = repository_rule(
+default_extra_swift_sources = repository_rule(
     implementation = _default_extra_swift_sources_impl,
 )
 
@@ -41,7 +26,7 @@ cc_library(
     visibility = ["//visibility:public"],
 )""")
 
-_default_extra_jni_deps = repository_rule(
+default_extra_jni_deps = repository_rule(
     implementation = _default_extra_jni_deps_impl,
 )
 

@@ -8,24 +8,6 @@ bazel_skylib:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE"
 
-com_envoyproxy_protoc_gen_validate:
-  project_name: "protoc-gen-validate (PGV)"
-  project_desc: "protoc plugin to generate polyglot message validators"
-  project_url: "https://github.com/bufbuild/protoc-gen-validate"
-  release_date: "2026-02-18"
-  use_category:
-  - api
-  implied_untracked_deps:
-  - com_github_iancoleman_strcase
-  - com_github_lyft_protoc_gen_star_v2
-  - com_github_spf13_afero
-  - org_golang_google_genproto
-  - org_golang_x_text
-  - org_golang_x_mod
-  - org_golang_x_sys
-  license: "Apache-2.0"
-  license_url: "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE"
-
 com_github_chrusty_protoc_gen_jsonschema:
   project_name: "protoc-gen-jsonschema"
   project_desc: "Protobuf to JSON-Schema compiler"
@@ -67,6 +49,7 @@ googleapis:
   project_name: "Google APIs"
   project_desc: "Public interface definitions of Google APIs"
   project_url: "https://github.com/googleapis/googleapis"
+  apparent_name: com_google_googleapis
   release_date: "2024-09-16"
   use_category:
   - api
@@ -84,7 +67,7 @@ opentelemetry-proto:
   license: "Apache-2.0"
   license_url: "https://github.com/open-telemetry/opentelemetry-proto/blob/v{version}/LICENSE"
 
-prometheus_metrics_model:
+prometheus-metrics-model:
   project_name: "Prometheus client model"
   project_desc: "Data model artifacts for Prometheus"
   project_url: "https://github.com/prometheus/client_model"
@@ -93,6 +76,25 @@ prometheus_metrics_model:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/prometheus/client_model/blob/v{version}/LICENSE"
+
+protoc-gen-validate:
+  project_name: "protoc-gen-validate (PGV)"
+  project_desc: "protoc plugin to generate polyglot message validators"
+  project_url: "https://github.com/bufbuild/protoc-gen-validate"
+  apparent_name: com_envoyproxy_protoc_gen_validate
+  release_date: "2026-02-18"
+  use_category:
+  - api
+  implied_untracked_deps:
+  - com_github_iancoleman_strcase
+  - com_github_lyft_protoc_gen_star_v2
+  - com_github_spf13_afero
+  - org_golang_google_genproto
+  - org_golang_x_text
+  - org_golang_x_mod
+  - org_golang_x_sys
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE"
 
 rules_buf:
   project_name: "Bazel rules for Buf"

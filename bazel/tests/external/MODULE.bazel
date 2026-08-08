@@ -1,0 +1,60 @@
+module(name = "envoy_external")
+
+bazel_dep(name = "envoy")
+bazel_dep(name = "envoy_api")
+bazel_dep(name = "envoy-docs", version = "1.40.0-dev")
+bazel_dep(name = "envoy-example-wasm-cc", version = "0.2.5.envoy")
+bazel_dep(name = "envoy-examples", version = "0.2.5.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.4.5.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-260810-90a1e22.envoy")
+bazel_dep(name = "toolchains_llvm", version = "1.8.0.envoy", dev_dependency = True)
+bazel_dep(name = "rules_go", version = "0.59.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "rules_python", version = "2.2.0")
+
+local_path_override(
+    module_name = "envoy",
+    path = "../../../",
+)
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "../../../api",
+)
+
+local_path_override(
+    module_name = "envoy-docs",
+    path = "../../../docs",
+)
+
+# needed to resolve conflict grpc <> flatbuffers
+single_version_override(
+    module_name = "rules_swift",
+    version = "2.4.0",
+)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.12",
+)
+use_repo(
+    python,
+    "python_3_12",
+    python = "python_versions",
+)
+
+go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(
+    name = "go_sdk",
+    version = "1.24.6",
+)
+use_repo(
+    go_sdk,
+    "go_sdk",
+    "go_toolchains",
+    "io_bazel_rules_nogo",
+)
+register_toolchains("@go_toolchains//:all")
+
+envoy_toolchains_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_toolchains_extension")
+use_repo(envoy_toolchains_ext, "clang_platform")
