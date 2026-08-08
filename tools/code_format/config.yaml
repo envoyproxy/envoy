@@ -101,7 +101,7 @@ paths:
     - source/common/rds/common/route_config_provider_manager_impl.h
     - source/common/rds/route_config_provider_manager.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
-    # StausOr where possible.
+    # StatusOr where possible.
     - source/common/watchdog/abort_action_config.cc
     - source/extensions/watchdog/backtrace_action/config.cc
     - source/extensions/watchdog/profile_action/config.cc
@@ -120,6 +120,7 @@ paths:
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/listener_manager/lds_api.cc
+    - source/common/listener_manager/filter_chain_manager_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
