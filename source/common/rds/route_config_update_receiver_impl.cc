@@ -96,7 +96,13 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
 
   warming_state_.route_config_proto_ = std::move(route_config_proto);
   warming_state_.config_ = std::move(config);
-  warming_state_.last_config_hash_ = hash;
+  // If previously, there was a pending RDS update that contains a hash. And then a new VHDS
+  // update arrives, the new VHDS update will not contain a hash. In this case, we should keep the
+  // last_config_hash_ in the warming state, so that when the configuration is warmed up,
+  // the last_config_hash_ will be updated to the last RDS update's hash.
+  if (hash.has_value()) {
+    warming_state_.last_config_hash_ = hash;
+  }
   warming_state_.last_updated_ = time_source_.systemTime();
   warming_state_.version_info_.assign(version_info.data(), version_info.size());
 
