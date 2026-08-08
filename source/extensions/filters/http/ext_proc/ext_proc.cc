@@ -1878,6 +1878,9 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     return;
   }
 
+  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
+                   responseCaseToString(response->response_case()), response->DebugString());
+
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
@@ -1895,16 +1898,24 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     if (config_->isAllowedOverrideMode(mode_override)) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server for this request",
                        *decoder_callbacks_);
+      const auto old_decoding_body_mode = decoding_state_.bodyMode();
       decoding_state_.setProcessingMode(mode_override);
       encoding_state_.setProcessingMode(mode_override);
+
+      // If the response case is not set, this response message is for overriding the
+      // processing mode only.
+      if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
+        // If this function call returns false, it's a spurious response, and is handled
+        // by the default case of the switch statement below.
+        if (decoding_state_.handleStandaloneModeOverride(old_decoding_body_mode)) {
+          return;
+        }
+      }
     } else {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server is disallowed",
                        *decoder_callbacks_);
     }
   }
-
-  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
-                   responseCaseToString(response->response_case()), response->DebugString());
 
   bool eos_seen_in_body = false;
   absl::Status processing_status;

@@ -818,6 +818,36 @@ bool DecodingProcessorState::isValidTrailersCallbackState() const {
   return false;
 }
 
+bool DecodingProcessorState::handleStandaloneModeOverride(
+    const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
+        old_body_mode) {
+  if (callbackState() == ProcessorState::CallbackState::HeadersCallback &&
+      (old_body_mode == ProcessingMode::STREAMED || old_body_mode == ProcessingMode::NONE) &&
+      body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED && send_trailers_) {
+    bool end_stream = (complete_body_available_ && trailers_ == nullptr);
+    if (hasBufferedData() || (bufferedData() && end_stream)) {
+      // Body came in while we were waiting for this response.
+      Buffer::OwnedImpl buffered_chunk;
+      modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
+      ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
+                       buffered_chunk.length());
+      auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
+      buffered_chunk.drain(buffered_chunk.length());
+      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::HeadersCallback, req);
+    }
+
+    if (trailers_ != nullptr) {
+      // Trailers came in while we were waiting for this response.
+      filter_.sendTrailers(*this, *trailers_);
+    }
+    return true;
+  }
+
+  ENVOY_STREAM_LOG(debug, "Invalid standalone mode_override message received on gRPC stream",
+                   *decoder_callbacks_);
+  return false;
+}
+
 void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
   // Account for the different default behaviors of headers and trailers --
   // headers are sent by default and trailers are not.

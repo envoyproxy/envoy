@@ -203,6 +203,9 @@ protected:
   void testSendDyanmicMetadata();
   void testSendTypedDyanmicMetadata();
   void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control);
+  void performStandAloneModeOverrideNormal(
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
+          initial_body_mode);
   void initializeConfigDuplexStreamed(bool both_direction = false);
 
   IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
