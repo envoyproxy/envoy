@@ -273,6 +273,82 @@ TEST_F(JsonWithExtBufParserTest, DocumentIsPublishedOnlyOnCompletion) {
   EXPECT_EQ(doc.json()["n"], 1);
 }
 
+// The cursor callbacks below are driven directly. They are the parser's public
+// Handler surface, but only the cursor is meant to call them -- and a correct
+// cursor never emits these sequences. The parser guards against them anyway,
+// because a callback that cannot return a status has nowhere else to put a
+// failure: it records the first one and drops everything after it, and feed()
+// is what surfaces it.
+
+// The stack is only ever popped by a close the cursor reports, so a close with
+// nothing open means the callback sequence is broken, not the body.
+TEST_F(JsonWithExtBufParserTest, ContainerCloseWithNothingOpenIsRejected) {
+  JsonWithExtBufParser parser(config_);
+  parser.onContainerClose(/*depth=*/1, /*token_end=*/0);
+
+  EXPECT_THAT(parser.feed(R"({"a":1})", /*end_stream=*/true),
+              HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_TRUE(parser.takeDocument().json().is_null());
+}
+
+// Whatever the cursor reports next, none of it is built: the callbacks stop
+// short of the DOM, and captured string content is dropped rather than
+// accumulated for a value that will never be attached.
+TEST_F(JsonWithExtBufParserTest, CallbacksNoOpOnceAnErrorIsRecorded) {
+  JsonWithExtBufParser parser(config_);
+  parser.onContainerClose(/*depth=*/1, /*token_end=*/0);
+
+  EXPECT_FALSE(parser.openStringCapture("s", /*depth=*/1, /*token_start=*/0));
+  EXPECT_FALSE(parser.onStringChunk("s", /*depth=*/1, "abc"));
+  parser.closeStringCapture("s", /*depth=*/1, /*token_end=*/5);
+  parser.onNull("n", /*depth=*/1, /*token_start=*/0, /*token_end=*/4);
+  parser.onContainerOpen("c", /*is_dict=*/true, /*depth=*/1, /*token_start=*/0);
+  parser.onContainerClose(/*depth=*/1, /*token_end=*/1);
+
+  EXPECT_THAT(parser.feed("{}", /*end_stream=*/true), HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_TRUE(parser.takeDocument().json().is_null());
+}
+
+// Trailing bytes are rejected by the cursor, so a value can only follow the
+// root if the callback sequence is broken; the first root is not overwritten.
+TEST_F(JsonWithExtBufParserTest, SecondRootValueIsRejected) {
+  JsonWithExtBufParser parser(config_);
+  parser.onNull("", /*depth=*/1, /*token_start=*/0, /*token_end=*/4);
+
+  // The error is recorded part way through the feed, where the callback has no
+  // status to return; the cursor finishes the body happily, and feed() reports
+  // the recorded error rather than the cursor's success.
+  EXPECT_THAT(parser.feed(R"({"a":1})", /*end_stream=*/true),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_TRUE(parser.takeDocument().json().is_null());
+}
+
+// A reference is only as good as the offsets behind it, so a range that cannot
+// even span the two quotes is refused rather than recorded.
+TEST_F(JsonWithExtBufParserTest, OffloadedStringWithImpossibleRangeIsRejected) {
+  JsonWithExtBufParser parser(config_);
+  // Past the threshold, so the value is headed for a reference rather than the
+  // DOM -- the only path that uses the token range.
+  ASSERT_OK(parser.feed(absl::StrCat(R"({"s":")", std::string(kThreshold + 1, 'a')),
+                        /*end_stream=*/false));
+
+  parser.closeStringCapture("s", /*depth=*/2, /*token_end=*/0);
+
+  EXPECT_THAT(parser.feed(R"("})", /*end_stream=*/true),
+              HasStatusCode(absl::StatusCode::kInternal));
+}
+
+// The cursor is what closes containers, so if it ever reports a document
+// complete with one still open, the DOM is unfinished and is not published.
+TEST_F(JsonWithExtBufParserTest, ContainerLeftOpenAtEndStreamIsRejected) {
+  JsonWithExtBufParser parser(config_);
+  parser.onContainerOpen("", /*is_dict=*/false, /*depth=*/1, /*token_start=*/0);
+
+  EXPECT_THAT(parser.feed("1", /*end_stream=*/true),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_TRUE(parser.takeDocument().json().is_null());
+}
+
 // A realistic shape: oversized message content each getting its own reference,
 // with small metadata left inline.
 TEST_F(JsonWithExtBufParserTest, MixedInlineAndOffloadedValues) {
