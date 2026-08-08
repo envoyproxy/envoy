@@ -8,12 +8,17 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace ListenerFilters {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 // A simple mock implementation of ListenerFilterBuffer for testing.
 class TestListenerFilterBuffer : public Network::ListenerFilterBuffer {
@@ -44,12 +49,12 @@ class DynamicModuleListenerFilterTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     filter_config_->stat_creation_frozen_ = false;
@@ -119,12 +124,12 @@ TEST_F(DynamicModuleListenerFilterTest, FilterWithNullInModuleFilterOnClose) {
 TEST_F(DynamicModuleListenerFilterTest, OnAcceptWithNullInModuleFilterClosesSocket) {
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_filter_new_fail", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-  EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+  EXPECT_OK(filter_config_or_status);
   auto filter_config = filter_config_or_status.value();
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config);
@@ -207,12 +212,12 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitialization) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "some_config", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_OK(filter_config_or_status);
 
   auto config = filter_config_or_status.value();
   EXPECT_NE(nullptr, config->in_module_config_);
@@ -231,12 +236,12 @@ TEST(DynamicModuleListenerFilterConfigTest, MissingSymbols) {
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   // Use the HTTP filter no_op module which lacks listener filter symbols.
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_FALSE(filter_config_or_status.ok());
+  EXPECT_THAT(filter_config_or_status, Not(IsOk()));
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, ConfigInitializationFailure) {
@@ -246,14 +251,13 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitializationFailure) {
   // Use a module that returns nullptr from config_new.
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_config_new_fail", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_FALSE(filter_config_or_status.ok());
-  EXPECT_THAT(filter_config_or_status.status().message(),
-              testing::HasSubstr("Failed to initialize"));
+  EXPECT_THAT(filter_config_or_status,
+              HasStatusMessage(testing::HasSubstr("Failed to initialize")));
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
@@ -262,12 +266,12 @@ TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_OK(filter_config_or_status);
   auto config = filter_config_or_status.value();
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(config);
@@ -289,12 +293,12 @@ TEST(DynamicModuleListenerFilterConfigTest, OnDataStopIterationStatus) {
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_OK(filter_config_or_status);
   auto config = filter_config_or_status.value();
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;

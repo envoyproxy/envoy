@@ -15,8 +15,8 @@ namespace MongoProxy {
 
 class MessageImpl : public virtual Message {
 public:
-  MessageImpl(int32_t request_id, uint32_t response_to)
-      : request_id_(request_id), response_to_(response_to) {}
+  MessageImpl(int32_t request_id, uint32_t response_to, uint32_t max_bson_depth = 100)
+      : request_id_(request_id), response_to_(response_to), max_bson_depth_(max_bson_depth) {}
 
   virtual void fromBuffer(uint32_t message_length, Buffer::Instance& data) PURE;
 
@@ -29,6 +29,7 @@ protected:
 
   const int32_t request_id_;
   const int32_t response_to_;
+  const uint32_t max_bson_depth_;
 };
 
 class GetMoreMessageImpl : public MessageImpl,
@@ -271,7 +272,8 @@ private:
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::mongo> {
 public:
-  DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
+  DecoderImpl(DecoderCallbacks& callbacks, uint32_t max_bson_depth)
+      : callbacks_(callbacks), max_bson_depth_(max_bson_depth) {}
 
   // Mongo::Decoder
   void onData(Buffer::Instance& data) override;
@@ -280,6 +282,7 @@ private:
   bool decode(Buffer::Instance& data);
 
   DecoderCallbacks& callbacks_;
+  const uint32_t max_bson_depth_;
 };
 
 class EncoderImpl : public Encoder, Logger::Loggable<Logger::Id::mongo> {

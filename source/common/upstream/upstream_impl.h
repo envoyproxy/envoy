@@ -46,6 +46,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/common/packed_struct.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
@@ -279,6 +280,17 @@ protected:
   makeAddressListOrNull(const Network::Address::InstanceConstSharedPtr& address,
                         const AddressVector& address_list);
 
+  /**
+   * @return nullptr if address_list has fewer than 2 addresses (happy eyeballs does not
+   * apply), otherwise a shared_ptr to a copy of address_list sorted with
+   * Network::HappyEyeballsConnectionProvider::sortAddresses() using the cluster's happy
+   * eyeballs config, or the default config if the cluster does not specify one. This is
+   * computed once when the address list is created or refreshed so that connection
+   * attempts do not re-sort it.
+   */
+  static SharedConstAddressVector makeSortedAddressListOrNull(const ClusterInfo& cluster,
+                                                              const AddressVector& address_list);
+
 private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
@@ -346,6 +358,11 @@ protected:
       std::shared_ptr<const envoy::config::core::v3::Locality> locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority, const AddressVector& address_list = {}, absl::string_view stat_name = {});
+
+  // Happy eyeballs sorted copy of the address list, or nullptr if the host does not have
+  // multiple addresses. Set at construction and never changed; read by
+  // HostImpl::sortedAddressListOrNull().
+  const SharedConstAddressVector sorted_address_list_or_null_;
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -478,10 +495,17 @@ public:
   }
 
 protected:
+  /**
+   * @return the address list sorted for happy eyeballs connection attempts, or nullptr if
+   * the host does not have multiple addresses. The list is computed once when the address
+   * list is created or refreshed rather than on every connection attempt.
+   */
+  virtual SharedConstAddressVector sortedAddressListOrNull() const PURE;
+
   static CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
-                   const SharedConstAddressVector& address_list,
+                   const SharedConstAddressVector& sorted_address_list,
                    Network::UpstreamTransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
@@ -497,7 +521,7 @@ protected:
                        Network::UpstreamTransportSocketFactory& factory,
                        Network::Address::InstanceConstSharedPtr orca_address,
                        const Network::Address::InstanceConstSharedPtr& host_address,
-                       const SharedConstAddressVector& address_list,
+                       const SharedConstAddressVector& sorted_address_list,
                        HostDescriptionConstSharedPtr host) const;
 
 private:
@@ -556,6 +580,11 @@ protected:
         HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
                             locality_metadata, locality, health_check_config, priority,
                             address_list, stat_name) {}
+
+  // Upstream::HostImplBase
+  SharedConstAddressVector sortedAddressListOrNull() const override {
+    return sorted_address_list_or_null_;
+  }
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -740,6 +769,8 @@ public:
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
+  bool batchUpdateActive() const override { return batch_update_; }
+
   HostMapConstSharedPtr crossPriorityHostMap() const override {
     return const_cross_priority_host_map_;
   }
@@ -793,7 +824,8 @@ private:
     void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                      const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
-                     std::optional<uint32_t> overprovisioning_factor) override;
+                     std::optional<uint32_t> overprovisioning_factor,
+                     HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
     absl::node_hash_set<HostSharedPtr> all_hosts_removed_;
@@ -902,6 +934,7 @@ public:
 
   float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
+  bool shouldPreconnect(const Host& host) const override;
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -917,7 +950,7 @@ public:
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const override {
-    return makeOptRefFromPtr(upstream_client_codec_factory_.get());
+    return makeOptRefFromPtr(upstream_client_codec_factory_);
   }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
 
@@ -1102,9 +1135,9 @@ private:
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   // Per-cluster upstream (client) codec factory, recovered from extension_protocol_options_ (an
-  // options entry that also implements the factory interface). Held to pin lifetime;
-  // upstreamHttpClientCodecFactory() returns a view into it.
-  const std::shared_ptr<const Http::ClientCodecFactory> upstream_client_codec_factory_;
+  // options entry that also implements the factory interface). Lifetime is pinned by
+  // extension_protocol_options_; upstreamHttpClientCodecFactory() returns a view into it.
+  const Http::ClientCodecFactory* upstream_client_codec_factory_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint32_t max_requests_per_connection_;
@@ -1112,6 +1145,7 @@ private:
   OptionalTimeouts optional_timeouts_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
+  const std::unique_ptr<const Matchers::MetadataMatcher> preconnect_enabled_matcher_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
   mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;

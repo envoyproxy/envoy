@@ -2,6 +2,7 @@
 
 #include <uadk/v1/wd_bmm.h>
 
+#include <cstdint>
 #include <memory>
 
 #include "envoy/common/pure.h"

@@ -36,7 +36,7 @@ BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
       .WillOnce(
           Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+            client_write_buffer_ = new testing::NiceMock<MockWatermarkBuffer>(
                 std::move(below_low), std::move(above_high), std::move(above_overflow));
             ON_CALL(*client_write_buffer_, move(_))
                 .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
@@ -138,6 +138,14 @@ BaseTcpProxySslIntegrationTest::ClientSslConnection::tlsSessionId() const {
   const Ssl::ConnectionInfoConstSharedPtr ssl_info =
       ssl_client_->connectionInfoProvider().sslConnection();
   return ssl_info ? std::make_optional<std::string>(ssl_info->sessionId()) : std::nullopt;
+}
+
+std::optional<std::string>
+BaseTcpProxySslIntegrationTest::ClientSslConnection::peerCertificateSha256Digest() const {
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info =
+      ssl_client_->connectionInfoProvider().sslConnection();
+  return ssl_info ? std::make_optional<std::string>(ssl_info->sha256PeerCertificateDigest())
+                  : std::nullopt;
 }
 
 void BaseTcpProxySslIntegrationTest::setupConnections() {

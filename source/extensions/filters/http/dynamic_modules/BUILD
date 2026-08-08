@@ -14,8 +14,15 @@ envoy_cc_library(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        "//envoy/secret:secret_manager_interface",
+        "//envoy/secret:secret_provider_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -25,6 +32,8 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":filter_config_lib",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/event:deferred_task",
         "//source/common/tracing:null_span_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
@@ -63,6 +72,7 @@ envoy_cc_library(
         "//source/common/router:string_accessor_lib",
         "//source/common/tracing:null_span_lib",
         "//source/common/tracing:tracer_lib",
+        "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

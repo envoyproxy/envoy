@@ -275,6 +275,8 @@ public:
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
   MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
+  MOCK_METHOD(void, addUpstreamWatermarkCallbacks, (UpstreamWatermarkCallbacks&));
+  MOCK_METHOD(void, removeUpstreamWatermarkCallbacks, (UpstreamWatermarkCallbacks&));
   MOCK_METHOD(void, setBufferLimit, (uint64_t));
   MOCK_METHOD(uint64_t, bufferLimit, ());
   MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
@@ -605,6 +607,12 @@ public:
 };
 
 class MockDownstreamWatermarkCallbacks : public DownstreamWatermarkCallbacks {
+public:
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+class MockUpstreamWatermarkCallbacks : public UpstreamWatermarkCallbacks {
 public:
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());

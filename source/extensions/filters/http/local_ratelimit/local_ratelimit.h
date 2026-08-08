@@ -76,7 +76,7 @@ class FilterConfig : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
-               const bool per_route = false);
+               absl::Status& creation_status, const bool per_route = false);
   ~FilterConfig() override {
     // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
     // timer is created and running.

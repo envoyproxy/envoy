@@ -64,7 +64,7 @@ public:
    */
   virtual DriverSharedPtr
   createGeoipProviderDriver(const Protobuf::Message& config, const std::string& stat_prefix,
-                            Server::Configuration::FactoryContext& context) PURE;
+                            Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.geoip_providers"; }
 };

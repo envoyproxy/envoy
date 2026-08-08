@@ -29,29 +29,29 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using Envoy::Http::LowerCaseString;
 using testing::_;
 using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Key;
-using testing::NiceMock;
 using testing::Not;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
   InSequence s;
@@ -182,21 +182,21 @@ TEST_F(HttpFilterTest, MergeConfig) {
   // First config base config with one base value, and one value to be overridden.
   (*extensions)["base_key"] = "base_value";
   (*extensions)["merged_key"] = "base_value";
-  FilterConfigPerRoute base_config(settings);
+  FilterConfigPerRoute base_config = makePerRoute(settings);
 
   // Construct a config to merge, that provides one value and overrides one value.
   settings.Clear();
   auto&& specific_extensions = settings.mutable_check_settings()->mutable_context_extensions();
   (*specific_extensions)["merged_key"] = "value";
   (*specific_extensions)["key"] = "value";
-  FilterConfigPerRoute specific_config(settings);
+  FilterConfigPerRoute specific_config = makePerRoute(settings);
 
   // Perform the merge:
   base_config.merge(specific_config);
 
   settings.Clear();
   settings.set_disabled(true);
-  FilterConfigPerRoute disabled_config(settings);
+  FilterConfigPerRoute disabled_config = makePerRoute(settings);
 
   // Perform a merge with disabled config:
   base_config.merge(disabled_config);
@@ -2891,10 +2891,13 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsConfigCheck) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   settings.mutable_check_settings()->CopyFrom(check_settings);
 
-  // Expect an exception while initializing the route's per filter config.
-  EXPECT_THROW_WITH_MESSAGE((FilterConfigPerRoute(settings)), EnvoyException,
-                            "Invalid configuration for check_settings. Only one of "
-                            "disable_request_body_buffering or with_request_body can be set.");
+  // Expect an error status while initializing the route's per filter config.
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute config(settings, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Invalid configuration for check_settings. Only one of "
+                        "disable_request_body_buffering or with_request_body can be set."));
 }
 
 // Checks that the per-route filter can override the check_settings set on the main filter.
@@ -2918,7 +2921,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
   // Initialize the route's per filter config.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   settings.mutable_check_settings()->CopyFrom(check_settings);
-  FilterConfigPerRoute auth_per_route(settings);
+  FilterConfigPerRoute auth_per_route = makePerRoute(settings);
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
@@ -3002,7 +3005,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
   // Initialize the route's per filter config.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   settings.mutable_check_settings()->CopyFrom(check_settings);
-  FilterConfigPerRoute auth_per_route(settings);
+  FilterConfigPerRoute auth_per_route = makePerRoute(settings);
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
@@ -3055,7 +3058,7 @@ TEST_F(HttpFilterTest, GrpcClientPerRouteError) {
   auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
   grpc_service->mutable_envoy_grpc()->set_cluster_name("nonexistent_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
 
   // Set up route config to use the per-route configuration.
   ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
@@ -3101,7 +3104,7 @@ TEST_F(HttpFilterTest, HttpClientPerRouteOverride) {
   http_service->mutable_server_uri()->set_cluster("per_route_http_cluster");
   http_service->set_path_prefix("/api/v2/auth");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
 
   // Set up route config to use the per-route configuration.
   ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
@@ -3895,7 +3898,7 @@ TEST_F(HttpFilterTest, CreatePerRouteGrpcClientWithServerContext) {
   auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
   grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 
@@ -3934,7 +3937,7 @@ TEST_F(HttpFilterTest, CreatePerRouteHttpClientWithServerContext) {
   http_service->mutable_server_uri()->set_uri("https://per-route.example.com");
   http_service->mutable_server_uri()->set_cluster("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 
@@ -4034,7 +4037,7 @@ TEST_F(HttpFilterTest, PerRouteGrpcClientCreationFailure) {
   auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
   grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 

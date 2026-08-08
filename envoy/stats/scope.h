@@ -109,7 +109,7 @@ public:
   /**
    * Allocate a new scope, optionally supplying tags and a pre-built tagged name (with tag values
    * interleaved). NOTE: The behavior is implementation-defined for now because both legacy and
-   * tag-aware scopes are still supported.
+   * explicit-tags scopes are still supported.
    *
    * @param base_name supplies the scope's tag-extracted name.
    * @param name_tags tags to associate with (and propagate from) the scope, as string_view pairs.
@@ -234,7 +234,7 @@ public:
    * @return a counter within the scope's namespace.
    */
   Counter& counterFromStatName(const StatName& name) {
-    return counterFromStatNameWithTags(name, std::nullopt);
+    return counterFromTaggedName(name, std::nullopt, StatName());
   }
   /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
@@ -261,7 +261,7 @@ public:
    * @return a gauge within the scope's namespace.
    */
   Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
-    return gaugeFromStatNameWithTags(name, std::nullopt, import_mode);
+    return gaugeFromTaggedName(name, std::nullopt, StatName(), import_mode);
   }
 
   /**
@@ -292,7 +292,7 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
-    return histogramFromStatNameWithTags(name, std::nullopt, unit);
+    return histogramFromTaggedName(name, std::nullopt, StatName(), unit);
   }
 
   /**
@@ -322,7 +322,7 @@ public:
    * @return a text readout within the scope's namespace.
    */
   TextReadout& textReadoutFromStatName(const StatName& name) {
-    return textReadoutFromStatNameWithTags(name, std::nullopt);
+    return textReadoutFromTaggedName(name, std::nullopt, StatName());
   }
 
   /**

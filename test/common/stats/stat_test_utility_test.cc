@@ -56,10 +56,14 @@ TEST_F(StatTestUtilityTest, Histograms) {
 TEST_F(StatTestUtilityTest, CountersWithTags) {
   StatNameTagVector dynamic_tags = {
       {dynamic_.add("dynamic_tag_name"), dynamic_.add("dynamic_tag_value")}};
-  test_scope_->counterFromStatNameWithTags(dynamic_.add("dynamic.stat"), dynamic_tags).inc();
+  test_scope_
+      ->counterFromTaggedName(dynamic_.add("dynamic.stat"), StatNameTagSpan(dynamic_tags), {})
+      .inc();
   StatNameTagVector symbolic_tags = {
       {symbolic_.add("symbolic_tag_name"), symbolic_.add("symbolic_tag_value")}};
-  test_scope_->counterFromStatNameWithTags(symbolic_.add("symbolic.stat"), symbolic_tags).inc();
+  test_scope_
+      ->counterFromTaggedName(symbolic_.add("symbolic.stat"), StatNameTagSpan(symbolic_tags), {})
+      .inc();
   EXPECT_EQ(1, test_store_.findCounterByString("dynamic.stat.dynamic_tag_name.dynamic_tag_value")
                    .value()
                    .get()

@@ -1,13 +1,23 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/grpc_mux.h"
+#include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
-#include "envoy/config/xds_config_tracker.h"
-#include "envoy/config/xds_resources_delegate.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "absl/base/attributes.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Config {
@@ -39,7 +49,7 @@ public:
   /**
    * Initializes the ADS connections.
    * This should be called after the cluster-manager was created, and the
-   * primiary clusters were initialized.
+   * primary clusters were initialized.
    * @param bootstrap - the bootstrap config of Envoy.
    * @return Ok if the initialization was successful, or an error otherwise.
    */

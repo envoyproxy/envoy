@@ -2,6 +2,7 @@
 
 #include "test/benchmark/main.h"
 #include "test/extensions/load_balancing_policies/common/benchmark_base_tester.h"
+#include "test/test_common/status_utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -31,7 +32,7 @@ void benchmarkRingHashLoadBalancerBuildRing(::benchmark::State& state) {
 
     // We are only interested in timing the initial ring build.
     state.ResumeTiming();
-    ASSERT_TRUE(tester.ring_hash_lb_->initialize().ok());
+    ASSERT_OK(tester.ring_hash_lb_->initialize());
     state.PauseTiming();
     const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
     state.counters["memory"] = end_mem - start_mem;
@@ -56,7 +57,7 @@ void benchmarkRingHashLoadBalancerChooseHost(::benchmark::State& state) {
     const uint64_t min_ring_size = state.range(1);
     const uint64_t keys_to_simulate = state.range(2);
     RingHashTester tester(num_hosts, min_ring_size);
-    ASSERT_TRUE(tester.ring_hash_lb_->initialize().ok());
+    ASSERT_OK(tester.ring_hash_lb_->initialize());
     LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create(tester.lb_params_);
     absl::node_hash_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
@@ -100,7 +101,7 @@ void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     RingHashTester tester(num_hosts, min_ring_size);
-    ASSERT_TRUE(tester.ring_hash_lb_->initialize().ok());
+    ASSERT_OK(tester.ring_hash_lb_->initialize());
     LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create(tester.lb_params_);
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
@@ -110,7 +111,7 @@ void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
     }
 
     RingHashTester tester2(num_hosts - hosts_to_lose, min_ring_size);
-    ASSERT_TRUE(tester2.ring_hash_lb_->initialize().ok());
+    ASSERT_OK(tester2.ring_hash_lb_->initialize());
     lb = tester2.ring_hash_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {

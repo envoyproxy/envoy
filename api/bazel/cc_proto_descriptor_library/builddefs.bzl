@@ -4,6 +4,7 @@
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
+load("@envoy//bazel:proto_toolchain.bzl", "get_proto_compiler", "use_proto_toolchain")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
@@ -203,7 +204,7 @@ def _compile_protos(ctx, generator, proto_info, proto_sources):
         ),
         tools = [tool],
         outputs = srcs + hdrs,
-        executable = ctx.executable._protoc,
+        executable = get_proto_compiler(ctx),
         arguments = [args],
         progress_message = "Generating descriptor protos for :" + ctx.label.name,
         mnemonic = "GenDescriptorProtos",
@@ -312,11 +313,6 @@ cc_proto_descriptor_library_aspect = aspect(
             cfg = "exec",
             default = "//bazel/cc_proto_descriptor_library:file_descriptor_generator",
         ),
-        "_protoc": attr.label(
-            executable = True,
-            cfg = "exec",
-            default = "@com_google_protobuf//:protoc",
-        ),
         "_cc_toolchain": attr.label(
             default = "@bazel_tools//tools/cpp:current_cc_toolchain",
         ),
@@ -331,7 +327,7 @@ cc_proto_descriptor_library_aspect = aspect(
     provides = _get_cc_proto_descriptor_library_aspect_provides(),
     attr_aspects = ["deps"],
     fragments = ["cpp"],
-    toolchains = use_cpp_toolchain(),
+    toolchains = use_cpp_toolchain() + use_proto_toolchain(),
 )
 
 cc_proto_descriptor_library = rule(

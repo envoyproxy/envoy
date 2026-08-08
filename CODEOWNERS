@@ -1,7 +1,6 @@
 # TODO(zuercher): determine how we want to deal with auto-assignment
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
-
 # ci
 /.github/ @agrawroh @phlax @jwendell
 /ci/ @agrawroh @phlax @jwendell
@@ -11,7 +10,6 @@
 
 # docs/examples
 /docs/ @envoyproxy/docs-shepherds
-/examples/ @envoyproxy/docs-shepherds
 /changelogs/ @envoyproxy/docs-shepherds
 
 # access loggers
@@ -28,8 +26,6 @@
 /*/extensions/filters/http/original_src @klarose @mattklein123
 # original_src listener filter extension
 /*/extensions/filters/listener/original_src @klarose @mattklein123
-# original_src common extension
-extensions/filters/common/original_src @klarose @mattklein123
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @wbpcode
 # cdn_loop extension
@@ -70,7 +66,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # starttls transport socket
 /*/extensions/transport_sockets/starttls @cpakulski @botengyao @ggreenway
 # proxy transport socket
-/*extensions/transport_sockets/http_11_proxy @abeyad @ryantheoptimist
+/*/extensions/transport_sockets/http_11_proxy @abeyad @ryantheoptimist
 # internal upstream transport socket
 /*/extensions/transport_sockets/internal_upstream @kyessenov @botengyao
 # sni_cluster extension
@@ -93,13 +89,13 @@ extensions/filters/common/original_src @klarose @mattklein123
 # UDP packet writer
 /*/extensions/udp_packet_writer/ @danzh2010 @ryantheoptimist
 # redis cluster extension
-/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @nezdolik @dinesh-murugiah
+/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @dinesh-murugiah
 # reverse conn cluster extension
 /*/extensions/clusters/reverse_connection @agrawroh @basundhara-c @botengyao @yanavlasov
-/*/extensions/common/redis @msukalski @henryyyang @mattklein123 @nezdolik @dinesh-murugiah
-/*/extensions/health_checkers/redis @mattklein123 @nezdolik @dinesh-murugiah
-/*/extensions/filters/network/redis_proxy @mattklein123 @nezdolik @dinesh-murugiah
-/*/extensions/filters/network/common/redis @mattklein123 @nezdolik @dinesh-murugiah
+/*/extensions/common/redis @msukalski @henryyyang @mattklein123 @dinesh-murugiah
+/*/extensions/health_checkers/redis @mattklein123 @dinesh-murugiah
+/*/extensions/filters/network/redis_proxy @mattklein123 @dinesh-murugiah
+/*/extensions/filters/network/common/redis @mattklein123 @dinesh-murugiah
 # dynamic forward proxy
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @ryantheoptimist
@@ -139,11 +135,11 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/wasm_runtime/ @mpwarres @kyessenov @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
-/*/extensions/common/matcher/domain_matcher @agrawroh @kyessenov
 /*/extensions/common/proxy_protocol @ggreenway @wez470
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @kbaichoo
 /*/extensions/filters/common/fault @rshriram @kbaichoo
+/*/extensions/filters/common/jwks @wbpcode @kanurag94 @taoxuy @tyxia @yanavlasov
 /*/extensions/filters/http/grpc_json_reverse_transcoder @numanelahi @yanavlasov
 /*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @nezdolik
 /*/extensions/filters/http/router @yanavlasov @mattklein123
@@ -187,15 +183,17 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/on_demand @dmitri-d @yanavlasov @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @delong-coder
 /*/extensions/filters/network/reverse_tunnel @agrawroh @basundhara-c @botengyao @yanavlasov
+/*/extensions/upstreams/http/reverse_tunnel @agrawroh @basundhara-c @botengyao @yanavlasov
 /*/extensions/filters/http/aws_request_signing @mattklein123 @marcomagdy @nbaws @niax
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @nbaws @niax
 /*/extensions/filters/http/buffer @adisuissa @mattklein123
 /*/extensions/transport_sockets/raw_buffer @botengyao @mattklein123
 # Watchdog Extensions
+/*/extensions/watchdog/backtrace_action @kbaichoo @jmsadair
 /*/extensions/watchdog/profile_action @kbaichoo @nezdolik
 # Core upstream code
-extensions/upstreams/http @yanavlasov @mattklein123
-extensions/upstreams/tcp @ggreenway @mattklein123
+/*/extensions/upstreams/http @yanavlasov @mattklein123
+/*/extensions/upstreams/tcp @ggreenway @mattklein123
 # OAuth2
 /*/extensions/filters/http/oauth2 @bplotnick @zhaohuabing @mattklein123 @wbpcode
 # HTTP Local Rate Limit
@@ -214,9 +212,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # dynamic metadata input matcher
 /*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
 # environment generic input
-/*/extensions/matching/common_inputs/environment @donyu @mattklein123
-# network common inputs
-/*/extensions/matching/common_inputs/network @agrawroh @kyessenov @wbpcode
+/*/extensions/matching/common_inputs/environment_variable @donyu @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # transform stats matching
@@ -345,6 +341,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
 /*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
 /*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway @antoniovleonti @yanjunxiang-google
+/*/extensions/filters/udp/udp_proxy/session_filters/ext_authz @antonkanug @yanavlasov
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
 # mongo proxy
@@ -368,6 +365,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
 # SSE to metadata
 /*/extensions/filters/http/sse_to_metadata @JuniorHsu @PeterL328 @tyxia
+# AWS EventStream parser
+/*/extensions/filters/http/aws_eventstream_parser @JuniorHsu @PeterL328 @cqi1217 @tyxia
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
@@ -442,6 +441,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/health_checkers/dynamic_modules @basundhara-c @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
+# AI Protocol Manager filter
+/*/extensions/filters/http/ai_protocol_manager @penguingao @botengyao @tyxia
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
@@ -464,12 +465,11 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 /*/extensions/clusters/dns @UNOWNED @UNOWNED
-/*/source/extensions/api_listeners/default_api_listener @UNOWNED @UNOWNED
-/*/source/extensions/listener_managers/listener_manager @yanavlasov @ggreenway
-/*/source/extensions/listener_managers/validation_listener_manager @adisuissa @ggreenway
-/*/source/extensions/matching/common_inputs/transport_socket @agrawroh @kyessenov
-/*/source/extensions/config_subscription/ @adisuissa @UNOWNED
-/*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
+/source/extensions/api_listeners/default_api_listener @UNOWNED @UNOWNED
+/source/extensions/listener_managers/validation_listener_manager @adisuissa @ggreenway
+/source/extensions/matching/common_inputs/transport_socket @agrawroh @kyessenov
+/source/extensions/config_subscription/ @adisuissa @UNOWNED
+/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @wbpcode @yanjunxiang-google

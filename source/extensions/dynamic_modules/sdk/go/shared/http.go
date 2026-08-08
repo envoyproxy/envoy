@@ -163,6 +163,17 @@ type HttpFilterHandle interface {
 	// SetMetadata sets the dynamic metadata value of the stream.
 	SetMetadata(metadataNamespace, key string, value any)
 
+	// SetMetadataStruct sets an entire dynamic metadata namespace from a serialized
+	// google.protobuf.Struct. The struct is merged into the namespace and existing entries with the
+	// same key are overwritten. A buffer that does not parse as a google.protobuf.Struct is a no-op.
+	SetMetadataStruct(metadataNamespace string, serializedStruct []byte)
+
+	// SetTypedMetadata sets an entire typed dynamic metadata namespace from a serialized
+	// google.protobuf.Any. The Any is merged into the namespace's typed_filter_metadata entry,
+	// preserving the exact message type via the Any type_url. A buffer that does not parse as a
+	// google.protobuf.Any is a no-op.
+	SetTypedMetadata(metadataNamespace string, serializedAny []byte)
+
 	// GetMetadataKeys retrieves all keys in the given metadata namespace.
 	// Returns list of keys in the namespace, or nil if the namespace does not exist.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
@@ -365,8 +376,10 @@ type HttpFilterHandle interface {
 	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
 	// headers if headers is nil). Useful for internal redirects or request retries. After a
 	// successful call, the current filter chain is destroyed and the filter SHOULD return Stop
-	// from the current callback. Returns false if recreation could not be initiated (e.g., the
-	// request body has not been fully received yet).
+	// from the current callback. The filter itself stays valid until the callback returns, and the
+	// methods it calls after the teardown are safe and do not affect the recreated stream.
+	// Returns false if recreation could not be initiated (e.g., the request body has not been fully
+	// received yet).
 	RecreateStream(headers [][2]string) bool
 
 	// RequestHeaders retrieves the request headers.
@@ -431,6 +444,16 @@ type HttpFilterHandle interface {
 
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
+
+	// GetLogLevel returns the current effective log level of the host environment's logging
+	// mechanism. The returned level reflects runtime changes, for example those applied via the
+	// admin API.
+	GetLogLevel() LogLevel
+
+	// IsLogLevelEnabled reports whether the given log level is enabled by the host environment's
+	// logging mechanism. It can be used to skip expensive work that is only needed when a message
+	// at the given level would actually be logged.
+	IsLogLevelEnabled(level LogLevel) bool
 
 	// HttpCallout performs an HTTP call to an external service. The call is asynchronous; the
 	// response, or an error, is delivered to the provided callback.
@@ -504,11 +527,21 @@ type HttpFilterHandle interface {
 	// IncrementCounterValue adds the given value to the counter metric. The order and
 	// size of tagsValues must match the tag keys defined when the metric was created.
 	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// GetGenericSecret returns the current value of a generic secret subscribed to by the filter
+	// config via HttpFilterConfigHandle.SubscribeGenericSecret. The second return value is false
+	// if the id does not correspond to a subscribed secret. The value is empty when the secret has
+	// been subscribed to but not yet delivered by the SDS server.
+	//
+	// The buffer aliases Envoy memory and must not be retained across events: a secret rotation
+	// replaces the value in between events on this worker thread. Copy it if it needs to outlive
+	// the current callback.
+	GetGenericSecret(id GenericSecretID) (UnsafeEnvoyBuffer, bool)
 }
 
 // HttpFilterConfigHandle is the per-filter-config handle exposed to HttpFilterConfig
-// implementations. It supports config-scoped logging, metric definition, and async I/O via
-// HttpCallout / StartHttpStream from the main thread.
+// implementations. It supports config-scoped logging, metric definition, generic secret
+// subscription, and async I/O via HttpCallout / StartHttpStream from the main thread.
 type HttpFilterConfigHandle interface {
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
@@ -588,4 +621,31 @@ type HttpFilterConfigHandle interface {
 	// Unlike HttpFilterHandle.IncrementCounterValue, this does not require a per-stream filter and
 	// can be called outside of the request lifecycle, for example from a scheduled background task.
 	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// SubscribeGenericSecret subscribes to a generic secret so that its value can later be read
+	// via GetGenericSecret, either here or on HttpFilterHandle.
+	//
+	// name is the name of the secret: for a static secret the name in the bootstrap configuration,
+	// and for a dynamic secret the resource name requested from the SDS server.
+	//
+	// sdsConfigSource is the JSON serialized envoy.config.core.v3.ConfigSource describing where to
+	// fetch the secret from, so that the value is updated whenever the SDS server pushes a new
+	// version. Pass an empty string to look the name up among the statically configured secrets
+	// instead.
+	//
+	// This can only be called while the filter config is being created, i.e. from
+	// HttpFilterConfigFactory.Create. Returns a zero ID if the secret cannot be subscribed to, for
+	// example when the static secret does not exist or sdsConfigSource is not a valid ConfigSource.
+	SubscribeGenericSecret(name string, sdsConfigSource string) GenericSecretID
+
+	// GetGenericSecret returns the current value of a previously subscribed generic secret. The
+	// second return value is false if the id does not correspond to a subscribed secret. The value
+	// is empty when the secret has been subscribed to but not yet delivered by the SDS server.
+	//
+	// Unlike HttpFilterHandle.GetGenericSecret, this does not require a per-stream filter and can
+	// be called outside of the request lifecycle, for example from a scheduled background task.
+	//
+	// The buffer aliases Envoy memory and must not be retained across events. Copy it if it needs
+	// to outlive the current callback.
+	GetGenericSecret(id GenericSecretID) (UnsafeEnvoyBuffer, bool)
 }

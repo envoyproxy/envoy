@@ -11,18 +11,18 @@ namespace HttpFilters {
 namespace BasicAuth {
 
 class BasicAuthFilterFactory
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::basic_auth::v3::BasicAuth,
           envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute> {
 public:
-  BasicAuthFilterFactory() : FactoryBase("envoy.filters.http.basic_auth") {}
+  BasicAuthFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.basic_auth") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::basic_auth::v3::BasicAuth& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::basic_auth::v3::BasicAuth& config,
       const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& context) override;

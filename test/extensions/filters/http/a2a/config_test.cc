@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/a2a/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,11 +27,23 @@ TEST_F(A2aFilterConfigFactoryTest, CreateFilterFactory) {
 
   // Envoy OSS uses absl::StatusOr, so we check .ok() or .status().ok()
   auto cb = factory_.createFilterFactoryFromProto(config, "stats", context);
-  EXPECT_TRUE(cb.status().ok());
+  EXPECT_OK(cb.status());
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb.value()(filter_callback);
+}
+
+TEST_F(A2aFilterConfigFactoryTest, CreateFilterWithServerContext) {
+  envoy::extensions::filters::http::a2a::v3::A2a config;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  Http::FilterFactoryCb cb =
+      factory_.createHttpFilterFactoryFromProto(config, "stats", server_context).value();
+
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
 }
 
 } // namespace

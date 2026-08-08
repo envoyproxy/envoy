@@ -83,8 +83,10 @@ Pictorially this looks like:
 
 `ParentHistogram`s are held weakly a set in ThreadLocalStore. Like other stats,
 they keep an embedded reference count and are removed from the set and destroyed
-when the last strong reference disappears. Consequently, we must hold a lock for
-the set when decrementing histogram reference counts. A similar process occurs for
+when the last strong reference disappears. Consequently, a decrement that may
+drop the last reference must hold a lock for the set, so that removal from the
+set is atomic with the final decrement; non-final decrements take a lock-free
+fast path. A similar process occurs for
 other types of stats, but in those cases it is taken care of in `AllocatorImpl`.
 There are strong references to `ParentHistograms` in TlsCacheEntry::parent_histograms_.
 
@@ -98,7 +100,7 @@ maintain data continuity as scopes are re-created during operation.
 Stat names are replicated in several places in various forms.
 
  * Held with the stat values, in `CounterImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
-   [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/allocator_impl.cc)
+   [allocator.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/allocator.cc)
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
@@ -188,7 +190,7 @@ showing the memory layout for a few scenarios of constructing and joining symbol
 
 There are several ways to create hot-path contention looking up stats by name,
 and there is no bulletproof way to prevent it from occurring.
- * The [stats macros](https://github.com/envoyproxy/envoy/blob/main/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
+ * The [stats macros](https://github.com/envoyproxy/envoy/blob/main/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
    scenario, consider factoring out the symbolization phase using MAKE_STAT_NAMES_STRUCT
    in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path and during
    control-plane updates, so that we do not need to take symbol-table locks. As an example, see
