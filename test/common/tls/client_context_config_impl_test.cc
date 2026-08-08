@@ -872,6 +872,31 @@ TEST_F(ClientContextConfigImplTest, TestLoadCorruptPkcs12) {
             "Failed to load pkcs12 from <inline>");
 }
 
+// Verify that X25519MLKEM768 can be explicitly configured as an ECDH curve
+// and that the resulting SSL context initializes successfully (non-FIPS only).
+// This proves PQC key exchange works via explicit opt-in configuration even
+// though it is not part of the default curve list.
+TEST_F(ClientContextConfigImplTest, ExplicitX25519Mlkem768Curve) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      ecdh_curves:
+      - X25519MLKEM768
+      - X25519
+      - P-256
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:X25519:P-256");
+  // Verify the SSL context can be created successfully with X25519MLKEM768.
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  if (!FIPS_mode()) {
+    EXPECT_TRUE(context_or_error.status().ok());
+  }
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
