@@ -86,6 +86,7 @@ envoy_cc_test(
         "GODEBUG": "cgocheck=0",
     },
     deps = [
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/stat_sinks/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",

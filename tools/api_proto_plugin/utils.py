@@ -1,6 +1,11 @@
 import os
 
 
+def _repo_part_from_label(label):
+    assert '//' in label, label
+    return label.split('//', 1)[0].lstrip('@')
+
+
 def proto_file_canonical_from_label(label):
     """Compute path from API root to a proto file from a Bazel proto label.
 
@@ -11,8 +16,8 @@ def proto_file_canonical_from_label(label):
         A string with the path, e.g. for @envoy_api//envoy/type/matcher:metadata.proto
         this would be envoy/type/matcher/matcher.proto.
     """
-    assert (label.startswith('@envoy_api//'))
-    return label[len('@envoy_api//'):].replace(':', '/')
+    assert 'envoy_api' in label and '//' in label, label
+    return label.split('//', 1)[1].replace(':', '/')
 
 
 def bazel_bin_path_for_output_artifact(label, suffix, root=''):
@@ -28,5 +33,8 @@ def bazel_bin_path_for_output_artifact(label, suffix, root=''):
     """
     proto_file_path = proto_file_canonical_from_label(label)
     return os.path.join(
-        root, 'bazel-bin/external/envoy_api', os.path.dirname(proto_file_path), 'pkg',
+        root, 'bazel-bin/external',
+        _repo_part_from_label(label),
+        os.path.dirname(proto_file_path),
+        'pkg',
         proto_file_path + suffix)

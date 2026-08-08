@@ -113,7 +113,7 @@ envoy_cc_library(
         "//conditions:default": "inotify",
     }),
     deps = [
-        "//bazel:libevent",
+        "@libevent",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",

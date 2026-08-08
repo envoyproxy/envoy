@@ -13,8 +13,10 @@ build --color=yes
 fetch --color=yes
 run --color=yes
 
-common --enable_workspace
-common --noenable_bzlmod
+common --enable_bzlmod
+common --noenable_workspace
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/2803c1f38e91dea0e49ab4c44b9fbc4569b5d01d
 common --noincompatible_disallow_empty_glob
 
 build --workspace_status_command="bash get_workspace_status"
@@ -118,3 +120,4 @@ common:remote-exec --jobs=200
 common:remote-exec --define=engflow_rbe=true
 
 try-import %workspace%/repo.bazelrc
+try-import %workspace%/user.bazelrc

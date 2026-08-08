@@ -71,7 +71,7 @@ envoy_cc_library(
 genrule(
     name = "kafka_request_generated_source",
     srcs = [
-        "@kafka_source//:request_protocol_files",
+        "@kafka_message//:request_protocol_files",
     ],
     outs = [
         "external/requests.h",
@@ -140,7 +140,7 @@ envoy_cc_library(
 genrule(
     name = "kafka_response_generated_source",
     srcs = [
-        "@kafka_source//:response_protocol_files",
+        "@kafka_message//:response_protocol_files",
     ],
     outs = [
         "external/responses.h",

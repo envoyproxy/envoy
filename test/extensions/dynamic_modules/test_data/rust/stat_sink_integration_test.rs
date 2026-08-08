@@ -136,7 +136,10 @@ impl StatSink for TestStatSink {
     // A tagged gauge reconstructed from the tag callbacks, and every counter's tag count agreed
     // with its per-tag reads: the tag ABI round-trips end to end against a live snapshot.
     if found_tagged_gauge && counter_tags_consistent {
-      envoy_log_info!("stat sink integration test: reconstructed tagged gauge cluster.membership_total envoy.cluster_name=cluster_0");
+      envoy_log_info!(
+        "stat sink integration test: reconstructed tagged gauge cluster.membership_total \
+         envoy.cluster_name=cluster_0"
+      );
     }
     envoy_log_info!(
       "stat sink integration test: flush called counters={} gauges={} histograms={}",

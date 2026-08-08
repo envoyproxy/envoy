@@ -209,9 +209,9 @@ extern "C" fn drop_live_exchange(object: *mut std::ffi::c_void) {
   drop(unsafe { Box::from_raw(object as *mut LiveExchange) });
 }
 
-/// A HTTP filter that keeps a live object alive across recreate_stream, the way a filter holding the
-/// endpoints of an async exchange would. The first instance queues a token on the live channel and
-/// parks it in filter state at Request lifespan, then recreates the stream, which destroys the
+/// A HTTP filter that keeps a live object alive across recreate_stream, the way a filter holding
+/// the endpoints of an async exchange would. The first instance queues a token on the live channel
+/// and parks it in filter state at Request lifespan, then recreates the stream, which destroys the
 /// instance. The rebuilt instance re-attaches to the same live object and drains the queued token,
 /// proving the live handles survived the recreate (a serialized copy would not carry the message).
 struct FilterStateObjectRecreateFilterConfig {}
@@ -1753,9 +1753,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingResponseReentryHttpFilte
 // =============================================================================
 
 // Completes its response with end-of-stream from on_scheduled. Completing with eos drives
-// FilterManager::onStreamComplete inline (before the scheduled callback returns), which synchronously
-// re-enters the same CatchUnwind-wrapped filter's on_stream_complete. If the filter isn't kept
-// alive across the re-entry, on_stream_complete is skipped and the counter isn't incremented.
+// FilterManager::onStreamComplete inline (before the scheduled callback returns), which
+// synchronously re-enters the same CatchUnwind-wrapped filter's on_stream_complete. If the filter
+// isn't kept alive across the re-entry, on_stream_complete is skipped and the counter isn't
+// incremented.
 struct ReentrantStreamCompleteFilterConfig {
   stream_complete_total: EnvoyCounterId,
 }

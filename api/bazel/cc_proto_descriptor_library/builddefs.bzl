@@ -4,7 +4,7 @@
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
-load("@envoy//bazel:proto_toolchain.bzl", "get_proto_compiler", "use_proto_toolchain")
+load("@envoy_toolshed//toolchains:utils.bzl", "get_proto_compiler", "use_proto_toolchain")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
@@ -138,7 +138,13 @@ def _cc_library_func(ctx, name, hdrs, srcs, copts, includes, dep_ccinfos):
         cc_toolchain = toolchain,
         compilation_outputs = compilation_outputs,
         linking_contexts = linking_contexts,
-        disallow_dynamic_library = cc_common.is_enabled(feature_configuration = feature_configuration, feature_name = "targets_windows"),
+        disallow_dynamic_library = cc_common.is_enabled(
+            feature_configuration = feature_configuration,
+            feature_name = "targets_windows",
+        ) or not cc_common.action_is_enabled(
+            feature_configuration = feature_configuration,
+            action_name = "c++-link-nodeps-dynamic-library",
+        ),
         **blaze_only_args
     )
 
