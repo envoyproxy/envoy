@@ -1,0 +1,13 @@
+module(
+    name = "envoy_docs",
+    version = "1.38.0-dev",
+)
+
+bazel_dep(name = "envoy")
+
+local_path_override(
+    module_name = "envoy",
+    path = "../",
+)
+
+bazel_dep(name = "envoy-examples", version = "0.2.4")
