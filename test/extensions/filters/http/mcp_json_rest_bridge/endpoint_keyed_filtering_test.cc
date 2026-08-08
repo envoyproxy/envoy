@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -30,7 +31,8 @@ public:
     TestUtility::loadFromYaml(yaml_config, proto_config);
 
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge filter_proto;
-    filter_config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto);
+    filter_config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto, *stats_store_.rootScope());
     per_route_config_ = std::make_unique<McpJsonRestBridgePerRouteConfig>(proto_config);
 
     recreateFilter();
@@ -49,6 +51,7 @@ public:
         .WillRepeatedly(Return(per_route_config_.get()));
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   McpJsonRestBridgeFilterConfigSharedPtr filter_config_;
   std::unique_ptr<McpJsonRestBridgePerRouteConfig> per_route_config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
@@ -212,7 +215,8 @@ tool_config:
 )yaml",
                             filter_proto);
 
-  auto filter_config = std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto);
+  auto filter_config =
+      std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto, *stats_store_.rootScope());
 
   EXPECT_FALSE(filter_config->textContentStreamingEnabled("tool_no_stream", "a.com", "/mcp"));
   EXPECT_FALSE(filter_config->textContentStreamingEnabled("non_existent_tool", "a.com", "/mcp"));
@@ -251,7 +255,8 @@ tool_config:
 )yaml",
                             filter_proto);
 
-  auto filter_config = std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto);
+  auto filter_config =
+      std::make_shared<McpJsonRestBridgeFilterConfig>(filter_proto, *stats_store_.rootScope());
 
   auto tools = filter_config->toolListLocalTools("", "/mcp");
   ASSERT_EQ(tools.size(), 1);

@@ -225,7 +225,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
 
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-        proto_config)
+        proto_config,
+    Stats::Scope& scope)
     : proto_config_(proto_config), fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                        proto_config_.server_info(), fallback_protocol_version,
                                        std::string(McpConstants::FALLBACK_PROTOCOL_VERSION))),
@@ -233,7 +234,8 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)),
-      clear_route_cache_(!proto_config_.disable_clear_route_cache()) {
+      clear_route_cache_(!proto_config_.disable_clear_route_cache()), scope_(scope),
+      stat_names_(scope_.symbolTable()) {
   const auto& tool_config = proto_config_.tool_config();
   std::string host = tool_config.default_server_info().host();
   std::string path = tool_config.default_server_info().path();
@@ -342,6 +344,19 @@ bool McpJsonRestBridgeFilterConfig::hasEndpoint(absl::string_view host,
     }
   }
   return false;
+}
+
+void McpJsonRestBridgeFilterConfig::incrementRequestCount(absl::string_view method,
+                                                          absl::string_view status) {
+  Stats::StatNameDynamicPool dynamic_stat_name_pool(scope_.symbolTable());
+  Stats::StatNameTagVector tags;
+  if (!method.empty()) {
+    tags.emplace_back(stat_names_.mcp_method_, dynamic_stat_name_pool.add(method));
+  }
+  if (!status.empty()) {
+    tags.emplace_back(stat_names_.status_, dynamic_stat_name_pool.add(status));
+  }
+  scope_.counterFromStatNameWithTags(stat_names_.request_count_, tags).inc();
 }
 
 McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
@@ -501,6 +516,7 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   path_ = std::string(path);
   mcp_operation_ = McpOperation::Undecided;
   server_name_ = std::move(server_name);
+  tool_name_.clear();
 
   if (request_headers.getMethodValue() != Http::Headers::get().MethodValues.Post) {
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
@@ -593,6 +609,7 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   // (final size is unknown), and let the headers flow through immediately so
   // the client can start receiving data without waiting for the full body.
   if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
+    const bool is_error = response_code >= static_cast<int>(Http::Code::BadRequest);
     // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
     // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
     // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
@@ -605,9 +622,11 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
         response_code != static_cast<int>(Http::Code::Forbidden)) {
       response_headers.setStatus(enumToInt(Http::Code::OK));
     }
-    buildStreamingPrefixAndSuffix(response_code >= static_cast<int>(Http::Code::BadRequest));
+    buildStreamingPrefixAndSuffix(is_error);
     response_headers.removeContentLength();
     response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+    setResponseMetadata(is_error ? BridgeStatus::ResponseBackendError : BridgeStatus::Ok,
+                        response_code);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -916,6 +935,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
+        config_->incrementRequestCount(McpConstants::Methods::TOOLS_LIST, BridgeStatusValues::OK);
         return;
       } else {
         // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
@@ -926,6 +946,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
+        config_->incrementRequestCount(McpConstants::Methods::TOOLS_LIST,
+                                       BridgeStatusValues::REQUEST_PASSTHROUGH);
       }
     }
   } else if (method == McpConstants::Methods::INITIALIZE) {
@@ -936,6 +958,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
       setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                      ? json_rpc[McpConstants::PARAMS_FIELD]
                                      : json::object());
+      config_->incrementRequestCount(McpConstants::Methods::INITIALIZE, BridgeStatusValues::OK);
       decoder_callbacks_->sendLocalReply(
           Http::Code::OK,
           generateInitializeResponse(
@@ -962,6 +985,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
     setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                    ? json_rpc[McpConstants::PARAMS_FIELD]
                                    : json::object());
+    config_->incrementRequestCount(McpConstants::Methods::NOTIFICATION_INITIALIZED,
+                                   BridgeStatusValues::OK);
     // TODO(guoyilin42): We may need to explicitly set `content-length: 0` to prevent curl from
     // hanging. `modify_headers` fails here as `sendLocalReply` removes it for empty bodies.
     decoder_callbacks_->sendLocalReply(Http::Code::Accepted, "", nullptr,
@@ -1136,6 +1161,8 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
     return;
   }
 
+  tool_name_ = tool_name;
+
   // Set the per-request streaming flag based on the tool's config.
   text_content_streaming_enabled_ =
       (per_route_config == nullptr)
@@ -1205,6 +1232,8 @@ void McpJsonRestBridgeFilter::sendErrorResponse(
   mcp_operation_ = McpOperation::OperationFailed;
   setParsingMetadata(method, params);
 
+  config_->incrementRequestCount(mcp_method_, bridgeStatusToString(status));
+
   decoder_callbacks_->sendLocalReply(response_code, response_body, modify_headers, grpc_status,
                                      bridgeStatusToString(status));
 }
@@ -1234,11 +1263,12 @@ void McpJsonRestBridgeFilter::setDynamicMetadata() {
 
 void McpJsonRestBridgeFilter::setParsingMetadata(absl::string_view method,
                                                  const nlohmann::json& params) {
+  mcp_method_ = std::string(method);
+
   if (!config_->shouldStoreToDynamicMetadata()) {
     return;
   }
 
-  mcp_method_ = std::string(method);
   has_params_ = false;
   mcp_params_.Clear();
   if (params.is_object() && !params.empty()) {
@@ -1258,6 +1288,9 @@ void McpJsonRestBridgeFilter::setResponseMetadata(BridgeStatus status,
                                                   std::optional<uint64_t> response_code) {
   status_ = status;
   backend_response_code_ = response_code;
+
+  config_->incrementRequestCount(mcp_method_, bridgeStatusToString(status));
+
   if (!config_->shouldStoreToDynamicMetadata()) {
     return;
   }

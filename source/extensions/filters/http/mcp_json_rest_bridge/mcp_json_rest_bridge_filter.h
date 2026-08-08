@@ -12,6 +12,8 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -30,6 +32,17 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 
 inline constexpr char FilterName[] = "envoy.filters.http.mcp_json_rest_bridge";
+
+struct McpJsonRestBridgeStatNames {
+  explicit McpJsonRestBridgeStatNames(Stats::SymbolTable& symbol_table)
+      : pool_(symbol_table), mcp_method_(pool_.add("mcp_method")), status_(pool_.add("status")),
+        request_count_(pool_.add("mcp_json_rest_bridge.request_count")) {}
+
+  Stats::StatNamePool pool_;
+  const Stats::StatName mcp_method_;
+  const Stats::StatName status_;
+  const Stats::StatName request_count_;
+};
 
 struct EndpointKey {
   std::string host;
@@ -115,7 +128,8 @@ class McpJsonRestBridgeFilterConfig : public Logger::Loggable<Logger::Id::config
 public:
   explicit McpJsonRestBridgeFilterConfig(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-          proto_config);
+          proto_config,
+      Stats::Scope& scope);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
@@ -159,6 +173,29 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  /**
+   * Increments the `http.mcp_json_rest_bridge.request_count` counter stat with
+   * `mcp_method` and `status` tags.
+   *
+   * Implementation and lifetime note:
+   * This method belongs on McpJsonRestBridgeFilterConfig because FilterConfig is a
+   * long-lived singleton per listener/route configuration that owns the Stats::Scope
+   * and StatNamePool shared across all worker threads and request streams. Placing this
+   * method here allows ephemeral per-stream McpJsonRestBridgeFilter instances to
+   * increment the shared stat counters across multiple requests.
+   *
+   * Cardinality considerations:
+   * - Tags are strictly restricted to `mcp_method` (~ 5) and `status` (~ 10),
+   *   but not all combinations are possible, e.g., some statuses are specific to
+   *   tools/call method.
+   * - Overall metric cardinality is strictly bounded to O(1) across the fixed set of MCP
+   *   methods and bridge status codes.
+   *
+   * @param method The MCP method (e.g., "initialize", "tools/call", "tools/list").
+   * @param status The bridge status string indicating request outcome or error reason.
+   */
+  void incrementRequestCount(absl::string_view method, absl::string_view status);
+
   bool perRouteOnly() const { return proto_config_.per_route_only(); }
 
 private:
@@ -181,6 +218,8 @@ private:
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
   bool clear_route_cache_;
+  Stats::Scope& scope_;
+  McpJsonRestBridgeStatNames stat_names_;
 };
 
 class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,
@@ -344,6 +383,7 @@ private:
 
   BridgeStatus status_{BridgeStatus::Ok};
   std::string mcp_method_;
+  std::string tool_name_;
   Protobuf::Struct mcp_params_;
   bool has_params_ = false;
   std::optional<uint64_t> backend_response_code_;
