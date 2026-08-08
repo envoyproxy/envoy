@@ -1,6 +1,7 @@
 #include "source/server/hot_restarting_parent.h"
 
 #include "envoy/server/instance.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/memory/stats.h"
 #include "source/common/network/utility.h"
@@ -12,6 +13,36 @@ namespace Envoy {
 namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
+
+namespace {
+
+// Records a metric's programmatic tags into the tag map keyed by the metric's fully qualified
+// name, so the hot restart child can re-create the stat with identical labels. Entries are
+// emitted only for metrics whose tags did NOT come from tag extraction: extraction on the child
+// re-derives extracted tags from the name during the merge (the common case, including the
+// default tag regexes), so re-transmitting those would only bloat the transfer. Tags supplied
+// programmatically at creation (whose values are embedded in the flat name) are the ones that
+// need the metadata.
+void recordTags(Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::TaggedMetric>* tag_map,
+                const std::string& name, const Stats::Metric& metric) {
+  if (!metric.noTagExtraction()) {
+    return;
+  }
+  const Stats::TagVector tags = metric.tags();
+  if (tags.empty()) {
+    return;
+  }
+  HotRestartMessage::Reply::Stats::TaggedMetric& tagged = (*tag_map)[name];
+  tagged.set_tag_extracted_name(metric.tagExtractedName());
+  tagged.mutable_tags()->Reserve(tags.size());
+  for (const Stats::Tag& tag : tags) {
+    HotRestartMessage::Reply::Stats::Tag* tag_proto = tagged.add_tags();
+    tag_proto->set_name(tag.name_);
+    tag_proto->set_value(tag.value_);
+  }
+}
+
+} // namespace
 
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
                                          const std::string& socket_path, mode_t socket_mode)
@@ -182,6 +213,7 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
       const std::string name = gauge.name();
       (*stats->mutable_gauges())[name] = gauge.value();
       recordDynamics(stats, name, gauge.statName());
+      recordTags(stats->mutable_gauge_tags(), name, gauge);
     }
   });
 
@@ -194,6 +226,7 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
         const std::string name = counter.name();
         (*stats->mutable_counter_deltas())[name] = latched_value;
         recordDynamics(stats, name, counter.statName());
+        recordTags(stats->mutable_counter_tags(), name, counter);
       }
     }
   });

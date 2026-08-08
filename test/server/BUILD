@@ -210,11 +210,16 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":utility_lib",
+        "//source/common/stats:allocator_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stats:tag_producer_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_child",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 

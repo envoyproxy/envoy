@@ -104,15 +104,30 @@ public:
   virtual bool hidden() const PURE;
 
   /**
+   * Indicates whether this metric's tags were supplied at creation rather than derived from its
+   * name by tag extraction, meaning they cannot be re-derived from the flat name (relevant for
+   * hot restart, where the parent must transmit such tags to the child explicitly).
+   */
+  virtual bool noTagExtraction() const { return false; }
+
+  /**
+   * Marks this metric's tags as not derived from tag extraction. Called at creation time by
+   * stores that create stats from caller-supplied tags.
+   */
+  virtual void markAsNoTagExtraction() {}
+
+  /**
    * Flags:
    * Used: used by all stats types to figure out whether they have been used.
    * Logic...: used by gauges to cache how they should be combined with a parent's value.
+   * NoTagExtraction: the metric's tags were supplied at creation rather than tag-extracted.
    */
   struct Flags {
     static constexpr uint8_t Used = 0x01;
     static constexpr uint8_t LogicAccumulate = 0x02;
     static constexpr uint8_t NeverImport = 0x04;
     static constexpr uint8_t Hidden = 0x08;
+    static constexpr uint8_t NoTagExtraction = 0x10;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;

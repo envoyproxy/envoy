@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "envoy/stats/store.h"
 
@@ -17,6 +19,17 @@ namespace Stats {
 class StatMerger {
 public:
   using DynamicsMap = absl::flat_hash_map<std::string, DynamicSpans>;
+
+  // The tag-extracted name and tags captured from the parent process for a single stat that was
+  // created with programmatic tags. Held in a store-neutral form (decoded from the hot restart
+  // protobuf by the caller) so this stats-layer class does not depend on the server proto.
+  struct ParentTags {
+    std::string tag_extracted_name_;
+    std::vector<std::pair<std::string, std::string>> tags_;
+  };
+  // Maps a fully qualified stat name (the same key used in the counter/gauge delta maps) to its
+  // parent tag metadata. A missing entry means the stat carries no programmatic tags.
+  using TagsMap = absl::flat_hash_map<std::string, ParentTags>;
 
   // Holds state needed to construct StatName with mixed dynamic/symbolic
   // components, based on a map.
@@ -53,10 +66,13 @@ public:
    * @param counter_deltas map of counter changes from parent
    * @param gauges map of gauge changes from parent
    * @param dynamics information about which segments of the names are dynamic.
+   * @param counter_tags parent tag metadata for counters created with programmatic tags.
+   * @param gauge_tags parent tag metadata for gauges created with programmatic tags.
    */
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                   const Protobuf::Map<std::string, uint64_t>& gauges,
-                  const DynamicsMap& dynamics = DynamicsMap());
+                  const DynamicsMap& dynamics = DynamicsMap(),
+                  const TagsMap& counter_tags = TagsMap(), const TagsMap& gauge_tags = TagsMap());
 
   /**
    * Indicates that a gauge's value from the hot-restart parent should be
@@ -75,9 +91,9 @@ public:
 
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
-                     const DynamicsMap& dynamics_map);
+                     const DynamicsMap& dynamics_map, const TagsMap& tags_map);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
-                   const DynamicsMap& dynamics_map);
+                   const DynamicsMap& dynamics_map, const TagsMap& tags_map);
 
   StatNameHashSet parent_gauges_;
   // A stats Scope for our in-the-merging-process counters to live in. Scopes conceptually hold
