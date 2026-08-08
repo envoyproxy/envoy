@@ -25,6 +25,7 @@ public:
   Rds::ConfigConstSharedPtr createNullConfig() const override;
   Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
                                          Server::Configuration::ServerFactoryContext& context,
+                                         Init::Manager&,
                                          bool validate_clusters_default) const override;
 
 private:
@@ -50,11 +51,16 @@ public:
                     std::set<std::string>&& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
+  void setObserver(Rds::RouteConfigUpdateObserver& observer) override {
+    base_.warmer_.setObserver(observer);
+  }
+  bool configWarming() const override { return base_.warmer_.warming(); }
   uint64_t configHash() const override { return base_.configHash(); }
   const std::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
   }
   bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
+  void clearVhdsConfigurationChanged() override { vhds_configuration_changed_ = false; }
   const Protobuf::Message& protobufConfiguration() const override {
     return base_.protobufConfiguration();
   }
@@ -73,6 +79,11 @@ public:
   }
 
 private:
+  const Protobuf::Message& latestProtobufConfiguration() const {
+    return base_.warming_state_.route_config_proto_ ? *base_.warming_state_.route_config_proto_
+                                                    : *base_.route_config_proto_;
+  }
+
   ConfigTraitsImpl config_traits_;
 
   Rds::RouteConfigUpdateReceiverImpl base_;
