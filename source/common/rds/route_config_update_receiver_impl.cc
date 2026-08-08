@@ -34,15 +34,11 @@ void ConfigWarmer::startWarming() {
 }
 
 void ConfigWarmer::onWarmed() {
-  // The new route configuration is warmed up, so the per-update init manager isn't needed anymore.
-  // The next update will create a new one.
-  //
-  // Note this runs from inside the readiness callback of init_manager_ itself. Dropping them here
-  // is safe: the callback is invoked through a handle that holds a shared_ptr to the callback for
-  // the duration of the call, and neither the manager nor the watcher touches its own state after
-  // invoking it. They are dropped before the observer is notified, so that warming() is false while
-  // the observer publishes the route configuration that was just warmed up.
+  // Drop the watcher right away, so that nothing can call back into this warmer.
   init_watcher_.reset();
+  // The init manager can't be dropped here because it may be destroyed from inside its own
+  // initialize() method.
+  deferred_delete_init_manager_ = std::move(init_manager_);
   init_manager_.reset();
   update_id_.clear();
 
