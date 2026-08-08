@@ -1,5 +1,6 @@
 #include "source/common/stats/tag_utility.h"
 
+#include <optional>
 #include <regex>
 
 #include "source/common/config/well_known_names.h"
@@ -8,20 +9,42 @@
 namespace Envoy {
 namespace Stats {
 namespace TagUtility {
+namespace {
+
+// A join of two names where one is empty produces bytes identical to the other name, so the
+// join -- and the heap allocation it makes -- can be skipped, referencing the non-empty name
+// directly instead. Returns nullopt when both names are non-empty and a join is required.
+//
+// The returned StatName references caller-owned storage, which is consistent with the
+// TagStatNameJoiner contract that all provided stat names outlive the joiner.
+std::optional<StatName> elideJoin(StatName a, StatName b) {
+  if (a.empty()) {
+    return b;
+  }
+  if (b.empty()) {
+    return a;
+  }
+  return std::nullopt;
+}
+
+} // namespace
 
 TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatName stat_name,
                                      std::optional<StatNameTagSpan> stat_name_tags,
                                      SymbolTable& symbol_table)
     : stat_name_tags_(stat_name_tags) {
-  prefix_storage_ = symbol_table.join({prefix, stat_name});
-  tag_extracted_name_ = StatName(prefix_storage_.get());
+  if (const std::optional<StatName> elided = elideJoin(prefix, stat_name); elided.has_value()) {
+    tag_extracted_name_ = *elided;
+  } else {
+    prefix_storage_ = symbol_table.join({prefix, stat_name});
+    tag_extracted_name_ = StatName(prefix_storage_.get());
+  }
 
   if (stat_name_tags.has_value() && !stat_name_tags->empty()) {
-    full_name_storage_ =
-        joinNameAndTags({}, StatName(prefix_storage_.get()), *stat_name_tags, symbol_table);
+    full_name_storage_ = joinNameAndTags({}, tag_extracted_name_, *stat_name_tags, symbol_table);
     name_with_tags_ = StatName(full_name_storage_.get());
   } else {
-    name_with_tags_ = StatName(prefix_storage_.get());
+    name_with_tags_ = tag_extracted_name_;
   }
 }
 
@@ -31,8 +54,12 @@ TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatNameTagSpan prefix_tag
                                      SymbolTable& symbol_table) {
   // The final tag-extracted name never includes tag values: it is the scope's tag-extracted
   // prefix joined with the stat's tag-extracted name.
-  prefix_storage_ = symbol_table.join({prefix, name});
-  tag_extracted_name_ = StatName(prefix_storage_.get());
+  if (const std::optional<StatName> elided = elideJoin(prefix, name); elided.has_value()) {
+    tag_extracted_name_ = *elided;
+  } else {
+    prefix_storage_ = symbol_table.join({prefix, name});
+    tag_extracted_name_ = StatName(prefix_storage_.get());
+  }
 
   // Effective tags = prefix tags (inherited from the scope) + name tags (provided by the
   // caller). These are copied into effective_tags_, owned by this Joiner; the underlying symbols
@@ -52,6 +79,10 @@ TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatNameTagSpan prefix_tag
   if (name_tags.empty()) {
     // We have prefix tags but no name tags. The stat full tagged name can be derived by joining the
     // scope's tagged prefix with the tag-extracted name -- no additional tag values to interleave.
+    if (const std::optional<StatName> elided = elideJoin(tagged_prefix, name); elided.has_value()) {
+      name_with_tags_ = *elided;
+      return;
+    }
     full_name_storage_ = symbol_table.join({tagged_prefix, name});
     name_with_tags_ = StatName(full_name_storage_.get());
     return;
@@ -60,6 +91,10 @@ TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatNameTagSpan prefix_tag
   if (!tagged_name.empty()) {
     // The caller has provided an explicit tagged name. Join the scope's tagged prefix with the
     // provided tagged name to get the final flat name.
+    if (tagged_prefix.empty()) {
+      name_with_tags_ = tagged_name;
+      return;
+    }
     full_name_storage_ = symbol_table.join({tagged_prefix, tagged_name});
     name_with_tags_ = StatName(full_name_storage_.get());
     return;

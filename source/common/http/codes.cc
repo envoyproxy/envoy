@@ -1,6 +1,7 @@
 #include "source/common/http/codes.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -17,6 +18,32 @@
 
 namespace Envoy {
 namespace Http {
+namespace {
+
+// A join over a name-vector holding at most one non-empty name produces bytes identical to that
+// name, so the join -- and the heap allocation it makes -- can be skipped, referencing the name
+// directly instead. This is the common case on the response path: the router, ext_authz and
+// ratelimit all leave ResponseStatInfo::prefix_ empty.
+//
+// Returns nullopt when two or more names are non-empty and a join is required. An all-empty
+// vector joins to an empty stat name, which is what the empty StatName returned here represents.
+std::optional<Stats::StatName> elideJoin(const Stats::StatNameVec& names) {
+  Stats::StatName sole_name;
+  bool found = false;
+  for (Stats::StatName name : names) {
+    if (name.empty()) {
+      continue;
+    }
+    if (found) {
+      return std::nullopt;
+    }
+    sole_name = name;
+    found = true;
+  }
+  return sole_name;
+}
+
+} // namespace
 
 CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
     : stat_name_pool_(symbol_table), symbol_table_(symbol_table),
@@ -44,17 +71,29 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
 }
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope, const Stats::StatNameVec& names) const {
+  if (const std::optional<Stats::StatName> elided = elideJoin(names); elided.has_value()) {
+    scope.counterFromStatName(*elided).inc();
+    return;
+  }
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const {
+  if (a.empty() || b.empty()) {
+    scope.counterFromStatName(a.empty() ? b : a).inc();
+    return;
+  }
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({a, b});
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
 void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const Stats::StatNameVec& names,
                                     Stats::Histogram::Unit unit, uint64_t count) const {
+  if (const std::optional<Stats::StatName> elided = elideJoin(names); elided.has_value()) {
+    scope.histogramFromStatName(*elided, unit).recordValue(count);
+    return;
+  }
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit).recordValue(count);
 }
