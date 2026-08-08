@@ -383,7 +383,7 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsRejectedWithUhvO
   } else {
     waitForNextUpstreamRequest();
 
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z0with%XYbad%7Jencoding%A");
+    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z%30with%XYbad%7Jencoding%A");
 
     // Send a headers only response.
     upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -408,7 +408,7 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsAllowed) {
                                      {":authority", "host"}});
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z0with%XYbad%7Jencoding%");
+  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z%30with%XYbad%7Jencoding%");
 
   // Send a headers only response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -418,6 +418,8 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsAllowed) {
 // Without the `envoy.uhv.reject_percent_00` override UHV rejects requests with the %00
 // sequence.
 TEST_P(DownstreamUhvIntegrationTest, RejectPercent00) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_percentzerozero_in_url_path",
+                                    "false");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
@@ -437,6 +439,8 @@ TEST_P(DownstreamUhvIntegrationTest, RejectPercent00) {
 }
 
 TEST_P(DownstreamUhvIntegrationTest, UhvAllowsPercent00WithOverride) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_percentzerozero_in_url_path",
+                                    "false");
   config_helper_.addRuntimeOverride("envoy.uhv.reject_percent_00", "false");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
