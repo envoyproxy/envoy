@@ -223,6 +223,20 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
   return "UNKNOWN";
 }
 
+absl::StatusOr<std::shared_ptr<McpJsonRestBridgeFilterConfig>>
+McpJsonRestBridgeFilterConfig::create(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+        proto_config) {
+  // use new/shared_ptr() instead of make_shared() because constructor is private
+  std::shared_ptr<McpJsonRestBridgeFilterConfig> config(
+      new McpJsonRestBridgeFilterConfig(proto_config));
+  auto status = config->initialize();
+  if (!status.ok()) {
+    return status;
+  }
+  return config;
+}
+
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
         proto_config)
@@ -233,7 +247,9 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
                                                              DEFAULT_MAX_REQUEST_BODY_SIZE)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)),
-      clear_route_cache_(!proto_config_.disable_clear_route_cache()) {
+      clear_route_cache_(!proto_config_.disable_clear_route_cache()) {}
+
+absl::Status McpJsonRestBridgeFilterConfig::initialize() {
   const auto& tool_config = proto_config_.tool_config();
   std::string host = tool_config.default_server_info().host();
   std::string path = tool_config.default_server_info().path();
@@ -243,19 +259,28 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
   EndpointKey key{host, path};
   auto& endpoint_config = endpoint_configs_[key];
   for (const auto& tool : tool_config.tools()) {
-    if (endpoint_config.tool_entries
-            .try_emplace(tool.name(),
-                         ToolEntry{tool.http_rule(), tool.text_content_streaming_enabled(), &tool})
-            .second) {
-      endpoint_config.tools.push_back(&tool);
+    if (!endpoint_config.tool_entries
+             .try_emplace(tool.name(),
+                          ToolEntry{tool.http_rule(), tool.text_content_streaming_enabled(), &tool})
+             .second) {
+      return absl::InvalidArgumentError(
+          fmt::format("Duplicate tool name: {} (host/path: {}, {})", tool.name(), host, path));
     }
+    endpoint_config.tools.push_back(&tool);
   }
   if (tool_config.has_tool_list_http_rule()) {
-    endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
+    const auto& rule = tool_config.tool_list_http_rule();
+    if (rule.get().empty() || !rule.put().empty() || !rule.post().empty() ||
+        !rule.delete_().empty() || !rule.patch().empty() || !rule.body().empty()) {
+      return absl::InvalidArgumentError(
+          "tool_list_http_rule must be a GET request with an empty body");
+    }
+    endpoint_config.tool_list_http_rule = rule;
   }
   endpoint_config.tool_list_local = tool_config.has_tool_list_local();
 
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
+  return absl::OkStatus();
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
@@ -344,10 +369,26 @@ bool McpJsonRestBridgeFilterConfig::hasEndpoint(absl::string_view host,
   return false;
 }
 
+absl::StatusOr<std::shared_ptr<McpJsonRestBridgePerRouteConfig>>
+McpJsonRestBridgePerRouteConfig::create(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+        proto_config) {
+  // use new/shared_ptr() instead of make_shared() because constructor is private
+  std::shared_ptr<McpJsonRestBridgePerRouteConfig> config(
+      new McpJsonRestBridgePerRouteConfig(proto_config));
+  auto status = config->initialize();
+  if (!status.ok()) {
+    return status;
+  }
+  return config;
+}
+
 McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
         proto_config)
-    : proto_config_(proto_config) {
+    : proto_config_(proto_config) {}
+
+absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
   if (proto_config_.tool_config().empty()) {
     EndpointKey key{"", "/mcp"};
     endpoint_configs_.try_emplace(key, EndpointConfig());
@@ -361,16 +402,25 @@ McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
       EndpointKey key{host, path};
       auto& endpoint_config = endpoint_configs_[key];
       for (const auto& tool : tool_config.tools()) {
-        if (endpoint_config.tool_entries
-                .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
-                                                    tool.text_content_streaming_enabled(), &tool})
-                .second) {
-          endpoint_config.tools.push_back(&tool);
+        if (!endpoint_config.tool_entries
+                 .try_emplace(tool.name(), ToolEntry{tool.http_rule(),
+                                                     tool.text_content_streaming_enabled(), &tool})
+                 .second) {
+          return absl::InvalidArgumentError(
+              fmt::format("Duplicate tool name: {} (host/path: {}, {})", tool.name(), host, path));
         }
+        endpoint_config.tools.push_back(&tool);
       }
-      if (!endpoint_config.tool_list_http_rule.has_value() &&
-          tool_config.has_tool_list_http_rule()) {
-        endpoint_config.tool_list_http_rule = tool_config.tool_list_http_rule();
+      if (tool_config.has_tool_list_http_rule()) {
+        const auto& rule = tool_config.tool_list_http_rule();
+        if (rule.get().empty() || !rule.put().empty() || !rule.post().empty() ||
+            !rule.delete_().empty() || !rule.patch().empty() || !rule.body().empty()) {
+          return absl::InvalidArgumentError(
+              "tool_list_http_rule must be a GET request with an empty body");
+        }
+        if (!endpoint_config.tool_list_http_rule.has_value()) {
+          endpoint_config.tool_list_http_rule = rule;
+        }
       }
       if (tool_config.has_tool_list_local()) {
         endpoint_config.tool_list_local = true;
@@ -379,6 +429,7 @@ McpJsonRestBridgePerRouteConfig::McpJsonRestBridgePerRouteConfig(
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge per-route config: {}",
             proto_config_.DebugString());
+  return absl::OkStatus();
 }
 
 absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
