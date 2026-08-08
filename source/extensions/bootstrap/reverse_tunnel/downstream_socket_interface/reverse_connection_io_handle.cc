@@ -73,7 +73,9 @@ void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
                                               const std::string& connection_key,
                                               std::optional<uint64_t> connection_id,
                                               const std::string& error_message) {
-  if (!extension_) {
+  // Skip before resolving a time source: unit tests (and production with no access_log config)
+  // may close tunnels without a dispatcher/TLS registry wired yet.
+  if (!extension_ || extension_->accessLogs().empty()) {
     return;
   }
   // The worker id is the worker dispatcher name (e.g. "worker_2"), the same identity sent in the
@@ -92,8 +94,8 @@ void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
 
-  // Detach any still-live child tunnel IoHandles so their parent() returns nullptr instead of a
-  // dangling pointer after this object is destroyed.
+  // Detach any still-live child tunnel IoHandles so their back-pointer is cleared instead of
+  // dangling after this object is destroyed.
   for (auto* child : child_io_handles_) {
     child->detachParent();
   }
@@ -868,17 +870,20 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
   ENVOY_LOG(debug, "reverse_tunnel: Downstream connection closed: {}", connection_key);
 
   auto [host_address, cluster_name] = dropTunnelFromTracking(connection_key);
+  // Always emit connection_closed so a prior drain can still be correlated via connection_key /
+  // connection_id even when host/cluster are empty (key already dropped at drain time).
+  emitAccessLog("connection_closed", host_address, cluster_name, connection_key, connection_id, "");
+
   if (host_address.empty()) {
     // Key already removed (typically via markTunnelDrainingAndDialReplacement when the tunnel
-    // began draining earlier). Benign no-op; logged at debug to avoid noisy warnings.
+    // began draining earlier). Tracking cleanup is a no-op; logged at debug to avoid noisy
+    // warnings.
     ENVOY_LOG(debug,
               "reverse_tunnel: connection key {} already removed from tracking; closure cleanup "
               "is a no-op",
               connection_key);
     return;
   }
-
-  emitAccessLog("connection_closed", host_address, cluster_name, connection_key, connection_id, "");
 
   // The next call to maintainClusterConnections() will detect the missing connection
   // and re-initiate it automatically.
@@ -889,7 +894,7 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
 }
 
 void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
-    const std::string& connection_key) {
+    const std::string& connection_key, uint64_t connection_id) {
   ENVOY_LOG(info,
             "reverse_tunnel: tunnel {} draining; dropping from tracking and dialing replacement",
             connection_key);
@@ -897,13 +902,16 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
   // Drop the key so the maintenance loop sees a deficit and dials a replacement. The underlying
   // TCP socket is left alone: in-flight HTTP/2 streams keep running on it and it closes naturally
   // on the next FIN; onDownstreamConnectionClosed() then no-ops.
-  const std::string host_address = dropTunnelFromTracking(connection_key).first;
+  auto [host_address, cluster_name] = dropTunnelFromTracking(connection_key);
   if (host_address.empty()) {
     // Already removed (e.g. a prior drain notice, or the host was pruned). Benign no-op.
     ENVOY_LOG(debug, "reverse_tunnel: connection key {} not in tracking map; nothing to drain",
               connection_key);
     return;
   }
+
+  emitAccessLog("connection_draining", host_address, cluster_name, connection_key, connection_id,
+                "");
 
   // Dial the replacement on the next dispatcher pass instead of waiting for the periodic tick.
   if (rev_conn_retry_timer_ != nullptr) {

@@ -183,6 +183,10 @@ public:
     tls_slot_ = std::move(slot);
   }
 
+  void setTestOnlyAccessLogs(AccessLog::InstanceSharedPtrVector access_logs) {
+    access_logs_ = std::move(access_logs);
+  }
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
