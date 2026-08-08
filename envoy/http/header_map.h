@@ -184,6 +184,7 @@ private:
   HEADER_FUNC(EnvoyExternalAddress)                                                                \
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
   HEADER_FUNC(EnvoyHedgeOnPerTryTimeout)                                                           \
+  HEADER_FUNC(EnvoyInternalRedirectOn)                                                             \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyIpTags)                                                                         \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
