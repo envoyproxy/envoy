@@ -690,6 +690,9 @@ public:
   OptRef<const Network::ListenerInfo> listenerInfo() const override {
     return StreamInfoImpl::downstreamAddressProvider().listenerInfo();
   }
+  OptRef<const Network::DrainDecision> drainDecision() const override {
+    return StreamInfoImpl::downstreamAddressProvider().drainDecision();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;

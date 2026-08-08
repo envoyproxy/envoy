@@ -1285,8 +1285,11 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
 void Filter::maybeCloseDownstreamForDrainClose() {
   if (!config_->checkDrainClose() || downstream_closed_ ||
-      read_callbacks_->connection().state() != Network::Connection::State::Open ||
-      !config_->drainDecision().drainClose(config_->drainCloseScope())) {
+      read_callbacks_->connection().state() != Network::Connection::State::Open) {
+    return;
+  }
+  if (OptRef<const Network::DrainDecision> drain_decision = read_callbacks_->connection().connectionInfoProvider().drainDecision();
+      drain_decision && !drain_decision->drainClose(config_->drainCloseScope())) {
     return;
   }
 

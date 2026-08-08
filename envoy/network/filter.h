@@ -673,6 +673,11 @@ public:
    * @return the filter chain info for this filter chain.
    */
   virtual const FilterChainInfoSharedPtr& filterChainInfo() const PURE;
+
+  /**
+   * @return the filter chain drain decision, which is jointly owned by the factory contexts.
+   */
+  virtual const DrainDecision& drainDecision() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

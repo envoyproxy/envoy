@@ -97,6 +97,12 @@ public:
   void setFilterChainInfo(FilterChainInfoConstSharedPtr filter_chain_info) override {
     filter_chain_info_ = std::move(filter_chain_info);
   }
+  OptRef<const Network::DrainDecision> drainDecision() const override {
+    return drain_decision_;
+  }
+  void setDrainDecision(const Network::DrainDecision& drain_decision) override {
+    drain_decision_ = drain_decision;
+  }
   OptRef<const ListenerInfo> listenerInfo() const override {
     return makeOptRefFromPtr<const ListenerInfo>(listener_info_.get());
   }
@@ -121,6 +127,7 @@ private:
   std::optional<std::chrono::milliseconds> round_trip_time_;
   FilterChainInfoConstSharedPtr filter_chain_info_;
   ListenerInfoConstSharedPtr listener_info_;
+  OptRef<const Network::DrainDecision> drain_decision_;
 };
 
 class SocketImpl : public virtual Socket {

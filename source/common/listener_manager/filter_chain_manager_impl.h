@@ -158,6 +158,10 @@ public:
     return filter_chain_info_;
   }
 
+  const Network::DrainDecision& drainDecision() const override {
+    return factory_context_->drainDecision();
+  }
+
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
