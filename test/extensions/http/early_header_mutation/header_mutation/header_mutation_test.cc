@@ -48,7 +48,7 @@ TEST(HeaderMutationTest, TestAll) {
   ProtoHeaderMutation proto_mutation;
   TestUtility::loadFromYaml(config, proto_mutation);
 
-  HeaderMutation mutation(proto_mutation, context);
+  HeaderMutation mutation(proto_mutation, context, ProtobufMessage::getNullValidationVisitor());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   Envoy::Http::TestRequestHeaderMapImpl headers = {
@@ -73,6 +73,99 @@ TEST(HeaderMutationTest, TestAll) {
   EXPECT_EQ(1, headers.get(Envoy::Http::LowerCaseString("flag-header-4")).size());
   EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
 }
+
+#if defined(USE_CEL_PARSER)
+
+TEST(HeaderMutationTest, CelConfigEnablesStringFunctionsForRequestHeaders) {
+  const std::string config = R"EOF(
+  mutations:
+  - append:
+      header:
+        key: "flag-header"
+        value: "%CEL(request.headers['source-header'].replace('old', 'new'))%"
+      append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+  formatters:
+  - name: envoy.formatter.cel
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+      cel_config:
+        enable_string_functions: true
+  )EOF";
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter(context);
+
+  ProtoHeaderMutation proto_mutation;
+  TestUtility::loadFromYaml(config, proto_mutation);
+
+  HeaderMutation mutation(proto_mutation, context, ProtobufMessage::getNullValidationVisitor());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Envoy::Http::TestRequestHeaderMapImpl headers = {
+      {":method", "GET"},
+      {"source-header", "prefix-old-suffix"},
+  };
+
+  mutation.mutate(headers, stream_info);
+
+  EXPECT_EQ("prefix-new-suffix", headers.get_("flag-header"));
+}
+
+TEST(HeaderMutationTest, StringFunctionExpressionRejectedWhenDisabled) {
+  const std::string config = R"EOF(
+  mutations:
+  - append:
+      header:
+        key: "flag-header"
+        value: "%CEL(request.headers['source-header'].replace('old', 'new'))%"
+      append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+  formatters:
+  - name: envoy.formatter.cel
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+      cel_config:
+        enable_string_functions: false
+  )EOF";
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  ProtoHeaderMutation proto_mutation;
+  TestUtility::loadFromYaml(config, proto_mutation);
+
+  EXPECT_THROW(
+      HeaderMutation mutation(proto_mutation, context, ProtobufMessage::getNullValidationVisitor()),
+      EnvoyException);
+}
+
+TEST(HeaderMutationTest, BuiltInCelWorksWithoutFormatters) {
+  const std::string config = R"EOF(
+  mutations:
+  - append:
+      header:
+        key: "flag-header"
+        value: "%CEL(request.headers[':method'])%"
+      append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter(context);
+
+  ProtoHeaderMutation proto_mutation;
+  TestUtility::loadFromYaml(config, proto_mutation);
+
+  HeaderMutation mutation(proto_mutation, context, ProtobufMessage::getNullValidationVisitor());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Envoy::Http::TestRequestHeaderMapImpl headers = {
+      {":method", "GET"},
+  };
+
+  mutation.mutate(headers, stream_info);
+
+  EXPECT_EQ("GET", headers.get_("flag-header"));
+}
+
+#endif // USE_CEL_PARSER
 
 } // namespace
 } // namespace HeaderMutation

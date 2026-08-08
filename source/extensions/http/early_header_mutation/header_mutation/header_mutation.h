@@ -3,6 +3,7 @@
 #include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.h"
 #include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.validate.h"
 #include "envoy/http/early_header_mutation.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "source/common/http/header_mutation.h"
 
@@ -20,7 +21,8 @@ using ProtoHeaderMutation =
 class HeaderMutation : public Envoy::Http::EarlyHeaderMutation {
 public:
   HeaderMutation(const ProtoHeaderMutation& mutations,
-                 Server::Configuration::ServerFactoryContext& context);
+                 Server::Configuration::ServerFactoryContext& context,
+                 ProtobufMessage::ValidationVisitor& validation_visitor);
 
   bool mutate(Envoy::Http::RequestHeaderMap& headers,
               const StreamInfo::StreamInfo& stream_info) const override;
