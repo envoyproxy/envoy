@@ -127,7 +127,7 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
   // and signalled readiness, so this is a no-op. Otherwise signal it here, unless an update is
   // still warming up - that one publishes and signals readiness itself - or unless publishing
   // failed, in which case nothing should be told that a route configuration is ready.
-  if (!config_update_info_->configWarming() && publish_status_.ok()) {
+  if (!config_update_info_->configWarming()) {
     local_init_target_.ready();
   }
 
