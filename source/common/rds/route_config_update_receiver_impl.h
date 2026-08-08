@@ -34,8 +34,9 @@ namespace Rds {
  */
 class ConfigWarmer : protected Logger::Loggable<Logger::Id::rds> {
 public:
-  ConfigWarmer(std::function<void()> on_warmed_callback = []() {})
-      : on_warmed_callback_(on_warmed_callback) {}
+  ConfigWarmer(
+      OptRef<Event::Dispatcher> dispatcher = {}, std::function<void()> on_warmed_callback = []() {})
+      : main_dispatcher_(dispatcher), on_warmed_callback_(on_warmed_callback) {}
 
   /**
    * Sets the observer that is notified once an update is warmed up.
@@ -79,19 +80,18 @@ private:
   // ready. Drops the per-update init manager and notifies the observer.
   void onWarmed();
 
+  void mayDeferDeleteInitManager();
+
+  OptRef<Event::Dispatcher> main_dispatcher_;
+  std::function<void()> on_warmed_callback_;
   OptRef<RouteConfigUpdateObserver> observer_;
   // Init manager that is used to warm up the resources owned by the route configuration of the
   // update that is warming up. Null if no update is warming up.
   std::unique_ptr<Init::ManagerImpl> init_manager_;
-  // The init manager of the update that was warmed up last. It can't be destroyed from inside its
-  // own readiness callback, see onWarmed(), so it is moved aside there and destroyed once the next
-  // update replaces it.
-  std::unique_ptr<Init::ManagerImpl> deferred_delete_init_manager_;
   // Watcher that init_manager_ notifies once everything it warms up is ready.
   std::unique_ptr<Init::WatcherImpl> init_watcher_;
   // Identifies the update that is warming up in logs.
   std::string update_id_;
-  std::function<void()> on_warmed_callback_;
 };
 
 // The state of one route configuration: the proto it was built from, the parsed configuration and

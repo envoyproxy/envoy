@@ -17,6 +17,8 @@ void ConfigWarmer::updateInitManager(std::unique_ptr<Init::ManagerImpl> init_man
               "rds: update {} superseded update {} while it was still warming up, abandoning "
               "the superseded update",
               update_id, update_id_);
+    init_watcher_.reset();
+    mayDeferDeleteInitManager();
   }
   update_id_ = std::string(update_id);
   // Assigning the watcher first drops the abandoned watcher while its init manager is still around.
@@ -38,7 +40,7 @@ void ConfigWarmer::onWarmed() {
   init_watcher_.reset();
   // The init manager can't be dropped here because it may be destroyed from inside its own
   // initialize() method.
-  deferred_delete_init_manager_ = std::move(init_manager_);
+  mayDeferDeleteInitManager();
   init_manager_.reset();
   update_id_.clear();
 
@@ -51,13 +53,33 @@ void ConfigWarmer::onWarmed() {
   }
 }
 
+class DeferredDeleteInitManagerCleanup : public Event::DeferredDeletable {
+public:
+  DeferredDeleteInitManagerCleanup(std::unique_ptr<Init::ManagerImpl> init_manager)
+      : init_manager_(std::move(init_manager)) {}
+  ~DeferredDeleteInitManagerCleanup() override = default;
+
+private:
+  std::unique_ptr<Init::ManagerImpl> init_manager_;
+};
+
+void ConfigWarmer::mayDeferDeleteInitManager() {
+  if (main_dispatcher_.has_value()) {
+    main_dispatcher_->deferredDelete(
+        std::make_unique<DeferredDeleteInitManagerCleanup>(std::move(init_manager_)));
+  } else {
+    init_manager_.reset();
+  }
+}
+
 RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
     ConfigTraits& config_traits, ProtoTraits& proto_traits,
     Server::Configuration::ServerFactoryContext& factory_context)
     : config_traits_(config_traits), proto_traits_(proto_traits), factory_context_(factory_context),
       time_source_(factory_context.timeSource()),
       route_config_proto_(proto_traits_.createEmptyProto()),
-      config_(config_traits_.createNullConfig()), warmer_([this]() { onConfigWarmed(); }) {}
+      config_(config_traits_.createNullConfig()),
+      warmer_(factory_context_.mainThreadDispatcher(), [this]() { onConfigWarmed(); }) {}
 
 void RouteConfigUpdateReceiverImpl::updateConfig(
     std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
