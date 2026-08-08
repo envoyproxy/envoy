@@ -34,7 +34,7 @@ absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFacto
       config_factory->createCompressorFactoryFromProto(*message, context);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
       proto_config, stats_prefix, context.scope(), context.serverFactoryContext().runtime(),
-      std::move(compressor_factory));
+      std::move(compressor_factory), context.serverFactoryContext());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CompressorFilter>(config));
   };
