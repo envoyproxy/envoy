@@ -103,38 +103,6 @@ void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
   init_target_.ready();
 }
 
-void VhdsSubscription::commitUpdateInitManager(
-    std::unique_ptr<Init::ManagerImpl> update_init_manager, absl::string_view version_info) {
-  if (update_init_manager_ != nullptr) {
-    // A previous update is still warming up. This update supersedes it: the route configuration it
-    // would have published has already been replaced in config_update_info_, so drop its watcher
-    // and init manager and never publish it.
-    ENVOY_LOG(debug,
-              "vhds: route config '{}' was updated again while the previous update was still "
-              "warming up, abandoning the previous update",
-              config_update_info_->protobufConfigurationCast().name());
-  }
-  // Assigning the watcher first drops the abandoned watcher while its init manager is still around.
-  // That is safe, the manager only holds a weak handle to it.
-  update_init_watcher_ = std::make_unique<Init::WatcherImpl>(
-      fmt::format("VHDS update-init-watcher {}:{}",
-                  config_update_info_->protobufConfigurationCast().name(), version_info),
-      [this]() { onUpdateInitManagerReady(); });
-  update_init_manager_ = std::move(update_init_manager);
-  // Note this publishes the update synchronously, i.e. before returning, if there is nothing to
-  // warm up. It may therefore reset the two members that were just assigned.
-  update_init_manager_->initialize(*update_init_watcher_);
-}
-
-void VhdsSubscription::resetUpdateInitManager() {
-  // Note this is normally called from inside the readiness callback of update_init_manager_ itself.
-  // That is safe: the callback is invoked through a handle that holds a shared_ptr to the callback
-  // for the duration of the call, and neither the manager nor the watcher touches its own state
-  // after invoking it.
-  update_init_watcher_.reset();
-  update_init_manager_.reset();
-}
-
 absl::Status VhdsSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -154,66 +122,19 @@ absl::Status VhdsSubscription::onConfigUpdate(
         Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::VirtualHost>(
             resource.get().resource()));
   }
-  // Every VHDS update gets its own independent init manager, so that the resources of the new route
-  // configuration are warmed up without interfering with the route configuration that is currently
-  // published. It is kept local until the update is known to be applied, so that an update that
-  // turns out to be a no-op leaves a previous update that is still warming up alone.
-  auto update_init_manager = std::make_unique<Init::ManagerImpl>(
-      fmt::format("VHDS update-init-manager {}:{}",
-                  config_update_info_->protobufConfigurationCast().name(), version_info));
-  if (!config_update_info_->onVhdsUpdate(added_vhosts, std::move(added_resource_ids),
-                                         removed_resources, *update_init_manager, version_info)) {
-    // The route configuration is unchanged, so there is nothing to warm up and nothing to publish.
-    // Note that update_init_manager is dropped here without ever being started, while a previous
-    // update that is still warming up is deliberately left untouched.
-    if (update_init_manager_ == nullptr) {
-      init_target_.ready();
-    }
-    // Otherwise readiness is signalled once the update that is still warming up is published.
-    return absl::OkStatus();
-  }
-
-  // The new route configuration has been built but is not visible to the workers yet. Wait until
-  // everything that registered to the per-update init manager is warmed up, and only publish the
-  // new route configuration then.
-  publish_status_ = absl::OkStatus();
-  commitUpdateInitManager(std::move(update_init_manager), version_info);
-
-  // If there was nothing to warm up, the watcher registered above has already run and the update
-  // was published before we got here, so a failure can still be reported to the xDS layer as a
-  // rejection. Otherwise the publishing happens later and publish_status_ is still OK here.
-  return publish_status_;
-}
-
-void VhdsSubscription::onUpdateInitManagerReady() {
-  stats_.config_reload_.inc();
-  ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",
-            config_update_info_->protobufConfigurationCast().name(),
-            config_update_info_->configHash());
-  if (route_config_provider_ != nullptr) {
-    publish_status_ = route_config_provider_->onConfigUpdate();
-    if (!publish_status_.ok()) {
-      ENVOY_LOG(warn, "vhds: failed to apply the warmed up route config '{}': {}",
-                config_update_info_->protobufConfigurationCast().name(), publish_status_.message());
+  if (config_update_info_->onVhdsUpdate(added_vhosts, std::move(added_resource_ids),
+                                        removed_resources, version_info)) {
+    stats_.config_reload_.inc();
+    ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",
+              config_update_info_->protobufConfigurationCast().name(),
+              config_update_info_->configHash());
+    if (route_config_provider_ != nullptr) {
+      RETURN_IF_NOT_OK(route_config_provider_->onConfigUpdate());
     }
   }
 
-  // The new route configuration is warmed up and published, so the per-update init manager isn't
-  // needed anymore. The next update will create a new one.
-  resetUpdateInitManager();
-
-  // Only signal readiness if the new route configuration actually went live, so that whatever
-  // warms up with this subscription isn't told that a route configuration is ready when it isn't.
-  //
-  // If the publishing happened synchronously, i.e. if onConfigUpdate() is still on the stack, the
-  // failure is returned to the xDS layer, which rejects the update and calls
-  // onConfigUpdateFailed(). That signals readiness, so server startup isn't blocked by a bad
-  // config. If the publishing happened asynchronously the update has already been accepted, so
-  // there is no such rejection: this subscription stays unready and whatever warms up with it,
-  // e.g. a listener, stays warming. The warning logged above is the only indication of that.
-  if (publish_status_.ok()) {
-    init_target_.ready();
-  }
+  init_target_.ready();
+  return absl::OkStatus();
 }
 
 } // namespace Router

@@ -34,6 +34,7 @@ envoy_cc_library(
         ":rds_interface",
         "//envoy/config:config_provider_manager_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/init:manager_interface",
         "//envoy/json:json_object_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/runtime:runtime_interface",
@@ -52,7 +53,6 @@ envoy_cc_library(
     deps = [
         ":rds_interface",
         "//envoy/common:time_interface",
-        "//envoy/init:manager_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",

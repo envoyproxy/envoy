@@ -262,6 +262,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
@@ -281,7 +282,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/config:utility_lib",
-        "//source/common/init:manager_lib",
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
         "//source/common/router:vhds_lib",

@@ -109,13 +109,13 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   SystemTime time1(std::chrono::milliseconds(1234567891234));
   timeSystem().setSystemTime(time1);
 
-  EXPECT_TRUE(config_update_->onRdsUpdate(response1, init_manager_, "1"));
+  EXPECT_TRUE(config_update_->onRdsUpdate(response1, "1"));
   EXPECT_EQ(nullptr, route("foo"));
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
   EXPECT_EQ(time1, config_update_->lastUpdated());
 
-  EXPECT_FALSE(config_update_->onRdsUpdate(response1, init_manager_, "2"));
+  EXPECT_FALSE(config_update_->onRdsUpdate(response1, "2"));
   EXPECT_EQ(nullptr, route("foo"));
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
 
@@ -142,7 +142,7 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   SystemTime time2(std::chrono::milliseconds(1234567891235));
   timeSystem().setSystemTime(time2);
 
-  EXPECT_TRUE(config_update_->onRdsUpdate(response2, init_manager_, "2"));
+  EXPECT_TRUE(config_update_->onRdsUpdate(response2, "2"));
   EXPECT_EQ("foo", *route("foo"));
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("2", config_update_->configInfo().value().version_);
@@ -292,9 +292,17 @@ class WarmingTestConfig : public TestConfig {
 public:
   WarmingTestConfig(const envoy::config::route::v3::RouteConfiguration& rc,
                     Server::Configuration::ServerFactoryContext& context,
-                    Init::Manager& init_manager)
+                    Init::Manager& init_manager, bool ready_synchronously)
       : TestConfig(rc, context, false),
-        target_(fmt::format("warming target {}", rc.name()), [this]() { initializing_ = true; }) {
+        target_(fmt::format("warming target {}", rc.name()), [this, ready_synchronously]() {
+          initializing_ = true;
+          // The resource is already available, so it signals readiness from within the
+          // initialization callback, i.e. before the init manager is done starting its
+          // targets up.
+          if (ready_synchronously) {
+            target_.ready();
+          }
+        }) {
     init_manager.add(target_);
   }
 
@@ -327,12 +335,15 @@ public:
     }
     // The created configurations are kept alive so that a test can complete the warming of an
     // update that has already been superseded by a newer one.
-    configs_.push_back(std::make_shared<WarmingTestConfig>(route_config, context, init_manager));
+    configs_.push_back(std::make_shared<WarmingTestConfig>(route_config, context, init_manager,
+                                                           ready_synchronously_));
     return configs_.back();
   }
 
   // Whether the created route configurations own a resource that needs to be warmed up.
   bool warming_{true};
+  // Whether that resource is ready as soon as it is asked to initialize.
+  bool ready_synchronously_{false};
   mutable std::vector<std::shared_ptr<WarmingTestConfig>> configs_;
 };
 
@@ -400,6 +411,8 @@ public:
     return *std::static_pointer_cast<TestRouteConfigProviderImpl>(provider_);
   }
 
+  RouteConfigUpdateReceiver& receiver() { return *provider().subscription().routeConfigUpdate(); }
+
   uint64_t configReloads() {
     return scope_.counter("test_listener.trds.test_route.config_reload").value();
   }
@@ -455,6 +468,48 @@ TEST_F(RdsWarmingTest, UpdateWithNothingToWarmUpIsPublishedSynchronously) {
   EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
   EXPECT_NE(nullptr, publishedRoute("foo"));
   EXPECT_EQ(1, configReloads());
+}
+
+// A route configuration whose resources are ready as soon as they are asked to initialize is
+// published synchronously, from within the init manager that is starting them up.
+TEST_F(RdsWarmingTest, UpdateWhoseResourcesAreImmediatelyReadyIsPublishedSynchronously) {
+  config_traits_.ready_synchronously_ = true;
+  createProvider();
+
+  init_watcher_.expectReady();
+  EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
+  ASSERT_EQ(1, config_traits_.configs_.size());
+  EXPECT_TRUE(config_traits_.configs_[0]->initializing_);
+  EXPECT_NE(nullptr, publishedRoute("foo"));
+  EXPECT_EQ(1, configReloads());
+
+  // A second such update is published as well, i.e. the init manager of the first one is replaced
+  // rather than reused.
+  EXPECT_TRUE(pushUpdate(routeConfig("2", "bar")).ok());
+  ASSERT_EQ(2, config_traits_.configs_.size());
+  EXPECT_NE(nullptr, publishedRoute("bar"));
+  EXPECT_EQ(2, configReloads());
+}
+
+// Nothing about an update that is still warming up is visible until it is published.
+TEST_F(RdsWarmingTest, WarmingUpdateIsNotVisibleBeforeItIsPublished) {
+  createProvider();
+
+  init_watcher_.expectReady().Times(0);
+  EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
+  ASSERT_EQ(1, config_traits_.configs_.size());
+  EXPECT_TRUE(receiver().configWarming());
+  // The published route configuration is still the null config, so there is no version yet.
+  EXPECT_FALSE(receiver().configInfo().has_value());
+  EXPECT_EQ(0, receiver().configHash());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  init_watcher_.expectReady();
+  config_traits_.configs_[0]->ready();
+  EXPECT_FALSE(receiver().configWarming());
+  ASSERT_TRUE(receiver().configInfo().has_value());
+  EXPECT_EQ("1", receiver().configInfo().value().version_);
+  EXPECT_NE(0, receiver().configHash());
 }
 
 // An update that arrives while a previous update is still warming up supersedes it. The superseded

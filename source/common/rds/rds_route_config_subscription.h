@@ -40,6 +40,7 @@ struct RdsStats {
  * RDS config providers.
  */
 class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
+                                   RouteConfigUpdateObserver,
                                    protected Logger::Loggable<Logger::Id::rds> {
 public:
   static absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>>
@@ -82,24 +83,16 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
 
+  // Rds::RouteConfigUpdateObserver
+  // Called by the receiver when the route configuration that it built is warmed up. Publishes the
+  // new route configuration and signals that this subscription is ready.
+  void onConfigWarmed() override;
+
   virtual absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
                                             std::unique_ptr<Cleanup>&) {
     return absl::OkStatus();
   }
   virtual absl::Status afterProviderUpdate() { return absl::OkStatus(); }
-
-  // Takes ownership of the init manager that is dedicated to the route configuration of the update
-  // that is being applied and starts warming it up. If a previous update is still warming up it is
-  // abandoned, as this update supersedes it. Only called once the update is known to be applied, so
-  // that an update that turns out to be a no-op leaves a warming up update alone.
-  void commitUpdateInitManager(std::unique_ptr<Init::ManagerImpl> update_init_manager,
-                               absl::string_view version_info);
-  // Drops the per-update init manager. Called once the route configuration of the update has been
-  // warmed up and published, so that there is no init manager in between updates.
-  void resetUpdateInitManager();
-  // Called when everything that registered to the per-update init manager is warmed up. Publishes
-  // the new route configuration and signals that this subscription is ready.
-  void onUpdateInitManagerReady();
 
 protected:
   const std::string route_config_name_;
@@ -116,13 +109,6 @@ protected:
   // Target which starts the RDS subscription.
   Init::TargetImpl local_init_target_;
   Init::ManagerImpl local_init_manager_;
-  // Init manager that is used to warm up the resources that are owned by the route configuration
-  // of the update that is currently being processed. Every update gets its own independent init
-  // manager, and it is reset once the new route configuration is warmed up and published, so a
-  // non-null value means that an update is still warming up.
-  std::unique_ptr<Init::ManagerImpl> update_init_manager_;
-  // Watcher that update_init_manager_ notifies once everything it warms up is ready.
-  std::unique_ptr<Init::WatcherImpl> update_init_watcher_;
   // Result of the last publishing attempt. Publishing is deferred until the route configuration is
   // warmed up, so a failure is only reported back to the xDS layer in the common case where there
   // is nothing to warm up and the publishing therefore happens synchronously. It also gates

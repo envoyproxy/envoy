@@ -61,7 +61,7 @@ private:
   struct VhdsContext {
     VhdsContext(const envoy::config::route::v3::RouteConfiguration& config,
                 Server::Configuration::ServerFactoryContext& factory_context,
-                Init::Manager& init_manager, StaticRouteConfigProviderImpl& parent,
+                StaticRouteConfigProviderImpl& parent,
                 Rds::RouteConfigProviderManager& route_config_provider_manager);
 
     absl::Status onConfigUpdate();

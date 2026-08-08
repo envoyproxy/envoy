@@ -60,6 +60,9 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
   local_init_manager_.add(local_init_target_);
+  // The receiver warms up the route configuration that it builds on every update and notifies this
+  // subscription once it's ready to be published.
+  config_update_info_->setObserver(*this);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -73,37 +76,6 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
   route_config_provider_manager_.eraseDynamicProvider(manager_identifier_);
 }
 
-void RdsRouteConfigSubscription::commitUpdateInitManager(
-    std::unique_ptr<Init::ManagerImpl> update_init_manager, absl::string_view version_info) {
-  if (update_init_manager_ != nullptr) {
-    // A previous update is still warming up. This update supersedes it: the route configuration it
-    // would have published has already been replaced in config_update_info_, so drop its watcher
-    // and init manager and never publish it.
-    ENVOY_LOG(debug,
-              "rds: route config '{}' was updated again while the previous update was "
-              "still warming up, abandoning the previous update",
-              route_config_name_);
-  }
-  // Assigning the watcher first drops the abandoned watcher while its init manager is still around.
-  // That is safe, the manager only holds a weak handle to it.
-  update_init_watcher_ = std::make_unique<Init::WatcherImpl>(
-      fmt::format("{} update-init-watcher {}:{}", rds_type_, route_config_name_, version_info),
-      [this]() { onUpdateInitManagerReady(); });
-  update_init_manager_ = std::move(update_init_manager);
-  // Note this publishes the update synchronously, i.e. before returning, if there is nothing to
-  // warm up. It may therefore reset the two members that were just assigned.
-  update_init_manager_->initialize(*update_init_watcher_);
-}
-
-void RdsRouteConfigSubscription::resetUpdateInitManager() {
-  // Note this is normally called from inside the readiness callback of update_init_manager_ itself.
-  // That is safe: the callback is invoked through a handle that holds a shared_ptr to the callback
-  // for the duration of the call, and neither the manager nor the watcher touches its own state
-  // after invoking it.
-  update_init_watcher_.reset();
-  update_init_manager_.reset();
-}
-
 absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
@@ -114,7 +86,7 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     // Don't signal readiness if a previous update is still warming up, that update publishes and
     // signals readiness itself. An empty resource list doesn't invalidate it: it leaves the
     // currently published route configuration in place.
-    if (update_init_manager_ == nullptr) {
+    if (!config_update_info_->configWarming()) {
       local_init_target_.ready();
     }
     return absl::OkStatus();
@@ -143,46 +115,33 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     ENVOY_LOG(warn, "rds: route config '{}' rejected: {}", route_config_name_, msg);
     return absl::InvalidArgumentError(msg);
   }
-  // Every update gets its own independent init manager so that the resources of the new route
-  // configuration can be warmed up without interfering with the route configuration that is
-  // currently published. It is kept local until the update is known to be applied, so that an
-  // update that turns out to be a no-op leaves a previous update that is still warming up alone.
-  auto update_init_manager = std::make_unique<Init::ManagerImpl>(
-      fmt::format("{} update-init-manager {}:{}", rds_type_, route_config_name_, version_info));
-  if (!config_update_info_->onRdsUpdate(route_config, *update_init_manager, version_info)) {
+  // The new route configuration is built and warmed up by the receiver, which calls back into
+  // onConfigWarmed() to publish it. Note that this may happen before onRdsUpdate() returns, i.e.
+  // synchronously, if there is nothing to warm up, so the publishing state is reset upfront.
+  publish_status_ = absl::OkStatus();
+  if (!config_update_info_->onRdsUpdate(route_config, version_info)) {
     // The route configuration is unchanged, so there is nothing to warm up and nothing to publish.
-    // Note that update_init_manager is dropped here without ever being started, while a previous
-    // update that is still warming up is deliberately left untouched.
-    if (update_init_manager_ == nullptr) {
+    // A previous update that is still warming up is deliberately left untouched.
+    if (!config_update_info_->configWarming()) {
       local_init_target_.ready();
     }
     // Otherwise readiness is signalled once the update that is still warming up is published.
     return absl::OkStatus();
   }
 
-  // The new route configuration has been built but is not visible to the workers yet. Wait until
-  // everything that registered to the per-update init manager is warmed up, and only publish the
-  // new route configuration then.
-  publish_status_ = absl::OkStatus();
-  commitUpdateInitManager(std::move(update_init_manager), version_info);
-
-  // If there was nothing to warm up, the watcher registered above has already run and the update
-  // was published before we got here, so a failure can still be reported to the xDS layer as a
-  // rejection. Otherwise the publishing happens later and publish_status_ is still OK here.
+  // If there was nothing to warm up, onConfigWarmed() has already run and the update was published
+  // before we got here, so a failure can still be reported to the xDS layer as a rejection.
+  // Otherwise the publishing happens later and publish_status_ is still OK here.
   return publish_status_;
 }
 
-void RdsRouteConfigSubscription::onUpdateInitManagerReady() {
+void RdsRouteConfigSubscription::onConfigWarmed() {
   // These must outlive local_init_target_.ready() below: resume_rds is a Cleanup that resumes the
   // VHDS subscription, and it has always run after this subscription signalled readiness.
   std::unique_ptr<Init::ManagerImpl> noop_init_manager;
   std::unique_ptr<Cleanup> resume_rds;
 
   Cleanup after_this_update([this]() {
-    // The new route configuration is warmed up and published, so the per-update init manager isn't
-    // needed anymore. The next update will create a new one.
-    resetUpdateInitManager();
-
     // Only signal readiness if the new route configuration actually went live, so that whatever
     // warms up with this subscription isn't told that a route configuration is ready when it
     // isn't.

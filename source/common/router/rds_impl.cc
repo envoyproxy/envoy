@@ -61,14 +61,14 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() { config_update_info_.
 // init target with it is always legal and the initial VHDS fetch warms up together with the rest
 // of the route configuration.
 //
-// This hook can't use update_init_manager_ directly though, it runs after that manager has been
+// This hook can't use the per-update init manager though, it runs after that manager has been
 // initialized and add() would assert. The VHDS subscription has to be created in the build step
-// instead, i.e. in onRdsUpdate(), which already receives the per-update init manager. Better yet,
-// move the VhdsSubscription into Router::RouteConfigUpdateReceiverImpl and manage its whole
-// lifecycle there: that also folds in the duplicate creation site in
-// StaticRouteConfigProviderImpl::VhdsContext, and it fixes vhds_configuration_changed_ being
-// latched in onRdsUpdate() but consumed here, which loses the VHDS subscription entirely if the
-// update that set it is superseded while still warming up.
+// instead, i.e. inside Router::RouteConfigUpdateReceiverImpl::onRdsUpdate(), which is where the
+// per-update init manager lives now. Better yet, move the VhdsSubscription into
+// Router::RouteConfigUpdateReceiverImpl and manage its whole lifecycle there: that also folds in
+// the duplicate creation site in StaticRouteConfigProviderImpl::VhdsContext, and it fixes
+// vhds_configuration_changed_ being latched in onRdsUpdate() but consumed here, which loses the
+// VHDS subscription entirely if the update that set it is superseded while still warming up.
 //
 // To sort out first: the receiver needs a late-bound Rds::RouteConfigProvider* (same pattern as
 // Rds::RdsRouteConfigSubscription::routeConfigProvider()), onRdsUpdate() needs a StatusOr return
@@ -91,6 +91,10 @@ absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
     vhds_subscription_->registerInitTargetWithInitManager(
         noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
   }
+  // A VHDS update publishes through this same path, so the change has to be consumed here.
+  // Otherwise the next VHDS update would re-create vhds_subscription_ and destroy the
+  // VhdsSubscription whose onConfigUpdate() is delivering that very update.
+  config_update_info_->clearVhdsConfigurationChanged();
   return absl::OkStatus();
 }
 

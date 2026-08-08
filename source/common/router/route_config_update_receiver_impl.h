@@ -46,17 +46,21 @@ public:
   bool updateVhosts(VirtualHostMap& vhosts, const VirtualHostRefVector& added_vhosts);
 
   // Router::RouteConfigUpdateReceiver
-  bool onRdsUpdate(const Protobuf::Message& rc, Init::Manager& init_manager,
-                   const std::string& version_info) override;
+  bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
   bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
                     std::set<std::string>&& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                    Init::Manager& init_manager, const std::string& version_info) override;
+                    const std::string& version_info) override;
+  void setObserver(Rds::RouteConfigUpdateObserver& observer) override {
+    base_.warmer().setObserver(observer);
+  }
+  bool configWarming() const override { return base_.warmer().warming(); }
   uint64_t configHash() const override { return base_.configHash(); }
   const std::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
   }
   bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
+  void clearVhdsConfigurationChanged() override { vhds_configuration_changed_ = false; }
   const Protobuf::Message& protobufConfiguration() const override {
     return base_.protobufConfiguration();
   }
