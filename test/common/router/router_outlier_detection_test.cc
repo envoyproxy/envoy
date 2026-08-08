@@ -69,5 +69,46 @@ INSTANTIATE_TEST_SUITE_P(
         // to the outlier detection.
         std::make_tuple(503, std::optional<bool>(false), std::optional<uint64_t>(200))));
 
+using ResetOutlierDetectionTestCase =
+    std::tuple<Http::StreamResetReason, std::optional<Upstream::Outlier::Result>>;
+
+class RouterResetOutlierDetectionTest
+    : public ::testing::TestWithParam<ResetOutlierDetectionTestCase> {};
+
+TEST_P(RouterResetOutlierDetectionTest, ClassifiesResetOrigin) {
+  EXPECT_EQ(std::get<1>(GetParam()),
+            Filter::streamResetReasonToOutlierResult(std::get<0>(GetParam())));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    RouterOutlierDetectionTestSuite, RouterResetOutlierDetectionTest,
+    ::testing::Values(
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::LocalReset,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::LocalRefusedStreamReset,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::RemoteReset,
+                                      Upstream::Outlier::Result::ExtOriginRequestFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::RemoteRefusedStreamReset,
+                                      Upstream::Outlier::Result::ExtOriginRequestFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::LocalConnectionFailure,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::RemoteConnectionFailure,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::ConnectionTimeout,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::ConnectionTermination,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::Overflow, std::nullopt},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::ConnectError,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::ProtocolError,
+                                      Upstream::Outlier::Result::ExtOriginRequestFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::OverloadManager,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::Http1PrematureUpstreamHalfClose,
+                                      Upstream::Outlier::Result::LocalOriginConnectFailed},
+        ResetOutlierDetectionTestCase{Http::StreamResetReason::RemoteResetNoError, std::nullopt}));
+
 } // namespace Router
 } // namespace Envoy

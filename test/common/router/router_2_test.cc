@@ -407,7 +407,8 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 
   // This should not trigger a retry as the retry state has been deleted.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
+                        std::optional<uint64_t>(503)));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{remote_reset}");
 }
