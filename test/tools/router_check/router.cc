@@ -175,7 +175,7 @@ void RouterCheckTool::assignRuntimeFraction(
 }
 
 void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
-                                      Envoy::StreamInfo::StreamInfoImpl stream_info) {
+                                      const Envoy::StreamInfo::StreamInfo& stream_info) {
   if (!headers_finalized_ && tool_config.route_ != nullptr) {
     const Formatter::Context formatter_context(tool_config.request_headers_.get(),
                                                tool_config.response_headers_.get(), nullptr, {}, {},
@@ -200,7 +200,7 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
 
 void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
                                      const Router::DirectResponseEntry& entry,
-                                     Envoy::StreamInfo::StreamInfoImpl& stream_info) {
+                                     const Envoy::StreamInfo::StreamInfo& stream_info) {
   auto encode_functions = Envoy::Http::Utility::EncodeFunctions{
       nullptr, nullptr,
       [&](Envoy::Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {

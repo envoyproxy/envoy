@@ -27,11 +27,9 @@ std::shared_ptr<Network::ConnectionInfoSetterImpl> connectionInfoProvider() {
 }
 
 StreamInfo::StreamInfoImpl createStreamInfo() {
-  CONSTRUCT_ON_FIRST_USE(
-      StreamInfo::StreamInfoImpl,
-      StreamInfo::StreamInfoImpl(::Envoy::Http::Protocol::Http2,
-                                 Event::GlobalTimeSystem().timeSystem(), connectionInfoProvider(),
-                                 StreamInfo::FilterState::LifeSpan::FilterChain));
+  return StreamInfo::StreamInfoImpl(
+      ::Envoy::Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(),
+      connectionInfoProvider(), StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 // =============================================================================
@@ -45,7 +43,8 @@ TEST(HttpDynamicModuleDataInputTest, DataInputType) {
 
 TEST(HttpDynamicModuleDataInputTest, GetWithAllHeaders) {
   HttpDynamicModuleDataInput input;
-  ::Envoy::Http::Matching::HttpMatchingDataImpl data(createStreamInfo());
+  auto stream_info = createStreamInfo();
+  ::Envoy::Http::Matching::HttpMatchingDataImpl data(stream_info);
 
   ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"x-test", "value"}};
   ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{"content-type", "text/plain"}};
@@ -68,7 +67,8 @@ TEST(HttpDynamicModuleDataInputTest, GetWithAllHeaders) {
 
 TEST(HttpDynamicModuleDataInputTest, GetWithRequestHeadersOnly) {
   HttpDynamicModuleDataInput input;
-  ::Envoy::Http::Matching::HttpMatchingDataImpl data(createStreamInfo());
+  auto stream_info = createStreamInfo();
+  ::Envoy::Http::Matching::HttpMatchingDataImpl data(stream_info);
 
   ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"x-test", "value"}};
   data.onRequestHeaders(request_headers);
@@ -85,7 +85,8 @@ TEST(HttpDynamicModuleDataInputTest, GetWithRequestHeadersOnly) {
 
 TEST(HttpDynamicModuleDataInputTest, GetWithNoHeaders) {
   HttpDynamicModuleDataInput input;
-  ::Envoy::Http::Matching::HttpMatchingDataImpl data(createStreamInfo());
+  auto stream_info = createStreamInfo();
+  ::Envoy::Http::Matching::HttpMatchingDataImpl data(stream_info);
 
   auto result = input.get(data);
   EXPECT_EQ(result.availability(), ::Envoy::Matcher::DataAvailability::AllDataAvailable);

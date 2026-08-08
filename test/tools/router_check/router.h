@@ -116,13 +116,13 @@ private:
    * Perform header transforms for any request/response headers for the route matched.
    * Can be called at most once for each test route.
    */
-  void finalizeHeaders(ToolConfig& tool_config, Envoy::StreamInfo::StreamInfoImpl stream_info);
+  void finalizeHeaders(ToolConfig& tool_config, const Envoy::StreamInfo::StreamInfo& stream_info);
 
   /*
    * Performs direct-response reply actions for a response entry.
    */
   void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry,
-                      Envoy::StreamInfo::StreamInfoImpl& stream_info);
+                      const Envoy::StreamInfo::StreamInfo& stream_info);
 
   /**
    * Apply dynamic metadata to stream_info, similar to how the set_metadata filter works.

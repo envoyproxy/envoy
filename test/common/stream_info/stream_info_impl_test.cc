@@ -41,16 +41,16 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 
 class StreamInfoImplTest : public testing::Test {
 protected:
-  void assertStreamInfoSize(StreamInfoImpl stream_info) {
+  void assertStreamInfoSize(const StreamInfoImpl& stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 752 ||
+        sizeof(stream_info) == 680 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 776 ||
+        sizeof(stream_info) == 704 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 728 ||
+        sizeof(stream_info) == 656 ||
         // with protobuf v35
-        sizeof(stream_info) == 736 || sizeof(stream_info) == 760)
+        sizeof(stream_info) == 672 || sizeof(stream_info) == 696)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
