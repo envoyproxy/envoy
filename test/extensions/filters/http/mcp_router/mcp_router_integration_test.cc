@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/extensions/filters/http/mcp_router/session_codec.h"
 
 #include "test/integration/http_integration.h"
 
@@ -2234,6 +2235,8 @@ public:
                 name: x-user-id
             validation:
               mode: ENFORCE
+          session_signing_key:
+            inline_string: test-signing-key
       )EOF");
     } else {
       config_helper_.prependFilter(R"EOF(
@@ -2252,6 +2255,8 @@ public:
                 name: x-user-id
             validation:
               mode: ENFORCE
+          session_signing_key:
+            inline_string: test-signing-key
       )EOF");
     }
 
@@ -2286,11 +2291,15 @@ public:
     HttpIntegrationTest::initialize();
   }
 
+  // Builds a session ID exactly the way the filter mints it: the subject is Base64 encoded inside
+  // the composite, the composite is Base64 encoded, and the blob is MACed with the configured
+  // signing key. (The previous version of this helper inserted the subject raw, so the parsed
+  // subject decoded to the empty string and the ENFORCE accept path was never exercised.)
   std::string encodeSessionId(const std::string& route, const std::string& subject,
                               const std::string& backend_session) {
-    std::string backend_encoded = Base64::encode(backend_session.data(), backend_session.size());
-    std::string composite = route + "@" + subject + "@time:" + backend_encoded;
-    return Base64::encode(composite.data(), composite.size());
+    const std::string composite =
+        SessionCodec::buildCompositeSessionId(route, subject, {{"time", backend_session}});
+    return SessionCodec::encodeWithIntegrity(composite, "test-signing-key");
   }
 };
 
@@ -2351,6 +2360,69 @@ TEST_P(McpRouterSubjectValidationIntegrationTest, MissingAuthHeaderReturns403) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("403", response->headers().getStatusValue());
+}
+
+// Positive ENFORCE path: a session minted for "alice" presented by "alice" passes subject
+// validation and the request proceeds.
+TEST_P(McpRouterSubjectValidationIntegrationTest, SubjectMatchProceeds) {
+  initializeFilterWithSubjectValidation();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  std::string session_id = encodeSessionId("test_route", "alice", "backend-session-123");
+
+  const std::string request_body = R"({"jsonrpc":"2.0","method":"ping","id":1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-session-id", session_id},
+                                     {"x-user-id", "alice"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Tamper regression: an attacker holding another principal's session ID can Base64 decode the
+// blob and rewrite the bound subject to their own identity, but without the server-held signing
+// key the MAC no longer verifies, so the session is rejected before the subject check runs.
+TEST_P(McpRouterSubjectValidationIntegrationTest, ForgedSessionSubjectRejected) {
+  initializeFilterWithSubjectValidation();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // A valid session minted for "alice".
+  const std::string valid = encodeSessionId("test_route", "alice", "backend-session-123");
+
+  // The attacker rebinds the subject to "bob" and must reuse the MAC, which they cannot
+  // recompute without the key.
+  const std::string stale_mac = valid.substr(valid.rfind('.') + 1);
+  const std::string forged_composite = SessionCodec::buildCompositeSessionId(
+      "test_route", "bob", {{"time", "backend-session-123"}});
+  const std::string forged = SessionCodec::encode(forged_composite) + "." + stale_mac;
+
+  const std::string request_body = R"({"jsonrpc":"2.0","method":"tools/list","id":1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-session-id", forged},
+                                     {"x-user-id", "bob"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_session_invalid", Eq(1));
 }
 
 // Test tools/list with SSE responses containing intermediate events (notifications, server

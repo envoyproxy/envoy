@@ -372,8 +372,19 @@ bool McpRouterFilter::readMetadataFromMcpFilter() {
   return true;
 }
 
+std::string McpRouterFilter::encodeCompositeSession(const std::string& composite) {
+  const std::string& key = config_->sessionSigningKey();
+  if (key.empty()) {
+    return SessionCodec::encode(composite);
+  }
+  return SessionCodec::encodeWithIntegrity(composite, key);
+}
+
 bool McpRouterFilter::decodeAndParseSession() {
-  std::string decoded = SessionCodec::decode(encoded_session_id_);
+  const std::string& key = config_->sessionSigningKey();
+  const std::string decoded =
+      key.empty() ? SessionCodec::decode(encoded_session_id_)
+                  : SessionCodec::decodeWithIntegrity(encoded_session_id_, key);
   if (decoded.empty()) {
     ENVOY_LOG(warn, "Failed to decode session ID");
     config_->stats().rq_session_invalid_.inc();
@@ -952,7 +963,7 @@ void McpRouterFilter::handleInitialize() {
     absl::flat_hash_map<std::string, std::string> empty_sessions;
     std::string composite =
         SessionCodec::buildCompositeSessionId(route_name_, subject, empty_sessions);
-    std::string encoded_session = SessionCodec::encode(composite);
+    std::string encoded_session = encodeCompositeSession(composite);
     encoded_session_id_ = encoded_session;
 
     sendJsonResponse(response_body, encoded_session);
@@ -989,7 +1000,7 @@ void McpRouterFilter::handleInitialize() {
     if (!sessions.empty()) {
       std::string composite =
           SessionCodec::buildCompositeSessionId(self->route_name_, subject, sessions);
-      encoded_session = SessionCodec::encode(composite);
+      encoded_session = self->encodeCompositeSession(composite);
     }
 
     self->sendJsonResponse(response_body, encoded_session);
@@ -2096,7 +2107,7 @@ void McpRouterFilter::resetStreamState() {
 void McpRouterFilter::updateEncodedSessionId() {
   std::string composite =
       SessionCodec::buildCompositeSessionId(route_name_, session_subject_, backend_sessions_);
-  encoded_session_id_ = SessionCodec::encode(composite);
+  encoded_session_id_ = encodeCompositeSession(composite);
 }
 
 void McpRouterFilter::lazyInitSingleBackend(const McpBackendConfig& backend,

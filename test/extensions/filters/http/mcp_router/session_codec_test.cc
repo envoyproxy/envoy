@@ -100,6 +100,50 @@ TEST(SessionCodecTest, BuildAndParsePartialBackendSessions) {
   EXPECT_EQ(result->backend_sessions.count("backend2"), 0);
 }
 
+TEST(SessionCodecTest, IntegrityRoundTrip) {
+  const std::string key = "server-held-secret";
+  const std::string composite =
+      SessionCodec::buildCompositeSessionId("route1", "user1", {{"backend1", "s1"}});
+
+  const std::string token = SessionCodec::encodeWithIntegrity(composite, key);
+
+  // Wire format is "<base64 payload>.<base64 mac>".
+  EXPECT_THAT(token, testing::StartsWith(SessionCodec::encode(composite) + "."));
+  EXPECT_EQ(composite, SessionCodec::decodeWithIntegrity(token, key));
+}
+
+// An attacker who holds a valid token can read and rewrite the payload (Base64 only), but cannot
+// recompute the MAC without the server-held key, so a rebound subject is rejected.
+TEST(SessionCodecTest, IntegrityRejectsForgedSubject) {
+  const std::string key = "server-held-secret";
+  const std::string token = SessionCodec::encodeWithIntegrity(
+      SessionCodec::buildCompositeSessionId("route1", "alice", {{"backend1", "s1"}}), key);
+
+  const size_t sep = token.rfind('.');
+  ASSERT_NE(sep, std::string::npos);
+  const std::string stale_mac = token.substr(sep + 1);
+  const std::string forged =
+      SessionCodec::encode(SessionCodec::buildCompositeSessionId("route1", "bob",
+                                                                 {{"backend1", "s1"}})) +
+      "." + stale_mac;
+
+  EXPECT_EQ("", SessionCodec::decodeWithIntegrity(forged, key));
+}
+
+TEST(SessionCodecTest, IntegrityRejectsWrongKey) {
+  const std::string token =
+      SessionCodec::encodeWithIntegrity("route1@dXNlcjE=@backend1:czE=", "server-held-secret");
+  EXPECT_EQ("", SessionCodec::decodeWithIntegrity(token, "attacker-guessed-key"));
+}
+
+TEST(SessionCodecTest, IntegrityRejectsMalformedTokens) {
+  const std::string key = "server-held-secret";
+  // No MAC separator, including the legacy unsigned format, is rejected when a key is set.
+  EXPECT_EQ("", SessionCodec::decodeWithIntegrity("aGVsbG8=", key));
+  // Empty MAC.
+  EXPECT_EQ("", SessionCodec::decodeWithIntegrity("aGVsbG8=.", key));
+}
+
 } // namespace
 } // namespace McpRouter
 } // namespace HttpFilters

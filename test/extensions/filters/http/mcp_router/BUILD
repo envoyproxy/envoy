@@ -74,6 +74,7 @@ envoy_extension_cc_test(
         "//source/extensions/clusters/mcp_multicluster:cluster",
         "//source/extensions/filters/http/mcp:config",
         "//source/extensions/filters/http/mcp_router:config",
+        "//source/extensions/filters/http/mcp_router:session_codec_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/extensions/clusters/mcp_multicluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",

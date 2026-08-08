@@ -98,6 +98,7 @@ public:
   virtual ValidationMode validationMode() const = 0;
   virtual bool shouldEnforceValidation() const = 0;
   virtual const std::string& metadataNamespace() const = 0;
+  virtual const std::string& sessionSigningKey() const = 0;
 
   virtual McpRouterStats& stats() = 0;
 };
@@ -130,6 +131,7 @@ public:
     return session_identity_.validation_mode == ValidationMode::Enforce;
   }
   const std::string& metadataNamespace() const override { return metadata_namespace_; }
+  const std::string& sessionSigningKey() const override { return session_signing_key_; }
 
   McpRouterStats& stats() override { return stats_; }
 
@@ -140,6 +142,7 @@ private:
   bool lazy_initialization_;
   SessionIdentityConfig session_identity_;
   std::string metadata_namespace_;
+  std::string session_signing_key_;
   McpRouterStats stats_;
 };
 
@@ -169,6 +172,9 @@ public:
   bool shouldEnforceValidation() const override { return base_config_->shouldEnforceValidation(); }
   const std::string& metadataNamespace() const override {
     return base_config_->metadataNamespace();
+  }
+  const std::string& sessionSigningKey() const override {
+    return base_config_->sessionSigningKey();
   }
 
   McpRouterStats& stats() override { return base_config_->stats(); }
