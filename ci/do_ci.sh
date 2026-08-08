@@ -326,18 +326,26 @@ function build_openssl_presubmit() {
                 local dir
                 dir="$(dirname "$file")"
                 dir="${dir#source/}"
-                test_targets+=("//test/${dir}/...")
+                # Not every source directory has a mirrored test directory.
+                if [[ -d "test/${dir}" ]]; then
+                    test_targets+=("//test/${dir}/...")
+                fi
                 ;;
             test/*/*)
                 local dir
                 dir="$(dirname "$file")"
-                test_targets+=("//${dir}/...")
+                # The directory may no longer exist if the change deletes it.
+                if [[ -d "${dir}" ]]; then
+                    test_targets+=("//${dir}/...")
+                fi
                 ;;
             envoy/*/*)
                 local dir
                 dir="$(dirname "$file")"
                 dir="${dir#envoy/}"
-                test_targets+=("//test/${dir}/...")
+                if [[ -d "test/${dir}" ]]; then
+                    test_targets+=("//test/${dir}/...")
+                fi
                 ;;
             compat/openssl/*)
                 test_targets+=("//compat/openssl/test/...")

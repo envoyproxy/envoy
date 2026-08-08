@@ -4,12 +4,23 @@
 
 #include <cstdint>
 
+#include "envoy/event/deferred_deletable.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+namespace {
+
+// Holds a timer handed over for deferred deletion on its dispatcher.
+struct TimerHolder : public Event::DeferredDeletable {
+  explicit TimerHolder(Event::TimerPtr&& timer) : timer_(std::move(timer)) {}
+  Event::TimerPtr timer_;
+};
+
+} // namespace
 
 ValidationResults TimedCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
@@ -58,6 +69,12 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
         }
         ValidationResults result = DefaultCertValidator::doVerifyCertChain(
             *certs, nullptr, transport_socket_options, ssl_ctx, {}, is_server, host);
+        // This timer is bound to the dispatcher of the connection being validated (a worker
+        // thread), but the validator lives in the TLS context, which on the server side can
+        // outlive the worker dispatcher at shutdown. Hand the timer back to its dispatcher for
+        // deferred deletion so it does not outlive the dispatcher's event loop.
+        callback_->dispatcher().deferredDelete(
+            std::make_unique<TimerHolder>(std::move(validation_timer_)));
         callback_->onCertValidationResult(
             result.status == ValidationResults::ValidationStatus::Successful,
             result.detailed_status,

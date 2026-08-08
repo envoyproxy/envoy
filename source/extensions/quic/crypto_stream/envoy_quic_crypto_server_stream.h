@@ -20,6 +20,9 @@ public:
       quic::QuicCryptoServerStreamBase::Helper* helper,
       OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
       Envoy::Event::Dispatcher& dispatcher) override;
+  // EnvoyTlsServerHandshaker validates client certificates against the filter chain's
+  // downstream TLS context.
+  bool supportsClientCertificateAuthentication() const override { return true; }
 };
 
 DECLARE_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl);

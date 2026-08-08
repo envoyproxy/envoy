@@ -15,6 +15,7 @@
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
 #include "quiche/quic/core/quic_dispatcher.h"
@@ -142,7 +143,16 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
       listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
       connection_stats_, debug_visitor_factory_, session_idle_list_.get());
-  if (filter_chain != nullptr) {
+  if (filter_chain != nullptr &&
+      dynamic_cast<const QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory())
+          .requireClientCertificate() &&
+      !crypto_server_stream_factory_.supportsClientCertificateAuthentication()) {
+    // Fail closed: without a crypto stream factory which validates client certificates, QUICHE
+    // would request the client certificate but accept it without any validation.
+    quic_session->close(Network::ConnectionCloseType::FlushWrite,
+                        "filter chain requires client certificates, but the configured crypto "
+                        "stream factory does not support client certificate validation");
+  } else if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =
         listener_config_->filterChainFactory().createNetworkFilterChain(

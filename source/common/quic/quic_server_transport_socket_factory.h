@@ -38,6 +38,9 @@ public:
 
   bool earlyDataEnabled() const { return enable_early_data_; }
   bool resumptionEnabled() const { return enable_resumption_; }
+  // Whether the downstream TLS context requires clients to present a certificate. This is a
+  // static config field, so no locking is needed.
+  bool requireClientCertificate() const { return config_->requireClientCertificate(); }
 
   struct SessionTicketConfig {
     // True when session ticket encryption keys are explicitly configured via
