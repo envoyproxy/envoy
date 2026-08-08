@@ -24,6 +24,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -109,13 +110,13 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   SystemTime time1(std::chrono::milliseconds(1234567891234));
   timeSystem().setSystemTime(time1);
 
-  EXPECT_TRUE(config_update_->onRdsUpdate(response1, "1"));
+  EXPECT_OK(config_update_->onRdsUpdate(response1, "1"));
   EXPECT_EQ(nullptr, route("foo"));
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
   EXPECT_EQ(time1, config_update_->lastUpdated());
 
-  EXPECT_FALSE(config_update_->onRdsUpdate(response1, "2"));
+  EXPECT_OK(config_update_->onRdsUpdate(response1, "2"));
   EXPECT_EQ(nullptr, route("foo"));
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
 
@@ -142,7 +143,7 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   SystemTime time2(std::chrono::milliseconds(1234567891235));
   timeSystem().setSystemTime(time2);
 
-  EXPECT_TRUE(config_update_->onRdsUpdate(response2, "2"));
+  EXPECT_OK(config_update_->onRdsUpdate(response2, "2"));
   EXPECT_EQ("foo", *route("foo"));
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("2", config_update_->configInfo().value().version_);

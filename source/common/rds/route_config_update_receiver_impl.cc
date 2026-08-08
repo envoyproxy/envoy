@@ -84,25 +84,33 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
 }
 
 // Rds::RouteConfigUpdateReceiver
-bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
-                                                const std::string& version_info) {
+absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
+                                                        const std::string& version_info) {
   uint64_t new_hash = getHash(rc);
   if (!checkHash(new_hash)) {
-    return false;
+    // The route configuration is unchanged, so there is nothing to build, warm up or publish. An
+    // update that is still warming up is deliberately left alone.
+    return absl::OkStatus();
   }
 
   updateConfig(cloneProto(proto_traits_, rc), new_hash, version_info);
   startWarming();
-  return true;
+  return absl::OkStatus();
 }
 
 void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
-  current_state_.route_config_proto_ = std::move(warming_state_.route_config_proto_);
-  current_state_.config_ = std::move(warming_state_.config_);
-  current_state_.last_config_hash_ = warming_state_.last_config_hash_;
-  current_state_.last_updated_ = warming_state_.last_updated_;
-  current_state_.config_info_.emplace(std::move(*warming_state_.config_info_));
+  if (warming_state_.config_ != nullptr) {
+    current_state_.route_config_proto_ = std::move(warming_state_.route_config_proto_);
+    current_state_.config_ = std::move(warming_state_.config_);
+    current_state_.last_config_hash_ = warming_state_.last_config_hash_;
+    current_state_.last_updated_ = warming_state_.last_updated_;
+    current_state_.config_info_.emplace(std::move(*warming_state_.config_info_));
+  }
 
+  clearWarmingState();
+}
+
+void RouteConfigUpdateReceiverImpl::clearWarmingState() {
   warming_state_.route_config_proto_.reset();
   warming_state_.config_.reset();
   warming_state_.last_config_hash_ = 0ull;

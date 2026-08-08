@@ -88,10 +88,9 @@ private:
   // new route configuration and signals that this subscription is ready.
   void onConfigWarmed() override;
 
-  virtual absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>&,
-                                            std::unique_ptr<Cleanup>&) {
-    return absl::OkStatus();
-  }
+  // Hooks that a derived subscription uses to react to a warmed up route configuration being
+  // published.
+  virtual absl::Status beforeProviderUpdate() { return absl::OkStatus(); }
   virtual absl::Status afterProviderUpdate() { return absl::OkStatus(); }
 
 protected:

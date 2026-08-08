@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/common/rds:rds_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",

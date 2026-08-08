@@ -15,6 +15,9 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+namespace Router {
+class RouteConfigUpdateReceiverImpl;
+} // namespace Router
 namespace Rds {
 
 /**
@@ -68,6 +71,24 @@ public:
    * before this method returns, i.e. synchronously, if there is nothing to warm up.
    */
   void startWarming();
+
+  /**
+   * Drops the init manager installed by updateInitManager() without warming it up. Called when the
+   * update it belongs to is rejected after it was built, i.e. never from inside a callback of the
+   * init manager itself, so destroying it here is safe.
+   */
+  void abandon() {
+    init_watcher_.reset();
+    init_manager_.reset();
+    update_id_.clear();
+  }
+
+  /**
+   * @return the init manager installed by updateInitManager(), i.e. the one that the resources of
+   * the update that is being applied warm up with. Only valid between updateInitManager() and the
+   * update being published, which is when the caller registers anything it wants warmed up.
+   */
+  Init::Manager* initManager() { return init_manager_.get(); }
 
   bool warming() const { return init_manager_ != nullptr; }
 
@@ -133,9 +154,16 @@ public:
   // it's ready. Note that this may happen before this method returns, i.e. synchronously, if there
   // is nothing to warm up.
   void startWarming() { warmer_.startWarming(); }
+  // Drops the route configuration built by the last updateConfig() call without publishing it, for
+  // when applying that update fails after it was built. Otherwise the rejected update would linger
+  // in the warming state and be what checkHash() and latestProtobufConfiguration() compare against.
+  void abandonUpdate() {
+    clearWarmingState();
+    warmer_.abandon();
+  }
 
   // RouteConfigUpdateReceiver
-  bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
+  absl::Status onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
   void setObserver(RouteConfigUpdateObserver& observer) override { warmer_.setObserver(observer); }
   bool configWarming() const override { return warmer_.warming(); }
 
@@ -149,15 +177,11 @@ public:
   ConfigConstSharedPtr parsedConfiguration() const override { return current_state_.config_; }
   SystemTime lastUpdated() const override { return current_state_.last_updated_; }
 
-  ConfigWarmer& warmer() { return warmer_; }
-  const ConfigWarmer& warmer() const { return warmer_; }
-  const Protobuf::Message& latestProtobufConfiguration() const {
-    return warming_state_.route_config_proto_ ? *warming_state_.route_config_proto_
-                                              : *current_state_.route_config_proto_;
-  }
-
 private:
+  friend class Envoy::Router::RouteConfigUpdateReceiverImpl;
+
   void onConfigWarmed();
+  void clearWarmingState();
 
   ConfigTraits& config_traits_;
   ProtoTraits& proto_traits_;

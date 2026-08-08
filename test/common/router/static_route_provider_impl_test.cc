@@ -13,6 +13,7 @@
 #include "source/common/router/static_route_provider_impl.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -127,12 +128,17 @@ vhds:
         vhds_callbacks = &callbacks;
         return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
       }));
+  // The initial VHDS fetch is started as part of applying the inline route configuration, so that
+  // it warms up with it.
+  EXPECT_CALL(*subscription_ptr, start(_));
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
                                          init_manager_, rds_manager_);
 
-  EXPECT_EQ("foo", provider.configCast()->name());
-  EXPECT_TRUE(provider.configInfo().has_value());
+  // Nothing has been published yet, so there is no config info to report until the initial VHDS
+  // fetch lands below.
+  EXPECT_FALSE(provider.configInfo().has_value());
+  EXPECT_EQ(0, provider.lastUpdated().time_since_epoch().count());
 
   // Test requestVirtualHostsUpdate.
   bool cb_called = false;
@@ -171,9 +177,88 @@ vhds:
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   EXPECT_TRUE(cb_called);
+  // The update went live, so it is now what the provider serves and what configInfo() describes.
+  EXPECT_EQ("foo", provider.configCast()->name());
+  EXPECT_TRUE(provider.configInfo().has_value());
   auto config_impl = std::static_pointer_cast<const ConfigImpl>(provider.configCast());
   EXPECT_TRUE(config_impl->virtualHostExists(
       Http::TestRequestHeaderMapImpl{{":authority", "example.com"}}));
+}
+
+// An inline route configuration that uses VHDS warms up: whatever initializes with it, i.e. the
+// listener it belongs to, waits for the initial VHDS fetch before the route configuration goes
+// live.
+TEST_F(StaticRouteConfigProviderImplTest, StaticConfigWithVhdsWarmsUp) {
+  const std::string config_yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      transport_api_version: V3
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+)EOF";
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+
+  envoy::config::route::v3::RouteConfiguration route_config;
+  TestUtility::loadFromYaml(config_yaml, route_config);
+
+  NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory;
+  ON_CALL(server_factory_context_.cluster_manager_, subscriptionFactory())
+      .WillByDefault(ReturnRef(subscription_factory));
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = nullptr;
+  auto subscription = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+  EXPECT_CALL(subscription_factory, subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce(Invoke([&vhds_callbacks, &subscription](
+                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
+                           Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                           const Envoy::Config::SubscriptionOptions&) {
+        vhds_callbacks = &callbacks;
+        return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
+      }));
+
+  StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
+                                         init_manager_, rds_manager_);
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // The provider registered an init target, and it isn't ready while the initial VHDS fetch is
+  // still outstanding.
+  Init::ExpectableWatcherImpl init_watcher;
+  init_watcher.expectReady().Times(0);
+  init_manager_.initialize(init_watcher);
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher);
+
+  // Landing the initial fetch publishes the route configuration and releases whatever warms up
+  // with this provider.
+  envoy::config::route::v3::VirtualHost vhost;
+  vhost.set_name("from_vhds");
+  vhost.add_domains("vhds.com");
+  auto* route = vhost.add_routes();
+  route->mutable_match()->set_prefix("/");
+  route->mutable_route()->set_cluster("baz");
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+  auto* resource = resources.Add();
+  resource->set_name("foo/vhds.com");
+  std::ignore = resource->mutable_resource()->PackFrom(vhost);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(resources, "name");
+
+  init_watcher.expectReady();
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+
+  const auto config_impl = std::static_pointer_cast<const ConfigImpl>(provider.configCast());
+  EXPECT_TRUE(
+      config_impl->virtualHostExists(Http::TestRequestHeaderMapImpl{{":authority", "vhds.com"}}));
 }
 
 // Validates that multiple on-demand VHDS request with a static route works.
@@ -208,6 +293,9 @@ vhds:
         vhds_callbacks = &callbacks;
         return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
       }));
+  // The initial VHDS fetch is started as part of applying the inline route configuration, so that
+  // it warms up with it.
+  EXPECT_CALL(*subscription_ptr, start(_));
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
                                          init_manager_, rds_manager_);
