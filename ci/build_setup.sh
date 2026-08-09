@@ -78,9 +78,11 @@ _bazel="$(which bazel)"
 case $CI_TARGET in
     config|docs|verify_examples)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-docs}"
+        SKIP_REMOTE_DETECTION=1
         ;;
     external)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-external}"
+        SKIP_REMOTE_DETECTION=1
         ;;
     refresh_compdb|pre_refresh_compdb)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-base-envoy-compdb}"
@@ -121,17 +123,18 @@ BAZEL_BUILD_OPTIONS=(
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
 
-rc_output=$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info --announce_rc "${BAZEL_BUILD_OPTIONS[@]}" 2>&1) || {
-    echo "bazel info failed:" >&2
-    echo "$rc_output" >&2
-    exit 1
-}
-if grep -q "remote_executor" <<<"$rc_output"; then
-
-    echo "Remote execution detected, not setting test_tmpdir."
-else
-    BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
-    echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
+if [[ -z "SKIP_REMOTE_DETECTION" ]]; then
+    rc_output=$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info --announce_rc "${BAZEL_BUILD_OPTIONS[@]}" 2>&1) || {
+        echo "bazel info failed:" >&2
+        echo "$rc_output" >&2
+        exit 1
+    }
+    if grep -q "remote_executor" <<<"$rc_output"; then
+        echo "Remote execution detected, not setting test_tmpdir."
+    else
+        BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
+        echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
+    fi
 fi
 
 BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
