@@ -83,3 +83,4 @@ jobs:
       run: |
         bazel shutdown
         bazel --version
+        echo "ANDROID_HOME=" >> "$GITHUB_ENV"
