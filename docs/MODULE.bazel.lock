@@ -1198,24 +1198,6 @@
         ]
       }
     },
-    "@@envoy-examples+//bazel:extensions.bzl%envoy_build_examples": {
-      "general": {
-        "bzlTransitiveDigest": "Vxf0wYcKcHMj90NYhiIgOT9QfWARN0Rc0/m4w/Y8p4A=",
-        "usagesDigest": "x6zk/iWC0JOZXIddtMQg3xkAnwKtU/AlVqmH+lTXSoE=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "envoy-example-wasm-cc": {
-            "repoRuleId": "@@envoy-examples+//bazel:nested.bzl%example_repository",
-            "attributes": {
-              "path": "wasm-cc"
-            }
-          }
-        },
-        "recordedRepoMappingEntries": []
-      }
-    },
     "@@envoy_api+//bazel:extensions.bzl%non_module_deps": {
       "general": {
         "bzlTransitiveDigest": "tyos86Xaj+puVHZqhfqYr3GNpcVntVvY5mhb7r9DAZ8=",

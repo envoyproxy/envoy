@@ -6,6 +6,7 @@ module(
 bazel_dep(name = "com_envoyproxy_protoc_gen_validate", version = "1.3.0.envoy")
 bazel_dep(name = "envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
+bazel_dep(name = "envoy-example-wasm-cc", version = "0.2.4.envoy")
 bazel_dep(name = "envoy-examples", version = "0.2.4.envoy")
 bazel_dep(name = "envoy_toolshed", version = "0.4.4.envoy")
 bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy")
@@ -21,6 +22,7 @@ bazel_dep(name = "toolchains_llvm", version = "1.8.0.envoy")
 bazel_dep(name = "xds", version = "0.0.1-20251110-8bfbf64.envoy")
 bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
 
+# THIS IS HERE FOR EXAMPLES CI
 local_path_override(
     module_name = "envoy",
     path = "../",
@@ -33,9 +35,10 @@ local_path_override(
     module_name = "envoy-examples",
     path = "../../examples",
 )
-
-envoy_examples_ext = use_extension("@envoy-examples//bazel:extensions.bzl", "envoy_build_examples")
-use_repo(envoy_examples_ext, "envoy-example-wasm-cc")
+local_path_override(
+    module_name = "envoy-example-wasm-cc",
+    path = "../../examples/wasm-cc",
+)
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
