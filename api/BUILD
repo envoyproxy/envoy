@@ -138,6 +138,7 @@ proto_library(
         "//envoy/config/trace/v3:pkg",
         "//envoy/config/upstream/local_address_selector/v3:pkg",
         "//envoy/data/accesslog/v3:pkg",
+        "//envoy/data/ai/v3:pkg",
         "//envoy/data/cluster/v3:pkg",
         "//envoy/data/core/v3:pkg",
         "//envoy/data/dns/v3:pkg",
