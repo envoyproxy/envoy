@@ -152,7 +152,11 @@ public:
   void startWarming() { warmer_.startWarming(); }
 
   // RouteConfigUpdateReceiver
-  bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
+  absl::Status onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
+  // The subscription gave up without publishing valid configuration.
+  // Recorded the same way a successful publish is, because from here on the two are
+  // equivalent: in both cases the owning init manager has stopped waiting.
+  void onRdsFailure() override { initialized_ = true; }
   void setObserver(RouteConfigUpdateObserver& observer) override { warmer_.setObserver(observer); }
   bool configWarming() const override { return warmer_.warming(); }
 
@@ -183,6 +187,13 @@ private:
   ConfigConstSharedPtr config_;
   ConfigWarmer warmer_;
   WarmingConfigState warming_state_;
+  // Whether anything still warms up with this receiver, i.e. whether the owning init manager is
+  // still waiting on it. Set once a configuration has been published, and also when the
+  // subscription gives up without publishing one - see onRdsFailure(). Note this is NOT the same
+  // as "a configuration has been published": readiness can be signalled without one, and an update
+  // that arrives afterwards must not hold its configuration back to warm up, because by then
+  // nothing is waiting for it and the listener is already serving.
+  bool initialized_{false};
 };
 
 } // namespace Rds

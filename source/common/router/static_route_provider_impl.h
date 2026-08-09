@@ -22,9 +22,9 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/init/target_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/rds/static_route_config_provider_impl.h"
-#include "source/common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
@@ -46,7 +46,7 @@ public:
   Rds::ConfigConstSharedPtr config() const override;
   const std::optional<ConfigInfo>& configInfo() const override;
   SystemTime lastUpdated() const override;
-  absl::Status onConfigUpdate() override;
+  absl::Status onConfigUpdate() override { return absl::OkStatus(); }
   ConfigConstSharedPtr configCast() const override;
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
@@ -58,13 +58,17 @@ private:
   // RouteConfiguration update, and that will be achieved by the implemented
   // methods. This implies that the "static" route-configuration has now become
   // "dynamic" when VHDS is configured.
-  struct VhdsContext {
+  struct VhdsContext : public Rds::RouteConfigUpdateObserver {
     VhdsContext(const envoy::config::route::v3::RouteConfiguration& config,
                 Server::Configuration::ServerFactoryContext& factory_context,
-                StaticRouteConfigProviderImpl& parent,
-                Rds::RouteConfigProviderManager& route_config_provider_manager);
+                Init::Manager& init_manager, Rds::ProtoTraits& proto_traits);
+    ~VhdsContext() override { local_init_target_.ready(); }
 
-    absl::Status onConfigUpdate();
+    // Rds::RouteConfigUpdateObserver
+    // Called when the route configuration that the receiver built is warmed up. Publishes it to
+    // the workers and signals that this provider is ready.
+    void onConfigWarmed() override;
+
     void requestVirtualHostsUpdate(const std::string& for_domain,
                                    Event::Dispatcher& thread_local_dispatcher,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback> cb);
@@ -83,15 +87,16 @@ private:
       std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
     };
 
-    RouteConfigUpdatePtr config_update_info_mutable_;
-    // config_update_info_ wraps config_update_info_mutable_ by a const pointer to a const object.
-    // This is done to ensure that the code doesn't mutate the state from the worker thread.
-    // TODO(adisuissa): consider refactoring the VHDS and RDS config providers
-    // to separate worker-thread/main-thread const/mutable use cases.
-    const RouteConfigUpdateReceiver* const config_update_info_;
-    VhdsSubscriptionPtr vhds_subscription_;
+    RouteConfigUpdatePtr config_update_info_;
+    bool initialized_{false};
     Server::Configuration::ServerFactoryContext& factory_context_;
+    // Name of the inline route configuration. Captured here because until the initial VHDS fetch
+    // has landed the receiver hasn't published anything to read it back off.
+    const std::string route_config_name_;
     ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
+    // Only ready once a route configuration has been warmed up and published, so that whatever
+    // warms up with this provider waits for the initial VHDS fetch.
+    Init::TargetImpl local_init_target_;
     std::list<UpdateOnDemandCallback> config_update_callbacks_;
     // A flag used to determine if this instance of StaticRouteConfigProviderImpl hasn't been
     // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.

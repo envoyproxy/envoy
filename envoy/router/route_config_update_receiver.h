@@ -15,17 +15,12 @@ namespace Envoy {
 namespace Router {
 
 /**
- * A primitive that keeps track of updates to a RouteConfiguration.
+ * The part of a route configuration receiver that a VHDS subscription drives. Split out so that the
+ * subscription only depends on - and a test only has to mock - the one callback it uses.
  */
-class RouteConfigUpdateReceiver : public Rds::RouteConfigUpdateReceiver {
+class VhdsConfigUpdateReceiver {
 public:
-  /**
-   * Same purpose as Rds::RouteConfigUpdateReceiver::protobufConfiguration()
-   * but the return is downcasted to proper type.
-   * @return current RouteConfiguration downcasted from Protobuf::Message&
-   */
-  virtual const envoy::config::route::v3::RouteConfiguration&
-  protobufConfigurationCast() const PURE;
+  virtual ~VhdsConfigUpdateReceiver() = default;
 
   using VirtualHostRefVector =
       std::vector<std::reference_wrapper<const envoy::config::route::v3::VirtualHost>>;
@@ -42,23 +37,27 @@ public:
                             std::set<std::string>&& added_resource_ids,
                             const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                             const std::string& version_info) PURE;
+};
+
+/**
+ * A primitive that keeps track of updates to a RouteConfiguration.
+ */
+class RouteConfigUpdateReceiver : public Rds::RouteConfigUpdateReceiver {
+public:
+  /**
+   * Same purpose as Rds::RouteConfigUpdateReceiver::protobufConfiguration()
+   * but the return is downcasted to proper type.
+   * @return current RouteConfiguration downcasted from Protobuf::Message&
+   */
+  virtual const envoy::config::route::v3::RouteConfiguration&
+  protobufConfigurationCast() const PURE;
 
   /**
-   * @return bool return whether VHDS configuration has been changed in the last RDS update.
+   * Requests an on-demand VHDS update for the given alias. Does nothing if the current route
+   * configuration doesn't configure VHDS.
+   * @param alias supplies the alias of the virtual host to fetch.
    */
-  // TODO(dmitri-d): Consider splitting RouteConfigUpdateReceiver into a RouteConfig state and a
-  // last update state. The latter could be passed to callbacks as a parameter, which would make the
-  // intent and the lifecycle of the "last update state" less muddled.
-  virtual bool vhdsConfigurationChanged() const PURE;
-
-  /**
-   * Clears the flag returned by vhdsConfigurationChanged(). Called once the VHDS configuration
-   * change has been acted on, i.e. once the VHDS subscription has been (re)started, so that the
-   * publishing of a later update - in particular of a VHDS update, which publishes through the
-   * same path - doesn't act on it a second time and tear down the VHDS subscription that is
-   * delivering it.
-   */
-  virtual void clearVhdsConfigurationChanged() PURE;
+  virtual void updateOnDemand(const std::string& alias) PURE;
 
   /**
    * @return the union of all resource names and aliases (if any) received with the last VHDS

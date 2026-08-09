@@ -111,19 +111,24 @@ void RouteConfigUpdateReceiverImpl::updateState(
 }
 
 // Rds::RouteConfigUpdateReceiver
-bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
-                                                const std::string& version_info) {
+absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
+                                                        const std::string& version_info) {
   uint64_t new_hash = getHash(rc);
   if (!checkHash(new_hash)) {
-    return false;
+    // The route configuration is unchanged, so there is nothing to build, warm up or publish. An
+    // update that is still warming up is deliberately left alone.
+    return absl::OkStatus();
   }
 
   updateConfig(cloneProto(proto_traits_, rc), new_hash, version_info);
   startWarming();
-  return true;
+  return absl::OkStatus();
 }
 
 void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
+  // Mark that we have received at least one valid route configuration update.
+  initialized_ = true;
+
   if (warming_state_.route_config_proto_ != nullptr) {
     route_config_proto_ = std::move(warming_state_.route_config_proto_);
     config_ = std::move(warming_state_.config_);

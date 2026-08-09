@@ -4,6 +4,7 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
+#include "source/common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
@@ -15,8 +16,8 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     : base_(config, config_traits, factory_context, init_manager, route_config_provider_manager),
       route_config_provider_manager_(route_config_provider_manager),
       vhds_context_(config.has_vhds()
-                        ? std::make_unique<VhdsContext>(config, factory_context, *this,
-                                                        route_config_provider_manager)
+                        ? std::make_unique<VhdsContext>(config, factory_context, init_manager,
+                                                        route_config_provider_manager.protoTraits())
                         : nullptr) {}
 
 StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
@@ -24,29 +25,28 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 }
 
 Rds::ConfigConstSharedPtr StaticRouteConfigProviderImpl::config() const {
-  return vhds_context_ ? vhds_context_->tls_->config_ : base_.config();
+  Rds::ConfigConstSharedPtr route_config;
+  if (vhds_context_ != nullptr) {
+    if (auto config = vhds_context_->tls_.get(); config.has_value()) {
+      route_config = config->config_;
+    }
+  }
+  return route_config != nullptr ? route_config : base_.config();
 }
 
 const std::optional<RouteConfigProvider::ConfigInfo>&
 StaticRouteConfigProviderImpl::configInfo() const {
-  if (vhds_context_) {
-    return vhds_context_->config_update_info_->configInfo();
+  if (vhds_context_ == nullptr || !vhds_context_->initialized_) {
+    return base_.configInfo();
   }
-  return base_.configInfo();
+  return vhds_context_->config_update_info_->configInfo();
 }
 
 SystemTime StaticRouteConfigProviderImpl::lastUpdated() const {
-  if (vhds_context_) {
-    return vhds_context_->config_update_info_->lastUpdated();
+  if (vhds_context_ == nullptr || !vhds_context_->initialized_) {
+    return base_.lastUpdated();
   }
-  return base_.lastUpdated();
-}
-
-absl::Status StaticRouteConfigProviderImpl::onConfigUpdate() {
-  if (vhds_context_) {
-    return vhds_context_->onConfigUpdate();
-  }
-  return absl::OkStatus();
+  return vhds_context_->config_update_info_->lastUpdated();
 }
 
 ConfigConstSharedPtr StaticRouteConfigProviderImpl::configCast() const {
@@ -72,44 +72,46 @@ void StaticRouteConfigProviderImpl::requestVirtualHostsUpdate(
   });
 }
 
-// TODO(wbpcode): for inline route configuration with VHDS, we assume the route configuration self
-// needn't be warmed up for now.
 StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
     const envoy::config::route::v3::RouteConfiguration& config,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    StaticRouteConfigProviderImpl& parent,
-    Rds::RouteConfigProviderManager& route_config_provider_manager)
-    : config_update_info_mutable_(std::make_unique<RouteConfigUpdateReceiverImpl>(
-          route_config_provider_manager.protoTraits(), factory_context)),
-      config_update_info_(config_update_info_mutable_.get()), factory_context_(factory_context),
-      tls_(factory_context.threadLocal()) {
-  // Emulate a config-update information gathering using a dynamic RouteConfigurationReceiver.
-  config_update_info_mutable_->onRdsUpdate(config, "");
-  // TODO(adisuissa): Convert the THROW_OR_RETURN_VALUE to return an
-  // absl::StatusOr<> and propagate the result through a StaticRouteConfigProviderImpl
-  // create function.
-  vhds_subscription_ =
-      THROW_OR_RETURN_VALUE(VhdsSubscription::createVhdsSubscription(config_update_info_mutable_,
-                                                                     factory_context, "", &parent),
-                            VhdsSubscriptionPtr);
-  vhds_subscription_->registerInitTargetWithInitManager(factory_context.initManager());
-  tls_.set([initial_config = parent.base_.config()](Event::Dispatcher&) {
-    return std::make_unique<ThreadLocalConfig>(initial_config);
-  });
+    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
+    Rds::ProtoTraits& proto_traits)
+    : config_update_info_(
+          std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits, factory_context, "")),
+      factory_context_(factory_context), route_config_name_(config.name()),
+      tls_(factory_context.threadLocal()),
+      local_init_target_(
+          fmt::format("StaticRouteConfigProvider local-init-target {}", route_config_name_),
+          []() {}) {
+  init_manager.add(local_init_target_);
+  config_update_info_->setObserver(*this);
+
+  // Emulate a config-update information gathering using a dynamic RouteConfigurationReceiver. This
+  // is also what creates the VHDS subscription and warms up its initial fetch, so the update is
+  // only published once the virtual hosts it serves have arrived.
+  //
+  // TODO(adisuissa): Convert the THROW_IF_NOT_OK to return an absl::StatusOr<> and propagate the
+  // result through a StaticRouteConfigProviderImpl create function.
+  THROW_IF_NOT_OK(config_update_info_->onRdsUpdate(config, ""));
 }
 
-absl::Status StaticRouteConfigProviderImpl::VhdsContext::onConfigUpdate() {
+void StaticRouteConfigProviderImpl::VhdsContext::onConfigWarmed() {
   // Update the worker-thread local view of the config (similar to the result of
   // RdsRouteConfigProviderImpl::onConfigUpdate()).
   Rds::ConfigConstSharedPtr parsed_config = config_update_info_->parsedConfiguration();
   tls_.set([parsed_config](Event::Dispatcher&) {
     return std::make_unique<ThreadLocalConfig>(parsed_config);
   });
+  // A route configuration is live now, so whatever warms up with this provider can proceed. This is
+  // what makes a listener with an inline route configuration that uses VHDS wait for the initial
+  // VHDS fetch.
+  local_init_target_.ready();
+  initialized_ = true;
 
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) updates don't populate aliases fields in resources.
   if (aliases.empty()) {
-    return absl::OkStatus();
+    return;
   }
 
   const auto config = std::static_pointer_cast<const ConfigImpl>(parsed_config);
@@ -133,7 +135,6 @@ absl::Status StaticRouteConfigProviderImpl::VhdsContext::onConfigUpdate() {
       it++;
     }
   }
-  return absl::OkStatus();
 }
 
 void StaticRouteConfigProviderImpl::VhdsContext::requestVirtualHostsUpdate(
@@ -141,17 +142,16 @@ void StaticRouteConfigProviderImpl::VhdsContext::requestVirtualHostsUpdate(
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
   // When a request for a VHDS update happens, Envoy needs to send the alias as
   // the resource name.
-  auto alias = VhdsSubscription::domainNameToAlias(
-      config_update_info_->protobufConfigurationCast().name(), for_domain);
+  auto alias = VhdsSubscription::domainNameToAlias(route_config_name_, for_domain);
   // The StaticRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the StaticRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
-  // determine if the RdsRouteConfigProviderImpl instance is still valid.
+  // determine if the StaticRouteConfigProviderImpl instance is still valid.
   factory_context_.mainThreadDispatcher().post(
       [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), alias, &thread_local_dispatcher,
        route_config_updated_cb]() -> void {
         if (maybe_still_alive.lock()) {
-          vhds_subscription_->updateOnDemand(alias);
+          config_update_info_->updateOnDemand(alias);
           config_update_callbacks_.push_back(
               {alias, thread_local_dispatcher, route_config_updated_cb});
         }

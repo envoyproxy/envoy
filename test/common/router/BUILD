@@ -216,6 +216,7 @@ envoy_cc_test(
         "//source/common/router:route_provider_manager_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
