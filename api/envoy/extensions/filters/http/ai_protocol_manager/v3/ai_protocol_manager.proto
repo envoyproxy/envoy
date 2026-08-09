@@ -2,9 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ai_protocol_manager.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ai_protocol_manager.v3";
 option java_outer_classname = "AiProtocolManagerProto";
@@ -19,5 +22,187 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.ai_protocol_manager]
 
 // Configuration for the AI Protocol Manager filter.
+//
+// The filter can be installed as a downstream (listener) HTTP filter, as an
+// upstream (cluster) HTTP filter, or both at once. An instance does whatever
+// its configuration enables, wherever it is installed.
 message AiProtocolManager {
+  // Response-side handling: observes upstream responses and extracts LLM token
+  // usage into dynamic metadata. When unset, responses pass through untouched.
+  ResponseHandling response_handling = 1;
+
+  // Request (decode-path) handling. When unset, the request payload offload is
+  // enabled — the filter's original behavior. Configure it with
+  // :ref:`payload_offload_enabled
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.payload_offload_enabled>`
+  // set to ``false`` to run the filter response-only: requests stream through
+  // untouched (no header hold, no offload/replay, no per-attempt replay under
+  // retries or hedging), which fits deployments that install the filter purely
+  // for response token-usage observation.
+  RequestHandling request_handling = 2;
+}
+
+// Configuration for request (decode-path) handling.
+message RequestHandling {
+  // Whether the request payload offload/replay is enabled. Defaults to
+  // ``true`` (also the behavior when ``request_handling`` itself is unset).
+  // When ``false`` the decode path is a pure passthrough: request headers are
+  // never held and bodies are not offloaded — the appropriate mode when the
+  // filter is installed only to observe responses, and the safe mode for
+  // routes whose request bodies do not end promptly (see the upstream
+  // placement caveats in the filter documentation).
+  google.protobuf.BoolValue payload_offload_enabled = 1;
+}
+
+// Configuration for response (encode-path) handling.
+//
+// The filter tees the response body — streaming SSE (``text/event-stream``) or
+// JSON (``application/json``, including a streamed root-level JSON array) — and
+// extracts normalized LLM token usage. The filter never stops iteration or
+// modifies the original response; bounded extraction state is maintained
+// separately (see ``max_event_size`` and ``max_inspected_body_size``), and
+// extraction work — including the JSON parse at end of stream — runs on the
+// response's filter-chain callbacks. The extracted usage is published as
+// dynamic metadata at end of stream, where it is visible to later filters
+// (e.g. ext_proc ``metadata_options.forwarding_namespaces``), access loggers,
+// and CEL. Responses with a non-identity ``content-encoding`` are skipped
+// unless the body is decompressed earlier on the encode path.
+//
+// The result is published under one namespace in both metadata forms: the
+// authoritative typed record (:ref:`envoy.data.ai.v3.TokenUsage
+// <envoy_v3_api_msg_data.ai.v3.TokenUsage>`, full ``uint64`` precision) and
+// an equivalent untyped ``Struct`` projection for consumers that only read
+// untyped metadata (access-log formatters, CEL).
+message ResponseHandling {
+  // Extractor selection. A ``oneof`` so that alternatives — most notably a
+  // ``config.core.v3.TypedExtensionConfig`` custom extractor for dialects the
+  // built-in extractor does not know — can be added without reshaping the
+  // configuration. Deliberately not ``(validate.required)``: when no member
+  // is set, response handling behaves as an unset
+  // :ref:`BuiltinTokenUsageExtractor
+  // <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.BuiltinTokenUsageExtractor>`
+  // (auto-detection).
+  //
+  // [#comment: Version skew for future members: a binary that predates a
+  // member does not silently fall back to auto-detection — Envoy's
+  // unknown-field validation rejects the configuration (statically, or NACKs
+  // it over xDS) unless the operator explicitly opted into
+  // ignore_unknown_dynamic_fields. The extractor boundary, including a
+  // TypedExtensionConfig member and its output-ownership contract, needs API
+  // shepherd review before a second member lands.]
+  oneof extractor {
+    // The built-in OpenAI/Anthropic/Gemini token-usage extractor.
+    BuiltinTokenUsageExtractor token_usage = 1;
+  }
+
+  // Namespace for the emitted token-usage dynamic metadata.
+  // Defaults to ``envoy.ai.token_usage``.
+  string metadata_namespace = 2;
+
+  // Maximum number of bytes of SSE extraction state buffered per stream: a
+  // pending (unterminated) event over the cap is discarded through its real
+  // terminating blank line, and a complete event over the cap is skipped
+  // without parsing. The response stream itself keeps flowing; only extraction
+  // state is dropped. Must be at least 1 — there is no way to disable the
+  // bound.
+  //
+  // Defaults to 1MiB: OpenAI Responses API streams carry usage on terminal
+  // lifecycle events that embed the *complete* response object (including all
+  // generated output), so ordinary long generations produce usage-bearing
+  // events far larger than typical SSE deltas. Lower this in constrained
+  // deployments at the cost of losing usage from long generations.
+  google.protobuf.UInt32Value max_event_size = 3 [(validate.rules).uint32 = {lte: 10485760 gte: 1}];
+
+  // Maximum number of response-body bytes inspected for a JSON (non-SSE)
+  // response. Larger bodies skip token extraction; the response is unaffected.
+  // A response whose ``content-length`` already exceeds the cap skips
+  // extraction without buffering anything. Must be at least 1. Defaults to
+  // 4MiB.
+  google.protobuf.UInt32Value max_inspected_body_size = 4
+      [(validate.rules).uint32 = {lte: 10485760 gte: 1}];
+
+  // Stream-wide extraction work budget: the maximum number of SSE data
+  // payloads parsed (as JSON) per response, counting malformed payloads.
+  // ``max_event_size`` bounds one event; this bounds the *number* of events a
+  // long-lived stream can make the worker parse — without it, a peer could
+  // send small under-cap events for the lifetime of the stream and consume
+  // parser/allocator CPU synchronously on the encode path. Events skipped by
+  // name (keep-alives, content deltas) do not consume budget. On exhaustion
+  // the accumulated usage is kept and later published as
+  // ``extraction_status: partial``, extraction goes inert (counted by
+  // ``sse_event_budget_exhausted``), and the response streams on unaffected.
+  //
+  // Defaults to 65536 — far above ordinary streams (one usage-bearing event,
+  // hundreds to thousands of deltas), while bounding worst-case per-stream
+  // parse work. Raise it for extremely long generations whose every chunk
+  // must be parsed (e.g. OpenAI Chat Completions streams, whose chunks are
+  // unnamed and cannot be skipped by classification).
+  google.protobuf.UInt32Value max_parsed_events = 5 [(validate.rules).uint32 = {gte: 1}];
+}
+
+// The built-in token-usage extractor for the OpenAI, Anthropic, and Gemini
+// wire dialects.
+//
+// The emitted counts follow one canonical, *inclusive* contract regardless of
+// dialect:
+//
+// * ``input_tokens``: ALL input consumed by the model — uncached input, cached
+//   reads, cache writes, and tool-use prompt tokens included.
+// * ``output_tokens``: ALL generated output — reasoning/thought tokens
+//   included.
+// * ``total_tokens``: ``input_tokens + output_tokens``, computed from the
+//   canonical components so the emitted triple is internally consistent. When
+//   the dialect also reports a total and it disagrees with the computed sum
+//   (an internally inconsistent response, or a usage bucket unknown to this
+//   extractor), the provider's value is surfaced separately as
+//   ``reported_total_tokens``; when a canonical component is missing, the
+//   provider-reported total is emitted as ``total_tokens`` as-is.
+//
+// The breakdown fields are subsets of the canonical values:
+// ``cached_input_tokens``, ``cache_creation_input_tokens``, and
+// ``tool_use_input_tokens`` are parts of ``input_tokens``;
+// ``reasoning_tokens`` is part of ``output_tokens``.
+//
+// Dialects report different shapes and the extractor normalizes them:
+// OpenAI's counts are already inclusive; Anthropic reports uncached input and
+// the two cache buckets disjointly (they are summed into the canonical
+// input); Gemini reports thoughts outside ``candidatesTokenCount`` and
+// tool-use prompts outside ``promptTokenCount`` (both are summed in).
+//
+// The canonical fields carry consistent *inclusion semantics* across
+// dialects. They deliberately do not make token counts equivalent units of
+// work or cost: tokenizer behavior, model vocabulary, cache pricing, and
+// provider pricing all differ, so cost accounting additionally needs
+// provider/model identity and a pricing model.
+//
+// The emitted metadata also carries ``extraction_status``: ``complete`` when
+// every observed usage document was extracted, ``partial`` when extraction
+// lost input on the stream — an event over ``max_event_size``, an unparseable
+// document, a known usage field with a malformed value, or SSE input
+// truncated before its terminating blank line — meaning the counts may be
+// stale or incomplete.
+message BuiltinTokenUsageExtractor {
+  // The wire dialect (API format) of the response. This deliberately names a
+  // *format*, not a provider identity: shape detection cannot distinguish an
+  // OpenAI-compatible backend (vLLM, gateways, Gemini's compatibility
+  // endpoint) from OpenAI itself. Provider identity, when needed, must come
+  // from configuration or routing metadata.
+  enum ApiFormat {
+    // Detect the format from the response shape. Only strong, dialect-unique
+    // markers lock detection; generic documents (e.g. a bare ``ping``
+    // heartbeat) are skipped.
+    AUTO_DETECT = 0;
+
+    // OpenAI Chat Completions and Responses API dialects.
+    OPENAI = 1;
+
+    // Anthropic Messages API dialect.
+    ANTHROPIC = 2;
+
+    // Gemini ``generateContent`` / ``streamGenerateContent`` dialect.
+    GEMINI = 3;
+  }
+
+  // Format selection. Defaults to auto-detection from the response shape.
+  ApiFormat api_format = 1 [(validate.rules).enum = {defined_only: true}];
 }

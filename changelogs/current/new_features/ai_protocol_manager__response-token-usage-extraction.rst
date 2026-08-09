@@ -1,0 +1,16 @@
+Added response-side LLM token-usage extraction to the
+:ref:`AI Protocol Manager filter <config_http_filters_ai_protocol_manager>`
+(alpha, work-in-progress API): streaming SSE and JSON responses in the OpenAI,
+Anthropic, and Gemini dialects are observed without stopping filter-chain
+iteration or mutating the response (extraction runs synchronously on the
+encode callbacks against a bounded side copy), and normalized usage is
+published as dynamic metadata (default namespace ``envoy.ai.token_usage``)
+in both forms: the authoritative typed record
+(:ref:`envoy.data.ai.v3.TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`)
+and an equivalent untyped ``Struct`` projection. Extraction behaves identically in the
+downstream and upstream (cluster, e.g. dynamic-forward-proxy egress)
+installations of the filter, and the new
+:ref:`request_handling.payload_offload_enabled
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.payload_offload_enabled>`
+field allows a response-only installation whose request path is a pure
+passthrough.

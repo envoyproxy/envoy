@@ -74,10 +74,49 @@ TEST(AiProtocolManagerConfigTest, IsRegisteredAsUpstreamFilter) {
                            testing::NotNull()));
 }
 
+// A response_handling config with an out-of-range cap is rejected by proto
+// validation.
+TEST(AiProtocolManagerConfigTest, RejectsOversizedEventCap) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+  proto_config.mutable_response_handling()->mutable_max_event_size()->set_value(20 * 1024 * 1024);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  AiProtocolManagerFilterConfigFactory factory;
+  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+               EnvoyException);
+}
+
+// An explicit zero cap is rejected: there is no way to disable the bound.
+TEST(AiProtocolManagerConfigTest, RejectsZeroCaps) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_response_handling()->mutable_max_event_size()->set_value(0);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+                 EnvoyException);
+  }
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_response_handling()->mutable_max_inspected_body_size()->set_value(0);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+                 EnvoyException);
+  }
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_response_handling()->mutable_max_parsed_events()->set_value(0);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+                 EnvoyException);
+  }
+}
+
 // Creating the filter from an upstream factory context yields the same stream
-// filter as the downstream path.
+// filter as the downstream path (see #46385: the upstream role installs the
+// full filter, request offload included, with the caveats documented for that
+// placement).
 TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromUpstreamContext) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+  proto_config.mutable_response_handling();
   NiceMock<Server::Configuration::MockUpstreamFactoryContext> context;
 
   AiProtocolManagerFilterConfigFactory factory;

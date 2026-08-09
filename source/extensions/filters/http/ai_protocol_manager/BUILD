@@ -59,6 +59,36 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "token_usage_extractor_lib",
+    srcs = ["token_usage_extractor.cc"],
+    hdrs = ["token_usage_extractor.h"],
+    deps = [
+        "//source/common/json:json_loader_lib",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:variant",
+    ],
+)
+
+envoy_cc_library(
+    name = "response_handler_lib",
+    srcs = ["response_handler.cc"],
+    hdrs = ["response_handler.h"],
+    deps = [
+        ":token_usage_extractor_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/common:pure_lib",
+        "//envoy/stats:stats_macros",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/http/sse:sse_parser_lib",
+        "//source/common/json:json_loader_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
@@ -66,8 +96,17 @@ envoy_cc_library(
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_chain_bridge_lib",
+        ":response_handler_lib",
+        "//envoy/stats:stats_interface",
         "//source/common/common:logger_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
     ],
 )
 
