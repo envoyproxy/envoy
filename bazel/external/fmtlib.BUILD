@@ -9,7 +9,7 @@ cc_library(
     ]),
     defines = [
         "FMT_HEADER_ONLY",
-        "FMT_UNICODE=0"
+        "FMT_UNICODE=0",
     ],
     includes = ["include"],
     visibility = ["//visibility:public"],
