@@ -7,7 +7,10 @@ cc_library(
     hdrs = glob([
         "include/fmt/*.h",
     ]),
-    defines = ["FMT_HEADER_ONLY"],
+    defines = [
+        "FMT_HEADER_ONLY",
+        "FMT_UNICODE=0"
+    ],
     includes = ["include"],
     visibility = ["//visibility:public"],
 )
