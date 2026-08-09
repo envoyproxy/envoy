@@ -128,7 +128,7 @@ message ResponseHandling {
   // long-lived stream can make the worker parse — without it, a peer could
   // send small under-cap events for the lifetime of the stream and consume
   // parser/allocator CPU synchronously on the encode path. Events skipped by
-  // name (keep-alives, content deltas) do not consume budget. On exhaustion
+  // name (keepalives, content deltas) do not consume budget. On exhaustion
   // the accumulated usage is kept and later published as
   // ``extraction_status: partial``, extraction goes inert (counted by
   // ``sse_event_budget_exhausted``), and the response streams on unaffected.
@@ -166,7 +166,7 @@ message ResponseHandling {
 //
 // Dialects report different shapes and the extractor normalizes them:
 // OpenAI's counts are already inclusive; Anthropic reports uncached input and
-// the two cache buckets disjointly (they are summed into the canonical
+// the two cache buckets as disjoint buckets (summed into the canonical
 // input); Gemini reports thoughts outside ``candidatesTokenCount`` and
 // tool-use prompts outside ``promptTokenCount`` (both are summed in).
 //

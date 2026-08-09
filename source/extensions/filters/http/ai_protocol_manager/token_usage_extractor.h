@@ -96,7 +96,7 @@ public:
 
   // Extract the partial *native* usage this document carries (see the
   // TokenUsage lifecycle comment). Absent fields stay unset; the caller
-  // accumulates via TokenUsage::merge() and canonicalizes via finalize().
+  // accumulates via TokenUsage::merge() with canonicalization in finalize().
   static ExtractionResult extract(ApiFormat format, const Json::Object& json);
 
   // True when this document marks the dialect's logical end of extraction

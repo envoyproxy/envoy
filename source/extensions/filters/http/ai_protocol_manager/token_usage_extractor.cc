@@ -145,7 +145,7 @@ Json::ObjectSharedPtr readObject(const Json::Object& json, const std::string& ke
   auto object_or = json.getObject(key);
   if (!object_or.ok()) {
     // Present but not an object: scalars and arrays are always malformed;
-    // null follows the position's documented nullability.
+    // null follows the position's documented null handling.
     if (json.getValue(key).ok() || presentValueIsContainer(json, key) ||
         null_policy == NullPolicy::NullIsMalformed) {
       malformed = true;
@@ -434,7 +434,7 @@ ApiFormat TokenUsageExtractor::detectFormat(const Json::Object& json) {
     // Anthropic markers need their documented companion structure: bare
     // `type` strings are generic, and a genuine stream always presents
     // message_start (nested Message) or a non-streaming Message (role/usage)
-    // before any usage, so skipping structureless types loses nothing.
+    // before any usage, so skipping the bare event types loses nothing.
     bool discard = false;
     if (type_view == "message") {
       if (readString(json, JsonKeys::get().Role).has_value() ||

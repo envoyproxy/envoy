@@ -26,7 +26,7 @@ constexpr absl::string_view SseContentType{"text/event-stream"};
 constexpr absl::string_view JsonContentType{"application/json"};
 // Sized so that ordinary OpenAI Responses API terminal lifecycle events --
 // which embed the complete response object, generated output included -- are
-// extractable by default; see the proto for the rationale.
+// extracted by default; see the proto for the rationale.
 constexpr uint32_t DefaultMaxEventSize = 1024 * 1024;
 constexpr uint32_t DefaultMaxInspectedBodySize = 4 * 1024 * 1024;
 // Far above ordinary streams (hundreds to low thousands of events) while

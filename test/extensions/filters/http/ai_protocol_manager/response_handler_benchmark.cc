@@ -1,7 +1,7 @@
 // Benchmarks for SSE response token-usage extraction. Guards the scanner's
 // linear-work property (previously asserted via production counters): the
-// per-byte cost must stay flat across fragmentation granularities, and a
-// content-delta-dominated stream must not regress superlinearly with length.
+// per-byte cost must stay flat across frame sizes, and a
+// content-delta-dominated stream must stay linear in stream length.
 //
 // Run with:
 //   bazel run //test/extensions/filters/http/ai_protocol_manager:response_handler_benchmark

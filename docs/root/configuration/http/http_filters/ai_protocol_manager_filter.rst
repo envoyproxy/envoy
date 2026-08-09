@@ -103,7 +103,7 @@ account-charged copy, bounded by the cap). Only the retained copy is
 account-charged: the transient allocations of parsing a completed event or
 body (the assembled event data string and the JSON document tree) are
 short-lived, bounded by the same caps, and not charged. Named events that
-cannot carry usage (keep-alives, content deltas, non-terminal OpenAI
+cannot carry usage (keepalives, content deltas, non-terminal OpenAI
 Responses lifecycle events) are dropped on their ``event:`` line alone,
 before any payload is assembled or parsed, and per-stream parse work is
 bounded by :ref:`max_parsed_events
@@ -328,7 +328,7 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
 
   token_usage_found, Counter, A response yielded token usage and metadata was written (includes ``partial`` records).
   token_usage_partial, Counter, A published record was flagged ``extraction_status: partial``.
-  token_usage_missing, Counter, A handled response ended without extractable usage.
+  token_usage_missing, Counter, A handled response ended with no usage to extract.
   token_usage_total_mismatch, Counter, The provider-reported total disagreed with the canonical input + output sum (``reported_total_tokens`` was emitted).
   token_usage_duplicate, Counter, Publication skipped because another installation of the filter had already published the namespace for this stream.
   malformed_usage_field, Counter, "A document carried a known usage field with an unusable value (wrong type, negative, fractional, or out of range); the response is flagged partial."

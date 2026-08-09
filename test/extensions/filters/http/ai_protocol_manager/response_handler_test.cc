@@ -131,7 +131,7 @@ TEST_F(ResponseHandlerTest, SseAnthropicNamedEventsCumulative) {
 
 TEST_F(ResponseHandlerTest, PingDoesNotPoisonAutoDetection) {
   // A bare JSON heartbeat is a weak marker any gateway may emit: it must not
-  // lock the stream format, or a subsequent OpenAI stream would be misparsed.
+  // lock the stream format, or a subsequent OpenAI stream would be misread.
   SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
   feed(handler,
        "data: {\"type\":\"ping\"}\n\n"
@@ -535,7 +535,7 @@ TEST_F(ResponseHandlerTest, MalformedFinalUsageFieldsMarkPartial) {
 }
 
 TEST_F(ResponseHandlerTest, GenericMessageEventDoesNotPoisonAutoDetection) {
-  // A structureless `{"type":"message"}` from a non-Anthropic gateway must not
+  // A bare `{"type":"message"}` from a non-Anthropic gateway must not
   // lock the stream; the later OpenAI usage chunk still detects and extracts.
   SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
   feed(handler,

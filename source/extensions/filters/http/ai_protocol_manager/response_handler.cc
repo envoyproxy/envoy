@@ -48,7 +48,7 @@ std::optional<absl::string_view> sseEventTypeView(absl::string_view region) {
 // before the event's data is assembled or parsed. Unnamed events (OpenAI Chat
 // Completions) cannot be classified and are bounded by the parse budget.
 bool skippableEventType(absl::string_view event_type) {
-  // Anthropic keep-alives and content deltas.
+  // Anthropic keepalives and content deltas.
   if (event_type == "ping" || absl::StartsWith(event_type, "content_block")) {
     return true;
   }
@@ -273,7 +273,7 @@ void SseResponseHandler::onEndStream() {
 void SseResponseHandler::processSseEvent(absl::string_view event) {
   const auto parsed_event = Http::Sse::SseParser::parseEvent(event);
   if (!parsed_event.data.has_value() || parsed_event.data.value().empty()) {
-    // Comment-only keep-alives and events without data are normal; skip.
+    // Comment-only keepalives and events without data are normal; skip.
     return;
   }
   const std::string& data = parsed_event.data.value();

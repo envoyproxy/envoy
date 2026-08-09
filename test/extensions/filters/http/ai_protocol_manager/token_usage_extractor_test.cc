@@ -378,7 +378,7 @@ TEST(TokenUsageTest, PresentButInvalidFieldsAreFlaggedMalformed) {
                                   std::string(R"({"usage":"not-an-object"})")}) {
     EXPECT_TRUE(TokenUsageExtractor::extract(ApiFormat::Anthropic, *parse(body)).malformed) << body;
   }
-  // Nullability is position-specific. OpenAI documents `"usage": null` as the
+  // Null handling is specific to the position. OpenAI documents `"usage": null` as the
   // placeholder on non-terminal chunks (and failed responses): benignly
   // absent, not malformed, and not degraded.
   EXPECT_FALSE(
@@ -411,7 +411,7 @@ TEST(TokenUsageTest, PresentButInvalidFieldsAreFlaggedMalformed) {
 }
 
 TEST(TokenUsageTest, NullCountRegressionScenario) {
-  // The reviewer repro: a final cumulative message_delta whose output_tokens
+  // The reviewer reproduction: a final cumulative message_delta whose output_tokens
   // is null must flag the stream, so the surviving earlier count publishes as
   // partial rather than complete.
   TokenUsage accumulated;
