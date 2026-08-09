@@ -56,6 +56,21 @@ public:
   }
 
   /**
+   * Abort existing warming update to ensure the init watcher will never be notified.
+   *
+   * NOTE: please ensure this is called before we update the warming state with the new update.
+   * Because the destruction of the configuration may trigger the init manager to be notified
+   * synchronously and result in the onWarmed being called to a dirty/modifying warming state.
+   */
+  void abortWarming() {
+    if (init_manager_ != nullptr) {
+      init_watcher_.reset();
+      mayDeferDeleteInitManager();
+      update_id_.clear();
+    }
+  }
+
+  /**
    * Takes ownership of the init manager created by createInitManager(), without starting to warm
    * it up yet. If a previous update is still warming up it is abandoned here, as this update
    * supersedes it. Warming only starts when startWarming() is called, so that the caller can
@@ -74,6 +89,8 @@ public:
   void startWarming();
 
   bool warming() const { return init_manager_ != nullptr; }
+
+  absl::string_view updateId() const { return update_id_; }
 
 private:
   // Called when everything that registered to the init manager of the update that is warming up is
@@ -113,7 +130,8 @@ struct WarmingConfigState {
   }
 };
 
-class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
+class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver,
+                                      protected Logger::Loggable<Logger::Id::rds> {
 public:
   RouteConfigUpdateReceiverImpl(ConfigTraits& config_traits, ProtoTraits& proto_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context);
@@ -146,6 +164,11 @@ public:
 
 private:
   friend class Envoy::Router::RouteConfigUpdateReceiverImpl;
+
+  void updateState(std::unique_ptr<Protobuf::Message> route_config_proto,
+                   std::optional<uint64_t> hash, absl::string_view version_info,
+                   ConfigConstSharedPtr config,
+                   std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id);
 
   void onConfigWarmed();
 

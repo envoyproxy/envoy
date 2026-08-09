@@ -9,17 +9,7 @@ namespace Rds {
 
 void ConfigWarmer::updateInitManager(std::unique_ptr<Init::ManagerImpl> init_manager,
                                      absl::string_view update_id) {
-  if (init_manager_ != nullptr) {
-    // A previous update is still warming up. This update supersedes it: the route configuration it
-    // would have published has already been replaced, so drop its watcher and init manager and
-    // never publish it.
-    ENVOY_LOG(debug,
-              "rds: update {} superseded update {} while it was still warming up, abandoning "
-              "the superseded update",
-              update_id, update_id_);
-    init_watcher_.reset();
-    mayDeferDeleteInitManager();
-  }
+  ASSERT(init_manager_ == nullptr);
   update_id_ = std::string(update_id);
   // Assigning the watcher first drops the abandoned watcher while its init manager is still around.
   // That is safe, the manager only holds a weak handle to it.
@@ -36,13 +26,7 @@ void ConfigWarmer::startWarming() {
 }
 
 void ConfigWarmer::onWarmed() {
-  // Drop the watcher right away, so that nothing can call back into this warmer.
-  init_watcher_.reset();
-  // The init manager can't be dropped here because it may be destroyed from inside its own
-  // initialize() method.
-  mayDeferDeleteInitManager();
-  init_manager_.reset();
-  update_id_.clear();
+  abortWarming();
 
   if (on_warmed_callback_) {
     on_warmed_callback_();
@@ -84,8 +68,7 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
 void RouteConfigUpdateReceiverImpl::updateConfig(
     std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
     absl::string_view version_info) {
-
-  const std::string update_id =
+  std::string update_id =
       fmt::format("rds {}:{}", resourceName(proto_traits_, *route_config_proto), version_info);
   // The init manager is kept local until the new route configuration is known to be built without
   // throwing, so that a rejected update leaves a previous update that is still warming up alone.
@@ -93,6 +76,22 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
   auto config =
       config_traits_.createConfig(*route_config_proto, factory_context_, *update_init_manager,
                                   false /* not validate unknown cluster */);
+
+  updateState(std::move(route_config_proto), hash, version_info, std::move(config),
+              std::move(update_init_manager), std::move(update_id));
+}
+
+void RouteConfigUpdateReceiverImpl::updateState(
+    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
+    absl::string_view version_info, ConfigConstSharedPtr config,
+    std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id) {
+  // Abort a previous warming update first to ensure the init watcher will never be notified when
+  // destroying the previous configuration.
+  if (warmer_.warming()) {
+    ENVOY_LOG(debug, "rds: update {} superseded update {} while it was still warming up", update_id,
+              warmer_.updateId());
+    warmer_.abortWarming();
+  }
 
   warming_state_.route_config_proto_ = std::move(route_config_proto);
   warming_state_.config_ = std::move(config);
@@ -108,7 +107,7 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
 
   // The new route configuration has been built but isn't warmed up or published yet. The caller
   // finishes applying the update and then calls startWarming().
-  warmer_.updateInitManager(std::move(update_init_manager), update_id);
+  warmer_.updateInitManager(std::move(update_init_manager), std::move(update_id));
 }
 
 // Rds::RouteConfigUpdateReceiver
