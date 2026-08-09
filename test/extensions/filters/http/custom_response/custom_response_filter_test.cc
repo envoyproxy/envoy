@@ -71,8 +71,10 @@ TEST_F(CustomResponseFilterTest, LocalData) {
   ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
             ::Envoy::Http::FilterHeadersStatus::Continue);
+  // Default policy clears response_code_details (legacy behavior).
+  encoder_callbacks_.stream_info_.response_code_details_ = "csrf_origin_mismatch";
   EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(static_cast<::Envoy::Http::Code>(499), "not allowed", _, _, _));
+              sendLocalReply(static_cast<::Envoy::Http::Code>(499), "not allowed", _, _, ""));
   ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
       .WillByDefault(Return(&request_headers));
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
@@ -410,6 +412,119 @@ TEST_F(CustomResponseFilterTest, PathRewriteInvalid) {
             path_rewrite: "/new/%INVALID_COMMAND_WITH_NO_CLOSING"
 )EOF"),
                           EnvoyException, "Failed to create path_rewrite formatter");
+}
+
+TEST_F(CustomResponseFilterTest, PreserveResponseCodeDetails) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 403
+          body:
+            inline_string: "forbidden"
+          preserve_response_code_details: true
+)EOF");
+  setupFilterAndCallback();
+
+  encoder_callbacks_.stream_info_.response_code_details_ = "csrf_origin_mismatch";
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden", _, _,
+                             "csrf_origin_mismatch"));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, PreserveResponseCodeDetailsWhenAbsent) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 403
+          body:
+            inline_string: "forbidden"
+          preserve_response_code_details: true
+)EOF");
+  setupFilterAndCallback();
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden", _, _, ""));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, ExplicitResponseCodeDetails) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 403
+          body:
+            inline_string: "forbidden"
+          response_code_details: "custom_error_page"
+)EOF");
+  setupFilterAndCallback();
+
+  encoder_callbacks_.stream_info_.response_code_details_ = "csrf_origin_mismatch";
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden", _, _,
+                             "custom_error_page"));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, PreserveResponseCodeDetailsFalseClears) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 403
+          body:
+            inline_string: "forbidden"
+          preserve_response_code_details: false
+)EOF");
+  setupFilterAndCallback();
+
+  encoder_callbacks_.stream_info_.response_code_details_ = "csrf_origin_mismatch";
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden", _, _, ""));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
 } // namespace
