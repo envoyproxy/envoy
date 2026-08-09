@@ -313,10 +313,18 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
 
 void HttpServerPropertiesCacheImpl::markHttp3Broken(const Origin& origin) {
   getOrCreateHttp3StatusTracker(origin).markHttp3Broken();
-  maybeSetCanonicalOriginForHttp3Brokenness(origin);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness")) {
+    maybeSetCanonicalOriginForHttp3Brokenness(origin);
+  }
 }
 
 bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness")) {
+    return getOrCreateHttp3StatusTracker(origin).isHttp3Broken();
+  }
+
   // Note that we don't create a new tracker for the origin.
   if (auto entry_it = protocols_.find(origin);
       entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
