@@ -1,6 +1,5 @@
 #include "source/common/rds/rds_route_config_subscription.h"
 
-#include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
 #include "source/common/rds/util.h"
 
@@ -119,60 +118,48 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
   }
   // The new route configuration is built and warmed up by the receiver, which calls back into
   // onConfigWarmed() to publish it. Note that this may happen before onRdsUpdate() returns, i.e.
-  // synchronously, if there is nothing to warm up, so the publishing state is reset upfront.
-  publish_status_ = absl::OkStatus();
+  // synchronously, if there is nothing to warm up.
   RETURN_IF_NOT_OK(config_update_info_->onRdsUpdate(route_config, version_info));
-  RETURN_IF_NOT_OK_REF(publish_status_);
 
-  // If the update was applied and there was nothing to warm up, onConfigWarmed() has already run
-  // and signalled readiness, so this is a no-op. Otherwise signal it here, unless an update is
-  // still warming up - that one publishes and signals readiness itself - or unless publishing
-  // failed, in which case nothing should be told that a route configuration is ready.
+  // If the update was applied and there was nothing to warm up, onConfigWarmed() has already
+  // signalled readiness, so this is a no-op. Otherwise signal it here, unless an update is still
+  // warming up - that one publishes and signals readiness itself.
   if (!config_update_info_->configWarming()) {
     local_init_target_.ready();
   }
 
-  // If there was nothing to warm up, onConfigWarmed() has already run and the update was published
-  // before we got here, so a failure can still be reported to the xDS layer as a rejection.
-  // Otherwise the publishing happens later and publish_status_ is still OK here.
-  return publish_status_;
+  return absl::OkStatus();
 }
 
 void RdsRouteConfigSubscription::onConfigWarmed() {
-  Cleanup after_this_update([this]() {
-    // Only signal readiness if the new route configuration actually went live, so that whatever
-    // warms up with this subscription isn't told that a route configuration is ready when it
-    // isn't.
-    //
-    // If the publishing happened synchronously, i.e. if onConfigUpdate() is still on the stack,
-    // the failure is returned to the xDS layer, which rejects the update and calls
-    // onConfigUpdateFailed(). That signals readiness, so server startup isn't blocked by a bad
-    // config. If the publishing happened asynchronously the update has already been accepted, so
-    // there is no such rejection: this subscription stays unready and whatever warms up with it,
-    // e.g. a listener, stays warming. The warning logged below is the only indication of that.
-    if (publish_status_.ok()) {
-      local_init_target_.ready();
-    } else {
-      ENVOY_LOG(warn, "rds: failed to apply the warmed up route config '{}': {}",
-                route_config_name_, publish_status_.message());
-    }
-  });
-
   stats_.config_reload_.inc();
   stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
 
-  publish_status_ = beforeProviderUpdate();
-  RETURN_ONLY_IF_NOT_OK_REF(publish_status_);
+  // None of the statuses below are propagated to the xDS layer: the route configuration is
+  // published regardless, and this is not necessarily running on the xDS update call stack, so
+  // there is nothing left to reject. A failure is only logged. See the comments on the hooks in
+  // the header and on RouteConfigProvider::onConfigUpdate().
+  if (const absl::Status status = beforeProviderUpdate(); !status.ok()) {
+    ENVOY_LOG(warn, "rds: beforeProviderUpdate() failed for route config '{}': {}",
+              route_config_name_, status.message());
+  }
 
   ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
             config_update_info_->configHash());
 
   if (route_config_provider_ != nullptr) {
-    publish_status_ = route_config_provider_->onConfigUpdate();
-    RETURN_ONLY_IF_NOT_OK_REF(publish_status_);
+    if (const absl::Status status = route_config_provider_->onConfigUpdate(); !status.ok()) {
+      ENVOY_LOG(warn, "rds: onConfigUpdate() failed for route config '{}': {}", route_config_name_,
+                status.message());
+    }
   }
 
-  publish_status_ = afterProviderUpdate();
+  if (const absl::Status status = afterProviderUpdate(); !status.ok()) {
+    ENVOY_LOG(warn, "rds: afterProviderUpdate() failed for route config '{}': {}",
+              route_config_name_, status.message());
+  }
+
+  local_init_target_.ready();
 }
 
 absl::Status RdsRouteConfigSubscription::onConfigUpdate(
