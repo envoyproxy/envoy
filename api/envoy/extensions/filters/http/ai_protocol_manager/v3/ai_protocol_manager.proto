@@ -73,6 +73,7 @@ message RequestHandling {
 // <envoy_v3_api_msg_data.ai.v3.TokenUsage>`, full ``uint64`` precision) and
 // an equivalent untyped ``Struct`` projection for consumers that only read
 // untyped metadata (access-log formatters, CEL).
+// [#next-free-field: 6]
 message ResponseHandling {
   // Extractor selection. A ``oneof`` so that alternatives — most notably a
   // ``config.core.v3.TypedExtensionConfig`` custom extractor for dialects the

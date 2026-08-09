@@ -35,6 +35,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // for the full contract. Every field is optional: dialects report different
 // subsets, and a status-only record (only ``api_format``, ``model``, and
 // ``extraction_status``) is published when extraction failed outright.
+// [#next-free-field: 12]
 message TokenUsage {
   // The wire dialect the response spoke. Deliberately a *format*, not a
   // provider identity: OpenAI-compatible backends legitimately speak a

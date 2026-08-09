@@ -331,7 +331,7 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   token_usage_missing, Counter, A handled response ended without extractable usage.
   token_usage_total_mismatch, Counter, The provider-reported total disagreed with the canonical input + output sum (``reported_total_tokens`` was emitted).
   token_usage_duplicate, Counter, Publication skipped because another installation of the filter had already published the namespace for this stream.
-  malformed_usage_field, Counter, A document carried a known usage field with an unusable value (wrong type\, negative\, fractional\, or out of range); the response is flagged partial.
+  malformed_usage_field, Counter, "A document carried a known usage field with an unusable value (wrong type, negative, fractional, or out of range); the response is flagged partial."
   sse_incomplete_event, Counter, Non-empty SSE input could not form a complete event by end of stream and was discarded; the response is flagged partial.
   sse_event_budget_exhausted, Counter, The stream hit :ref:`max_parsed_events <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.max_parsed_events>`; extraction went inert and the response is flagged partial.
   response_parse_error, Counter, A JSON body or SSE event payload failed to parse (per occurrence; the stream is unaffected).

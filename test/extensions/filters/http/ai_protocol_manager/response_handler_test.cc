@@ -455,12 +455,13 @@ TEST_F(ResponseHandlerTest, SseDiscardBoundaryStraddlesFrames) {
 TEST_F(ResponseHandlerTest, NonObjectJsonShapesTolerated) {
   // Valid JSON whose root or elements are not objects must be skipped without
   // reaching object-only accessors (an IS_ENVOY_BUG path in the JSON impl).
-  for (const std::string body : {std::string("[1]"),
-                                 std::string("[null,{\"usageMetadata\":{\"promptTokenCount\":1,"
-                                             "\"candidatesTokenCount\":2,\"totalTokenCount\":3}}]"),
-                                 std::string("[[1],{\"usageMetadata\":{\"promptTokenCount\":1,"
-                                             "\"candidatesTokenCount\":2,\"totalTokenCount\":3}}]"),
-                                 std::string("\"just-a-string\"")}) {
+  for (const std::string& body :
+       {std::string("[1]"),
+        std::string("[null,{\"usageMetadata\":{\"promptTokenCount\":1,"
+                    "\"candidatesTokenCount\":2,\"totalTokenCount\":3}}]"),
+        std::string("[[1],{\"usageMetadata\":{\"promptTokenCount\":1,"
+                    "\"candidatesTokenCount\":2,\"totalTokenCount\":3}}]"),
+        std::string("\"just-a-string\"")}) {
     JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
     feed(handler, body, 4096);
     if (absl::StrContains(body, "usageMetadata")) {

@@ -369,13 +369,13 @@ TEST(TokenUsageTest, PresentButInvalidFieldsAreFlaggedMalformed) {
   // ...but a known field that is present with an unusable value is: wrong
   // scalar type, wrong container type, negative, fractional, out of range,
   // and a non-object usage node itself.
-  for (const std::string body : {std::string(R"({"usage":{"output_tokens":"5"}})"),
-                                 std::string(R"({"usage":{"output_tokens":{}}})"),
-                                 std::string(R"({"usage":{"output_tokens":[5]}})"),
-                                 std::string(R"({"usage":{"output_tokens":-5}})"),
-                                 std::string(R"({"usage":{"output_tokens":5.5}})"),
-                                 std::string(R"({"usage":{"output_tokens":9007199254740992}})"),
-                                 std::string(R"({"usage":"not-an-object"})")}) {
+  for (const std::string& body : {std::string(R"({"usage":{"output_tokens":"5"}})"),
+                                  std::string(R"({"usage":{"output_tokens":{}}})"),
+                                  std::string(R"({"usage":{"output_tokens":[5]}})"),
+                                  std::string(R"({"usage":{"output_tokens":-5}})"),
+                                  std::string(R"({"usage":{"output_tokens":5.5}})"),
+                                  std::string(R"({"usage":{"output_tokens":9007199254740992}})"),
+                                  std::string(R"({"usage":"not-an-object"})")}) {
     EXPECT_TRUE(TokenUsageExtractor::extract(ApiFormat::Anthropic, *parse(body)).malformed) << body;
   }
   // Nullability is position-specific. OpenAI documents `"usage": null` as the
