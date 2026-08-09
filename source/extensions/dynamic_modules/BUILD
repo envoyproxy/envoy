@@ -14,8 +14,10 @@ envoy_cc_library(
     srcs = [
         "background_fetch_manager.cc",
         "dynamic_module_stats.cc",
-        "dynamic_modules.cc",
-    ],
+    ] + select({
+        "//bazel:windows_x86_64": ["win32/os_sys_calls_impl.cc"],
+        "//conditions:default": ["posix/dynamic_modules.cc"],
+    }),
     hdrs = [
         "background_fetch_manager.h",
         "dynamic_module_stats.h",
@@ -36,6 +38,8 @@ envoy_cc_library(
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
